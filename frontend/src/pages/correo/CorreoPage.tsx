@@ -1216,7 +1216,7 @@ export default function CorreoPage() {
     : false;
 
   return (
-    <div className="flex h-[calc(100dvh-4rem)] flex-col">
+    <div className="flex h-full flex-col">
       {/* Encabezado */}
       <div className="flex items-center gap-3 border-b border-border/60 px-4 py-3">
         {/* En móvil la flecha es la única forma de volver de un mensaje. Y en
@@ -1697,8 +1697,11 @@ export default function CorreoPage() {
         <div className={cn("min-w-0 flex-1", enLista ? (sinDivision ? "hidden" : "hidden md:block") : "block", enProgramados && "!hidden")}>
           {sel === null ? (
             <div className="hidden h-full flex-col items-center justify-center gap-3 md:flex">
-              <div className="flex h-16 w-16 items-center justify-center rounded-3xl bg-gradient-to-br from-accent/10 to-primary/10">
-                <Mail className="h-7 w-7 text-primary/70" />
+              <div className="relative">
+                <div aria-hidden className="pointer-events-none absolute inset-0 -z-10 rounded-full bg-primary/25 blur-2xl" />
+                <div className="flex h-16 w-16 items-center justify-center rounded-3xl border border-white/50 bg-white/55 backdrop-blur-xl shadow-[inset_0_1px_0_rgba(255,255,255,0.6)] dark:border-white/10 dark:bg-white/[0.06]">
+                  <Mail className="h-7 w-7 text-primary/70" />
+                </div>
               </div>
               <p className="text-sm text-muted-foreground">{t("mail.pickOne")}</p>
             </div>
