@@ -1582,7 +1582,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
   const relojPared = new Date(now).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
 
   return (
-    <div className="flex flex-1 min-h-0 bg-background text-foreground relative md:flex-row-reverse">
+    <div className="flex flex-1 min-h-0 text-foreground relative md:flex-row-reverse dark:bg-black/20">
       {/* En escritorio el panel lateral va a la DERECHA (Jhon, 10/09); el orden del
           DOM no cambia, lo invierte flex-row-reverse. En el teléfono el panel es
           una hoja fija y el orden no importa. */}
@@ -1668,7 +1668,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
       <div className={`
         fixed md:relative z-40 md:z-auto
         w-72 xl:w-80 h-[calc(100dvh-3.5rem)] md:h-full
-        md:border-l border-border/60 flex flex-col bg-card
+        md:border-l border-border/60 flex flex-col bg-card/65 backdrop-blur-xl
         transition-transform duration-200 ease-in-out
         ${sidebarCollapsed ? "md:hidden" : ""}
         ${sidebarOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"}
@@ -2316,7 +2316,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                       // card-estudio: la misma elevación de set que los tiles de la
                       // llamada (sombra honda + filo de luz), conservando bg-card y
                       // el borde verde al hablar.
-                      "card-estudio flex min-w-0 flex-col overflow-hidden rounded-2xl border bg-card transition-colors",
+                      "card-estudio flex min-w-0 flex-col overflow-hidden rounded-2xl border bg-card/55 backdrop-blur-xl transition-colors",
                       // Verde cuando alguien está HABLANDO ahora: es lo único que
                       // amerita pintar la tarjeta. Compartir pantalla es lo normal
                       // y ya no colorea el borde; lo anormal (no compartir) sale
@@ -2422,12 +2422,20 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                         175 px, 16:9 daban 98 px y la pausa no cabía). */}
                     <div className={cn(
                       "relative aspect-[4/3] overflow-hidden md:aspect-video",
-                      participants.length === 0 ? "bg-muted/50" : "bg-black/40",
+                      participants.length === 0 ? "bg-black/35" : "bg-black/40",
                     )}>
                       {participants.length === 0 ? (
                         <>
-                          <div className="flex h-full flex-col items-center justify-center gap-1.5 text-muted-foreground/60">
-                            <Users2 className="h-5 w-5" />
+                          {/* Placeholder con GLOW cuando no hay cámara/gente
+                              (look aprobado por Alvaro): círculo de vidrio con
+                              glow de acento, en vez del negro plano. */}
+                          <div className="relative flex h-full flex-col items-center justify-center gap-2.5 text-muted-foreground/70">
+                            <div className="relative">
+                              <div aria-hidden className="pointer-events-none absolute inset-0 -z-10 rounded-full bg-primary/30 blur-2xl" />
+                              <div className="flex h-12 w-12 items-center justify-center rounded-full border border-white/10 bg-white/[0.06] text-primary shadow-[inset_0_1px_0_rgba(255,255,255,0.12)] backdrop-blur-sm">
+                                <Users2 className="h-5 w-5" />
+                              </div>
+                            </div>
                             <span className="text-xs">{t("cowork.host.noParticipants")}</span>
                           </div>
                           {/* El monitor sigue MONTADO aunque no vea a nadie. Antes se
