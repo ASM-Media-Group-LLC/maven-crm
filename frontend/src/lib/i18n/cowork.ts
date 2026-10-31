@@ -728,4 +728,7 @@ export const cowork = {
   "cowork.avisar.sit.pausaAvisar": { es: "Avisa antes de ausentarte", en: "Let us know before stepping away" },
   "cowork.avisar.sit.generalLlamame": { es: "Escríbeme o llámame cuando puedas", en: "Message or call me when you can" },
   "cowork.avisar.sit.generalBuenTrabajo": { es: "Buen trabajo, sigue así", en: "Good work, keep it up" },
+
+  // Monitor de cámara de RRHH: cartelito para la persona monitoreada.
+  "cowork.monitorActivo": { es: "Monitor activo", en: "Monitor on" },
 } as const satisfies Record<string, { es: string; en: string }>;

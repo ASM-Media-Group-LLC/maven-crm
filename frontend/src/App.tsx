@@ -165,6 +165,7 @@ const HROnboardingNew = lazy(() => import("./pages/hr/HROnboardingNew"));
 const HROffboarding = lazy(() => import("./pages/hr/HROffboarding"));
 const HROffboardingNew = lazy(() => import("./pages/hr/HROffboardingNew"));
 const HRMonitoring = lazy(() => import("./pages/hr/HRMonitoring"));
+const HRMonitorIA = lazy(() => import("./pages/hr/HRMonitorIA"));
 const HRDirectoryLookup = lazy(() => import("./pages/hr/HRDirectoryLookup"));
 const HROrganigrama = lazy(() => import("./pages/hr/HROrganigrama"));
 const HRDeductions = lazy(() => import("./pages/hr/HRDeductions"));
@@ -430,6 +431,7 @@ const App = () => (
                 <Route path="/hr/horarios/banco-horas" element={<PermissionRoute module="HR" submodule="Banco de Horas"><HRLayout><HRHourBank /></HRLayout></PermissionRoute>} />
                 <Route path="/hr/horarios-chatters" element={<PermissionRoute module="HR" submodule="Horarios Chatters"><HRLayout><HRChatterSchedules /></HRLayout></PermissionRoute>} />
                 <Route path="/hr/monitoreo" element={<PermissionRoute module="HR" submodule="Monitoreo"><HRLayout><HRMonitoring /></HRLayout></PermissionRoute>} />
+                <Route path="/hr/monitor-ia" element={<PermissionRoute module="HR" submodule="Monitor IA"><HRLayout><HRMonitorIA /></HRLayout></PermissionRoute>} />
                 <Route path="/hr/organizacion/directorio" element={<PermissionRoute module="HR" submodule="Directorio"><HRLayout><HRDirectoryLookup /></HRLayout></PermissionRoute>} />
                 <Route path="/hr/organizacion/organigrama" element={<PermissionRoute module="HR" submodule="Organigrama"><HRLayout><HROrganigrama /></HRLayout></PermissionRoute>} />
                 <Route path="/hr/deducciones" element={<PermissionRoute module="HR" submodule="Deducciones"><HRLayout><HRDeductions /></HRLayout></PermissionRoute>} />

@@ -23,6 +23,7 @@ import { puedeCompartirPantalla } from "@/lib/compartirPantalla";
 import { toast } from "sonner";
 import { useFaceWatch, faceStateLabel, type FaceWatch } from "@/hooks/useFaceWatch";
 import { useFaceNudge, useScreenShareNudge } from "@/hooks/useFaceNudge";
+import { useMonitorCamara } from "@/hooks/useMonitorCamara";
 import { latirEnLlamada, salirDeLlamada, LATIDO_LLAMADA_MS } from "@/lib/llamadaEnMaven";
 import { useRegistrarLlamados } from "@/hooks/useRegistrarLlamados";
 import { esBlur, alternarBlur, leerFondoGuardado, guardarFondo, type BackgroundEffect } from "@/lib/fondoDeLlamada";
@@ -614,6 +615,18 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
   // "prende la cámara" la mandaría a arreglar lo que no está roto, en vez de
   // enterarse de que se cayó la sala (para eso está el cartel).
   useFaceNudge(supervisorEncuadre && conSalaViva ? faceWatch : null);
+  // Monitor de cámara de RRHH: vive JUSTO acá, pegado al supervisor de encuadre,
+  // porque comparte su mismo track y estado y su misma vida (sobrevive a la
+  // ventanita flotante). Registra las faltas gratis (cámara apagada/tapada, se
+  // fue, cara incompleta) y cada ~2 min pasa un frame por la IA (celular/
+  // distraído). Solo en una sala de Cowork viva; el propio hook excluye admins.
+  useMonitorCamara({
+    track: localCameraTrack,
+    camaraRealOn,
+    faceWatch,
+    activo: !!supervisorEncuadre && conSalaViva,
+    roomNombre: roomName,
+  });
   // Cualquier llamada que NO es la sala de Cowork (Messenger, Meet, la 1:1 con
   // el coordinador) deja un latido en localStorage mientras está montada: el
   // supervisor de encuadre de Cowork lo consulta en cada tic y se calla — estar

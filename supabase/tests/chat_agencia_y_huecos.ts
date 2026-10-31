@@ -105,6 +105,9 @@ const FIXTURE_HASTA = "20260929180000";
 // el motivo. Si SÍ cambia el Messenger, lo que hay que hacer es sumar al fixture
 // lo que le falta.
 const NO_TOCAN_EL_MESSENGER: Record<string, string> = {
+  "20261030120000_monitor_camara_ia.sql":
+    "el monitor de cámara de Cowork; solo toca el Messenger porque su trigger inserta avisos en notifications, pero " +
+    "crea sus propias tablas y el bucket de storage, y no aporta nada al Messenger. Se prueba en frontend/test/monitor.",
   "20261009100000_portal_pedidos.sql":
     "solo toca el Messenger porque inserta avisos en notifications (los Personalizados del portal), pero necesita " +
     "custom_requests, creadora_cuentas y drive_items, que este fixture no trae. Se prueba en portal_pedidos.ts.",

@@ -89,6 +89,7 @@ export const ETIQUETAS: Record<string, TranslationKey> = {
   "Vacaciones": "admin.perm.vacation",
   "Permisos": "admin.perm.leave",
   "Monitoreo": "admin.perm.monitoring",
+  "Monitor IA": "admin.perm.monitorIA",
   "Incidentes": "admin.perm.incidents",
   "Desempeño": "admin.perm.hrPerformance",
   "Capacitación": "admin.perm.training",

@@ -32,6 +32,7 @@ import { useLanguage } from "@/hooks/useLanguage";
 import { traducir, type TranslationKey } from "@/lib/i18n";
 import { MENSAJE_LLAMADA_PRIVADA, MENSAJE_PEDIR_AYUDA, NOMBRE_PAUSA } from "./textosCowork";
 import AvisoChatter from "./AvisoChatter";
+import { IndicadorMonitorActivo } from "./IndicadorMonitorActivo";
 import { useRecepcionAvisos } from "./useRecepcionAvisos";
 import {
   DropdownMenu,
@@ -1128,6 +1129,9 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
             t={t}
           />
         )}
+
+        {/* Monitor de RRHH activo: aviso discreto a la persona monitoreada. */}
+        <IndicadorMonitorActivo enSala={!!connectedLkRoom} />
       </div>
     </div>
   );

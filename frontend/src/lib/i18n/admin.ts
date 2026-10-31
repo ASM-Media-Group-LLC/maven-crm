@@ -412,6 +412,7 @@ export const admin = {
   "admin.perm.vacation": { es: "Vacaciones", en: "Vacation" },
   "admin.perm.leave": { es: "Permisos", en: "Leave" },
   "admin.perm.monitoring": { es: "Monitoreo", en: "Monitoring" },
+  "admin.perm.monitorIA": { es: "Monitor IA", en: "AI Monitor" },
   "admin.perm.incidents": { es: "Incidentes", en: "Incidents" },
   "admin.perm.hrPerformance": { es: "Desempeño", en: "Performance" },
   "admin.perm.training": { es: "Capacitación", en: "Training" },

@@ -274,7 +274,7 @@ export const MODULES_CONFIG: ModuleConfig[] = [
     "Dashboard", "Candidatos", "Onboarding", "Empleados Activos", "Offboarding", "Asistencia",
     "Horarios", "Horarios Chatters",
     { name: "Horas Extra", parent: "Horarios" }, { name: "Banco de Horas", parent: "Horarios" },
-    "Vacaciones", "Permisos", "Monitoreo", "Incidentes", "Desempeño", "Capacitación",
+    "Vacaciones", "Permisos", "Monitoreo", "Monitor IA", "Incidentes", "Desempeño", "Capacitación",
     "Directorio", "Organigrama", "Deducciones", "Anuncios",
   ]),
 
