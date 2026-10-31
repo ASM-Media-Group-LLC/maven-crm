@@ -248,18 +248,18 @@ export default function CentroDeOperaciones() {
           <p className="text-sm text-muted-foreground">{t("dashboard.centro.sinProductividad")}</p>
         ) : (
           <div className="flex h-40 items-end gap-2.5 sm:gap-3">
-            {productividad.dias.map((d) => (
+            {productividad.dias.map((d, i) => (
               <div key={d.dia} className="group flex h-full flex-1 flex-col items-center justify-end gap-2">
                 <span className="text-[10px] font-semibold tabular-nums text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100">
                   {horasBonitas(d.horas)}
                 </span>
                 <div
-                  className={`w-full max-w-[38px] rounded-t-lg transition-[filter] group-hover:brightness-110 ${
+                  className={`barra-crece w-full max-w-[38px] rounded-t-lg transition-[filter] group-hover:brightness-110 ${
                     d.esHoy
                       ? "bg-gradient-to-b from-primary to-primary/40 shadow-[0_0_22px_hsl(var(--primary)/0.5)]"
                       : "bg-gradient-to-b from-primary/50 to-primary/10"
                   }`}
-                  style={{ height: `${Math.max(4, (d.horas / maxProd) * 100)}%` }}
+                  style={{ height: `${Math.max(4, (d.horas / maxProd) * 100)}%`, animationDelay: `${0.1 + i * 0.07}s` }}
                 />
                 <span className={`text-[11px] font-semibold ${d.esHoy ? "text-primary" : "text-muted-foreground"}`}>{d.etiqueta}</span>
               </div>
