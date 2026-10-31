@@ -25,7 +25,7 @@ const DashboardTopbar = () => {
           la columna y la barra, como ítem flex, se encogía hasta su contenido
           (perdía ~12 px: se "comía" las campanas). Con shrink-0 la barra mide
           siempre sus 56 px y es la pantalla la que se acomoda. */}
-      <header className="sticky top-0 z-30 box-content flex h-14 shrink-0 items-center gap-2 border-b border-white/10 bg-background/60 px-3 pt-safe backdrop-blur-xl sm:gap-4 sm:px-4">
+      <header className="vidrio-barra z-30 box-content flex h-14 shrink-0 items-center gap-2 px-3 pt-safe sm:gap-4 sm:px-4">
         <SidebarTrigger />
 
         {/* min-w-0 + truncate: sin esto el texto del buscador (que no parte) fija

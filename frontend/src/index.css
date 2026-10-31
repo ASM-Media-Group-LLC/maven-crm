@@ -1224,6 +1224,38 @@ All colors MUST be HSL. Light mode in :root, dark mode in .dark.
 .glow-v { --glow: rgba(179,155,255,.22); }
 :root[data-contrast="high"] .vidrio-glow::before { display: none; }
 
+/* PANELES FLOTANTES DEL CASCARÓN (como el link: riel, barra y contenido son
+   islas de vidrio separadas con aire; por los huecos asoma la atmósfera).
+   .vidrio-panel = el área de contenido; .vidrio-barra = la barra de arriba.
+   El panel de contenido NO lleva backdrop-filter (es un área enorme que
+   scrollea con data densa — el blur ahí es caro); el riel y la barra sí. */
+.vidrio-panel {
+  border-radius: 20px;
+  background: linear-gradient(160deg, rgba(255,255,255,.60), rgba(255,255,255,.42));
+  border: 1px solid rgba(20,30,60,.08);
+  box-shadow: 0 1px 2px rgba(30,40,70,.05), 0 18px 44px rgba(30,40,70,.12), inset 0 1px 0 rgba(255,255,255,.85);
+}
+.dark .vidrio-panel {
+  background: linear-gradient(160deg, rgba(255,255,255,.055), rgba(255,255,255,.02));
+  border: 1px solid rgba(255,255,255,.08);
+  box-shadow: 0 22px 54px rgba(0,0,0,.5), inset 0 1px 0 rgba(255,255,255,.1);
+}
+.vidrio-barra {
+  border-radius: 16px;
+  background: linear-gradient(160deg, rgba(255,255,255,.70), rgba(255,255,255,.50));
+  border: 1px solid rgba(20,30,60,.09);
+  -webkit-backdrop-filter: blur(20px) saturate(1.2);
+  backdrop-filter: blur(20px) saturate(1.2);
+  box-shadow: 0 1px 2px rgba(30,40,70,.05), 0 12px 30px rgba(30,40,70,.1), inset 0 1px 0 rgba(255,255,255,.9);
+}
+.dark .vidrio-barra {
+  background: linear-gradient(160deg, rgba(255,255,255,.08), rgba(255,255,255,.03));
+  border: 1px solid rgba(255,255,255,.09);
+  box-shadow: 0 16px 38px rgba(0,0,0,.4), inset 0 1px 0 rgba(255,255,255,.12);
+}
+:root[data-contrast="high"] .vidrio-panel,
+:root[data-contrast="high"] .vidrio-barra { background: hsl(var(--card)); box-shadow: none; }
+
 /* CLARO (día): escena de ventanales al atardecer — el ámbar fuerte abajo al
    centro, violeta arriba-izq, azul arriba-der, sobre un degradado cálido
    crema→frío. Valores literales del mockup aprobado ("Maven Glass"). */

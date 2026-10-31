@@ -82,19 +82,30 @@ const AppShell = () => {
     <TypingInboxProvider>
     <ChatProvider>
     <MessengerDockProvider>
-    <SidebarProvider>
+    {/* defaultOpen=false: el menú arranca como RIEL fino de iconos (la barra
+        del link). Nada se pierde — cada icono abre su menú flotante con todo, y
+        el riel se puede expandir con su tirador o ⌘B. */}
+    <SidebarProvider defaultOpen={false}>
       {/* alto-de-la-app = h-dvh (no h-screen: en mobile el alto dinámico descuenta el
           teclado virtual y la barra del navegador, así el composer del Messenger no
           queda tapado) MÁS la compensación de la PWA instalada de iPhone, donde 100dvh
           se queda corto en el alto de la barra de estado (ver lib/altoDeLaApp.ts). */}
+      {/* Cascarón FLOTANTE (como el link): el riel ya flota con su propio aire
+          (variant floating); la columna derecha agrega aire arriba/derecha/abajo
+          y separa la barra del contenido. Por los huecos asoma la atmósfera
+          (.fondo-glass-sutil). El contenido vive dentro de un panel de vidrio.
+          El cascarón nunca scrollea (overflow-hidden + alto fijo): cada página
+          maneja su propio scroll adentro — contrato que ya existía. */}
       <div className="fondo-glass-sutil flex alto-de-la-app w-full overflow-hidden">
         <DashboardSidebar />
-        <div className="flex flex-1 flex-col min-w-0">
+        <div className="flex flex-1 flex-col min-w-0 gap-2 py-2 pr-2">
           <DashboardTopbar />
           <BackToDashboardBar />
-          <Suspense fallback={<ContentLoadingFallback />}>
-            <Outlet />
-          </Suspense>
+          <main className="vidrio-panel relative flex flex-1 flex-col min-h-0 overflow-hidden">
+            <Suspense fallback={<ContentLoadingFallback />}>
+              <Outlet />
+            </Suspense>
+          </main>
         </div>
       </div>
       {popups.length > 0 && <AnnouncementPopup popups={popups} />}

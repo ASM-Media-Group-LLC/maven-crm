@@ -415,7 +415,7 @@ const DashboardSidebar = () => {
   // qué pasó y se puede reintentar sin recargar la página.
   if (permisosCargando || permisosFallaron) {
     return (
-      <Sidebar collapsible="icon">
+      <Sidebar collapsible="icon" variant="floating">
         <SidebarHeader className="flex h-14 flex-row items-center justify-start px-5 border-b border-border shrink-0">
           <Link
           to="/dashboard"
@@ -448,7 +448,7 @@ const DashboardSidebar = () => {
   }
 
   return (
-    <Sidebar collapsible="icon">
+    <Sidebar collapsible="icon" variant="floating">
       {/* Rediseño 09/2026: la marca va centrada y con aire arriba (como en el
           resto de las plataformas de Unlimited), sin línea debajo: el menú
           arranca solo. En el rail plegado queda la baldosa. */}
