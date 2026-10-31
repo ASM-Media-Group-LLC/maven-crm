@@ -1049,7 +1049,14 @@ All colors MUST be HSL. Light mode in :root, dark mode in .dark.
   position: relative;
   border: 1px solid hsl(var(--border));
   border-radius: 1rem;
-  background: hsl(var(--card) / .62);
+  /* Glow de acento SUTIL en la esquina para que hasta las salas vacías sientan
+     el color (Alvaro, 31/10: "no se aplica el color en Cowork"). Las salas con
+     gente (--viva) pisan este background con su propio degradé, así que esto
+     solo toca a las vacías. El background respeta el border-radius: sin overflow
+     que recorte el menú ni los avatares. */
+  background:
+    radial-gradient(62% 80% at 92% 0%, hsl(var(--primary) / .07), transparent 60%),
+    hsl(var(--card) / .62);
   -webkit-backdrop-filter: blur(16px) saturate(150%);
   backdrop-filter: blur(16px) saturate(150%);
   box-shadow:
