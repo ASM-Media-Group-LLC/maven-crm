@@ -87,7 +87,7 @@ const AppShell = () => {
           teclado virtual y la barra del navegador, así el composer del Messenger no
           queda tapado) MÁS la compensación de la PWA instalada de iPhone, donde 100dvh
           se queda corto en el alto de la barra de estado (ver lib/altoDeLaApp.ts). */}
-      <div className="flex alto-de-la-app w-full overflow-hidden">
+      <div className="fondo-glass-sutil flex alto-de-la-app w-full overflow-hidden">
         <DashboardSidebar />
         <div className="flex flex-1 flex-col min-w-0">
           <DashboardTopbar />

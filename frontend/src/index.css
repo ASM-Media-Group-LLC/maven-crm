@@ -1214,6 +1214,25 @@ All colors MUST be HSL. Light mode in :root, dark mode in .dark.
 /* Alto contraste: se apaga la atmósfera (prima la legibilidad). */
 :root[data-contrast="high"] .fondo-glass { background: hsl(var(--background)); }
 
+/* Versión SOBRIA del ambiente, para el fondo de TODA la app (pantallas de
+   trabajo): un guiño de profundidad muy tenue que no estorba la lectura. El
+   fondo completo (.fondo-glass) se reserva para inicio/dashboard y Cowork. */
+.fondo-glass-sutil {
+  background:
+    radial-gradient(72% 55% at 50% 104%, hsl(32 80% 58% / .07), transparent 60%),
+    radial-gradient(54% 52% at 6% -2%, hsl(258 50% 56% / .05), transparent 58%),
+    hsl(var(--background));
+  background-attachment: fixed;
+}
+.dark .fondo-glass-sutil {
+  background:
+    radial-gradient(74% 56% at 50% 106%, hsl(214 64% 46% / .09), transparent 60%),
+    radial-gradient(56% 54% at 4% -4%, hsl(258 52% 50% / .08), transparent 58%),
+    hsl(var(--background));
+  background-attachment: fixed;
+}
+:root[data-contrast="high"] .fondo-glass-sutil { background: hsl(var(--background)); }
+
 /* Áreas seguras del teléfono (notch, barra de inicio). Valen 0 donde no aplica,
    así que van sin condición y no cambian nada en escritorio. Con
    viewport-fit=cover (index.html) el contenido de la PWA instalada en iPhone
