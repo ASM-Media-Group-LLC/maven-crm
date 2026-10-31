@@ -38,7 +38,9 @@ const HRLayout = ({ children }: { children: React.ReactNode }) => {
           </Button>
         </div>
       )}
-      <div className="flex-1 min-h-0 overflow-hidden">{children}</div>
+      {/* flex flex-col: sin esto el <Page> hijo (flex-1 min-h-0 overflow-y-auto)
+          no agarra altura y el scroll propio de la página no funciona. */}
+      <div className="flex flex-1 min-h-0 flex-col overflow-hidden">{children}</div>
     </div>
   );
 };
