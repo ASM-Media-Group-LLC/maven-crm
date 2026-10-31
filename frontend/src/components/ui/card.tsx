@@ -15,7 +15,7 @@ const Card = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElemen
       // logra con bg-card/80 + gradient + ring blanco sutil. El blur
       // queda reservado para Dialog/Popover/Sheet donde no hay hover
       // de elementos animados.
-      "rounded-xl border border-white/10 bg-card/80 bg-gradient-to-br from-white/[0.02] to-transparent text-card-foreground shadow-sm ring-1 ring-white/5",
+      "rounded-xl border border-white/10 bg-card/[0.72] bg-gradient-to-br from-white/[0.02] to-transparent text-card-foreground shadow-sm ring-1 ring-white/5",
       className,
     )}
     {...props}

@@ -283,7 +283,7 @@ export default function CoworkPage() {
   // No session selected → landing
   if (!sessionId) {
     return (
-      <div className="flex-1 min-h-0 overflow-y-auto">
+      <div className="fondo-glass flex-1 min-h-0 overflow-y-auto">
       <div className="flex flex-col gap-6 p-4 md:p-6">
         {/* Encabezado de la pantalla: va ARRIBA y las listas de salas abajo
             (pedido de Jhon, 03/09/2026). Al dejar de ser un pie se le bajó el

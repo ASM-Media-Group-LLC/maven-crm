@@ -61,7 +61,7 @@ function TarjetaKpi({ icono: Icono, etiqueta, valor, detalle, tono = "primary" }
     : tono === "warning" ? "bg-warning/10 text-warning"
     : "bg-primary/10 text-primary";
   return (
-    <div className="rounded-card border border-border bg-card p-4 flex flex-col gap-3">
+    <div className="rounded-card border border-border bg-card/[0.72] p-4 flex flex-col gap-3">
       <div className="flex items-center gap-2.5">
         <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-panel ${chip}`}>
           <Icono className="h-[18px] w-[18px]" />
@@ -139,7 +139,7 @@ export default function CentroDeOperaciones() {
   };
 
   return (
-    <div className="p-4 md:p-6 space-y-5">
+    <div className="fondo-glass p-4 md:p-6 space-y-5">
       {/* Cabecera */}
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
@@ -199,7 +199,7 @@ export default function CentroDeOperaciones() {
       </div>
 
       {/* Salas en vivo */}
-      <section className="rounded-card border border-border bg-card p-4">
+      <section className="rounded-card border border-border bg-card/[0.72] p-4">
         <div className="mb-3 flex items-center justify-between gap-3">
           <h2 className="flex items-center gap-2 text-sm font-semibold">
             <span className="flex h-7 w-7 items-center justify-center rounded-panel bg-primary/10 text-primary"><DoorOpen className="h-4 w-4" /></span>
