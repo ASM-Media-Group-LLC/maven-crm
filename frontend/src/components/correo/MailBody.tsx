@@ -218,7 +218,7 @@ export function MailBody({ html, text, remoteImages, truncated }: Props) {
         srcDoc={srcDoc}
         sandbox="allow-same-origin allow-popups allow-popups-to-escape-sandbox"
         referrerPolicy="no-referrer"
-        className="w-full rounded-2xl border-0 bg-white"
+        className="w-full rounded-2xl border-0 bg-white shadow-[0_10px_40px_-12px_rgba(0,0,0,0.5)] ring-1 ring-black/5 dark:ring-white/10"
         style={{ height: alto }}
       />
 
