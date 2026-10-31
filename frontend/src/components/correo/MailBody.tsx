@@ -163,7 +163,10 @@ export function MailBody({ html, text, remoteImages, truncated }: Props) {
         // body/documentElement nunca bajan del alto del propio iframe.
         const medida = doc.getElementById("medida");
         const h = medida
-          ? Math.ceil(medida.getBoundingClientRect().height) + 32   // + el padding del body
+          // max con scrollHeight: si el contenido mide un pelín más que
+          // #medida+padding (márgenes, &nbsp; finales), no queda un scroll fino
+          // dentro de la cajita — se ajusta al correo de verdad.
+          ? Math.max(Math.ceil(medida.getBoundingClientRect().height) + 32, doc.body.scrollHeight)
           : Math.max(doc.body.scrollHeight, doc.documentElement.scrollHeight);
         // ⚠️ El piso estaba en 96 y una respuesta de una palabra quedaba en
         // una tarjeta blanca medio vacía. 44 es una línea con su padding: lo

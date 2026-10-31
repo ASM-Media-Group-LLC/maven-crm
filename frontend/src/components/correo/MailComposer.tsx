@@ -1315,13 +1315,17 @@ export function MailComposer({ abierto, onCerrar, onVerProgramados, inicial, rem
               blanco en Gmail/Outlook, y las tintas de la paleta (incluido el
               negro) están pensadas para ese fondo. Con editor oscuro, elegir
               negro dejaba el texto invisible al escribir. */}
-          <div className="mail-composer-row flex-1 bg-white px-5 py-4">
+          <div className="mail-composer-row flex-1 bg-white px-5 py-4 dark:bg-[#15171f]">
             <div
               data-ancla-del-cuerpo
               className={cn(
                 // `relative`: es el ancla de la lista de menciones, que se abre
                 // hacia arriba desde el cuerpo.
-                "relative text-[#1f2937]",
+                // En OSCURO el área se ve oscura con texto claro (como Gmail de
+                // noche). Es SOLO display por CSS: el HTML que se envía no lleva
+                // este color, así que quien recibe lo ve normal (negro sobre
+                // blanco). Ojo: elegir "negro" de la paleta se verá oscuro aquí.
+                "relative text-[#1f2937] dark:text-slate-100",
                 // Tailwind resetea listas y citas: se restauran SOLO adentro
                 // del editor, con los mismos valores que htmlParaCorreo.
                 "[&_ul]:list-disc [&_ul]:pl-6 [&_ol]:list-decimal [&_ol]:pl-6",
