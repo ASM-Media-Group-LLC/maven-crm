@@ -7,6 +7,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useLanguage } from "@/hooks/useLanguage";
 import type { TranslationKey } from "@/lib/i18n";
 import { esCuentaDeCreadora } from "@/lib/portal/cuenta";
+import { PORTAL_CERRADO } from "@/lib/modulosOcultos";
 import {
   type FichaDeAgencia,
   guardarFichaActiva,
@@ -116,6 +117,9 @@ export default function PortalLayout() {
   }
   if (!user) return <Navigate to="/portal/entrar" replace state={{ from: location }} />;
   if (!esCreadora) return <Navigate to="/dashboard" replace />;
+  // Portal cerrado (recorte reversible): la creadora va al aviso de cerrado que
+  // vive en /portal/entrar. Reabrir = PORTAL_CERRADO = false en lib/modulosOcultos.ts.
+  if (PORTAL_CERRADO) return <Navigate to="/portal/entrar" replace />;
 
   if (fichas.isLoading) {
     return (

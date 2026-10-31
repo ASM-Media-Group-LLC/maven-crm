@@ -230,6 +230,43 @@ describe("canAccess", () => {
   });
 
   // -------------------------------------------------------------------------
+  describe("recorte reversible (modulosOcultos)", () => {
+    it("esconde Creadores y Creator Sales al equipo, aunque el rol los tenga concedidos", async () => {
+      // Arrange: el rol SÍ tiene acceso explícito a los tres.
+      setupViewer([
+        { module: "Creadores", submodule: null, can_access: true, data_scope: "all" },
+        { module: "Creator Sales", submodule: "Dashboard", can_access: true, data_scope: "all" },
+        { module: "Contactos", submodule: null, can_access: true, data_scope: "all" },
+      ]);
+      const wrapper = makeWrapper(viewerAuth);
+
+      // Act
+      const { result } = renderHook(() => usePermissions(), { wrapper });
+      await waitFor(() => expect(result.current.isLoading).toBe(false));
+
+      // Assert: el interruptor gana sobre el permiso del rol...
+      expect(result.current.canAccess("Creadores")).toBe(false);
+      expect(result.current.canAccess("Creator Sales", "Dashboard")).toBe(false);
+      // ...pero solo sobre los módulos apagados: el resto sigue igual.
+      expect(result.current.canAccess("Contactos")).toBe(true);
+    });
+
+    it("al admin NO le esconde nada (el interruptor va después del bypass)", async () => {
+      // Arrange
+      stub.setUserRole(adminUser.id, "admin");
+      const wrapper = makeWrapper(adminAuth);
+
+      // Act
+      const { result } = renderHook(() => usePermissions(), { wrapper });
+      await waitFor(() => expect(result.current.isLoading).toBe(false));
+
+      // Assert
+      expect(result.current.canAccess("Creadores")).toBe(true);
+      expect(result.current.canAccess("Creator Sales", "Dashboard")).toBe(true);
+    });
+  });
+
+  // -------------------------------------------------------------------------
   describe("empty permissions edge cases", () => {
     it("should not throw when permissions are empty and multiple canAccess calls are made", async () => {
       // Arrange

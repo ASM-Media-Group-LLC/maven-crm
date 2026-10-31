@@ -245,6 +245,13 @@ export const portal = {
   "portal.entrar.faltan": { es: "Escribe tu correo y tu contraseña.", en: "Enter your email and password." },
   "portal.entrar.error": { es: "No pudimos entrar", en: "We couldn't sign you in" },
 
+  // ── Portal cerrado (recorte reversible) ─────────────────────────────────────
+  "portal.cerrado.titulo": { es: "El portal está cerrado por ahora", en: "The portal is closed for now" },
+  "portal.cerrado.detalle": {
+    es: "Estamos haciendo cambios. Más adelante podrás volver a entrar a tu espacio.",
+    en: "We're making changes. You'll be able to sign back in to your space later.",
+  },
+
   // ── La agencia: pestaña Portal del perfil de la creadora ────────────────────
   "portal.acceso.tab": { es: "Portal", en: "Portal" },
   "portal.acceso.titulo": { es: "Acceso al portal", en: "Portal access" },

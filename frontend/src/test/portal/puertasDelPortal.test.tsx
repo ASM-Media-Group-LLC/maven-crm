@@ -18,6 +18,14 @@ vi.mock("@/hooks/useAuth", () => ({
 }));
 const rpc = vi.hoisted(() => vi.fn());
 vi.mock("@/integrations/supabase/client", () => ({ supabase: { rpc } }));
+// El interruptor de recorte: por default el portal está ABIERTO (las puertas de
+// siempre). Cada test del portal cerrado lo prende. Getter para que PortalLayout
+// lea el valor vivo en cada caso.
+const sw = vi.hoisted(() => ({ portalCerrado: false }));
+vi.mock("@/lib/modulosOcultos", () => ({
+  get PORTAL_CERRADO() { return sw.portalCerrado; },
+  esModuloOculto: () => false,
+}));
 
 import ProtectedRoute from "@/components/ProtectedRoute";
 import PortalLayout from "@/pages/portal/PortalLayout";
@@ -46,6 +54,7 @@ function montar(ruta: string) {
 }
 
 beforeEach(() => {
+  sw.portalCerrado = false;
   rpc.mockReset();
   rpc.mockResolvedValue({
     data: [{ creator_id: "c1", tenant_id: "t1", agencia: "ASM Tech", nombre: "Sofía", nombre_artistico: "Sofi", foto: null }],
@@ -100,5 +109,29 @@ describe("las puertas", () => {
     expect(screen.getAllByText("Sofi").length).toBeGreaterThan(0);
     expect(rpc).toHaveBeenCalledWith("portal_mis_agencias");
     expect(rpc).toHaveBeenCalledWith("portal_hola", { p_creator: "c1" });
+  });
+});
+
+describe("el portal cerrado (recorte reversible)", () => {
+  it("una creadora que entra al portal cerrado va a la puerta (aviso de cerrado)", async () => {
+    sw.portalCerrado = true;
+    sesion.user = CREADORA;
+    montar("/portal");
+    expect(await screen.findByText("entrar al portal")).toBeTruthy();
+    expect(screen.queryByText("inicio del portal")).toBeNull();
+  });
+
+  it("el equipo que cae en el portal cerrado sigue volviendo a su Maven", async () => {
+    sw.portalCerrado = true;
+    sesion.user = EMPLEADO;
+    montar("/portal");
+    expect(await screen.findByText("crm del equipo")).toBeTruthy();
+  });
+
+  it("sin sesión, el portal cerrado sigue pidiendo entrar por su puerta", async () => {
+    sw.portalCerrado = true;
+    sesion.user = null;
+    montar("/portal");
+    expect(await screen.findByText("entrar al portal")).toBeTruthy();
   });
 });
