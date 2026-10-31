@@ -81,7 +81,7 @@ export default function AvisarGeneralDialog({ objetivos, onAvisar, t }: AvisarGe
           {t("cowork.avisar.trigger")}
         </Button>
       </DialogTrigger>
-      <DialogContent className="max-w-xl gap-3 max-h-[85dvh] overflow-y-auto overflow-x-hidden bg-none">
+      <DialogContent className="max-w-xl gap-3 max-h-[85dvh] overflow-y-auto overflow-x-hidden">
         <DialogHeader className="text-left">
           <DialogTitle>{t("cowork.avisar.generalTitle")}</DialogTitle>
           <DialogDescription>{t("cowork.avisar.generalHint")}</DialogDescription>

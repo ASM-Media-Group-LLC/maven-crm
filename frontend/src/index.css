@@ -1158,9 +1158,15 @@ All colors MUST be HSL. Light mode in :root, dark mode in .dark.
    propio componente (ring-primary). */
 .tile-estudio {
   border: 1px solid hsl(var(--border));
-  background: radial-gradient(120% 120% at 50% 28%, hsl(var(--card)), hsl(var(--background)));
+  /* Vidrio con un glow de acento sutil arriba (decisión de Alvaro: vidrio +
+     morado, fondo oscuro). El tile se mantiene oscuro para que la cámara/cara
+     luzca; el toque de color da el feeling sin competir con el video. */
+  background:
+    radial-gradient(90% 70% at 50% 0%, hsl(var(--primary) / .1), transparent 60%),
+    radial-gradient(120% 120% at 50% 28%, hsl(var(--card)), hsl(var(--background)));
+  -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px);
   box-shadow:
-    inset 0 1px 0 hsl(0 0% 100% / .05),
+    inset 0 1px 0 hsl(0 0% 100% / .08),
     0 2px 8px -4px hsl(0 0% 0% / .55),
     0 20px 42px -24px hsl(0 0% 0% / .8);
 }

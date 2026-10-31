@@ -72,7 +72,7 @@ export default function AvisarDialog({ nombreChatter, onAvisar, t, open, onOpenC
   }
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-xl gap-2 max-h-[85dvh] overflow-y-auto overflow-x-hidden bg-none">
+      <DialogContent className="max-w-xl gap-2 max-h-[85dvh] overflow-y-auto overflow-x-hidden">
         <DialogHeader className="text-left">
           <DialogTitle className="font-display">{titulo}</DialogTitle>
           <DialogDescription>{t("cowork.avisar.dialogHint")}</DialogDescription>
