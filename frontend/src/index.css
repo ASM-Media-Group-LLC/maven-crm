@@ -1192,42 +1192,83 @@ All colors MUST be HSL. Light mode in :root, dark mode in .dark.
    clase en el contenedor scrolleable de una pantalla; el fondo queda FIJO
    (no scrollea) para dar sensación de profundidad. Un guiño de "ventanales"
    con las líneas verticales tenues. Todo deriva de --background (tema). */
+/* TARJETA DE VIDRIO reutilizable (lenguaje exacto del mockup "Maven Glass").
+   CLARO = blanco translúcido casi opaco con filo de luz; OSCURO = frost tenue
+   que LEVANTA con sombra profunda + filo de luz arriba. Radio grande (22px).
+   Un lever global: .vidrio reemplaza a "border bg-card" donde se quiera vidrio. */
+.vidrio {
+  position: relative;
+  border-radius: 22px;
+  background: linear-gradient(160deg, rgba(255,255,255,.74), rgba(255,255,255,.52));
+  border: 1px solid rgba(20,30,60,.1);
+  -webkit-backdrop-filter: blur(22px) saturate(1.2);
+  backdrop-filter: blur(22px) saturate(1.2);
+  box-shadow: 0 1px 2px rgba(30,40,70,.06), 0 16px 40px rgba(30,40,70,.13), inset 0 1px 0 rgba(255,255,255,.9);
+}
+.dark .vidrio {
+  background: linear-gradient(160deg, rgba(255,255,255,.09), rgba(255,255,255,.03));
+  border: 1px solid rgba(255,255,255,.1);
+  box-shadow: 0 20px 50px rgba(0,0,0,.45), inset 0 1px 0 rgba(255,255,255,.14);
+}
+/* Glow de color en la esquina superior derecha (como las stat del mockup).
+   Va en ::before a z-index 0; el contenido se pone en un wrapper .v-cont. */
+.vidrio-glow { overflow: hidden; }
+.vidrio-glow::before {
+  content: ""; position: absolute; inset: 0; pointer-events: none; opacity: .6; z-index: 0;
+  background: radial-gradient(70% 90% at 90% 0%, var(--glow, rgba(106,166,255,.22)), transparent 60%);
+}
+.vidrio-glow > .v-cont { position: relative; z-index: 1; }
+.glow-b { --glow: rgba(106,166,255,.22); }
+.glow-g { --glow: rgba(73,227,166,.20); }
+.glow-a { --glow: rgba(255,179,107,.22); }
+.glow-v { --glow: rgba(179,155,255,.22); }
+:root[data-contrast="high"] .vidrio-glow::before { display: none; }
+
+/* CLARO (día): escena de ventanales al atardecer — el ámbar fuerte abajo al
+   centro, violeta arriba-izq, azul arriba-der, sobre un degradado cálido
+   crema→frío. Valores literales del mockup aprobado ("Maven Glass"). */
 .fondo-glass {
   background:
-    radial-gradient(70% 52% at 50% 86%, hsl(32 88% 62% / .24), transparent 62%),
-    radial-gradient(52% 48% at 10% 10%, hsl(258 64% 64% / .18), transparent 60%),
-    radial-gradient(46% 44% at 92% 6%, hsl(205 88% 60% / .16), transparent 60%),
-    hsl(var(--background));
+    repeating-linear-gradient(90deg, transparent 0 calc(16.6667% - 1.5px), rgba(120,90,50,.05) calc(16.6667% - 1.5px) 16.6667%),
+    radial-gradient(60% 46% at 50% 82%, rgba(255,184,96,.55), transparent 62%),
+    radial-gradient(46% 42% at 14% 16%, rgba(150,120,230,.26), transparent 60%),
+    radial-gradient(40% 40% at 88% 12%, rgba(92,162,232,.3), transparent 60%),
+    linear-gradient(180deg, #efe7d6 0%, #ecd9c3 48%, #e7ecf6 100%);
   background-attachment: fixed;
 }
+/* NOCHE: profundo y frío, radiales azul/violeta/teal VISIBLES (más vivas que
+   el mockup porque aquí hay huecos entre tarjetas donde asoma el fondo). */
 .dark .fondo-glass {
   background:
-    radial-gradient(72% 54% at 50% 86%, hsl(216 62% 50% / .24), transparent 62%),
-    radial-gradient(54% 50% at 8% 10%, hsl(258 60% 56% / .22), transparent 60%),
-    radial-gradient(48% 46% at 92% 6%, hsl(200 70% 50% / .17), transparent 60%),
-    hsl(var(--background));
+    radial-gradient(60% 46% at 50% 70%, rgba(72,104,196,.34), transparent 64%),
+    radial-gradient(44% 42% at 14% 16%, rgba(124,92,228,.30), transparent 62%),
+    radial-gradient(42% 42% at 90% 12%, rgba(52,140,210,.28), transparent 62%),
+    linear-gradient(180deg, #0a0f1d 0%, #0b1020 40%, #080a16 72%, #050610 90%, #030308 100%);
   background-attachment: fixed;
 }
 /* Alto contraste: se apaga la atmósfera (prima la legibilidad). */
 :root[data-contrast="high"] .fondo-glass { background: hsl(var(--background)); }
 
-/* Versión SOBRIA del ambiente, para el fondo de TODA la app (pantallas de
-   trabajo): un guiño de profundidad muy tenue que no estorba la lectura. El
-   fondo completo (.fondo-glass) se reserva para inicio/dashboard y Cowork. */
+/* Versión del ambiente para el fondo de TODA la app (pantallas de trabajo): la
+   MISMA escena del mockup, un punto más calmada para no estorbar la lectura de
+   tablas y data densa. El fondo pleno (.fondo-glass) va en inicio/dashboard y
+   Cowork. */
 .fondo-glass-sutil {
   background:
-    radial-gradient(78% 58% at 50% 102%, hsl(32 88% 60% / .18), transparent 62%),
-    radial-gradient(58% 56% at 4% -2%, hsl(258 62% 60% / .15), transparent 60%),
-    radial-gradient(48% 46% at 98% 0%, hsl(205 86% 58% / .13), transparent 58%),
-    hsl(var(--background));
+    repeating-linear-gradient(90deg, transparent 0 calc(16.6667% - 1.5px), rgba(120,90,50,.04) calc(16.6667% - 1.5px) 16.6667%),
+    radial-gradient(64% 48% at 50% 96%, rgba(255,184,96,.34), transparent 62%),
+    radial-gradient(48% 44% at 8% 2%, rgba(150,120,230,.18), transparent 60%),
+    radial-gradient(42% 42% at 94% 0%, rgba(92,162,232,.2), transparent 60%),
+    linear-gradient(180deg, #f3eee2 0%, #eee6f2 60%, #e9edf6 100%);
   background-attachment: fixed;
 }
 .dark .fondo-glass-sutil {
   background:
-    radial-gradient(80% 58% at 50% 104%, hsl(214 72% 50% / .22), transparent 62%),
-    radial-gradient(60% 58% at 2% -4%, hsl(258 60% 56% / .19), transparent 60%),
-    radial-gradient(50% 48% at 100% -2%, hsl(200 72% 48% / .15), transparent 58%),
-    hsl(var(--background));
+    repeating-linear-gradient(90deg, transparent 0 calc(20% - 2.5px), rgba(10,8,12,.4) calc(20% - 2.5px) calc(20% + .5px), transparent calc(20% + .5px) 20%),
+    radial-gradient(58% 44% at 50% 90%, rgba(64,92,170,.15), transparent 62%),
+    radial-gradient(42% 40% at 10% 4%, rgba(104,80,200,.12), transparent 60%),
+    radial-gradient(38% 38% at 92% 2%, rgba(42,120,180,.11), transparent 60%),
+    linear-gradient(180deg, #080b14 0%, #070912 50%, #050710 100%);
   background-attachment: fixed;
 }
 :root[data-contrast="high"] .fondo-glass-sutil { background: hsl(var(--background)); }

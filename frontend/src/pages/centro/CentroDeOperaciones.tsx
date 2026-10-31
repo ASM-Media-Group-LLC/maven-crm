@@ -60,16 +60,22 @@ function TarjetaKpi({ icono: Icono, etiqueta, valor, detalle, tono = "primary" }
     tono === "success" ? "bg-success/10 text-success"
     : tono === "warning" ? "bg-warning/10 text-warning"
     : "bg-primary/10 text-primary";
+  const glow =
+    tono === "success" ? "glow-g"
+    : tono === "warning" ? "glow-a"
+    : "glow-b";
   return (
-    <div className="rounded-card border border-white/60 dark:border-white/[0.08] bg-white/55 dark:bg-white/[0.06] backdrop-blur-xl ring-1 ring-white/50 dark:ring-white/[0.06] shadow-[inset_0_1px_0_rgba(255,255,255,0.6),0_18px_44px_-16px_rgba(20,30,60,0.22)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.12),0_24px_56px_-18px_rgba(0,0,0,0.6)] p-4 flex flex-col gap-3">
-      <div className="flex items-center gap-2.5">
-        <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-panel ${chip}`}>
-          <Icono className="h-[18px] w-[18px]" />
-        </span>
-        <span className="text-xs font-medium text-muted-foreground">{etiqueta}</span>
+    <div className={`vidrio vidrio-glow ${glow} p-4`}>
+      <div className="v-cont flex flex-col gap-3">
+        <div className="flex items-center gap-2.5">
+          <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-panel ${chip}`}>
+            <Icono className="h-[18px] w-[18px]" />
+          </span>
+          <span className="text-xs font-medium text-muted-foreground">{etiqueta}</span>
+        </div>
+        <div className="font-display text-[26px] font-bold leading-none tracking-tight tabular-nums">{valor}</div>
+        <div className="text-xs text-muted-foreground">{detalle}</div>
       </div>
-      <div className="font-display text-[26px] font-bold leading-none tracking-tight tabular-nums">{valor}</div>
-      <div className="text-xs text-muted-foreground">{detalle}</div>
     </div>
   );
 }
@@ -199,7 +205,7 @@ export default function CentroDeOperaciones() {
       </div>
 
       {/* Salas en vivo */}
-      <section className="rounded-card border border-white/60 dark:border-white/[0.08] bg-white/55 dark:bg-white/[0.06] backdrop-blur-xl ring-1 ring-white/50 dark:ring-white/[0.06] shadow-[inset_0_1px_0_rgba(255,255,255,0.6),0_18px_44px_-16px_rgba(20,30,60,0.22)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.12),0_24px_56px_-18px_rgba(0,0,0,0.6)] p-4">
+      <section className="vidrio p-4">
         <div className="mb-3 flex items-center justify-between gap-3">
           <h2 className="flex items-center gap-2 text-sm font-semibold">
             <span className="flex h-7 w-7 items-center justify-center rounded-panel bg-primary/10 text-primary"><DoorOpen className="h-4 w-4" /></span>
@@ -234,7 +240,7 @@ export default function CentroDeOperaciones() {
               const reposo = s.rooms.filter((r) => (r.online ?? 0) === 0);
               const enLinea = s.online == null ? "–" : s.online;
               return (
-                <div key={s.id} className="flex flex-col gap-2.5 rounded-panel border border-border bg-background/60 p-3">
+                <div key={s.id} className="flex flex-col gap-2.5 rounded-panel border border-white/50 bg-white/50 dark:border-white/[0.07] dark:bg-white/[0.04] p-3">
                   <div className="flex items-center justify-between gap-2">
                     <span className="truncate text-sm font-semibold">{tituloBonito(s.name)}</span>
                     <span className="flex shrink-0 items-center gap-1.5">
@@ -300,7 +306,7 @@ export default function CentroDeOperaciones() {
       </section>
 
       {/* Tiempo del equipo hoy */}
-      <section className="rounded-card border border-border bg-card p-4">
+      <section className="vidrio p-4">
         <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold">
           <span className="flex h-7 w-7 items-center justify-center rounded-panel bg-success/10 text-success"><Clock className="h-4 w-4" /></span>
           {t("dashboard.centro.equipoHoy")}
@@ -338,7 +344,7 @@ export default function CentroDeOperaciones() {
       </section>
 
       {/* Ventas, empujado al fondo pero entero: todo el tablero vive detrás de este botón. */}
-      <section className="flex flex-wrap items-center gap-3 rounded-card border border-border bg-card/50 p-4">
+      <section className="vidrio flex flex-wrap items-center gap-3 p-4">
         <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-panel bg-muted text-muted-foreground"><BarChart3 className="h-[18px] w-[18px]" /></span>
         <span className="min-w-0 flex-1">
           <span className="block text-sm font-semibold">{t("dashboard.centro.ventasTitulo")}</span>
