@@ -96,7 +96,7 @@ const AppShell = () => {
           (.fondo-glass-sutil). El contenido vive dentro de un panel de vidrio.
           El cascarón nunca scrollea (overflow-hidden + alto fijo): cada página
           maneja su propio scroll adentro — contrato que ya existía. */}
-      <div className="fondo-glass-sutil flex alto-de-la-app w-full overflow-hidden">
+      <div className="fondo-glass flex alto-de-la-app w-full overflow-hidden">
         <DashboardSidebar />
         <div className="flex flex-1 flex-col min-w-0 gap-2 py-2 pr-2">
           <DashboardTopbar />

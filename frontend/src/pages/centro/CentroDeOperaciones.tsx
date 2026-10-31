@@ -153,7 +153,7 @@ export default function CentroDeOperaciones() {
   };
 
   return (
-    <div className="fondo-glass p-4 md:p-6 space-y-5">
+    <div className="p-4 md:p-6 space-y-5">
       {/* Cabecera */}
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
