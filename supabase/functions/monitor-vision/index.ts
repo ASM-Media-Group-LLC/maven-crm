@@ -164,6 +164,18 @@ Deno.serve(async (req: Request) => {
     if (res.error === "no-key") return json({ ok: false, error: "no-key" }, 503);
     return json({ ok: false, error: "vision", detalle: res.error }, 502);
   }
+  // Rondín: registra el latido de ESTA ronda (haya falta o no) para el cartel
+  // "última ronda · N en sala" del panel. Nunca bloquea: si falla, se ignora.
+  const trabajando = res.v.presente && res.v.mirando_pantalla && !res.v.usando_celular && !res.v.distraido;
+  await admin.from("monitor_rondas").upsert({
+    user_id: user.id,
+    room_nombre: body.room_nombre ?? null,
+    presente: res.v.presente,
+    trabajando,
+    resumen: res.v.detalle || null,
+    last_at: new Date().toISOString(),
+  }).then(() => {}, (e: unknown) => console.warn("monitor-vision: latido", (e as Error)?.message));
+
   const falta = faltaDe(res.v);
   if (!falta) return json({ ok: true, falta: null });
 

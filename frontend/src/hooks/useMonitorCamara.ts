@@ -30,6 +30,7 @@ interface Params {
 
 const UMBRAL_FALTA_MS = 20_000; // una mala postura sostenida >20 s cuenta como falta
 const CHEQUEO_MS = 5_000; // cada cuánto se revisa la duración del estado
+const LATIDO_MS = 60_000; // cada cuánto se deja el latido del rondín (monitor_rondas)
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const sinTipar = supabase as unknown as { from: (t: string) => any };
@@ -95,12 +96,29 @@ export function useMonitorCamara({ track, camaraRealOn, faceWatch, activo, roomN
   const roomRef = useRef(roomNombre);
   roomRef.current = roomNombre;
 
-  // ── 1) Faltas gratis (del detector de cara) ──
+  // ── 1) Faltas gratis (del detector de cara) + latido del rondín ──
   const ultimoEpisodioRef = useRef<number>(0); // faceWatch.since ya marcado
+  const ultimoLatidoRef = useRef<number>(0);
   useEffect(() => {
     if (!activoFree || !user) return;
     const iv = window.setInterval(() => {
       const fw = faceRef.current;
+
+      // Latido del rondín (cada ~1 min): deja constancia de que el robot "pasó"
+      // por esta persona, aunque todo esté bien. Alimenta el cartel "última ronda
+      // · N en sala". No depende de la IA ni de que haya falta.
+      const ahora = Date.now();
+      if (ahora - ultimoLatidoRef.current > LATIDO_MS) {
+        ultimoLatidoRef.current = ahora;
+        void sinTipar.from("monitor_rondas").upsert({
+          user_id: user.id,
+          room_nombre: roomRef.current,
+          presente: fw.state === "ok" || fw.state === "too_small" || fw.state === "too_dark",
+          trabajando: fw.state === "ok",
+          last_at: new Date().toISOString(),
+        });
+      }
+
       const tipo = TIPO_POR_CARA[fw.state];
       if (!tipo) return; // "ok" / "unavailable": nada que marcar
       if (Date.now() - fw.since < UMBRAL_FALTA_MS) return; // todavía en gracia

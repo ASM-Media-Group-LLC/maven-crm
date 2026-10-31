@@ -893,4 +893,48 @@ export const hr = {
   "hr.monia.error": { es: "No se pudieron cargar las faltas", en: "Could not load issues" },
   "hr.monia.reintentar": { es: "Reintentar", en: "Retry" },
   "hr.monia.vacio": { es: "Sin faltas registradas todavía", en: "No issues logged yet" },
+  // Rondín (última ronda / en sala)
+  "hr.monia.ronda.ultima": { es: "Última ronda", en: "Last round" },
+  "hr.monia.ronda.hace": { es: "hace {n} min", en: "{n} min ago" },
+  "hr.monia.ronda.reciente": { es: "recién", en: "just now" },
+  "hr.monia.ronda.enSala": { es: "{n} en sala", en: "{n} in the room" },
+  "hr.monia.ronda.trabajando": { es: "{n} trabajando", en: "{n} working" },
+  "hr.monia.ronda.sinRonda": { es: "El robot aún no ha hecho su primera ronda", en: "The robot hasn't done its first round yet" },
+  // Filtros de la lista
+  "hr.monia.filtro.pendientes": { es: "Pendientes", en: "Pending" },
+  "hr.monia.filtro.faltas": { es: "Faltas", en: "Faults" },
+  "hr.monia.filtro.todos": { es: "Todos", en: "All" },
+  // Acciones sobre cada evento
+  "hr.monia.accion.falta": { es: "Marcar falta", en: "Mark fault" },
+  "hr.monia.accion.descartar": { es: "Descartar", en: "Dismiss" },
+  "hr.monia.accion.nota": { es: "Nota", en: "Note" },
+  "hr.monia.accion.correo": { es: "Correo", en: "Email" },
+  "hr.monia.accion.reabrir": { es: "Reabrir", en: "Reopen" },
+  "hr.monia.estado.falta": { es: "Falta marcada", en: "Fault marked" },
+  "hr.monia.estado.descartado": { es: "Descartado", en: "Dismissed" },
+  "hr.monia.faltaMarcada": { es: "Falta marcada", en: "Fault marked" },
+  "hr.monia.descartado": { es: "Evento descartado", en: "Event dismissed" },
+  "hr.monia.notaGuardada": { es: "Nota guardada", en: "Note saved" },
+  "hr.monia.errorAccion": { es: "No se pudo completar la acción", en: "Couldn't complete the action" },
+  // Modal de nota
+  "hr.monia.nota.title": { es: "Nota del evento", en: "Event note" },
+  "hr.monia.nota.ph": { es: "Escribe una nota (ej: ya hablé con él)…", en: "Write a note (e.g. already talked to them)…" },
+  "hr.monia.nota.guardar": { es: "Guardar nota", en: "Save note" },
+  // Modal de correo (borrador que RRHH revisa y manda)
+  "hr.monia.correo.title": { es: "Borrador de correo", en: "Email draft" },
+  "hr.monia.correo.desc": { es: "Revisa el texto, cópialo y envíalo desde tu correo.", en: "Review the text, copy it and send it from your email." },
+  "hr.monia.correo.asunto": { es: "Asunto", en: "Subject" },
+  "hr.monia.correo.cuerpoLabel": { es: "Mensaje", en: "Message" },
+  "hr.monia.correo.copiar": { es: "Copiar", en: "Copy" },
+  "hr.monia.correo.copiado": { es: "Copiado", en: "Copied" },
+  "hr.monia.correo.asuntoText": { es: "Aviso: cámara y atención en Cowork", en: "Notice: camera and focus in Cowork" },
+  "hr.monia.correo.cuerpo": {
+    es: "Hola {nombre},\n\nEl monitoreo de Cowork registró lo siguiente el {fecha}: {motivo} (hora {hora}).\n\nTe recordamos mantener la cámara encendida y la atención en el trabajo durante tu turno. Si hubo un motivo, respóndenos este correo.\n\nGracias,\nRecursos Humanos",
+    en: "Hi {nombre},\n\nThe Cowork monitor logged the following on {fecha}: {motivo} (at {hora}).\n\nPlease keep your camera on and stay focused during your shift. If there was a reason, reply to this email.\n\nThanks,\nHuman Resources",
+  },
+  // Ranking de faltas por persona
+  "hr.monia.rank.title": { es: "Ranking de faltas", en: "Faults leaderboard" },
+  "hr.monia.rank.sub": { es: "Faltas confirmadas · últimos 7 días", en: "Confirmed faults · last 7 days" },
+  "hr.monia.rank.vacio": { es: "Sin faltas confirmadas en el período", en: "No confirmed faults in this period" },
+  "hr.monia.rank.faltas": { es: "{count} faltas", en: "{count} faults" },
 } as const satisfies Record<string, { es: string; en: string }>;

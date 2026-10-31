@@ -1,10 +1,13 @@
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useCanalQueRevive } from "@/hooks/useCanalQueRevive";
 
 // Las faltas que registró el monitor de cámara, para el panel de RRHH. Lo ven
 // supervisores y admins (lo fuerza la RLS). Se refresca en vivo: cuando entra
-// una falta nueva (gratis o de IA), la lista se actualiza sola.
+// una falta nueva (gratis o de IA), la lista se actualiza sola. Desde acá RRHH
+// también actúa sobre cada falta (marcarla, descartarla, anotarla).
+
+export type EstadoEvento = "pendiente" | "falta" | "descartado";
 
 export interface MonitorEvento {
   id: string;
@@ -16,12 +19,14 @@ export interface MonitorEvento {
   detalle: string | null;
   captura_path: string | null;
   created_at: string;
+  estado: EstadoEvento;
+  nota: string | null;
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const sinTipar = supabase as unknown as { from: (t: string) => any };
 
-export function useMonitorEventos(limite = 200) {
+export function useMonitorEventos(limite = 300) {
   const qc = useQueryClient();
 
   const query = useQuery({
@@ -30,7 +35,7 @@ export function useMonitorEventos(limite = 200) {
     queryFn: async (): Promise<MonitorEvento[]> => {
       const { data, error } = await sinTipar
         .from("monitor_eventos")
-        .select("id, user_id, room_nombre, tipo, fuente, detalle, captura_path, created_at")
+        .select("id, user_id, room_nombre, tipo, fuente, detalle, captura_path, created_at, estado, nota")
         .order("created_at", { ascending: false })
         .limit(limite);
       if (error) throw error;
@@ -52,10 +57,34 @@ export function useMonitorEventos(limite = 200) {
     armar: (ch) =>
       ch.on(
         "postgres_changes",
-        { event: "INSERT", schema: "public", table: "monitor_eventos" },
+        { event: "*", schema: "public", table: "monitor_eventos" },
         () => { void qc.invalidateQueries({ queryKey: ["monitor-eventos"] }); },
       ),
     alRevivir: () => { void qc.invalidateQueries({ queryKey: ["monitor-eventos"] }); },
+  });
+
+  // ── Acciones de RRHH sobre una falta ──
+  // Marcar falta / descartar guardan el estado + quién y cuándo resolvió. La nota
+  // es un comentario libre ("ya hablé con él"). La RLS solo deja a supervisor+.
+  const resolver = useMutation({
+    mutationFn: async ({ id, estado }: { id: string; estado: EstadoEvento }) => {
+      const uid = (await supabase.auth.getUser()).data.user?.id ?? null;
+      const { error } = await sinTipar.from("monitor_eventos")
+        .update({ estado, resuelto_por: uid, resuelto_at: new Date().toISOString() })
+        .eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["monitor-eventos"] }),
+  });
+
+  const anotar = useMutation({
+    mutationFn: async ({ id, nota }: { id: string; nota: string }) => {
+      const { error } = await sinTipar.from("monitor_eventos")
+        .update({ nota: nota.trim() || null })
+        .eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["monitor-eventos"] }),
   });
 
   return {
@@ -65,6 +94,11 @@ export function useMonitorEventos(limite = 200) {
     // panel vacío ante un error de red o de permisos (regla del repo).
     error: (query.error as Error | null) ?? null,
     refrescar: () => qc.invalidateQueries({ queryKey: ["monitor-eventos"] }),
+    marcarFalta: (id: string) => resolver.mutateAsync({ id, estado: "falta" }),
+    descartar: (id: string) => resolver.mutateAsync({ id, estado: "descartado" }),
+    reabrir: (id: string) => resolver.mutateAsync({ id, estado: "pendiente" }),
+    guardarNota: (id: string, nota: string) => anotar.mutateAsync({ id, nota }),
+    actuando: resolver.isPending || anotar.isPending,
   };
 }
 
