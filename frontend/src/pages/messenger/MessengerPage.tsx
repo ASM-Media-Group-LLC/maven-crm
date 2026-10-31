@@ -21,6 +21,7 @@ import { cn } from "@/lib/utils";
 import { EmptyState } from "@/components/EmptyState";
 import { toast } from "sonner";
 import { useLanguage } from "@/hooks/useLanguage";
+import { Video, BellOff, Archive, Users2 } from "lucide-react";
 
 function openCallInNewTab(roomName: string, isAdmin: boolean, displayName?: string) {
   const params = new URLSearchParams();
@@ -34,6 +35,94 @@ function openCallInNewTab(roomName: string, isAdmin: boolean, displayName?: stri
 
 /** Solo rutas internas: "/algo". Corta "//host", "http…" y cualquier absoluta. */
 const rutaInterna = (r: string | null): boolean => !!r && /^\/[A-Za-z0-9\-_/]*(\?[^#]*)?$/.test(r) && !r.startsWith("//");
+
+const inicialesDe = (nombre: string | null | undefined) =>
+  (nombre ?? "")
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((p) => p[0]?.toUpperCase() ?? "")
+    .join("") || "?";
+
+// PANEL DE CONTEXTO (Propuesta 3, Alvaro 31/10): una 3ª columna a la derecha de
+// la conversación con la ficha del contacto/grupo, acciones rápidas y, en grupos,
+// los miembros. Solo en escritorio ancho (lg+); en pantallas chicas no cabe y se
+// esconde. Datos reales de la conversación activa; acciones que ya existen.
+function PanelContexto({ conv, userId, isOnline, onVideo, onMute, onArchive }: {
+  conv: ConversationWithDetails;
+  userId: string | undefined;
+  isOnline: (id: string) => boolean;
+  onVideo: () => void;
+  onMute: () => void;
+  onArchive: () => void;
+}) {
+  const { t } = useLanguage();
+  const esGrupo = conv.type === "group";
+  const otro = !esGrupo ? conv.participants.find((p) => p.user_id !== userId) : null;
+  const enLinea = otro ? isOnline(otro.user_id) : false;
+  const miembros = conv.participants.length;
+  return (
+    <aside className="hidden w-[260px] shrink-0 flex-col overflow-y-auto border-l border-white/40 bg-card/55 backdrop-blur-xl dark:border-white/[0.06] lg:flex">
+      <div className="flex flex-col items-center gap-3 px-5 py-6 text-center">
+        <div className="relative">
+          <div aria-hidden className="pointer-events-none absolute inset-0 -z-10 rounded-full bg-primary/25 blur-2xl" />
+          <div className="flex h-20 w-20 items-center justify-center overflow-hidden rounded-full border border-white/50 bg-white/55 text-lg font-bold text-primary shadow-[inset_0_1px_0_rgba(255,255,255,0.6)] backdrop-blur-xl dark:border-white/10 dark:bg-white/[0.06]">
+            {conv.avatar_url ? (
+              <img src={conv.avatar_url} alt="" className="h-full w-full object-cover" />
+            ) : esGrupo ? (
+              <Users2 className="h-8 w-8" />
+            ) : (
+              inicialesDe(conv.displayName)
+            )}
+          </div>
+        </div>
+        <div>
+          <div className="font-display text-base font-semibold">{conv.displayName}</div>
+          <div className="mt-0.5 text-xs text-muted-foreground">
+            {esGrupo
+              ? t("messenger.ctx.members", { n: miembros })
+              : enLinea
+                ? <span className="text-success">{t("messenger.ctx.online")}</span>
+                : t("messenger.ctx.offline")}
+          </div>
+        </div>
+        <div className="mt-1 flex items-center gap-2">
+          <button type="button" onClick={onVideo} title={t("messenger.ctx.video")} className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/10 text-primary transition-colors hover:bg-primary/20">
+            <Video className="h-4 w-4" />
+          </button>
+          <button type="button" onClick={onMute} title={t("messenger.ctx.mute")} className="flex h-9 w-9 items-center justify-center rounded-full bg-muted text-muted-foreground transition-colors hover:text-foreground">
+            <BellOff className="h-4 w-4" />
+          </button>
+          <button type="button" onClick={onArchive} title={t("messenger.ctx.archive")} className="flex h-9 w-9 items-center justify-center rounded-full bg-muted text-muted-foreground transition-colors hover:text-foreground">
+            <Archive className="h-4 w-4" />
+          </button>
+        </div>
+      </div>
+
+      {esGrupo && conv.participants.length > 0 && (
+        <div className="border-t border-white/40 px-4 py-4 dark:border-white/[0.06]">
+          <div className="mb-2.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{t("messenger.ctx.membersTitle")}</div>
+          <div className="flex flex-col gap-1.5">
+            {conv.participants.slice(0, 10).map((p) => (
+              <div key={p.user_id} className="flex items-center gap-2.5">
+                <span className="flex h-7 w-7 shrink-0 items-center justify-center overflow-hidden rounded-full bg-primary/15 text-[10px] font-bold text-primary">
+                  {p.profile?.avatar_url ? <img src={p.profile.avatar_url} alt="" className="h-full w-full object-cover" /> : inicialesDe(p.profile?.full_name)}
+                </span>
+                <span className="min-w-0 flex-1 truncate text-sm">{p.profile?.full_name || "—"}</span>
+                {isOnline(p.user_id) && <span className="h-2 w-2 shrink-0 rounded-full bg-success" />}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <div className="border-t border-white/40 px-4 py-4 dark:border-white/[0.06]">
+        <div className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{t("messenger.ctx.filesTitle")}</div>
+        <p className="text-xs text-muted-foreground">{t("messenger.ctx.filesHint")}</p>
+      </div>
+    </aside>
+  );
+}
 
 export default function MessengerPage() {
   const { conversations, loading, profiles, createDirectChat, createGroupChat, deleteConversation, loadConversations, markConversationRead, markConversationUnread, toggleMute } = useChatShared();
@@ -368,6 +457,19 @@ export default function MessengerPage() {
           </div>
         )}
       </div>
+
+      {/* Panel de contexto (Propuesta 3): 3ª columna con la ficha del contacto/
+          grupo, acciones y miembros. Solo con un chat abierto y en escritorio ancho. */}
+      {activeConv && (
+        <PanelContexto
+          conv={activeConv}
+          userId={user?.id}
+          isOnline={isOnline}
+          onVideo={() => handleStartVideoCall(activeConv)}
+          onMute={() => toggleMute(activeConv.id)}
+          onArchive={() => { toggleArchive(activeConv.id); selectChat(null); }}
+        />
+      )}
 
       {/* El modal de llamada entrante ahora es GLOBAL (CallProvider), para que
           suene estés en la sección de Maven que estés, no solo aquí. */}

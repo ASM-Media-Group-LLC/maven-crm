@@ -81,6 +81,15 @@ export const messenger = {
   "messenger.page.abriendoSala": { es: "Abriendo sala en nueva pestaña...", en: "Opening room in a new tab..." },
   "messenger.page.ningunaAbierta": { es: "Ninguna conversación abierta", en: "No conversation open" },
   "messenger.page.seleccionaChat": { es: "Selecciona un chat o contacto para comenzar a conversar", en: "Pick a chat or contact to start a conversation" },
+  "messenger.ctx.online": { es: "en línea", en: "online" },
+  "messenger.ctx.offline": { es: "desconectado", en: "offline" },
+  "messenger.ctx.members": { es: "{n} miembros", en: "{n} members" },
+  "messenger.ctx.video": { es: "Videollamada", en: "Video call" },
+  "messenger.ctx.mute": { es: "Silenciar", en: "Mute" },
+  "messenger.ctx.archive": { es: "Archivar", en: "Archive" },
+  "messenger.ctx.membersTitle": { es: "Miembros", en: "Members" },
+  "messenger.ctx.filesTitle": { es: "Archivos y multimedia", en: "Files & media" },
+  "messenger.ctx.filesHint": { es: "Lo que compartan en el chat aparece aquí.", en: "What's shared in the chat shows up here." },
 
   // Estado de la persona (StatusPicker) y el modal de chat nuevo (NewChatModal).
   "messenger.status.disponible": { es: "Disponible", en: "Available" },
