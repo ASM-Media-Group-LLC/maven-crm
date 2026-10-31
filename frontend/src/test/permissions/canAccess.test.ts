@@ -182,11 +182,14 @@ describe("canAccess", () => {
 
   // -------------------------------------------------------------------------
   describe("submodule resolution", () => {
+    // NOTA: se usa Promolog/Historial (módulos NO escondidos por el recorte) a
+    // propósito. Con HR/Candidatos, el candado de modulosOcultos devuelve false
+    // antes de resolver los rows y estos casos de RESOLUCIÓN no se podrían probar.
     it("should return true when specific submodule row overrides a false module row", async () => {
-      // Arrange: HR modulo-level false, pero Candidatos submodule true
+      // Arrange: Promolog modulo-level false, pero Historial submodule true
       setupViewer([
-        { module: "HR", submodule: "Candidatos", can_access: true, data_scope: "all" },
-        { module: "HR", submodule: null, can_access: false, data_scope: "all" },
+        { module: "Promolog", submodule: "Historial", can_access: true, data_scope: "all" },
+        { module: "Promolog", submodule: null, can_access: false, data_scope: "all" },
       ]);
       const wrapper = makeWrapper(viewerAuth);
 
@@ -195,13 +198,13 @@ describe("canAccess", () => {
       await waitFor(() => expect(result.current.isLoading).toBe(false));
 
       // Assert: el row del submodulo tiene precedencia
-      expect(result.current.canAccess("HR", "Candidatos")).toBe(true);
+      expect(result.current.canAccess("Promolog", "Historial")).toBe(true);
     });
 
     it("should inherit module-level permission when no specific submodule row exists", async () => {
-      // Arrange: HR modulo-level true, sin row para Candidatos
+      // Arrange: Promolog modulo-level true, sin row para Historial
       setupViewer([
-        { module: "HR", submodule: null, can_access: true, data_scope: "all" },
+        { module: "Promolog", submodule: null, can_access: true, data_scope: "all" },
       ]);
       const wrapper = makeWrapper(viewerAuth);
 
@@ -210,7 +213,7 @@ describe("canAccess", () => {
       await waitFor(() => expect(result.current.isLoading).toBe(false));
 
       // Assert: hereda el permiso del modulo
-      expect(result.current.canAccess("HR", "Candidatos")).toBe(true);
+      expect(result.current.canAccess("Promolog", "Historial")).toBe(true);
     });
 
     it("should return false for module when only submodule is denied", async () => {
