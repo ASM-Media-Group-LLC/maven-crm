@@ -13,6 +13,9 @@ verify_jwt = false
 [functions.monitor-vision]
 verify_jwt = true
 
+[functions.argos-mirar]
+verify_jwt = true
+
 # Gestión de API keys (solo-admin). verify_jwt=false: valida el JWT + rol admin adentro.
 [functions.manage-api-keys]
 verify_jwt = false

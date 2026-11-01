@@ -1,7 +1,9 @@
+import { useEffect, useRef } from "react";
 import { MonitorPlay, Loader2, AlertTriangle, ScreenShare, RefreshCw, Sparkles } from "lucide-react";
 import { useLanguage } from "@/hooks/useLanguage";
 import { UserAvatar } from "@/components/UserAvatar";
 import { useCapturasVivo } from "@/hooks/useCapturasVivo";
+import { supabase } from "@/integrations/supabase/client";
 
 // LA MURALLA EN VIVO de Argos (modelo Hubstaff): una tarjeta por persona con lo
 // que pasa en los últimos minutos —su pantalla grande, su cámara en inset, quién
@@ -9,6 +11,22 @@ import { useCapturasVivo } from "@/hooks/useCapturasVivo";
 export function PantallazosVivoPanel() {
   const { t } = useLanguage();
   const { personas, cargando, error, refrescar } = useCapturasVivo();
+
+  // Cuando hay pantallas sin veredicto, le pedimos a Argos que las mire (una sola
+  // llamada en vuelo a la vez). Al terminar, refrescamos para pintar la línea.
+  const analizando = useRef(false);
+  useEffect(() => {
+    const hayPendientes = personas.some((p) => p.veredicto == null && p.tienePantalla);
+    if (!hayPendientes || analizando.current) return;
+    analizando.current = true;
+    void supabase.functions
+      .invoke("argos-mirar")
+      .then(() => refrescar())
+      .catch(() => {})
+      .finally(() => {
+        analizando.current = false;
+      });
+  }, [personas, refrescar]);
 
   return (
     <section className="vidrio sube p-4 lg:p-5">
