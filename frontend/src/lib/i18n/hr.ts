@@ -1016,6 +1016,8 @@ export const hr = {
   "hr.pantallazos.fueraDeLugar": { es: "Fuera de lugar", en: "Off task" },
   "hr.pantallazos.ahora": { es: "ahora", en: "now" },
   "hr.pantallazos.hace": { es: "hace {n} min", en: "{n} min ago" },
+  "hr.pantallazos.contando": { es: "{n} en vivo ahora mismo", en: "{n} live right now" },
+  "hr.pantallazos.analizando": { es: "Argos está mirando…", en: "Argos is watching…" },
   // ── Expediente del empleado (calendario del mes, Argos) ──
   "hr.exp.title": { es: "Expediente", en: "Record" },
   "hr.exp.sub": { es: "Qué hizo cada día", en: "What they did each day" },

@@ -1,14 +1,14 @@
-import { MonitorPlay, Loader2, AlertTriangle, ScreenShare, Camera, RefreshCw } from "lucide-react";
+import { MonitorPlay, Loader2, AlertTriangle, ScreenShare, RefreshCw, Sparkles } from "lucide-react";
 import { useLanguage } from "@/hooks/useLanguage";
 import { UserAvatar } from "@/components/UserAvatar";
 import { useCapturasVivo } from "@/hooks/useCapturasVivo";
 
-// LOS PANTALLAZOS EN VIVO de Argos (modelo Hubstaff): grilla de miniaturas de lo
-// que el equipo está haciendo AHORA —pantalla y cámara—, cada una con su URL
-// firmada. Se refresca solo. Todo el texto por t(); los datos, de useCapturasVivo.
+// LA MURALLA EN VIVO de Argos (modelo Hubstaff): una tarjeta por persona con lo
+// que pasa en los últimos minutos —su pantalla grande, su cámara en inset, quién
+// es, hace cuánto y la línea de la IA—. Se refresca solo. Todo el texto por t().
 export function PantallazosVivoPanel() {
   const { t } = useLanguage();
-  const { capturas, cargando, error, refrescar } = useCapturasVivo();
+  const { personas, cargando, error, refrescar } = useCapturasVivo();
 
   return (
     <section className="vidrio sube p-4 lg:p-5">
@@ -16,11 +16,15 @@ export function PantallazosVivoPanel() {
         <div className="mb-4 flex flex-wrap items-center gap-3">
           <span className="relative flex h-9 w-9 shrink-0 items-center justify-center rounded-panel bg-primary/10 text-primary">
             <MonitorPlay className="h-[18px] w-[18px]" />
-            {capturas.length > 0 && <span className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-success shadow-[0_0_6px_hsl(var(--success))]" />}
+            {personas.length > 0 && (
+              <span className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-success shadow-[0_0_6px_hsl(var(--success))]" />
+            )}
           </span>
           <div className="min-w-0 flex-1">
             <h2 className="font-display text-base font-bold leading-tight tracking-tight">{t("hr.pantallazos.title")}</h2>
-            <p className="text-xs text-muted-foreground">{t("hr.pantallazos.sub")}</p>
+            <p className="text-xs text-muted-foreground">
+              {personas.length > 0 ? t("hr.pantallazos.contando", { n: personas.length }) : t("hr.pantallazos.sub")}
+            </p>
           </div>
           <button
             type="button"
@@ -38,51 +42,90 @@ export function PantallazosVivoPanel() {
             <AlertTriangle className="h-7 w-7 text-destructive/70" />
             <p className="text-sm">{t("hr.pantallazos.error")}</p>
           </div>
-        ) : cargando && capturas.length === 0 ? (
-          <div className="flex items-center justify-center py-12 text-muted-foreground"><Loader2 className="h-6 w-6 animate-spin" /></div>
-        ) : capturas.length === 0 ? (
+        ) : cargando && personas.length === 0 ? (
+          <div className="flex items-center justify-center py-12 text-muted-foreground">
+            <Loader2 className="h-6 w-6 animate-spin" />
+          </div>
+        ) : personas.length === 0 ? (
           <div className="flex flex-col items-center gap-2 py-10 text-center text-muted-foreground">
             <MonitorPlay className="h-7 w-7 opacity-40" />
             <p className="text-sm">{t("hr.pantallazos.vacio")}</p>
           </div>
         ) : (
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-            {capturas.map((c) => {
-              const nombre = c.nombre || t("hr.noName");
-              const min = Math.max(0, Math.round((Date.now() - new Date(c.createdAt).getTime()) / 60000));
-              const tipoLabel = c.tipo === "pantalla" ? t("hr.pantallazos.pantalla") : t("hr.pantallazos.camara");
-              const TipoIcon = c.tipo === "pantalla" ? ScreenShare : Camera;
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            {personas.map((p) => {
+              const nombre = p.nombre || t("hr.noName");
+              const min = Math.max(0, Math.round((Date.now() - new Date(p.ultima).getTime()) / 60000));
               return (
-                <button
-                  key={c.id}
-                  type="button"
-                  onClick={() => { if (c.url) window.open(c.url, "_blank", "noopener"); }}
-                  className={`group relative block overflow-hidden rounded-2xl border bg-card/30 text-left transition-colors ${c.fueraDeLugar ? "border-destructive/50" : "border-border/40 hover:border-primary/40"}`}
-                  title={`${nombre} · ${tipoLabel}`}
+                <div
+                  key={p.userId}
+                  className={`group relative overflow-hidden rounded-2xl border bg-card/30 transition-colors ${
+                    p.fueraDeLugar ? "border-destructive/60" : "border-border/40 hover:border-primary/40"
+                  }`}
                 >
+                  {/* La pantalla (lo que hace), grande */}
                   <div className="relative aspect-[16/10] w-full bg-muted/40">
-                    {c.url ? (
-                      <img src={c.url} alt={`${nombre} · ${tipoLabel}`} className="h-full w-full object-cover" loading="lazy" />
+                    {p.principalUrl ? (
+                      <img
+                        src={p.principalUrl}
+                        alt={nombre}
+                        className="h-full w-full object-cover"
+                        loading="lazy"
+                      />
                     ) : (
-                      <div className="flex h-full w-full items-center justify-center text-muted-foreground"><Loader2 className="h-5 w-5 animate-spin" /></div>
+                      <div className="flex h-full w-full items-center justify-center text-muted-foreground">
+                        <Loader2 className="h-5 w-5 animate-spin" />
+                      </div>
                     )}
-                    <span className="absolute left-1.5 top-1.5 inline-flex items-center gap-1 rounded-control bg-black/55 px-1.5 py-0.5 text-[10px] font-semibold text-white backdrop-blur-sm">
-                      <TipoIcon className="h-3 w-3" />{tipoLabel}
-                    </span>
-                    {c.fueraDeLugar && (
-                      <span className="absolute right-1.5 top-1.5 inline-flex items-center gap-1 rounded-control bg-destructive px-1.5 py-0.5 text-[10px] font-semibold text-destructive-foreground">
-                        <AlertTriangle className="h-3 w-3" />{t("hr.pantallazos.fueraDeLugar")}
+
+                    {/* Marca de tipo: si lo grande es la pantalla */}
+                    {p.tienePantalla && (
+                      <span className="absolute left-1.5 top-1.5 inline-flex items-center gap-1 rounded-control bg-black/55 px-1.5 py-0.5 text-[10px] font-semibold text-white backdrop-blur-sm">
+                        <ScreenShare className="h-3 w-3" />
+                        {t("hr.pantallazos.pantalla")}
                       </span>
                     )}
+
+                    {/* Fuera de lugar */}
+                    {p.fueraDeLugar && (
+                      <span className="absolute right-1.5 top-1.5 inline-flex items-center gap-1 rounded-control bg-destructive px-1.5 py-0.5 text-[10px] font-semibold text-destructive-foreground">
+                        <AlertTriangle className="h-3 w-3" />
+                        {t("hr.pantallazos.fueraDeLugar")}
+                      </span>
+                    )}
+
+                    {/* La cámara (que esté), en inset */}
+                    {p.camaraUrl && p.tienePantalla && (
+                      <img
+                        src={p.camaraUrl}
+                        alt={nombre}
+                        loading="lazy"
+                        className="absolute bottom-1.5 right-1.5 h-14 w-20 rounded-lg border-2 border-background/80 object-cover shadow-md"
+                      />
+                    )}
                   </div>
-                  <div className="flex items-center gap-2 px-2 py-1.5">
-                    <UserAvatar name={nombre} src={c.avatarUrl} seed={c.avatarSeed} size="sm" />
-                    <span className="min-w-0 flex-1 truncate text-xs font-medium">{nombre}</span>
+
+                  {/* Quién es + hace cuánto */}
+                  <div className="flex items-center gap-2 px-2.5 py-2">
+                    <UserAvatar name={nombre} src={p.avatarUrl} seed={p.avatarSeed} size="sm" />
+                    <span className="min-w-0 flex-1 truncate text-sm font-semibold">{nombre}</span>
                     <span className="shrink-0 text-[10px] tabular-nums text-muted-foreground">
                       {min < 1 ? t("hr.pantallazos.ahora") : t("hr.pantallazos.hace", { n: min })}
                     </span>
                   </div>
-                </button>
+
+                  {/* La línea de la IA: qué está haciendo */}
+                  <div
+                    className={`flex items-start gap-1.5 border-t border-border/40 px-2.5 py-2 text-xs ${
+                      p.fueraDeLugar ? "text-destructive" : "text-muted-foreground"
+                    }`}
+                  >
+                    <Sparkles className="mt-0.5 h-3.5 w-3.5 shrink-0 opacity-70" />
+                    <span className="min-w-0 flex-1 leading-snug">
+                      {p.veredicto || t("hr.pantallazos.analizando")}
+                    </span>
+                  </div>
+                </div>
               );
             })}
           </div>

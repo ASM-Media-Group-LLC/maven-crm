@@ -382,14 +382,15 @@ export default function HRMonitorIA() {
         }
       />
 
-      {/* La nota del equipo — lo primero: saber al instante quién va bien o mal. */}
+      {/* La muralla en vivo — lo PRIMERO: una tarjeta por persona con su pantalla,
+          su cámara, quién es, hace cuánto y qué anda haciendo (estilo Hubstaff). */}
+      <div className="mt-5"><PantallazosVivoPanel /></div>
+
+      {/* La nota del equipo: saber al instante quién va bien o mal. */}
       <div className="mt-5"><NotasEquipoPanel /></div>
 
-      {/* El rondín en vivo: qué hace cada quien AHORA. */}
+      {/* El rondín en vivo: estado de cada quien AHORA (pausa/baño/llamada). */}
       <div className="mt-5"><RondinVivoPanel /></div>
-
-      {/* Los pantallazos en vivo: lo que hacen (pantalla) y que estén (cámara). */}
-      <div className="mt-5"><PantallazosVivoPanel /></div>
 
       <div className="mt-4 grid grid-cols-2 gap-4 md:grid-cols-4">
         <HRMetricCard title={t("hr.monia.kpi.hoy")} value={hoy.length} icon={AlertTriangle} color={hoy.length > 0 ? "warning" : "default"} subtitle={t("hr.monia.kpi.hoySub")} />
