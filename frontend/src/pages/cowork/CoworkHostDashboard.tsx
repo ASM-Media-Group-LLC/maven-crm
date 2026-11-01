@@ -1582,7 +1582,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
   const relojPared = new Date(now).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
 
   return (
-    <div className="flex flex-1 min-h-0 text-foreground relative md:flex-row-reverse dark:bg-black/20">
+    <div className="flex flex-1 min-h-0 text-foreground relative md:flex-row-reverse">
       {/* En escritorio el panel lateral va a la DERECHA (Jhon, 10/09); el orden del
           DOM no cambia, lo invierte flex-row-reverse. En el teléfono el panel es
           una hoja fija y el orden no importa. */}
@@ -2690,7 +2690,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
           <div
             ref={hubPanelRef}
             className={cn(
-              "relative border border-border/60 bg-card/85 shadow-2xl backdrop-blur-xl overflow-hidden flex flex-col",
+              "relative border border-white/10 bg-card/60 shadow-2xl backdrop-blur-xl overflow-hidden flex flex-col [box-shadow:0_20px_50px_-12px_rgba(0,0,0,.5),inset_0_1px_0_hsl(0_0%_100%/.1)]",
               isMobile
                 ? (hubMaximized ? "w-screen h-[100dvh] rounded-none border-0 pt-safe pb-safe" : "w-screen rounded-t-2xl border-x-0 border-b-0 pb-safe")
                 : hubMaximized
