@@ -13,14 +13,21 @@ import type { CSSProperties, MouseEvent as ReactMouseEvent, PointerEvent as Reac
  *
  * La lógica salió tal cual de ClariAiFab, que ahora la consume desde acá.
  */
-export const FAB_SIZE = 56; // h-14 w-14
+/** En el teléfono el muelle es más chico (h-11 = 44px) y más pegado a la
+ *  esquina, para no tapar contenido ni botones; en escritorio, el de siempre
+ *  (h-14 = 56px). El umbral coincide con el `sm:` de Tailwind (640px), así las
+ *  clases h-11/sm:h-14 de los botones cuadran con este cálculo de posición. */
+const esMovil = () => typeof window !== "undefined" && window.innerWidth < 640;
+export const fabSize = () => (esMovil() ? 44 : 56);
+/** Compat: algún consumidor viejo importa el número. Para cálculos usar fabSize(). */
+export const FAB_SIZE = 56; // h-14 w-14 (escritorio)
 export const MARGIN = 8; // margen mínimo al borde de la ventana
 /** Ancla dentro de la pila del muelle (arriba de la nubecita del Messenger)
  *  donde otras pantallas pueden colgar un botón por portal. Hoy lo usa el
  *  Supervisor Hub de Cowork cuando está minimizado: así el «Hub» queda
  *  siempre en el mismo lugar y sigue al muelle si lo arrastran. */
 export const MUELLE_EXTRA_ID = "muelle-flotante-extra";
-const DEFAULT_GAP = 24; // bottom-6 right-6
+const gapPorDefecto = () => (esMovil() ? 12 : 24); // más pegado a la esquina en el teléfono
 const DRAG_THRESHOLD = 5; // px de movimiento para considerar "arrastre" (vs click)
 
 const POS_KEY = "muelle.pos";
@@ -31,13 +38,13 @@ const POS_KEY_LEGACY = "clari.fab.pos";
 export interface Pos { x: number; y: number }
 
 const posPorDefecto = (): Pos => ({
-  x: window.innerWidth - FAB_SIZE - DEFAULT_GAP,
-  y: window.innerHeight - FAB_SIZE - DEFAULT_GAP,
+  x: window.innerWidth - fabSize() - gapPorDefecto(),
+  y: window.innerHeight - fabSize() - gapPorDefecto(),
 });
 
 export const clampToViewport = (p: Pos): Pos => {
-  const maxX = window.innerWidth - FAB_SIZE - MARGIN;
-  const maxY = window.innerHeight - FAB_SIZE - MARGIN;
+  const maxX = window.innerWidth - fabSize() - MARGIN;
+  const maxY = window.innerHeight - fabSize() - MARGIN;
   return {
     x: Math.max(MARGIN, Math.min(p.x, Math.max(MARGIN, maxX))),
     y: Math.max(MARGIN, Math.min(p.y, Math.max(MARGIN, maxY))),
@@ -157,11 +164,11 @@ export function useMuelleFlotante() {
   const anclarPanel = useCallback((ancho: number, alto: number): CSSProperties => {
     const altoReal = Math.min(alto, window.innerHeight - 2 * MARGIN);
     let top = pos.y - altoReal - MARGIN; // preferimos arriba del muelle
-    if (top < MARGIN) top = pos.y + FAB_SIZE + MARGIN; // si no entra, abajo
+    if (top < MARGIN) top = pos.y + fabSize() + MARGIN; // si no entra, abajo
     top = Math.max(MARGIN, Math.min(top, window.innerHeight - altoReal - MARGIN));
     // Alineado por el borde derecho del muelle; si eso lo saca por la izquierda,
     // se abre hacia la derecha.
-    let left = pos.x + FAB_SIZE - ancho;
+    let left = pos.x + fabSize() - ancho;
     left = Math.max(MARGIN, Math.min(left, window.innerWidth - ancho - MARGIN));
     return { left, top, height: altoReal };
   }, [pos.x, pos.y]);
@@ -171,7 +178,7 @@ export function useMuelleFlotante() {
     /** Estilo del contenedor: la columna crece HACIA ARRIBA desde el anclaje. */
     estiloContenedor: {
       left: pos.x,
-      bottom: altoVentana - pos.y - FAB_SIZE,
+      bottom: altoVentana - pos.y - fabSize(),
     } as CSSProperties,
     arrastreProps: { onPointerDown, onClickCapture },
     anclarPanel,

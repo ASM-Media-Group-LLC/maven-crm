@@ -7,7 +7,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useChatShared } from "@/hooks/ChatProvider";
 import { usePermissions } from "@/hooks/usePermissions";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { useMuelleFlotante, FAB_SIZE, MARGIN, MUELLE_EXTRA_ID } from "@/hooks/useMuelleFlotante";
+import { useMuelleFlotante, fabSize, MARGIN, MUELLE_EXTRA_ID } from "@/hooks/useMuelleFlotante";
 import ClariAiFab from "@/components/ClariAiFab";
 import { useUserRole } from "@/hooks/useUserRole";
 import DockChatWindow, { VENTANA_ANCHO } from "./DockChatWindow";
@@ -103,14 +103,14 @@ export function MessengerDockProvider({ children }: { children: ReactNode }) {
     bottom: estiloContenedor.bottom,
     ...(haciaIzquierda
       ? { right: (typeof window === "undefined" ? 0 : window.innerWidth) - pos.x + MARGIN }
-      : { left: pos.x + FAB_SIZE + MARGIN }),
+      : { left: pos.x + fabSize() + MARGIN }),
   } as React.CSSProperties;
 
   // En una pantalla angosta no entran tres ventanas de 336px: mostramos las que
   // quepan (las más recientes) y el resto sigue abierto, solo que no se dibuja.
   const anchoLibre = typeof window === "undefined"
     ? 0
-    : (haciaIzquierda ? pos.x : window.innerWidth - pos.x - FAB_SIZE) - 2 * MARGIN;
+    : (haciaIzquierda ? pos.x : window.innerWidth - pos.x - fabSize()) - 2 * MARGIN;
   const ventanas = abiertas
     .map((id) => porId[id])
     .filter(Boolean)
@@ -199,12 +199,12 @@ export function MessengerDockProvider({ children }: { children: ReactNode }) {
           <button
             type="button"
             onClick={() => setPanelAbierto((v) => !v)}
-            className="glass-panel relative flex h-14 w-14 items-center justify-center rounded-full text-foreground transition-transform hover:scale-105 active:scale-95"
+            className="glass-panel relative flex h-11 w-11 sm:h-14 sm:w-14 items-center justify-center rounded-full text-foreground transition-transform hover:scale-105 active:scale-95"
             title={t("messenger.dock.mensajesArrastrame")}
             aria-expanded={panelAbierto}
             aria-label={t("messenger.dock.mensajes")}
           >
-            <MessageCircle className="h-6 w-6" />
+            <MessageCircle className="h-5 w-5 sm:h-6 sm:w-6" />
             {sinLeer > 0 && (
               <span className="absolute -right-0.5 -top-0.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-destructive px-1 text-[10px] font-bold text-destructive-foreground ring-2 ring-background">
                 {sinLeer > 99 ? "99+" : sinLeer}
@@ -225,7 +225,7 @@ export function MessengerDockProvider({ children }: { children: ReactNode }) {
             NO ensancha la pila (con `contents` una píldora más ancha corría las
             burbujas). `data-lado` dice de qué lado de la pantalla está el
             muelle, para que lo colgado se alinee hacia adentro. */}
-        <div id={MUELLE_EXTRA_ID} data-lado={haciaIzquierda ? "derecha" : "izquierda"} className="relative h-0 w-14" />
+        <div id={MUELLE_EXTRA_ID} data-lado={haciaIzquierda ? "derecha" : "izquierda"} className="relative h-0 w-11 sm:w-14" />
       </div>
       )}
     </DockContext.Provider>

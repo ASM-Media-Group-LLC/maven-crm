@@ -76,7 +76,7 @@ function TarjetaKpi({ icono: Icono, etiqueta, valor, detalle, tono = "primary", 
           </span>
           <span className="text-xs font-medium text-muted-foreground">{etiqueta}</span>
         </div>
-        <div className="font-display text-[26px] font-bold leading-none tracking-tight tabular-nums">{valor}</div>
+        <div className="font-display text-[22px] sm:text-[26px] font-bold leading-tight tracking-tight tabular-nums [text-wrap:balance]">{valor}</div>
         <div className="text-xs text-muted-foreground">{detalle}</div>
       </div>
     </div>
@@ -155,7 +155,7 @@ export default function CentroDeOperaciones() {
   return (
     // flex-1 min-h-0 overflow-y-auto: el scroll propio de la página. El <main>
     // del AppShell es overflow-hidden (cada página pone su scroll), si no, recorta.
-    <div className="flex-1 min-h-0 overflow-y-auto p-4 md:p-6 space-y-5">
+    <div className="flex-1 min-h-0 overflow-y-auto p-4 pb-24 md:p-6 space-y-5">
       {/* Cabecera */}
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>

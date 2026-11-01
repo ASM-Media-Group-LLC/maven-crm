@@ -102,11 +102,11 @@ const ClariAiFab = ({ anclarPanel }: { anclarPanel: (ancho: number, alto: number
       <button
         type="button"
         onClick={() => setOpen((o) => { if (!o) setHasActivity(true); return !o; })}
-        className="relative flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-br from-primary to-primary/80 text-primary-foreground shadow-lg ring-2 ring-primary/30 transition-[box-shadow,transform] duration-200 hover:shadow-xl hover:ring-primary/60"
+        className="relative flex h-11 w-11 sm:h-14 sm:w-14 items-center justify-center rounded-full bg-gradient-to-br from-primary to-primary/80 text-primary-foreground shadow-lg ring-2 ring-primary/30 transition-[box-shadow,transform] duration-200 hover:shadow-xl hover:ring-primary/60"
         aria-label={open ? t("shared.clari.minimize") : t("shared.clari.open")}
         title="Clari AI"
       >
-        <Bot className="h-6 w-6" />
+        <Bot className="h-5 w-5 sm:h-6 sm:w-6" />
         {!open && hasActivity && (
           <span className="absolute right-0 top-0 h-3.5 w-3.5 rounded-full border-2 border-background bg-success shadow-sm" />
         )}
