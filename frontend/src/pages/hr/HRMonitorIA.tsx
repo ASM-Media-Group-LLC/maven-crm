@@ -28,6 +28,7 @@ import { useMonitorConfig } from "@/hooks/useMonitorConfig";
 import { useMonitorRanking } from "@/hooks/useMonitorPanel";
 import { NotasEquipoPanel } from "@/components/hr/NotasEquipoPanel";
 import { RondinVivoPanel } from "@/components/hr/RondinVivoPanel";
+import { PantallazosVivoPanel } from "@/components/hr/PantallazosVivoPanel";
 import { LABEL_FALTA, type FaltaTipo } from "@/lib/monitorFaltas";
 import type { TranslationKey } from "@/lib/i18n";
 
@@ -386,6 +387,9 @@ export default function HRMonitorIA() {
 
       {/* El rondín en vivo: qué hace cada quien AHORA. */}
       <div className="mt-5"><RondinVivoPanel /></div>
+
+      {/* Los pantallazos en vivo: lo que hacen (pantalla) y que estén (cámara). */}
+      <div className="mt-5"><PantallazosVivoPanel /></div>
 
       <div className="mt-4 grid grid-cols-2 gap-4 md:grid-cols-4">
         <HRMetricCard title={t("hr.monia.kpi.hoy")} value={hoy.length} icon={AlertTriangle} color={hoy.length > 0 ? "warning" : "default"} subtitle={t("hr.monia.kpi.hoySub")} />

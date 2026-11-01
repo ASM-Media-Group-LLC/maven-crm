@@ -1005,6 +1005,17 @@ export const hr = {
   "hr.rondin.estado.camara_apagada": { es: "Cámara apagada", en: "Camera off" },
   "hr.rondin.estado.se_fue": { es: "Fuera del puesto", en: "Away from desk" },
   "hr.rondin.estado.ausente": { es: "Desconectado", en: "Disconnected" },
+  // ── Pantallazos en vivo (galería tipo Hubstaff, Argos) ──
+  "hr.pantallazos.title": { es: "Pantallazos en vivo", en: "Live screenshots" },
+  "hr.pantallazos.sub": { es: "Lo que el equipo está haciendo ahora", en: "What the team is doing now" },
+  "hr.pantallazos.vacio": { es: "Todavía no hay pantallazos. Aparecen cuando el equipo trabaja con Maven abierto.", en: "No screenshots yet. They show up when the team works with Maven open." },
+  "hr.pantallazos.error": { es: "No se pudieron cargar los pantallazos. Reintenta.", en: "Couldn't load the screenshots. Try again." },
+  "hr.pantallazos.reintentar": { es: "Actualizar", en: "Refresh" },
+  "hr.pantallazos.pantalla": { es: "Pantalla", en: "Screen" },
+  "hr.pantallazos.camara": { es: "Cámara", en: "Camera" },
+  "hr.pantallazos.fueraDeLugar": { es: "Fuera de lugar", en: "Off task" },
+  "hr.pantallazos.ahora": { es: "ahora", en: "now" },
+  "hr.pantallazos.hace": { es: "hace {n} min", en: "{n} min ago" },
   // ── Expediente del empleado (calendario del mes, Argos) ──
   "hr.exp.title": { es: "Expediente", en: "Record" },
   "hr.exp.sub": { es: "Qué hizo cada día", en: "What they did each day" },

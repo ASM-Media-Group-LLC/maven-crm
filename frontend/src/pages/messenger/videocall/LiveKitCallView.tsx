@@ -496,12 +496,17 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
   // ya está probado: leer el estado REAL en un tic, no confiar en la lista.
   // Cuesta nada — es mirar una propiedad de un objeto que ya está en memoria.
   const [compartiendoReal, setCompartiendoReal] = useState(false);
+  // El MediaStreamTrack de la pantalla propia, para que Argos le saque un
+  // pantallazo cada minuto (igual que el de la cámara). Sale del mismo tic.
+  const [localScreenTrack, setLocalScreenTrack] = useState<MediaStreamTrack | null>(null);
   useEffect(() => {
     const mirar = () => {
       const room = lk.getRoom();
       const pub = room?.localParticipant?.getTrackPublication?.(Track.Source.ScreenShare);
       const activo = !!pub && !pub.isMuted;
       setCompartiendoReal((antes) => (antes === activo ? antes : activo));
+      const t = activo ? ((pub?.track?.mediaStreamTrack as MediaStreamTrack | undefined) ?? null) : null;
+      setLocalScreenTrack((antes) => (antes === t ? antes : t));
     };
     mirar();
     const id = window.setInterval(mirar, 1000);
@@ -622,6 +627,7 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
   // distraído). Solo en una sala de Cowork viva; el propio hook excluye admins.
   useMonitorCamara({
     track: localCameraTrack,
+    trackPantalla: localScreenTrack,
     camaraRealOn,
     faceWatch,
     activo: !!supervisorEncuadre && conSalaViva,

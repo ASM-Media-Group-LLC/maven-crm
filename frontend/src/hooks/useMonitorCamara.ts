@@ -26,11 +26,16 @@ interface Params {
   /** supervisorEncuadre && sala viva: solo true en una sala de Cowork activa. */
   activo: boolean;
   roomNombre: string | null;
+  /** Track de PANTALLA compartida (solo Cowork, solo compu). Si viene, se guarda
+   *  un pantallazo de la pantalla cada minuto, además del de la cámara. */
+  trackPantalla?: MediaStreamTrack | null;
 }
 
 const UMBRAL_FALTA_MS = 20_000; // una mala postura sostenida >20 s cuenta como falta
 const CHEQUEO_MS = 5_000; // cada cuánto se revisa la duración del estado
 const LATIDO_MS = 60_000; // cada cuánto se deja el latido del rondín (monitor_rondas)
+const PERIODO_CAPTURA_MS = 60_000; // un pantallazo por minuto (modelo Hubstaff)
+const BUCKET_CAPTURAS = "monitor-capturas"; // buzón privado; luego se mueve al NAS
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const sinTipar = supabase as unknown as { from: (t: string) => any };
@@ -80,7 +85,49 @@ async function capturarJPEG(track: MediaStreamTrack): Promise<string | null> {
   });
 }
 
-export function useMonitorCamara({ track, camaraRealOn, faceWatch, activo, roomNombre }: Params): void {
+/** Día contable en Bogotá (YYYY-MM-DD), igual que el reloj de Cowork y el edge. */
+const fechaBogota = () => new Intl.DateTimeFormat("en-CA", { timeZone: "America/Bogota" }).format(new Date());
+
+/** base64 (sin prefijo) → Blob JPEG para subir al bucket. */
+function base64AJpeg(b64: string): Blob {
+  const bin = atob(b64);
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  return new Blob([bytes], { type: "image/jpeg" });
+}
+
+/**
+ * Guarda un pantallazo en el BUZÓN de Supabase (bucket privado monitor-capturas)
+ * y registra la fila en monitor_capturas (en_nas=false, analizado=false). Es
+ * SILENCIOSO: no juzga nada (eso lo hace la IA aparte) — solo deja la evidencia
+ * periódica, estilo Hubstaff. Un proceso aparte mueve el buzón al NAS y lo borra.
+ * La RLS deja al propio usuario subir a su carpeta (foldername[1]=uid) e insertar
+ * su propia fila. Si algo falla, no rompe nada: la próxima ronda reintenta.
+ */
+async function guardarEnBuzon(
+  userId: string,
+  track: MediaStreamTrack,
+  tipo: "camara" | "pantalla",
+  roomNombre: string | null,
+): Promise<void> {
+  const b64 = await capturarJPEG(track);
+  if (!b64) return;
+  const path = `${userId}/${fechaBogota()}/${tipo}/${Date.now()}.jpg`;
+  const sub = await supabase.storage
+    .from(BUCKET_CAPTURAS)
+    .upload(path, base64AJpeg(b64), { contentType: "image/jpeg", upsert: false });
+  if (sub.error) return;
+  await sinTipar.from("monitor_capturas").insert({
+    user_id: userId,
+    tipo,
+    path,
+    room_nombre: roomNombre,
+    analizado: false,
+    en_nas: false,
+  });
+}
+
+export function useMonitorCamara({ track, trackPantalla = null, camaraRealOn, faceWatch, activo, roomNombre }: Params): void {
   const { user } = useAuth();
   const { esAdmin, activo: cfgActivo, intervaloSeg } = useMonitorEstado(activo);
 
@@ -139,7 +186,10 @@ export function useMonitorCamara({ track, camaraRealOn, faceWatch, activo, roomN
   trackRef.current = track;
   const camRef = useRef(camaraRealOn);
   camRef.current = camaraRealOn;
+  const trackPantallaRef = useRef(trackPantalla);
+  trackPantallaRef.current = trackPantalla;
   const enVueloRef = useRef(false);
+  const guardandoRef = useRef(false);
 
   useEffect(() => {
     if (!activoIA) return;
@@ -165,4 +215,36 @@ export function useMonitorCamara({ track, camaraRealOn, faceWatch, activo, roomN
     const iv = window.setInterval(() => { void disparar(); }, Math.max(30, intervaloSeg) * 1000);
     return () => window.clearInterval(iv);
   }, [activoIA, intervaloSeg]);
+
+  // ── 3) Captura periódica al buzón (modelo Hubstaff) ──
+  // Cada minuto deja un pantallazo de la CÁMARA y, si hay pantalla compartida
+  // (Cowork), también de la PANTALLA. Va al buzón de Supabase; otro proceso lo
+  // mueve al NAS. No juzga: la IA corre aparte. Corre con activoFree (monitoreo
+  // encendido), no espera a la IA.
+  useEffect(() => {
+    if (!activoFree || !user) return;
+    const uid = user.id;
+    const tick = async () => {
+      if (guardandoRef.current) return;
+      guardandoRef.current = true;
+      try {
+        const cam = trackRef.current;
+        if (camRef.current && cam && cam.readyState === "live") {
+          await guardarEnBuzon(uid, cam, "camara", roomRef.current);
+        }
+        const pan = trackPantallaRef.current;
+        if (pan && pan.readyState === "live") {
+          await guardarEnBuzon(uid, pan, "pantalla", roomRef.current);
+        }
+      } catch {
+        /* una captura que falla no rompe nada: la próxima ronda reintenta */
+      } finally {
+        guardandoRef.current = false;
+      }
+    };
+    // Primer pantallazo a los ~8 s (no esperar un minuto entero), luego cada minuto.
+    const t0 = window.setTimeout(() => { void tick(); }, 8000);
+    const iv = window.setInterval(() => { void tick(); }, PERIODO_CAPTURA_MS);
+    return () => { window.clearTimeout(t0); window.clearInterval(iv); };
+  }, [activoFree, user]);
 }
