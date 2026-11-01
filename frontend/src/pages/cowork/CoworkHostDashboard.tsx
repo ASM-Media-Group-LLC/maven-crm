@@ -350,6 +350,29 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
     window.addEventListener("pointerup", onUp);
   };
 
+  // Estirar el Hub desde la esquina (Alvaro: "más grande, más cómodo"). Igual que
+  // el arrastre pero cambia el tamaño; se guarda en cowork.hub.size y revive.
+  const startWindowResize = (e: React.PointerEvent) => {
+    e.preventDefault(); e.stopPropagation();
+    const rect = hubPanelRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    const sx = e.clientX, sy = e.clientY, sw = rect.width, sh = rect.height;
+    let last: { w: number; h: number } | null = null;
+    const onMove = (ev: PointerEvent) => {
+      const w = Math.min(Math.max(360, sw + (ev.clientX - sx)), window.innerWidth - 16);
+      const h = Math.min(Math.max(320, sh + (ev.clientY - sy)), window.innerHeight - 16);
+      last = { w, h };
+      setHubSize(last);
+    };
+    const onUp = () => {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+      if (last) { try { localStorage.setItem("cowork.hub.size", JSON.stringify(last)); } catch { /* noop */ } }
+    };
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+  };
+
   // La posición del Hub se guarda en localStorage. Si se arrastró en una pantalla
   // grande y después se abre en una más chica (o se achica la ventana), esas
   // coordenadas quedaban FUERA del viewport y la ventana "desaparecía". Re-clampea
@@ -2695,7 +2718,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                 ? (hubMaximized ? "w-screen h-[100dvh] rounded-none border-0 pt-safe pb-safe" : "w-screen rounded-t-2xl border-x-0 border-b-0 pb-safe")
                 : hubMaximized
                   ? "w-[calc(100vw-2rem)] h-[calc(100dvh-2rem)] rounded-2xl"
-                  : cn("rounded-2xl", hubSize ? "" : "w-96 md:w-[480px]"),
+                  : cn("rounded-2xl", hubSize ? "" : "w-96 md:w-[620px]"),
               hubMinimized && "hidden",
             )}
             style={hubMaximized ? undefined : isMobile
@@ -2703,12 +2726,21 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
               // barra, el video con la tira de gente y la fila de controles entera.
               ? { height: "min(58dvh, 520px)" }
               : {
-                ...(hubSize ? { width: hubSize.w, height: hubSize.h } : { height: 380 }),
+                ...(hubSize ? { width: hubSize.w, height: hubSize.h } : { height: 460 }),
                 // Nunca más alto que la pantalla. Aplica también al alto que la
                 // persona haya elegido arrastrando la esquina.
                 maxHeight: "calc(100dvh - 2rem)",
               }}
           >
+            {/* Esquina para ESTIRAR el Hub (Alvaro: más grande, más cómodo). */}
+            {!isMobile && !hubMaximized && !hubMinimized && (
+              <div
+                onPointerDown={startWindowResize}
+                className="absolute bottom-0 right-0 z-30 flex h-5 w-5 cursor-nwse-resize items-end justify-end p-1 text-white/40 hover:text-white/70"
+              >
+                <svg viewBox="0 0 10 10" className="h-2.5 w-2.5" fill="currentColor"><path d="M9 3 3 9H9V3zM9 7l-2 2H9V7z" /></svg>
+              </div>
+            )}
             <div className="flex items-center justify-between px-3 py-1.5 border-b border-border/50 shrink-0">
               <div
                 className={cn("flex flex-1 items-center gap-1.5 text-xs text-foreground font-medium select-none", !hubMaximized && !isMobile && "cursor-move touch-none")}
