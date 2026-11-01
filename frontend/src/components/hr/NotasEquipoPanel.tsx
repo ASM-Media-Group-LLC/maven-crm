@@ -1,8 +1,9 @@
 import { useMemo, useState } from "react";
-import { Gauge, Loader2, AlertTriangle } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { Gauge, Loader2, AlertTriangle, CalendarDays } from "lucide-react";
 import { useLanguage } from "@/hooks/useLanguage";
 import { UserAvatar } from "@/components/UserAvatar";
-import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { useNotasEquipo, type NotaDePersona, type PeriodoNota } from "@/hooks/useNotasEquipo";
 import type { BandaNota, FactorNota } from "@/lib/notaEmpleado";
 import type { TranslationKey } from "@/lib/i18n";
@@ -52,13 +53,14 @@ function colorDe(banda: BandaNota | null) {
 }
 
 // ── Ficha de una persona (la nota desglosada) ──
-function FichaPersona({ p, t, onClose }: { p: NotaDePersona | null; t: Tr; onClose: () => void }) {
+function FichaPersona({ p, t, onClose, onExpediente }: { p: NotaDePersona | null; t: Tr; onClose: () => void; onExpediente: (id: string) => void }) {
   if (!p) return null;
   const c = colorDe(p.nota.banda);
   const nombre = p.nombre || t("hr.noName");
   return (
     <Dialog open={!!p} onOpenChange={(o) => { if (!o) onClose(); }}>
       <DialogContent className="max-w-md">
+        <DialogTitle className="sr-only">{nombre}</DialogTitle>
         <div className="flex flex-col gap-5">
           {/* Identidad */}
           <div className="flex items-center gap-3">
@@ -118,6 +120,12 @@ function FichaPersona({ p, t, onClose }: { p: NotaDePersona | null; t: Tr; onClo
             </div>
           </div>
 
+          <button
+            onClick={() => onExpediente(p.userId)}
+            className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-3 py-2.5 text-sm font-semibold text-white shadow-[0_8px_20px_-8px_hsl(var(--primary))] transition hover:brightness-110"
+          >
+            <CalendarDays className="h-4 w-4" /> {t("hr.exp.verExpediente")}
+          </button>
           <p className="text-[11px] leading-relaxed text-muted-foreground">{t("hr.notas.pie")}</p>
         </div>
       </DialogContent>
@@ -127,6 +135,7 @@ function FichaPersona({ p, t, onClose }: { p: NotaDePersona | null; t: Tr; onClo
 
 export function NotasEquipoPanel() {
   const { t } = useLanguage();
+  const navigate = useNavigate();
   const [periodo, setPeriodo] = useState<PeriodoNota>("hoy");
   const [ficha, setFicha] = useState<NotaDePersona | null>(null);
   const { notas, cargando, error } = useNotasEquipo(periodo);
@@ -235,7 +244,7 @@ export function NotasEquipoPanel() {
         )}
       </div>
 
-      <FichaPersona p={ficha} t={t} onClose={() => setFicha(null)} />
+      <FichaPersona p={ficha} t={t} onClose={() => setFicha(null)} onExpediente={(id) => { setFicha(null); navigate(`/hr/expediente/${id}`); }} />
     </section>
   );
 }
