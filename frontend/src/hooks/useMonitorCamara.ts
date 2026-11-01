@@ -165,27 +165,4 @@ export function useMonitorCamara({ track, camaraRealOn, faceWatch, activo, roomN
     const iv = window.setInterval(() => { void disparar(); }, Math.max(30, intervaloSeg) * 1000);
     return () => window.clearInterval(iv);
   }, [activoIA, intervaloSeg]);
-
-  // ── DIAGNÓSTICO TEMPORAL (Alvaro, 31/10) ─────────────────────────────────
-  // El monitor no graba nada (monitor_eventos/rondas = 0) aunque hay gente en
-  // Cowork. Esto escribe, cada ~15s mientras el hook está montado en una llamada
-  // REAL (no la vigilancia de app, roomNombre "maven"), el estado de cada
-  // condición del gate, para ver EN VIVO cuál falla. BORRAR cuando quede resuelto.
-  useEffect(() => {
-    if (!user || roomRef.current === "maven") return;
-    const escribir = () => {
-      void sinTipar.from("monitor_debug").insert({
-        user_id: user.id,
-        activo_param: activo,
-        es_admin: esAdmin,
-        cfg_activo: cfgActivo,
-        activo_free: activoFree,
-        face_state: faceRef.current?.state ?? null,
-        room_nombre: roomRef.current,
-      });
-    };
-    escribir();
-    const iv = window.setInterval(escribir, 15000);
-    return () => window.clearInterval(iv);
-  }, [user, activo, esAdmin, cfgActivo, activoFree]);
 }
