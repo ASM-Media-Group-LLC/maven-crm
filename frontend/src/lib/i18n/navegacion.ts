@@ -112,7 +112,7 @@ export const navegacion = {
 
   // RRHH - grupos y sub-items
   "nav.hr.dashboard": { es: "Dashboard HR", en: "HR Dashboard" },
-  "nav.hr.lifecycle": { es: "Employee Lifecycle", en: "Employee Lifecycle" },
+  "nav.hr.lifecycle": { es: "Ciclo del empleado", en: "Employee Lifecycle" },
   "nav.hr.staff": { es: "Personal", en: "Staff" },
   "nav.hr.candidates": { es: "Candidatos", en: "Candidates" },
   "nav.hr.onboarding": { es: "Onboarding", en: "Onboarding" },
@@ -133,7 +133,7 @@ export const navegacion = {
   "nav.hr.monitorIA": { es: "Monitor IA", en: "AI Monitor" },
   "nav.hr.tracking": { es: "Seguimiento", en: "Follow-up" },
   "nav.hr.incidents": { es: "Incidentes", en: "Incidents" },
-  "nav.hr.development": { es: "Desarrollo & Performance", en: "Development & Performance" },
+  "nav.hr.development": { es: "Desarrollo y Desempeño", en: "Development & Performance" },
   "nav.hr.performance": { es: "Desempeño", en: "Performance" },
   "nav.hr.training": { es: "Capacitación", en: "Training" },
   "nav.hr.organization": { es: "Organización", en: "Organization" },

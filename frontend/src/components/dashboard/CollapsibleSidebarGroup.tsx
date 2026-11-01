@@ -50,8 +50,11 @@ export const CollapsibleSidebarGroup = ({
   collapsedItems,
   children,
 }: Props) => {
-  const { state } = useSidebar();
-  const collapsed = state === "collapsed";
+  const { state, isMobile } = useSidebar();
+  // En el teléfono el menú es un cajón a lo ancho (Sheet), no un riel de iconos:
+  // ahí NUNCA va la rama "plegada" (el flyout lateral de escritorio, que se
+  // salía de la pantalla y cortaba los nombres). Siempre acordeón inline.
+  const collapsed = state === "collapsed" && !isMobile;
   const navigate = useNavigate();
   const { pathname } = useLocation();
 

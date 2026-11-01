@@ -69,7 +69,10 @@ const pickActiveUrl = (urls: string[], pathname: string): string | null => {
 
 const DashboardSidebar = () => {
   const { state, isMobile, setOpenMobile } = useSidebar();
-  const collapsed = state === "collapsed";
+  // En el teléfono el sidebar es un cajón a lo ancho (Sheet): nunca se renderiza
+  // como riel plegado (Finanzas/RRHH mostraban su flyout de escritorio y el pie
+  // se apilaba en iconos). Plegado SOLO en escritorio.
+  const collapsed = state === "collapsed" && !isMobile;
   const { pathname } = useLocation();
 
   // En móvil el sidebar es un Sheet overlay: cerrarlo al navegar para que la
