@@ -466,6 +466,50 @@ All colors MUST be HSL. Light mode in :root, dark mode in .dark.
   stroke-width: 1.5;
 }
 
+/* ── Menú del TELÉFONO (cajón) ──────────────────────────────────────────
+   El riel de escritorio es fino y pensado para mouse; el cajón del teléfono
+   se toca con el dedo, así que acá va más grande, más legible y con más aire.
+   Solo aplica dentro del Sheet móvil (data-mobile="true"): el escritorio no se
+   toca. (Alvaro, 01/11: "pulir el menú del teléfono".) Los 3 atributos del
+   selector le ganan en especificidad a las utilities de Tailwind. */
+[data-sidebar="sidebar"][data-mobile="true"] [data-sidebar="content"] {
+  gap: 0.25rem;
+  padding-left: 0.5rem;
+  padding-right: 0.5rem;
+}
+/* Filas de primer nivel: ítems sueltos (menu-button) y cabeceras de grupo
+   (group-label). Alto cómodo al tacto (~46px), texto y radios más generosos. */
+[data-sidebar="sidebar"][data-mobile="true"] [data-sidebar="menu-button"],
+[data-sidebar="sidebar"][data-mobile="true"] [data-sidebar="group-label"] {
+  min-height: 2.875rem;
+  padding-top: 0.625rem;
+  padding-bottom: 0.625rem;
+  font-size: 0.95rem;
+  line-height: 1.25;
+  border-radius: 0.875rem;
+}
+/* Iconos más grandes para el dedo y la vista. */
+[data-sidebar="sidebar"][data-mobile="true"] [data-sidebar="menu-button"] > svg,
+[data-sidebar="sidebar"][data-mobile="true"] [data-sidebar="group-label"] > svg {
+  width: 1.3rem;
+  height: 1.3rem;
+}
+/* Sub-ítems (Promolog, Parrilla, los de RRHH…): un escalón menos que los de
+   primer nivel pero igual cómodos. */
+[data-sidebar="sidebar"][data-mobile="true"] [data-sidebar="menu-sub-button"] {
+  min-height: 2.6rem;
+  font-size: 0.925rem;
+  border-radius: 0.75rem;
+}
+/* Badges (Correo 395, Messenger 12…) un pelín más grandes para leerlos al
+   vuelo en el teléfono. */
+[data-sidebar="sidebar"][data-mobile="true"] [data-sidebar="menu-button"] > span.rounded-full,
+[data-sidebar="sidebar"][data-mobile="true"] [data-sidebar="menu-sub-button"] > span.rounded-full {
+  height: 1.375rem;
+  min-width: 1.375rem;
+  font-size: 0.7rem;
+}
+
 /* Auth animated gradient blobs */
 @keyframes blob-move-1 {
   0% { transform: translate(0, 0) scale(1); }
