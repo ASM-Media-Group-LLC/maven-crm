@@ -10,6 +10,7 @@ import { ChatProvider } from "@/hooks/ChatProvider";
 import { TypingInboxProvider } from "@/hooks/useTypingInbox";
 import { MessengerDockProvider } from "@/components/messenger/MessengerDock";
 import AnnouncementPopup from "@/components/dashboard/AnnouncementPopup";
+import { ArgosVigilante } from "@/components/ArgosVigilante";
 import { useAnnouncementsByChannel } from "@/hooks/useAnnouncements";
 import { useWaInboxNotifications } from "@/hooks/useWaInboxNotifications";
 import { useTgInboxNotifications } from "@/hooks/useTgInboxNotifications";
@@ -109,6 +110,9 @@ const AppShell = () => {
         </div>
       </div>
       {popups.length > 0 && <AnnouncementPopup popups={popups} />}
+      {/* Argos vigilante: monitor a nivel de toda la app (cámara propia, sin
+          LiveKit). El hook se autogatea (no-admin + interruptores); off por defecto. */}
+      <ArgosVigilante />
     </SidebarProvider>
     </MessengerDockProvider>
     </ChatProvider>

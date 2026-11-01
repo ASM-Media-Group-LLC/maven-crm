@@ -11,9 +11,11 @@ export interface MonitorConfig {
   activo: boolean;
   intervaloIaSeg: number;
   avisarSupervisor: boolean;
+  /** Vigilancia a nivel de toda la app (cámara propia, sin LiveKit). Off por defecto. */
+  vigilanciaApp: boolean;
 }
 
-const DEFAULTS: MonitorConfig = { activo: true, intervaloIaSeg: 120, avisarSupervisor: true };
+const DEFAULTS: MonitorConfig = { activo: true, intervaloIaSeg: 120, avisarSupervisor: true, vigilanciaApp: false };
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const sinTipar = supabase as unknown as { from: (t: string) => any };
@@ -28,7 +30,7 @@ export function useMonitorConfig(habilitado = true) {
     queryFn: async (): Promise<MonitorConfig> => {
       const { data, error } = await sinTipar
         .from("monitor_config")
-        .select("activo, intervalo_ia_seg, avisar_supervisor")
+        .select("activo, intervalo_ia_seg, avisar_supervisor, vigilancia_app")
         .eq("id", 1)
         .maybeSingle();
       if (error) throw error;
@@ -37,6 +39,7 @@ export function useMonitorConfig(habilitado = true) {
         activo: data.activo !== false,
         intervaloIaSeg: Math.max(30, Number(data.intervalo_ia_seg) || DEFAULTS.intervaloIaSeg),
         avisarSupervisor: data.avisar_supervisor !== false,
+        vigilanciaApp: data.vigilancia_app === true,
       };
     },
   });

@@ -887,6 +887,11 @@ export const hr = {
   "hr.monia.cfg.activo": { es: "Monitor encendido", en: "Monitor enabled" },
   "hr.monia.cfg.avisar": { es: "Avisar al supervisor", en: "Alert supervisor" },
   "hr.monia.cfg.intervalo": { es: "IA cada (seg)", en: "AI every (sec)" },
+  "hr.monia.cfg.vigilanciaApp": { es: "Vigilancia en toda la app", en: "App-wide monitoring" },
+  "hr.monia.cfg.vigilanciaAppHint": { es: "Argos prende la cámara y vigila mientras la persona esté en Maven, sin depender de Cowork/LiveKit.", en: "Argos turns on the camera and monitors while the person is in Maven, independent of Cowork/LiveKit." },
+  // Cartel de transparencia (lo ve la persona monitoreada)
+  "hr.monia.vig.viendo": { es: "Argos te está viendo", en: "Argos is watching" },
+  "hr.monia.vig.permiso": { es: "Argos necesita tu cámara", en: "Argos needs your camera" },
   "hr.monia.guardar": { es: "Guardar", en: "Save" },
   "hr.monia.guardado": { es: "Ajustes guardados", en: "Settings saved" },
   "hr.monia.errorGuardar": { es: "No se pudo guardar", en: "Could not save" },

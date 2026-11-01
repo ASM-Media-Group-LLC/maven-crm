@@ -17,6 +17,8 @@ export interface MonitorEstado {
   /** null = aún no cargó; true/false = interruptor del monitor. */
   activo: boolean | null;
   intervaloSeg: number;
+  /** Vigilancia a nivel de TODA la app (cámara propia, sin LiveKit). Off por defecto. */
+  vigilanciaApp: boolean;
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -27,6 +29,7 @@ export function useMonitorEstado(habilitado: boolean): MonitorEstado {
   const [esAdmin, setEsAdmin] = useState<boolean | null>(null);
   const [activo, setActivo] = useState<boolean | null>(null);
   const [intervaloSeg, setIntervaloSeg] = useState(120);
+  const [vigilanciaApp, setVigilanciaApp] = useState(false);
   const on = habilitado && !!user;
 
   useEffect(() => {
@@ -47,12 +50,13 @@ export function useMonitorEstado(habilitado: boolean): MonitorEstado {
     try {
       const { data, error } = await sinTipar
         .from("monitor_config")
-        .select("activo, intervalo_ia_seg")
+        .select("activo, intervalo_ia_seg, vigilancia_app")
         .eq("id", 1)
         .maybeSingle();
       if (error) throw error;
       setActivo(data ? data.activo !== false : true);
       setIntervaloSeg(data ? Math.max(30, Number(data.intervalo_ia_seg) || 120) : 120);
+      setVigilanciaApp(data ? data.vigilancia_app === true : false);
     } catch {
       // Un fallo de lectura NO apaga el monitor: deja lo anterior (si nunca
       // cargó, queda null y la IA espera; las faltas gratis corren igual).
@@ -72,5 +76,5 @@ export function useMonitorEstado(habilitado: boolean): MonitorEstado {
     alRevivir: () => { void leerCfg.current(); },
   });
 
-  return { esAdmin, activo, intervaloSeg };
+  return { esAdmin, activo, intervaloSeg, vigilanciaApp };
 }
