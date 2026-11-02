@@ -22,10 +22,16 @@ const HRLayout = ({ children }: { children: React.ReactNode }) => {
   const isRoot = pathname === "/hr" || pathname === "/hr/";
   const navState = state as { fromDashboard?: boolean; fromHR?: boolean } | null;
   const universalBarActive = !!navState?.fromDashboard || !!navState?.fromHR;
+  // Argos (/hr/monitor-ia) tiene su PROPIO botón en el riel: es un destino
+  // primario, no una sub-página de RR.HH. a la que te "mandaron". Su expediente
+  // trae su propio «← Volver a Argos». En ninguno va la barra «Volver al
+  // Dashboard HR» (Álvaro): para volver a RR.HH. está el sidebar.
+  const PRIMARIOS = ["/hr/monitor-ia", "/hr/expediente"];
+  const esPrimario = PRIMARIOS.some((r) => pathname === r || pathname.startsWith(r + "/"));
 
   return (
     <div className="flex-1 overflow-hidden flex flex-col">
-      {!isRoot && !universalBarActive && (
+      {!isRoot && !universalBarActive && !esPrimario && (
         <div className="shrink-0 px-6 pt-3">
           <Button
             variant="ghost"

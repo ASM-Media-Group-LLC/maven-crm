@@ -4,6 +4,7 @@ import { MonitorPlay, Loader2, AlertTriangle, ScreenShare, RefreshCw, Sparkles, 
 import { useLanguage } from "@/hooks/useLanguage";
 import { UserAvatar } from "@/components/UserAvatar";
 import { useCapturasVivo, type PersonaVivo } from "@/hooks/useCapturasVivo";
+import { useSemaforos, PUNTO_SEM, type Semaforo } from "@/hooks/useSemaforos";
 
 // LA MURALLA EN VIVO de Argos (modelo Hubstaff): las FOTOS de lo que pasa en los
 // últimos minutos, con identidad propia de MURAL — NO es la lista de Conectados
@@ -25,6 +26,7 @@ export function PantallazosVivoPanel() {
   const { t } = useLanguage();
   const navigate = useNavigate();
   const { personas, cargando, error, refrescar } = useCapturasVivo();
+  const { semaforoDe } = useSemaforos();
   const [modo, setModo] = useState<Modo>(leerModo);
 
   const elegir = (m: Modo) => { setModo(m); try { localStorage.setItem(MODO_KEY, m); } catch { /* sin storage */ } };
@@ -95,11 +97,11 @@ export function PantallazosVivoPanel() {
           </div>
         ) : modo === "muralla" ? (
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-            {personas.map((p) => <CardMuralla key={p.userId} p={p} t={t} hace={hace} onClick={() => irA(p.userId)} />)}
+            {personas.map((p) => <CardMuralla key={p.userId} p={p} t={t} hace={hace} sem={semaforoDe(p.userId, p.fueraDeLugar, p.veredicto)} onClick={() => irA(p.userId)} />)}
           </div>
         ) : (
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 2xl:grid-cols-6">
-            {personas.map((p) => <CeldaCuadricula key={p.userId} p={p} t={t} onClick={() => irA(p.userId)} />)}
+            {personas.map((p) => <CeldaCuadricula key={p.userId} p={p} t={t} sem={semaforoDe(p.userId, p.fueraDeLugar, p.veredicto)} onClick={() => irA(p.userId)} />)}
           </div>
         )}
       </div>
@@ -109,15 +111,21 @@ export function PantallazosVivoPanel() {
 
 type Tr = ReturnType<typeof useLanguage>["t"];
 
-// ── Vista MURALLA: tarjeta grande ──
-function CardMuralla({ p, t, hace, onClick }: { p: PersonaVivo; t: Tr; hace: (iso: string) => string; onClick: () => void }) {
+// El mensaje corto de estado por color de semáforo (el "sí o no" en palabras).
+const MSG_SEM: Record<Semaforo, string> = {
+  verde: "hr.sem.msg.verde", amarillo: "hr.sem.msg.amarillo", rojo: "hr.sem.msg.rojo", gris: "hr.sem.msg.gris",
+};
+
+// ── Vista MURALLA: tarjeta grande (foto + semáforo + mensaje + análisis) ──
+function CardMuralla({ p, t, hace, sem, onClick }: { p: PersonaVivo; t: Tr; hace: (iso: string) => string; sem: Semaforo; onClick: () => void }) {
   const nombre = p.nombre || t("hr.noName");
+  const rojo = sem === "rojo";
   return (
     <button
       type="button"
       onClick={onClick}
       title={t("hr.pantallazos.verExpediente", { nombre })}
-      className={`group relative block w-full overflow-hidden rounded-2xl border bg-card/30 text-left transition-colors ${p.fueraDeLugar ? "border-destructive/60 hover:border-destructive" : "border-border/40 hover:border-primary/60"}`}
+      className={`group relative block w-full overflow-hidden rounded-2xl border bg-card/30 text-left transition-colors ${rojo ? "border-destructive/60 hover:border-destructive" : sem === "amarillo" ? "border-warning/50 hover:border-warning" : "border-border/40 hover:border-primary/60"}`}
     >
       <div className="relative aspect-[16/10] w-full bg-muted/40">
         {p.principalUrl ? (
@@ -140,27 +148,35 @@ function CardMuralla({ p, t, hace, onClick }: { p: PersonaVivo; t: Tr; hace: (is
         )}
       </div>
       <div className="flex items-center gap-2 px-2.5 py-2">
+        {/* El semáforo también en el pantallazo: el sí-o-no en color */}
+        <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${PUNTO_SEM[sem]}`} />
         <UserAvatar name={nombre} src={p.avatarUrl} seed={p.avatarSeed} size="sm" />
         <span className="min-w-0 flex-1 truncate text-sm font-semibold">{nombre}</span>
         <span className="shrink-0 text-[10px] tabular-nums text-muted-foreground">{hace(p.ultima)}</span>
       </div>
-      <div className={`flex items-start gap-1.5 border-t border-border/40 px-2.5 py-2 text-xs ${p.fueraDeLugar ? "text-destructive" : "text-muted-foreground"}`}>
-        <Sparkles className="mt-0.5 h-3.5 w-3.5 shrink-0 opacity-70" />
-        <span className="min-w-0 flex-1 leading-snug">{p.veredicto || t("hr.pantallazos.analizando")}</span>
+      {/* El MENSAJE (estado en palabras) + el ANÁLISIS de la IA */}
+      <div className={`border-t border-border/40 px-2.5 py-2 ${rojo ? "text-destructive" : sem === "amarillo" ? "text-warning" : "text-muted-foreground"}`}>
+        <p className={`text-[11px] font-bold uppercase tracking-wide ${rojo ? "text-destructive" : sem === "amarillo" ? "text-warning" : sem === "verde" ? "text-success" : "text-muted-foreground"}`}>
+          {t(MSG_SEM[sem] as Parameters<typeof t>[0])}
+        </p>
+        <p className="mt-0.5 flex items-start gap-1.5 text-xs">
+          <Sparkles className="mt-0.5 h-3.5 w-3.5 shrink-0 opacity-70" />
+          <span className="min-w-0 flex-1 leading-snug">{p.veredicto || t("hr.pantallazos.analizando")}</span>
+        </p>
       </div>
     </button>
   );
 }
 
-// ── Vista CUADRÍCULA: celda compacta ──
-function CeldaCuadricula({ p, t, onClick }: { p: PersonaVivo; t: Tr; onClick: () => void }) {
+// ── Vista CUADRÍCULA: celda compacta (con punto de semáforo y análisis en hover) ──
+function CeldaCuadricula({ p, t, sem, onClick }: { p: PersonaVivo; t: Tr; sem: Semaforo; onClick: () => void }) {
   const nombre = p.nombre || t("hr.noName");
   return (
     <button
       type="button"
       onClick={onClick}
-      title={`${nombre}${p.veredicto ? ` · ${p.veredicto}` : ""}`}
-      className={`group relative block w-full overflow-hidden rounded-xl border bg-card/30 text-left transition-colors ${p.fueraDeLugar ? "border-destructive/60 hover:border-destructive" : "border-border/40 hover:border-primary/60"}`}
+      title={`${nombre} · ${t(MSG_SEM[sem] as Parameters<typeof t>[0])}${p.veredicto ? ` · ${p.veredicto}` : ""}`}
+      className={`group relative block w-full overflow-hidden rounded-xl border bg-card/30 text-left transition-colors ${sem === "rojo" ? "border-destructive/60 hover:border-destructive" : sem === "amarillo" ? "border-warning/50 hover:border-warning" : "border-border/40 hover:border-primary/60"}`}
     >
       <div className="relative aspect-[16/10] w-full bg-muted/40">
         {p.principalUrl ? (
@@ -171,11 +187,8 @@ function CeldaCuadricula({ p, t, onClick }: { p: PersonaVivo; t: Tr; onClick: ()
         {p.camaraUrl && p.tienePantalla && (
           <img src={p.camaraUrl} alt="" loading="lazy" className="absolute bottom-1 right-1 h-8 w-12 rounded border border-background/80 object-cover shadow" />
         )}
-        {p.fueraDeLugar && (
-          <span className="absolute left-1 top-1 inline-flex items-center rounded bg-destructive px-1 py-0.5 text-[9px] font-semibold text-destructive-foreground">
-            <AlertTriangle className="h-2.5 w-2.5" />
-          </span>
-        )}
+        {/* El semáforo en la esquina */}
+        <span className={`absolute left-1 top-1 h-2.5 w-2.5 rounded-full ring-2 ring-black/40 ${PUNTO_SEM[sem]}`} />
         <span className="absolute inset-x-0 bottom-0 truncate bg-gradient-to-t from-black/70 to-transparent px-1.5 pb-1 pt-4 text-[11px] font-semibold text-white">{nombre}</span>
       </div>
     </button>

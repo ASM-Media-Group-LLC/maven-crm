@@ -4,8 +4,8 @@ import { Radio, Loader2, AlertTriangle, RefreshCw, ChevronRight, Sparkles } from
 import { useLanguage } from "@/hooks/useLanguage";
 import { UserAvatar } from "@/components/UserAvatar";
 import { useCapturasVivo } from "@/hooks/useCapturasVivo";
-import { useAtencionAhora, TIPOS_GRAVES } from "@/hooks/useAtencionAhora";
 import { useAtencionHoy } from "@/hooks/useAtencionHoy";
+import { useSemaforos, PUNTO_SEM, type Semaforo } from "@/hooks/useSemaforos";
 
 // CONECTADOS AHORA — el TABLERO DE PERSONAL de Argos (Álvaro, 02/11). NO es la
 // muralla de fotos (eso es "Pantallazos en vivo"): aquí es QUIÉN está trabajando
@@ -14,39 +14,17 @@ import { useAtencionHoy } from "@/hooks/useAtencionHoy";
 // atención de hoy. Filtros por color para guiarse (ver solo los rojos, etc.).
 // Clic en alguien → su expediente (ahí sí viven sus fotos). Se refresca solo.
 //
-// EL SEMÁFORO: el sí-o-no de un vistazo por persona, AHORA:
-// 🟢 trabajando (juzgada y en lo suyo) · 🟡 pausa/ojo (alerta leve) ·
-// 🔴 no está en lo suyo (fuera de lugar o alerta grave) · gris: Argos aún no
-// la juzga.
-
-type Semaforo = "verde" | "amarillo" | "rojo" | "gris";
-
-const PUNTO_SEM: Record<Semaforo, string> = {
-  verde: "bg-success shadow-[0_0_6px_hsl(var(--success))]",
-  amarillo: "bg-warning shadow-[0_0_6px_hsl(var(--warning))]",
-  rojo: "bg-destructive shadow-[0_0_6px_hsl(var(--destructive))] animate-pulse",
-  gris: "bg-muted-foreground/40",
-};
+// EL SEMÁFORO: el sí-o-no de un vistazo por persona, AHORA (lógica y colores
+// compartidos en useSemaforos, iguales a los de Pantallazos en vivo):
+// 🟢 trabajando · 🟡 pausa/ojo · 🔴 no está en lo suyo · ⚪ Argos aún no la juzga.
 
 export function ConectadosAhoraPanel() {
   const { t } = useLanguage();
   const navigate = useNavigate();
   const { personas, cargando, error, refrescar } = useCapturasVivo();
-  const { personas: enAtencion } = useAtencionAhora();
   const { atencionPor } = useAtencionHoy();
+  const { semaforoDe } = useSemaforos();
 
-  // Alertas vivas por persona: graves → rojo, leves → amarillo.
-  const alertaPor = useMemo(() => {
-    const m = new Map<string, "grave" | "leve">();
-    for (const p of enAtencion) m.set(p.userId, p.alertas.some((a) => TIPOS_GRAVES.has(a.tipo)) ? "grave" : "leve");
-    return m;
-  }, [enAtencion]);
-  const semaforoDe = (p: { userId: string; fueraDeLugar: boolean | null; veredicto: string | null }): Semaforo => {
-    const alerta = alertaPor.get(p.userId);
-    if (p.fueraDeLugar === true || alerta === "grave") return "rojo";
-    if (alerta === "leve") return "amarillo";
-    return p.veredicto ? "verde" : "gris";
-  };
   const labelSem: Record<Semaforo, string> = {
     verde: t("hr.sem.trabajando"),
     amarillo: t("hr.sem.pausa"),
@@ -58,7 +36,7 @@ export function ConectadosAhoraPanel() {
   // para guiarse rápido (p.ej. ver solo los rojos). Cada persona ya trae su
   // semáforo; contamos cuántos hay de cada color para las pastillas.
   const [filtro, setFiltro] = useState<Semaforo | "todos">("todos");
-  const semPorPersona = useMemo(() => new Map(personas.map((p) => [p.userId, semaforoDe(p)])), [personas, alertaPor]);
+  const semPorPersona = useMemo(() => new Map(personas.map((p) => [p.userId, semaforoDe(p.userId, p.fueraDeLugar, p.veredicto)])), [personas, semaforoDe]);
   const conteo = useMemo(() => {
     const c: Record<Semaforo, number> = { verde: 0, amarillo: 0, rojo: 0, gris: 0 };
     for (const s of semPorPersona.values()) c[s]++;
@@ -149,7 +127,7 @@ export function ConectadosAhoraPanel() {
           <div className="flex flex-col gap-1.5">
             {orden.map((p) => {
               const nombre = p.nombre || t("hr.noName");
-              const sem = semaforoDe(p);
+              const sem = semPorPersona.get(p.userId) ?? "gris";
               const at = atencionPor?.get(p.userId) ?? null;
               const tonoPct = at == null ? "text-muted-foreground" : at.pct >= 80 ? "text-success" : at.pct >= 60 ? "text-warning" : "text-destructive";
               return (

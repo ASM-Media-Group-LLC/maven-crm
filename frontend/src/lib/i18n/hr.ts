@@ -1086,6 +1086,11 @@ export const hr = {
   "hr.exp.calendario": { es: "Calendario", en: "Calendar" },
   "hr.exp.error": { es: "No se pudo cargar el expediente", en: "Could not load the record" },
   "hr.exp.volverArgos": { es: "Volver a Argos", en: "Back to Argos" },
+  // Mensaje corto por color de semáforo, para la muralla de pantallazos
+  "hr.sem.msg.verde": { es: "En lo suyo", en: "On task" },
+  "hr.sem.msg.amarillo": { es: "En pausa — ojo", en: "On a break — watch" },
+  "hr.sem.msg.rojo": { es: "No está en lo suyo", en: "Off task" },
+  "hr.sem.msg.gris": { es: "Argos está mirando…", en: "Argos is looking…" },
   // ── Semáforo en vivo + % de atención del día (Argos) ──
   "hr.sem.trabajando": { es: "Trabajando", en: "Working" },
   "hr.sem.pausa": { es: "Pausa / ojo", en: "Break / watch" },
