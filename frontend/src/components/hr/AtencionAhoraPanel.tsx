@@ -84,12 +84,21 @@ export function AtencionAhoraPanel() {
               const nombre = p.nombre || t("hr.noName");
               const min = Math.max(0, Math.round((Date.now() - Date.parse(p.abiertaAt)) / 60000));
               const frase = p.alertas.find((a) => a.detalle)?.detalle ?? null;
+              // Hover: TODO lo que está mal, escrito. Cada alerta con su detalle y
+              // hace cuánto, para saber por qué está en rojo sin entrar al perfil.
+              const porQue = p.alertas
+                .map((a) => {
+                  const m = Math.max(0, Math.round((Date.now() - Date.parse(a.abiertaAt)) / 60000));
+                  const det = a.detalle ? ` — ${a.detalle}` : "";
+                  return `• ${labelTipo(a.tipo, t)}${det} (${t("hr.rondin.desdeHace", { n: m })})`;
+                })
+                .join("\n");
               return (
                 <button
                   key={p.userId}
                   type="button"
                   onClick={() => navigate(`/hr/expediente/${p.userId}`, { state: { volverA: "/hr/monitor-ia?t=atencion" } })}
-                  title={t("hr.atencion.verExpediente")}
+                  title={`${nombre}\n${porQue}`}
                   className={`group flex w-full items-center gap-3 rounded-2xl border bg-card/30 px-3 py-2.5 text-left transition-colors hover:bg-card/50 ${grave ? "border-destructive/50 hover:border-destructive" : "border-warning/40 hover:border-warning"}`}
                 >
                   <UserAvatar name={nombre} src={p.avatarUrl} seed={p.avatarSeed} size="md" status="busy" />
