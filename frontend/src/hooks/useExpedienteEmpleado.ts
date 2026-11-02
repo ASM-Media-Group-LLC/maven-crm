@@ -17,6 +17,9 @@ export interface DiaExpediente {
   faltas: FaltaDia[];
   minutosPausaDeMas: number;
   capturas: CapturaDia[];
+  segEnSala: number;      // segundos en sala de Cowork (para pantalla%/cámara%)
+  segSinPantalla: number;
+  segSinCamara: number;
   nota: Nota;
 }
 export interface Expediente {
@@ -27,7 +30,7 @@ export interface Expediente {
 }
 
 const SERIAS = ["camara_apagada", "se_fue", "celular", "distraido", "no_mira", "pantalla_distraccion"];
-const META_DIA = 6;
+const META_DIA = 8; // meta de horas del día (Alvaro, 02/11)
 
 type RpcDb = { rpc: (f: string, a: unknown) => Promise<{ data: unknown[] | null; error: { message: string } | null }> };
 
@@ -65,14 +68,19 @@ export function useExpedienteEmpleado(userId: string | null, anio: number, mes: 
       const dias = new Map<string, DiaExpediente>();
       const asegura = (f: string): DiaExpediente => {
         let d = dias.get(f);
-        if (!d) { d = { fecha: f, horas: 0, faltas: [], minutosPausaDeMas: 0, capturas: [], nota: { valor: null, banda: null, factores: [] } }; dias.set(f, d); }
+        if (!d) { d = { fecha: f, horas: 0, faltas: [], minutosPausaDeMas: 0, capturas: [], segEnSala: 0, segSinPantalla: 0, segSinCamara: 0, nota: { valor: null, banda: null, factores: [] } }; dias.set(f, d); }
         return d;
       };
 
-      // horas por día
-      for (const r of (tiempoRes.data ?? []) as Array<{ dia: string; seg_activo: number | string }>) {
+      // horas + segundos de sala/pantalla/cámara por día (para la nota)
+      for (const r of (tiempoRes.data ?? []) as Array<{ dia: string; seg_activo: number | string; seg_en_sala?: number | string; seg_sin_pantalla?: number | string; seg_sin_camara?: number | string }>) {
         const f = r.dia?.slice(0, 10);
-        if (f) asegura(f).horas = Number(r.seg_activo) / 3600;
+        if (!f) continue;
+        const d = asegura(f);
+        d.horas = Number(r.seg_activo) / 3600;
+        d.segEnSala = Number(r.seg_en_sala ?? 0);
+        d.segSinPantalla = Number(r.seg_sin_pantalla ?? 0);
+        d.segSinCamara = Number(r.seg_sin_camara ?? 0);
       }
       // faltas por día
       for (const e of (eventosRes.data ?? []) as Array<{ id: string; tipo: string; fuente: string; detalle: string | null; captura_path: string | null; created_at: string }>) {
@@ -92,16 +100,24 @@ export function useExpedienteEmpleado(userId: string | null, anio: number, mes: 
         asegura(f).capturas.push({ id: c.id, tipo: c.tipo, path: c.path, nasPath: c.nas_path, enNas: c.en_nas === true, fueraDeLugar: c.fuera_de_lugar, veredicto: c.veredicto, createdAt: c.created_at });
       }
 
-      // nota por día (solo faltas SERIAS cuentan)
+      // nota por día: pantalla 30 / cámara 30 / atención 30 / horas 10 (Alvaro).
       for (const d of dias.values()) {
-        const faltasSerias = d.faltas.filter((x) => SERIAS.includes(x.tipo)).length;
-        const conPausa = d.minutosPausaDeMas > 0 || (tiempoRes.data ?? []).some((r) => (r as { dia?: string }).dia?.slice(0, 10) === d.fecha);
-        d.nota = calcularNota({
-          horasHechas: d.horas,
-          horasMeta: META_DIA,
-          faltasSerias,
-          minutosPausaDeMas: conPausa ? d.minutosPausaDeMas : undefined,
-        });
+        // Pantalla% y cámara% salen del tiempo en sala de Cowork. Si NO entró a
+        // Cowork (segEnSala=0) pero Argos lo vio (hubo capturas), no compartió
+        // pantalla → 0 (activa el tope 50); la cámara queda sin dato (reparte).
+        const tuvoCapturas = d.capturas.length > 0;
+        const pantallaPct = d.segEnSala > 0
+          ? Math.max(0, d.segEnSala - d.segSinPantalla) / d.segEnSala
+          : tuvoCapturas ? 0 : undefined;
+        const camaraPct = d.segEnSala > 0
+          ? Math.max(0, d.segEnSala - d.segSinCamara) / d.segEnSala
+          : undefined;
+        // Atención: de los pantallazos de pantalla que la IA ya juzgó, cuántos en lo suyo.
+        const juzgadas = d.capturas.filter((c) => c.tipo === "pantalla" && c.veredicto != null);
+        const atencionPct = juzgadas.length > 0
+          ? juzgadas.filter((c) => c.fueraDeLugar !== true).length / juzgadas.length
+          : undefined;
+        d.nota = calcularNota({ pantallaPct, camaraPct, atencionPct, horasHechas: d.horas, horasMeta: META_DIA });
       }
 
       const p = perfRes.data as { full_name: string | null; avatar_url: string | null; avatar_seed: string | null } | null;
