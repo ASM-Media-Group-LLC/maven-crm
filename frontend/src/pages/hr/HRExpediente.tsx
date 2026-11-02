@@ -8,7 +8,7 @@ import { UserAvatar } from "@/components/UserAvatar";
 import { Page } from "@/components/ui/page";
 import { PageHeader } from "@/components/ui/page-header";
 import { useExpedienteEmpleado, type DiaExpediente, type CapturaDia } from "@/hooks/useExpedienteEmpleado";
-import { urlCaptura } from "@/hooks/useMonitorEventos";
+import { urlCaptura, urlsDeNas } from "@/hooks/useMonitorEventos";
 import { LABEL_FALTA, type FaltaTipo } from "@/lib/monitorFaltas";
 import type { BandaNota } from "@/lib/notaEmpleado";
 import type { TranslationKey } from "@/lib/i18n";
@@ -33,7 +33,17 @@ function sumarDias(ymd: string, delta: number): string {
   return dt.toISOString().slice(0, 10);
 }
 
-const abrirCaptura = async (path: string) => { const u = await urlCaptura(path); if (u) window.open(u, "_blank", "noopener"); };
+// Dónde firmar cada captura: si ya está en el NAS (enNas), por su nasPath; si no,
+// por su path del buzón.
+const claveFoto = (c: CapturaDia | null): string | null => (c ? (c.enNas ? c.nasPath : c.path) : null);
+
+// Abrir una captura entera (buzón o NAS).
+const abrirFoto = async (c: CapturaDia) => {
+  const u = c.enNas && c.nasPath ? (await urlsDeNas([c.nasPath]))[c.nasPath] : await urlCaptura(c.path);
+  if (u) window.open(u, "_blank", "noopener");
+};
+// Abrir una captura del buzón por su path (las faltas de monitor_eventos nunca van al NAS).
+const abrirPath = async (path: string) => { const u = await urlCaptura(path); if (u) window.open(u, "_blank", "noopener"); };
 
 // Un MOMENTO del día: una pantalla con su cámara pegada (o, si no hay pantalla,
 // la cámara sola). Se emparejan por cercanía en el tiempo (≤ 90 s).
@@ -76,10 +86,22 @@ function TiraDelDia({ capturas, t }: { capturas: CapturaDia[]; t: Tr }) {
   useEffect(() => {
     let vivo = true;
     void (async () => {
-      const rutas = new Set<string>();
-      for (const m of visibles) { if (m.pantalla) rutas.add(m.pantalla.path); if (m.camara) rutas.add(m.camara.path); }
-      const pares = await Promise.all([...rutas].map(async (r) => [r, await urlCaptura(r)] as const));
-      if (vivo) setUrls(Object.fromEntries(pares.filter(([, u]) => !!u) as [string, string][]));
+      // Las del buzón se firman con Supabase; las que ya están en el NAS, por la
+      // edge argos-foto (un solo viaje). El mapa se indexa por clave (path o nasPath).
+      const buzon = new Set<string>();
+      const nas = new Set<string>();
+      for (const m of visibles) {
+        for (const c of [m.pantalla, m.camara]) {
+          if (!c) continue;
+          if (c.enNas && c.nasPath) nas.add(c.nasPath);
+          else if (!c.enNas) buzon.add(c.path);
+        }
+      }
+      const [nasUrls, buzonPairs] = await Promise.all([
+        urlsDeNas([...nas]),
+        Promise.all([...buzon].map(async (p) => [p, await urlCaptura(p)] as const)),
+      ]);
+      if (vivo) setUrls({ ...nasUrls, ...Object.fromEntries(buzonPairs.filter(([, u]) => !!u) as [string, string][]) });
     })();
     return () => { vivo = false; };
   }, [visibles]);
@@ -110,14 +132,16 @@ function TiraDelDia({ capturas, t }: { capturas: CapturaDia[]; t: Tr }) {
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-5">
             {g.items.map((m) => {
               const principal = m.pantalla ?? m.camara!;
-              const url = urls[principal.path];
+              const claveP = claveFoto(principal);
+              const url = claveP ? urls[claveP] : undefined;
               const esPantalla = !!m.pantalla;
-              const camUrl = m.pantalla && m.camara ? urls[m.camara.path] : null;
+              const claveC = m.pantalla && m.camara ? claveFoto(m.camara) : null;
+              const camUrl = claveC ? urls[claveC] : null;
               return (
                 <button
                   key={m.id}
                   type="button"
-                  onClick={() => abrirCaptura(principal.path)}
+                  onClick={() => abrirFoto(principal)}
                   title={`${format(new Date(m.createdAt), "HH:mm")}${m.veredicto ? ` · ${m.veredicto}` : ""}`}
                   className={`group relative overflow-hidden rounded-xl border bg-muted/40 transition ${m.fueraDeLugar ? "border-destructive/60" : "border-border/40 hover:border-primary/50"}`}
                 >
@@ -303,7 +327,7 @@ export default function HRExpediente() {
                       <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-destructive/80" />
                       <span className="min-w-0 flex-1 truncate text-xs">{lbl ? t(lbl) : f.tipo}{f.detalle ? ` · ${f.detalle}` : ""}</span>
                       {f.capturaPath && (
-                        <button type="button" onClick={() => abrirCaptura(f.capturaPath!)} className="shrink-0 text-muted-foreground hover:text-primary" title={t("hr.exp.abrir")}><ImageIcon className="h-3.5 w-3.5" /></button>
+                        <button type="button" onClick={() => abrirPath(f.capturaPath!)} className="shrink-0 text-muted-foreground hover:text-primary" title={t("hr.exp.abrir")}><ImageIcon className="h-3.5 w-3.5" /></button>
                       )}
                       <span className="shrink-0 text-[10px] tabular-nums text-muted-foreground">{format(new Date(f.createdAt), "HH:mm")}</span>
                     </div>

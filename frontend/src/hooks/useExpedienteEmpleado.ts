@@ -10,7 +10,7 @@ import { calcularNota, type Nota } from "@/lib/notaEmpleado";
 // (pantallazos/cámara). Lo ven supervisor+ (lo fuerza la RLS).
 
 export interface FaltaDia { id: string; tipo: string; fuente: string; detalle: string | null; capturaPath: string | null; createdAt: string; }
-export interface CapturaDia { id: string; tipo: "pantalla" | "camara"; path: string; fueraDeLugar: boolean | null; veredicto: string | null; createdAt: string; }
+export interface CapturaDia { id: string; tipo: "pantalla" | "camara"; path: string; nasPath: string | null; enNas: boolean; fueraDeLugar: boolean | null; veredicto: string | null; createdAt: string; }
 export interface DiaExpediente {
   fecha: string;         // YYYY-MM-DD
   horas: number;
@@ -59,7 +59,7 @@ export function useExpedienteEmpleado(userId: string | null, anio: number, mes: 
         db.rpc("cowork_tiempo_diario", { _desde: desde, _hasta: hasta, _user_id: userId, _limit: 100, _offset: 0 }),
         supabase.from("monitor_eventos").select("id, tipo, fuente, detalle, captura_path, created_at, estado").eq("user_id", userId!).neq("estado", "descartado").gte("created_at", inicioISO).lte("created_at", finISO).order("created_at", { ascending: false }).limit(1000),
         db.rpc("cowork_pausas_resumen", { _desde: desde, _hasta: hasta, _session_id: null, _user_id: userId, _limit: 100, _offset: 0 }),
-        supabase.from("monitor_capturas").select("id, tipo, path, fuera_de_lugar, veredicto, created_at").eq("user_id", userId!).gte("created_at", inicioISO).lte("created_at", finISO).order("created_at", { ascending: false }).limit(3000),
+        supabase.from("monitor_capturas").select("id, tipo, path, nas_path, en_nas, fuera_de_lugar, veredicto, created_at").eq("user_id", userId!).gte("created_at", inicioISO).lte("created_at", finISO).order("created_at", { ascending: false }).limit(3000),
       ]);
 
       const dias = new Map<string, DiaExpediente>();
@@ -87,9 +87,9 @@ export function useExpedienteEmpleado(userId: string | null, anio: number, mes: 
         asegura(f).minutosPausaDeMas += (banoDeMas + Number(r.seg_break_de_mas ?? 0) + Number(r.seg_almuerzo_de_mas ?? 0)) / 60;
       }
       // capturas por día
-      for (const c of (capturasRes.data ?? []) as Array<{ id: string; tipo: "pantalla" | "camara"; path: string; fuera_de_lugar: boolean | null; veredicto: string | null; created_at: string }>) {
+      for (const c of (capturasRes.data ?? []) as Array<{ id: string; tipo: "pantalla" | "camara"; path: string; nas_path: string | null; en_nas: boolean; fuera_de_lugar: boolean | null; veredicto: string | null; created_at: string }>) {
         const f = diaDe(c.created_at);
-        asegura(f).capturas.push({ id: c.id, tipo: c.tipo, path: c.path, fueraDeLugar: c.fuera_de_lugar, veredicto: c.veredicto, createdAt: c.created_at });
+        asegura(f).capturas.push({ id: c.id, tipo: c.tipo, path: c.path, nasPath: c.nas_path, enNas: c.en_nas === true, fueraDeLugar: c.fuera_de_lugar, veredicto: c.veredicto, createdAt: c.created_at });
       }
 
       // nota por día (solo faltas SERIAS cuentan)

@@ -102,12 +102,28 @@ export function useMonitorEventos(limite = 300) {
   };
 }
 
-/** URL firmada (2 min) para ver una captura del bucket privado. */
+/** URL firmada (2 min) para ver una captura del BUZÓN (bucket privado de Supabase). */
 export async function urlCaptura(path: string): Promise<string | null> {
   try {
     const { data } = await supabase.storage.from("monitor-capturas").createSignedUrl(path, 120);
     return data?.signedUrl ?? null;
   } catch {
     return null;
+  }
+}
+
+/** URLs firmadas para las capturas que ya viven en el NAS (en_nas), en un solo
+ *  viaje. Devuelve un mapa { nasPath: url }. Solo el dueño puede (lo fuerza la
+ *  edge argos-foto). Un fallo devuelve mapa vacío (la miniatura queda en spinner,
+ *  nunca se concluye "no hay"). */
+export async function urlsDeNas(nasPaths: string[]): Promise<Record<string, string>> {
+  const unicas = [...new Set(nasPaths.filter(Boolean))];
+  if (unicas.length === 0) return {};
+  try {
+    const { data, error } = await supabase.functions.invoke("argos-foto", { body: { nas_paths: unicas } });
+    if (error) return {};
+    return (data as { urls?: Record<string, string> } | null)?.urls ?? {};
+  } catch {
+    return {};
   }
 }
