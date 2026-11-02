@@ -1089,11 +1089,13 @@ export const hr = {
   // Mensaje corto por color de semáforo, para la muralla de pantallazos
   "hr.sem.msg.verde": { es: "En lo suyo", en: "On task" },
   "hr.sem.msg.amarillo": { es: "En pausa — ojo", en: "On a break — watch" },
+  "hr.sem.msg.naranja": { es: "No comparte pantalla", en: "Not sharing screen" },
   "hr.sem.msg.rojo": { es: "No está en lo suyo", en: "Off task" },
   "hr.sem.msg.gris": { es: "Argos está mirando…", en: "Argos is looking…" },
   // ── Semáforo en vivo + % de atención del día (Argos) ──
   "hr.sem.trabajando": { es: "Trabajando", en: "Working" },
   "hr.sem.pausa": { es: "Pausa / ojo", en: "Break / watch" },
+  "hr.sem.sinPantalla": { es: "No comparte pantalla", en: "Not sharing screen" },
   "hr.sem.problema": { es: "No está en lo suyo", en: "Off task" },
   "hr.sem.esperando": { es: "Esperando a Argos", en: "Waiting for Argos" },
   "hr.conectados.pctHoy": { es: "{n}% hoy", en: "{n}% today" },

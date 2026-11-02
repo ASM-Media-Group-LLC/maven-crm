@@ -113,19 +113,29 @@ type Tr = ReturnType<typeof useLanguage>["t"];
 
 // El mensaje corto de estado por color de semáforo (el "sí o no" en palabras).
 const MSG_SEM: Record<Semaforo, string> = {
-  verde: "hr.sem.msg.verde", amarillo: "hr.sem.msg.amarillo", rojo: "hr.sem.msg.rojo", gris: "hr.sem.msg.gris",
+  verde: "hr.sem.msg.verde", amarillo: "hr.sem.msg.amarillo", naranja: "hr.sem.msg.naranja", rojo: "hr.sem.msg.rojo", gris: "hr.sem.msg.gris",
+};
+// Borde y color de texto por semáforo, para las tarjetas.
+const BORDE_SEM: Record<Semaforo, string> = {
+  verde: "border-border/40 hover:border-primary/60",
+  amarillo: "border-warning/50 hover:border-warning",
+  naranja: "border-orange-500/50 hover:border-orange-500",
+  rojo: "border-destructive/60 hover:border-destructive",
+  gris: "border-border/40 hover:border-primary/60",
+};
+const TEXTO_SEM: Record<Semaforo, string> = {
+  verde: "text-success", amarillo: "text-warning", naranja: "text-orange-500", rojo: "text-destructive", gris: "text-muted-foreground",
 };
 
 // ── Vista MURALLA: tarjeta grande (foto + semáforo + mensaje + análisis) ──
 function CardMuralla({ p, t, hace, sem, onClick }: { p: PersonaVivo; t: Tr; hace: (iso: string) => string; sem: Semaforo; onClick: () => void }) {
   const nombre = p.nombre || t("hr.noName");
-  const rojo = sem === "rojo";
   return (
     <button
       type="button"
       onClick={onClick}
       title={t("hr.pantallazos.verExpediente", { nombre })}
-      className={`group relative block w-full overflow-hidden rounded-2xl border bg-card/30 text-left transition-colors ${rojo ? "border-destructive/60 hover:border-destructive" : sem === "amarillo" ? "border-warning/50 hover:border-warning" : "border-border/40 hover:border-primary/60"}`}
+      className={`group relative block w-full overflow-hidden rounded-2xl border bg-card/30 text-left transition-colors ${BORDE_SEM[sem]}`}
     >
       <div className="relative aspect-[16/10] w-full bg-muted/40">
         {p.principalUrl ? (
@@ -155,8 +165,8 @@ function CardMuralla({ p, t, hace, sem, onClick }: { p: PersonaVivo; t: Tr; hace
         <span className="shrink-0 text-[10px] tabular-nums text-muted-foreground">{hace(p.ultima)}</span>
       </div>
       {/* El MENSAJE (estado en palabras) + el ANÁLISIS de la IA */}
-      <div className={`border-t border-border/40 px-2.5 py-2 ${rojo ? "text-destructive" : sem === "amarillo" ? "text-warning" : "text-muted-foreground"}`}>
-        <p className={`text-[11px] font-bold uppercase tracking-wide ${rojo ? "text-destructive" : sem === "amarillo" ? "text-warning" : sem === "verde" ? "text-success" : "text-muted-foreground"}`}>
+      <div className="border-t border-border/40 px-2.5 py-2 text-muted-foreground">
+        <p className={`text-[11px] font-bold uppercase tracking-wide ${TEXTO_SEM[sem]}`}>
           {t(MSG_SEM[sem] as Parameters<typeof t>[0])}
         </p>
         <p className="mt-0.5 flex items-start gap-1.5 text-xs">
@@ -176,7 +186,7 @@ function CeldaCuadricula({ p, t, sem, onClick }: { p: PersonaVivo; t: Tr; sem: S
       type="button"
       onClick={onClick}
       title={`${nombre} · ${t(MSG_SEM[sem] as Parameters<typeof t>[0])}${p.veredicto ? ` · ${p.veredicto}` : ""}`}
-      className={`group relative block w-full overflow-hidden rounded-xl border bg-card/30 text-left transition-colors ${sem === "rojo" ? "border-destructive/60 hover:border-destructive" : sem === "amarillo" ? "border-warning/50 hover:border-warning" : "border-border/40 hover:border-primary/60"}`}
+      className={`group relative block w-full overflow-hidden rounded-xl border bg-card/30 text-left transition-colors ${BORDE_SEM[sem]}`}
     >
       <div className="relative aspect-[16/10] w-full bg-muted/40">
         {p.principalUrl ? (

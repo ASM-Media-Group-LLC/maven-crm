@@ -28,6 +28,7 @@ export function ConectadosAhoraPanel() {
   const labelSem: Record<Semaforo, string> = {
     verde: t("hr.sem.trabajando"),
     amarillo: t("hr.sem.pausa"),
+    naranja: t("hr.sem.sinPantalla"),
     rojo: t("hr.sem.problema"),
     gris: t("hr.sem.esperando"),
   };
@@ -38,7 +39,7 @@ export function ConectadosAhoraPanel() {
   const [filtro, setFiltro] = useState<Semaforo | "todos">("todos");
   const semPorPersona = useMemo(() => new Map(personas.map((p) => [p.userId, semaforoDe(p.userId, p.fueraDeLugar, p.veredicto)])), [personas, semaforoDe]);
   const conteo = useMemo(() => {
-    const c: Record<Semaforo, number> = { verde: 0, amarillo: 0, rojo: 0, gris: 0 };
+    const c: Record<Semaforo, number> = { verde: 0, amarillo: 0, naranja: 0, rojo: 0, gris: 0 };
     for (const s of semPorPersona.values()) c[s]++;
     return c;
   }, [semPorPersona]);
@@ -83,6 +84,7 @@ export function ConectadosAhoraPanel() {
             {([
               { k: "todos", label: t("hr.conectados.filtroTodos"), n: personas.length, punto: "" },
               { k: "rojo", label: labelSem.rojo, n: conteo.rojo, punto: PUNTO_SEM.rojo },
+              { k: "naranja", label: labelSem.naranja, n: conteo.naranja, punto: PUNTO_SEM.naranja },
               { k: "amarillo", label: labelSem.amarillo, n: conteo.amarillo, punto: PUNTO_SEM.amarillo },
               { k: "verde", label: labelSem.verde, n: conteo.verde, punto: PUNTO_SEM.verde },
               { k: "gris", label: labelSem.gris, n: conteo.gris, punto: PUNTO_SEM.gris },
