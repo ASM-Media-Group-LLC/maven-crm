@@ -1018,6 +1018,7 @@ export const hr = {
   "hr.pantallazos.hace": { es: "hace {n} min", en: "{n} min ago" },
   "hr.pantallazos.contando": { es: "{n} en vivo ahora mismo", en: "{n} live right now" },
   "hr.pantallazos.analizando": { es: "Argos está mirando…", en: "Argos is watching…" },
+  "hr.pantallazos.verExpediente": { es: "Ver el expediente de {nombre}", en: "Open {nombre}'s record" },
   // ── Expediente del empleado (calendario del mes, Argos) ──
   "hr.exp.title": { es: "Expediente", en: "Record" },
   "hr.exp.sub": { es: "Qué hizo cada día", en: "What they did each day" },

@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import { useNavigate } from "react-router-dom";
 import { MonitorPlay, Loader2, AlertTriangle, ScreenShare, RefreshCw, Sparkles } from "lucide-react";
 import { useLanguage } from "@/hooks/useLanguage";
 import { UserAvatar } from "@/components/UserAvatar";
@@ -10,6 +11,7 @@ import { supabase } from "@/integrations/supabase/client";
 // es, hace cuánto y la línea de la IA—. Se refresca solo. Todo el texto por t().
 export function PantallazosVivoPanel() {
   const { t } = useLanguage();
+  const navigate = useNavigate();
   const { personas, cargando, error, refrescar } = useCapturasVivo();
 
   // Cuando hay pantallas sin veredicto, le pedimos a Argos que las mire (una sola
@@ -75,10 +77,13 @@ export function PantallazosVivoPanel() {
               const nombre = p.nombre || t("hr.noName");
               const min = Math.max(0, Math.round((Date.now() - new Date(p.ultima).getTime()) / 60000));
               return (
-                <div
+                <button
                   key={p.userId}
-                  className={`group relative overflow-hidden rounded-2xl border bg-card/30 transition-colors ${
-                    p.fueraDeLugar ? "border-destructive/60" : "border-border/40 hover:border-primary/40"
+                  type="button"
+                  onClick={() => navigate(`/hr/expediente/${p.userId}`)}
+                  title={t("hr.pantallazos.verExpediente", { nombre })}
+                  className={`group relative block w-full overflow-hidden rounded-2xl border bg-card/30 text-left transition-colors ${
+                    p.fueraDeLugar ? "border-destructive/60 hover:border-destructive" : "border-border/40 hover:border-primary/60"
                   }`}
                 >
                   {/* La pantalla (lo que hace), grande */}
@@ -143,7 +148,7 @@ export function PantallazosVivoPanel() {
                       {p.veredicto || t("hr.pantallazos.analizando")}
                     </span>
                   </div>
-                </div>
+                </button>
               );
             })}
           </div>
