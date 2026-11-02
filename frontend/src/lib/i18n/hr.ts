@@ -1057,6 +1057,9 @@ export const hr = {
   "hr.exp.abrir": { es: "Abrir", en: "Open" },
   "hr.exp.hoy": { es: "Hoy", en: "Today" },
   "hr.exp.pantallazosDia": { es: "Pantallazos del día", en: "Screenshots of the day" },
-  "hr.exp.masCapturas": { es: "+{n} pantallazos más", en: "+{n} more screenshots" },
+  "hr.exp.masCapturas": { es: "+{n} momentos más", en: "+{n} more moments" },
+  "hr.exp.diaAnterior": { es: "Día anterior", en: "Previous day" },
+  "hr.exp.diaSiguiente": { es: "Día siguiente", en: "Next day" },
+  "hr.exp.calendario": { es: "Calendario", en: "Calendar" },
   "hr.exp.error": { es: "No se pudo cargar el expediente", en: "Could not load the record" },
 } as const satisfies Record<string, { es: string; en: string }>;

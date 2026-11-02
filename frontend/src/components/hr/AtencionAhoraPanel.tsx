@@ -35,7 +35,7 @@ export function AtencionAhoraPanel() {
   const hayProblema = personas.length > 0;
 
   return (
-    <section className={`vidrio sube p-4 lg:p-5 ${hayProblema ? "ring-1 ring-destructive/30" : ""}`}>
+    <section className="vidrio sube p-4 lg:p-5">
       <div className="v-cont">
         <div className="mb-4 flex flex-wrap items-center gap-3">
           <span className={`relative flex h-9 w-9 shrink-0 items-center justify-center rounded-panel ${hayProblema ? "bg-destructive/10 text-destructive" : "bg-success/10 text-success"}`}>

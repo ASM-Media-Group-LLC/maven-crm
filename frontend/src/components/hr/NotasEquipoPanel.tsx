@@ -59,7 +59,7 @@ function FichaPersona({ p, t, onClose, onExpediente }: { p: NotaDePersona | null
   const nombre = p.nombre || t("hr.noName");
   return (
     <Dialog open={!!p} onOpenChange={(o) => { if (!o) onClose(); }}>
-      <DialogContent className="max-w-md">
+      <DialogContent className="max-w-md bg-none from-transparent">
         <DialogTitle className="sr-only">{nombre}</DialogTitle>
         <div className="flex flex-col gap-5">
           {/* Identidad */}
