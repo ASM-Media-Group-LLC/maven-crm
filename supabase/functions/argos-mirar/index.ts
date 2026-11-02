@@ -4,31 +4,26 @@ import { encodeBase64 } from "jsr:@std/encoding@1/base64";
 
 // argos-mirar — el CEREBRO de la muralla en vivo de Argos (Álvaro, 01/11).
 //
-// Mira los PANTALLAZOS de pantalla más recientes de cada persona y dice, en una
-// frase corta, QUÉ está haciendo y si está FUERA DE LUGAR. Escribe el veredicto
-// en monitor_capturas (veredicto, fuera_de_lugar, analizado) para que la muralla
-// lo pinte bajo cada tarjeta y el expediente/las notas lo acumulen.
+// Mira el PANTALLAZO de pantalla más reciente de cada persona y dice QUÉ SISTEMA
+// está usando y si es una herramienta de trabajo de SU EMPRESA o algo ajeno.
+// Escribe el veredicto en monitor_capturas (veredicto, fuera_de_lugar, analizado).
 //
-// DOS PUERTAS:
-//   · Cron (cada 2 min, pg_cron `argos-mirar`): X-Cron-Token = CRON_INTERNAL_TOKEN,
-//     como los demás crons. Argos juzga SOLO, haya o no alguien mirando. Es el motor.
-//   · Supervisor con sesión (para pruebas a mano). verify_jwt=true en el gateway
-//     cubre las dos (el cron manda la llave pública como Bearer).
+// LA REGLA (Alvaro, 02/11): Argos juzga el SISTEMA, nunca el contenido. Lo que
+// haya en la pantalla (fotos, videos, textos, personas) es irrelevante: no se
+// juzga ni se describe. Solo: ¿la aplicación o sitio que se ve es de trabajo
+// para esta empresa, o es algo ajeno (ocio/personal)?
 //
-// PROVEEDORES (02/11): OpenRouter 401 "User not found" y Anthropic 401 "invalid
-// x-api-key" → MUERTAS (eran llaves de Jhon). Gemini VIVE pero en NIVEL GRATUITO
-// (~10 llamadas/min, ~250/día → 429 frecuentes). Por eso: Gemini primero, UNA
-// foto a la vez con pausa entre fotos, pocas por ronda, reintento corto en 429,
-// pensamiento apagado (gemini-2.5-flash "piensa" y se come el tope de tokens →
-// JSON truncado) y NO re-juzgar a la misma persona antes de REJUZGAR_MIN. Cuando
-// Alvaro active facturación o ponga llave nueva, se suben ARGOS_TOPE/ARGOS_ESPACIO_MS
-// por variables de entorno sin tocar código. Los otros dos proveedores quedan de
-// respaldo: reviven solos con llave nueva. Cada paso deja huella en argos_diag.
+// POR EMPRESA: el contexto vive en argos_contexto (por tenant): qué hace la
+// empresa, qué sistemas son trabajo y cuáles son fuera de lugar. Hoy: Kash
+// Agency (contenido adulto → la bóveda y las plataformas de creadoras son
+// trabajo). Mañana otra empresa tendrá sus propias reglas, editables en Ajustes
+// de Argos por el admin, sin tocar código.
 //
-// EL NEGOCIO (lección del primer veredicto, 02/11): esta es una agencia de
-// creadoras de contenido para adultos. Ver/elegir/vender contenido explícito en
-// la bóveda (Media Vault) o chatear con fans ES el trabajo, nunca "fuera de
-// lugar". El prompt lo dice explícito para no acusar a nadie por hacer su labor.
+// DOS PUERTAS: cron (X-Cron-Token, cada 2 min — el motor) y supervisor con sesión.
+// PROVEEDORES: Gemini primero (única llave viva, nivel gratuito → una foto a la
+// vez, pausa entre fotos, reintento en 429, pensamiento apagado, no re-juzgar a
+// la misma persona antes de REJUZGAR_MIN); OpenRouter y Anthropic de respaldo
+// (muertas desde el 01/10; reviven solas con llave nueva). Huella en argos_diag.
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -39,13 +34,13 @@ const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY") ?? "";
 const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY") ?? Deno.env.get("GOOGLE_AI_API_KEY") ?? "";
 const MODELO_OPENROUTER = Deno.env.get("MONITOR_LLM_MODEL") ?? "openai/gpt-4o-mini";
 const MODELO_ANTHROPIC = Deno.env.get("ARGOS_ANTHROPIC_MODEL") ?? "claude-haiku-4-5";
-const MODELO_GEMINI = Deno.env.get("ARGOS_GEMINI_MODEL") ?? "gemini-2.5-flash"; // el que ya usaba Maven (8k llamadas)
+const MODELO_GEMINI = Deno.env.get("ARGOS_GEMINI_MODEL") ?? "gemini-2.5-flash";
 const LLM_TIMEOUT_MS = 20_000;
-const VENTANA_MIN = 7; // solo lo de los últimos minutos
-const TOPE_PERSONAS = Number(Deno.env.get("ARGOS_TOPE") ?? 5); // por ronda (nivel gratuito: 5)
-const ESPACIO_MS = Number(Deno.env.get("ARGOS_ESPACIO_MS") ?? 6_000); // pausa entre fotos (≤10/min)
-const REJUZGAR_MIN = Number(Deno.env.get("ARGOS_REJUZGAR_MIN") ?? 30); // no re-juzgar a la misma persona antes
-const REINTENTO_MS = 2_500; // pausa antes de reintentar un 429/vacío
+const VENTANA_MIN = 7;
+const TOPE_PERSONAS = Number(Deno.env.get("ARGOS_TOPE") ?? 5);
+const ESPACIO_MS = Number(Deno.env.get("ARGOS_ESPACIO_MS") ?? 6_000);
+const REJUZGAR_MIN = Number(Deno.env.get("ARGOS_REJUZGAR_MIN") ?? 30);
+const REINTENTO_MS = 2_500;
 
 const CORS = {
   "Access-Control-Allow-Origin": "*",
@@ -67,23 +62,38 @@ function igualesConstante(a: string, b: string): boolean {
 
 const dormir = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-const PROMPT =
-  `Eres Argos, el monitor de trabajo de una agencia que gestiona creadoras de contenido para adultos (tipo OnlyFans). El equipo —chatters y closers— trabaja TODO el día con contenido explícito: conversa con fans en nombre de las creadoras, vende fotos y videos íntimos, revisa la bóveda de contenido ("Media Vault", "Vault", galerías) y usa el CRM Maven, Cowork, un contador de tiempo, correo y planillas.
+interface Contexto {
+  descripcion: string;
+  es_trabajo: string;
+  fuera_de_lugar: string;
+}
 
-Te paso un PANTALLAZO de la pantalla de un trabajador. Di en una frase corta y neutral QUÉ está haciendo y si está TRABAJANDO o FUERA DE LUGAR.
+const CONTEXTO_GENERICO: Contexto = {
+  descripcion: "una empresa",
+  es_trabajo: "las herramientas de trabajo de la empresa: su CRM, correo, chats de trabajo, planillas, documentos y llamadas de trabajo",
+  fuera_de_lugar: "redes sociales personales, YouTube u otro streaming de ocio, juegos, series o películas, compras personales, el escritorio o la pantalla de inicio sin actividad, la pantalla apagada o bloqueada",
+};
 
-TRABAJO (nunca es fuera de lugar): chats con fans (OnlyFans, Fansly u otra plataforma de creadoras; WhatsApp/Telegram de trabajo), la bóveda de contenido / Media Vault aunque muestre desnudos o material explícito, elegir o enviar ese contenido, el CRM Maven, Cowork, el contador de tiempo, correo, planillas, documentos, llamadas de trabajo.
-FUERA DE LUGAR: redes sociales PERSONALES (Instagram, TikTok, Facebook, X propios, no la cuenta de una creadora), YouTube u otro streaming de ocio, juegos, series o películas, compras personales, pornografía de ocio en sitios que NO son la plataforma de trabajo, el escritorio o la pantalla de inicio sin actividad, la pantalla apagada o bloqueada.
+/** El prompt se arma con el contexto de LA EMPRESA de la persona. */
+function armarPrompt(c: Contexto): string {
+  return `Eres Argos, el monitor de trabajo de ${c.descripcion.trim() || CONTEXTO_GENERICO.descripcion}
+
+TU REGLA: juzgas el SISTEMA que usa la persona, NUNCA el contenido. Lo que haya dentro de la pantalla (fotos, videos, textos, personas, dinero) es IRRELEVANTE: no lo juzgues ni lo describas. Solo determina qué aplicación o sitio se ve y si es una herramienta de trabajo de esta empresa o algo ajeno.
+
+HERRAMIENTAS DE TRABAJO (correcto, nunca fuera de lugar): ${c.es_trabajo.trim() || CONTEXTO_GENERICO.es_trabajo}
+
+FUERA DE LUGAR (sistema equivocado): ${c.fuera_de_lugar.trim() || CONTEXTO_GENERICO.fuera_de_lugar}
 
 Devuelve SOLO este JSON, sin texto antes ni después, sin markdown:
-{ "actividad": "frase corta y concreta: qué aplicación y qué hace", "fuera_de_lugar": true | false }
+{ "sistema": "nombre de la aplicación o sitio que se ve", "actividad": "frase corta: qué sistema usa y qué tipo de acción hace, SIN describir el contenido", "fuera_de_lugar": true | false }
 
 REGLAS:
-- Ante la duda, fuera_de_lugar=false. Solo true si es EVIDENTE que no es trabajo.
-- En "actividad" NO describas el contenido explícito; di algo neutral como "revisando la bóveda de contenido" o "chateando con un fan".
-- Español neutro, sin voseo, máximo una frase.`;
+- Ante la duda, fuera_de_lugar=false. Solo true si es EVIDENTE que el sistema no es de trabajo.
+- Español neutro, sin voseo, máximo una frase en "actividad".`;
+}
 
 interface Veredicto {
+  sistema: string;
   actividad: string;
   fuera_de_lugar: boolean;
 }
@@ -105,7 +115,7 @@ async function cuerpoError(resp: Response): Promise<string> {
   return `${resp.status}: ${(await resp.text().catch(() => "")).slice(0, 200)}`;
 }
 
-async function pedirGemini(b64: string): Promise<Respuesta> {
+async function pedirGemini(prompt: string, b64: string): Promise<Respuesta> {
   if (!GEMINI_API_KEY) return { error: "sin-llave" };
   try {
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${MODELO_GEMINI}:generateContent?key=${GEMINI_API_KEY}`;
@@ -113,23 +123,17 @@ async function pedirGemini(b64: string): Promise<Respuesta> {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        contents: [{
-          parts: [
-            { text: PROMPT },
-            { inline_data: { mime_type: "image/jpeg", data: b64 } },
-          ],
-        }],
+        contents: [{ parts: [{ text: prompt }, { inline_data: { mime_type: "image/jpeg", data: b64 } }] }],
         generationConfig: {
           temperature: 0.1,
           maxOutputTokens: 600,
           responseMimeType: "application/json",
-          // gemini-2.5-flash piensa antes de responder y ese pensamiento consume
-          // el tope de tokens → llegaba "{" y nada más. Para clasificar un
-          // pantallazo no hace falta pensar: se apaga.
+          // gemini-2.5-flash piensa antes de responder y se come el tope → JSON
+          // truncado. Para nombrar un sistema no hace falta pensar: se apaga.
           thinkingConfig: { thinkingBudget: 0 },
         },
-        // Pantallazos de trabajo con contenido adulto: que el filtro no bloquee la
-        // respuesta (si bloquea, no hay veredicto y la persona queda sin juzgar).
+        // Pantallazos de trabajo con contenido adulto: que el filtro no bloquee
+        // la respuesta (si bloquea, la persona queda sin veredicto).
         safetySettings: [
           { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_NONE" },
           { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_NONE" },
@@ -147,7 +151,7 @@ async function pedirGemini(b64: string): Promise<Respuesta> {
   }
 }
 
-async function pedirOpenRouter(b64: string): Promise<Respuesta> {
+async function pedirOpenRouter(prompt: string, b64: string): Promise<Respuesta> {
   if (!OPENROUTER_API_KEY) return { error: "sin-llave" };
   try {
     const resp = await conTimeout("https://openrouter.ai/api/v1/chat/completions", {
@@ -163,7 +167,7 @@ async function pedirOpenRouter(b64: string): Promise<Respuesta> {
         messages: [{
           role: "user",
           content: [
-            { type: "text", text: PROMPT },
+            { type: "text", text: prompt },
             { type: "image_url", image_url: { url: `data:image/jpeg;base64,${b64}` } },
           ],
         }],
@@ -181,7 +185,7 @@ async function pedirOpenRouter(b64: string): Promise<Respuesta> {
   }
 }
 
-async function pedirAnthropic(b64: string): Promise<Respuesta> {
+async function pedirAnthropic(prompt: string, b64: string): Promise<Respuesta> {
   if (!ANTHROPIC_API_KEY) return { error: "sin-llave" };
   try {
     const resp = await conTimeout("https://api.anthropic.com/v1/messages", {
@@ -199,7 +203,7 @@ async function pedirAnthropic(b64: string): Promise<Respuesta> {
           role: "user",
           content: [
             { type: "image", source: { type: "base64", media_type: "image/jpeg", data: b64 } },
-            { type: "text", text: PROMPT },
+            { type: "text", text: prompt },
           ],
         }],
       }),
@@ -213,7 +217,7 @@ async function pedirAnthropic(b64: string): Promise<Respuesta> {
   }
 }
 
-const PEDIR: Record<Proveedor, (b64: string) => Promise<Respuesta>> = {
+const PEDIR: Record<Proveedor, (prompt: string, b64: string) => Promise<Respuesta>> = {
   gemini: pedirGemini,
   openrouter: pedirOpenRouter,
   anthropic: pedirAnthropic,
@@ -229,11 +233,18 @@ function parsearVeredicto(text: string): Veredicto | null {
   try {
     const p = JSON.parse(text.slice(i, j + 1));
     const actividad = String(p.actividad ?? "").trim();
-    if (!actividad) return null;
-    return { actividad, fuera_de_lugar: p.fuera_de_lugar === true };
+    const sistema = String(p.sistema ?? "").trim();
+    if (!actividad && !sistema) return null;
+    return { sistema, actividad: actividad || sistema, fuera_de_lugar: p.fuera_de_lugar === true };
   } catch {
     return null;
   }
+}
+
+/** Lo que se guarda y se pinta: el sistema por delante si la frase no lo nombra. */
+function textoVeredicto(v: Veredicto): string {
+  if (!v.sistema) return v.actividad;
+  return v.actividad.toLowerCase().includes(v.sistema.toLowerCase()) ? v.actividad : `${v.sistema} · ${v.actividad}`;
 }
 
 interface Fila {
@@ -251,7 +262,6 @@ Deno.serve(async (req: Request) => {
 
   const admin = createClient(SUPABASE_URL, SERVICE_KEY, { auth: { persistSession: false, autoRefreshToken: false } });
   const ronda = crypto.randomUUID().slice(0, 8);
-  // Deja huella de cada paso. Nunca tumba la función si la tabla falla.
   const diag = async (paso: string, detalle: Record<string, unknown> = {}) => {
     await admin.from("argos_diag").insert({ ronda, paso, detalle }).then(() => {}, () => {});
   };
@@ -267,7 +277,6 @@ Deno.serve(async (req: Request) => {
     const { data: { user }, error: authErr } = await userClient.auth.getUser();
     await diag("auth", { user: user?.id ?? null, error: authErr?.message ?? null });
     if (!user) return json({ ok: false, error: "no-auth" }, 401);
-
     const { data: puede, error: rolErr } = await admin.rpc("is_in_role_group", { _user_id: user.id, _group: "supervisor_or_above" });
     await diag("rol", { puede, error: rolErr?.message ?? null });
     if (puede !== true) return json({ ok: false, error: "forbidden" }, 403);
@@ -279,8 +288,8 @@ Deno.serve(async (req: Request) => {
   const { data: cfg } = await admin.from("monitor_config").select("activo").eq("id", 1).maybeSingle();
   if (cfg && cfg.activo === false) { await diag("apagado"); return json({ ok: true, analizadas: 0, skip: "off" }); }
 
-  // 3) Pantallazos de pantalla recientes SIN veredicto; el más reciente de cada
-  //    persona. Se saltan las personas juzgadas hace menos de REJUZGAR_MIN (cuota).
+  // 3) Pantallazos recientes SIN veredicto; el más reciente de cada persona; se
+  //    saltan las personas juzgadas hace menos de REJUZGAR_MIN (cuota).
   const ahora = Date.now();
   const desdeISO = new Date(ahora - VENTANA_MIN * 60_000).toISOString();
   const [{ data: filas, error: qErr }, { data: recientes }] = await Promise.all([
@@ -311,24 +320,41 @@ Deno.serve(async (req: Request) => {
   await diag("pendientes", { filas: filas?.length ?? 0, personas: porPersona.size, ya_juzgadas: yaJuzgados.size, a_analizar: pendientes.length });
   if (pendientes.length === 0) return json({ ok: true, analizadas: 0 });
 
-  // 4) Juzgar UNA foto a la vez con pausa (nivel gratuito de Gemini). El primer
-  //    proveedor que responde se queda para el resto de la ronda. Un 429 o vacío
-  //    se reintenta una vez tras una pausa corta. Si ningún proveedor responde en
-  //    la primera foto, se corta la ronda.
+  // 4) El contexto de LA EMPRESA de cada persona (tenant_members → argos_contexto).
+  const ids = pendientes.map((f) => f.user_id);
+  const [{ data: miembros }, { data: contextos }] = await Promise.all([
+    admin.from("tenant_members").select("user_id, tenant_id").in("user_id", ids),
+    admin.from("argos_contexto").select("tenant_id, descripcion, es_trabajo, fuera_de_lugar"),
+  ]);
+  const tenantDe = new Map<string, string>();
+  for (const m of (miembros ?? []) as Array<{ user_id: string; tenant_id: string }>) {
+    if (!tenantDe.has(m.user_id)) tenantDe.set(m.user_id, m.tenant_id);
+  }
+  const contextoDe = new Map<string, Contexto>();
+  for (const c of (contextos ?? []) as Array<Contexto & { tenant_id: string }>) contextoDe.set(c.tenant_id, c);
+  const promptDe = (userId: string): string => {
+    const t = tenantDe.get(userId);
+    return armarPrompt((t && contextoDe.get(t)) || CONTEXTO_GENERICO);
+  };
+  await diag("contexto", { empresas: contextoDe.size, con_empresa: ids.filter((id) => tenantDe.has(id)).length, sin_empresa: ids.filter((id) => !tenantDe.has(id)).length });
+
+  // 5) Juzgar UNA foto a la vez con pausa (nivel gratuito de Gemini). El primer
+  //    proveedor que responde se queda para el resto de la ronda. Un 429/vacío se
+  //    reintenta una vez. Si ninguno responde en la primera foto, se corta la ronda.
   let proveedorVivo: Proveedor | null = null;
   const fallas: Record<string, string> = {};
 
-  const pedirConReintento = async (p: Proveedor, b64: string): Promise<Respuesta> => {
-    const r1 = await PEDIR[p](b64);
+  const pedirConReintento = async (p: Proveedor, prompt: string, b64: string): Promise<Respuesta> => {
+    const r1 = await PEDIR[p](prompt, b64);
     if (!("error" in r1) || !r1.reintentable) return r1;
     await dormir(REINTENTO_MS);
-    return await PEDIR[p](b64);
+    return await PEDIR[p](prompt, b64);
   };
 
-  const juzgar = async (b64: string): Promise<{ v: Veredicto; proveedor: Proveedor } | null> => {
+  const juzgar = async (prompt: string, b64: string): Promise<{ v: Veredicto; proveedor: Proveedor } | null> => {
     const orden = proveedorVivo ? [proveedorVivo] : ORDEN;
     for (const p of orden) {
-      const r = await pedirConReintento(p, b64);
+      const r = await pedirConReintento(p, prompt, b64);
       if ("error" in r) { fallas[p] = r.error; continue; }
       const v = parsearVeredicto(r.text);
       if (!v) { fallas[p] = `json-invalido: ${r.text.slice(0, 160)}`; continue; }
@@ -342,7 +368,7 @@ Deno.serve(async (req: Request) => {
   const errores: string[] = [];
   let primera = true;
   for (const f of pendientes) {
-    if (!primera) await dormir(ESPACIO_MS); // respeta el ritmo del nivel gratuito
+    if (!primera) await dormir(ESPACIO_MS);
     primera = false;
     const ruta = f.en_nas ? f.nas_path : f.path;
     if (!ruta) { errores.push("sin-ruta"); continue; }
@@ -353,20 +379,21 @@ Deno.serve(async (req: Request) => {
       continue;
     }
     const bytes = new Uint8Array(await dl.data.arrayBuffer());
-    const res = await juzgar(encodeBase64(bytes)); // base64 nativo: sin bucle char a char
+    const res = await juzgar(promptDe(f.user_id), encodeBase64(bytes));
     if (!res) {
       errores.push("sin-proveedor");
       await diag("vision_error", { id: f.id, bytes: bytes.length, fallas });
-      if (!proveedorVivo) break; // ninguno respondió: no seguir gastando esta ronda
+      if (!proveedorVivo) break;
       continue;
     }
+    const veredicto = textoVeredicto(res.v);
     const { error: upErr } = await admin
       .from("monitor_capturas")
-      .update({ veredicto: res.v.actividad, fuera_de_lugar: res.v.fuera_de_lugar, analizado: true })
+      .update({ veredicto, fuera_de_lugar: res.v.fuera_de_lugar, analizado: true })
       .eq("id", f.id);
     if (upErr) { errores.push(`update: ${upErr.message}`); await diag("update_error", { id: f.id, error: upErr.message }); continue; }
     analizadas++;
-    await diag("ok", { id: f.id, user: f.user_id, bytes: bytes.length, proveedor: res.proveedor, actividad: res.v.actividad, fuera: res.v.fuera_de_lugar });
+    await diag("ok", { id: f.id, user: f.user_id, bytes: bytes.length, proveedor: res.proveedor, sistema: res.v.sistema, actividad: res.v.actividad, fuera: res.v.fuera_de_lugar });
   }
 
   await diag("fin", { via: esCron ? "cron" : "usuario", analizadas, proveedor: proveedorVivo, fallas, errores: errores.slice(0, 5) });
