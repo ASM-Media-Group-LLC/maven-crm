@@ -335,6 +335,10 @@ export default function HRMonitorIA() {
   const [filtro, setFiltro] = useState<Filtro>("pendiente");
   const [notaDe, setNotaDe] = useState<MonitorEvento | null>(null);
   const [correoDe, setCorreoDe] = useState<MonitorEvento | null>(null);
+  // Argos en PESTAÑAS. Entra en «Notas del equipo» (el equipo y su día); el vivo
+  // y las alertas quedan en sus pestañas, no en la entrada (Álvaro).
+  type TabArgos = "equipo" | "envivo" | "atencion" | "ajustes";
+  const [tab, setTab] = useState<TabArgos>("equipo");
 
   const hoy = useMemo(() => eventos.filter((e) => isToday(new Date(e.created_at))), [eventos]);
   const personas = useMemo(() => new Set(hoy.map((e) => e.user_id)).size, [hoy]);
@@ -384,32 +388,59 @@ export default function HRMonitorIA() {
         }
       />
 
-      {/* ATENCIÓN AHORA — lo primero de todo: solo quien tiene un problema en este
-          momento, de peor a mejor. Si nadie, «todo en orden». */}
-      <div className="mt-5"><AtencionAhoraPanel /></div>
+      {/* Pestañas de Argos */}
+      {(() => {
+        const tabs: Array<{ k: TabArgos; label: string }> = [
+          { k: "equipo", label: t("hr.monia.tab.equipo") },
+          { k: "envivo", label: t("hr.monia.tab.envivo") },
+          { k: "atencion", label: t("hr.monia.tab.atencion") },
+          ...(isAdmin ? [{ k: "ajustes" as TabArgos, label: t("hr.monia.tab.ajustes") }] : []),
+        ];
+        return (
+          <div className="mt-4 flex gap-1 overflow-x-auto rounded-2xl border border-border/50 bg-background/40 p-1">
+            {tabs.map((x) => (
+              <button
+                key={x.k}
+                type="button"
+                onClick={() => setTab(x.k)}
+                className={`shrink-0 rounded-xl px-4 py-2 text-sm font-semibold transition ${tab === x.k ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
+              >
+                {x.label}
+              </button>
+            ))}
+          </div>
+        );
+      })()}
 
-      {/* La muralla en vivo: una tarjeta por persona con su pantalla, su cámara,
-          quién es, hace cuánto y qué anda haciendo (estilo Hubstaff). */}
-      <div className="mt-5"><PantallazosVivoPanel /></div>
+      {/* ENTRADA — Notas del equipo: el equipo y su día; clic en alguien → su día. */}
+      {tab === "equipo" && <div className="mt-5"><NotasEquipoPanel /></div>}
 
-      {/* La nota del equipo: saber al instante quién va bien o mal. */}
-      <div className="mt-5"><NotasEquipoPanel /></div>
+      {/* Pantallazos en vivo: la muralla (Muralla/Cuadrícula/Lista). */}
+      {tab === "envivo" && <div className="mt-5"><PantallazosVivoPanel /></div>}
 
-      {/* El rondín en vivo: estado de cada quien AHORA (pausa/baño/llamada). */}
-      <div className="mt-5"><RondinVivoPanel /></div>
+      {/* Atención ahora + el rondín (estado de cada quien AHORA). */}
+      {tab === "atencion" && (
+        <>
+          <div className="mt-5"><AtencionAhoraPanel /></div>
+          <div className="mt-5"><RondinVivoPanel /></div>
+        </>
+      )}
 
-      <div className="mt-4 grid grid-cols-2 gap-4 md:grid-cols-4">
+      {/* Ajustes (solo dueño): KPIs, interruptor, contexto y los eventos. */}
+      {tab === "ajustes" && isAdmin && (
+      <>
+      <div className="mt-5 grid grid-cols-2 gap-4 md:grid-cols-4">
         <HRMetricCard title={t("hr.monia.kpi.hoy")} value={hoy.length} icon={AlertTriangle} color={hoy.length > 0 ? "warning" : "default"} subtitle={t("hr.monia.kpi.hoySub")} />
         <HRMetricCard title={t("hr.monia.kpi.personas")} value={personas} icon={Users} color="primary" subtitle={t("hr.monia.kpi.personasSub")} />
         <HRMetricCard title={t("hr.monia.kpi.celular")} value={enCel} icon={Smartphone} color={enCel > 0 ? "destructive" : "default"} subtitle={t("hr.monia.kpi.celularSub")} />
         <HRMetricCard title={t("hr.monia.kpi.camOff")} value={camOff} icon={VideoOff} color={camOff > 0 ? "warning" : "default"} subtitle={t("hr.monia.kpi.camOffSub")} />
       </div>
 
-      {isAdmin && <div className="mt-4"><PanelAjustes t={t} /></div>}
+      <div className="mt-4"><PanelAjustes t={t} /></div>
 
       {/* El contexto de la empresa para Argos: qué sistemas son trabajo y cuáles
-          fuera de lugar. Argos juzga el sistema, no el contenido. Solo admin. */}
-      {isAdmin && <div className="mt-4"><ContextoEmpresaPanel /></div>}
+          fuera de lugar. Argos juzga el sistema, no el contenido. */}
+      <div className="mt-4"><ContextoEmpresaPanel /></div>
 
       <div className="mt-5 grid grid-cols-1 gap-5 lg:grid-cols-[1fr_320px]">
         {/* Lista de eventos con filtro */}
@@ -469,6 +500,8 @@ export default function HRMonitorIA() {
         {/* Ranking */}
         <div className="min-w-0"><PanelRanking t={t} /></div>
       </div>
+      </>
+      )}
 
       <DialogNota
         evento={notaDe}

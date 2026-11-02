@@ -218,11 +218,16 @@ export function NotasEquipoPanel() {
             {notas.map((p) => {
               const c = colorDe(p.nota.banda);
               const nombre = p.nombre || t("hr.noName");
+              const irAlDia = () => navigate(`/hr/expediente/${p.userId}`);
               return (
-                <button
+                <div
                   key={p.userId}
-                  onClick={() => setFicha(p)}
-                  className="flex items-center gap-3 rounded-2xl border border-transparent px-2.5 py-2.5 text-left transition hover:border-border/50 hover:bg-primary/5"
+                  role="button"
+                  tabIndex={0}
+                  onClick={irAlDia}
+                  onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); irAlDia(); } }}
+                  title={t("hr.notas.verDia", { nombre })}
+                  className="flex cursor-pointer items-center gap-3 rounded-2xl border border-transparent px-2.5 py-2.5 text-left transition hover:border-border/50 hover:bg-primary/5"
                 >
                   <UserAvatar name={nombre} src={p.avatarUrl} seed={p.avatarSeed} size="sm" />
                   <div className="min-w-0 flex-1">
@@ -231,13 +236,19 @@ export function NotasEquipoPanel() {
                       {p.horas.toFixed(1)}h · {p.faltas === 0 ? t("hr.notas.detFaltasCero") : p.faltas === 1 ? t("hr.notas.detFalta1") : t("hr.notas.detFaltas", { n: p.faltas })}
                     </p>
                   </div>
-                  <div className="flex flex-col items-end gap-1">
+                  {/* La nota abre el desglose (cómo se arma), sin salir de la lista */}
+                  <button
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); setFicha(p); }}
+                    title={t("hr.notas.verDesglose")}
+                    className="flex flex-col items-end gap-1 rounded-lg px-1.5 py-1 transition hover:bg-primary/10"
+                  >
                     <span className={`font-display text-xl font-bold leading-none tabular-nums ${c.tx}`}>{p.nota.valor ?? "—"}</span>
                     <span className="block h-1.5 w-14 overflow-hidden rounded-full bg-primary/15">
                       <span className={`block h-full rounded-full ${c.bar}`} style={{ width: `${p.nota.valor ?? 0}%` }} />
                     </span>
-                  </div>
-                </button>
+                  </button>
+                </div>
               );
             })}
           </div>
