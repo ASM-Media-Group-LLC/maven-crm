@@ -293,6 +293,16 @@ export default function HRExpediente() {
 
   const nombre = expediente?.nombre || t("hr.noName");
   const c = dia.nota.banda ? TONO[dia.nota.banda] : null;
+
+  // % DE ATENCIÓN DEL DÍA (estilo Hubstaff): de los pantallazos que la IA ya
+  // juzgó este día, qué porción estaba en lo suyo. Sin juzgados → "—" (no 0).
+  const atencion = useMemo(() => {
+    const juzgadas = dia.capturas.filter((x) => x.tipo === "pantalla" && x.veredicto != null);
+    if (juzgadas.length === 0) return null;
+    const ok = juzgadas.filter((x) => x.fueraDeLugar !== true).length;
+    return { pct: Math.round((ok / juzgadas.length) * 100), ok, n: juzgadas.length };
+  }, [dia]);
+  const tonoAt = atencion == null ? "" : atencion.pct >= 80 ? "text-success" : atencion.pct >= 60 ? "text-warning" : "text-destructive";
   const diaTexto = esHoy ? t("hr.exp.hoy") : format(new Date(diaSel + "T12:00:00"), "EEEE d 'de' MMMM", { locale: es });
 
   // Celdas del mes para el calendario opcional (lunes primero).
@@ -367,10 +377,18 @@ export default function HRExpediente() {
           )}
 
           {/* Stats del día */}
-          <div className="mt-4 grid grid-cols-4 gap-2">
+          <div className="mt-4 grid grid-cols-3 gap-2 sm:grid-cols-5">
             <div className={`rounded-panel border p-2.5 text-center ${c ? c.bg : "border-border/40 bg-card/40"}`}>
               <div className={`font-display text-lg font-bold tabular-nums ${c?.tx ?? ""}`}>{dia.nota.valor ?? "—"}</div>
               <div className="text-[10px] uppercase tracking-wide text-muted-foreground">{t("hr.exp.nota")}</div>
+            </div>
+            {/* % de atención del día: el sí-o-no con número */}
+            <div
+              className="rounded-panel border border-border/40 bg-card/40 p-2.5 text-center"
+              title={atencion ? t("hr.exp.atencionDetalle", { ok: atencion.ok, n: atencion.n }) : undefined}
+            >
+              <div className={`font-display text-lg font-bold tabular-nums ${tonoAt}`}>{atencion ? `${atencion.pct}%` : "—"}</div>
+              <div className="text-[10px] uppercase tracking-wide text-muted-foreground">{t("hr.exp.atencion")}</div>
             </div>
             <div className="rounded-panel border border-border/40 bg-card/40 p-2.5 text-center">
               <div className="font-display text-lg font-bold tabular-nums">{dia.horas.toFixed(1)}h</div>

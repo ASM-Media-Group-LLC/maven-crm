@@ -2,7 +2,7 @@ import { useNavigate } from "react-router-dom";
 import { Siren, CheckCircle2, Loader2, AlertTriangle, RefreshCw, ChevronRight, ScreenShare, Coffee } from "lucide-react";
 import { useLanguage } from "@/hooks/useLanguage";
 import { UserAvatar } from "@/components/UserAvatar";
-import { useAtencionAhora, type TipoAlerta } from "@/hooks/useAtencionAhora";
+import { useAtencionAhora, TIPOS_GRAVES, type TipoAlerta } from "@/hooks/useAtencionAhora";
 import { LABEL_FALTA, type FaltaTipo } from "@/lib/monitorFaltas";
 import type { TranslationKey } from "@/lib/i18n";
 
@@ -26,10 +26,6 @@ const TONO_GRAVEDAD: Record<number, string> = {
   2: "border-warning/50 bg-warning/10 text-warning",
   1: "border-border/50 bg-muted/40 text-muted-foreground",
 };
-
-// PROBLEMAS (acción) vs PAUSAS/ojo. Una pausa (baño/break/almuerzo) nunca cuenta
-// como problema; lo grave es dejar de trabajar o estar fuera de lugar.
-const TIPOS_GRAVES = new Set<TipoAlerta>(["fuera_de_lugar", "sin_senal", "sin_pantalla", "camara_apagada", "se_fue", "celular", "no_mira"]);
 
 export function AtencionAhoraPanel() {
   const { t } = useLanguage();

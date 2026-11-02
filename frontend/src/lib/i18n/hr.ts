@@ -1076,7 +1076,7 @@ export const hr = {
   "hr.exp.hoy": { es: "Hoy", en: "Today" },
   "hr.exp.pantallazosDia": { es: "Pantallazos del día", en: "Screenshots of the day" },
   "hr.exp.masCapturas": { es: "+{n} momentos más", en: "+{n} more moments" },
-  "monitor.pantallazo": { es: "Argos tomó un pantallazo 📸", en: "Argos took a screenshot 📸" },
+  "hr.monitor.pantallazo": { es: "Argos tomó un pantallazo 📸", en: "Argos took a screenshot 📸" },
   "hr.exp.sinPantalla": { es: "No compartía pantalla", en: "No screen shared" },
   "hr.exp.camaraApagada": { es: "Cámara apagada", en: "Camera off" },
   "hr.exp.masViejo": { es: "Más viejo", en: "Older" },
@@ -1085,4 +1085,12 @@ export const hr = {
   "hr.exp.diaSiguiente": { es: "Día siguiente", en: "Next day" },
   "hr.exp.calendario": { es: "Calendario", en: "Calendar" },
   "hr.exp.error": { es: "No se pudo cargar el expediente", en: "Could not load the record" },
+  // ── Semáforo en vivo + % de atención del día (Argos) ──
+  "hr.sem.trabajando": { es: "Trabajando", en: "Working" },
+  "hr.sem.pausa": { es: "Pausa / ojo", en: "Break / watch" },
+  "hr.sem.problema": { es: "No está en lo suyo", en: "Off task" },
+  "hr.sem.esperando": { es: "Esperando a Argos", en: "Waiting for Argos" },
+  "hr.conectados.pctHoy": { es: "{n}% hoy", en: "{n}% today" },
+  "hr.exp.atencion": { es: "Atención", en: "Focus" },
+  "hr.exp.atencionDetalle": { es: "{ok} de {n} pantallazos en lo suyo", en: "{ok} of {n} screenshots on task" },
 } as const satisfies Record<string, { es: string; en: string }>;

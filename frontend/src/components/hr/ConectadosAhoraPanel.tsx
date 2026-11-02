@@ -5,19 +5,56 @@ import { useLanguage } from "@/hooks/useLanguage";
 import { UserAvatar } from "@/components/UserAvatar";
 import { useCapturasVivo } from "@/hooks/useCapturasVivo";
 import { useNotasEquipo } from "@/hooks/useNotasEquipo";
+import { useAtencionAhora, TIPOS_GRAVES } from "@/hooks/useAtencionAhora";
+import { useAtencionHoy } from "@/hooks/useAtencionHoy";
 
 // CONECTADOS AHORA — la ENTRADA de Argos (Álvaro): solo la gente que está
 // trabajando en este momento (manda pantallazos), en lista limpia: su foto
 // chica, quién es, qué está haciendo (IA), el MINUTO de su último pantallazo y
 // su NOTA de hoy fusionada ahí mismo. Los desconectados no aparecen. Los fuera
 // de lugar, arriba y en rojo. Clic → su día. Se refresca solo.
+//
+// EL SEMÁFORO (Alvaro, 02/11): el sí-o-no de un vistazo por persona, AHORA:
+// 🟢 trabajando (juzgada y en lo suyo) · 🟡 pausa/ojo (alerta leve) ·
+// 🔴 no está en lo suyo (fuera de lugar o alerta grave) · gris: Argos aún no
+// la juzga. Al lado, su % de atención de HOY (pantallazos en lo suyo).
+
+type Semaforo = "verde" | "amarillo" | "rojo" | "gris";
+
+const PUNTO_SEM: Record<Semaforo, string> = {
+  verde: "bg-success shadow-[0_0_6px_hsl(var(--success))]",
+  amarillo: "bg-warning shadow-[0_0_6px_hsl(var(--warning))]",
+  rojo: "bg-destructive shadow-[0_0_6px_hsl(var(--destructive))] animate-pulse",
+  gris: "bg-muted-foreground/40",
+};
+
 export function ConectadosAhoraPanel() {
   const { t } = useLanguage();
   const navigate = useNavigate();
   const { personas, cargando, error, refrescar } = useCapturasVivo();
   const { notas } = useNotasEquipo("hoy");
+  const { personas: enAtencion } = useAtencionAhora();
+  const { atencionPor } = useAtencionHoy();
 
   const notaPor = useMemo(() => new Map(notas.map((n) => [n.userId, n])), [notas]);
+  // Alertas vivas por persona: graves → rojo, leves → amarillo.
+  const alertaPor = useMemo(() => {
+    const m = new Map<string, "grave" | "leve">();
+    for (const p of enAtencion) m.set(p.userId, p.alertas.some((a) => TIPOS_GRAVES.has(a.tipo)) ? "grave" : "leve");
+    return m;
+  }, [enAtencion]);
+  const semaforoDe = (p: { userId: string; fueraDeLugar: boolean | null; veredicto: string | null }): Semaforo => {
+    const alerta = alertaPor.get(p.userId);
+    if (p.fueraDeLugar === true || alerta === "grave") return "rojo";
+    if (alerta === "leve") return "amarillo";
+    return p.veredicto ? "verde" : "gris";
+  };
+  const labelSem: Record<Semaforo, string> = {
+    verde: t("hr.sem.trabajando"),
+    amarillo: t("hr.sem.pausa"),
+    rojo: t("hr.sem.problema"),
+    gris: t("hr.sem.esperando"),
+  };
   const orden = useMemo(
     () => [...personas].sort((a, b) => (Number(b.fueraDeLugar) - Number(a.fueraDeLugar)) || (a.ultima < b.ultima ? 1 : -1)),
     [personas],
@@ -68,6 +105,9 @@ export function ConectadosAhoraPanel() {
             {orden.map((p) => {
               const nombre = p.nombre || t("hr.noName");
               const nota = notaPor.get(p.userId)?.nota.valor ?? null;
+              const sem = semaforoDe(p);
+              const at = atencionPor?.get(p.userId) ?? null;
+              const tonoPct = at == null ? "text-muted-foreground" : at.pct >= 80 ? "text-success" : at.pct >= 60 ? "text-warning" : "text-destructive";
               return (
                 <button
                   key={p.userId}
@@ -86,6 +126,8 @@ export function ConectadosAhoraPanel() {
                   <UserAvatar name={nombre} src={p.avatarUrl} seed={p.avatarSeed} size="sm" status="online" />
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-1.5">
+                      {/* El semáforo: el sí-o-no de un vistazo */}
+                      <span className={`h-2 w-2 shrink-0 rounded-full ${PUNTO_SEM[sem]}`} title={labelSem[sem]} aria-label={labelSem[sem]} />
                       <span className="truncate text-sm font-semibold">{nombre}</span>
                       {p.fueraDeLugar && (
                         <span className="inline-flex shrink-0 items-center gap-0.5 rounded bg-destructive px-1 py-0.5 text-[9px] font-semibold text-destructive-foreground">
@@ -97,7 +139,13 @@ export function ConectadosAhoraPanel() {
                       <Sparkles className="h-3 w-3 shrink-0 opacity-60" />{p.veredicto || t("hr.pantallazos.analizando")}
                     </p>
                   </div>
-                  <span className="shrink-0 text-[11px] tabular-nums text-muted-foreground">{horaDe(p.ultima)}</span>
+                  <div className="flex shrink-0 flex-col items-end gap-0.5">
+                    <span className="text-[11px] tabular-nums text-muted-foreground">{horaDe(p.ultima)}</span>
+                    {/* % de atención de HOY (pantallazos juzgados en lo suyo) */}
+                    <span className={`text-[10px] font-semibold tabular-nums ${tonoPct}`}>
+                      {at ? t("hr.conectados.pctHoy", { n: at.pct }) : "—"}
+                    </span>
+                  </div>
                   {/* La nota de hoy, fusionada */}
                   <div className="flex shrink-0 flex-col items-end gap-1">
                     <span className={`font-display text-lg font-bold leading-none tabular-nums ${tonoNota(nota)}`}>{nota ?? "—"}</span>

@@ -263,7 +263,7 @@ export function useMonitorCamara({ track, trackPantalla = null, camaraRealOn, fa
       // corran dos capturadores a la vez).
       if (guardoAlgo && !cancelado && avisarCapturaRef.current !== false && Date.now() - ultimoAvisoCaptura > 30_000) {
         ultimoAvisoCaptura = Date.now();
-        try { toast(t("monitor.pantallazo"), { duration: 2600 }); } catch { /* sin toast no pasa nada */ }
+        try { toast(t("hr.monitor.pantallazo"), { duration: 2600 }); } catch { /* sin toast no pasa nada */ }
       }
     };
     // Primer pantallazo a los ~8 s; luego cada ~2 min a HORA ALEATORIA (90–150 s).

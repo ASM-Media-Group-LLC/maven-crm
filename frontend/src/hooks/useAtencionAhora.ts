@@ -15,6 +15,11 @@ export type TipoAlerta =
   | "camara_apagada" | "camara_tapada" | "se_fue" | "cara_incompleta"
   | "celular" | "distraido" | "no_mira";
 
+// PROBLEMAS (acción) vs PAUSAS/ojo. Una pausa (baño/break/almuerzo) nunca cuenta
+// como problema; lo grave es dejar de trabajar o estar fuera de lugar. Lo usan
+// el panel de Atención y el semáforo de Conectados ahora.
+export const TIPOS_GRAVES = new Set<TipoAlerta>(["fuera_de_lugar", "sin_senal", "sin_pantalla", "camara_apagada", "se_fue", "celular", "no_mira"]);
+
 export interface AlertaViva {
   id: string;
   tipo: TipoAlerta;
