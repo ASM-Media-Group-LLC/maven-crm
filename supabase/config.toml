@@ -16,6 +16,9 @@ verify_jwt = true
 [functions.argos-mirar]
 verify_jwt = true
 
+[functions.argos-vigia]
+verify_jwt = true  # el cron manda la llave pública como Bearer + X-Cron-Token adentro
+
 # Gestión de API keys (solo-admin). verify_jwt=false: valida el JWT + rol admin adentro.
 [functions.manage-api-keys]
 verify_jwt = false

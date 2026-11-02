@@ -29,6 +29,7 @@ import { useMonitorRanking } from "@/hooks/useMonitorPanel";
 import { NotasEquipoPanel } from "@/components/hr/NotasEquipoPanel";
 import { RondinVivoPanel } from "@/components/hr/RondinVivoPanel";
 import { PantallazosVivoPanel } from "@/components/hr/PantallazosVivoPanel";
+import { ContextoEmpresaPanel } from "@/components/hr/ContextoEmpresaPanel";
 import { LABEL_FALTA, type FaltaTipo } from "@/lib/monitorFaltas";
 import type { TranslationKey } from "@/lib/i18n";
 
@@ -400,6 +401,10 @@ export default function HRMonitorIA() {
       </div>
 
       {isAdmin && <div className="mt-4"><PanelAjustes t={t} /></div>}
+
+      {/* El contexto de la empresa para Argos: qué sistemas son trabajo y cuáles
+          fuera de lugar. Argos juzga el sistema, no el contenido. Solo admin. */}
+      {isAdmin && <div className="mt-4"><ContextoEmpresaPanel /></div>}
 
       <div className="mt-5 grid grid-cols-1 gap-5 lg:grid-cols-[1fr_320px]">
         {/* Lista de eventos con filtro */}
