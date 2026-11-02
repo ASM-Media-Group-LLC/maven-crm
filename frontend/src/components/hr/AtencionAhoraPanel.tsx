@@ -77,7 +77,7 @@ export function AtencionAhoraPanel() {
           <div className="flex flex-col gap-2">
             {personas.map((p) => {
               const nombre = p.nombre || t("hr.noName");
-              const min = Math.max(0, Math.round((Date.now() - new Date(p.desde).getTime()) / 60000));
+              const min = Math.max(0, Math.round((Date.now() - Date.parse(p.abiertaAt)) / 60000));
               const frase = p.alertas.find((a) => a.detalle)?.detalle ?? null;
               return (
                 <button
