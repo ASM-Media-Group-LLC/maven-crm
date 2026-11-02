@@ -1,13 +1,13 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
-import { ChevronLeft, ChevronRight, Clock, AlertTriangle, Coffee, Monitor, Camera, ImageIcon, Loader2, Gauge } from "lucide-react";
+import { ChevronLeft, ChevronRight, AlertTriangle, ScreenShare, Camera, ImageIcon, Loader2, Gauge } from "lucide-react";
 import { useLanguage } from "@/hooks/useLanguage";
 import { UserAvatar } from "@/components/UserAvatar";
 import { Page } from "@/components/ui/page";
 import { PageHeader } from "@/components/ui/page-header";
-import { useExpedienteEmpleado, type DiaExpediente } from "@/hooks/useExpedienteEmpleado";
+import { useExpedienteEmpleado, type DiaExpediente, type CapturaDia } from "@/hooks/useExpedienteEmpleado";
 import { urlCaptura } from "@/hooks/useMonitorEventos";
 import { LABEL_FALTA, type FaltaTipo } from "@/lib/monitorFaltas";
 import type { BandaNota } from "@/lib/notaEmpleado";
@@ -23,7 +23,75 @@ const TONO: Record<BandaNota, { bg: string; tx: string; bar: string }> = {
   mal: { bg: "bg-destructive/15 border-destructive/30", tx: "text-destructive", bar: "bg-destructive" },
 };
 
-function DetalleDia({ dia, t }: { dia: DiaExpediente | null; t: (k: TranslationKey, v?: Record<string, string | number>) => string }) {
+const abrirCaptura = async (path: string) => { const u = await urlCaptura(path); if (u) window.open(u, "_blank", "noopener"); };
+
+// Galería de miniaturas de un día: firma hasta TOPE rutas y las pinta como fotos
+// (modelo Hubstaff). Lo malo (fuera de lugar) va con borde rojo. Al tocar, abre
+// la foto entera. Re-firma al cambiar de día (las URLs firmadas caducan a 2 min).
+function GaleriaCapturas({ capturas, tipo, tope, t }: {
+  capturas: CapturaDia[];
+  tipo: "pantalla" | "camara";
+  tope: number;
+  t: (k: TranslationKey, v?: Record<string, string | number>) => string;
+}) {
+  const lista = useMemo(() => capturas.filter((c) => c.tipo === tipo), [capturas, tipo]);
+  const muestra = useMemo(() => lista.slice(0, tope), [lista, tope]);
+  const [urls, setUrls] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    let vivo = true;
+    void (async () => {
+      const pares = await Promise.all(muestra.map(async (c) => [c.id, await urlCaptura(c.path)] as const));
+      if (vivo) setUrls(Object.fromEntries(pares.filter(([, u]) => !!u) as [string, string][]));
+    })();
+    return () => { vivo = false; };
+  }, [muestra]);
+
+  if (lista.length === 0) return <p className="text-xs text-muted-foreground">{t("hr.exp.sinCapturas")}</p>;
+
+  const esPantalla = tipo === "pantalla";
+  return (
+    <div className="space-y-2">
+      <div className={`grid gap-2 ${esPantalla ? "grid-cols-2 sm:grid-cols-3" : "grid-cols-4 sm:grid-cols-5"}`}>
+        {muestra.map((c) => {
+          const u = urls[c.id];
+          return (
+            <button
+              key={c.id}
+              type="button"
+              onClick={() => abrirCaptura(c.path)}
+              title={`${format(new Date(c.createdAt), "HH:mm")}${c.veredicto ? ` · ${c.veredicto}` : ""}`}
+              className={`group relative overflow-hidden rounded-xl border bg-muted/40 transition ${
+                c.fueraDeLugar ? "border-destructive/60" : "border-border/40 hover:border-primary/50"
+              }`}
+            >
+              <div className={`relative w-full ${esPantalla ? "aspect-[16/10]" : "aspect-square"}`}>
+                {u ? (
+                  <img src={u} alt={format(new Date(c.createdAt), "HH:mm")} loading="lazy" className="h-full w-full object-cover" />
+                ) : (
+                  <div className="flex h-full w-full items-center justify-center text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /></div>
+                )}
+                <span className="absolute bottom-1 right-1 rounded bg-black/55 px-1 py-0.5 text-[9px] font-semibold tabular-nums text-white backdrop-blur-sm">
+                  {format(new Date(c.createdAt), "HH:mm")}
+                </span>
+                {c.fueraDeLugar && (
+                  <span className="absolute left-1 top-1 inline-flex items-center gap-0.5 rounded bg-destructive px-1 py-0.5 text-[9px] font-semibold text-destructive-foreground">
+                    <AlertTriangle className="h-2.5 w-2.5" />{t("hr.exp.fueraDeLugar")}
+                  </span>
+                )}
+              </div>
+            </button>
+          );
+        })}
+      </div>
+      {lista.length > muestra.length && (
+        <p className="text-[11px] text-muted-foreground">{t("hr.exp.masCapturas", { n: lista.length - muestra.length })}</p>
+      )}
+    </div>
+  );
+}
+
+function DetalleDia({ dia, esHoy, t }: { dia: DiaExpediente | null; esHoy: boolean; t: (k: TranslationKey, v?: Record<string, string | number>) => string }) {
   if (!dia) {
     return (
       <div className="flex min-h-[220px] flex-col items-center justify-center gap-2 text-center text-muted-foreground">
@@ -32,15 +100,15 @@ function DetalleDia({ dia, t }: { dia: DiaExpediente | null; t: (k: TranslationK
       </div>
     );
   }
-  const abrir = async (path: string) => { const u = await urlCaptura(path); if (u) window.open(u, "_blank", "noopener"); };
-  const pantallazos = dia.capturas.filter((c) => c.tipo === "pantalla");
-  const fotos = dia.capturas.filter((c) => c.tipo === "camara");
   const c = dia.nota.banda ? TONO[dia.nota.banda] : null;
+  const fotos = dia.capturas.filter((x) => x.tipo === "camara");
   return (
     <div className="flex flex-col gap-4">
       <div className="flex items-center gap-3">
-        <div>
-          <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">{format(new Date(dia.fecha + "T12:00:00"), "EEEE d 'de' MMMM", { locale: es })}</p>
+        <div className="min-w-0">
+          <p className="truncate text-[11px] font-semibold uppercase tracking-wider text-primary">
+            {esHoy ? t("hr.exp.hoy") : format(new Date(dia.fecha + "T12:00:00"), "EEEE d 'de' MMMM", { locale: es })}
+          </p>
           <p className="text-xs text-muted-foreground">{t("hr.exp.nota")}</p>
         </div>
         <div className={`ml-auto font-display text-3xl font-bold tabular-nums ${c?.tx ?? "text-muted-foreground"}`}>{dia.nota.valor ?? "—"}</div>
@@ -61,12 +129,18 @@ function DetalleDia({ dia, t }: { dia: DiaExpediente | null; t: (k: TranslationK
         </div>
       </div>
 
-      {/* Faltas del día */}
+      {/* Los PANTALLAZOS del día, como fotos (lo que hizo) */}
       <div>
-        <p className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">{t("hr.exp.faltas")}</p>
-        {dia.faltas.length === 0 ? (
-          <p className="text-xs text-muted-foreground">{t("hr.exp.sinFaltas")}</p>
-        ) : (
+        <p className="mb-2 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+          <ScreenShare className="h-3.5 w-3.5" />{t("hr.exp.pantallazosDia")}
+        </p>
+        <GaleriaCapturas capturas={dia.capturas} tipo="pantalla" tope={48} t={t} />
+      </div>
+
+      {/* Faltas del día */}
+      {dia.faltas.length > 0 && (
+        <div>
+          <p className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">{t("hr.exp.faltas")}</p>
           <div className="flex flex-col gap-1.5">
             {dia.faltas.slice(0, 20).map((f) => {
               const lbl = LABEL_FALTA[f.tipo as FaltaTipo];
@@ -75,35 +149,25 @@ function DetalleDia({ dia, t }: { dia: DiaExpediente | null; t: (k: TranslationK
                   <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-destructive/80" />
                   <span className="min-w-0 flex-1 truncate text-xs">{lbl ? t(lbl) : f.tipo}{f.detalle ? ` · ${f.detalle}` : ""}</span>
                   {f.capturaPath && (
-                    <button type="button" onClick={() => abrir(f.capturaPath!)} className="shrink-0 text-muted-foreground hover:text-primary" title={t("hr.exp.abrir")}><ImageIcon className="h-3.5 w-3.5" /></button>
+                    <button type="button" onClick={() => abrirCaptura(f.capturaPath!)} className="shrink-0 text-muted-foreground hover:text-primary" title={t("hr.exp.abrir")}><ImageIcon className="h-3.5 w-3.5" /></button>
                   )}
                   <span className="shrink-0 text-[10px] tabular-nums text-muted-foreground">{format(new Date(f.createdAt), "HH:mm")}</span>
                 </div>
               );
             })}
           </div>
-        )}
-      </div>
+        </div>
+      )}
 
-      {/* Pantallazos y capturas */}
-      <div>
-        <p className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">{t("hr.exp.capturas")}</p>
-        {dia.capturas.length === 0 ? (
-          <p className="text-xs text-muted-foreground">{t("hr.exp.sinCapturas")}</p>
-        ) : (
-          <div className="flex flex-col gap-1.5">
-            {[...pantallazos, ...fotos].slice(0, 40).map((c2) => (
-              <button key={c2.id} type="button" onClick={() => abrir(c2.path)} className="flex items-center gap-2 rounded-xl border border-border/40 bg-card/30 px-2.5 py-1.5 text-left transition hover:border-primary/40 hover:bg-primary/5">
-                {c2.tipo === "pantalla" ? <Monitor className="h-3.5 w-3.5 shrink-0 text-primary" /> : <Camera className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />}
-                <span className="text-xs">{c2.tipo === "pantalla" ? t("hr.exp.pantalla") : t("hr.exp.camara")}</span>
-                {c2.fueraDeLugar && <span className="rounded-md bg-destructive/15 px-1.5 py-0.5 text-[10px] font-semibold text-destructive">{t("hr.exp.fueraDeLugar")}</span>}
-                <span className="min-w-0 flex-1 truncate text-[11px] text-muted-foreground">{c2.veredicto ?? ""}</span>
-                <span className="shrink-0 text-[10px] tabular-nums text-muted-foreground">{format(new Date(c2.createdAt), "HH:mm")}</span>
-              </button>
-            ))}
-          </div>
-        )}
-      </div>
+      {/* La cámara del día (que estuvo) */}
+      {fotos.length > 0 && (
+        <div>
+          <p className="mb-2 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+            <Camera className="h-3.5 w-3.5" />{t("hr.exp.camara")}
+          </p>
+          <GaleriaCapturas capturas={dia.capturas} tipo="camara" tope={24} t={t} />
+        </div>
+      )}
     </div>
   );
 }
@@ -112,12 +176,19 @@ export default function HRExpediente() {
   const { userId } = useParams<{ userId: string }>();
   const { t } = useLanguage();
   const [cur, setCur] = useState(() => { const d = new Date(); return { anio: d.getFullYear(), mes: d.getMonth() + 1 }; });
-  const [diaSel, setDiaSel] = useState<string | null>(null);
+  // Arranca en HOY: lo primero que quiere ver Alvaro es el día de hoy, no un panel vacío.
+  const [diaSel, setDiaSel] = useState<string | null>(() => new Date().toLocaleDateString("en-CA", { timeZone: "America/Bogota" }));
   const { expediente, cargando, error, hoy } = useExpedienteEmpleado(userId ?? null, cur.anio, cur.mes);
 
   const mesTexto = useMemo(() => new Date(cur.anio, cur.mes - 1, 1).toLocaleDateString("es-CO", { month: "long", year: "numeric" }), [cur]);
   const esMesActual = useMemo(() => { const d = new Date(); return d.getFullYear() === cur.anio && d.getMonth() + 1 === cur.mes; }, [cur]);
-  const mover = (d: number) => { setDiaSel(null); setCur((c) => { const m = c.mes - 1 + d; return { anio: c.anio + Math.floor(m / 12), mes: ((m % 12) + 12) % 12 + 1 }; }); };
+  const mover = (d: number) => {
+    const m = cur.mes - 1 + d;
+    const n = { anio: cur.anio + Math.floor(m / 12), mes: ((m % 12) + 12) % 12 + 1 };
+    const esActual = new Date().getFullYear() === n.anio && new Date().getMonth() + 1 === n.mes;
+    setCur(n);
+    setDiaSel(esActual ? hoy : null); // al volver al mes actual, cae en hoy
+  };
 
   // Grilla del mes (lunes primero).
   const celdas = useMemo(() => {
@@ -130,7 +201,14 @@ export default function HRExpediente() {
     return out;
   }, [cur]);
 
-  const diaDetalle = diaSel ? expediente?.dias.get(diaSel) ?? null : null;
+  // El día seleccionado. Si tiene datos, esos; si está seleccionado pero sin datos
+  // (p. ej. hoy sin capturas todavía), un día en cero — nunca el cartel "elige un día".
+  const diaDetalle = useMemo<DiaExpediente | null>(() => {
+    if (!diaSel || !expediente) return null;
+    const d = expediente.dias.get(diaSel);
+    if (d) return d;
+    return { fecha: diaSel, horas: 0, faltas: [], minutosPausaDeMas: 0, capturas: [], nota: { valor: null, banda: null, factores: [] } };
+  }, [diaSel, expediente]);
   const nombre = expediente?.nombre || t("hr.noName");
 
   return (
@@ -194,7 +272,7 @@ export default function HRExpediente() {
 
         {/* Detalle del día */}
         <section className="vidrio sube p-4 lg:p-5" style={{ animationDelay: "0.06s" }}>
-          <div className="v-cont"><DetalleDia dia={diaDetalle} t={t} /></div>
+          <div className="v-cont"><DetalleDia dia={diaDetalle} esHoy={diaSel === hoy} t={t} /></div>
         </section>
       </div>
     </Page>

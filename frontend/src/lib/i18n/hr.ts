@@ -1035,5 +1035,8 @@ export const hr = {
   "hr.exp.pantalla": { es: "Pantalla", en: "Screen" },
   "hr.exp.camara": { es: "Cámara", en: "Camera" },
   "hr.exp.abrir": { es: "Abrir", en: "Open" },
+  "hr.exp.hoy": { es: "Hoy", en: "Today" },
+  "hr.exp.pantallazosDia": { es: "Pantallazos del día", en: "Screenshots of the day" },
+  "hr.exp.masCapturas": { es: "+{n} pantallazos más", en: "+{n} more screenshots" },
   "hr.exp.error": { es: "No se pudo cargar el expediente", en: "Could not load the record" },
 } as const satisfies Record<string, { es: string; en: string }>;
