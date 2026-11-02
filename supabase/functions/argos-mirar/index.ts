@@ -7,20 +7,25 @@ import { encodeBase64 } from "jsr:@std/encoding@1/base64";
 // Mira los PANTALLAZOS de pantalla más recientes de cada persona y dice, en una
 // frase corta, QUÉ está haciendo y si está FUERA DE LUGAR. Escribe el veredicto
 // en monitor_capturas (veredicto, fuera_de_lugar, analizado) para que la muralla
-// lo pinte bajo cada tarjeta.
+// lo pinte bajo cada tarjeta y el expediente/las notas lo acumulen.
 //
-// Lo dispara el cliente cuando un supervisor abre la muralla (verify_jwt=true):
-// así solo se gasta IA cuando alguien está mirando, y se analiza lo de AHORITA.
+// DOS PUERTAS:
+//   · Cron (cada 2 min, pg_cron): X-Cron-Token = CRON_INTERNAL_TOKEN, como los
+//     demás crons. Argos juzga SOLO, haya o no alguien mirando.
+//   · Supervisor: la muralla la invoca con la sesión del usuario (acelera lo de
+//     ahorita). verify_jwt=true en el gateway cubre las dos (el cron manda la
+//     llave pública como Bearer).
 //
 // PROVEEDORES EN CADENA: la llave de OpenRouter apareció muerta (401 "User not
-// found", 02/11) y toda la IA dejó de usarse el 01/10 (llaves de Jhon). Por eso
-// se intenta OpenRouter → Anthropic → Gemini con las llaves que ya existen; el
-// primero que responde se usa para el resto de la ronda. Cada paso deja huella en
-// argos_diag (solo service_role) para ver desde afuera qué proveedor vive.
+// found", 02/11) y toda la IA dejó de usarse el 01/10 (llaves de Jhon). Se
+// intenta OpenRouter → Anthropic → Gemini con las llaves que ya existen; el
+// primero que responde se usa para el resto de la ronda. Cada paso deja huella
+// en argos_diag (solo service_role) para ver desde afuera qué proveedor vive.
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
+const CRON_TOKEN = Deno.env.get("CRON_INTERNAL_TOKEN") ?? "";
 const OPENROUTER_API_KEY = Deno.env.get("OPENROUTER_API_KEY") ?? "";
 const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY") ?? "";
 const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY") ?? Deno.env.get("GOOGLE_AI_API_KEY") ?? "";
@@ -29,17 +34,25 @@ const MODELO_ANTHROPIC = Deno.env.get("ARGOS_ANTHROPIC_MODEL") ?? "claude-haiku-
 const MODELO_GEMINI = Deno.env.get("ARGOS_GEMINI_MODEL") ?? "gemini-2.5-flash"; // ídem (8k llamadas)
 const LLM_TIMEOUT_MS = 20_000;
 const VENTANA_MIN = 7; // solo lo de los últimos minutos
-const TOPE_PERSONAS = 10; // techo por ronda; la muralla vuelve a llamar
+const TOPE_PERSONAS = 10; // techo por ronda
 const EN_PARALELO = 4; // cuántas visiones a la vez
 
 const CORS = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-cron-token",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
 function json(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), { status, headers: { ...CORS, "Content-Type": "application/json" } });
+}
+
+/** Comparación en tiempo constante (no filtra el token por el reloj). */
+function igualesConstante(a: string, b: string): boolean {
+  if (a.length !== b.length || a.length === 0) return false;
+  let d = 0;
+  for (let i = 0; i < a.length; i++) d |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return d === 0;
 }
 
 const PROMPT =
@@ -208,18 +221,22 @@ Deno.serve(async (req: Request) => {
     await admin.from("argos_diag").insert({ ronda, paso, detalle }).then(() => {}, () => {});
   };
 
-  await diag("entrada");
+  // 1) ¿Quién llama? Puerta de cron (X-Cron-Token) o supervisor con sesión.
+  const tokenCron = req.headers.get("X-Cron-Token") ?? "";
+  const esCron = !!tokenCron && igualesConstante(tokenCron, CRON_TOKEN);
+  await diag("entrada", { via: esCron ? "cron" : "usuario", hay_cron_token_env: CRON_TOKEN.length > 0 });
 
-  // 1) Quién llama (el gateway ya validó el JWT). Debe ser supervisor+.
-  const authHeader = req.headers.get("Authorization") ?? "";
-  const userClient = createClient(SUPABASE_URL, ANON_KEY, { global: { headers: { Authorization: authHeader } } });
-  const { data: { user }, error: authErr } = await userClient.auth.getUser();
-  await diag("auth", { user: user?.id ?? null, error: authErr?.message ?? null });
-  if (!user) return json({ ok: false, error: "no-auth" }, 401);
+  if (!esCron) {
+    const authHeader = req.headers.get("Authorization") ?? "";
+    const userClient = createClient(SUPABASE_URL, ANON_KEY, { global: { headers: { Authorization: authHeader } } });
+    const { data: { user }, error: authErr } = await userClient.auth.getUser();
+    await diag("auth", { user: user?.id ?? null, error: authErr?.message ?? null });
+    if (!user) return json({ ok: false, error: "no-auth" }, 401);
 
-  const { data: puede, error: rolErr } = await admin.rpc("is_in_role_group", { _user_id: user.id, _group: "supervisor_or_above" });
-  await diag("rol", { puede, error: rolErr?.message ?? null });
-  if (puede !== true) return json({ ok: false, error: "forbidden" }, 403);
+    const { data: puede, error: rolErr } = await admin.rpc("is_in_role_group", { _user_id: user.id, _group: "supervisor_or_above" });
+    await diag("rol", { puede, error: rolErr?.message ?? null });
+    if (puede !== true) return json({ ok: false, error: "forbidden" }, 403);
+  }
 
   await diag("llaves", {
     openrouter: OPENROUTER_API_KEY.length,
@@ -304,6 +321,6 @@ Deno.serve(async (req: Request) => {
     await Promise.all(pendientes.slice(i, i + EN_PARALELO).map(unaPersona));
   }
 
-  await diag("fin", { analizadas, proveedor: proveedorVivo, fallas: fallasProveedor, errores: errores.slice(0, 5) });
+  await diag("fin", { via: esCron ? "cron" : "usuario", analizadas, proveedor: proveedorVivo, fallas: fallasProveedor, errores: errores.slice(0, 5) });
   return json({ ok: true, analizadas, proveedor: proveedorVivo, fallas: fallasProveedor });
 });
