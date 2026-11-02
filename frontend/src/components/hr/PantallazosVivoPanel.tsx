@@ -1,10 +1,8 @@
-import { useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { MonitorPlay, Loader2, AlertTriangle, ScreenShare, RefreshCw, Sparkles } from "lucide-react";
 import { useLanguage } from "@/hooks/useLanguage";
 import { UserAvatar } from "@/components/UserAvatar";
 import { useCapturasVivo } from "@/hooks/useCapturasVivo";
-import { supabase } from "@/integrations/supabase/client";
 
 // LA MURALLA EN VIVO de Argos (modelo Hubstaff): una tarjeta por persona con lo
 // que pasa en los últimos minutos —su pantalla grande, su cámara en inset, quién
@@ -14,33 +12,9 @@ export function PantallazosVivoPanel() {
   const navigate = useNavigate();
   const { personas, cargando, error, refrescar } = useCapturasVivo();
 
-  // Cuando hay pantallas sin veredicto, le pedimos a Argos que las mire: una sola
-  // llamada en vuelo, mínimo 60 s entre llamadas, y si no juzga nada (IA caída,
-  // llave muerta) espera cada vez más (hasta 10 min) para no martillar la función.
-  // Solo refrescamos cuando sí hubo veredictos nuevos que pintar.
-  const analizando = useRef(false);
-  const ultimoIntento = useRef(0);
-  const espera = useRef(60_000);
-  useEffect(() => {
-    const hayPendientes = personas.some((p) => p.veredicto == null && p.tienePantalla);
-    if (!hayPendientes || analizando.current) return;
-    const ahora = Date.now();
-    if (ahora - ultimoIntento.current < espera.current) return;
-    analizando.current = true;
-    ultimoIntento.current = ahora;
-    const masEspera = () => { espera.current = Math.min(espera.current * 2, 10 * 60_000); };
-    void supabase.functions
-      .invoke("argos-mirar")
-      .then(({ data }) => {
-        const r = data as { analizadas?: number } | null;
-        if (r && (r.analizadas ?? 0) > 0) { espera.current = 60_000; void refrescar(); }
-        else masEspera();
-      })
-      .catch(masEspera)
-      .finally(() => {
-        analizando.current = false;
-      });
-  }, [personas, refrescar]);
+  // El cerebro (argos-mirar) corre solo por cron cada 2 min; la muralla solo
+  // pinta lo que ya juzgó (se refresca cada 20 s). No se dispara desde aquí: dos
+  // fuentes a la vez provocaban 429 en el nivel gratuito de Gemini.
 
   return (
     <section className="vidrio sube p-4 lg:p-5">
