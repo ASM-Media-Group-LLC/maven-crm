@@ -13,11 +13,13 @@ const BackToDashboardBar = () => {
   const navigate = useNavigate();
   const s = state as { fromDashboard?: boolean; fromHR?: boolean } | null;
 
-  // El Messenger es un destino primario del sidebar, no una sub-página a la que te
-  // "manden" desde un dashboard. Nada en RR.HH. enlaza al Messenger, así que la barra
-  // "Volver al Dashboard HR" que aparecía ahí venía de estado de navegación pegado y no
-  // tenía sentido. La ocultamos en /messenger (al abrirlo desde el tab no debe salir).
-  if (pathname === "/messenger" || pathname.startsWith("/messenger/")) return null;
+  // Destinos PRIMARIOS del sidebar (tienen su propio botón en el riel): no son
+  // sub-páginas a las que te "manden" desde un dashboard, así que la barra "Volver
+  // al Dashboard" no tiene sentido ahí — venía de estado de navegación pegado y
+  // sacaba al usuario de su lugar. El Messenger y Argos (/hr/monitor-ia, con su
+  // propio ojo en el riel) son primarios: para volver a RR.HH. está el sidebar.
+  const ES_PRIMARIO = ["/messenger", "/hr/monitor-ia", "/hr/expediente"];
+  if (ES_PRIMARIO.some((r) => pathname === r || pathname.startsWith(r + "/"))) return null;
 
   if (!s?.fromDashboard && !s?.fromHR) return null;
 
