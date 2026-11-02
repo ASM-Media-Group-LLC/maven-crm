@@ -24,6 +24,7 @@ import {
 } from "@/components/ui/sidebar";
 import { useLanguage } from "@/hooks/useLanguage";
 import { usePermissions } from "@/hooks/usePermissions";
+import { useEsDueno } from "@/hooks/useEsDueno";
 import { CollapsibleSidebarGroup } from "@/components/dashboard/CollapsibleSidebarGroup";
 import WhatsAppIcon from "@/components/icons/WhatsAppIcon";
 import TelegramIcon from "@/components/icons/TelegramIcon";
@@ -83,6 +84,8 @@ const DashboardSidebar = () => {
   const navigate = useNavigate();
   const { t } = useLanguage();
   const { canAccess, isLoading: permisosCargando, hayError: permisosFallaron, reintentar: reintentarPermisos } = usePermissions();
+  // Argos (por ahora) solo lo ve el dueño de la empresa, aunque tenga el permiso.
+  const { esDueno } = useEsDueno();
 
   const unreadChatCount = useUnreadChatCount();
   const { promologCount, leadgenCount, closersCount, waInboxCount, tgInboxCount, coworkRequestsCount, correoUnreadCount } = useSidebarBadges();
@@ -247,7 +250,7 @@ const DashboardSidebar = () => {
   // Filter HR items the role can't actually reach so the sidebar
   // doesn't show entries that just bounce back to /dashboard.
   const filterHRItems = (items?: HRItem[]) =>
-    items?.filter((i) => !i.submodule || canAccess("HR", i.submodule));
+    items?.filter((i) => !i.submodule || (canAccess("HR", i.submodule) && (i.submodule !== "Monitor IA" || esDueno === true)));
   const hrGroups: HRGroup[] = hrGroupsAll
     .map((g) => ({
       ...g,
@@ -507,9 +510,9 @@ const DashboardSidebar = () => {
         </CollapsibleSidebarGroup>
 
         {/* Argos: su PROPIO botón en el riel (Alvaro), no dentro del flyout de
-            Menú. Monitor del equipo en vivo; solo lo ven supervisores y admin
-            (gate HR/Monitor IA). */}
-        {canAccess("HR", "Monitor IA") && (
+            Menú. Monitor del equipo en vivo; por ahora solo lo ve el DUEÑO de la
+            empresa (gate HR/Monitor IA + tenant_owners). */}
+        {canAccess("HR", "Monitor IA") && esDueno === true && (
           <SidebarMenu>
             <SidebarMenuItem>
               <SidebarMenuButton asChild tooltip={t("nav.argos")}>
