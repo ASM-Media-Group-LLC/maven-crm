@@ -2,9 +2,10 @@ import { useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
-import { ChevronLeft, ChevronRight, AlertTriangle, ScreenShare, ScreenShareOff, CameraOff, ImageIcon, Loader2, Gauge, CalendarDays } from "lucide-react";
+import { ChevronLeft, ChevronRight, AlertTriangle, ScreenShare, ScreenShareOff, CameraOff, ImageIcon, Loader2, Gauge, CalendarDays, Sparkles } from "lucide-react";
 import { useLanguage } from "@/hooks/useLanguage";
 import { UserAvatar } from "@/components/UserAvatar";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Page } from "@/components/ui/page";
 import { PageHeader } from "@/components/ui/page-header";
 import { useExpedienteEmpleado, type DiaExpediente, type CapturaDia } from "@/hooks/useExpedienteEmpleado";
@@ -37,11 +38,6 @@ function sumarDias(ymd: string, delta: number): string {
 // por su path del buzón.
 const claveFoto = (c: CapturaDia | null): string | null => (c ? (c.enNas ? c.nasPath : c.path) : null);
 
-// Abrir una captura entera (buzón o NAS).
-const abrirFoto = async (c: CapturaDia) => {
-  const u = c.enNas && c.nasPath ? (await urlsDeNas([c.nasPath]))[c.nasPath] : await urlCaptura(c.path);
-  if (u) window.open(u, "_blank", "noopener");
-};
 // Abrir una captura del buzón por su path (las faltas de monitor_eventos nunca van al NAS).
 const abrirPath = async (path: string) => { const u = await urlCaptura(path); if (u) window.open(u, "_blank", "noopener"); };
 
@@ -106,6 +102,20 @@ function TiraDelDia({ capturas, t }: { capturas: CapturaDia[]; t: Tr }) {
     return () => { vivo = false; };
   }, [visibles]);
 
+  // Visor pop-up: índice del momento abierto dentro de `visibles`. Flechas del
+  // teclado pasan entre momentos; Esc cierra. (visibles va de más nuevo a más viejo.)
+  const [visorIdx, setVisorIdx] = useState<number | null>(null);
+  useEffect(() => {
+    if (visorIdx === null) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "ArrowRight") setVisorIdx((i) => (i === null ? i : Math.max(0, i - 1)));
+      else if (e.key === "ArrowLeft") setVisorIdx((i) => (i === null ? i : Math.min(visibles.length - 1, i + 1)));
+      else if (e.key === "Escape") setVisorIdx(null);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [visorIdx, visibles.length]);
+
   if (momentos.length === 0) {
     return (
       <div className="flex flex-col items-center gap-2 py-12 text-center text-muted-foreground">
@@ -134,7 +144,7 @@ function TiraDelDia({ capturas, t }: { capturas: CapturaDia[]; t: Tr }) {
               const urlP = m.pantalla ? urls[claveFoto(m.pantalla)!] : undefined;
               const urlC = m.camara ? urls[claveFoto(m.camara)!] : undefined;
               const hora = format(new Date(m.createdAt), "HH:mm");
-              const abrir = () => { if (m.pantalla) void abrirFoto(m.pantalla); else if (m.camara) void abrirFoto(m.camara); };
+              const abrir = () => setVisorIdx(visibles.indexOf(m)); // pop-up, no pestaña nueva
               return (
                 <button
                   key={m.id}
@@ -187,6 +197,72 @@ function TiraDelDia({ capturas, t }: { capturas: CapturaDia[]; t: Tr }) {
       {momentos.length > visibles.length && (
         <p className="text-[11px] text-muted-foreground">{t("hr.exp.masCapturas", { n: momentos.length - visibles.length })}</p>
       )}
+
+      {/* ── Pop-up: pantalla (1) grande + cámara (2) flotante, con su minuto exacto ── */}
+      {visorIdx !== null && visibles[visorIdx] && (() => {
+        const m = visibles[visorIdx];
+        const urlP = m.pantalla ? urls[claveFoto(m.pantalla)!] : undefined;
+        const urlC = m.camara ? urls[claveFoto(m.camara)!] : undefined;
+        const hp = m.pantalla ? format(new Date(m.pantalla.createdAt), "HH:mm:ss") : null;
+        const hc = m.camara ? format(new Date(m.camara.createdAt), "HH:mm:ss") : null;
+        return (
+          <Dialog open onOpenChange={(o) => { if (!o) setVisorIdx(null); }}>
+            <DialogContent className="max-w-5xl bg-none from-transparent p-2 sm:p-3">
+              <DialogTitle className="sr-only">{t("hr.exp.pantallazosDia")}</DialogTitle>
+              <div className="flex flex-col gap-2.5">
+                <div className="relative overflow-hidden rounded-xl border border-border/50 bg-black">
+                  <div className="relative aspect-[16/10] w-full">
+                    {m.pantalla ? (
+                      urlP ? <img src={urlP} alt="" className="h-full w-full object-contain" /> : <div className="flex h-full w-full items-center justify-center text-muted-foreground"><Loader2 className="h-6 w-6 animate-spin" /></div>
+                    ) : (
+                      <div className="flex h-full w-full flex-col items-center justify-center gap-2 text-muted-foreground"><ScreenShareOff className="h-9 w-9 opacity-60" /><span className="text-xs font-semibold uppercase tracking-wide">{t("hr.exp.sinPantalla")}</span></div>
+                    )}
+                    {/* 1 Pantalla + su hora */}
+                    <span className="absolute left-2.5 top-2.5 inline-flex items-center gap-2 rounded-lg bg-black/60 px-2.5 py-1.5 text-xs font-semibold text-white backdrop-blur-sm">
+                      <span className="flex h-5 w-5 items-center justify-center rounded-full bg-primary text-[11px] text-primary-foreground">1</span>
+                      {t("hr.exp.pantalla")}{hp && <span className="font-normal tabular-nums opacity-75">· {hp}</span>}
+                    </span>
+                    {m.fueraDeLugar && (
+                      <span className="absolute left-2.5 top-11 inline-flex items-center gap-1 rounded-lg bg-destructive px-2 py-1 text-[11px] font-semibold text-destructive-foreground">
+                        <AlertTriangle className="h-3 w-3" />{t("hr.exp.fueraDeLugar")}
+                      </span>
+                    )}
+                    {/* 2 Cámara, flotante */}
+                    <div className="absolute bottom-2.5 right-2.5 w-[32%] max-w-[230px] overflow-hidden rounded-lg border-2 border-white/80 shadow-xl">
+                      <div className="relative aspect-[4/3] bg-black">
+                        {m.camara ? (
+                          urlC ? <img src={urlC} alt="" className="h-full w-full object-cover" /> : <div className="flex h-full w-full items-center justify-center text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /></div>
+                        ) : (
+                          <div className="flex h-full w-full flex-col items-center justify-center gap-1 text-destructive"><CameraOff className="h-5 w-5" /><span className="text-[9px] font-semibold uppercase">{t("hr.exp.camaraApagada")}</span></div>
+                        )}
+                        <span className="absolute left-1.5 top-1.5 inline-flex items-center gap-1 rounded bg-black/60 px-1.5 py-0.5 text-[10px] font-semibold text-white backdrop-blur-sm">
+                          <span className="flex h-4 w-4 items-center justify-center rounded-full bg-primary text-[9px] text-primary-foreground">2</span>{t("hr.exp.camara")}{hc && <span className="font-normal tabular-nums opacity-75">· {hc}</span>}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                {/* Veredicto de la IA */}
+                {m.veredicto && (
+                  <div className={`flex items-start gap-2 rounded-lg border border-border/40 bg-card/40 px-3 py-2 text-sm ${m.fueraDeLugar ? "text-destructive" : "text-muted-foreground"}`}>
+                    <Sparkles className="mt-0.5 h-4 w-4 shrink-0 opacity-70" /><span>{m.veredicto}</span>
+                  </div>
+                )}
+                {/* Navegación entre momentos */}
+                <div className="flex items-center justify-between">
+                  <button type="button" onClick={() => setVisorIdx((i) => (i === null ? i : Math.min(visibles.length - 1, i + 1)))} disabled={visorIdx >= visibles.length - 1} className="flex h-9 items-center gap-1.5 rounded-lg border border-border/50 bg-card/40 px-3 text-sm font-medium text-muted-foreground transition hover:text-foreground disabled:opacity-40">
+                    <ChevronLeft className="h-4 w-4" />{t("hr.exp.masViejo")}
+                  </button>
+                  <span className="text-xs tabular-nums text-muted-foreground">{format(new Date(m.createdAt), "HH:mm")} · {visibles.length - visorIdx}/{visibles.length}</span>
+                  <button type="button" onClick={() => setVisorIdx((i) => (i === null ? i : Math.max(0, i - 1)))} disabled={visorIdx <= 0} className="flex h-9 items-center gap-1.5 rounded-lg border border-border/50 bg-card/40 px-3 text-sm font-medium text-muted-foreground transition hover:text-foreground disabled:opacity-40">
+                    {t("hr.exp.masNuevo")}<ChevronRight className="h-4 w-4" />
+                  </button>
+                </div>
+              </div>
+            </DialogContent>
+          </Dialog>
+        );
+      })()}
     </div>
   );
 }

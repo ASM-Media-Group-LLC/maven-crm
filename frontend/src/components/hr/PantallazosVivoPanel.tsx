@@ -28,10 +28,8 @@ export function PantallazosVivoPanel() {
 
   const elegir = (m: Modo) => { setModo(m); try { localStorage.setItem(MODO_KEY, m); } catch { /* sin storage */ } };
   const irA = (userId: string) => navigate(`/hr/expediente/${userId}`);
-  const hace = (iso: string) => {
-    const min = Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 60000));
-    return min < 1 ? t("hr.pantallazos.ahora") : t("hr.pantallazos.hace", { n: min });
-  };
+  // El minuto exacto del pantallazo (no "ahora"): Argos captura cada ~2 min.
+  const hace = (iso: string) => new Date(iso).toLocaleTimeString("es-CO", { hour: "2-digit", minute: "2-digit" });
 
   // Para la lista: los fuera de lugar primero, luego lo más reciente.
   const ordenLista = useMemo(

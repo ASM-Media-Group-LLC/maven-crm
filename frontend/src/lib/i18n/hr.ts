@@ -1070,6 +1070,8 @@ export const hr = {
   "monitor.pantallazo": { es: "Argos tomó un pantallazo 📸", en: "Argos took a screenshot 📸" },
   "hr.exp.sinPantalla": { es: "No compartía pantalla", en: "No screen shared" },
   "hr.exp.camaraApagada": { es: "Cámara apagada", en: "Camera off" },
+  "hr.exp.masViejo": { es: "Más viejo", en: "Older" },
+  "hr.exp.masNuevo": { es: "Más nuevo", en: "Newer" },
   "hr.exp.diaAnterior": { es: "Día anterior", en: "Previous day" },
   "hr.exp.diaSiguiente": { es: "Día siguiente", en: "Next day" },
   "hr.exp.calendario": { es: "Calendario", en: "Calendar" },
