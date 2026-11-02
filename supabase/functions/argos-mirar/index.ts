@@ -10,17 +10,25 @@ import { encodeBase64 } from "jsr:@std/encoding@1/base64";
 // lo pinte bajo cada tarjeta y el expediente/las notas lo acumulen.
 //
 // DOS PUERTAS:
-//   · Cron (cada 2 min, pg_cron): X-Cron-Token = CRON_INTERNAL_TOKEN, como los
-//     demás crons. Argos juzga SOLO, haya o no alguien mirando. Es el motor.
+//   · Cron (cada 2 min, pg_cron `argos-mirar`): X-Cron-Token = CRON_INTERNAL_TOKEN,
+//     como los demás crons. Argos juzga SOLO, haya o no alguien mirando. Es el motor.
 //   · Supervisor con sesión (para pruebas a mano). verify_jwt=true en el gateway
 //     cubre las dos (el cron manda la llave pública como Bearer).
 //
 // PROVEEDORES (02/11): OpenRouter 401 "User not found" y Anthropic 401 "invalid
-// x-api-key" → MUERTAS (eran llaves de Jhon). Gemini VIVE pero en nivel gratuito
-// (429 por cuota/ritmo). Por eso: Gemini PRIMERO, una llamada a la vez, reintento
-// corto en 429, pensamiento apagado (gemini-2.5-flash "piensa" y se come el tope
-// de tokens → JSON truncado). Los otros dos quedan de respaldo por si Alvaro pone
-// llaves nuevas: reviven solos. Cada paso deja huella en argos_diag.
+// x-api-key" → MUERTAS (eran llaves de Jhon). Gemini VIVE pero en NIVEL GRATUITO
+// (~10 llamadas/min, ~250/día → 429 frecuentes). Por eso: Gemini primero, UNA
+// foto a la vez con pausa entre fotos, pocas por ronda, reintento corto en 429,
+// pensamiento apagado (gemini-2.5-flash "piensa" y se come el tope de tokens →
+// JSON truncado) y NO re-juzgar a la misma persona antes de REJUZGAR_MIN. Cuando
+// Alvaro active facturación o ponga llave nueva, se suben ARGOS_TOPE/ARGOS_ESPACIO_MS
+// por variables de entorno sin tocar código. Los otros dos proveedores quedan de
+// respaldo: reviven solos con llave nueva. Cada paso deja huella en argos_diag.
+//
+// EL NEGOCIO (lección del primer veredicto, 02/11): esta es una agencia de
+// creadoras de contenido para adultos. Ver/elegir/vender contenido explícito en
+// la bóveda (Media Vault) o chatear con fans ES el trabajo, nunca "fuera de
+// lugar". El prompt lo dice explícito para no acusar a nadie por hacer su labor.
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -34,7 +42,9 @@ const MODELO_ANTHROPIC = Deno.env.get("ARGOS_ANTHROPIC_MODEL") ?? "claude-haiku-
 const MODELO_GEMINI = Deno.env.get("ARGOS_GEMINI_MODEL") ?? "gemini-2.5-flash"; // el que ya usaba Maven (8k llamadas)
 const LLM_TIMEOUT_MS = 20_000;
 const VENTANA_MIN = 7; // solo lo de los últimos minutos
-const TOPE_PERSONAS = 10; // techo por ronda (cada 2 min)
+const TOPE_PERSONAS = Number(Deno.env.get("ARGOS_TOPE") ?? 5); // por ronda (nivel gratuito: 5)
+const ESPACIO_MS = Number(Deno.env.get("ARGOS_ESPACIO_MS") ?? 6_000); // pausa entre fotos (≤10/min)
+const REJUZGAR_MIN = Number(Deno.env.get("ARGOS_REJUZGAR_MIN") ?? 30); // no re-juzgar a la misma persona antes
 const REINTENTO_MS = 2_500; // pausa antes de reintentar un 429/vacío
 
 const CORS = {
@@ -58,18 +68,20 @@ function igualesConstante(a: string, b: string): boolean {
 const dormir = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 const PROMPT =
-  `Eres Argos, el monitor de trabajo de una agencia. Te paso un PANTALLAZO de la pantalla de un trabajador.
-Di en una frase corta y neutral QUÉ está haciendo en su pantalla, y si está TRABAJANDO o FUERA DE LUGAR.
+  `Eres Argos, el monitor de trabajo de una agencia que gestiona creadoras de contenido para adultos (tipo OnlyFans). El equipo —chatters y closers— trabaja TODO el día con contenido explícito: conversa con fans en nombre de las creadoras, vende fotos y videos íntimos, revisa la bóveda de contenido ("Media Vault", "Vault", galerías) y usa el CRM Maven, Cowork, un contador de tiempo, correo y planillas.
 
-TRABAJO: chat o mensajería de clientes, el CRM Maven, correo, planillas, documentos, una llamada de trabajo, o navegación relacionada al trabajo.
-FUERA DE LUGAR: redes sociales personales, YouTube u otro streaming de ocio, juegos, compras personales, la pantalla de inicio sin actividad, la pantalla apagada, o cualquier cosa ajena al trabajo.
+Te paso un PANTALLAZO de la pantalla de un trabajador. Di en una frase corta y neutral QUÉ está haciendo y si está TRABAJANDO o FUERA DE LUGAR.
+
+TRABAJO (nunca es fuera de lugar): chats con fans (OnlyFans, Fansly u otra plataforma de creadoras; WhatsApp/Telegram de trabajo), la bóveda de contenido / Media Vault aunque muestre desnudos o material explícito, elegir o enviar ese contenido, el CRM Maven, Cowork, el contador de tiempo, correo, planillas, documentos, llamadas de trabajo.
+FUERA DE LUGAR: redes sociales PERSONALES (Instagram, TikTok, Facebook, X propios, no la cuenta de una creadora), YouTube u otro streaming de ocio, juegos, series o películas, compras personales, pornografía de ocio en sitios que NO son la plataforma de trabajo, el escritorio o la pantalla de inicio sin actividad, la pantalla apagada o bloqueada.
 
 Devuelve SOLO este JSON, sin texto antes ni después, sin markdown:
-{ "actividad": "frase corta de qué se ve en la pantalla", "fuera_de_lugar": true | false }
+{ "actividad": "frase corta y concreta: qué aplicación y qué hace", "fuera_de_lugar": true | false }
 
 REGLAS:
-- Ante la duda, fuera_de_lugar=false. Solo true si es evidente que no es trabajo.
-- "actividad" en español neutro, sin voseo, máximo una frase.`;
+- Ante la duda, fuera_de_lugar=false. Solo true si es EVIDENTE que no es trabajo.
+- En "actividad" NO describas el contenido explícito; di algo neutral como "revisando la bóveda de contenido" o "chateando con un fan".
+- Español neutro, sin voseo, máximo una frase.`;
 
 interface Veredicto {
   actividad: string;
@@ -116,6 +128,14 @@ async function pedirGemini(b64: string): Promise<Respuesta> {
           // pantallazo no hace falta pensar: se apaga.
           thinkingConfig: { thinkingBudget: 0 },
         },
+        // Pantallazos de trabajo con contenido adulto: que el filtro no bloquee la
+        // respuesta (si bloquea, no hay veredicto y la persona queda sin juzgar).
+        safetySettings: [
+          { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_NONE" },
+          { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_NONE" },
+          { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_NONE" },
+          { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_NONE" },
+        ],
       }),
     });
     if (!resp.ok) return { error: await cuerpoError(resp), reintentable: resp.status === 429 || resp.status >= 500 };
@@ -259,30 +279,42 @@ Deno.serve(async (req: Request) => {
   const { data: cfg } = await admin.from("monitor_config").select("activo").eq("id", 1).maybeSingle();
   if (cfg && cfg.activo === false) { await diag("apagado"); return json({ ok: true, analizadas: 0, skip: "off" }); }
 
-  // 3) Pantallazos de pantalla recientes SIN veredicto; el más reciente de cada persona.
-  const desdeISO = new Date(Date.now() - VENTANA_MIN * 60_000).toISOString();
-  const { data: filas, error: qErr } = await admin
-    .from("monitor_capturas")
-    .select("id, user_id, path, nas_path, en_nas, created_at")
-    .eq("tipo", "pantalla")
-    .is("veredicto", null)
-    .gte("created_at", desdeISO)
-    .order("created_at", { ascending: false })
-    .limit(400);
+  // 3) Pantallazos de pantalla recientes SIN veredicto; el más reciente de cada
+  //    persona. Se saltan las personas juzgadas hace menos de REJUZGAR_MIN (cuota).
+  const ahora = Date.now();
+  const desdeISO = new Date(ahora - VENTANA_MIN * 60_000).toISOString();
+  const [{ data: filas, error: qErr }, { data: recientes }] = await Promise.all([
+    admin
+      .from("monitor_capturas")
+      .select("id, user_id, path, nas_path, en_nas, created_at")
+      .eq("tipo", "pantalla")
+      .is("veredicto", null)
+      .gte("created_at", desdeISO)
+      .order("created_at", { ascending: false })
+      .limit(400),
+    admin
+      .from("monitor_capturas")
+      .select("user_id")
+      .not("veredicto", "is", null)
+      .gte("created_at", new Date(ahora - REJUZGAR_MIN * 60_000).toISOString())
+      .limit(1000),
+  ]);
   if (qErr) { await diag("query_error", { error: qErr.message }); return json({ ok: false, error: "query", detalle: qErr.message }, 500); }
 
+  const yaJuzgados = new Set(((recientes ?? []) as Array<{ user_id: string }>).map((r) => r.user_id));
   const porPersona = new Map<string, Fila>();
   for (const f of (filas ?? []) as Fila[]) {
+    if (yaJuzgados.has(f.user_id)) continue;
     if (!porPersona.has(f.user_id)) porPersona.set(f.user_id, f);
   }
   const pendientes = [...porPersona.values()].slice(0, TOPE_PERSONAS);
-  await diag("pendientes", { filas: filas?.length ?? 0, personas: porPersona.size, a_analizar: pendientes.length });
+  await diag("pendientes", { filas: filas?.length ?? 0, personas: porPersona.size, ya_juzgadas: yaJuzgados.size, a_analizar: pendientes.length });
   if (pendientes.length === 0) return json({ ok: true, analizadas: 0 });
 
-  // 4) Juzgar UNA foto a la vez (nivel gratuito de Gemini: ritmo limitado). El
-  //    primer proveedor que responde se queda para el resto de la ronda. Un 429 o
-  //    vacío se reintenta una vez tras una pausa corta. Si ningún proveedor
-  //    responde en la primera foto, se corta la ronda.
+  // 4) Juzgar UNA foto a la vez con pausa (nivel gratuito de Gemini). El primer
+  //    proveedor que responde se queda para el resto de la ronda. Un 429 o vacío
+  //    se reintenta una vez tras una pausa corta. Si ningún proveedor responde en
+  //    la primera foto, se corta la ronda.
   let proveedorVivo: Proveedor | null = null;
   const fallas: Record<string, string> = {};
 
@@ -308,7 +340,10 @@ Deno.serve(async (req: Request) => {
 
   let analizadas = 0;
   const errores: string[] = [];
+  let primera = true;
   for (const f of pendientes) {
+    if (!primera) await dormir(ESPACIO_MS); // respeta el ritmo del nivel gratuito
+    primera = false;
     const ruta = f.en_nas ? f.nas_path : f.path;
     if (!ruta) { errores.push("sin-ruta"); continue; }
     const dl = await admin.storage.from("monitor-capturas").download(ruta);
