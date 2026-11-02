@@ -3,6 +3,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useMonitorEstado } from "@/hooks/useMonitorEstado";
 import { useFaceWatch } from "@/hooks/useFaceWatch";
 import { useMonitorCamara } from "@/hooks/useMonitorCamara";
+import { useGrabadorClips } from "@/hooks/useGrabadorClips";
 
 // ARGOS VIGILANTE — el monitor a nivel de TODA la app, independiente de LiveKit
 // (modelo Hubstaff). Mientras la persona esté logueada en Maven y el admin tenga
@@ -31,34 +32,45 @@ export function useArgosVigilante(): EstadoVigilante {
   const debeVigilar = !!user && esAdmin === false && activo === true && vigilanciaApp === true;
 
   const [track, setTrack] = useState<MediaStreamTrack | null>(null);
+  const [stream, setStream] = useState<MediaStream | null>(null);
   const [permisoNegado, setPermisoNegado] = useState(false);
   const streamRef = useRef<MediaStream | null>(null);
 
   // Prende/apaga la cámara propia según la config. Al apagar, suelta el stream
   // (se apaga la lucecita de la cámara) — importante para la confianza de la gente.
+  // Pide también MICRÓFONO (para los clips con audio). Si lo niegan, reintenta solo
+  // cámara: las fotos/faltas siguen; el clip saldría sin audio.
   useEffect(() => {
     const apagar = () => {
       streamRef.current?.getTracks().forEach((t) => t.stop());
       streamRef.current = null;
       setTrack(null);
+      setStream(null);
     };
     if (!debeVigilar || typeof navigator === "undefined" || !navigator.mediaDevices?.getUserMedia) {
       apagar();
       return;
     }
     let vivo = true;
+    const video = { width: { ideal: 640 }, height: { ideal: 480 } };
+    const pedir = async (): Promise<MediaStream> => {
+      try {
+        return await navigator.mediaDevices.getUserMedia({ video, audio: true });
+      } catch {
+        // Negó el micrófono (o no hay): al menos la cámara, para no perder la vigilancia.
+        return await navigator.mediaDevices.getUserMedia({ video, audio: false });
+      }
+    };
     void (async () => {
       try {
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: { width: { ideal: 640 }, height: { ideal: 480 } },
-          audio: false,
-        });
-        if (!vivo) { stream.getTracks().forEach((t) => t.stop()); return; }
-        streamRef.current = stream;
-        setTrack(stream.getVideoTracks()[0] ?? null);
+        const s = await pedir();
+        if (!vivo) { s.getTracks().forEach((t) => t.stop()); return; }
+        streamRef.current = s;
+        setStream(s);
+        setTrack(s.getVideoTracks()[0] ?? null);
         setPermisoNegado(false);
       } catch {
-        if (vivo) { setPermisoNegado(true); setTrack(null); }
+        if (vivo) { setPermisoNegado(true); setTrack(null); setStream(null); }
       }
     })();
     return () => { vivo = false; apagar(); };
@@ -69,6 +81,8 @@ export function useArgosVigilante(): EstadoVigilante {
   // de app (no una sala de Cowork puntual).
   const faceWatch = useFaceWatch(track, debeVigilar && !!track);
   useMonitorCamara({ track, camaraRealOn: !!track, faceWatch, activo: debeVigilar, roomNombre: "maven" });
+  // Clips de video: graba cuando la persona deja de mirar la cámara (se distrae).
+  useGrabadorClips({ stream, faceWatch, activo: debeVigilar, roomNombre: "maven" });
 
   return { vigilando: debeVigilar && !!track, permisoNegado, debeVigilar };
 }

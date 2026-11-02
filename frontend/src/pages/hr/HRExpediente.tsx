@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
-import { ArrowLeft, ChevronLeft, ChevronRight, AlertTriangle, ScreenShare, ScreenShareOff, CameraOff, ImageIcon, Loader2, Gauge, CalendarDays, Sparkles } from "lucide-react";
+import { ArrowLeft, ChevronLeft, ChevronRight, AlertTriangle, ScreenShare, ScreenShareOff, CameraOff, ImageIcon, Loader2, Gauge, CalendarDays, Sparkles, Video, Volume2, VolumeX, Archive } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useLanguage } from "@/hooks/useLanguage";
 import { UserAvatar } from "@/components/UserAvatar";
@@ -10,6 +10,7 @@ import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Page } from "@/components/ui/page";
 import { PageHeader } from "@/components/ui/page-header";
 import { useExpedienteEmpleado, type DiaExpediente, type CapturaDia } from "@/hooks/useExpedienteEmpleado";
+import { useClipsDia, type ClipDia } from "@/hooks/useClipsDia";
 import { urlCaptura, urlsDeNas } from "@/hooks/useMonitorEventos";
 import { LABEL_FALTA, type FaltaTipo } from "@/lib/monitorFaltas";
 import type { BandaNota } from "@/lib/notaEmpleado";
@@ -283,6 +284,7 @@ export default function HRExpediente() {
   const anio = Number(diaSel.slice(0, 4));
   const mes = Number(diaSel.slice(5, 7));
   const { expediente, cargando, error, hoy } = useExpedienteEmpleado(userId ?? null, anio, mes);
+  const { clips, cargando: cargandoClips, error: errorClips } = useClipsDia(userId ?? null, diaSel);
 
   const esHoy = diaSel === hoy;
   const puedeAvanzar = diaSel < hoy;
@@ -458,6 +460,54 @@ export default function HRExpediente() {
           )}
         </div>
       </section>
+
+      {/* Clips de video (cuando dejó de mirar la cámara) */}
+      <section className="vidrio sube mt-5 p-4 lg:p-5" style={{ animationDelay: "0.1s" }}>
+        <div className="v-cont">
+          <p className="mb-3 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+            <Video className="h-3.5 w-3.5" />{t("hr.exp.clipsDia")}
+          </p>
+          {errorClips ? (
+            <div className="flex flex-col items-center gap-2 py-10 text-center text-muted-foreground"><AlertTriangle className="h-7 w-7 text-destructive/70" /><p className="text-sm">{t("hr.exp.error")}</p></div>
+          ) : cargandoClips ? (
+            <div className="flex items-center justify-center py-12 text-muted-foreground"><Loader2 className="h-6 w-6 animate-spin" /></div>
+          ) : clips.length === 0 ? (
+            <div className="flex flex-col items-center gap-2 py-10 text-center text-muted-foreground"><Video className="h-7 w-7 opacity-40" /><p className="text-sm">{t("hr.exp.sinClips")}</p></div>
+          ) : (
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {clips.map((c) => <TarjetaClip key={c.id} c={c} t={t} />)}
+            </div>
+          )}
+        </div>
+      </section>
     </Page>
+  );
+}
+
+// Una tarjeta de clip: el video (o "archivado" si ya está en el NAS), con su
+// motivo, hora, duración y si lleva audio.
+function TarjetaClip({ c, t }: { c: ClipDia; t: Tr }) {
+  const hora = format(new Date(c.createdAt), "HH:mm");
+  const dur = c.durSeg != null ? `${Math.floor(c.durSeg / 60)}:${String(c.durSeg % 60).padStart(2, "0")}` : null;
+  const motivo = c.motivo === "se_fue" ? t("hr.exp.clipSeFue") : c.motivo === "cara_incompleta" ? t("hr.exp.clipLejos") : t("hr.exp.clipDistraido");
+  return (
+    <div className="overflow-hidden rounded-2xl border border-border/40 bg-card/30">
+      <div className="relative aspect-video w-full bg-black/40">
+        {c.url ? (
+          <video src={c.url} controls preload="metadata" className="h-full w-full object-contain" />
+        ) : (
+          <div className="flex h-full w-full flex-col items-center justify-center gap-1.5 text-muted-foreground">
+            <Archive className="h-6 w-6 opacity-50" /><span className="text-[11px]">{t("hr.exp.clipArchivado")}</span>
+          </div>
+        )}
+      </div>
+      <div className="flex items-center gap-2 px-2.5 py-2">
+        <span className="inline-flex items-center gap-1 rounded-control bg-warning/10 px-1.5 py-0.5 text-[10px] font-semibold text-warning">
+          <AlertTriangle className="h-2.5 w-2.5" />{motivo}
+        </span>
+        {c.conAudio ? <Volume2 className="h-3.5 w-3.5 text-muted-foreground" /> : <VolumeX className="h-3.5 w-3.5 text-muted-foreground/50" />}
+        <span className="ml-auto text-[10px] tabular-nums text-muted-foreground">{hora}{dur ? ` · ${dur}` : ""}</span>
+      </div>
+    </div>
   );
 }
