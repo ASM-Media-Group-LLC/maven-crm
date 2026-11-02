@@ -1,23 +1,23 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Radio, Loader2, AlertTriangle, RefreshCw, ChevronRight, Sparkles } from "lucide-react";
 import { useLanguage } from "@/hooks/useLanguage";
 import { UserAvatar } from "@/components/UserAvatar";
 import { useCapturasVivo } from "@/hooks/useCapturasVivo";
-import { useNotasEquipo } from "@/hooks/useNotasEquipo";
 import { useAtencionAhora, TIPOS_GRAVES } from "@/hooks/useAtencionAhora";
 import { useAtencionHoy } from "@/hooks/useAtencionHoy";
 
-// CONECTADOS AHORA — la ENTRADA de Argos (Álvaro): solo la gente que está
-// trabajando en este momento (manda pantallazos), en lista limpia: su foto
-// chica, quién es, qué está haciendo (IA), el MINUTO de su último pantallazo y
-// su NOTA de hoy fusionada ahí mismo. Los desconectados no aparecen. Los fuera
-// de lugar, arriba y en rojo. Clic → su día. Se refresca solo.
+// CONECTADOS AHORA — el TABLERO DE PERSONAL de Argos (Álvaro, 02/11). NO es la
+// muralla de fotos (eso es "Pantallazos en vivo"): aquí es QUIÉN está trabajando
+// y en qué semáforo va cada quien, en lista limpia SIN pantallazos. Una fila por
+// persona: su semáforo, su avatar, su nombre, qué sistema usa (IA) y su % de
+// atención de hoy. Filtros por color para guiarse (ver solo los rojos, etc.).
+// Clic en alguien → su expediente (ahí sí viven sus fotos). Se refresca solo.
 //
-// EL SEMÁFORO (Alvaro, 02/11): el sí-o-no de un vistazo por persona, AHORA:
+// EL SEMÁFORO: el sí-o-no de un vistazo por persona, AHORA:
 // 🟢 trabajando (juzgada y en lo suyo) · 🟡 pausa/ojo (alerta leve) ·
 // 🔴 no está en lo suyo (fuera de lugar o alerta grave) · gris: Argos aún no
-// la juzga. Al lado, su % de atención de HOY (pantallazos en lo suyo).
+// la juzga.
 
 type Semaforo = "verde" | "amarillo" | "rojo" | "gris";
 
@@ -32,11 +32,9 @@ export function ConectadosAhoraPanel() {
   const { t } = useLanguage();
   const navigate = useNavigate();
   const { personas, cargando, error, refrescar } = useCapturasVivo();
-  const { notas } = useNotasEquipo("hoy");
   const { personas: enAtencion } = useAtencionAhora();
   const { atencionPor } = useAtencionHoy();
 
-  const notaPor = useMemo(() => new Map(notas.map((n) => [n.userId, n])), [notas]);
   // Alertas vivas por persona: graves → rojo, leves → amarillo.
   const alertaPor = useMemo(() => {
     const m = new Map<string, "grave" | "leve">();
@@ -55,13 +53,26 @@ export function ConectadosAhoraPanel() {
     rojo: t("hr.sem.problema"),
     gris: t("hr.sem.esperando"),
   };
+
+  // FILTRO por color del semáforo (Alvaro, 02/11): "todos" o un solo estado,
+  // para guiarse rápido (p.ej. ver solo los rojos). Cada persona ya trae su
+  // semáforo; contamos cuántos hay de cada color para las pastillas.
+  const [filtro, setFiltro] = useState<Semaforo | "todos">("todos");
+  const semPorPersona = useMemo(() => new Map(personas.map((p) => [p.userId, semaforoDe(p)])), [personas, alertaPor]);
+  const conteo = useMemo(() => {
+    const c: Record<Semaforo, number> = { verde: 0, amarillo: 0, rojo: 0, gris: 0 };
+    for (const s of semPorPersona.values()) c[s]++;
+    return c;
+  }, [semPorPersona]);
+
   const orden = useMemo(
-    () => [...personas].sort((a, b) => (Number(b.fueraDeLugar) - Number(a.fueraDeLugar)) || (a.ultima < b.ultima ? 1 : -1)),
-    [personas],
+    () =>
+      [...personas]
+        .filter((p) => filtro === "todos" || semPorPersona.get(p.userId) === filtro)
+        .sort((a, b) => (Number(b.fueraDeLugar) - Number(a.fueraDeLugar)) || (a.ultima < b.ultima ? 1 : -1)),
+    [personas, filtro, semPorPersona],
   );
   const horaDe = (iso: string) => new Date(iso).toLocaleTimeString("es-CO", { hour: "2-digit", minute: "2-digit" });
-  const tonoNota = (v: number | null) => (v == null ? "text-muted-foreground" : v >= 80 ? "text-success" : v >= 60 ? "text-warning" : "text-destructive");
-  const barNota = (v: number | null) => (v == null ? "bg-muted-foreground/40" : v >= 80 ? "bg-success" : v >= 60 ? "bg-warning" : "bg-destructive");
 
   return (
     <section className="vidrio sube p-4 lg:p-5">
@@ -88,6 +99,35 @@ export function ConectadosAhoraPanel() {
           </button>
         </div>
 
+        {/* Filtros por color del semáforo: guiarse de un vistazo (p.ej. solo rojos) */}
+        {personas.length > 0 && !error && (
+          <div className="mb-3 flex flex-wrap gap-1.5">
+            {([
+              { k: "todos", label: t("hr.conectados.filtroTodos"), n: personas.length, punto: "" },
+              { k: "rojo", label: labelSem.rojo, n: conteo.rojo, punto: PUNTO_SEM.rojo },
+              { k: "amarillo", label: labelSem.amarillo, n: conteo.amarillo, punto: PUNTO_SEM.amarillo },
+              { k: "verde", label: labelSem.verde, n: conteo.verde, punto: PUNTO_SEM.verde },
+              { k: "gris", label: labelSem.gris, n: conteo.gris, punto: PUNTO_SEM.gris },
+            ] as const).map((f) => {
+              const activo = filtro === f.k;
+              return (
+                <button
+                  key={f.k}
+                  type="button"
+                  onClick={() => setFiltro(f.k)}
+                  className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium transition-colors ${
+                    activo ? "border-primary/60 bg-primary/15 text-foreground" : "border-border/40 bg-card/30 text-muted-foreground hover:bg-card/50"
+                  }`}
+                >
+                  {f.punto && <span className={`h-1.5 w-1.5 rounded-full ${f.punto}`} />}
+                  {f.label}
+                  <span className="tabular-nums opacity-70">{f.n}</span>
+                </button>
+              );
+            })}
+          </div>
+        )}
+
         {error ? (
           <div className="flex flex-col items-center gap-2 py-10 text-center text-muted-foreground">
             <AlertTriangle className="h-7 w-7 text-destructive/70" />
@@ -100,11 +140,15 @@ export function ConectadosAhoraPanel() {
             <Radio className="h-7 w-7 opacity-40" />
             <p className="text-sm">{t("hr.conectados.vacio")}</p>
           </div>
+        ) : orden.length === 0 ? (
+          <div className="flex flex-col items-center gap-2 py-10 text-center text-muted-foreground">
+            <Radio className="h-7 w-7 opacity-40" />
+            <p className="text-sm">{t("hr.conectados.sinEnFiltro")}</p>
+          </div>
         ) : (
           <div className="flex flex-col gap-1.5">
             {orden.map((p) => {
               const nombre = p.nombre || t("hr.noName");
-              const nota = notaPor.get(p.userId)?.nota.valor ?? null;
               const sem = semaforoDe(p);
               const at = atencionPor?.get(p.userId) ?? null;
               const tonoPct = at == null ? "text-muted-foreground" : at.pct >= 80 ? "text-success" : at.pct >= 60 ? "text-warning" : "text-destructive";
@@ -114,20 +158,13 @@ export function ConectadosAhoraPanel() {
                   type="button"
                   onClick={() => navigate(`/hr/expediente/${p.userId}`)}
                   title={t("hr.notas.verDia", { nombre })}
-                  className={`group flex w-full items-center gap-3 rounded-xl border bg-card/30 px-2.5 py-2 text-left transition-colors hover:bg-card/50 ${p.fueraDeLugar ? "border-destructive/50 hover:border-destructive" : "border-border/40 hover:border-primary/50"}`}
+                  className={`group flex w-full items-center gap-3 rounded-xl border bg-card/30 px-3 py-2.5 text-left transition-colors hover:bg-card/50 ${p.fueraDeLugar ? "border-destructive/50 hover:border-destructive" : "border-border/40 hover:border-primary/50"}`}
                 >
-                  <div className="relative h-11 w-[4.5rem] shrink-0 overflow-hidden rounded-md border border-border/40 bg-muted/40">
-                    {p.principalUrl ? (
-                      <img src={p.principalUrl} alt="" loading="lazy" className="h-full w-full object-cover" />
-                    ) : (
-                      <div className="flex h-full w-full items-center justify-center text-muted-foreground"><Loader2 className="h-3.5 w-3.5 animate-spin" /></div>
-                    )}
-                  </div>
+                  {/* El semáforo manda: punto grande a la izquierda */}
+                  <span className={`h-3 w-3 shrink-0 rounded-full ${PUNTO_SEM[sem]}`} title={labelSem[sem]} aria-label={labelSem[sem]} />
                   <UserAvatar name={nombre} src={p.avatarUrl} seed={p.avatarSeed} size="sm" status="online" />
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-1.5">
-                      {/* El semáforo: el sí-o-no de un vistazo */}
-                      <span className={`h-2 w-2 shrink-0 rounded-full ${PUNTO_SEM[sem]}`} title={labelSem[sem]} aria-label={labelSem[sem]} />
                       <span className="truncate text-sm font-semibold">{nombre}</span>
                       {p.fueraDeLugar && (
                         <span className="inline-flex shrink-0 items-center gap-0.5 rounded bg-destructive px-1 py-0.5 text-[9px] font-semibold text-destructive-foreground">
@@ -139,19 +176,12 @@ export function ConectadosAhoraPanel() {
                       <Sparkles className="h-3 w-3 shrink-0 opacity-60" />{p.veredicto || t("hr.pantallazos.analizando")}
                     </p>
                   </div>
+                  {/* % de atención de HOY (el número que guía) + hora */}
                   <div className="flex shrink-0 flex-col items-end gap-0.5">
-                    <span className="text-[11px] tabular-nums text-muted-foreground">{horaDe(p.ultima)}</span>
-                    {/* % de atención de HOY (pantallazos juzgados en lo suyo) */}
-                    <span className={`text-[10px] font-semibold tabular-nums ${tonoPct}`}>
-                      {at ? t("hr.conectados.pctHoy", { n: at.pct }) : "—"}
+                    <span className={`font-display text-base font-bold leading-none tabular-nums ${tonoPct}`}>
+                      {at ? `${at.pct}%` : "—"}
                     </span>
-                  </div>
-                  {/* La nota de hoy, fusionada */}
-                  <div className="flex shrink-0 flex-col items-end gap-1">
-                    <span className={`font-display text-lg font-bold leading-none tabular-nums ${tonoNota(nota)}`}>{nota ?? "—"}</span>
-                    <span className="block h-1 w-12 overflow-hidden rounded-full bg-primary/15">
-                      <span className={`block h-full rounded-full ${barNota(nota)}`} style={{ width: `${nota ?? 0}%` }} />
-                    </span>
+                    <span className="text-[10px] tabular-nums text-muted-foreground">{horaDe(p.ultima)}</span>
                   </div>
                   <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground transition group-hover:translate-x-0.5 group-hover:text-foreground" />
                 </button>

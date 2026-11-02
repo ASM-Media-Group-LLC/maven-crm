@@ -1093,4 +1093,7 @@ export const hr = {
   "hr.conectados.pctHoy": { es: "{n}% hoy", en: "{n}% today" },
   "hr.exp.atencion": { es: "Atención", en: "Focus" },
   "hr.exp.atencionDetalle": { es: "{ok} de {n} pantallazos en lo suyo", en: "{ok} of {n} screenshots on task" },
+  // Filtros de Conectados ahora por color del semáforo
+  "hr.conectados.filtroTodos": { es: "Todos", en: "All" },
+  "hr.conectados.sinEnFiltro": { es: "Nadie en este estado ahora mismo", en: "Nobody in this state right now" },
 } as const satisfies Record<string, { es: string; en: string }>;
