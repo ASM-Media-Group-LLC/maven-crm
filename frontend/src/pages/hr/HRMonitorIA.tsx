@@ -26,7 +26,7 @@ import { HRMetricCard } from "@/components/hr/HRMetricCard";
 import { useMonitorEventos, urlCaptura, type MonitorEvento } from "@/hooks/useMonitorEventos";
 import { useMonitorConfig } from "@/hooks/useMonitorConfig";
 import { useMonitorRanking } from "@/hooks/useMonitorPanel";
-import { NotasEquipoPanel } from "@/components/hr/NotasEquipoPanel";
+import { ConectadosAhoraPanel } from "@/components/hr/ConectadosAhoraPanel";
 import { RondinVivoPanel } from "@/components/hr/RondinVivoPanel";
 import { PantallazosVivoPanel } from "@/components/hr/PantallazosVivoPanel";
 import { ContextoEmpresaPanel } from "@/components/hr/ContextoEmpresaPanel";
@@ -423,7 +423,7 @@ export default function HRMonitorIA() {
       })()}
 
       {/* ENTRADA — Notas del equipo: el equipo y su día; clic en alguien → su día. */}
-      {tab === "equipo" && <div className="mt-5"><NotasEquipoPanel /></div>}
+      {tab === "equipo" && <div className="mt-5"><ConectadosAhoraPanel /></div>}
 
       {/* Pantallazos en vivo: la muralla (Muralla/Cuadrícula/Lista). */}
       {tab === "envivo" && <div className="mt-5"><PantallazosVivoPanel /></div>}
