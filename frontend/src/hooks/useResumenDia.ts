@@ -36,8 +36,8 @@ export interface PersonaResumen {
   bajones: BajonDia[];
 }
 
-interface FilaTiempo { user_id: string; seg_activo: number | string; seg_en_sala?: number | string; seg_sin_pantalla?: number | string; seg_sin_camara?: number | string; }
-interface FilaCaptura { user_id: string; fuera_de_lugar: boolean | null; }
+interface FilaTiempo { user_id: string; seg_activo: number | string; }
+interface FilaMomentos { user_id: string; mom_camara: number | string; mom_pantalla: number | string; faltas_camara: number | string; juzgadas: number | string; juzgadas_ok: number | string; }
 interface FilaAlerta { user_id: string; tipo: string; detalle: string | null; abierta_at: string; cerrada_at: string | null; }
 
 export function useResumenDia(dia: string) {
@@ -50,32 +50,26 @@ export function useResumenDia(dia: string) {
       const inicioISO = `${dia}T00:00:00-05:00`;
       const finISO = `${dia}T23:59:59-05:00`;
 
-      const [tiempoRes, capturasRes, alertasRes] = await Promise.all([
+      const [tiempoRes, momentosRes, alertasRes] = await Promise.all([
         db.rpc("cowork_tiempo_diario", { _desde: dia, _hasta: dia, _user_id: null, _limit: 500, _offset: 0 }),
-        sinTipar.from("monitor_capturas").select("user_id, fuera_de_lugar").eq("tipo", "pantalla").not("veredicto", "is", null).gte("created_at", inicioISO).lte("created_at", finISO).limit(20000),
+        db.rpc("argos_momentos_dia", { _dia: dia }),
         sinTipar.from("argos_alertas").select("user_id, tipo, detalle, abierta_at, cerrada_at").gte("abierta_at", inicioISO).lte("abierta_at", finISO).limit(5000),
       ]);
       if (tiempoRes.error) throw new Error(tiempoRes.error.message);
+      if (momentosRes.error) throw new Error(momentosRes.error.message);
 
-      // Tiempo en sala / pantalla / cámara por persona (para pantalla% y cámara%).
-      const tiempoPor = new Map<string, { enSala: number; sinPant: number; sinCam: number; horas: number }>();
-      for (const r of (tiempoRes.data ?? []) as FilaTiempo[]) {
-        const enSala = Number(r.seg_en_sala ?? 0);
-        tiempoPor.set(r.user_id, {
-          enSala,
-          sinPant: Number(r.seg_sin_pantalla ?? 0),
-          sinCam: Number(r.seg_sin_camara ?? 0),
-          horas: Number(r.seg_activo) / 3600,
-        });
-      }
+      // Horas conectadas (reloj de Cowork) por persona, solo para el factor horas.
+      const horasPor = new Map<string, number>();
+      for (const r of (tiempoRes.data ?? []) as FilaTiempo[]) horasPor.set(r.user_id, Number(r.seg_activo) / 3600);
 
-      // Atención por persona: de los pantallazos juzgados, cuántos en lo suyo.
+      // Momentos por persona: de TODO el tiempo conectada (capturas de cámara),
+      // cuántos compartió pantalla y cuántos juzgó la IA en lo suyo. Pantalla% y
+      // cámara% salen de aquí, no del ratito en Cowork (Alvaro, 02/11).
+      const momPor = new Map<string, { camara: number; pantalla: number; faltasCam: number }>();
       const atPor = new Map<string, { ok: number; n: number }>();
-      for (const c of (capturasRes.data ?? []) as FilaCaptura[]) {
-        const a = atPor.get(c.user_id) ?? { ok: 0, n: 0 };
-        a.n++;
-        if (c.fuera_de_lugar !== true) a.ok++;
-        atPor.set(c.user_id, a);
+      for (const m of (momentosRes.data ?? []) as FilaMomentos[]) {
+        momPor.set(m.user_id, { camara: Number(m.mom_camara), pantalla: Number(m.mom_pantalla), faltasCam: Number(m.faltas_camara) });
+        atPor.set(m.user_id, { ok: Number(m.juzgadas_ok), n: Number(m.juzgadas) });
       }
 
       // Bajones por persona (momentos malos del día).
@@ -89,21 +83,21 @@ export function useResumenDia(dia: string) {
         bajonesPor.set(a.user_id, arr);
       }
 
-      // Roster del día: quien tuvo tiempo en sala, pantallazos juzgados o alertas.
-      const ids = new Set<string>([...tiempoPor.keys(), ...atPor.keys(), ...bajonesPor.keys()]);
+      // Roster del día: quien tuvo momentos (capturas), horas o alertas.
+      const ids = new Set<string>([...momPor.keys(), ...horasPor.keys(), ...bajonesPor.keys()]);
       if (ids.size === 0) return [];
 
       const { data: perfiles } = await supabase.from("profiles").select("id, full_name, avatar_url, avatar_seed").in("id", [...ids]);
       const perfilPor = new Map((perfiles ?? []).map((p) => [p.id as string, p as { full_name: string | null; avatar_url: string | null; avatar_seed: string | null }]));
 
       const personas: PersonaResumen[] = [...ids].map((id) => {
-        const t = tiempoPor.get(id);
+        const m = momPor.get(id);
         const at = atPor.get(id);
-        const tuvoCapturas = !!at && at.n > 0;
-        const pantallaPct = t && t.enSala > 0 ? Math.max(0, t.enSala - t.sinPant) / t.enSala : tuvoCapturas ? 0 : undefined;
-        const camaraPct = t && t.enSala > 0 ? Math.max(0, t.enSala - t.sinCam) / t.enSala : undefined;
+        // Pantalla% = de todos los momentos conectada (cámara), cuántos compartió.
+        const pantallaPct = m && m.camara > 0 ? Math.min(1, m.pantalla / m.camara) : undefined;
+        const camaraPct = m && m.camara > 0 ? m.camara / (m.camara + m.faltasCam) : undefined;
         const atencionPct = at && at.n > 0 ? at.ok / at.n : undefined;
-        const horas = t?.horas ?? 0;
+        const horas = horasPor.get(id) ?? 0;
         const nota = calcularNota({ pantallaPct, camaraPct, atencionPct, horasHechas: horas, horasMeta: META_DIA });
         const perfil = perfilPor.get(id);
         const bajones = (bajonesPor.get(id) ?? []).sort((a, b) => b.minutos - a.minutos).slice(0, 8);

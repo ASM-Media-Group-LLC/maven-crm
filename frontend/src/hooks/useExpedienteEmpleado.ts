@@ -102,16 +102,15 @@ export function useExpedienteEmpleado(userId: string | null, anio: number, mes: 
 
       // nota por día: pantalla 30 / cámara 30 / atención 30 / horas 10 (Alvaro).
       for (const d of dias.values()) {
-        // Pantalla% y cámara% salen del tiempo en sala de Cowork. Si NO entró a
-        // Cowork (segEnSala=0) pero Argos lo vio (hubo capturas), no compartió
-        // pantalla → 0 (activa el tope 50); la cámara queda sin dato (reparte).
-        const tuvoCapturas = d.capturas.length > 0;
-        const pantallaPct = d.segEnSala > 0
-          ? Math.max(0, d.segEnSala - d.segSinPantalla) / d.segEnSala
-          : tuvoCapturas ? 0 : undefined;
-        const camaraPct = d.segEnSala > 0
-          ? Math.max(0, d.segEnSala - d.segSinCamara) / d.segEnSala
-          : undefined;
+        // Pantalla% y cámara% se miden sobre TODO el tiempo CONECTADA, no solo el
+        // ratito en Cowork (Alvaro, 02/11): de todos los MOMENTOS que Argos la vio
+        // (capturas de cámara = estuvo conectada), ¿en cuántos compartió pantalla?
+        // Así alguien conectada 8 h que comparte 1 h sale 12%, no 100%.
+        const momCamara = d.capturas.filter((c) => c.tipo === "camara").length;
+        const momPantalla = d.capturas.filter((c) => c.tipo === "pantalla").length;
+        const faltasCamara = d.faltas.filter((x) => x.tipo === "camara_apagada" || x.tipo === "camara_tapada" || x.tipo === "se_fue").length;
+        const pantallaPct = momCamara > 0 ? Math.min(1, momPantalla / momCamara) : undefined;
+        const camaraPct = momCamara > 0 ? momCamara / (momCamara + faltasCamara) : undefined;
         // Atención: de los pantallazos de pantalla que la IA ya juzgó, cuántos en lo suyo.
         const juzgadas = d.capturas.filter((c) => c.tipo === "pantalla" && c.veredicto != null);
         const atencionPct = juzgadas.length > 0
