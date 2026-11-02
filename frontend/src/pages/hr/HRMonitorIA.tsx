@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { isToday, format } from "date-fns";
 import {
   Eye, VideoOff, UserX, Smartphone, ScanFace, AlertTriangle, Users,
@@ -345,10 +346,16 @@ export default function HRMonitorIA() {
   const [filtro, setFiltro] = useState<Filtro>("pendiente");
   const [notaDe, setNotaDe] = useState<MonitorEvento | null>(null);
   const [correoDe, setCorreoDe] = useState<MonitorEvento | null>(null);
-  // Argos en PESTAÑAS. Entra en «Notas del equipo» (el equipo y su día); el vivo
-  // y las alertas quedan en sus pestañas, no en la entrada (Álvaro).
+  // Argos en PESTAÑAS. Entra en «Conectados ahora» (el tablero de personal); el
+  // vivo y las alertas quedan en sus pestañas. La pestaña vive en la URL (?t=…)
+  // para que al entrar a un perfil y volver (atrás del navegador) Argos te deje
+  // DONDE ESTABAS, no reiniciado (Álvaro, 02/11).
   type TabArgos = "equipo" | "envivo" | "atencion" | "ajustes";
-  const [tab, setTab] = useState<TabArgos>("equipo");
+  const [searchParams, setSearchParams] = useSearchParams();
+  const TABS_VALIDAS: TabArgos[] = ["equipo", "envivo", "atencion", "ajustes"];
+  const tabURL = searchParams.get("t") as TabArgos | null;
+  const tab: TabArgos = tabURL && TABS_VALIDAS.includes(tabURL) ? tabURL : "equipo";
+  const setTab = (k: TabArgos) => setSearchParams((prev) => { const n = new URLSearchParams(prev); n.set("t", k); return n; }, { replace: true });
 
   const hoy = useMemo(() => eventos.filter((e) => isToday(new Date(e.created_at))), [eventos]);
   const personas = useMemo(() => new Set(hoy.map((e) => e.user_id)).size, [hoy]);

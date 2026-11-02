@@ -1085,6 +1085,7 @@ export const hr = {
   "hr.exp.diaSiguiente": { es: "Día siguiente", en: "Next day" },
   "hr.exp.calendario": { es: "Calendario", en: "Calendar" },
   "hr.exp.error": { es: "No se pudo cargar el expediente", en: "Could not load the record" },
+  "hr.exp.volverArgos": { es: "Volver a Argos", en: "Back to Argos" },
   // ── Semáforo en vivo + % de atención del día (Argos) ──
   "hr.sem.trabajando": { es: "Trabajando", en: "Working" },
   "hr.sem.pausa": { es: "Pausa / ojo", en: "Break / watch" },

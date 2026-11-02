@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
-import { ChevronLeft, ChevronRight, AlertTriangle, ScreenShare, ScreenShareOff, CameraOff, ImageIcon, Loader2, Gauge, CalendarDays, Sparkles } from "lucide-react";
+import { ArrowLeft, ChevronLeft, ChevronRight, AlertTriangle, ScreenShare, ScreenShareOff, CameraOff, ImageIcon, Loader2, Gauge, CalendarDays, Sparkles } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { useLanguage } from "@/hooks/useLanguage";
 import { UserAvatar } from "@/components/UserAvatar";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
@@ -270,6 +271,11 @@ function TiraDelDia({ capturas, t }: { capturas: CapturaDia[]; t: Tr }) {
 export default function HRExpediente() {
   const { userId } = useParams<{ userId: string }>();
   const { t } = useLanguage();
+  const navigate = useNavigate();
+  const location = useLocation();
+  // Volver SIEMPRE a Argos (a la pestaña de donde saliste): si vinimos de un
+  // panel de Argos, trae su URL en el state (volverA) y la usa; si no, al monitor.
+  const volverA = (location.state as { volverA?: string } | null)?.volverA ?? "/hr/monitor-ia";
   const hoyStr = useMemo(() => new Date().toLocaleDateString("en-CA", { timeZone: "America/Bogota" }), []);
   // Se abre en HOY. El día elegido manda; el mes sale de él (para cargar y para el calendario).
   const [diaSel, setDiaSel] = useState<string>(hoyStr);
@@ -319,6 +325,15 @@ export default function HRExpediente() {
 
   return (
     <Page>
+      <Button
+        variant="ghost"
+        size="sm"
+        className="mb-1 gap-1.5 self-start text-muted-foreground hover:text-foreground"
+        onClick={() => navigate(volverA)}
+      >
+        <ArrowLeft className="h-4 w-4" />
+        {t("hr.exp.volverArgos")}
+      </Button>
       <PageHeader title={t("hr.exp.title")} subtitle={t("hr.exp.sub")} icon={<Gauge className="h-5 w-5" />} />
 
       {/* Identidad + nota + día + flechas */}

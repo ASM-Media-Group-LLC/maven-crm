@@ -88,7 +88,7 @@ export function AtencionAhoraPanel() {
                 <button
                   key={p.userId}
                   type="button"
-                  onClick={() => navigate(`/hr/expediente/${p.userId}`)}
+                  onClick={() => navigate(`/hr/expediente/${p.userId}`, { state: { volverA: "/hr/monitor-ia?t=atencion" } })}
                   title={t("hr.atencion.verExpediente")}
                   className={`group flex w-full items-center gap-3 rounded-2xl border bg-card/30 px-3 py-2.5 text-left transition-colors hover:bg-card/50 ${grave ? "border-destructive/50 hover:border-destructive" : "border-warning/40 hover:border-warning"}`}
                 >

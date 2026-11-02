@@ -27,7 +27,7 @@ export function PantallazosVivoPanel() {
   const [modo, setModo] = useState<Modo>(leerModo);
 
   const elegir = (m: Modo) => { setModo(m); try { localStorage.setItem(MODO_KEY, m); } catch { /* sin storage */ } };
-  const irA = (userId: string) => navigate(`/hr/expediente/${userId}`);
+  const irA = (userId: string) => navigate(`/hr/expediente/${userId}`, { state: { volverA: "/hr/monitor-ia?t=envivo" } });
   // El minuto exacto del pantallazo (no "ahora"): Argos captura cada ~2 min.
   const hace = (iso: string) => new Date(iso).toLocaleTimeString("es-CO", { hour: "2-digit", minute: "2-digit" });
 
