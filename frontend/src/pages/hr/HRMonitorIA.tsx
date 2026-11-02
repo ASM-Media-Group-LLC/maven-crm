@@ -180,6 +180,7 @@ function PanelAjustes({ t }: { t: Tr }) {
   const [intervalo, setIntervalo] = useState(120);
   const [avisar, setAvisar] = useState(true);
   const [vigilanciaApp, setVigilanciaApp] = useState(false);
+  const [avisarCaptura, setAvisarCaptura] = useState(true);
   const [guardando, setGuardando] = useState(false);
 
   useEffect(() => {
@@ -188,6 +189,7 @@ function PanelAjustes({ t }: { t: Tr }) {
     setIntervalo(config.intervaloIaSeg);
     setAvisar(config.avisarSupervisor);
     setVigilanciaApp(config.vigilanciaApp);
+    setAvisarCaptura(config.avisarCaptura);
   }, [config]);
 
   const guardar = async () => {
@@ -198,6 +200,7 @@ function PanelAjustes({ t }: { t: Tr }) {
         intervalo_ia_seg: Math.max(30, Math.min(900, Math.round(intervalo))),
         avisar_supervisor: avisar,
         vigilancia_app: vigilanciaApp,
+        avisar_captura: avisarCaptura,
         updated_at: new Date().toISOString(),
       }).eq("id", 1);
       if (error) throw error;
@@ -226,6 +229,13 @@ function PanelAjustes({ t }: { t: Tr }) {
             <Label htmlFor="monia-vigapp" className="cursor-pointer text-sm font-medium">{t("hr.monia.cfg.vigilanciaApp")}</Label>
           </div>
           <p className="max-w-xs text-[11px] text-muted-foreground">{t("hr.monia.cfg.vigilanciaAppHint")}</p>
+        </div>
+        <div className="flex flex-col gap-1">
+          <div className="flex items-center gap-3">
+            <Switch checked={avisarCaptura} onCheckedChange={setAvisarCaptura} id="monia-aviso-cap" />
+            <Label htmlFor="monia-aviso-cap" className="cursor-pointer text-sm font-medium">{t("hr.monia.cfg.avisarCaptura")}</Label>
+          </div>
+          <p className="max-w-xs text-[11px] text-muted-foreground">{t("hr.monia.cfg.avisarCapturaHint")}</p>
         </div>
         <div className="flex flex-col gap-1">
           <Label htmlFor="monia-int" className="text-xs text-muted-foreground">{t("hr.monia.cfg.intervalo")}</Label>

@@ -1,5 +1,5 @@
 import { useNavigate } from "react-router-dom";
-import { Siren, CheckCircle2, Loader2, AlertTriangle, RefreshCw, ChevronRight, ScreenShare } from "lucide-react";
+import { Siren, CheckCircle2, Loader2, AlertTriangle, RefreshCw, ChevronRight, ScreenShare, Coffee } from "lucide-react";
 import { useLanguage } from "@/hooks/useLanguage";
 import { UserAvatar } from "@/components/UserAvatar";
 import { useAtencionAhora, type TipoAlerta } from "@/hooks/useAtencionAhora";
@@ -26,6 +26,10 @@ const TONO_GRAVEDAD: Record<number, string> = {
   2: "border-warning/50 bg-warning/10 text-warning",
   1: "border-border/50 bg-muted/40 text-muted-foreground",
 };
+
+// PROBLEMAS (acción) vs PAUSAS/ojo. Una pausa (baño/break/almuerzo) nunca cuenta
+// como problema; lo grave es dejar de trabajar o estar fuera de lugar.
+const TIPOS_GRAVES = new Set<TipoAlerta>(["fuera_de_lugar", "sin_senal", "camara_apagada", "se_fue", "celular", "no_mira"]);
 
 export function AtencionAhoraPanel() {
   const { t } = useLanguage();
@@ -74,8 +78,13 @@ export function AtencionAhoraPanel() {
             <p className="text-sm font-medium text-success">{t("hr.atencion.todoBien")}</p>
           </div>
         ) : (
-          <div className="flex flex-col gap-2">
-            {personas.map((p) => {
+          (() => {
+            // Dos niveles: PROBLEMAS (acción) y PAUSAS/OJO. Una pausa/baño NO es lo
+            // mismo que estar fuera de lugar, así que van separadas y con otro color.
+            const esGrave = (p: typeof personas[number]) => p.alertas.some((a) => TIPOS_GRAVES.has(a.tipo));
+            const graves = personas.filter(esGrave);
+            const leves = personas.filter((p) => !esGrave(p));
+            const fila = (p: typeof personas[number], grave: boolean) => {
               const nombre = p.nombre || t("hr.noName");
               const min = Math.max(0, Math.round((Date.now() - Date.parse(p.abiertaAt)) / 60000));
               const frase = p.alertas.find((a) => a.detalle)?.detalle ?? null;
@@ -85,9 +94,7 @@ export function AtencionAhoraPanel() {
                   type="button"
                   onClick={() => navigate(`/hr/expediente/${p.userId}`)}
                   title={t("hr.atencion.verExpediente")}
-                  className={`group flex w-full items-center gap-3 rounded-2xl border bg-card/30 px-3 py-2.5 text-left transition-colors hover:bg-card/50 ${
-                    p.gravedad >= 3 ? "border-destructive/50 hover:border-destructive" : "border-warning/40 hover:border-warning"
-                  }`}
+                  className={`group flex w-full items-center gap-3 rounded-2xl border bg-card/30 px-3 py-2.5 text-left transition-colors hover:bg-card/50 ${grave ? "border-destructive/50 hover:border-destructive" : "border-warning/40 hover:border-warning"}`}
                 >
                   <UserAvatar name={nombre} src={p.avatarUrl} seed={p.avatarSeed} size="md" status="busy" />
                   <div className="min-w-0 flex-1">
@@ -110,8 +117,28 @@ export function AtencionAhoraPanel() {
                   <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground transition group-hover:translate-x-0.5 group-hover:text-foreground" />
                 </button>
               );
-            })}
-          </div>
+            };
+            return (
+              <div className="flex flex-col gap-4">
+                {graves.length > 0 && (
+                  <div>
+                    <p className="mb-2 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-destructive">
+                      <AlertTriangle className="h-3.5 w-3.5" />{t("hr.atencion.grupoGrave", { n: graves.length })}
+                    </p>
+                    <div className="flex flex-col gap-2">{graves.map((p) => fila(p, true))}</div>
+                  </div>
+                )}
+                {leves.length > 0 && (
+                  <div>
+                    <p className="mb-2 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-warning">
+                      <Coffee className="h-3.5 w-3.5" />{t("hr.atencion.grupoLeve", { n: leves.length })}
+                    </p>
+                    <div className="flex flex-col gap-2">{leves.map((p) => fila(p, false))}</div>
+                  </div>
+                )}
+              </div>
+            );
+          })()
         )}
       </div>
     </section>

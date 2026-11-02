@@ -19,6 +19,8 @@ export interface MonitorEstado {
   intervaloSeg: number;
   /** Vigilancia a nivel de TODA la app (cámara propia, sin LiveKit). Off por defecto. */
   vigilanciaApp: boolean;
+  /** Si el empleado ve el aviso del pantallazo (transparencia). Por defecto true. */
+  avisarCaptura: boolean;
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -30,6 +32,7 @@ export function useMonitorEstado(habilitado: boolean): MonitorEstado {
   const [activo, setActivo] = useState<boolean | null>(null);
   const [intervaloSeg, setIntervaloSeg] = useState(120);
   const [vigilanciaApp, setVigilanciaApp] = useState(false);
+  const [avisarCaptura, setAvisarCaptura] = useState(true);
   const on = habilitado && !!user;
 
   useEffect(() => {
@@ -50,13 +53,14 @@ export function useMonitorEstado(habilitado: boolean): MonitorEstado {
     try {
       const { data, error } = await sinTipar
         .from("monitor_config")
-        .select("activo, intervalo_ia_seg, vigilancia_app")
+        .select("activo, intervalo_ia_seg, vigilancia_app, avisar_captura")
         .eq("id", 1)
         .maybeSingle();
       if (error) throw error;
       setActivo(data ? data.activo !== false : true);
       setIntervaloSeg(data ? Math.max(30, Number(data.intervalo_ia_seg) || 120) : 120);
       setVigilanciaApp(data ? data.vigilancia_app === true : false);
+      setAvisarCaptura(data ? data.avisar_captura !== false : true);
     } catch {
       // Un fallo de lectura NO apaga el monitor: deja lo anterior (si nunca
       // cargó, queda null y la IA espera; las faltas gratis corren igual).
@@ -76,5 +80,5 @@ export function useMonitorEstado(habilitado: boolean): MonitorEstado {
     alRevivir: () => { void leerCfg.current(); },
   });
 
-  return { esAdmin, activo, intervaloSeg, vigilanciaApp };
+  return { esAdmin, activo, intervaloSeg, vigilanciaApp, avisarCaptura };
 }

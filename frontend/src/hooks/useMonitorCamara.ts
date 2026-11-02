@@ -139,7 +139,10 @@ async function guardarEnBuzon(
 export function useMonitorCamara({ track, trackPantalla = null, camaraRealOn, faceWatch, activo, roomNombre }: Params): void {
   const { user } = useAuth();
   const { t } = useLanguage();
-  const { esAdmin, activo: cfgActivo, intervaloSeg } = useMonitorEstado(activo);
+  const { esAdmin, activo: cfgActivo, intervaloSeg, avisarCaptura } = useMonitorEstado(activo);
+  // El switch de transparencia, en ref para que el timer use el valor en vivo.
+  const avisarCapturaRef = useRef(avisarCaptura);
+  avisarCapturaRef.current = avisarCaptura;
 
   // Solo se monitorea una vez confirmado que NO es admin (esAdmin === false).
   const base = activo && !!user && esAdmin === false;
@@ -258,7 +261,7 @@ export function useMonitorCamara({ track, trackPantalla = null, camaraRealOn, fa
       }
       // Transparencia: la persona ve que se le tomó un pantallazo (una vez, aunque
       // corran dos capturadores a la vez).
-      if (guardoAlgo && !cancelado && Date.now() - ultimoAvisoCaptura > 30_000) {
+      if (guardoAlgo && !cancelado && avisarCapturaRef.current !== false && Date.now() - ultimoAvisoCaptura > 30_000) {
         ultimoAvisoCaptura = Date.now();
         try { toast(t("monitor.pantallazo"), { duration: 2600 }); } catch { /* sin toast no pasa nada */ }
       }
