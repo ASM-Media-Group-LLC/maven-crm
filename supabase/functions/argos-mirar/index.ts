@@ -277,8 +277,8 @@ Deno.serve(async (req: Request) => {
     const { data: { user }, error: authErr } = await userClient.auth.getUser();
     await diag("auth", { user: user?.id ?? null, error: authErr?.message ?? null });
     if (!user) return json({ ok: false, error: "no-auth" }, 401);
-    // Argos lo ve solo el dueño (admin), por ahora (Alvaro, 02/11).
-    const { data: puede, error: rolErr } = await admin.rpc("is_in_role_group", { _user_id: user.id, _group: "admin" });
+    // Argos lo ve solo el DUEÑO (tenant_owners), por ahora (Alvaro, 02/11).
+    const { data: puede, error: rolErr } = await admin.rpc("es_dueno", { _user_id: user.id });
     await diag("rol", { puede, error: rolErr?.message ?? null });
     if (puede !== true) return json({ ok: false, error: "forbidden" }, 403);
   }

@@ -30,6 +30,7 @@ import { NotasEquipoPanel } from "@/components/hr/NotasEquipoPanel";
 import { RondinVivoPanel } from "@/components/hr/RondinVivoPanel";
 import { PantallazosVivoPanel } from "@/components/hr/PantallazosVivoPanel";
 import { ContextoEmpresaPanel } from "@/components/hr/ContextoEmpresaPanel";
+import { AtencionAhoraPanel } from "@/components/hr/AtencionAhoraPanel";
 import { LABEL_FALTA, type FaltaTipo } from "@/lib/monitorFaltas";
 import type { TranslationKey } from "@/lib/i18n";
 
@@ -383,8 +384,12 @@ export default function HRMonitorIA() {
         }
       />
 
-      {/* La muralla en vivo — lo PRIMERO: una tarjeta por persona con su pantalla,
-          su cámara, quién es, hace cuánto y qué anda haciendo (estilo Hubstaff). */}
+      {/* ATENCIÓN AHORA — lo primero de todo: solo quien tiene un problema en este
+          momento, de peor a mejor. Si nadie, «todo en orden». */}
+      <div className="mt-5"><AtencionAhoraPanel /></div>
+
+      {/* La muralla en vivo: una tarjeta por persona con su pantalla, su cámara,
+          quién es, hace cuánto y qué anda haciendo (estilo Hubstaff). */}
       <div className="mt-5"><PantallazosVivoPanel /></div>
 
       {/* La nota del equipo: saber al instante quién va bien o mal. */}

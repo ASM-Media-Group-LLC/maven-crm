@@ -432,8 +432,9 @@ const App = () => (
                 <Route path="/hr/horarios/banco-horas" element={<PermissionRoute module="HR" submodule="Banco de Horas"><HRLayout><HRHourBank /></HRLayout></PermissionRoute>} />
                 <Route path="/hr/horarios-chatters" element={<PermissionRoute module="HR" submodule="Horarios Chatters"><HRLayout><HRChatterSchedules /></HRLayout></PermissionRoute>} />
                 <Route path="/hr/monitoreo" element={<PermissionRoute module="HR" submodule="Monitoreo"><HRLayout><HRMonitoring /></HRLayout></PermissionRoute>} />
-                <Route path="/hr/monitor-ia" element={<PermissionRoute module="HR" submodule="Monitor IA"><HRLayout><HRMonitorIA /></HRLayout></PermissionRoute>} />
-                <Route path="/hr/expediente/:userId" element={<PermissionRoute module="HR" submodule="Monitor IA"><HRLayout><HRExpediente /></HRLayout></PermissionRoute>} />
+                {/* Argos (por ahora) solo para el dueño de la empresa: soloDueno. */}
+                <Route path="/hr/monitor-ia" element={<PermissionRoute module="HR" submodule="Monitor IA" soloDueno><HRLayout><HRMonitorIA /></HRLayout></PermissionRoute>} />
+                <Route path="/hr/expediente/:userId" element={<PermissionRoute module="HR" submodule="Monitor IA" soloDueno><HRLayout><HRExpediente /></HRLayout></PermissionRoute>} />
                 <Route path="/hr/organizacion/directorio" element={<PermissionRoute module="HR" submodule="Directorio"><HRLayout><HRDirectoryLookup /></HRLayout></PermissionRoute>} />
                 <Route path="/hr/organizacion/organigrama" element={<PermissionRoute module="HR" submodule="Organigrama"><HRLayout><HROrganigrama /></HRLayout></PermissionRoute>} />
                 <Route path="/hr/deducciones" element={<PermissionRoute module="HR" submodule="Deducciones"><HRLayout><HRDeductions /></HRLayout></PermissionRoute>} />
