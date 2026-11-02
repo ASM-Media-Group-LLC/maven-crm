@@ -14,17 +14,29 @@ export function PantallazosVivoPanel() {
   const navigate = useNavigate();
   const { personas, cargando, error, refrescar } = useCapturasVivo();
 
-  // Cuando hay pantallas sin veredicto, le pedimos a Argos que las mire (una sola
-  // llamada en vuelo a la vez). Al terminar, refrescamos para pintar la línea.
+  // Cuando hay pantallas sin veredicto, le pedimos a Argos que las mire: una sola
+  // llamada en vuelo, mínimo 60 s entre llamadas, y si no juzga nada (IA caída,
+  // llave muerta) espera cada vez más (hasta 10 min) para no martillar la función.
+  // Solo refrescamos cuando sí hubo veredictos nuevos que pintar.
   const analizando = useRef(false);
+  const ultimoIntento = useRef(0);
+  const espera = useRef(60_000);
   useEffect(() => {
     const hayPendientes = personas.some((p) => p.veredicto == null && p.tienePantalla);
     if (!hayPendientes || analizando.current) return;
+    const ahora = Date.now();
+    if (ahora - ultimoIntento.current < espera.current) return;
     analizando.current = true;
+    ultimoIntento.current = ahora;
+    const masEspera = () => { espera.current = Math.min(espera.current * 2, 10 * 60_000); };
     void supabase.functions
       .invoke("argos-mirar")
-      .then(() => refrescar())
-      .catch(() => {})
+      .then(({ data }) => {
+        const r = data as { analizadas?: number } | null;
+        if (r && (r.analizadas ?? 0) > 0) { espera.current = 60_000; void refrescar(); }
+        else masEspera();
+      })
+      .catch(masEspera)
       .finally(() => {
         analizando.current = false;
       });
