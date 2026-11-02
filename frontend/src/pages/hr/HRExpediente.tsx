@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
-import { ChevronLeft, ChevronRight, AlertTriangle, ScreenShare, Camera, ImageIcon, Loader2, Gauge, CalendarDays } from "lucide-react";
+import { ChevronLeft, ChevronRight, AlertTriangle, ScreenShare, ScreenShareOff, CameraOff, ImageIcon, Loader2, Gauge, CalendarDays } from "lucide-react";
 import { useLanguage } from "@/hooks/useLanguage";
 import { UserAvatar } from "@/components/UserAvatar";
 import { Page } from "@/components/ui/page";
@@ -131,38 +131,49 @@ function TiraDelDia({ capturas, t }: { capturas: CapturaDia[]; t: Tr }) {
           <p className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">{g.hora}</p>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-5">
             {g.items.map((m) => {
-              const principal = m.pantalla ?? m.camara!;
-              const claveP = claveFoto(principal);
-              const url = claveP ? urls[claveP] : undefined;
-              const esPantalla = !!m.pantalla;
-              const claveC = m.pantalla && m.camara ? claveFoto(m.camara) : null;
-              const camUrl = claveC ? urls[claveC] : null;
+              const urlP = m.pantalla ? urls[claveFoto(m.pantalla)!] : undefined;
+              const urlC = m.camara ? urls[claveFoto(m.camara)!] : undefined;
+              const hora = format(new Date(m.createdAt), "HH:mm");
+              const abrir = () => { if (m.pantalla) void abrirFoto(m.pantalla); else if (m.camara) void abrirFoto(m.camara); };
               return (
                 <button
                   key={m.id}
                   type="button"
-                  onClick={() => abrirFoto(principal)}
-                  title={`${format(new Date(m.createdAt), "HH:mm")}${m.veredicto ? ` · ${m.veredicto}` : ""}`}
+                  onClick={abrir}
+                  title={`${hora}${m.veredicto ? ` · ${m.veredicto}` : ""}`}
                   className={`group relative overflow-hidden rounded-xl border bg-muted/40 transition ${m.fueraDeLugar ? "border-destructive/60" : "border-border/40 hover:border-primary/50"}`}
                 >
                   <div className="relative aspect-[16/10] w-full">
-                    {url ? (
-                      <img src={url} alt={format(new Date(m.createdAt), "HH:mm")} loading="lazy" className="h-full w-full object-cover" />
+                    {/* GRANDE: la pantalla; si no compartía, una X */}
+                    {m.pantalla ? (
+                      urlP ? (
+                        <img src={urlP} alt={hora} loading="lazy" className="h-full w-full object-cover" />
+                      ) : (
+                        <div className="flex h-full w-full items-center justify-center text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /></div>
+                      )
                     ) : (
-                      <div className="flex h-full w-full items-center justify-center text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /></div>
+                      <div className="flex h-full w-full flex-col items-center justify-center gap-1 bg-muted/30 text-muted-foreground">
+                        <ScreenShareOff className="h-5 w-5 opacity-60" />
+                        <span className="text-[9px] font-medium uppercase tracking-wide">{t("hr.exp.sinPantalla")}</span>
+                      </div>
                     )}
-                    {/* La cámara pegada en la esquina */}
-                    {camUrl && (
-                      <img src={camUrl} alt="" loading="lazy" className="absolute bottom-1 right-1 h-11 w-16 rounded-md border-2 border-background/80 object-cover shadow-md" />
-                    )}
-                    <span className="absolute bottom-1 left-1 rounded bg-black/55 px-1 py-0.5 text-[9px] font-semibold tabular-nums text-white backdrop-blur-sm">
-                      {format(new Date(m.createdAt), "HH:mm")}
-                    </span>
-                    <span className="absolute left-1 top-1 inline-flex items-center gap-0.5 rounded bg-black/55 px-1 py-0.5 text-[9px] font-semibold text-white backdrop-blur-sm">
-                      {esPantalla ? <ScreenShare className="h-2.5 w-2.5" /> : <Camera className="h-2.5 w-2.5" />}
-                    </span>
+                    {/* ESQUINA: la cámara; si estaba apagada, una X roja */}
+                    <div className="absolute bottom-1 right-1 h-11 w-16 overflow-hidden rounded-md border-2 border-background/80 shadow-md">
+                      {m.camara ? (
+                        urlC ? (
+                          <img src={urlC} alt="" loading="lazy" className="h-full w-full object-cover" />
+                        ) : (
+                          <div className="flex h-full w-full items-center justify-center bg-muted/60 text-muted-foreground"><Loader2 className="h-3 w-3 animate-spin" /></div>
+                        )
+                      ) : (
+                        <div className="flex h-full w-full items-center justify-center bg-destructive/15 text-destructive" title={t("hr.exp.camaraApagada")}>
+                          <CameraOff className="h-3.5 w-3.5" />
+                        </div>
+                      )}
+                    </div>
+                    <span className="absolute bottom-1 left-1 rounded bg-black/55 px-1 py-0.5 text-[9px] font-semibold tabular-nums text-white backdrop-blur-sm">{hora}</span>
                     {m.fueraDeLugar && (
-                      <span className="absolute right-1 top-1 inline-flex items-center gap-0.5 rounded bg-destructive px-1 py-0.5 text-[9px] font-semibold text-destructive-foreground">
+                      <span className="absolute left-1 top-1 inline-flex items-center gap-0.5 rounded bg-destructive px-1 py-0.5 text-[9px] font-semibold text-destructive-foreground">
                         <AlertTriangle className="h-2.5 w-2.5" />{t("hr.exp.fueraDeLugar")}
                       </span>
                     )}

@@ -1,6 +1,8 @@
 import { useEffect, useRef } from "react";
+import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { useLanguage } from "@/hooks/useLanguage";
 import { useMonitorEstado } from "@/hooks/useMonitorEstado";
 import type { FaceWatch } from "@/hooks/useFaceWatch";
 import { TIPO_POR_CARA } from "@/lib/monitorFaltas";
@@ -34,8 +36,15 @@ interface Params {
 const UMBRAL_FALTA_MS = 20_000; // una mala postura sostenida >20 s cuenta como falta
 const CHEQUEO_MS = 5_000; // cada cuánto se revisa la duración del estado
 const LATIDO_MS = 60_000; // cada cuánto se deja el latido del rondín (monitor_rondas)
-const PERIODO_CAPTURA_MS = 60_000; // un pantallazo por minuto (modelo Hubstaff)
+// Un pantallazo cada ~2 min a HORA ALEATORIA (modelo Hubstaff): no se sabe el
+// momento exacto, para que no se pueda jugar. Promedio 2 min, entre 90 y 150 s.
+const CAPTURA_MIN_MS = 90_000;
+const CAPTURA_RANGO_MS = 60_000;
 const BUCKET_CAPTURAS = "monitor-capturas"; // buzón privado; luego se mueve al NAS
+
+// Avísale a la persona que se le tomó un pantallazo (transparencia, como Hubstaff),
+// una sola vez aunque corran dos capturadores a la vez (Cowork + app-wide).
+let ultimoAvisoCaptura = 0;
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const sinTipar = supabase as unknown as { from: (t: string) => any };
@@ -129,6 +138,7 @@ async function guardarEnBuzon(
 
 export function useMonitorCamara({ track, trackPantalla = null, camaraRealOn, faceWatch, activo, roomNombre }: Params): void {
   const { user } = useAuth();
+  const { t } = useLanguage();
   const { esAdmin, activo: cfgActivo, intervaloSeg } = useMonitorEstado(activo);
 
   // Solo se monitorea una vez confirmado que NO es admin (esAdmin === false).
@@ -224,27 +234,43 @@ export function useMonitorCamara({ track, trackPantalla = null, camaraRealOn, fa
   useEffect(() => {
     if (!activoFree || !user) return;
     const uid = user.id;
+    let cancelado = false;
+    let timer: number | undefined;
     const tick = async () => {
       if (guardandoRef.current) return;
       guardandoRef.current = true;
+      let guardoAlgo = false;
       try {
         const cam = trackRef.current;
         if (camRef.current && cam && cam.readyState === "live") {
           await guardarEnBuzon(uid, cam, "camara", roomRef.current);
+          guardoAlgo = true;
         }
         const pan = trackPantallaRef.current;
         if (pan && pan.readyState === "live") {
           await guardarEnBuzon(uid, pan, "pantalla", roomRef.current);
+          guardoAlgo = true;
         }
       } catch {
         /* una captura que falla no rompe nada: la próxima ronda reintenta */
       } finally {
         guardandoRef.current = false;
       }
+      // Transparencia: la persona ve que se le tomó un pantallazo (una vez, aunque
+      // corran dos capturadores a la vez).
+      if (guardoAlgo && !cancelado && Date.now() - ultimoAvisoCaptura > 30_000) {
+        ultimoAvisoCaptura = Date.now();
+        try { toast(t("monitor.pantallazo"), { duration: 2600 }); } catch { /* sin toast no pasa nada */ }
+      }
     };
-    // Primer pantallazo a los ~8 s (no esperar un minuto entero), luego cada minuto.
-    const t0 = window.setTimeout(() => { void tick(); }, 8000);
-    const iv = window.setInterval(() => { void tick(); }, PERIODO_CAPTURA_MS);
-    return () => { window.clearTimeout(t0); window.clearInterval(iv); };
-  }, [activoFree, user]);
+    // Primer pantallazo a los ~8 s; luego cada ~2 min a HORA ALEATORIA (90–150 s).
+    const agendar = (ms: number) => {
+      timer = window.setTimeout(async () => {
+        await tick();
+        if (!cancelado) agendar(CAPTURA_MIN_MS + Math.floor(Math.random() * CAPTURA_RANGO_MS));
+      }, ms);
+    };
+    agendar(8000);
+    return () => { cancelado = true; if (timer) window.clearTimeout(timer); };
+  }, [activoFree, user, t]);
 }
