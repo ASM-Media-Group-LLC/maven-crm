@@ -20,10 +20,11 @@ import { encodeBase64 } from "jsr:@std/encoding@1/base64";
 // de Argos por el admin, sin tocar código.
 //
 // DOS PUERTAS: cron (X-Cron-Token, cada 2 min — el motor) y supervisor con sesión.
-// PROVEEDORES: Gemini primero (única llave viva, nivel gratuito → una foto a la
-// vez, pausa entre fotos, reintento en 429, pensamiento apagado, no re-juzgar a
-// la misma persona antes de REJUZGAR_MIN); OpenRouter y Anthropic de respaldo
-// (muertas desde el 01/10; reviven solas con llave nueva). Huella en argos_diag.
+// PROVEEDORES: Gemini primero (llave PAGADA nivel 1 desde el 02/11 → todo el
+// equipo por ronda, pausa corta entre fotos, reintento en 429, pensamiento
+// apagado, veredicto fresco cada REJUZGAR_MIN); OpenRouter y Anthropic de
+// respaldo (muertas desde el 01/10; reviven solas con llave nueva). Huella en
+// argos_diag. Costo estimado del ritmo por defecto: ~$1–2/día con ~20 personas.
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -34,12 +35,13 @@ const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY") ?? "";
 const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY") ?? Deno.env.get("GOOGLE_AI_API_KEY") ?? "";
 const MODELO_OPENROUTER = Deno.env.get("MONITOR_LLM_MODEL") ?? "openai/gpt-4o-mini";
 const MODELO_ANTHROPIC = Deno.env.get("ARGOS_ANTHROPIC_MODEL") ?? "claude-haiku-4-5";
-const MODELO_GEMINI = Deno.env.get("ARGOS_GEMINI_MODEL") ?? "gemini-2.5-flash";
+// gemini-2.5-flash quedó cerrado para cuentas nuevas (404 el 02/11): va el 3.8.
+const MODELO_GEMINI = Deno.env.get("ARGOS_GEMINI_MODEL") ?? "gemini-3.8-flash";
 const LLM_TIMEOUT_MS = 20_000;
 const VENTANA_MIN = 7;
-const TOPE_PERSONAS = Number(Deno.env.get("ARGOS_TOPE") ?? 5);
-const ESPACIO_MS = Number(Deno.env.get("ARGOS_ESPACIO_MS") ?? 6_000);
-const REJUZGAR_MIN = Number(Deno.env.get("ARGOS_REJUZGAR_MIN") ?? 30);
+const TOPE_PERSONAS = Number(Deno.env.get("ARGOS_TOPE") ?? 40);
+const ESPACIO_MS = Number(Deno.env.get("ARGOS_ESPACIO_MS") ?? 1_500);
+const REJUZGAR_MIN = Number(Deno.env.get("ARGOS_REJUZGAR_MIN") ?? 6);
 const REINTENTO_MS = 2_500;
 
 const CORS = {
@@ -128,7 +130,7 @@ async function pedirGemini(prompt: string, b64: string): Promise<Respuesta> {
           temperature: 0.1,
           maxOutputTokens: 600,
           responseMimeType: "application/json",
-          // gemini-2.5-flash piensa antes de responder y se come el tope → JSON
+          // gemini flash piensa antes de responder y se come el tope → JSON
           // truncado. Para nombrar un sistema no hace falta pensar: se apaga.
           thinkingConfig: { thinkingBudget: 0 },
         },
@@ -339,7 +341,7 @@ Deno.serve(async (req: Request) => {
   };
   await diag("contexto", { empresas: contextoDe.size, con_empresa: ids.filter((id) => tenantDe.has(id)).length, sin_empresa: ids.filter((id) => !tenantDe.has(id)).length });
 
-  // 5) Juzgar UNA foto a la vez con pausa (nivel gratuito de Gemini). El primer
+  // 5) Juzgar las fotos una a una con pausa corta. El primer
   //    proveedor que responde se queda para el resto de la ronda. Un 429/vacío se
   //    reintenta una vez. Si ninguno responde en la primera foto, se corta la ronda.
   let proveedorVivo: Proveedor | null = null;
