@@ -1044,6 +1044,7 @@ export const hr = {
   "hr.atencion.grupoLeve": { es: "Pausas y ojo ({n})", en: "Breaks & watch ({n})" },
   "hr.atencion.tipo.fuera_de_lugar": { es: "Fuera de lugar", en: "Off-task" },
   "hr.atencion.tipo.sin_senal": { es: "Sin señal", en: "No signal" },
+  "hr.atencion.tipo.sin_pantalla": { es: "No comparte pantalla", en: "Not sharing screen" },
   "hr.atencion.tipo.pausa_de_mas": { es: "Pausa de más", en: "Over break" },
   "hr.atencion.verExpediente": { es: "Ver expediente", en: "Open record" },
   "hr.contexto.title": { es: "Contexto de la empresa para Argos", en: "Company context for Argos" },

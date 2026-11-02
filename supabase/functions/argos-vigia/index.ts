@@ -26,6 +26,7 @@ const ACTIVO_MIN = 60; // «estaba trabajando»: alguna captura en esta ventana
 const SIN_SENAL_MIN = 8; // sin pantallazos hace ≥ esto = sin señal
 const IA_VENTANA_MIN = 40; // el veredicto de la IA vale esto (se re-juzga cada ~30 min)
 const FALTA_FRESCA_MIN = 5; // una falta de cámara/puesto es «ahora» si tiene ≤ 5 min
+const PANTALLA_MIN = 10; // conectado sin PANTALLA hace ≥ esto = no comparte (exigida)
 
 const CORS = {
   "Access-Control-Allow-Origin": "*",
@@ -45,7 +46,7 @@ function igualesConstante(a: string, b: string): boolean {
 }
 
 type Tipo =
-  | "fuera_de_lugar" | "sin_senal" | "pausa_de_mas"
+  | "fuera_de_lugar" | "sin_senal" | "sin_pantalla" | "pausa_de_mas"
   | "camara_apagada" | "camara_tapada" | "se_fue" | "cara_incompleta"
   | "celular" | "distraido" | "no_mira";
 
@@ -53,6 +54,7 @@ type Tipo =
 const LABEL: Record<Tipo, string> = {
   fuera_de_lugar: "Fuera de lugar",
   sin_senal: "Sin señal",
+  sin_pantalla: "No comparte pantalla",
   pausa_de_mas: "Pausa de más",
   camara_apagada: "Cámara apagada",
   camara_tapada: "Cámara tapada",
@@ -63,7 +65,7 @@ const LABEL: Record<Tipo, string> = {
   no_mira: "No mira la pantalla",
 };
 const GRAVEDAD: Record<Tipo, number> = {
-  fuera_de_lugar: 3, se_fue: 3, camara_apagada: 3, celular: 3,
+  fuera_de_lugar: 3, se_fue: 3, camara_apagada: 3, celular: 3, sin_pantalla: 3,
   sin_senal: 2, pausa_de_mas: 2, camara_tapada: 2, distraido: 2, no_mira: 2,
   cara_incompleta: 1,
 };
@@ -154,6 +156,19 @@ Deno.serve(async (req: Request) => {
     const hace = Math.round((ahora - Date.parse(ult.created_at)) / 60_000);
     if (hace >= SIN_SENAL_MIN && !enPausa.has(userId)) {
       poner({ user_id: userId, tipo: "sin_senal", gravedad: GRAVEDAD.sin_senal, detalle: `Sin pantallazos hace ${hace} min`, captura_path: ultimaPantallaPor.get(userId)?.path ?? null });
+    }
+    // PANTALLA EXIGIDA (Alvaro): conectado (señal fresca) pero sin compartir
+    // pantalla hace ≥ PANTALLA_MIN y sin pausa abierta → alerta + aviso a la persona.
+    const p = ultimaPantallaPor.get(userId);
+    const haceP = p ? Math.round((ahora - Date.parse(p.created_at)) / 60_000) : Infinity;
+    if (hace < SIN_SENAL_MIN && haceP >= PANTALLA_MIN && !enPausa.has(userId)) {
+      poner({
+        user_id: userId,
+        tipo: "sin_pantalla",
+        gravedad: GRAVEDAD.sin_pantalla,
+        detalle: p ? `Conectado sin compartir pantalla hace ${haceP} min` : "Conectado sin compartir pantalla",
+        captura_path: p?.path ?? null,
+      });
     }
     const j = ultimaJuzgadaPor.get(userId);
     if (j && j.fuera_de_lugar === true && ahora - Date.parse(j.created_at) <= IA_VENTANA_MIN * 60_000) {
@@ -259,6 +274,24 @@ Deno.serve(async (req: Request) => {
     if (nErr) { errores.push(`avisar: ${nErr.message}`); continue; }
     avisosN += filas.length;
     await admin.from("argos_alertas").update({ notificada_at: ahoraISO }).eq("id", fila.id);
+
+    // Pantalla exigida: aviso automático a LA PERSONA (una vez por alerta, no
+    // cada 2 min). Sin required_permission: le llega a ella, con su push.
+    if (d.tipo === "sin_pantalla") {
+      await admin.from("notifications").insert({
+        user_id: d.user_id,
+        type: "argos_pantalla",
+        title: "Argos: comparte tu pantalla",
+        message: "Estás conectado sin compartir pantalla en Cowork. Compártela para que tu trabajo cuente.",
+        reference_id: fila.id,
+        reference_type: "argos_alerta",
+        module_origin: "HR",
+        priority: "high",
+        status: "new",
+        visibility_scope: "personal",
+        deep_link_url: "/cowork",
+      }).then(() => { avisosN++; }, (e: unknown) => errores.push(`avisar-persona: ${(e as Error)?.message}`));
+    }
   }
 
   await diag("fin", { personas_vistas: ultimaPor.size, deseadas: deseadas.size, abiertas: abiertasN, actualizadas: actualizadasN, cerradas: cerradasN, avisos: avisosN, errores: errores.slice(0, 5) });

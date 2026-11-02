@@ -11,7 +11,7 @@ import { urlCaptura } from "@/hooks/useMonitorEventos";
 const sinTipar = supabase as unknown as { from: (t: string) => any };
 
 export type TipoAlerta =
-  | "fuera_de_lugar" | "sin_senal" | "pausa_de_mas"
+  | "fuera_de_lugar" | "sin_senal" | "sin_pantalla" | "pausa_de_mas"
   | "camara_apagada" | "camara_tapada" | "se_fue" | "cara_incompleta"
   | "celular" | "distraido" | "no_mira";
 

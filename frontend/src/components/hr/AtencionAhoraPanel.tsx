@@ -14,7 +14,7 @@ import type { TranslationKey } from "@/lib/i18n";
 type Tr = (k: TranslationKey, vars?: Record<string, string | number>) => string;
 
 function labelTipo(tipo: TipoAlerta, t: Tr): string {
-  if (tipo === "fuera_de_lugar" || tipo === "sin_senal" || tipo === "pausa_de_mas") {
+  if (tipo === "fuera_de_lugar" || tipo === "sin_senal" || tipo === "sin_pantalla" || tipo === "pausa_de_mas") {
     return t(`hr.atencion.tipo.${tipo}` as TranslationKey);
   }
   const k = LABEL_FALTA[tipo as FaltaTipo];
@@ -29,7 +29,7 @@ const TONO_GRAVEDAD: Record<number, string> = {
 
 // PROBLEMAS (acción) vs PAUSAS/ojo. Una pausa (baño/break/almuerzo) nunca cuenta
 // como problema; lo grave es dejar de trabajar o estar fuera de lugar.
-const TIPOS_GRAVES = new Set<TipoAlerta>(["fuera_de_lugar", "sin_senal", "camara_apagada", "se_fue", "celular", "no_mira"]);
+const TIPOS_GRAVES = new Set<TipoAlerta>(["fuera_de_lugar", "sin_senal", "sin_pantalla", "camara_apagada", "se_fue", "celular", "no_mira"]);
 
 export function AtencionAhoraPanel() {
   const { t } = useLanguage();
