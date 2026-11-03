@@ -1237,4 +1237,9 @@ export const hr = {
   "hr.argoscentro.mezclaDesc": { es: "Argos es muy presente, pero cede si el supervisor acaba de hablarle a la persona (salvo que sea importante), y espacia si satura. Ajustable por sala.", en: "Argos is very present, but yields if the supervisor just spoke to the person (unless it's important), and spaces out if it saturates. Adjustable per room." },
   "hr.argoscentro.antifalsos": { es: "Antes de acusar, Argos confirma con la verdad de LiveKit y que sea sostenido. Un error de captura nunca cuenta contra la persona.", en: "Before accusing, Argos confirms with LiveKit's truth and that it's sustained. A capture error never counts against the person." },
   "hr.argoscentro.editarPronto": { es: "Editar textos, tiempos y on/off llega en el siguiente paso. Esto es la vista para que oigas y veas cómo va.", en: "Editing text, timing and on/off comes next. This is the view so you can hear and see how it's going." },
+  "hr.argoscentro.estadoSitN": { es: "{n} situaciones", en: "{n} situations" },
+  "hr.argoscentro.catTitle": { es: "El catálogo de Argos", en: "Argos's catalog" },
+  "hr.argoscentro.catSub": { es: "Tu catálogo de Avisar, ahora de Argos. Toca ▶ para oírlo en su voz. «Argos solo» = lo detecta y lo dice sin que nadie apriete; «Supervisor» = lo sigue mandando el supervisor con el botón.", en: "Your Avisar catalog, now Argos's. Tap ▶ to hear it in his voice. “Argos alone” = detects and says it with no one pressing; “Supervisor” = the supervisor still sends it with the button." },
+  "hr.argoscentro.tagAuto": { es: "Argos solo", en: "Argos alone" },
+  "hr.argoscentro.tagManual": { es: "Supervisor", en: "Supervisor" },
 } as const satisfies Record<string, { es: string; en: string }>;
