@@ -1238,6 +1238,7 @@ export const hr = {
   "hr.argoscentro.antifalsos": { es: "Antes de acusar, Argos confirma con la verdad de LiveKit y que sea sostenido. Un error de captura nunca cuenta contra la persona.", en: "Before accusing, Argos confirms with LiveKit's truth and that it's sustained. A capture error never counts against the person." },
   "hr.argoscentro.editarPronto": { es: "Editar textos, tiempos y on/off llega en el siguiente paso. Esto es la vista para que oigas y veas cómo va.", en: "Editing text, timing and on/off comes next. This is the view so you can hear and see how it's going." },
   "hr.argoscentro.estadoSitN": { es: "{n} situaciones", en: "{n} situations" },
+  "hr.argoscentro.estadoLive": { es: "{n} en el piso", en: "{n} on the floor" },
   "hr.argoscentro.catTitle": { es: "El catálogo de Argos", en: "Argos's catalog" },
   "hr.argoscentro.catSub": { es: "Tu catálogo, ahora de Argos, ordenado y numerado: arriba lo que hace Argos solo, abajo lo que manda el supervisor. Verde «En el piso» = ya funciona en vivo hoy; amarillo «Pronto» = lo hará cuando termine el motor. Toca ▶ para oírlo con Javi.", en: "Your catalog, now Argos's, sorted and numbered: on top what Argos does alone, below what the supervisor sends. Green “On the floor” = already live today; amber “Soon” = coming when the engine is done. Tap ▶ to hear it with Javi." },
   "hr.argoscentro.secArgos": { es: "Lo que hace Argos", en: "What Argos does" },

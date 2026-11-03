@@ -6,35 +6,53 @@ import {
   SlidersHorizontal, Play, Square, Volume2, Users, Info, Shield,
   Check, X, ToggleLeft, ToggleRight,
 } from "lucide-react";
+import translations, { type TranslationKey } from "@/lib/i18n";
 import { anunciar } from "@/lib/anunciarVoz";
 import { SITUACIONES_AVISO, type SituacionAviso } from "@/lib/coworkAvisos";
 
-// Centro de control de Argos: el único lugar donde se ve y se oye todo. El
-// catálogo es el del botón Avisar (lib/coworkAvisos), reordenado en DOS listas
-// numeradas: lo que hace Argos (verde «En el piso» si ya funciona de verdad hoy,
-// amarillo «Pronto» si entra con el motor) y lo que manda el supervisor (rojo).
-// Cada una de Argos tiene su interruptor on/off (de momento solo visual: guardar
-// llega con la edición, candada a admin+dueño). Se usa como la pestaña Ajustes
-// de Argos y como página propia.
+// Centro de control de Argos: el único lugar donde se ve y se oye todo.
+//
+// Argos tiene SU PROPIA lista (las situaciones que él detecta, en granular, no
+// las del menú Avisar que las agrupaba): 8 verdes «En el piso» (ya funcionan en
+// vivo hoy) + 7 amarillas «Pronto» (entran con el motor). Cada una con su
+// interruptor on/off (de momento visual; guardar llega con la edición, candada a
+// admin+dueño). Debajo, en rojo, lo que NO puede Argos y manda el supervisor con
+// el botón Avisar (ventas, trato, tiempo de respuesta…). Pestaña Ajustes + ruta.
+
+const dict = translations as unknown as Record<string, { es: string; en: string }>;
+const fraseEs = (k: TranslationKey): string => dict[k]?.es ?? "";
 
 const VOZ_ARGOS = "aYbngTsp5kp0sibI3Z0T";
 
-// AUTO = lo que Argos hace solo (ve cámara/pantalla/pausa/foco).
-const AUTO: ReadonlySet<string> = new Set([
-  "camara-encender", "camara-encuadre", "pantalla-compartir", "pantalla-ajena",
-  "pausa-volver", "pausa-avisar",
-  "foco-distraccion", "foco-celular", "foco-pestanas", "foco-inactivo",
-]);
+// Las situaciones PROPIAS de Argos, granulares. `live` = ya funciona hoy en el
+// piso (useFaceNudge / useScreenShareNudge / fin de pausa hablan solos).
+const ARGOS_SITS: Array<{ slug: string; label: TranslationKey; voz: TranslationKey; live: boolean }> = [
+  { slug: "camara-apagada", label: "hr.monia.cmp.s.camara", voz: "hr.monia.cmp.voz.camara", live: true },
+  { slug: "no-frente", label: "hr.monia.cmp.s.rostro", voz: "hr.monia.cmp.voz.rostro", live: true },
+  { slug: "fuera-cuadro", label: "hr.monia.cmp.s.cuadro", voz: "hr.monia.cmp.voz.cuadro", live: true },
+  { slug: "poca-luz", label: "hr.monia.cmp.s.luz", voz: "hr.monia.cmp.voz.luz", live: true },
+  { slug: "sin-pantalla", label: "hr.monia.cmp.s.pantalla", voz: "hr.monia.cmp.voz.pantalla", live: true },
+  { slug: "pasado-bano", label: "hr.monia.cmp.s.bano", voz: "hr.monia.cmp.voz.bano", live: true },
+  { slug: "pasado-break", label: "hr.monia.cmp.s.break", voz: "hr.monia.cmp.voz.break", live: true },
+  { slug: "pasado-almuerzo", label: "hr.monia.cmp.s.almuerzo", voz: "hr.monia.cmp.voz.almuerzo", live: true },
+  { slug: "celular", label: "hr.monia.cmp.n.celular", voz: "hr.monia.cmp.voz.celular", live: false },
+  { slug: "distraido", label: "hr.monia.cmp.n.distraido", voz: "hr.monia.cmp.voz.distraido", live: false },
+  { slug: "fuera-de-lugar", label: "hr.monia.cmp.n.fuera", voz: "hr.monia.cmp.voz.fuera", live: false },
+  { slug: "sin-senal", label: "hr.monia.cmp.n.senal", voz: "hr.monia.cmp.voz.senal", live: false },
+  { slug: "tarde", label: "hr.monia.cmp.n.tarde", voz: "hr.monia.cmp.voz.tarde", live: false },
+  { slug: "inactivo", label: "hr.monia.cmp.n.inactivo", voz: "hr.monia.cmp.voz.inactivo", live: false },
+  { slug: "abusa-pausas", label: "hr.monia.cmp.n.pausas", voz: "hr.monia.cmp.voz.pausas", live: false },
+];
 
-// LIVE = lo que YA funciona de verdad en el piso hoy (useFaceNudge /
-// useScreenShareNudge / fin de pausa hablan solos). El resto de AUTO es «Pronto».
-const LIVE: ReadonlySet<string> = new Set([
-  "camara-encender", "camara-encuadre", "pantalla-compartir", "pausa-volver",
-]);
+// Lo que manda el SUPERVISOR con el botón (del catálogo Avisar): lo que Argos no
+// puede porque tendría que leer los chats — ventas, trato, tiempo de respuesta,
+// charla y general.
+const SUP_GRUPOS = new Set(["respuesta", "ventas", "trato", "general"]);
+const supList: SituacionAviso[] = SITUACIONES_AVISO.filter(
+  (s) => SUP_GRUPOS.has(s.grupo) || s.slug === "foco-charla",
+);
 
-const argosList = SITUACIONES_AVISO.filter((s) => AUTO.has(s.slug))
-  .sort((a, b) => Number(LIVE.has(b.slug)) - Number(LIVE.has(a.slug)));
-const supList = SITUACIONES_AVISO.filter((s) => !AUTO.has(s.slug));
+const liveN = ARGOS_SITS.filter((s) => s.live).length;
 
 export function ArgosAjustesContenido() {
   const { t } = useLanguage();
@@ -71,41 +89,7 @@ export function ArgosAjustesContenido() {
     );
   };
 
-  const total = SITUACIONES_AVISO.length;
-  const vozPrueba = SITUACIONES_AVISO.find((s) => s.slug === "camara-encender")?.vozEs ?? "";
-
-  // Fila de una situación de Argos (con estado En el piso/Pronto e interruptor).
-  const FilaArgos = (s: SituacionAviso, i: number) => {
-    const live = LIVE.has(s.slug);
-    const encendida = !off.has(s.slug);
-    return (
-      <div
-        key={s.slug}
-        className={`flex flex-wrap items-center gap-x-3 gap-y-2 rounded-2xl border border-border/60 bg-background/40 px-4 py-3 ${encendida ? "" : "opacity-55"}`}
-      >
-        <span className="w-6 shrink-0 self-start pt-0.5 text-sm font-semibold text-muted-foreground">{i + 1}</span>
-        <div className="min-w-0 flex-1">
-          <p className="text-sm font-semibold text-foreground">{t(s.etiqueta)}</p>
-          <p className="mt-0.5 text-sm text-muted-foreground">&ldquo;{s.vozEs}&rdquo;</p>
-        </div>
-        <span
-          className={`inline-flex shrink-0 items-center gap-1.5 self-start rounded-full px-2.5 py-0.5 text-xs font-semibold ${live ? "bg-success/15 text-success" : "bg-warning/15 text-warning"}`}
-        >
-          {live ? <Check className="h-3.5 w-3.5" /> : <Info className="h-3.5 w-3.5" />}
-          {live ? t("hr.argoscentro.enPiso") : t("hr.argoscentro.pronto")}
-        </span>
-        <button
-          type="button"
-          onClick={() => alternar(s.slug)}
-          className={`shrink-0 self-start transition ${encendida ? "text-primary" : "text-muted-foreground"}`}
-          aria-label={s.slug}
-        >
-          {encendida ? <ToggleRight className="h-6 w-6" /> : <ToggleLeft className="h-6 w-6" />}
-        </button>
-        <Btn id={s.slug} texto={s.vozEs} />
-      </div>
-    );
-  };
+  const vozPrueba = fraseEs("hr.monia.cmp.voz.camara");
 
   return (
     <div className="grid gap-4">
@@ -117,7 +101,7 @@ export function ArgosAjustesContenido() {
         </div>
         <div className="rounded-2xl border border-border/60 bg-card p-4">
           <p className="text-xs font-semibold text-muted-foreground">{t("hr.argoscentro.estado")}</p>
-          <p className="mt-1 font-display text-lg font-bold text-success">{t("hr.argoscentro.estadoSitN", { n: total })}</p>
+          <p className="mt-1 font-display text-lg font-bold text-success">{t("hr.argoscentro.estadoLive", { n: liveN })}</p>
         </div>
         <div className="rounded-2xl border border-border/60 bg-card p-4">
           <p className="text-xs font-semibold text-muted-foreground">{t("hr.argoscentro.estado")}</p>
@@ -146,25 +130,54 @@ export function ArgosAjustesContenido() {
         </p>
       </div>
 
-      {/* El catálogo, ordenado en dos listas. */}
+      {/* El catálogo: lista de Argos + lista del supervisor. */}
       <div className="rounded-2xl border border-border/60 bg-card p-5 sm:p-6">
         <h2 className="font-display text-lg font-bold tracking-tight">{t("hr.argoscentro.catTitle")}</h2>
         <p className="mt-1 text-sm text-muted-foreground">{t("hr.argoscentro.catSub")}</p>
 
-        {/* ✓ Lo que hace Argos */}
+        {/* ✓ Lo que hace Argos (su lista granular). */}
         <h3 className="mb-2.5 mt-5 flex items-center gap-2 font-display text-sm font-bold text-success">
           <Check className="h-4 w-4" />
-          {t("hr.argoscentro.secArgos")} ({argosList.length})
+          {t("hr.argoscentro.secArgos")} ({ARGOS_SITS.length})
         </h3>
         <div className="grid gap-2">
-          {argosList.map((s, i) => FilaArgos(s, i))}
+          {ARGOS_SITS.map((s, i) => {
+            const encendida = !off.has(s.slug);
+            return (
+              <div
+                key={s.slug}
+                className={`flex flex-wrap items-center gap-x-3 gap-y-2 rounded-2xl border border-border/60 bg-background/40 px-4 py-3 ${encendida ? "" : "opacity-55"}`}
+              >
+                <span className="w-6 shrink-0 self-start pt-0.5 text-sm font-semibold text-muted-foreground">{i + 1}</span>
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-semibold text-foreground">{t(s.label)}</p>
+                  <p className="mt-0.5 text-sm text-muted-foreground">&ldquo;{fraseEs(s.voz)}&rdquo;</p>
+                </div>
+                <span
+                  className={`inline-flex shrink-0 items-center gap-1.5 self-start rounded-full px-2.5 py-0.5 text-xs font-semibold ${s.live ? "bg-success/15 text-success" : "bg-warning/15 text-warning"}`}
+                >
+                  {s.live ? <Check className="h-3.5 w-3.5" /> : <Info className="h-3.5 w-3.5" />}
+                  {s.live ? t("hr.argoscentro.enPiso") : t("hr.argoscentro.pronto")}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => alternar(s.slug)}
+                  className={`shrink-0 self-start transition ${encendida ? "text-primary" : "text-muted-foreground"}`}
+                  aria-label={s.slug}
+                >
+                  {encendida ? <ToggleRight className="h-6 w-6" /> : <ToggleLeft className="h-6 w-6" />}
+                </button>
+                <Btn id={s.slug} texto={fraseEs(s.voz)} />
+              </div>
+            );
+          })}
         </div>
         <p className="mt-2.5 flex items-start gap-2 text-xs text-muted-foreground">
           <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" />
           {t("hr.argoscentro.onoffNota")}
         </p>
 
-        {/* ✗ Lo que manda el supervisor */}
+        {/* ✗ Lo que manda el supervisor (del botón Avisar). */}
         <h3 className="mb-2.5 mt-6 flex items-center gap-2 font-display text-sm font-bold text-destructive">
           <X className="h-4 w-4" />
           {t("hr.argoscentro.secSup")} ({supList.length})
