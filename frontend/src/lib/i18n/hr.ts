@@ -1247,4 +1247,10 @@ export const hr = {
   "hr.argoscentro.pronto": { es: "Pronto", en: "Soon" },
   "hr.argoscentro.tagManual": { es: "Supervisor", en: "Supervisor" },
   "hr.argoscentro.onoffNota": { es: "El on/off de aquí se guarda cuando construya la edición (solo admin y dueño). Por ahora es para ver cómo queda.", en: "The on/off here saves once I build editing (admin and owner only). For now it's to preview." },
+  "hr.argoscentro.vecesHoy": { es: "{n} hoy", en: "{n} today" },
+  "hr.argoscentro.sinRegistro": { es: "sin registro", en: "no record" },
+  "hr.argoscentro.verQuien": { es: "A quién", en: "Who" },
+  "hr.argoscentro.quienTitle": { es: "A quién le aplicó hoy", en: "Who it applied to today" },
+  "hr.argoscentro.nadieHoy": { es: "Nadie hoy.", en: "No one today." },
+  "hr.argoscentro.cargandoChequeo": { es: "Cargando el chequeo de hoy…", en: "Loading today's check…" },
 } as const satisfies Record<string, { es: string; en: string }>;
