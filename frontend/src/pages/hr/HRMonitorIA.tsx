@@ -222,10 +222,6 @@ function PanelAjustes({ t }: { t: Tr }) {
           <Switch checked={activo} onCheckedChange={setActivo} id="monia-activo" />
           <Label htmlFor="monia-activo" className="cursor-pointer text-sm">{t("hr.monia.cfg.activo")}</Label>
         </div>
-        <div className="flex items-center gap-3">
-          <Switch checked={avisar} onCheckedChange={setAvisar} id="monia-avisar" />
-          <Label htmlFor="monia-avisar" className="cursor-pointer text-sm">{t("hr.monia.cfg.avisar")}</Label>
-        </div>
         <div className="flex flex-col gap-1">
           <div className="flex items-center gap-3">
             <Switch checked={vigilanciaApp} onCheckedChange={setVigilanciaApp} id="monia-vigapp" />
@@ -449,93 +445,20 @@ export default function HRMonitorIA() {
         </>
       )}
 
-      {/* Ajustes (solo dueño): KPIs, interruptor, contexto y los eventos. */}
+      {/* Ajustes (solo dueño): 4 secciones limpias — Argos general, la voz, qué
+          avisa (situaciones) y el contexto. Lo viejo (KPIs de faltas, lista de
+          eventos, ranking) se jubiló: esos números viven en Resumen del día y
+          Atención ahora (Alvaro, 02/11). */}
       {tab === "ajustes" && isAdmin && (
-      <>
-      <div className="mt-5 grid grid-cols-2 gap-4 md:grid-cols-4">
-        <HRMetricCard title={t("hr.monia.kpi.hoy")} value={hoy.length} icon={AlertTriangle} color={hoy.length > 0 ? "warning" : "default"} subtitle={t("hr.monia.kpi.hoySub")} />
-        <HRMetricCard title={t("hr.monia.kpi.personas")} value={personas} icon={Users} color="primary" subtitle={t("hr.monia.kpi.personasSub")} />
-        <HRMetricCard title={t("hr.monia.kpi.celular")} value={enCel} icon={Smartphone} color={enCel > 0 ? "destructive" : "default"} subtitle={t("hr.monia.kpi.celularSub")} />
-        <HRMetricCard title={t("hr.monia.kpi.camOff")} value={camOff} icon={VideoOff} color={camOff > 0 ? "warning" : "default"} subtitle={t("hr.monia.kpi.camOffSub")} />
-      </div>
-
-      <div className="mt-4"><PanelAjustes t={t} /></div>
-
-      {/* La VOZ de Argos y qué dice en cada situación, editable por el dueño. */}
-      <div className="mt-4"><ArgosSituacionesPanel /></div>
-
-      {/* El contexto de la empresa para Argos: qué sistemas son trabajo y cuáles
-          fuera de lugar. Argos juzga el sistema, no el contenido. */}
-      <div className="mt-4"><ContextoEmpresaPanel /></div>
-
-      <div className="mt-5 grid grid-cols-1 gap-5 lg:grid-cols-[1fr_320px]">
-        {/* Lista de eventos con filtro */}
-        <div className="min-w-0">
-          <div className="mb-3 flex flex-wrap gap-1.5">
-            {FILTROS.map((f) => (
-              <Button
-                key={f.k}
-                size="sm"
-                variant={filtro === f.k ? "default" : "outline"}
-                className="h-8 gap-1.5 px-3 text-xs"
-                onClick={() => setFiltro(f.k)}
-              >
-                {t(f.tk)}
-                {typeof f.n === "number" && f.n > 0 && (
-                  <span className="rounded-full bg-background/30 px-1.5 text-[10px] tabular-nums">{f.n}</span>
-                )}
-              </Button>
-            ))}
-          </div>
-
-          {error && eventos.length === 0 ? (
-            <div className="mx-auto mt-6 max-w-md rounded-card border border-destructive/40 bg-destructive/5 p-6 text-center">
-              <AlertTriangle className="mx-auto mb-3 h-8 w-8 text-destructive" />
-              <p className="text-sm text-foreground">{t("hr.monia.error")}</p>
-              <Button variant="outline" size="sm" className="mt-4" onClick={() => refrescar()}>
-                {t("hr.monia.reintentar")}
-              </Button>
-            </div>
-          ) : cargando && eventos.length === 0 ? (
-            <div className="flex items-center justify-center py-16 text-muted-foreground">
-              <Loader2 className="h-6 w-6 animate-spin" />
-            </div>
-          ) : lista.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-16 text-center text-muted-foreground">
-              <Eye className="mb-3 h-8 w-8 opacity-40" />
-              <p className="text-sm">{t("hr.monia.vacio")}</p>
-            </div>
-          ) : (
-            <div className="flex flex-col gap-2">
-              {lista.map((e) => (
-                <FilaEvento
-                  key={e.id}
-                  e={e}
-                  t={t}
-                  actuando={actuando}
-                  onFalta={() => accion(() => marcarFalta(e.id), "hr.monia.faltaMarcada")}
-                  onDescartar={() => accion(() => descartar(e.id), "hr.monia.descartado")}
-                  onNota={() => setNotaDe(e)}
-                  onCorreo={() => setCorreoDe(e)}
-                />
-              ))}
-            </div>
-          )}
+        <div className="mt-5 flex flex-col gap-4">
+          {/* 1) Argos general */}
+          <PanelAjustes t={t} />
+          {/* 2) La voz · 3) Qué avisa (situaciones) */}
+          <ArgosSituacionesPanel />
+          {/* 4) El contexto de la empresa */}
+          <ContextoEmpresaPanel />
         </div>
-
-        {/* Ranking */}
-        <div className="min-w-0"><PanelRanking t={t} /></div>
-      </div>
-      </>
       )}
-
-      <DialogNota
-        evento={notaDe}
-        t={t}
-        onClose={() => setNotaDe(null)}
-        onGuardar={(nota) => accion(() => guardarNota(notaDe!.id, nota), "hr.monia.notaGuardada")}
-      />
-      <DialogCorreo evento={correoDe} t={t} onClose={() => setCorreoDe(null)} />
     </Page>
   );
 }
