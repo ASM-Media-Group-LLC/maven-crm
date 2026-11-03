@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useLanguage } from "@/hooks/useLanguage";
 import { Page } from "@/components/ui/page";
 import { PageHeader } from "@/components/ui/page-header";
-import { SlidersHorizontal, Play, Square, Volume2, Users, Info, Shield, Bot, UserCheck } from "lucide-react";
+import { SlidersHorizontal, Play, Square, Volume2, Users, Info, Shield, Check, X } from "lucide-react";
 import { anunciar } from "@/lib/anunciarVoz";
 import { SITUACIONES_AVISO, GRUPOS_AVISO, type SituacionAviso } from "@/lib/coworkAvisos";
 
@@ -117,9 +117,9 @@ export function ArgosAjustesContenido() {
                         <p className="mt-0.5 text-sm text-muted-foreground">&ldquo;{s.vozEs}&rdquo;</p>
                       </div>
                       <span
-                        className={`inline-flex shrink-0 items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-semibold ${auto ? "bg-primary/15 text-primary" : "bg-muted text-muted-foreground"}`}
+                        className={`inline-flex shrink-0 items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-semibold ${auto ? "bg-success/15 text-success" : "bg-destructive/15 text-destructive"}`}
                       >
-                        {auto ? <Bot className="h-3.5 w-3.5" /> : <UserCheck className="h-3.5 w-3.5" />}
+                        {auto ? <Check className="h-3.5 w-3.5" /> : <X className="h-3.5 w-3.5" />}
                         {auto ? t("hr.argoscentro.tagAuto") : t("hr.argoscentro.tagManual")}
                       </span>
                       <Btn id={s.slug} texto={s.vozEs} />
