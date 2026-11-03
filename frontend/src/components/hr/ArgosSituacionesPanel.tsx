@@ -24,6 +24,9 @@ const VOCES: Array<{ id: string; k: TranslationKey }> = [
   { id: "TxGEqnHWrfWFTfGW9XjX", k: "hr.argosaj.voz.josh" },
 ];
 const FRASE_PRUEBA = "Atención, mensaje de Argos. Comparte tu pantalla, por favor. Recuerda que debe estar visible mientras trabajas.";
+// Al escuchar el mensaje de una situación, {nombre} se reemplaza por este
+// ejemplo para que suene como de verdad.
+const NOMBRE_EJEMPLO = "María";
 
 const ICONO: Record<string, typeof ScreenShare> = {
   sin_pantalla: ScreenShare, camara_apagada: CameraOff, fuera_de_lugar: Coffee, se_fue: UserX,
@@ -32,7 +35,7 @@ const TITULO: Record<string, TranslationKey> = {
   sin_pantalla: "hr.sem.sinPantalla", camara_apagada: "hr.resumen.bajon.camara", fuera_de_lugar: "hr.sem.problema", se_fue: "hr.resumen.bajon.seFue",
 };
 
-function FilaSituacion({ s, t, onGuardar, guardando }: { s: Situacion; t: Tr; onGuardar: (s: Partial<Situacion> & { tipo: string }) => void; guardando: boolean }) {
+function FilaSituacion({ s, t, onGuardar, guardando, onEscuchar, sonando }: { s: Situacion; t: Tr; onGuardar: (s: Partial<Situacion> & { tipo: string }) => void; guardando: boolean; onEscuchar: (tipo: string, mensaje: string) => void; sonando: string | null }) {
   const [local, setLocal] = useState(s);
   useEffect(() => setLocal(s), [s]);
   const Icono = ICONO[s.tipo] ?? ScreenShare;
@@ -51,7 +54,15 @@ function FilaSituacion({ s, t, onGuardar, guardando }: { s: Situacion; t: Tr; on
           <span className="text-xs text-muted-foreground">{t("hr.argosaj.min")}</span>
         </div>
         <div>
-          <p className="mb-1 text-xs text-muted-foreground">{t("hr.argosaj.queDice")}</p>
+          <div className="mb-1 flex items-center justify-between gap-2">
+            <p className="text-xs text-muted-foreground">{t("hr.argosaj.queDice")}</p>
+            {/* Escuchar este mensaje tal como está, con la voz de Argos */}
+            <button type="button" onClick={() => onEscuchar(s.tipo, local.mensaje)} disabled={sonando === `sit:${s.tipo}` || !local.mensaje.trim()}
+              className="inline-flex shrink-0 items-center gap-1 rounded-lg bg-primary/15 px-2 py-1 text-xs font-medium text-primary transition hover:bg-primary/25 disabled:opacity-60">
+              {sonando === `sit:${s.tipo}` ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Play className="h-3.5 w-3.5" />}
+              {t("hr.argosaj.escuchar")}
+            </button>
+          </div>
           <Textarea value={local.mensaje} onChange={(e) => setLocal({ ...local, mensaje: e.target.value })} rows={2} className="text-sm" />
         </div>
         <div className="flex flex-wrap gap-x-4 gap-y-1.5">
@@ -82,13 +93,15 @@ export function ArgosSituacionesPanel() {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   useEffect(() => { if (voz) setVozLocal(voz); }, [voz]);
 
-  // ESCUCHAR una voz: pide el audio a anuncio-tts (ElevenLabs) y lo reproduce.
-  // Si falta la llave, el edge responde no-key y se lo decimos claro.
-  const escuchar = async (voiceId: string) => {
+  // ESCUCHAR: pide el audio a anuncio-tts (ElevenLabs) y lo reproduce. `clave`
+  // identifica qué botón suena (para el spinner); `texto` es lo que se dice (una
+  // frase de prueba al probar la voz, o el mensaje real de una situación). Si
+  // falta la llave, el edge responde no-key y se lo decimos claro.
+  const escuchar = async (clave: string, voiceId: string, texto: string) => {
     if (sonando) { try { audioRef.current?.pause(); } catch { /* noop */ } }
-    setSonando(voiceId);
+    setSonando(clave);
     try {
-      const { data, error } = await supabase.functions.invoke("anuncio-tts", { body: { texto: FRASE_PRUEBA, voiceId } });
+      const { data, error } = await supabase.functions.invoke("anuncio-tts", { body: { texto, voiceId } });
       // Un 503/400 NO llega en `data`: supabase-js lo lanza como error con la
       // Response en error.context. Leemos ese cuerpo para distinguir "no-key"
       // (falta la llave) del resto, y así decirle a Alvaro exactamente qué pasa.
@@ -114,6 +127,12 @@ export function ArgosSituacionesPanel() {
       setSonando(null);
     }
   };
+
+  // Escuchar el MENSAJE de una situación, tal como está escrito (con {nombre}
+  // puesto a un ejemplo), con la voz en español configurada. Así Alvaro oye
+  // exactamente lo que Argos va a decir, aunque aún no lo haya guardado.
+  const escucharSituacion = (tipo: string, mensaje: string) =>
+    escuchar(`sit:${tipo}`, vozLocal.voz_es, mensaje.replaceAll("{nombre}", NOMBRE_EJEMPLO));
 
   const onGuardarSit = async (s: Partial<Situacion> & { tipo: string }) => {
     setGuardandoS(true);
@@ -154,10 +173,10 @@ export function ArgosSituacionesPanel() {
                     {VOCES.map((v) => <option key={v.id} value={v.id}>{t(v.k)}</option>)}
                   </select>
                   {/* Escuchar la voz elegida */}
-                  <button type="button" onClick={() => escuchar(vozLocal[k])} disabled={sonando === vozLocal[k]}
+                  <button type="button" onClick={() => escuchar(`voz:${k}`, vozLocal[k], FRASE_PRUEBA)} disabled={sonando === `voz:${k}`}
                     title={t("hr.argosaj.escuchar")} aria-label={t("hr.argosaj.escuchar")}
                     className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/15 text-primary transition hover:bg-primary/25 disabled:opacity-60">
-                    {sonando === vozLocal[k] ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
+                    {sonando === `voz:${k}` ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
                   </button>
                 </div>
               </div>
@@ -182,7 +201,7 @@ export function ArgosSituacionesPanel() {
             </div>
           </div>
           <div className="flex flex-col gap-3">
-            {situaciones.map((s) => <FilaSituacion key={s.tipo} s={s} t={t} onGuardar={onGuardarSit} guardando={guardandoS} />)}
+            {situaciones.map((s) => <FilaSituacion key={s.tipo} s={s} t={t} onGuardar={onGuardarSit} guardando={guardandoS} onEscuchar={escucharSituacion} sonando={sonando} />)}
           </div>
         </div>
       </section>
