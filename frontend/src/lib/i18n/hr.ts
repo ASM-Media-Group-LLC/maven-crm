@@ -1239,7 +1239,7 @@ export const hr = {
   "hr.argoscentro.editarPronto": { es: "Editar textos, tiempos y on/off llega en el siguiente paso. Esto es la vista para que oigas y veas cómo va.", en: "Editing text, timing and on/off comes next. This is the view so you can hear and see how it's going." },
   "hr.argoscentro.estadoSitN": { es: "{n} situaciones", en: "{n} situations" },
   "hr.argoscentro.catTitle": { es: "El catálogo de Argos", en: "Argos's catalog" },
-  "hr.argoscentro.catSub": { es: "Tu catálogo de Avisar, ahora de Argos. Toca ▶ para oírlo en su voz. «Argos solo» = lo detecta y lo dice sin que nadie apriete; «Supervisor» = lo sigue mandando el supervisor con el botón.", en: "Your Avisar catalog, now Argos's. Tap ▶ to hear it in his voice. “Argos alone” = detects and says it with no one pressing; “Supervisor” = the supervisor still sends it with the button." },
+  "hr.argoscentro.catSub": { es: "Tu catálogo de Avisar, ahora de Argos. Toca ▶ para oírlo en su voz. «Argos solo» = lo detecta y lo dice sin que nadie apriete, y sale del botón Avisar del supervisor (vuelve si apagas Argos en esa sala). «Supervisor» = lo sigue mandando él con el botón.", en: "Your Avisar catalog, now Argos's. Tap ▶ to hear it in his voice. “Argos alone” = detects and says it with no one pressing, and leaves the supervisor's Avisar button (it comes back if you turn Argos off in that room). “Supervisor” = he still sends it with the button." },
   "hr.argoscentro.tagAuto": { es: "Argos solo", en: "Argos alone" },
   "hr.argoscentro.tagManual": { es: "Supervisor", en: "Supervisor" },
 } as const satisfies Record<string, { es: string; en: string }>;
