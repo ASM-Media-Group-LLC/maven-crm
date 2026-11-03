@@ -4,7 +4,7 @@ import { Radio, Loader2, AlertTriangle, RefreshCw, ChevronRight, Sparkles } from
 import { useLanguage } from "@/hooks/useLanguage";
 import { UserAvatar } from "@/components/UserAvatar";
 import { useCapturasVivo } from "@/hooks/useCapturasVivo";
-import { useAtencionHoy } from "@/hooks/useAtencionHoy";
+import { useNotasDia } from "@/hooks/useNotasDia";
 import { useSemaforos, PUNTO_SEM, type Semaforo } from "@/hooks/useSemaforos";
 
 // CONECTADOS AHORA — el TABLERO DE PERSONAL de Argos (Álvaro, 02/11). NO es la
@@ -22,7 +22,7 @@ export function ConectadosAhoraPanel() {
   const { t } = useLanguage();
   const navigate = useNavigate();
   const { personas, cargando, error, refrescar } = useCapturasVivo();
-  const { atencionPor } = useAtencionHoy();
+  const { notasPor } = useNotasDia();
   const { semaforoDe } = useSemaforos();
 
   const labelSem: Record<Semaforo, string> = {
@@ -130,8 +130,8 @@ export function ConectadosAhoraPanel() {
             {orden.map((p) => {
               const nombre = p.nombre || t("hr.noName");
               const sem = semPorPersona.get(p.userId) ?? "gris";
-              const at = atencionPor?.get(p.userId) ?? null;
-              const tonoPct = at == null ? "text-muted-foreground" : at.pct >= 80 ? "text-success" : at.pct >= 60 ? "text-warning" : "text-destructive";
+              const nota = notasPor?.get(p.userId)?.valor ?? null;
+              const tonoNota = nota == null ? "text-muted-foreground" : nota >= 80 ? "text-success" : nota >= 60 ? "text-warning" : "text-destructive";
               return (
                 <button
                   key={p.userId}
@@ -156,10 +156,10 @@ export function ConectadosAhoraPanel() {
                       <Sparkles className="h-3 w-3 shrink-0 opacity-60" />{p.veredicto || t("hr.pantallazos.analizando")}
                     </p>
                   </div>
-                  {/* % de atención de HOY (el número que guía) + hora */}
+                  {/* La NOTA del día (pantalla+cámara+atención+horas) + hora */}
                   <div className="flex shrink-0 flex-col items-end gap-0.5">
-                    <span className={`font-display text-base font-bold leading-none tabular-nums ${tonoPct}`}>
-                      {at ? `${at.pct}%` : "—"}
+                    <span className={`font-display text-base font-bold leading-none tabular-nums ${tonoNota}`}>
+                      {nota ?? "—"}
                     </span>
                     <span className="text-[10px] tabular-nums text-muted-foreground">{horaDe(p.ultima)}</span>
                   </div>
