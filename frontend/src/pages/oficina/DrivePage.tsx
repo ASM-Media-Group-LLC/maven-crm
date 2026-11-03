@@ -5,7 +5,7 @@ import { format } from "date-fns";
 import {
   Building2, ChevronRight, Clock, Download, File, FileArchive, FileImage, FileSpreadsheet, FileText, FileVideo,
   Folder, FolderInput, FolderPlus, HardDrive, History, Info, Loader2, MoreVertical, Pencil, Plus, RotateCcw, Share2, Trash2,
-  Upload, Users, X, AlertTriangle, Check,
+  Upload, Users, X, AlertTriangle, Check, Lock,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Page } from "@/components/ui/page";
@@ -31,7 +31,7 @@ import { useFechasDeArchivos } from "@/hooks/useFechasDeArchivos";
 import { useDirectorioCorreo } from "@/hooks/useDirectorioCorreo";
 import {
   abrirArchivo, leerRutaDrive, SIN_PERMISO_DRIVE, useBorrarParaSiempre, useCrearCarpeta, useCrearUnidad, useDriveVista, useFichaDrive,
-  useRenombrar, useRutaDrive, useSubidasDrive, useTamanosDeCarpetas, useUnidadesConNombre, type DriveItem, type ResultadoDelDrive, type VistaDrive,
+  useRenombrar, useRutaDrive, useCarpetaDelEnlace, useSubidasDrive, useTamanosDeCarpetas, useUnidadesConNombre, type DriveItem, type ResultadoDelDrive, type VistaDrive,
 } from "@/hooks/useDrive";
 import DialogoDeNombre from "@/components/oficina/DialogoDeNombre";
 import PanelDeDetalles, { type ObjetivoDeDetalles } from "@/pages/oficina/drive/PanelDeDetalles";
@@ -111,11 +111,12 @@ export default function DrivePage() {
   const fechas = useFechasDeArchivos();
   const { user } = useAuth();
   const [params, setParams] = useSearchParams();
-  const vista = (VISTAS.find((v) => v.id === params.get("vista"))?.id ?? "mia") as VistaDrive;
+  const vistaDelEnlace = VISTAS.find((v) => v.id === params.get("vista"))?.id as VistaDrive | undefined;
   const carpeta = params.get("carpeta");
 
-  const items = useDriveVista(vista, carpeta);
+  const items = useDriveVista(vistaDelEnlace ?? "mia", carpeta);
   const ruta = useRutaDrive(carpeta);
+  const enlace = useCarpetaDelEnlace(carpeta);
   const directorio = useDirectorioCorreo(true);
   const nombreDe = useMemo(() => {
     const m = new Map((directorio.data ?? []).map((p) => [p.user_id, p.nombre]));
@@ -128,6 +129,10 @@ export default function DrivePage() {
   // no se sabe de dónde viene, «Importado de Google».
   const unidadesConNombre = useUnidadesConNombre();
   const raizDeLaRuta = carpeta ? ruta.data?.[0] : undefined;
+  // Un enlace copiado de la barra trae solo «?carpeta=»: la sección (y la
+  // primera miga) sale de su raíz, no se queda en «Mi unidad» (03/11).
+  const vista: VistaDrive = vistaDelEnlace
+    ?? (carpeta && raizDeLaRuta ? vistaDeLaRaiz(raizDeLaRuta, unidadesConNombre.data, user?.id) : "mia");
   const duenoDe = (i: DriveItem): { texto: string; titulo?: string } => {
     if (i.owner_id) return { texto: nombreDe(i.owner_id) };
     const u = unidadesConNombre.data;
@@ -886,7 +891,24 @@ export default function DrivePage() {
             )}
           </div>
 
-          {items.isLoading ? (
+          {carpeta && enlace.error ? (
+            <div className="flex flex-col items-center justify-center gap-3 px-6 py-14 text-center">
+              <AlertTriangle className="h-10 w-10 text-destructive/70" />
+              <p className="text-sm text-destructive">{t("drive.enlace.error")}: {(enlace.error as Error).message}</p>
+              <Button size="sm" variant="secondary" onClick={() => void enlace.refetch()}>{t("drive.reintentar")}</Button>
+            </div>
+          ) : carpeta && (enlace.data === "sin_acceso" || enlace.data === "papelera") ? (
+            <div className="flex flex-col items-center justify-center gap-3 px-6 py-14 text-center">
+              {enlace.data === "papelera"
+                ? <Trash2 className="h-10 w-10 text-muted-foreground/60" />
+                : <Lock className="h-10 w-10 text-muted-foreground/60" />}
+              <p className="text-base font-medium">{t(enlace.data === "papelera" ? "drive.enlace.papelera" : "drive.enlace.sinAcceso")}</p>
+              <p className="max-w-md text-sm text-muted-foreground">
+                {t(enlace.data === "papelera" ? "drive.enlace.papelera.texto" : "drive.enlace.sinAcceso.texto")}
+              </p>
+              <Button size="sm" variant="secondary" onClick={() => ir("mia")}>{t("drive.enlace.irAMiUnidad")}</Button>
+            </div>
+          ) : items.isLoading || (carpeta && enlace.isLoading) ? (
             <div className="space-y-2 p-4">
               {[0, 1, 2, 3].map((i) => <Skeleton key={i} className="h-9 w-full" />)}
             </div>

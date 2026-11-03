@@ -238,7 +238,9 @@ export async function leerRutaDrive(carpeta: string): Promise<PasoDeRuta[]> {
   const raices = new Set((await unidadesQueVeo()).map((u) => u.item_id));
   let actual: string | null = carpeta;
   for (let i = 0; actual && i < 30; i++) {
-    const { data } = await tabla("drive_items").select("id, nombre, parent_id, owner_id").eq("id", actual).maybeSingle();
+    const { data, error } = await tabla("drive_items").select("id, nombre, parent_id, owner_id").eq("id", actual).maybeSingle();
+    // Un fallo no es «llegué a la raíz» (03/11): se dice, no se cortan las migas.
+    if (error) throw error;
     const f = data as unknown as { id: string; nombre: string; parent_id: string | null; owner_id: string | null } | null;
     if (!f) break;
     ruta.unshift({ id: f.id, nombre: f.nombre, owner_id: f.owner_id });
@@ -246,6 +248,29 @@ export async function leerRutaDrive(carpeta: string): Promise<PasoDeRuta[]> {
     actual = f.parent_id;
   }
   return ruta;
+}
+
+/** Qué pasa con la carpeta de un enlace (Brayan, 03/11: «cada vez que alguien
+ *  comparte un link de drive sale una carpeta en blanco»). La RLS no devuelve
+ *  la ficha si no es tuya ni te la compartieron, y la lista de adentro llega
+ *  vacía: sin esto se veía «Mi unidad · Esta carpeta está vacía». */
+export type EstadoDelEnlace = "ok" | "papelera" | "sin_acceso";
+export function estadoDelEnlace(fila: { trashed_at: string | null } | null): EstadoDelEnlace {
+  if (!fila) return "sin_acceso";
+  return fila.trashed_at ? "papelera" : "ok";
+}
+
+export function useCarpetaDelEnlace(carpeta: string | null) {
+  return useQuery({
+    queryKey: ["drive-ruta", "enlace", carpeta],
+    enabled: !!carpeta,
+    staleTime: 60_000,
+    queryFn: async (): Promise<EstadoDelEnlace> => {
+      const { data, error } = await tabla("drive_items").select("id, trashed_at").eq("id", carpeta!).maybeSingle();
+      if (error) throw error;
+      return estadoDelEnlace(data as unknown as { trashed_at: string | null } | null);
+    },
+  });
 }
 
 export function useRutaDrive(carpeta: string | null) {
