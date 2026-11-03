@@ -168,6 +168,7 @@ const HRMonitoring = lazy(() => import("./pages/hr/HRMonitoring"));
 const HRMonitorIA = lazy(() => import("./pages/hr/HRMonitorIA"));
 const HRExpediente = lazy(() => import("./pages/hr/HRExpediente"));
 const ArgosComparativo = lazy(() => import("./pages/hr/ArgosComparativo"));
+const ArgosAjustes = lazy(() => import("./pages/hr/ArgosAjustes"));
 const HRDirectoryLookup = lazy(() => import("./pages/hr/HRDirectoryLookup"));
 const HROrganigrama = lazy(() => import("./pages/hr/HROrganigrama"));
 const HRDeductions = lazy(() => import("./pages/hr/HRDeductions"));
@@ -437,6 +438,7 @@ const App = () => (
                 <Route path="/hr/monitor-ia" element={<PermissionRoute module="HR" submodule="Monitor IA" soloDueno><HRLayout><HRMonitorIA /></HRLayout></PermissionRoute>} />
                 <Route path="/hr/expediente/:userId" element={<PermissionRoute module="HR" submodule="Monitor IA" soloDueno><HRLayout><HRExpediente /></HRLayout></PermissionRoute>} />
                 <Route path="/hr/argos-comparativo" element={<PermissionRoute module="HR" submodule="Monitor IA" soloDueno><HRLayout><ArgosComparativo /></HRLayout></PermissionRoute>} />
+                <Route path="/hr/argos-ajustes" element={<PermissionRoute module="HR" submodule="Monitor IA" soloDueno><HRLayout><ArgosAjustes /></HRLayout></PermissionRoute>} />
                 <Route path="/hr/organizacion/directorio" element={<PermissionRoute module="HR" submodule="Directorio"><HRLayout><HRDirectoryLookup /></HRLayout></PermissionRoute>} />
                 <Route path="/hr/organizacion/organigrama" element={<PermissionRoute module="HR" submodule="Organigrama"><HRLayout><HROrganigrama /></HRLayout></PermissionRoute>} />
                 <Route path="/hr/deducciones" element={<PermissionRoute module="HR" submodule="Deducciones"><HRLayout><HRDeductions /></HRLayout></PermissionRoute>} />
