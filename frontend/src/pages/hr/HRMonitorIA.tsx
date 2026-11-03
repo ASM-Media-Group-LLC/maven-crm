@@ -33,6 +33,7 @@ import { PantallazosVivoPanel } from "@/components/hr/PantallazosVivoPanel";
 import { ContextoEmpresaPanel } from "@/components/hr/ContextoEmpresaPanel";
 import { AtencionAhoraPanel } from "@/components/hr/AtencionAhoraPanel";
 import { ResumenDiaPanel } from "@/components/hr/ResumenDiaPanel";
+import { ArgosSituacionesPanel } from "@/components/hr/ArgosSituacionesPanel";
 import { LABEL_FALTA, type FaltaTipo } from "@/lib/monitorFaltas";
 import type { TranslationKey } from "@/lib/i18n";
 
@@ -459,6 +460,9 @@ export default function HRMonitorIA() {
       </div>
 
       <div className="mt-4"><PanelAjustes t={t} /></div>
+
+      {/* La VOZ de Argos y qué dice en cada situación, editable por el dueño. */}
+      <div className="mt-4"><ArgosSituacionesPanel /></div>
 
       {/* El contexto de la empresa para Argos: qué sistemas son trabajo y cuáles
           fuera de lugar. Argos juzga el sistema, no el contenido. */}
