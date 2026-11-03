@@ -132,7 +132,7 @@ export function ArgosSituacionesPanel() {
   // puesto a un ejemplo), con la voz en español configurada. Así Alvaro oye
   // exactamente lo que Argos va a decir, aunque aún no lo haya guardado.
   const escucharSituacion = (tipo: string, mensaje: string) =>
-    escuchar(`sit:${tipo}`, vozLocal.voz_es, mensaje.replaceAll("{nombre}", NOMBRE_EJEMPLO));
+    escuchar(`sit:${tipo}`, vozLocal.voz_es, mensaje.replace(/\{nombre\}/g, NOMBRE_EJEMPLO));
 
   const onGuardarSit = async (s: Partial<Situacion> & { tipo: string }) => {
     setGuardandoS(true);
