@@ -113,9 +113,12 @@ export function ArgosAjustesContenido() {
               key={s.voz}
               className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-2xl border border-border/60 bg-background/40 px-4 py-3"
             >
-              <span className="w-6 shrink-0 text-sm font-semibold text-muted-foreground">{i + 1}</span>
-              <span className="min-w-0 flex-1 text-sm text-foreground">{t(s.label)}</span>
-              <span className="inline-flex items-center gap-1 rounded-full bg-success/15 px-2.5 py-0.5 text-xs font-semibold text-success">
+              <span className="w-6 shrink-0 self-start pt-0.5 text-sm font-semibold text-muted-foreground">{i + 1}</span>
+              <div className="min-w-0 flex-1">
+                <p className="text-xs font-semibold text-muted-foreground">{t(s.label)}</p>
+                <p className="mt-0.5 text-sm text-foreground">&ldquo;{fraseEs(s.voz)}&rdquo;</p>
+              </div>
+              <span className="inline-flex shrink-0 items-center gap-1 self-start rounded-full bg-success/15 px-2.5 py-0.5 text-xs font-semibold text-success">
                 {t("hr.argoscentro.sitActiva")}
               </span>
               <Btn id={`s${i}`} voz={s.voz} />
