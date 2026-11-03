@@ -25,6 +25,9 @@ verify_jwt = true  # solo cron (X-Cron-Token); mueve el buzón al NAS
 [functions.argos-foto]
 verify_jwt = true  # dueño con sesión, o cron para autoprueba; sirve la foto desde el NAS
 
+[functions.argos-cierre-turno]
+verify_jwt = true  # dueño con sesión (modo prueba), o cron; correo diario de cierre de turno
+
 # Gestión de API keys (solo-admin). verify_jwt=false: valida el JWT + rol admin adentro.
 [functions.manage-api-keys]
 verify_jwt = false
