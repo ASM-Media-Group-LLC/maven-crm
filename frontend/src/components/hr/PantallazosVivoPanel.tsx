@@ -97,11 +97,11 @@ export function PantallazosVivoPanel() {
           </div>
         ) : modo === "muralla" ? (
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-            {personas.map((p) => <CardMuralla key={p.userId} p={p} t={t} hace={hace} sem={semaforoDe(p.userId, p.fueraDeLugar, p.veredicto)} onClick={() => irA(p.userId)} />)}
+            {personas.map((p) => <CardMuralla key={p.userId} p={p} t={t} hace={hace} sem={semaforoDe(p.userId, p.fueraDeLugar, p.veredicto, p.tienePantalla)} onClick={() => irA(p.userId)} />)}
           </div>
         ) : (
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 2xl:grid-cols-6">
-            {personas.map((p) => <CeldaCuadricula key={p.userId} p={p} t={t} sem={semaforoDe(p.userId, p.fueraDeLugar, p.veredicto)} onClick={() => irA(p.userId)} />)}
+            {personas.map((p) => <CeldaCuadricula key={p.userId} p={p} t={t} sem={semaforoDe(p.userId, p.fueraDeLugar, p.veredicto, p.tienePantalla)} onClick={() => irA(p.userId)} />)}
           </div>
         )}
       </div>

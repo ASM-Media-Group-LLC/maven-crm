@@ -4,7 +4,6 @@ import { Radio, Loader2, AlertTriangle, RefreshCw, ChevronRight, Sparkles } from
 import { useLanguage } from "@/hooks/useLanguage";
 import { UserAvatar } from "@/components/UserAvatar";
 import { useCapturasVivo } from "@/hooks/useCapturasVivo";
-import { useNotasDia } from "@/hooks/useNotasDia";
 import { useSemaforos, PUNTO_SEM, type Semaforo } from "@/hooks/useSemaforos";
 
 // CONECTADOS AHORA — el TABLERO DE PERSONAL de Argos (Álvaro, 02/11). NO es la
@@ -22,7 +21,6 @@ export function ConectadosAhoraPanel() {
   const { t } = useLanguage();
   const navigate = useNavigate();
   const { personas, cargando, error, refrescar } = useCapturasVivo();
-  const { notasPor } = useNotasDia();
   const { semaforoDe } = useSemaforos();
 
   const labelSem: Record<Semaforo, string> = {
@@ -37,7 +35,7 @@ export function ConectadosAhoraPanel() {
   // para guiarse rápido (p.ej. ver solo los rojos). Cada persona ya trae su
   // semáforo; contamos cuántos hay de cada color para las pastillas.
   const [filtro, setFiltro] = useState<Semaforo | "todos">("todos");
-  const semPorPersona = useMemo(() => new Map(personas.map((p) => [p.userId, semaforoDe(p.userId, p.fueraDeLugar, p.veredicto)])), [personas, semaforoDe]);
+  const semPorPersona = useMemo(() => new Map(personas.map((p) => [p.userId, semaforoDe(p.userId, p.fueraDeLugar, p.veredicto, p.tienePantalla)])), [personas, semaforoDe]);
   const conteo = useMemo(() => {
     const c: Record<Semaforo, number> = { verde: 0, amarillo: 0, naranja: 0, rojo: 0, gris: 0 };
     for (const s of semPorPersona.values()) c[s]++;
@@ -130,8 +128,8 @@ export function ConectadosAhoraPanel() {
             {orden.map((p) => {
               const nombre = p.nombre || t("hr.noName");
               const sem = semPorPersona.get(p.userId) ?? "gris";
-              const nota = notasPor?.get(p.userId)?.valor ?? null;
-              const tonoNota = nota == null ? "text-muted-foreground" : nota >= 80 ? "text-success" : nota >= 60 ? "text-warning" : "text-destructive";
+              const estado = sem === "verde" ? t("hr.sem.trabajando") : sem === "amarillo" ? t("hr.sem.pausa") : sem === "naranja" ? t("hr.sem.sinPantalla") : sem === "rojo" ? t("hr.sem.problema") : t("hr.sem.esperando");
+              const tonoEstado = sem === "verde" ? "text-success" : sem === "amarillo" ? "text-warning" : sem === "naranja" ? "text-orange-500" : sem === "rojo" ? "text-destructive" : "text-muted-foreground";
               return (
                 <button
                   key={p.userId}
@@ -156,11 +154,9 @@ export function ConectadosAhoraPanel() {
                       <Sparkles className="h-3 w-3 shrink-0 opacity-60" />{p.veredicto || t("hr.pantallazos.analizando")}
                     </p>
                   </div>
-                  {/* La NOTA del día (pantalla+cámara+atención+horas) + hora */}
+                  {/* El estado EN VIVO en palabras + la hora del último pantallazo */}
                   <div className="flex shrink-0 flex-col items-end gap-0.5">
-                    <span className={`font-display text-base font-bold leading-none tabular-nums ${tonoNota}`}>
-                      {nota ?? "—"}
-                    </span>
+                    <span className={`text-xs font-semibold ${tonoEstado}`}>{estado}</span>
                     <span className="text-[10px] tabular-nums text-muted-foreground">{horaDe(p.ultima)}</span>
                   </div>
                   <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground transition group-hover:translate-x-0.5 group-hover:text-foreground" />

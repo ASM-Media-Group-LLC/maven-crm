@@ -1,15 +1,17 @@
 import { useMemo } from "react";
 import { useAtencionAhora, type TipoAlerta } from "@/hooks/useAtencionAhora";
 
-// EL SEMÁFORO de Argos, en un solo lugar (Álvaro, 02/11), para que Conectados
-// ahora y Pantallazos en vivo lo pinten IGUAL. Cinco estados, cada uno una cosa
-// DISTINTA (el error era mezclar "no comparte pantalla" con "está en ocio"):
-//   🟢 verde    — juzgada por la IA y en lo suyo (trabajando)
+// EL SEMÁFORO EN VIVO de Argos, en un solo lugar (Álvaro, 02/11), para que
+// Conectados ahora y Pantallazos en vivo lo pinten IGUAL. Es el estado de ESTE
+// instante, no del día. Cinco estados:
+//   🟢 verde    — COMPARTE PANTALLA ahora Y está en lo suyo (trabajando bien)
 //   🟡 amarillo — en pausa (baño/break): ojo, pero no es grave
-//   🟠 naranja  — no comparte pantalla / sin señal / sin cámara: Argos NO puede
-//                 ver (punto ciego a resolver), ≠ estar en ocio
+//   🟠 naranja  — NO comparte pantalla ahora (o sin señal/cámara): hay que
+//                 exigirle que comparta; ≠ estar en ocio
 //   🔴 rojo     — de verdad fuera de lugar: ocio (YouTube, redes), celular, no mira
-//   ⚪ gris     — Argos aún no la juzga
+//   ⚪ gris     — comparte pantalla pero Argos aún no la juzga
+// REGLA (Alvaro): sin compartir pantalla NO puede ser verde, aunque lo que haga
+// sea trabajo. Compartir pantalla es el requisito para el verde.
 
 export type Semaforo = "verde" | "amarillo" | "naranja" | "rojo" | "gris";
 
@@ -41,13 +43,15 @@ export function useSemaforos() {
     return m;
   }, [enAtencion]);
 
+  // tienePantalla = comparte pantalla AHORA (su pantallazo reciente la trae).
+  // Sin pantalla nunca es verde: cae a naranja (hay que exigirla).
   const semaforoDe = useMemo(
     () =>
-      (userId: string, fueraDeLugar: boolean | null, veredicto: string | null): Semaforo => {
+      (userId: string, fueraDeLugar: boolean | null, veredicto: string | null, tienePantalla: boolean): Semaforo => {
         const clase = clasePor.get(userId);
         if (fueraDeLugar === true || clase === "ocio") return "rojo";
-        if (clase === "cobertura") return "naranja";
-        if (clase === "leve") return "amarillo";
+        if (clase === "leve") return "amarillo"; // pausa (baño/break) manda sobre "sin pantalla"
+        if (clase === "cobertura" || !tienePantalla) return "naranja";
         return veredicto ? "verde" : "gris";
       },
     [clasePor],
