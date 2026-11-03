@@ -11,7 +11,6 @@
 
 import { supabase, SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY } from "@/integrations/supabase/client";
 import { hablar } from "./voz";
-import { CLIPS_VOZ } from "./clipsVoz";
 
 /** Cuando el servidor dice que no hay clave, dejamos de preguntarle en esta
  *  sesión y vamos directo a la voz del navegador: nada de un round-trip ocioso
@@ -24,33 +23,15 @@ let audioActual: HTMLAudioElement | null = null;
 
 const TIMEOUT_MS = 8000;
 
-/** Reproduce un audio (clip pregrabado o URL del servidor). Resuelve cuando
- *  ARRANCA; rechaza si no pudo (archivo/caché roto, autoplay bloqueado) para que
- *  el que llama caiga al servidor o a la voz del navegador. */
-function reproducir(url: string, volumen?: number): Promise<void> {
-  return new Promise((resolve, reject) => {
-    try { audioActual?.pause(); } catch { /* noop */ }
-    const a = new Audio(url);
-    a.volume = volumen ?? 0.9;
-    audioActual = a;
-    a.onerror = () => reject(new Error("audio"));
-    a.play().then(() => resolve()).catch(reject);
-  });
-}
-
 export async function anunciar(texto: string, opciones?: { volumen?: number; voiceId?: string }): Promise<void> {
   const frase = (texto ?? "").trim();
   if (!frase) return;
 
-  // 1) Audio pregrabado (voz Mario empacada con la app): no depende de clave,
-  //    servidor ni internet. Si el texto tiene clip, suena ese y listo. PERO si
-  //    se pidió una VOZ específica (voiceId), se salta el clip: el clip es Mario
-  //    y aquí se quiere oír la otra voz (p. ej. probar una voz nueva de Argos).
-  const clip = opciones?.voiceId ? undefined : CLIPS_VOZ[frase];
-  if (clip) {
-    try { await reproducir(clip, opciones?.volumen); return; }
-    catch { /* si el clip falla, seguimos al servidor o al navegador */ }
-  }
+  // 1) Audio pregrabado (CLIPS_VOZ): DESHABILITADO a propósito. Esos clips están
+  //    grabados con la voz vieja (Mario) y la voz del sistema ahora es Javi
+  //    (announcement_overrides). Mientras no se regeneren en Javi, TODO va al
+  //    servidor —que ya devuelve Javi— para que el piso suene consistente; y si
+  //    el servidor falla, sigue cayendo a la voz del navegador más abajo.
 
   if (sinClaveEnServidor) { hablar(frase, opciones); return; }
 
