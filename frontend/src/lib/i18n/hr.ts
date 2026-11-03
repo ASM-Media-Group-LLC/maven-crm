@@ -1195,4 +1195,18 @@ export const hr = {
   "hr.monia.cmp.n.inactivo": { es: "Inactivo mucho rato", en: "Idle for a while" },
   "hr.monia.cmp.n.pausas": { es: "Abusa de pausas: muchas seguidas", en: "Too many breaks in a row" },
   "hr.monia.cmp.iaTag": { es: "IA", en: "AI" },
+  // Sección "Óyelo": play de cada situación con la voz de ahora y la de Argos.
+  "hr.monia.cmp.oyeTitle": { es: "Óyelo: cada situación, ahora y con Argos", en: "Hear it: each situation, now and with Argos" },
+  "hr.monia.cmp.oyeSub": { es: "Dale play. «Ahora» es la voz robótica del coordinador; «Argos» es la voz del sistema (hoy Mario, la cambiaremos por la que elijas).", en: "Press play. “Now” is the coordinator's robotic voice; “Argos” is the system voice (Mario today, we'll swap it for the one you pick)." },
+  "hr.monia.cmp.playAhora": { es: "Ahora", en: "Now" },
+  "hr.monia.cmp.playArgos": { es: "Argos", en: "Argos" },
+  // Frases HABLADAS (la voz siempre va en español, es-419). Nombre de ejemplo: María.
+  "hr.monia.cmp.voz.camara": { es: "María tiene la cámara apagada y no marcó pausa.", en: "Maria has her camera off and didn't mark a break." },
+  "hr.monia.cmp.voz.rostro": { es: "María no está frente a la cámara.", en: "Maria is not in front of the camera." },
+  "hr.monia.cmp.voz.cuadro": { es: "María está fuera de cuadro.", en: "Maria is out of frame." },
+  "hr.monia.cmp.voz.luz": { es: "María no tiene luz suficiente.", en: "Maria doesn't have enough light." },
+  "hr.monia.cmp.voz.pantalla": { es: "María lleva 8 minutos sin compartir pantalla.", en: "Maria has gone 8 minutes without sharing her screen." },
+  "hr.monia.cmp.voz.bano": { es: "María lleva 5 minutos pasado de su baño.", en: "Maria is 5 minutes over her bathroom break." },
+  "hr.monia.cmp.voz.break": { es: "María lleva 5 minutos pasado de su break.", en: "Maria is 5 minutes over her break." },
+  "hr.monia.cmp.voz.almuerzo": { es: "María lleva 10 minutos pasado de su almuerzo.", en: "Maria is 10 minutes over her lunch." },
 } as const satisfies Record<string, { es: string; en: string }>;
