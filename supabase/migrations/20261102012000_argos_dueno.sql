@@ -22,9 +22,16 @@ as $$
   select exists (select 1 from public.tenant_owners o where o.user_id = _user_id)
 $$;
 
-insert into public.tenant_owners (tenant_id, user_id) values
-  ('30869615-f579-4981-8a1f-dbebc61eae2d', 'fcdfdfcb-c0ab-4c82-b6d9-d50d37ab086e'), -- Alvaro René
-  ('30869615-f579-4981-8a1f-dbebc61eae2d', '528453bd-f1e1-43d3-85c1-01c5fa5bbcfb')  -- Alvaro Stephan Mejía
+-- Los dueños de hoy. Se siembra fila por fila SOLO si el tenant existe, para que
+-- la migración cargue también en una base limpia (el guard de banco PGlite no
+-- tiene los datos de producción) sin violar la FK a public.tenants.
+insert into public.tenant_owners (tenant_id, user_id)
+select t.tenant_id, t.user_id
+from (values
+  ('30869615-f579-4981-8a1f-dbebc61eae2d'::uuid, 'fcdfdfcb-c0ab-4c82-b6d9-d50d37ab086e'::uuid), -- Alvaro René
+  ('30869615-f579-4981-8a1f-dbebc61eae2d'::uuid, '528453bd-f1e1-43d3-85c1-01c5fa5bbcfb'::uuid)  -- Alvaro Stephan Mejía
+) as t(tenant_id, user_id)
+where exists (select 1 from public.tenants where id = t.tenant_id)
 on conflict do nothing;
 
 alter policy monitor_capturas_sel_supervisor on public.monitor_capturas
