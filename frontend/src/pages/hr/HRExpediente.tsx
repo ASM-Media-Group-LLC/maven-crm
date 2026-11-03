@@ -139,7 +139,7 @@ function TiraDelDia({ capturas, t }: { capturas: CapturaDia[]; t: Tr }) {
     <div className="flex flex-col gap-5">
       {grupos.map((g) => (
         <div key={g.hora}>
-          <p className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">{g.hora}</p>
+          <p className="mb-2 text-xs font-semibold text-muted-foreground">{g.hora}</p>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-5">
             {g.items.map((m) => {
               const urlP = m.pantalla ? urls[claveFoto(m.pantalla)!] : undefined;
@@ -165,11 +165,11 @@ function TiraDelDia({ capturas, t }: { capturas: CapturaDia[]; t: Tr }) {
                     ) : (
                       <div className="flex h-full w-full flex-col items-center justify-center gap-1 bg-muted/30 text-muted-foreground">
                         <ScreenShareOff className="h-5 w-5 opacity-60" />
-                        <span className="text-[9px] font-medium uppercase tracking-wide">{t("hr.exp.sinPantalla")}</span>
+                        <span className="text-[9px] font-medium">{t("hr.exp.sinPantalla")}</span>
                       </div>
                     )}
                     {/* ESQUINA: la cámara; si estaba apagada, una X roja */}
-                    <div className="absolute bottom-1 right-1 h-11 w-16 overflow-hidden rounded-md border-2 border-background/80 shadow-md">
+                    <div className="absolute bottom-1 right-1 h-11 w-16 overflow-hidden rounded-control border-2 border-background/80 shadow-md">
                       {m.camara ? (
                         urlC ? (
                           <img src={urlC} alt="" loading="lazy" className="h-full w-full object-cover" />
@@ -216,7 +216,7 @@ function TiraDelDia({ capturas, t }: { capturas: CapturaDia[]; t: Tr }) {
                     {m.pantalla ? (
                       urlP ? <img src={urlP} alt="" className="h-full w-full object-contain" /> : <div className="flex h-full w-full items-center justify-center text-muted-foreground"><Loader2 className="h-6 w-6 animate-spin" /></div>
                     ) : (
-                      <div className="flex h-full w-full flex-col items-center justify-center gap-2 text-muted-foreground"><ScreenShareOff className="h-9 w-9 opacity-60" /><span className="text-xs font-semibold uppercase tracking-wide">{t("hr.exp.sinPantalla")}</span></div>
+                      <div className="flex h-full w-full flex-col items-center justify-center gap-2 text-muted-foreground"><ScreenShareOff className="h-9 w-9 opacity-60" /><span className="text-xs font-semibold">{t("hr.exp.sinPantalla")}</span></div>
                     )}
                     {/* 1 Pantalla + su hora */}
                     <span className="absolute left-2.5 top-2.5 inline-flex items-center gap-2 rounded-lg bg-black/60 px-2.5 py-1.5 text-xs font-semibold text-white backdrop-blur-sm">
@@ -234,7 +234,7 @@ function TiraDelDia({ capturas, t }: { capturas: CapturaDia[]; t: Tr }) {
                         {m.camara ? (
                           urlC ? <img src={urlC} alt="" className="h-full w-full object-cover" /> : <div className="flex h-full w-full items-center justify-center text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /></div>
                         ) : (
-                          <div className="flex h-full w-full flex-col items-center justify-center gap-1 text-destructive"><CameraOff className="h-5 w-5" /><span className="text-[9px] font-semibold uppercase">{t("hr.exp.camaraApagada")}</span></div>
+                          <div className="flex h-full w-full flex-col items-center justify-center gap-1 text-destructive"><CameraOff className="h-5 w-5" /><span className="text-[9px] font-semibold">{t("hr.exp.camaraApagada")}</span></div>
                         )}
                         <span className="absolute left-1.5 top-1.5 inline-flex items-center gap-1 rounded bg-black/60 px-1.5 py-0.5 text-[10px] font-semibold text-white backdrop-blur-sm">
                           <span className="flex h-4 w-4 items-center justify-center rounded-full bg-primary text-[9px] text-primary-foreground">2</span>{t("hr.exp.camara")}{hc && <span className="font-normal tabular-nums opacity-75">· {hc}</span>}
@@ -368,10 +368,12 @@ export default function HRExpediente() {
           {verCalendario && (
             <div className="mt-4 rounded-2xl border border-border/40 bg-card/30 p-3">
               <p className="mb-2 text-center text-xs capitalize text-muted-foreground">{mesTexto}</p>
-              <div className="mb-1 grid grid-cols-7 gap-1 text-center text-[10px] font-semibold uppercase text-muted-foreground">
+              {/* Calendario: 7 columnas = los 7 días de la semana, a propósito en
+                  toda anchura (en móvil las celdas quedan chicas pero caben). */}
+              <div className="mb-1 grid grid-cols-7 gap-1 text-center text-[10px] font-semibold text-muted-foreground sm:grid-cols-7">
                 {["L", "M", "M", "J", "V", "S", "D"].map((d, i) => <div key={i}>{d}</div>)}
               </div>
-              <div className="grid grid-cols-7 gap-1">
+              <div className="grid grid-cols-7 gap-1 sm:grid-cols-7">
                 {celdas.map((f, i) => {
                   if (!f) return <div key={i} />;
                   const d = expediente?.dias.get(f);
@@ -395,7 +397,7 @@ export default function HRExpediente() {
           <div className="mt-4 grid grid-cols-3 gap-2 sm:grid-cols-5">
             <div className={`rounded-panel border p-2.5 text-center ${c ? c.bg : "border-border/40 bg-card/40"}`}>
               <div className={`font-display text-lg font-bold tabular-nums ${c?.tx ?? ""}`}>{dia.nota.valor ?? "—"}</div>
-              <div className="text-[10px] uppercase tracking-wide text-muted-foreground">{t("hr.exp.nota")}</div>
+              <div className="text-[10px] text-muted-foreground">{t("hr.exp.nota")}</div>
             </div>
             {/* % de atención del día: el sí-o-no con número */}
             <div
@@ -403,19 +405,19 @@ export default function HRExpediente() {
               title={atencion ? t("hr.exp.atencionDetalle", { ok: atencion.ok, n: atencion.n }) : undefined}
             >
               <div className={`font-display text-lg font-bold tabular-nums ${tonoAt}`}>{atencion ? `${atencion.pct}%` : "—"}</div>
-              <div className="text-[10px] uppercase tracking-wide text-muted-foreground">{t("hr.exp.atencion")}</div>
+              <div className="text-[10px] text-muted-foreground">{t("hr.exp.atencion")}</div>
             </div>
             <div className="rounded-panel border border-border/40 bg-card/40 p-2.5 text-center">
               <div className="font-display text-lg font-bold tabular-nums">{dia.horas.toFixed(1)}h</div>
-              <div className="text-[10px] uppercase tracking-wide text-muted-foreground">{t("hr.exp.horas")}</div>
+              <div className="text-[10px] text-muted-foreground">{t("hr.exp.horas")}</div>
             </div>
             <div className="rounded-panel border border-border/40 bg-card/40 p-2.5 text-center">
               <div className="font-display text-lg font-bold tabular-nums">{dia.faltas.length}</div>
-              <div className="text-[10px] uppercase tracking-wide text-muted-foreground">{t("hr.exp.faltas")}</div>
+              <div className="text-[10px] text-muted-foreground">{t("hr.exp.faltas")}</div>
             </div>
             <div className="rounded-panel border border-border/40 bg-card/40 p-2.5 text-center">
               <div className="font-display text-lg font-bold tabular-nums">{Math.round(dia.minutosPausaDeMas)}m</div>
-              <div className="text-[10px] uppercase tracking-wide text-muted-foreground">{t("hr.exp.pausas")}</div>
+              <div className="text-[10px] text-muted-foreground">{t("hr.exp.pausas")}</div>
             </div>
           </div>
         </div>
@@ -424,7 +426,7 @@ export default function HRExpediente() {
       {/* La tira de pantallazos del día (Hubstaff) */}
       <section className="vidrio sube mt-5 p-4 lg:p-5" style={{ animationDelay: "0.05s" }}>
         <div className="v-cont">
-          <p className="mb-3 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+          <p className="mb-3 flex items-center gap-1.5 text-xs font-semibold text-muted-foreground">
             <ScreenShare className="h-3.5 w-3.5" />{t("hr.exp.pantallazosDia")}
           </p>
           {error ? (
@@ -438,7 +440,7 @@ export default function HRExpediente() {
           {/* Faltas del día, si hay */}
           {dia.faltas.length > 0 && (
             <div className="mt-5 border-t border-border/40 pt-4">
-              <p className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">{t("hr.exp.faltas")}</p>
+              <p className="mb-2 text-xs font-semibold text-muted-foreground">{t("hr.exp.faltas")}</p>
               <div className="flex flex-col gap-1.5">
                 {dia.faltas.slice(0, 20).map((f) => {
                   const lbl = LABEL_FALTA[f.tipo as FaltaTipo];
