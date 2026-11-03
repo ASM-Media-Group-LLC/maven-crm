@@ -1121,14 +1121,12 @@ export const hr = {
   "hr.resumen.bajon.seFue": { es: "Se fue de cámara", en: "Left the camera" },
   "hr.resumen.bajon.sinSenal": { es: "Sin señal", en: "No signal" },
   "hr.resumen.bajon.pausa": { es: "Pausa de más", en: "Break overrun" },
-  "hr.exp.volverArgos": { es: "Volver a Argos", en: "Back to Argos" },
   // ── Ajustes de Argos: voz y situaciones ──
   "hr.argosaj.vozTitulo": { es: "La voz de Argos", en: "Argos's voice" },
   "hr.argosaj.vozSub": { es: "Cómo habla Argos cuando avisa una situación", en: "How Argos speaks when it reports a situation" },
   "hr.argosaj.vozEs": { es: "Voz en español", en: "Spanish voice" },
   "hr.argosaj.vozEn": { es: "Voz en inglés", en: "English voice" },
   "hr.argosaj.intro": { es: "Intro de locutora: «Atención, mensaje de Argos» antes de hablar", en: "Announcer intro: “Attention, message from Argos” before speaking" },
-  "hr.argosaj.notaLlave": { es: "El audio suena cuando esté puesta la llave de ElevenLabs. El escuchar ▶ se activa con la llave.", en: "Audio plays once the ElevenLabs key is set. The ▶ preview turns on with the key." },
   "hr.argosaj.guardarVoz": { es: "Guardar voz", en: "Save voice" },
   "hr.argosaj.sitTitulo": { es: "Qué avisa Argos", en: "What Argos reports" },
   "hr.argosaj.sitSub": { es: "Cada situación: cuándo avisa, qué dice y a quién", en: "Each situation: when it alerts, what it says and to whom" },
@@ -1148,4 +1146,7 @@ export const hr = {
   "hr.argosaj.voz.adam": { es: "Adam — neutro profesional", en: "Adam — neutral, professional" },
   "hr.argosaj.voz.arnold": { es: "Arnold — fuerte, de jefe", en: "Arnold — strong, boss-like" },
   "hr.argosaj.voz.josh": { es: "Josh — joven, cercano", en: "Josh — young, friendly" },
+  "hr.argosaj.escuchar": { es: "Escuchar esta voz", en: "Listen to this voice" },
+  "hr.argosaj.faltaLlave": { es: "Falta la llave de ElevenLabs — ponla en Supabase", en: "ElevenLabs key missing — add it in Supabase" },
+  "hr.argosaj.sinVoz": { es: "No se pudo generar la voz", en: "Couldn't generate the voice" },
 } as const satisfies Record<string, { es: string; en: string }>;
