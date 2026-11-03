@@ -48,6 +48,11 @@ const OIR: Array<{ label: TranslationKey; voz: TranslationKey }> = [
 const dict = translations as unknown as Record<string, { es: string; en: string }>;
 const fraseEs = (k: TranslationKey): string => dict[k]?.es ?? "";
 
+// La voz que se está probando para Argos en esta página: Javi Rojas (España,
+// pulida y con autoridad), id de ElevenLabs. El botón ▶ Argos la usa en vez de
+// Mario. Cuando se decida, se fija como voz del sistema en Ajustes de Argos.
+const VOZ_ARGOS = "aYbngTsp5kp0sibI3Z0T";
+
 export default function ArgosComparativo() {
   const { t } = useLanguage();
   // `${modo}:${vozKey}` de lo que suena ahora, para marcar el botón.
@@ -69,7 +74,7 @@ export default function ArgosComparativo() {
     const id = `argos:${voz}`;
     if (sonando === id) { setSonando(null); return; }
     setSonando(id);
-    try { await anunciar(fraseEs(voz)); } catch { /* cae solo a la del navegador */ }
+    try { await anunciar(fraseEs(voz), { voiceId: VOZ_ARGOS }); } catch { /* cae solo a la del navegador */ }
     setSonando((s) => (s === id ? null : s));
   }
 

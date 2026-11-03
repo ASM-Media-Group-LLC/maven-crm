@@ -38,13 +38,15 @@ function reproducir(url: string, volumen?: number): Promise<void> {
   });
 }
 
-export async function anunciar(texto: string, opciones?: { volumen?: number }): Promise<void> {
+export async function anunciar(texto: string, opciones?: { volumen?: number; voiceId?: string }): Promise<void> {
   const frase = (texto ?? "").trim();
   if (!frase) return;
 
   // 1) Audio pregrabado (voz Mario empacada con la app): no depende de clave,
-  //    servidor ni internet. Si el texto tiene clip, suena ese y listo.
-  const clip = CLIPS_VOZ[frase];
+  //    servidor ni internet. Si el texto tiene clip, suena ese y listo. PERO si
+  //    se pidió una VOZ específica (voiceId), se salta el clip: el clip es Mario
+  //    y aquí se quiere oír la otra voz (p. ej. probar una voz nueva de Argos).
+  const clip = opciones?.voiceId ? undefined : CLIPS_VOZ[frase];
   if (clip) {
     try { await reproducir(clip, opciones?.volumen); return; }
     catch { /* si el clip falla, seguimos al servidor o al navegador */ }
@@ -68,7 +70,7 @@ export async function anunciar(texto: string, opciones?: { volumen?: number }): 
           "apikey": SUPABASE_PUBLISHABLE_KEY,
           "Authorization": `Bearer ${token}`,
         },
-        body: JSON.stringify({ texto: frase }),
+        body: JSON.stringify({ texto: frase, ...(opciones?.voiceId ? { voiceId: opciones.voiceId } : {}) }),
         signal: ctrl.signal,
       });
     } finally {

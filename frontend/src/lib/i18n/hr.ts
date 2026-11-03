@@ -1197,7 +1197,7 @@ export const hr = {
   "hr.monia.cmp.iaTag": { es: "IA", en: "AI" },
   // Sección "Óyelo": play de cada situación con la voz de ahora y la de Argos.
   "hr.monia.cmp.oyeTitle": { es: "Óyelo: cada situación, ahora y con Argos", en: "Hear it: each situation, now and with Argos" },
-  "hr.monia.cmp.oyeSub": { es: "Dale play. «Ahora» es la voz robótica del coordinador; «Argos» es la voz del sistema (hoy Mario, la cambiaremos por la que elijas).", en: "Press play. “Now” is the coordinator's robotic voice; “Argos” is the system voice (Mario today, we'll swap it for the one you pick)." },
+  "hr.monia.cmp.oyeSub": { es: "Dale play. «Ahora» es la voz robótica del coordinador; «Argos» es la voz que estamos probando: Javi Rojas, de España, seria y natural.", en: "Press play. “Now” is the coordinator's robotic voice; “Argos” is the voice we're testing: Javi Rojas, from Spain, serious and natural." },
   "hr.monia.cmp.playAhora": { es: "Ahora", en: "Now" },
   "hr.monia.cmp.playArgos": { es: "Argos", en: "Argos" },
   // Frases HABLADAS (la voz siempre va en español, es-419). Nombre de ejemplo: María.
