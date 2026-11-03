@@ -20,7 +20,7 @@ import { PantallazosVivoPanel } from "@/components/hr/PantallazosVivoPanel";
 import { ContextoEmpresaPanel } from "@/components/hr/ContextoEmpresaPanel";
 import { AtencionAhoraPanel } from "@/components/hr/AtencionAhoraPanel";
 import { ResumenDiaPanel } from "@/components/hr/ResumenDiaPanel";
-import { ArgosSituacionesPanel } from "@/components/hr/ArgosSituacionesPanel";
+import { ArgosAjustesContenido } from "@/pages/hr/ArgosAjustes";
 import type { TranslationKey } from "@/lib/i18n";
 
 // Panel de RRHH del monitor de cámara de Cowork. Muestra en vivo las faltas que
@@ -204,11 +204,13 @@ export default function HRMonitorIA() {
           Atención ahora (Alvaro, 02/11). */}
       {tab === "ajustes" && isAdmin && (
         <div className="mt-5 flex flex-col gap-4">
-          {/* 1) Argos general */}
+          {/* El Centro de control de Argos: voz (Javi), las 15 situaciones y la
+              mezcla. Reemplaza el panel viejo del selector de voz para que haya
+              un solo lugar, sin confusión con Mario ni la robótica de Jhon. */}
+          <ArgosAjustesContenido />
+          {/* Argos general (prender/apagar el monitor) */}
           <PanelAjustes t={t} />
-          {/* 2) La voz · 3) Qué avisa (situaciones) */}
-          <ArgosSituacionesPanel />
-          {/* 4) El contexto de la empresa */}
+          {/* El contexto de la empresa */}
           <ContextoEmpresaPanel />
         </div>
       )}
