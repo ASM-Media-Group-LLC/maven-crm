@@ -195,6 +195,16 @@ All colors MUST be HSL. Light mode in :root, dark mode in .dark.
     --sidebar-ring: 290 84% 49%;
   }
 
+  /* Violeta — el morado original de Maven (hue 255). Su rotación de atmósfera
+     es 0: elegirlo deja TODA la escena con el morado de siempre. */
+  :root[data-skin="violeta"] {
+    --primary: 255 72% 50%;
+    --accent: 285 72% 52%;
+    --ring: 255 72% 50%;
+    --sidebar-primary: 255 72% 50%;
+    --sidebar-ring: 255 72% 50%;
+  }
+
   :root[data-skin="medianoche"] {
     --primary: 217 91% 53%;
     --accent: 217 91% 53%;

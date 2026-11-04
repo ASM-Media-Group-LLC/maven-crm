@@ -87,6 +87,7 @@ Deno.serve(async (req) => {
 
   // Generar con ElevenLabs.
   if (!XI_KEY) {
+    console.error("[anuncio-tts] falta el secreto ELEVENLABS_API_KEY");
     return json({ error: "no-key", detalle: "Falta el secreto ELEVENLABS_API_KEY" }, 503);
   }
   const resp = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`, {
@@ -104,6 +105,9 @@ Deno.serve(async (req) => {
   });
   if (!resp.ok) {
     const detalle = await resp.text().catch(() => "");
+    // Log para diagnosticar POR QUÉ ElevenLabs rechaza (voz inexistente, llave
+    // inválida, cuota agotada): el status y el cuerpo quedan en function_logs.
+    console.error("[anuncio-tts] ElevenLabs rechazó", resp.status, "voiceId:", voiceId, "detalle:", detalle.slice(0, 400));
     return json({ error: "elevenlabs", status: resp.status, detalle: detalle.slice(0, 300) }, 502);
   }
   const bytes = new Uint8Array(await resp.arrayBuffer());

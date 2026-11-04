@@ -49,6 +49,7 @@ export const internos = {
   "int.skin.atardecer": { es: "Atardecer", en: "Sunset" },
   "int.skin.esmeralda": { es: "Esmeralda", en: "Emerald" },
   "int.skin.orquidea": { es: "Orquídea", en: "Orchid" },
+  "int.skin.violeta": { es: "Violeta", en: "Violet" },
   "int.skin.medianoche": { es: "Medianoche", en: "Midnight" },
   "int.skin.dorado": { es: "Dorado", en: "Gold" },
   "int.skin.kash": { es: "Rojo Kash", en: "Kash Red" },

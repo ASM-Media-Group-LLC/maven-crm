@@ -23,6 +23,7 @@ export type SkinId =
   | "atardecer"
   | "esmeralda"
   | "orquidea"
+  | "violeta"
   | "medianoche"
   | "dorado"
   | "kash"
@@ -54,6 +55,7 @@ export const SKINS: SkinDef[] = [
   definirSkin({ id: "atardecer", primary: "hsl(25 95% 39%)", accent: "hsl(340 82% 59%)" }, "int.skin.atardecer"),
   definirSkin({ id: "esmeralda", primary: "hsl(160 84% 28%)", accent: "hsl(190 90% 45%)" }, "int.skin.esmeralda"),
   definirSkin({ id: "orquidea", primary: "hsl(290 84% 49%)", accent: "hsl(320 85% 55%)" }, "int.skin.orquidea"),
+  definirSkin({ id: "violeta", primary: "hsl(255 72% 50%)", accent: "hsl(285 72% 52%)" }, "int.skin.violeta"),
   definirSkin({ id: "medianoche", primary: "hsl(217 91% 53%)", accent: "hsl(217 91% 53%)" }, "int.skin.medianoche"),
   definirSkin({ id: "dorado", primary: "hsl(43 80% 30%)", accent: "hsl(30 85% 45%)" }, "int.skin.dorado"),
   definirSkin({ id: "kash", primary: "hsl(350 80% 42%)", accent: "hsl(15 90% 50%)" }, "int.skin.kash"),
