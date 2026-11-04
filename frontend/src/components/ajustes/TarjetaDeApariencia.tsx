@@ -1,12 +1,13 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useTheme } from "next-themes";
-import { Monitor, Moon, Palette, Sun } from "lucide-react";
+import { Check, Monitor, Moon, Palette, Sun, Undo2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
 import { useLanguage } from "@/hooks/useLanguage";
-import { activeSeason, applyCustomHue, SKINS, useSkin, useUiPrefs } from "@/hooks/useSkin";
+import { activeSeason, applyCustomHue, applySkin, SKINS, useSkin, useUiPrefs, type SkinId } from "@/hooks/useSkin";
 import { useAvisarme } from "@/lib/avisoPersona";
 import { aaLightnessForHue, CUSTOM_SKIN_SATURATION } from "@/lib/wcag";
 
@@ -91,13 +92,57 @@ export function TarjetaDeApariencia({ conDensidad = true }: { conDensidad?: bool
   const { theme, setTheme } = useTheme();
   const { skin, setSkin } = useSkin();
   const { prefs, setPrefs } = useUiPrefs();
-  // Mientras se arrastra el slider de hue el valor vive acá y se aplica en
-  // vivo (applyCustomHue); recién al soltar se persiste (localStorage + DB)
-  // para no meter un UPDATE por cada pixel de arrastre.
-  const [hueDraft, setHueDraft] = useState<number | null>(null);
 
-  const customActive = prefs.customHue != null;
-  const customHue = hueDraft ?? prefs.customHue ?? DEFAULT_CUSTOM_HUE;
+  // Flujo "elegir → guardar": tocar un color lo PREVISUALIZA en vivo pero no se
+  // persiste hasta tocar Guardar; Descartar vuelve al guardado. `pendiente` es
+  // la selección en vista previa (null = se ve el guardado). El tema y los
+  // switches de abajo siguen instantáneos — acá solo se escenifica el color.
+  type Sel = { kind: "preset"; id: SkinId } | { kind: "custom"; hue: number };
+  const guardado: Sel = prefs.customHue != null
+    ? { kind: "custom", hue: prefs.customHue }
+    : { kind: "preset", id: skin };
+  const mismo = (a: Sel, b: Sel) =>
+    a.kind === b.kind && (a.kind === "preset" ? a.id === (b as { id: SkinId }).id : a.hue === (b as { hue: number }).hue);
+
+  const [pendiente, setPendiente] = useState<Sel | null>(null);
+  const vista: Sel = pendiente ?? guardado;
+  const hayCambios = pendiente != null && !mismo(pendiente, guardado);
+
+  // Aplica una selección al DOM SIN persistir (vista previa).
+  const previsualizar = (sel: Sel) => {
+    if (sel.kind === "preset") { applyCustomHue(null); applySkin(sel.id); }
+    else applyCustomHue(sel.hue); // las vars inline le ganan a cualquier [data-skin]
+  };
+  // Vuelve el DOM al color GUARDADO (al descartar o al salir sin guardar).
+  const restaurarGuardado = () => {
+    if (guardado.kind === "custom") { applySkin(skin); applyCustomHue(guardado.hue); }
+    else { applyCustomHue(null); applySkin(guardado.id); }
+  };
+  const elegir = (sel: Sel) => {
+    previsualizar(sel);
+    setPendiente(mismo(sel, guardado) ? null : sel);
+  };
+  const guardar = () => {
+    if (!pendiente) return;
+    if (pendiente.kind === "preset") {
+      setSkin(pendiente.id);
+      avisarme(t("settings.skinApplied"), SKINS.find((s) => s.id === (pendiente as { id: SkinId }).id)?.label ?? "");
+    } else {
+      setPrefs({ customHue: pendiente.hue });
+      avisarme(t("settings.skinApplied"), t("settings.skinCustom"));
+    }
+    setPendiente(null);
+  };
+  const descartar = () => { restaurarGuardado(); setPendiente(null); };
+
+  // Si el usuario sale de Ajustes con una vista previa sin guardar, el color
+  // debe volver al guardado (no dejar aplicado algo que no eligió de verdad).
+  const salidaRef = useRef<() => void>(() => {});
+  salidaRef.current = () => { if (pendiente) restaurarGuardado(); };
+  useEffect(() => () => salidaRef.current(), []);
+
+  const customEnVista = vista.kind === "custom";
+  const customHue = customEnVista ? vista.hue : (prefs.customHue ?? DEFAULT_CUSTOM_HUE);
   const customPreview = `hsl(${customHue} ${CUSTOM_SKIN_SATURATION}% ${aaLightnessForHue(customHue)}%)`;
   const season = activeSeason();
   const seasonOn = !!season && prefs.seasonalOptOut !== true;
@@ -163,13 +208,9 @@ export function TarjetaDeApariencia({ conDensidad = true }: { conDensidad?: bool
               <SkinSwatch
                 key={s.id}
                 label={s.label}
-                active={!customActive && skin === s.id}
+                active={vista.kind === "preset" && vista.id === s.id}
                 background={`linear-gradient(135deg, ${s.primary}, ${s.accent})`}
-                onClick={() => {
-                  if (!customActive && skin === s.id) return;
-                  setSkin(s.id);
-                  avisarme(t("settings.skinApplied"), s.label);
-                }}
+                onClick={() => elegir({ kind: "preset", id: s.id })}
               />
             ))}
           </div>
@@ -186,13 +227,9 @@ export function TarjetaDeApariencia({ conDensidad = true }: { conDensidad?: bool
               <SkinSwatch
                 key={s.id}
                 label={s.label}
-                active={!customActive && skin === s.id}
+                active={vista.kind === "preset" && vista.id === s.id}
                 background={`linear-gradient(135deg, ${s.primary}, ${s.accent})`}
-                onClick={() => {
-                  if (!customActive && skin === s.id) return;
-                  setSkin(s.id);
-                  avisarme(t("settings.skinApplied"), s.label);
-                }}
+                onClick={() => elegir({ kind: "preset", id: s.id })}
               />
             ))}
             {/* Tono personalizado: swatch cónico arcoíris, separado de las
@@ -201,18 +238,14 @@ export function TarjetaDeApariencia({ conDensidad = true }: { conDensidad?: bool
             <span className="mx-1 h-10 w-px self-start bg-border" aria-hidden />
             <SkinSwatch
               label={t("settings.skinCustom")}
-              active={customActive}
+              active={customEnVista}
               background="conic-gradient(from 0deg, hsl(0 85% 50%), hsl(60 85% 42%), hsl(120 85% 35%), hsl(180 85% 40%), hsl(240 85% 58%), hsl(300 85% 48%), hsl(0 85% 50%))"
-              onClick={() => {
-                if (customActive) return;
-                setPrefs({ customHue: prefs.customHue ?? DEFAULT_CUSTOM_HUE });
-                avisarme(t("settings.skinApplied"), t("settings.skinCustom"));
-              }}
+              onClick={() => elegir({ kind: "custom", hue: prefs.customHue ?? DEFAULT_CUSTOM_HUE })}
             />
           </div>
 
-          {/* Slider de HUE del tono personalizado (solo con custom activo). */}
-          {customActive && (
+          {/* Slider de HUE del tono personalizado (solo con custom en vista). */}
+          {customEnVista && (
             <div className="max-w-sm space-y-2 pt-2">
               <div className="flex items-center justify-between">
                 <Label className="text-xs">{t("settings.skinCustomHue")}</Label>
@@ -230,20 +263,33 @@ export function TarjetaDeApariencia({ conDensidad = true }: { conDensidad?: bool
                 step={1}
                 value={[customHue]}
                 onValueChange={([h]) => {
-                  setHueDraft(h);
-                  // Con el overlay de temporada puesto NO se aplica en vivo
-                  // (las vars inline le ganarían al overlay y al soltar
-                  // "rebotaría"); el circulito de al lado sigue mostrando
-                  // el tono elegido.
+                  // Previsualiza en vivo (salvo con overlay de temporada, donde
+                  // las vars inline le ganarían al overlay); se persiste al
+                  // tocar Guardar, no al soltar el slider.
                   if (!seasonOn) applyCustomHue(h);
-                }}
-                onValueCommit={([h]) => {
-                  setHueDraft(null);
-                  setPrefs({ customHue: h });
+                  const sel: Sel = { kind: "custom", hue: h };
+                  setPendiente(mismo(sel, guardado) ? null : sel);
                 }}
                 aria-label={t("settings.skinCustomHue")}
               />
               <p className="text-[11px] text-muted-foreground">{t("settings.skinCustomDesc")}</p>
+            </div>
+          )}
+
+          {/* Barra elegir → guardar: aparece solo cuando hay una vista previa
+              distinta del color guardado. Guardar persiste (local + perfil,
+              te sigue entre dispositivos); Descartar vuelve al actual. */}
+          {hayCambios && (
+            <div className="flex flex-wrap items-center gap-2 rounded-lg border border-primary/30 bg-primary/5 px-3 py-2">
+              <span className="min-w-0 flex-1 text-[11px] text-muted-foreground">{t("settings.skinPreview")}</span>
+              <Button type="button" size="sm" variant="ghost" className="h-8" onClick={descartar}>
+                <Undo2 className="mr-1 h-3.5 w-3.5" />
+                {t("settings.skinDiscard")}
+              </Button>
+              <Button type="button" size="sm" className="h-8" onClick={guardar}>
+                <Check className="mr-1 h-3.5 w-3.5" />
+                {t("settings.skinSave")}
+              </Button>
             </div>
           )}
         </div>
