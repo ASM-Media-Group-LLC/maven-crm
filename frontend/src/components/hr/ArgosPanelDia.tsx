@@ -5,6 +5,7 @@ import { useLanguage } from "@/hooks/useLanguage";
 import { UserAvatar } from "@/components/UserAvatar";
 import { useResumenDia, type PersonaResumen, type BajonDia } from "@/hooks/useResumenDia";
 import { ArgosTendencia } from "@/components/hr/ArgosTendencia";
+import { useTendenciaMes } from "@/hooks/useTendenciaMes";
 import type { TranslationKey } from "@/lib/i18n";
 
 // PANEL DEL DÍA — la PORTADA de Argos (Alvaro, 03/11). Responde de un vistazo:
@@ -219,6 +220,9 @@ export function ArgosPanelDia() {
     return out;
   }, [anio, mes]);
   const mesTexto = useMemo(() => new Date(anio, mes - 1, 1).toLocaleDateString("es-CO", { month: "long", year: "numeric" }), [anio, mes]);
+  // Dato por día del mes (para pintar el calendario: qué días hay info y cómo
+  // estuvo la pantalla del equipo). Solo cuando el calendario está abierto.
+  const { porDia } = useTendenciaMes(anio, mes, hoy);
 
   const d = useMemo(() => {
     // Solo quien tuvo actividad hoy (horas, nota o alguna falla) entra al podio
@@ -279,9 +283,11 @@ export function ArgosPanelDia() {
           </button>
         </div>
 
-        {/* Calendario opcional: saltar a cualquier día pasado (como el Expediente). */}
+        {/* Calendario opcional: saltar a cualquier día pasado. Compacto (no ocupa
+            toda la pantalla) y cada día con DATO: un punto verde/ámbar/rojo según
+            cómo estuvo la pantalla del equipo; los días sin info van apagados. */}
         {verCalendario && (
-          <div className="rounded-2xl border border-border/40 bg-card/30 p-3">
+          <div className="mx-auto w-full max-w-[26rem] rounded-2xl border border-border/40 bg-card/30 p-3">
             <p className="mb-2 text-center text-xs capitalize text-muted-foreground">{mesTexto}</p>
             <div className="mb-1 grid grid-cols-7 gap-1 text-center text-[10px] font-semibold text-muted-foreground">
               {["L", "M", "M", "J", "V", "S", "D"].map((dl, i) => <div key={i}>{dl}</div>)}
@@ -291,17 +297,24 @@ export function ArgosPanelDia() {
                 if (!f) return <div key={i} />;
                 const futuro = f > hoy;
                 const sel = f === dia;
+                const info = porDia.get(f);
+                const hayDato = !!info && info.personas > 0;
+                const banda = !info || info.pantalla == null ? null
+                  : info.pantalla >= 70 ? "bg-success" : info.pantalla >= 50 ? "bg-warning" : "bg-destructive";
                 return (
                   <button
                     key={i}
                     type="button"
                     disabled={futuro}
                     onClick={() => { setDia(f); setVerCalendario(false); }}
-                    className={`flex aspect-square items-center justify-center rounded-lg border text-xs tabular-nums transition disabled:opacity-30
-                      ${sel ? "border-primary bg-primary/15 text-primary ring-1 ring-primary" : "border-border/30 bg-card/20 hover:border-primary/40"}
-                      ${f === hoy && !sel ? "font-bold text-primary" : "text-foreground/80"}`}
+                    title={hayDato ? t("hr.panel.calDiaInfo", { p: info!.pantalla ?? 0, n: info!.personas }) : undefined}
+                    className={`flex aspect-square flex-col items-center justify-center gap-0.5 rounded-lg border text-xs tabular-nums transition disabled:opacity-25
+                      ${sel ? "border-primary bg-primary/15 ring-1 ring-primary"
+                        : hayDato ? "border-border/40 bg-card/40 hover:border-primary/40"
+                        : "border-border/20 bg-transparent hover:border-primary/30"}`}
                   >
-                    {Number(f.slice(8))}
+                    <span className={sel ? "text-primary" : f === hoy ? "font-bold text-primary" : hayDato ? "text-foreground/85" : "text-muted-foreground/50"}>{Number(f.slice(8))}</span>
+                    {banda && <span className={`h-1 w-1 rounded-full ${banda}`} />}
                   </button>
                 );
               })}

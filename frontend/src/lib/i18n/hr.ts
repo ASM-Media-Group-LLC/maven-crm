@@ -1156,6 +1156,7 @@ export const hr = {
   "hr.panel.tendenciaTitulo": { es: "Tendencia", en: "Trend" },
   "hr.panel.tendenciaDias": { es: "últimos {n} días", en: "last {n} days" },
   "hr.panel.tendenciaVacio": { es: "Aún no hay suficientes días para la tendencia.", en: "Not enough days yet for a trend." },
+  "hr.panel.calDiaInfo": { es: "pantalla {p}% · {n} personas", en: "screen {p}% · {n} people" },
   "hr.panel.camaraSobre": { es: "sobre {n} en cámara", en: "over {n} on camera" },
   "hr.panel.sinMiradas": { es: "la IA aún no mira", en: "AI hasn't looked yet" },
   "hr.panel.pocaMuestra": { es: "muestra chica, poco confiable", en: "small sample, low trust" },
