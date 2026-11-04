@@ -1021,6 +1021,7 @@ export const hr = {
   "hr.pantallazos.selloTrabajando": { es: "Trabajando", en: "Working" },
   "hr.pantallazos.selloRevisar": { es: "Revisar", en: "Review" },
   "hr.pantallazos.selloMirando": { es: "Revisando…", en: "Checking…" },
+  "hr.pantallazos.filtroPersona": { es: "Filtrar por persona", en: "Filter by person" },
   "hr.pantallazos.verExpediente": { es: "Ver el expediente de {nombre}", en: "Open {nombre}'s record" },
   "hr.notas.verDia": { es: "Ver el día de {nombre}", en: "Open {nombre}'s day" },
   "hr.notas.verDesglose": { es: "Ver cómo se arma la nota", en: "See how the score is built" },

@@ -115,8 +115,10 @@ export function useCapturasVivo() {
         }),
       );
 
-      // Más recientes primero: quién acaba de dar señal va arriba.
-      personas.sort((a, b) => (a.ultima < b.ultima ? 1 : -1));
+      // Orden ESTABLE alfabético (Alvaro, 04/11): así al refrescar las caras NO
+      // saltan de lugar —estabas viendo a alguien y no "se va a otro". Cada panel
+      // reordena a su gusto (problemáticos primero, etc.) sobre este orden fijo.
+      personas.sort((a, b) => (a.nombre || "").localeCompare(b.nombre || "", "es"));
       return personas;
     },
   });

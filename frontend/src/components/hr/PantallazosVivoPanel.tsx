@@ -28,6 +28,12 @@ export function PantallazosVivoPanel() {
   const { personas, cargando, error, refrescar } = useCapturasVivo();
   const { semaforoDe } = useSemaforos();
   const [modo, setModo] = useState<Modo>(leerModo);
+  // Filtro por empleado (Alvaro, 04/11): elige una persona y ves solo lo suyo.
+  // Si el filtrado desaparece de la ventana, cae solo a "Todos".
+  const [persona, setPersona] = useState<string>("todos");
+  const lista = persona !== "todos" && personas.some((p) => p.userId === persona)
+    ? personas.filter((p) => p.userId === persona)
+    : personas;
 
   const elegir = (m: Modo) => { setModo(m); try { localStorage.setItem(MODO_KEY, m); } catch { /* sin storage */ } };
   const irA = (userId: string) => navigate(`/hr/expediente/${userId}`, { state: { volverA: "/hr/monitor-ia?t=envivo" } });
@@ -53,6 +59,20 @@ export function PantallazosVivoPanel() {
               {personas.length > 0 ? t("hr.pantallazos.contando", { n: personas.length }) : t("hr.pantallazos.sub")}
             </p>
           </div>
+          {/* Filtro por empleado */}
+          {personas.length > 0 && (
+            <select
+              value={persona}
+              onChange={(e) => setPersona(e.target.value)}
+              aria-label={t("hr.pantallazos.filtroPersona")}
+              className="h-8 max-w-[10rem] rounded-lg border border-border/50 bg-background/40 px-2 text-xs text-foreground outline-none transition-colors hover:border-primary/40 focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              <option value="todos">{t("hr.conectados.filtroTodos")}</option>
+              {personas.map((p) => (
+                <option key={p.userId} value={p.userId}>{p.nombre || t("hr.noName")}</option>
+              ))}
+            </select>
+          )}
           {/* Selector de vista */}
           <div className="inline-flex gap-0.5 rounded-xl border border-border/50 bg-background/40 p-0.5">
             {vistas.map((v) => {
@@ -97,11 +117,11 @@ export function PantallazosVivoPanel() {
           </div>
         ) : modo === "muralla" ? (
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-            {personas.map((p) => <CardMuralla key={p.userId} p={p} t={t} hace={hace} sem={semaforoDe(p.userId, p.fueraDeLugar, p.veredicto, p.tienePantalla)} onClick={() => irA(p.userId)} />)}
+            {lista.map((p) => <CardMuralla key={p.userId} p={p} t={t} hace={hace} sem={semaforoDe(p.userId, p.fueraDeLugar, p.veredicto, p.tienePantalla)} onClick={() => irA(p.userId)} />)}
           </div>
         ) : (
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 2xl:grid-cols-6">
-            {personas.map((p) => <CeldaCuadricula key={p.userId} p={p} t={t} sem={semaforoDe(p.userId, p.fueraDeLugar, p.veredicto, p.tienePantalla)} onClick={() => irA(p.userId)} />)}
+            {lista.map((p) => <CeldaCuadricula key={p.userId} p={p} t={t} sem={semaforoDe(p.userId, p.fueraDeLugar, p.veredicto, p.tienePantalla)} onClick={() => irA(p.userId)} />)}
           </div>
         )}
       </div>

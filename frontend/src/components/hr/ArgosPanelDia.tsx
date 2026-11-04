@@ -258,8 +258,9 @@ export function ArgosPanelDia() {
                 y Ojo abren solas; Bien y Sin datos vienen cerradas. */}
             <div className="space-y-2">
               <p className="text-xs font-medium text-muted-foreground">{t("hr.panel.equipoTitulo")} · {d.total}</p>
-              <CajaEquipo titulo={t("hr.panel.cajaMal")} punto="bg-destructive" gente={d.mal} abierta t={t} onPersona={irA} />
-              <CajaEquipo titulo={t("hr.panel.cajaOjo")} punto="bg-warning" gente={d.ojo} abierta t={t} onPersona={irA} />
+              {/* Todas vienen CERRADAS (Alvaro, 04/11): él abre la que necesite. */}
+              <CajaEquipo titulo={t("hr.panel.cajaMal")} punto="bg-destructive" gente={d.mal} abierta={false} t={t} onPersona={irA} />
+              <CajaEquipo titulo={t("hr.panel.cajaOjo")} punto="bg-warning" gente={d.ojo} abierta={false} t={t} onPersona={irA} />
               <CajaEquipo titulo={t("hr.panel.cajaBien")} punto="bg-success" gente={d.bien} abierta={false} t={t} onPersona={irA} />
               <CajaEquipo titulo={t("hr.panel.cajaSin")} punto="bg-muted-foreground/40" gente={d.sin} abierta={false} t={t} onPersona={irA} />
             </div>
