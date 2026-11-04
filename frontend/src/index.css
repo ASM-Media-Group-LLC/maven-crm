@@ -1410,13 +1410,13 @@ All colors MUST be HSL. Light mode in :root, dark mode in .dark.
 }
 :root[data-contrast="high"] .fondo-glass-sutil { background: hsl(var(--background)); }
 
-/* RECOLOR POR SKIN: la atmósfera del fondo (radiales morado/azul/ámbar hechos a
-   mano) rota su hue por --skin-rot para seguir el color del skin elegido, no
-   solo el acento. Maven = 0deg (queda idéntico). Decisión de Alvaro (03/11): al
-   cambiar el skin, todo recolorea. Alto contraste ya pone fondo plano, no aplica. */
-.fondo-glass, .fondo-glass-sutil { filter: hue-rotate(var(--skin-rot, 0deg)); }
-:root[data-contrast="high"] .fondo-glass,
-:root[data-contrast="high"] .fondo-glass-sutil { filter: none; }
+/* El fondo NO se tiñe con el skin. Probamos rotar su hue por --skin-rot (03/11),
+   pero .fondo-glass es el contenedor raíz de toda la app: un `filter` ahí arrastra
+   a TODOS sus hijos (swatches, avatar, íconos, texto) y los deja con el color
+   equivocado, y además la escena multicolor (ámbar+azul+violeta) al rotarla sale
+   embarrada. El sistema de diseño pide atmósfera NEUTRA fría constante. Así que el
+   skin recolorea acento + detalles + glows (capa aparte, sin contenido: ver
+   .vidrio-glow::before, que sí usa --skin-rot con seguridad), y el fondo queda igual. */
 
 /* Áreas seguras del teléfono (notch, barra de inicio). Valen 0 donde no aplica,
    así que van sin condición y no cambian nada en escritorio. Con
