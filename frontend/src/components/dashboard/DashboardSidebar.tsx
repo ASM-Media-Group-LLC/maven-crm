@@ -298,7 +298,12 @@ const DashboardSidebar = () => {
     return items;
   });
 
-  const isHRActive = pathname === "/hr" || pathname.startsWith("/hr/");
+  // Argos (Monitor IA) tiene su PROPIO icono fijo en el riel (el ojo), así que
+  // el grupo RRHH NO debe marcarse activo cuando estás en Argos — si no, se
+  // prenden DOS iconos azules a la vez. Solo uno se ilumina: donde estás.
+  // Alvaro, 03/11.
+  const enMonitorIA = pathname === "/hr/monitor-ia" || pathname.startsWith("/hr/monitor-ia/");
+  const isHRActive = !enMonitorIA && (pathname === "/hr" || pathname.startsWith("/hr/"));
 
   const rrhhCollapsedItems: Array<
     | { kind?: "item"; title: string; url: string }
