@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { ChevronRight, History, Info, Loader2, X, type LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
@@ -10,6 +10,7 @@ import {
 import { tamano } from "@/lib/drive/formato";
 import { tipoDeFicha } from "@/lib/drive/tipoDeArchivo";
 import { textoDeTamano, useCuantos } from "@/pages/oficina/drive/Tamanos";
+import PanelDeActividad from "@/pages/oficina/drive/PanelDeActividad";
 
 // EL PANEL DE DETALLES (ⓘ) de Google Drive (Jhon, 03/10: «no veo el tamaño de
 // los archivos por ningún lado; la fecha tampoco es clara»). De lo elegido (o
@@ -46,24 +47,53 @@ export interface PanelDeDetallesProps {
 export default function PanelDeDetalles(props: PanelDeDetallesProps) {
   const { t } = useLanguage();
   const { objetivo, onCerrar } = props;
+  const unItem = objetivo.tipo === "uno" ? objetivo.item : null;
+  // Pestañas Detalles | Actividad (solo con un elemento elegido, como en Google).
+  const [tab, setTab] = useState<"detalles" | "actividad">("detalles");
+  // Al cambiar de elemento (o dejar de tener uno) se vuelve a Detalles.
+  useEffect(() => { setTab("detalles"); }, [unItem?.id, objetivo.tipo]);
+
+  const tabBtn = (clave: "detalles" | "actividad", etiqueta: string) => (
+    <button
+      type="button"
+      onClick={() => setTab(clave)}
+      className={cn(
+        "relative px-1 py-1 text-sm font-semibold transition-colors",
+        tab === clave ? "text-foreground" : "text-muted-foreground hover:text-foreground",
+      )}
+    >
+      {etiqueta}
+      {tab === clave && <span className="absolute inset-x-0 -bottom-[9px] h-0.5 rounded-full bg-primary" />}
+    </button>
+  );
+
   return (
     <section aria-label={t("drive.detalles.titulo")} className="flex min-h-0 flex-col">
-      <div className="flex items-center gap-2 border-b border-border/60 px-4 py-2.5">
-        <h2 className="min-w-0 flex-1 truncate text-sm font-semibold">{t("drive.detalles.titulo")}</h2>
+      <div className="flex items-center gap-4 border-b border-border/60 px-4 py-2.5">
+        {unItem ? (
+          <div className="flex min-w-0 flex-1 items-center gap-4">
+            {tabBtn("detalles", t("drive.detalles.titulo"))}
+            {tabBtn("actividad", t("drive.actividad.titulo"))}
+          </div>
+        ) : (
+          <h2 className="min-w-0 flex-1 truncate text-sm font-semibold">{t("drive.detalles.titulo")}</h2>
+        )}
         {onCerrar && (
           <button
             type="button"
             onClick={onCerrar}
             aria-label={t("drive.detalles.cerrar")}
             title={t("drive.detalles.cerrar")}
-            className="inline-flex h-8 w-8 items-center justify-center rounded-full text-muted-foreground hover:bg-muted hover:text-foreground"
+            className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-muted-foreground hover:bg-muted hover:text-foreground"
           >
             <X className="h-4 w-4" />
           </button>
         )}
       </div>
       <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
-        {objetivo.tipo === "uno" ? (
+        {unItem && tab === "actividad" ? (
+          <PanelDeActividad itemId={unItem.id} activo />
+        ) : objetivo.tipo === "uno" ? (
           <DetallesDeUno key={objetivo.item.id} item={objetivo.item} {...props} />
         ) : objetivo.tipo === "varios" ? (
           <DetallesDeVarios items={objetivo.items} tamanoDe={props.tamanoDe} />
