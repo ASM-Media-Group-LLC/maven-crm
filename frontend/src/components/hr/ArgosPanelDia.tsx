@@ -1,0 +1,212 @@
+import { useMemo } from "react";
+import { useNavigate } from "react-router-dom";
+import { LayoutDashboard, Loader2, AlertTriangle, RefreshCw, ChevronRight, Camera, ScreenShare, Sparkles, Trophy, Eye } from "lucide-react";
+import { useLanguage } from "@/hooks/useLanguage";
+import { UserAvatar } from "@/components/UserAvatar";
+import { useResumenDia, type PersonaResumen, type BajonDia } from "@/hooks/useResumenDia";
+import type { TranslationKey } from "@/lib/i18n";
+
+// PANEL DEL DÍA — la PORTADA de Argos (Alvaro, 03/11). Responde de un vistazo:
+// cómo estuvo HOY cada persona. No compite con el Centro de operaciones (ese mide
+// PRODUCCIÓN del equipo: horas, mensajes, respuesta); este mide DISCIPLINA por
+// PERSONA: cámara, pantalla, atención, problemas. Arriba los números de hoy; luego
+// el podio (mejores / ojo con) por MENOS fallas; abajo el equipo completo, clic →
+// su día. Estilo sobrio, poco color (un acento puntual). Todo por t().
+
+type Tr = (k: TranslationKey, v?: Record<string, string | number>) => string;
+
+const LBL_BAJON: Record<string, TranslationKey> = {
+  sin_pantalla: "hr.sem.sinPantalla",
+  camara_apagada: "hr.resumen.bajon.camara",
+  camara_tapada: "hr.resumen.bajon.camara",
+  fuera_de_lugar: "hr.sem.problema",
+  se_fue: "hr.resumen.bajon.seFue",
+  sin_senal: "hr.resumen.bajon.sinSenal",
+  pausa_de_mas: "hr.resumen.bajon.pausa",
+};
+
+const prom = (arr: number[]): number | null =>
+  arr.length ? Math.round(arr.reduce((a, b) => a + b, 0) / arr.length) : null;
+
+const fallasDe = (p: PersonaResumen) => ({
+  veces: p.bajones.length,
+  min: p.bajones.reduce((a, b) => a + b.minutos, 0),
+});
+
+// La falla principal (más minutos) para el renglón del equipo.
+const fallaPrincipal = (bajones: BajonDia[]): BajonDia | null =>
+  bajones.length ? [...bajones].sort((a, b) => b.minutos - a.minutos)[0] : null;
+
+// Un número grande del día (tile sobrio): etiqueta, cifra y una línea chica.
+function Tile({ icon: Icon, label, valor, sub }: { icon: typeof Camera; label: string; valor: string; sub?: string }) {
+  return (
+    <div className="flex flex-col gap-2 rounded-2xl border border-border/40 bg-card/20 p-4">
+      <div className="flex items-center gap-2 text-muted-foreground">
+        <Icon className="h-4 w-4 shrink-0" />
+        <span className="truncate text-xs">{label}</span>
+      </div>
+      <div className="font-display text-2xl font-bold leading-none tabular-nums">{valor}</div>
+      {sub && <div className="text-[11px] text-muted-foreground">{sub}</div>}
+    </div>
+  );
+}
+
+// Una persona del podio: puesto, cara, nombre y su resumen de fallas.
+function PodioFila({ i, p, t, onClick }: { i: number; p: PersonaResumen; t: Tr; onClick: () => void }) {
+  const f = fallasDe(p);
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="group flex w-full items-center gap-3 rounded-xl px-2 py-2 text-left transition-colors hover:bg-card/40"
+    >
+      <span className="w-4 shrink-0 text-center text-sm font-semibold tabular-nums text-muted-foreground">{i + 1}</span>
+      <UserAvatar name={p.nombre || t("hr.noName")} src={p.avatarUrl} seed={p.avatarSeed} size="sm" />
+      <span className="min-w-0 flex-1 truncate text-sm font-medium">{p.nombre || t("hr.noName")}</span>
+      <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
+        {f.veces === 0
+          ? t("hr.panel.sinFallas")
+          : f.veces === 1
+            ? t("hr.panel.fallaResumenUno", { min: f.min })
+            : t("hr.panel.fallasResumen", { veces: f.veces, min: f.min })}
+      </span>
+      <ChevronRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground/50 transition group-hover:translate-x-0.5 group-hover:text-foreground" />
+    </button>
+  );
+}
+
+// Un renglón del equipo completo: cara, nombre, falla principal y la nota discreta.
+function EquipoFila({ p, t, onClick }: { p: PersonaResumen; t: Tr; onClick: () => void }) {
+  const nombre = p.nombre || t("hr.noName");
+  const fp = fallaPrincipal(p.bajones);
+  const abierto = p.bajones.some((b) => b.abierto);
+  const dot = p.nota.banda === "bien" ? "bg-success"
+    : p.nota.banda === "ojo" ? "bg-warning"
+    : p.nota.banda === "mal" ? "bg-destructive"
+    : "bg-muted-foreground/40";
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      title={t("hr.atencion.verExpediente")}
+      className="group flex w-full items-center gap-3 rounded-2xl border border-border/40 bg-card/20 px-3.5 py-2.5 text-left transition-colors hover:border-primary/30 hover:bg-card/40"
+    >
+      <UserAvatar name={nombre} src={p.avatarUrl} seed={p.avatarSeed} size="sm" />
+      <div className="min-w-0 flex-1">
+        <span className="block truncate text-sm font-semibold">{nombre}</span>
+        {fp ? (
+          <span className="mt-0.5 inline-flex items-center gap-1.5 text-xs">
+            <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${abierto ? "bg-destructive animate-pulse" : "bg-muted-foreground/40"}`} />
+            <span className="text-foreground/80">{LBL_BAJON[fp.tipo] ? t(LBL_BAJON[fp.tipo]) : fp.tipo}</span>
+            {p.bajones.length > 1 && <span className="text-muted-foreground">+{p.bajones.length - 1}</span>}
+          </span>
+        ) : (
+          <span className="mt-0.5 block text-xs text-muted-foreground">{t("hr.resumen.sinNovedad")}</span>
+        )}
+      </div>
+      <span className="flex shrink-0 items-center gap-1.5">
+        <span className={`h-1.5 w-1.5 rounded-full ${dot}`} />
+        <span className="text-sm font-semibold tabular-nums text-foreground/80">{p.nota.valor ?? "—"}</span>
+      </span>
+      <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground/60 transition group-hover:translate-x-0.5 group-hover:text-foreground" />
+    </button>
+  );
+}
+
+export function ArgosPanelDia() {
+  const { t } = useLanguage();
+  const navigate = useNavigate();
+  const { personas, cargando, error, refrescar } = useResumenDia(new Date().toLocaleDateString("en-CA", { timeZone: "America/Bogota" }));
+
+  const d = useMemo(() => {
+    // Solo quien tuvo actividad hoy (horas, nota o alguna falla) entra al podio
+    // y a los promedios; quien no se conectó no es "el mejor" por 0 fallas.
+    const activos = personas.filter((p) => p.horas > 0 || p.bajones.length > 0 || p.nota.valor != null);
+    const atencion = prom(personas.map((p) => p.atencionPct).filter((x): x is number => x != null));
+    const camara = prom(personas.map((p) => p.camaraPct).filter((x): x is number => x != null));
+    const pantalla = prom(personas.map((p) => p.pantallaPct).filter((x): x is number => x != null));
+    const enProblema = personas.filter((p) => p.bajones.some((b) => b.abierto) || (p.nota.valor != null && p.nota.valor < 60)).length;
+    // Menos fallas primero (minutos, luego veces). Para "ojo con", al revés.
+    const porFallas = [...activos].sort((a, b) => {
+      const fa = fallasDe(a), fb = fallasDe(b);
+      return (fa.min - fb.min) || (fa.veces - fb.veces);
+    });
+    return {
+      total: personas.length,
+      atencion, camara, pantalla, enProblema,
+      mejores: porFallas.slice(0, 3),
+      peores: [...porFallas].reverse().slice(0, 3),
+    };
+  }, [personas]);
+
+  const irA = (id: string) => navigate(`/hr/expediente/${id}`, { state: { volverA: "/hr/monitor-ia?t=panel" } });
+  const hoyTxt = new Date().toLocaleDateString("es-CO", { weekday: "long", day: "numeric", month: "long" });
+
+  return (
+    <section className="vidrio sube p-4 lg:p-5">
+      <div className="v-cont space-y-5">
+        {/* Cabecera */}
+        <div className="flex flex-wrap items-center gap-3">
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-panel bg-primary/10 text-primary">
+            <LayoutDashboard className="h-[18px] w-[18px]" />
+          </span>
+          <div className="min-w-0 flex-1">
+            <h2 className="font-display text-base font-bold leading-tight tracking-tight">{t("hr.panel.title")}</h2>
+            <p className="text-xs capitalize text-muted-foreground">{t("hr.panel.hoy")} · {hoyTxt}</p>
+          </div>
+          <button type="button" onClick={() => void refrescar()} className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-foreground/5 hover:text-foreground" title={t("hr.pantallazos.reintentar")} aria-label={t("hr.pantallazos.reintentar")}>
+            <RefreshCw className={`h-4 w-4 ${cargando ? "animate-spin" : ""}`} />
+          </button>
+        </div>
+
+        {error ? (
+          <div className="flex flex-col items-center gap-2 py-10 text-center text-muted-foreground"><AlertTriangle className="h-7 w-7 text-destructive/70" /><p className="text-sm">{t("hr.panel.error")}</p></div>
+        ) : cargando && personas.length === 0 ? (
+          <div className="flex items-center justify-center py-12 text-muted-foreground"><Loader2 className="h-6 w-6 animate-spin" /></div>
+        ) : personas.length === 0 ? (
+          <div className="flex flex-col items-center gap-2 py-10 text-center text-muted-foreground"><LayoutDashboard className="h-7 w-7 opacity-40" /><p className="text-sm">{t("hr.panel.vacio")}</p></div>
+        ) : (
+          <>
+            {/* Números de DISCIPLINA del día (nada de producción: eso es del Centro) */}
+            <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+              <Tile icon={Sparkles} label={t("hr.panel.numAtencion")} valor={d.atencion == null ? "—" : `${d.atencion}%`} sub={t("hr.panel.promDe")} />
+              <Tile icon={Camera} label={t("hr.panel.numCamara")} valor={d.camara == null ? "—" : `${d.camara}%`} sub={t("hr.panel.promDe")} />
+              <Tile icon={ScreenShare} label={t("hr.panel.numPantalla")} valor={d.pantalla == null ? "—" : `${d.pantalla}%`} sub={t("hr.panel.promDe")} />
+              <Tile icon={AlertTriangle} label={t("hr.panel.numProblema")} valor={`${d.enProblema}`} sub={t("hr.panel.numProblemaSub", { n: d.total })} />
+            </div>
+
+            {/* Podio: mejores / ojo con — por MENOS fallas del día */}
+            <div className="grid gap-3 md:grid-cols-2">
+              <div className="rounded-2xl border border-border/40 bg-card/10 p-3">
+                <p className="mb-1 flex items-center gap-2 px-2 text-xs font-medium text-muted-foreground">
+                  <Trophy className="h-3.5 w-3.5 text-success/80" />{t("hr.panel.mejores")}
+                  <span className="text-muted-foreground/60">· {t("hr.panel.porMenosFallas")}</span>
+                </p>
+                <div className="flex flex-col">
+                  {d.mejores.map((p, i) => <PodioFila key={p.userId} i={i} p={p} t={t} onClick={() => irA(p.userId)} />)}
+                </div>
+              </div>
+              <div className="rounded-2xl border border-border/40 bg-card/10 p-3">
+                <p className="mb-1 flex items-center gap-2 px-2 text-xs font-medium text-muted-foreground">
+                  <Eye className="h-3.5 w-3.5 text-destructive/80" />{t("hr.panel.peores")}
+                  <span className="text-muted-foreground/60">· {t("hr.panel.porMasFallas")}</span>
+                </p>
+                <div className="flex flex-col">
+                  {d.peores.map((p, i) => <PodioFila key={p.userId} i={i} p={p} t={t} onClick={() => irA(p.userId)} />)}
+                </div>
+              </div>
+            </div>
+
+            {/* Todo el equipo — clic en alguien abre su día (expediente) */}
+            <div>
+              <p className="mb-2 text-xs font-medium text-muted-foreground">{t("hr.panel.equipoTitulo")} · {d.total}</p>
+              <div className="flex flex-col gap-2">
+                {personas.map((p) => <EquipoFila key={p.userId} p={p} t={t} onClick={() => irA(p.userId)} />)}
+              </div>
+            </div>
+          </>
+        )}
+      </div>
+    </section>
+  );
+}

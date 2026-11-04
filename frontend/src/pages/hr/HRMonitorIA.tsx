@@ -20,6 +20,7 @@ import { PantallazosVivoPanel } from "@/components/hr/PantallazosVivoPanel";
 import { ContextoEmpresaPanel } from "@/components/hr/ContextoEmpresaPanel";
 import { AtencionAhoraPanel } from "@/components/hr/AtencionAhoraPanel";
 import { ResumenDiaPanel } from "@/components/hr/ResumenDiaPanel";
+import { ArgosPanelDia } from "@/components/hr/ArgosPanelDia";
 import { ArgosAjustesContenido } from "@/pages/hr/ArgosAjustes";
 import type { TranslationKey } from "@/lib/i18n";
 
@@ -128,11 +129,11 @@ export default function HRMonitorIA() {
   // vivo y las alertas quedan en sus pestañas. La pestaña vive en la URL (?t=…)
   // para que al entrar a un perfil y volver (atrás del navegador) Argos te deje
   // DONDE ESTABAS, no reiniciado (Álvaro, 02/11).
-  type TabArgos = "equipo" | "envivo" | "atencion" | "resumen" | "ajustes";
+  type TabArgos = "panel" | "equipo" | "envivo" | "atencion" | "resumen" | "ajustes";
   const [searchParams, setSearchParams] = useSearchParams();
-  const TABS_VALIDAS: TabArgos[] = ["equipo", "envivo", "atencion", "resumen", "ajustes"];
+  const TABS_VALIDAS: TabArgos[] = ["panel", "equipo", "envivo", "atencion", "resumen", "ajustes"];
   const tabURL = searchParams.get("t") as TabArgos | null;
-  const tab: TabArgos = tabURL && TABS_VALIDAS.includes(tabURL) ? tabURL : "equipo";
+  const tab: TabArgos = tabURL && TABS_VALIDAS.includes(tabURL) ? tabURL : "panel";
   const setTab = (k: TabArgos) => setSearchParams((prev) => { const n = new URLSearchParams(prev); n.set("t", k); return n; }, { replace: true });
 
   const monitorOff = config ? !config.activo : false;
@@ -159,6 +160,7 @@ export default function HRMonitorIA() {
       {/* Pestañas de Argos */}
       {(() => {
         const tabs: Array<{ k: TabArgos; label: string }> = [
+          { k: "panel", label: t("hr.monia.tab.panel") },
           { k: "equipo", label: t("hr.monia.tab.equipo") },
           { k: "envivo", label: t("hr.monia.tab.envivo") },
           { k: "atencion", label: t("hr.monia.tab.atencion") },
@@ -181,7 +183,10 @@ export default function HRMonitorIA() {
         );
       })()}
 
-      {/* ENTRADA — Notas del equipo: el equipo y su día; clic en alguien → su día. */}
+      {/* PORTADA — Panel del día: números de disciplina + podio + equipo. */}
+      {tab === "panel" && <div className="mt-5"><ArgosPanelDia /></div>}
+
+      {/* Conectados ahora: el equipo y su día; clic en alguien → su día. */}
       {tab === "equipo" && <div className="mt-5"><ConectadosAhoraPanel /></div>}
 
       {/* Pantallazos en vivo: la muralla (Muralla/Cuadrícula/Lista). */}
