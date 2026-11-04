@@ -268,6 +268,121 @@ function TiraDelDia({ capturas, t }: { capturas: CapturaDia[]; t: Tr }) {
   );
 }
 
+// Etiqueta y color de cada factor de la nota, para el desglose.
+const FACTOR_LBL: Record<string, TranslationKey> = {
+  pantalla: "hr.resumen.pantalla", camara: "hr.resumen.camara", atencion: "hr.resumen.atencion", horas: "hr.panel.factorHoras",
+};
+
+// POP-UP «Cómo se arma la nota» (Alvaro, 04/11): al tocar un número del día se
+// abre esto. Responde «64, ¿basado en qué?» — cada factor (pantalla/cámara/
+// atención/horas) con su % REAL, cuántos puntos aporta y sobre qué prueba se
+// midió. Así la nota deja de ser una cifra a ciegas. La evidencia (pantallazos
+// con su cámara y el juicio de la IA) está abajo en la misma página.
+function DesgloseNota({ dia, atencion, t, onClose }: {
+  dia: DiaExpediente;
+  atencion: { pct: number; ok: number; n: number } | null;
+  t: Tr;
+  onClose: () => void;
+}) {
+  const nota = dia.nota;
+  const presentes = nota.factores.filter((f) => f.sub != null);
+  const pesoTotal = presentes.reduce((a, f) => a + f.peso, 0) || 1;
+  const aporte = (sub: number, peso: number) => Math.round(sub * (peso / pesoTotal));
+  const bandaTono = nota.banda ? TONO[nota.banda] : null;
+  const pantallaFactor = nota.factores.find((f) => f.clave === "pantalla");
+  const reglaDura = pantallaFactor?.sub != null && pantallaFactor.sub < 5;
+  // Momentos de cámara que SE PUDIERON MEDIR hoy (cara_visible no nulo): la prueba
+  // detrás del % de cámara.
+  const momCamMedida = new Set(
+    dia.capturas.filter((c) => c.tipo === "camara" && c.caraVisible != null).map((c) => Math.floor(Date.parse(c.createdAt) / 120000)),
+  ).size;
+
+  // Línea de prueba bajo cada factor: sobre qué se midió de verdad.
+  const prueba = (clave: string): string | null => {
+    if (clave === "camara") return momCamMedida > 0 ? t("hr.exp.pruebaCamara", { n: momCamMedida }) : t("hr.exp.pruebaCamaraNadie");
+    if (clave === "atencion") return atencion ? t("hr.exp.pruebaAtencion", { ok: atencion.ok, n: atencion.n }) : t("hr.exp.pruebaAtencionSin");
+    return null;
+  };
+
+  return (
+    <Dialog open onOpenChange={(o) => { if (!o) onClose(); }}>
+      <DialogContent className="max-w-md">
+        <DialogTitle className="flex items-center gap-2 text-base">
+          <Gauge className="h-4 w-4 text-primary" />{t("hr.exp.desgloseTitulo")}
+        </DialogTitle>
+
+        {nota.valor == null ? (
+          <p className="py-6 text-center text-sm text-muted-foreground">{t("hr.exp.desgloseSinNota")}</p>
+        ) : (
+          <div className="flex flex-col gap-4">
+            {/* La nota grande + su banda */}
+            <div className={`flex items-center gap-3 rounded-2xl border p-3 ${bandaTono?.bg ?? "border-border/40 bg-card/40"}`}>
+              <span className={`font-display text-3xl font-bold tabular-nums ${bandaTono?.tx ?? ""}`}>{nota.valor}</span>
+              <span className="text-xs text-muted-foreground">{t("hr.exp.desgloseSub", { valor: nota.valor })}</span>
+            </div>
+
+            {/* Los factores: % real, barra, aporte en puntos y la prueba */}
+            <div className="flex flex-col gap-3">
+              {nota.factores.map((f) => {
+                const pr = prueba(f.clave);
+                return (
+                  <div key={f.clave} className="space-y-1">
+                    <div className="flex items-baseline gap-2">
+                      <span className="text-sm font-medium">{t(FACTOR_LBL[f.clave] ?? "hr.resumen.pantalla")}</span>
+                      <span className="text-[11px] text-muted-foreground">{t("hr.exp.factorPeso", { n: Math.round(f.peso * 100) })}</span>
+                      <span className="ml-auto text-sm font-semibold tabular-nums">
+                        {f.sub == null ? <span className="text-xs font-normal text-muted-foreground">{t("hr.exp.factorSinDato")}</span> : `${Math.round(f.sub)}%`}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="h-2 flex-1 overflow-hidden rounded-full bg-foreground/10">
+                        <div className={`h-full rounded-full ${f.sub == null ? "bg-transparent" : "bg-primary/70"}`} style={{ width: `${f.sub == null ? 0 : Math.round(f.sub)}%` }} />
+                      </div>
+                      {f.sub != null && (
+                        <span className="w-20 shrink-0 text-right text-[11px] text-muted-foreground">{t("hr.exp.factorAporta", { n: aporte(f.sub, f.peso) })}</span>
+                      )}
+                    </div>
+                    {pr && <p className="text-[11px] text-muted-foreground">{pr}</p>}
+                  </div>
+                );
+              })}
+            </div>
+
+            {reglaDura && (
+              <div className="flex items-start gap-2 rounded-xl border border-destructive/30 bg-destructive/5 px-3 py-2 text-[11px] text-destructive">
+                <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />{t("hr.exp.reglaDura")}
+              </div>
+            )}
+
+            {/* Qué pasó hoy: las faltas, o «ninguna» */}
+            <div className="border-t border-border/40 pt-3">
+              <p className="mb-1.5 text-xs font-semibold text-muted-foreground">{t("hr.exp.desgloseFaltas")}</p>
+              {dia.faltas.length === 0 ? (
+                <p className="text-[11px] text-muted-foreground">{t("hr.exp.desgloseSinFaltas")}</p>
+              ) : (
+                <div className="flex flex-col gap-1">
+                  {dia.faltas.slice(0, 8).map((f) => {
+                    const lbl = LABEL_FALTA[f.tipo as FaltaTipo];
+                    return (
+                      <div key={f.id} className="flex items-center gap-2 text-[11px]">
+                        <AlertTriangle className="h-3 w-3 shrink-0 text-destructive/70" />
+                        <span className="min-w-0 flex-1 truncate">{lbl ? t(lbl) : f.tipo}</span>
+                        <span className="shrink-0 tabular-nums text-muted-foreground">{format(new Date(f.createdAt), "HH:mm")}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            <p className="text-[11px] italic text-muted-foreground">{t("hr.exp.desglosePrueba")}</p>
+          </div>
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 export default function HRExpediente() {
   const { userId } = useParams<{ userId: string }>();
   const { t } = useLanguage();
@@ -280,6 +395,7 @@ export default function HRExpediente() {
   // Se abre en HOY. El día elegido manda; el mes sale de él (para cargar y para el calendario).
   const [diaSel, setDiaSel] = useState<string>(hoyStr);
   const [verCalendario, setVerCalendario] = useState(false);
+  const [verDesglose, setVerDesglose] = useState(false);
   const anio = Number(diaSel.slice(0, 4));
   const mes = Number(diaSel.slice(5, 7));
   const { expediente, cargando, error, hoy } = useExpedienteEmpleado(userId ?? null, anio, mes);
@@ -393,33 +509,37 @@ export default function HRExpediente() {
             </div>
           )}
 
-          {/* Stats del día */}
+          {/* Stats del día — TOCA cualquiera para ver el desglose de la nota
+              (de qué se arma el número) + la prueba (Alvaro, 04/11). */}
           <div className="mt-4 grid grid-cols-3 gap-2 sm:grid-cols-5">
-            <div className={`rounded-panel border p-2.5 text-center ${c ? c.bg : "border-border/40 bg-card/40"}`}>
+            <button type="button" onClick={() => setVerDesglose(true)} title={t("hr.exp.desgloseTitulo")} className={`rounded-panel border p-2.5 text-center transition hover:ring-2 hover:ring-primary/40 ${c ? c.bg : "border-border/40 bg-card/40"}`}>
               <div className={`font-display text-lg font-bold tabular-nums ${c?.tx ?? ""}`}>{dia.nota.valor ?? "—"}</div>
               <div className="text-[10px] text-muted-foreground">{t("hr.exp.nota")}</div>
-            </div>
+            </button>
             {/* % de atención del día: el sí-o-no con número */}
-            <div
-              className="rounded-panel border border-border/40 bg-card/40 p-2.5 text-center"
-              title={atencion ? t("hr.exp.atencionDetalle", { ok: atencion.ok, n: atencion.n }) : undefined}
+            <button
+              type="button"
+              onClick={() => setVerDesglose(true)}
+              className="rounded-panel border border-border/40 bg-card/40 p-2.5 text-center transition hover:ring-2 hover:ring-primary/40"
+              title={atencion ? t("hr.exp.atencionDetalle", { ok: atencion.ok, n: atencion.n }) : t("hr.exp.desgloseTitulo")}
             >
               <div className={`font-display text-lg font-bold tabular-nums ${tonoAt}`}>{atencion ? `${atencion.pct}%` : "—"}</div>
               <div className="text-[10px] text-muted-foreground">{t("hr.exp.atencion")}</div>
-            </div>
-            <div className="rounded-panel border border-border/40 bg-card/40 p-2.5 text-center">
+            </button>
+            <button type="button" onClick={() => setVerDesglose(true)} title={t("hr.exp.desgloseTitulo")} className="rounded-panel border border-border/40 bg-card/40 p-2.5 text-center transition hover:ring-2 hover:ring-primary/40">
               <div className="font-display text-lg font-bold tabular-nums">{dia.horas.toFixed(1)}h</div>
               <div className="text-[10px] text-muted-foreground">{t("hr.exp.horas")}</div>
-            </div>
-            <div className="rounded-panel border border-border/40 bg-card/40 p-2.5 text-center">
+            </button>
+            <button type="button" onClick={() => setVerDesglose(true)} title={t("hr.exp.desgloseTitulo")} className="rounded-panel border border-border/40 bg-card/40 p-2.5 text-center transition hover:ring-2 hover:ring-primary/40">
               <div className="font-display text-lg font-bold tabular-nums">{dia.faltas.length}</div>
               <div className="text-[10px] text-muted-foreground">{t("hr.exp.faltas")}</div>
-            </div>
-            <div className="rounded-panel border border-border/40 bg-card/40 p-2.5 text-center">
+            </button>
+            <button type="button" onClick={() => setVerDesglose(true)} title={t("hr.exp.desgloseTitulo")} className="rounded-panel border border-border/40 bg-card/40 p-2.5 text-center transition hover:ring-2 hover:ring-primary/40">
               <div className="font-display text-lg font-bold tabular-nums">{Math.round(dia.minutosPausaDeMas)}m</div>
               <div className="text-[10px] text-muted-foreground">{t("hr.exp.pausas")}</div>
-            </div>
+            </button>
           </div>
+          {verDesglose && <DesgloseNota dia={dia} atencion={atencion} t={t} onClose={() => setVerDesglose(false)} />}
         </div>
       </section>
 
