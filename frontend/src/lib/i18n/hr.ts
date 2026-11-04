@@ -1137,6 +1137,7 @@ export const hr = {
   "hr.panel.sinFallas": { es: "Sin fallas hoy", en: "No issues today" },
   "hr.panel.fallasResumen": { es: "{veces} fallas · {min} min", en: "{veces} issues · {min} min" },
   "hr.panel.fallaResumenUno": { es: "1 falla · {min} min", en: "1 issue · {min} min" },
+  "hr.panel.factorHoras": { es: "Horas", en: "Hours" },
   "hr.panel.equipoTitulo": { es: "Todo el equipo", en: "Whole team" },
   "hr.panel.vacio": { es: "Aún no hay actividad hoy", en: "No activity yet today" },
   "hr.panel.error": { es: "No se pudo cargar el panel", en: "Couldn't load the board" },

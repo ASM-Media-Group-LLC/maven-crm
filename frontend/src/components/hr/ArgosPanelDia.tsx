@@ -38,16 +38,36 @@ const fallaPrincipal = (bajones: BajonDia[]): BajonDia | null =>
   bajones.length ? [...bajones].sort((a, b) => b.minutos - a.minutos)[0] : null;
 
 // Un número grande del día (tile sobrio): etiqueta, cifra y una línea chica.
-function Tile({ icon: Icon, label, valor, sub }: { icon: typeof Camera; label: string; valor: string; sub?: string }) {
+// `malo` pone la cifra en ROJO: así el número problemático salta a la vista.
+function Tile({ icon: Icon, label, valor, sub, malo }: { icon: typeof Camera; label: string; valor: string; sub?: string; malo?: boolean }) {
   return (
-    <div className="flex flex-col gap-2 rounded-2xl border border-border/40 bg-card/20 p-4">
+    <div className={`flex flex-col gap-2 rounded-2xl border p-4 ${malo ? "border-destructive/40 bg-destructive/5" : "border-border/40 bg-card/20"}`}>
       <div className="flex items-center gap-2 text-muted-foreground">
-        <Icon className="h-4 w-4 shrink-0" />
+        <Icon className={`h-4 w-4 shrink-0 ${malo ? "text-destructive/80" : ""}`} />
         <span className="truncate text-xs">{label}</span>
       </div>
-      <div className="font-display text-2xl font-bold leading-none tabular-nums">{valor}</div>
+      <div className={`font-display text-2xl font-bold leading-none tabular-nums ${malo ? "text-destructive" : ""}`}>{valor}</div>
       {sub && <div className="text-[11px] text-muted-foreground">{sub}</div>}
     </div>
+  );
+}
+
+// El semáforo de una persona (de la banda de su nota): color del borde y texto.
+const SEMAFORO: Record<string, { barra: string; texto: string; punto: string }> = {
+  bien: { barra: "border-l-success/70", texto: "text-success", punto: "bg-success" },
+  ojo: { barra: "border-l-warning/70", texto: "text-warning", punto: "bg-warning" },
+  mal: { barra: "border-l-destructive/80", texto: "text-destructive", punto: "bg-destructive" },
+  sin: { barra: "border-l-border", texto: "text-muted-foreground", punto: "bg-muted-foreground/40" },
+};
+
+// Un factor de la nota (Pantalla/Cámara/Atención/Horas) para explicar el porqué.
+// Pantalla baja va en ROJO: es el problema #1 que Alvaro quiere ver marcado.
+function FactorChip({ label, sub, alerta }: { label: string; sub: number | null; alerta?: boolean }) {
+  const bajo = alerta && sub != null && sub < 50;
+  return (
+    <span className={`text-[11px] ${bajo ? "font-semibold text-destructive" : "text-muted-foreground"}`}>
+      {label} <span className="tabular-nums">{sub == null ? "—" : `${Math.round(sub)}%`}</span>
+    </span>
   );
 }
 
@@ -75,39 +95,43 @@ function PodioFila({ i, p, t, onClick }: { i: number; p: PersonaResumen; t: Tr; 
   );
 }
 
-// Un renglón del equipo completo: cara, nombre, falla principal y la nota discreta.
+// Un renglón del equipo: SEMÁFORO (barra de color = su banda, los rojos saltan),
+// cara, nombre, la falla principal, la nota 0–100 EXPLICADA (sus 4 factores) y el
+// puntaje. Pantalla baja marcada en rojo (el problema #1 que Alvaro quiere ver).
 function EquipoFila({ p, t, onClick }: { p: PersonaResumen; t: Tr; onClick: () => void }) {
   const nombre = p.nombre || t("hr.noName");
   const fp = fallaPrincipal(p.bajones);
   const abierto = p.bajones.some((b) => b.abierto);
-  const dot = p.nota.banda === "bien" ? "bg-success"
-    : p.nota.banda === "ojo" ? "bg-warning"
-    : p.nota.banda === "mal" ? "bg-destructive"
-    : "bg-muted-foreground/40";
+  const sem = SEMAFORO[p.nota.banda ?? "sin"];
+  const factor = (clave: string) => p.nota.factores.find((f) => f.clave === clave)?.sub ?? null;
   return (
     <button
       type="button"
       onClick={onClick}
       title={t("hr.atencion.verExpediente")}
-      className="group flex w-full items-center gap-3 rounded-2xl border border-border/40 bg-card/20 px-3.5 py-2.5 text-left transition-colors hover:border-primary/30 hover:bg-card/40"
+      className={`group flex w-full items-center gap-3 rounded-2xl border border-l-4 border-border/40 ${sem.barra} bg-card/20 px-3.5 py-2.5 text-left transition-colors hover:border-primary/30 hover:bg-card/40`}
     >
       <UserAvatar name={nombre} src={p.avatarUrl} seed={p.avatarSeed} size="sm" />
-      <div className="min-w-0 flex-1">
-        <span className="block truncate text-sm font-semibold">{nombre}</span>
-        {fp ? (
-          <span className="mt-0.5 inline-flex items-center gap-1.5 text-xs">
-            <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${abierto ? "bg-destructive animate-pulse" : "bg-muted-foreground/40"}`} />
-            <span className="text-foreground/80">{LBL_BAJON[fp.tipo] ? t(LBL_BAJON[fp.tipo]) : fp.tipo}</span>
-            {p.bajones.length > 1 && <span className="text-muted-foreground">+{p.bajones.length - 1}</span>}
-          </span>
-        ) : (
-          <span className="mt-0.5 block text-xs text-muted-foreground">{t("hr.resumen.sinNovedad")}</span>
-        )}
+      <div className="min-w-0 flex-1 space-y-1">
+        <div className="flex items-center gap-2">
+          <span className="truncate text-sm font-semibold">{nombre}</span>
+          {fp && (
+            <span className="inline-flex items-center gap-1 text-[11px] text-muted-foreground">
+              <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${abierto ? "bg-destructive animate-pulse" : "bg-muted-foreground/40"}`} />
+              {LBL_BAJON[fp.tipo] ? t(LBL_BAJON[fp.tipo]) : fp.tipo}
+              {p.bajones.length > 1 && <span className="text-muted-foreground/70">+{p.bajones.length - 1}</span>}
+            </span>
+          )}
+        </div>
+        {/* La nota EXPLICADA: los 4 factores. Pantalla baja en rojo. */}
+        <div className="flex flex-wrap gap-x-3 gap-y-0.5">
+          <FactorChip label={t("hr.resumen.pantalla")} sub={factor("pantalla")} alerta />
+          <FactorChip label={t("hr.resumen.camara")} sub={factor("camara")} />
+          <FactorChip label={t("hr.resumen.atencion")} sub={factor("atencion")} />
+          <FactorChip label={t("hr.panel.factorHoras")} sub={factor("horas")} />
+        </div>
       </div>
-      <span className="flex shrink-0 items-center gap-1.5">
-        <span className={`h-1.5 w-1.5 rounded-full ${dot}`} />
-        <span className="text-sm font-semibold tabular-nums text-foreground/80">{p.nota.valor ?? "—"}</span>
-      </span>
+      <span className={`shrink-0 font-display text-lg font-bold tabular-nums ${sem.texto}`}>{p.nota.valor ?? "—"}</span>
       <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground/60 transition group-hover:translate-x-0.5 group-hover:text-foreground" />
     </button>
   );
@@ -171,8 +195,8 @@ export function ArgosPanelDia() {
             <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
               <Tile icon={Sparkles} label={t("hr.panel.numAtencion")} valor={d.atencion == null ? "—" : `${d.atencion}%`} sub={t("hr.panel.promDe")} />
               <Tile icon={Camera} label={t("hr.panel.numCamara")} valor={d.camara == null ? "—" : `${d.camara}%`} sub={t("hr.panel.promDe")} />
-              <Tile icon={ScreenShare} label={t("hr.panel.numPantalla")} valor={d.pantalla == null ? "—" : `${d.pantalla}%`} sub={t("hr.panel.promDe")} />
-              <Tile icon={AlertTriangle} label={t("hr.panel.numProblema")} valor={`${d.enProblema}`} sub={t("hr.panel.numProblemaSub", { n: d.total })} />
+              <Tile icon={ScreenShare} label={t("hr.panel.numPantalla")} valor={d.pantalla == null ? "—" : `${d.pantalla}%`} sub={t("hr.panel.promDe")} malo={d.pantalla != null && d.pantalla < 50} />
+              <Tile icon={AlertTriangle} label={t("hr.panel.numProblema")} valor={`${d.enProblema}`} sub={t("hr.panel.numProblemaSub", { n: d.total })} malo={d.enProblema > 0} />
             </div>
 
             {/* Podio: mejores / ojo con — por MENOS fallas del día */}
