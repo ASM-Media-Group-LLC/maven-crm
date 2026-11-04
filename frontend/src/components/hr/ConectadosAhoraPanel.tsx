@@ -1,10 +1,26 @@
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Radio, Loader2, AlertTriangle, RefreshCw, ChevronRight, Sparkles } from "lucide-react";
+import { Radio, Loader2, AlertTriangle, RefreshCw } from "lucide-react";
 import { useLanguage } from "@/hooks/useLanguage";
 import { UserAvatar } from "@/components/UserAvatar";
 import { useCapturasVivo } from "@/hooks/useCapturasVivo";
 import { useSemaforos, PUNTO_SEM, type Semaforo } from "@/hooks/useSemaforos";
+
+// El ANILLO de color de cada cara en la muralla (mismo semáforo que el punto).
+const ANILLO_SEM: Record<Semaforo, string> = {
+  verde: "ring-success/70",
+  amarillo: "ring-warning/70",
+  naranja: "ring-orange-500/70",
+  rojo: "ring-destructive",
+  gris: "ring-border",
+};
+const TONO_SEM: Record<Semaforo, string> = {
+  verde: "text-success",
+  amarillo: "text-warning",
+  naranja: "text-orange-500",
+  rojo: "text-destructive",
+  gris: "text-muted-foreground",
+};
 
 // CONECTADOS AHORA — el TABLERO DE PERSONAL de Argos (Álvaro, 02/11). NO es la
 // muralla de fotos (eso es "Pantallazos en vivo"): aquí es QUIÉN está trabajando
@@ -124,42 +140,30 @@ export function ConectadosAhoraPanel() {
             <p className="text-sm">{t("hr.conectados.sinEnFiltro")}</p>
           </div>
         ) : (
-          <div className="flex flex-col gap-1.5">
+          /* MURALLA DE CARAS (Alvaro, 04/11): una rejilla de caras con ANILLO de
+             color = su semáforo, para leer el piso de un vistazo como una pared
+             de monitoreo. Los rojos (anillo rojo) saltan. Clic → su día. */
+          <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6">
             {orden.map((p) => {
               const nombre = p.nombre || t("hr.noName");
               const sem = semPorPersona.get(p.userId) ?? "gris";
               const estado = sem === "verde" ? t("hr.sem.trabajando") : sem === "amarillo" ? t("hr.sem.pausa") : sem === "naranja" ? t("hr.sem.sinPantalla") : sem === "rojo" ? t("hr.sem.problema") : t("hr.sem.esperando");
-              const tonoEstado = sem === "verde" ? "text-success" : sem === "amarillo" ? "text-warning" : sem === "naranja" ? "text-orange-500" : sem === "rojo" ? "text-destructive" : "text-muted-foreground";
               return (
                 <button
                   key={p.userId}
                   type="button"
                   onClick={() => navigate(`/hr/expediente/${p.userId}`, { state: { volverA: "/hr/monitor-ia?t=equipo" } })}
-                  title={t("hr.notas.verDia", { nombre })}
-                  className={`group flex w-full items-center gap-3 rounded-xl border bg-card/30 px-3 py-2.5 text-left transition-colors hover:bg-card/50 ${p.fueraDeLugar ? "border-destructive/50 hover:border-destructive" : "border-border/40 hover:border-primary/50"}`}
+                  title={`${nombre} · ${estado}`}
+                  className={`group flex flex-col items-center gap-1.5 rounded-2xl border bg-card/20 px-2 py-3 text-center transition-colors hover:bg-card/40 ${sem === "rojo" || sem === "naranja" ? "border-destructive/40" : "border-border/40 hover:border-primary/40"}`}
                 >
-                  {/* El semáforo manda: punto grande a la izquierda */}
-                  <span className={`h-3 w-3 shrink-0 rounded-full ${PUNTO_SEM[sem]}`} title={labelSem[sem]} aria-label={labelSem[sem]} />
-                  <UserAvatar name={nombre} src={p.avatarUrl} seed={p.avatarSeed} size="sm" status="online" />
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-1.5">
-                      <span className="truncate text-sm font-semibold">{nombre}</span>
-                      {p.fueraDeLugar && (
-                        <span className="inline-flex shrink-0 items-center gap-0.5 rounded bg-destructive px-1 py-0.5 text-[9px] font-semibold text-destructive-foreground">
-                          <AlertTriangle className="h-2.5 w-2.5" />{t("hr.pantallazos.fueraDeLugar")}
-                        </span>
-                      )}
-                    </div>
-                    <p className={`flex items-center gap-1 truncate text-xs ${p.fueraDeLugar ? "text-destructive" : "text-muted-foreground"}`}>
-                      <Sparkles className="h-3 w-3 shrink-0 opacity-60" />{p.veredicto || t("hr.pantallazos.analizando")}
-                    </p>
-                  </div>
-                  {/* El estado EN VIVO en palabras + la hora del último pantallazo */}
-                  <div className="flex shrink-0 flex-col items-end gap-0.5">
-                    <span className={`text-xs font-semibold ${tonoEstado}`}>{estado}</span>
-                    <span className="text-[10px] tabular-nums text-muted-foreground">{horaDe(p.ultima)}</span>
-                  </div>
-                  <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground transition group-hover:translate-x-0.5 group-hover:text-foreground" />
+                  {/* La cara con su anillo de color + el punto del semáforo */}
+                  <span className={`relative rounded-full p-0.5 ring-2 ${ANILLO_SEM[sem]}`}>
+                    <UserAvatar name={nombre} src={p.avatarUrl} seed={p.avatarSeed} size="lg" />
+                    <span className={`absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-background ${PUNTO_SEM[sem]}`} title={labelSem[sem]} aria-label={labelSem[sem]} />
+                  </span>
+                  <span className="w-full truncate text-xs font-semibold">{nombre}</span>
+                  <span className={`truncate text-[10px] font-medium ${TONO_SEM[sem]}`}>{estado}</span>
+                  <span className="text-[9px] tabular-nums text-muted-foreground/70">{horaDe(p.ultima)}</span>
                 </button>
               );
             })}
