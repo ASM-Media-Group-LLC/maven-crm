@@ -1117,6 +1117,8 @@ export const hr = {
   "hr.resumen.camara": { es: "Cámara", en: "Camera" },
   "hr.resumen.atencion": { es: "Atención", en: "Focus" },
   "hr.resumen.min": { es: "{n} min", en: "{n} min" },
+  "hr.resumen.ahora": { es: "ahora", en: "now" },
+  "hr.resumen.sinNovedad": { es: "Sin novedades", en: "All clear" },
   "hr.resumen.bajon.camara": { es: "Cámara apagada", en: "Camera off" },
   "hr.resumen.bajon.seFue": { es: "Se fue de cámara", en: "Left the camera" },
   "hr.resumen.bajon.sinSenal": { es: "Sin señal", en: "No signal" },
