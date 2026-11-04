@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
@@ -7,7 +7,6 @@ import { Button } from "@/components/ui/button";
 import { useLanguage } from "@/hooks/useLanguage";
 import { UserAvatar } from "@/components/UserAvatar";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
-import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
 import { Page } from "@/components/ui/page";
 import { PageHeader } from "@/components/ui/page-header";
 import { useExpedienteEmpleado, type DiaExpediente, type CapturaDia } from "@/hooks/useExpedienteEmpleado";
@@ -325,11 +324,13 @@ function DesgloseNotaContenido({ dia, atencion, t, compacto }: {
 
   return (
     <div className="flex flex-col gap-4">
-      {/* La nota grande + su banda */}
-      <div className={`flex items-center gap-3 rounded-2xl border p-3 ${bandaTono?.bg ?? "border-border/40 bg-card/40"}`}>
-        <span className={`font-display text-3xl font-bold tabular-nums ${bandaTono?.tx ?? ""}`}>{nota.valor}</span>
-        <span className="text-xs text-muted-foreground">{t("hr.exp.desgloseSub", { valor: nota.valor })}</span>
-      </div>
+      {/* La nota grande + su banda (no en la versión inline: el tile ya la muestra) */}
+      {!compacto && (
+        <div className={`flex items-center gap-3 rounded-2xl border p-3 ${bandaTono?.bg ?? "border-border/40 bg-card/40"}`}>
+          <span className={`font-display text-3xl font-bold tabular-nums ${bandaTono?.tx ?? ""}`}>{nota.valor}</span>
+          <span className="text-xs text-muted-foreground">{t("hr.exp.desgloseSub", { valor: nota.valor })}</span>
+        </div>
+      )}
 
       {/* Los factores: % real, barra, aporte en puntos y la prueba */}
       <div className="flex flex-col gap-3">
@@ -364,78 +365,34 @@ function DesgloseNotaContenido({ dia, atencion, t, compacto }: {
         </div>
       )}
 
-      {/* Qué pasó hoy: las faltas, o «ninguna» */}
-      <div className="border-t border-border/40 pt-3">
-        <p className="mb-1.5 text-xs font-semibold text-muted-foreground">{t("hr.exp.desgloseFaltas")}</p>
-        {dia.faltas.length === 0 ? (
-          <p className="text-[11px] text-muted-foreground">{t("hr.exp.desgloseSinFaltas")}</p>
-        ) : (
-          <div className="flex flex-col gap-1">
-            {dia.faltas.slice(0, 8).map((f) => {
-              const lbl = LABEL_FALTA[f.tipo as FaltaTipo];
-              return (
-                <div key={f.id} className="flex items-center gap-2 text-[11px]">
-                  <AlertTriangle className="h-3 w-3 shrink-0 text-destructive/70" />
-                  <span className="min-w-0 flex-1 truncate">{lbl ? t(lbl) : f.tipo}</span>
-                  <span className="shrink-0 tabular-nums text-muted-foreground">{format(new Date(f.createdAt), "HH:mm")}</span>
-                </div>
-              );
-            })}
+      {/* Qué pasó hoy + nota de la prueba: solo en el pop-up completo. En la
+          versión inline las faltas ya están listadas abajo en la página. */}
+      {!compacto && (
+        <>
+          <div className="border-t border-border/40 pt-3">
+            <p className="mb-1.5 text-xs font-semibold text-muted-foreground">{t("hr.exp.desgloseFaltas")}</p>
+            {dia.faltas.length === 0 ? (
+              <p className="text-[11px] text-muted-foreground">{t("hr.exp.desgloseSinFaltas")}</p>
+            ) : (
+              <div className="flex flex-col gap-1">
+                {dia.faltas.slice(0, 8).map((f) => {
+                  const lbl = LABEL_FALTA[f.tipo as FaltaTipo];
+                  return (
+                    <div key={f.id} className="flex items-center gap-2 text-[11px]">
+                      <AlertTriangle className="h-3 w-3 shrink-0 text-destructive/70" />
+                      <span className="min-w-0 flex-1 truncate">{lbl ? t(lbl) : f.tipo}</span>
+                      <span className="shrink-0 tabular-nums text-muted-foreground">{format(new Date(f.createdAt), "HH:mm")}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
-        )}
-      </div>
 
-      <p className="text-[11px] italic text-muted-foreground">{t("hr.exp.desglosePrueba")}</p>
+          <p className="text-[11px] italic text-muted-foreground">{t("hr.exp.desglosePrueba")}</p>
+        </>
+      )}
     </div>
-  );
-}
-
-// El pop-up de CLIC (sobre todo para móvil, donde no hay hover): el mismo
-// desglose dentro de un diálogo.
-function DesgloseNota({ dia, atencion, t, onClose }: {
-  dia: DiaExpediente;
-  atencion: { pct: number; ok: number; n: number } | null;
-  t: Tr;
-  onClose: () => void;
-}) {
-  return (
-    <Dialog open onOpenChange={(o) => { if (!o) onClose(); }}>
-      <DialogContent className="max-w-md">
-        <DialogTitle className="flex items-center gap-2 text-base">
-          <Gauge className="h-4 w-4 text-primary" />{t("hr.exp.desgloseTitulo")}
-        </DialogTitle>
-        <DesgloseNotaContenido dia={dia} atencion={atencion} t={t} />
-      </DialogContent>
-    </Dialog>
-  );
-}
-
-// Una casilla del día (Nota, Atención, Horas, Faltas, Pausas): al PASAR EL CURSOR
-// por encima (hover) muestra el desglose de la nota en una tarjeta; al TOCAR abre
-// el mismo desglose en pop-up (para móvil, donde no hay hover). Alvaro, 04/11:
-// «cuando me pongo arriba de esto no me sale ningún pop-up del desglose».
-function CasillaDelDia({ dia, atencion, t, onClick, title, className, children }: {
-  dia: DiaExpediente;
-  atencion: { pct: number; ok: number; n: number } | null;
-  t: Tr;
-  onClick: () => void;
-  title: string;
-  className: string;
-  children: ReactNode;
-}) {
-  return (
-    <HoverCard openDelay={100} closeDelay={60}>
-      <HoverCardTrigger asChild>
-        <button type="button" onClick={onClick} title={title} className={className}>{children}</button>
-      </HoverCardTrigger>
-      {/* Superficie ELEVADA sólida (bg-muted, más clara que la página) + borde
-          con acento + sombra: el popover por defecto es casi del mismo negro que
-          la página y translúcido, y el cuerpo se perdía. Sin blur (no compone). */}
-      <HoverCardContent align="start" className="max-h-[80vh] w-80 overflow-y-auto border-primary/30 bg-muted shadow-2xl backdrop-blur-none">
-        <p className="mb-2 flex items-center gap-2 text-sm font-semibold"><Gauge className="h-4 w-4 text-primary" />{t("hr.exp.desgloseTitulo")}</p>
-        <DesgloseNotaContenido dia={dia} atencion={atencion} t={t} />
-      </HoverCardContent>
-    </HoverCard>
   );
 }
 
@@ -451,7 +408,6 @@ export default function HRExpediente() {
   // Se abre en HOY. El día elegido manda; el mes sale de él (para cargar y para el calendario).
   const [diaSel, setDiaSel] = useState<string>(hoyStr);
   const [verCalendario, setVerCalendario] = useState(false);
-  const [verDesglose, setVerDesglose] = useState(false);
   const anio = Number(diaSel.slice(0, 4));
   const mes = Number(diaSel.slice(5, 7));
   const { expediente, cargando, error, hoy } = useExpedienteEmpleado(userId ?? null, anio, mes);
@@ -565,32 +521,40 @@ export default function HRExpediente() {
             </div>
           )}
 
-          {/* Stats del día — PASA EL CURSOR por encima (hover) para ver el
-              desglose de la nota; TÓCALA (móvil) para abrirlo en pop-up. */}
+          {/* Stats del día */}
           <div className="mt-4 grid grid-cols-3 gap-2 sm:grid-cols-5">
-            <CasillaDelDia dia={dia} atencion={atencion} t={t} onClick={() => setVerDesglose(true)} title={t("hr.exp.desgloseTitulo")} className={`rounded-panel border p-2.5 text-center transition hover:ring-2 hover:ring-primary/40 ${c ? c.bg : "border-border/40 bg-card/40"}`}>
+            <div className={`rounded-panel border p-2.5 text-center ${c ? c.bg : "border-border/40 bg-card/40"}`}>
               <div className={`font-display text-lg font-bold tabular-nums ${c?.tx ?? ""}`}>{dia.nota.valor ?? "—"}</div>
               <div className="text-[10px] text-muted-foreground">{t("hr.exp.nota")}</div>
-            </CasillaDelDia>
+            </div>
             {/* % de atención del día: el sí-o-no con número */}
-            <CasillaDelDia dia={dia} atencion={atencion} t={t} onClick={() => setVerDesglose(true)} title={atencion ? t("hr.exp.atencionDetalle", { ok: atencion.ok, n: atencion.n }) : t("hr.exp.desgloseTitulo")} className="rounded-panel border border-border/40 bg-card/40 p-2.5 text-center transition hover:ring-2 hover:ring-primary/40">
+            <div className="rounded-panel border border-border/40 bg-card/40 p-2.5 text-center" title={atencion ? t("hr.exp.atencionDetalle", { ok: atencion.ok, n: atencion.n }) : undefined}>
               <div className={`font-display text-lg font-bold tabular-nums ${tonoAt}`}>{atencion ? `${atencion.pct}%` : "—"}</div>
               <div className="text-[10px] text-muted-foreground">{t("hr.exp.atencion")}</div>
-            </CasillaDelDia>
-            <CasillaDelDia dia={dia} atencion={atencion} t={t} onClick={() => setVerDesglose(true)} title={t("hr.exp.desgloseTitulo")} className="rounded-panel border border-border/40 bg-card/40 p-2.5 text-center transition hover:ring-2 hover:ring-primary/40">
+            </div>
+            <div className="rounded-panel border border-border/40 bg-card/40 p-2.5 text-center">
               <div className="font-display text-lg font-bold tabular-nums">{dia.horas.toFixed(1)}h</div>
               <div className="text-[10px] text-muted-foreground">{t("hr.exp.horas")}</div>
-            </CasillaDelDia>
-            <CasillaDelDia dia={dia} atencion={atencion} t={t} onClick={() => setVerDesglose(true)} title={t("hr.exp.desgloseTitulo")} className="rounded-panel border border-border/40 bg-card/40 p-2.5 text-center transition hover:ring-2 hover:ring-primary/40">
+            </div>
+            <div className="rounded-panel border border-border/40 bg-card/40 p-2.5 text-center">
               <div className="font-display text-lg font-bold tabular-nums">{dia.faltas.length}</div>
               <div className="text-[10px] text-muted-foreground">{t("hr.exp.faltas")}</div>
-            </CasillaDelDia>
-            <CasillaDelDia dia={dia} atencion={atencion} t={t} onClick={() => setVerDesglose(true)} title={t("hr.exp.desgloseTitulo")} className="rounded-panel border border-border/40 bg-card/40 p-2.5 text-center transition hover:ring-2 hover:ring-primary/40">
+            </div>
+            <div className="rounded-panel border border-border/40 bg-card/40 p-2.5 text-center">
               <div className="font-display text-lg font-bold tabular-nums">{Math.round(dia.minutosPausaDeMas)}m</div>
               <div className="text-[10px] text-muted-foreground">{t("hr.exp.pausas")}</div>
-            </CasillaDelDia>
+            </div>
           </div>
-          {verDesglose && <DesgloseNota dia={dia} atencion={atencion} t={t} onClose={() => setVerDesglose(false)} />}
+
+          {/* Desglose de la nota SIEMPRE A LA VISTA (Alvaro, 04/11): de qué se
+              arma el número — cada factor con su %, su aporte y la prueba. Sin
+              hover ni clic, para que se entienda de una. */}
+          <div className="mt-3 rounded-2xl border border-border/40 bg-card/20 p-3.5">
+            <p className="mb-2.5 flex items-center gap-2 text-xs font-semibold text-muted-foreground">
+              <Gauge className="h-3.5 w-3.5 text-primary" />{t("hr.exp.desgloseTitulo")}
+            </p>
+            <DesgloseNotaContenido dia={dia} atencion={atencion} t={t} compacto />
+          </div>
         </div>
       </section>
 
