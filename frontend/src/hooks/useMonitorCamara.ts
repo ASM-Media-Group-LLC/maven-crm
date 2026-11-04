@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useLanguage } from "@/hooks/useLanguage";
 import { useMonitorEstado } from "@/hooks/useMonitorEstado";
-import type { FaceWatch } from "@/hooks/useFaceWatch";
+import type { FaceWatch, FaceState } from "@/hooks/useFaceWatch";
 import { TIPO_POR_CARA } from "@/lib/monitorFaltas";
 
 // Monitor de cámara de RRHH (Álvaro, 30/10). Corre en el navegador de la propia
@@ -118,6 +118,7 @@ async function guardarEnBuzon(
   track: MediaStreamTrack,
   tipo: "camara" | "pantalla",
   roomNombre: string | null,
+  caraVisible: boolean | null,
 ): Promise<void> {
   const b64 = await capturarJPEG(track);
   if (!b64) return;
@@ -133,7 +134,20 @@ async function guardarEnBuzon(
     room_nombre: roomNombre,
     analizado: false,
     en_nas: false,
+    // Solo para cámara: ¿el detector veía una cara en este instante? De aquí sale
+    // la cámara% REAL del día (momentos con cara ÷ momentos medidos), en vez del
+    // viejo 100% de adorno. Para pantalla no aplica (null).
+    cara_visible: caraVisible,
   });
+}
+
+/** ¿Había una cara cuando se tomó la foto? De `useFaceWatch`:
+ *  - ok / too_small / too_dark → el detector SÍ encontró una cara.
+ *  - no_face → cámara prendida pero no se ve a nadie.
+ *  - cam_off / unavailable → no se pudo medir (null, no cuenta ni a favor ni en contra). */
+function caraVisibleDeEstado(state: FaceState): boolean | null {
+  if (state === "unavailable" || state === "cam_off") return null;
+  return state !== "no_face";
 }
 
 export function useMonitorCamara({ track, trackPantalla = null, camaraRealOn, faceWatch, activo, roomNombre }: Params): void {
@@ -246,12 +260,12 @@ export function useMonitorCamara({ track, trackPantalla = null, camaraRealOn, fa
       try {
         const cam = trackRef.current;
         if (camRef.current && cam && cam.readyState === "live") {
-          await guardarEnBuzon(uid, cam, "camara", roomRef.current);
+          await guardarEnBuzon(uid, cam, "camara", roomRef.current, caraVisibleDeEstado(faceRef.current.state));
           guardoAlgo = true;
         }
         const pan = trackPantallaRef.current;
         if (pan && pan.readyState === "live") {
-          await guardarEnBuzon(uid, pan, "pantalla", roomRef.current);
+          await guardarEnBuzon(uid, pan, "pantalla", roomRef.current, null);
           guardoAlgo = true;
         }
       } catch {

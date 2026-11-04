@@ -185,7 +185,9 @@ export function ArgosPanelDia() {
     const activos = personas.filter((p) => p.horas > 0 || p.bajones.length > 0 || p.nota.valor != null);
     const atencion = prom(personas.map((p) => p.atencionPct).filter((x): x is number => x != null));
     const juzgadasTotal = personas.reduce((a, p) => a + p.juzgadas, 0);
-    const camara = prom(personas.map((p) => p.camaraPct).filter((x): x is number => x != null));
+    const camaraVals = personas.map((p) => p.camaraPct).filter((x): x is number => x != null);
+    const camara = prom(camaraVals);
+    const camaraMedidos = camaraVals.length;
     const pantalla = prom(personas.map((p) => p.pantallaPct).filter((x): x is number => x != null));
     const enProblema = personas.filter((p) => p.bajones.some((b) => b.abierto) || (p.nota.valor != null && p.nota.valor < 60)).length;
     // Menos fallas primero (minutos, luego veces). Para "ojo con", al revés.
@@ -197,7 +199,7 @@ export function ArgosPanelDia() {
     const caja = (b: string | null) => personas.filter((p) => (p.nota.banda ?? "sin") === b);
     return {
       total: personas.length,
-      atencion, camara, pantalla, enProblema, juzgadasTotal,
+      atencion, camara, camaraMedidos, pantalla, enProblema, juzgadasTotal,
       mejores: porFallas.slice(0, 3),
       peores: [...porFallas].reverse().slice(0, 3),
       mal: caja("mal"), ojo: caja("ojo"), bien: caja("bien"), sin: caja("sin"),
@@ -238,15 +240,15 @@ export function ArgosPanelDia() {
                 icon={Sparkles}
                 label={t("hr.panel.numAtencion")}
                 valor={d.atencion == null ? "—" : `${d.atencion}%`}
-                sub={d.juzgadasTotal > 0 ? t("hr.panel.miradas", { n: d.juzgadasTotal }) : t("hr.panel.camaraSinMedir")}
+                sub={d.juzgadasTotal > 0 ? t("hr.panel.miradas", { n: d.juzgadasTotal }) : t("hr.panel.sinMiradas")}
                 flojo={d.juzgadasTotal < 30}
               />
               <Tile
                 icon={Camera}
                 label={t("hr.panel.numCamara")}
                 valor={d.camara == null ? "—" : `${d.camara}%`}
-                sub={t("hr.panel.camaraSinMedir")}
-                flojo
+                sub={d.camaraMedidos > 0 ? t("hr.panel.camaraSobre", { n: d.camaraMedidos }) : t("hr.panel.camaraNadie")}
+                flojo={d.camaraMedidos > 0 && d.camaraMedidos < 3}
               />
               <Tile icon={ScreenShare} label={t("hr.panel.numPantalla")} valor={d.pantalla == null ? "—" : `${d.pantalla}%`} sub={t("hr.panel.promDe")} malo={d.pantalla != null && d.pantalla < 50} />
               <Tile icon={AlertTriangle} label={t("hr.panel.numProblema")} valor={`${d.enProblema}`} sub={t("hr.panel.numProblemaSub", { n: d.total })} malo={d.enProblema > 0} />

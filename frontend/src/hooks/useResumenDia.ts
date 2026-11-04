@@ -39,7 +39,7 @@ export interface PersonaResumen {
 }
 
 interface FilaTiempo { user_id: string; seg_activo: number | string; }
-interface FilaMomentos { user_id: string; mom_camara: number | string; mom_pantalla: number | string; faltas_camara: number | string; juzgadas: number | string; juzgadas_ok: number | string; }
+interface FilaMomentos { user_id: string; mom_camara: number | string; mom_pantalla: number | string; faltas_camara: number | string; juzgadas: number | string; juzgadas_ok: number | string; mom_cara_ok: number | string; mom_cara_medida: number | string; }
 interface FilaAlerta { user_id: string; tipo: string; detalle: string | null; abierta_at: string; cerrada_at: string | null; }
 
 export function useResumenDia(dia: string) {
@@ -67,10 +67,10 @@ export function useResumenDia(dia: string) {
       // Momentos por persona: de TODO el tiempo conectada (capturas de cámara),
       // cuántos compartió pantalla y cuántos juzgó la IA en lo suyo. Pantalla% y
       // cámara% salen de aquí, no del ratito en Cowork (Alvaro, 02/11).
-      const momPor = new Map<string, { camara: number; pantalla: number; faltasCam: number }>();
+      const momPor = new Map<string, { camara: number; pantalla: number; caraOk: number; caraMedida: number }>();
       const atPor = new Map<string, { ok: number; n: number }>();
       for (const m of (momentosRes.data ?? []) as FilaMomentos[]) {
-        momPor.set(m.user_id, { camara: Number(m.mom_camara), pantalla: Number(m.mom_pantalla), faltasCam: Number(m.faltas_camara) });
+        momPor.set(m.user_id, { camara: Number(m.mom_camara), pantalla: Number(m.mom_pantalla), caraOk: Number(m.mom_cara_ok), caraMedida: Number(m.mom_cara_medida) });
         atPor.set(m.user_id, { ok: Number(m.juzgadas_ok), n: Number(m.juzgadas) });
       }
 
@@ -97,7 +97,10 @@ export function useResumenDia(dia: string) {
         const at = atPor.get(id);
         // Pantalla% = de todos los momentos conectada (cámara), cuántos compartió.
         const pantallaPct = m && m.camara > 0 ? Math.min(1, m.pantalla / m.camara) : undefined;
-        const camaraPct = m && m.camara > 0 ? m.camara / (m.camara + m.faltasCam) : undefined;
+        // Cámara% REAL: de los momentos de cámara que SE PUDIERON MEDIR, en cuántos
+        // había cara. Sin momentos medidos (no prendió cámara en ninguna llamada) =
+        // sin dato: no cuenta ni a favor ni en contra (ya no es el 100% de adorno).
+        const camaraPct = m && m.caraMedida > 0 ? m.caraOk / m.caraMedida : undefined;
         const atencionPct = at && at.n > 0 ? at.ok / at.n : undefined;
         const horas = horasPor.get(id) ?? 0;
         const nota = calcularNota({ pantallaPct, camaraPct, atencionPct, horasHechas: horas, horasMeta: META_DIA });
