@@ -30,7 +30,8 @@ const HORAS_BUZON = Number(Deno.env.get("ARGOS_NAS_HORAS") ?? 168); // 7 días e
 const DIAS_RETENCION = Number(Deno.env.get("ARGOS_NAS_DIAS") ?? 30); // retención en el NAS
 const VENCE_SUBIR = 12 * 3600;
 const VENCE_BORRAR = 10 * 60;
-const ARGOS_NS = "a6905000-0000-4000-8000-000000000001";
+const ARGOS_NS = "a6905000-0000-4000-8000-000000000001";       // fotos
+const ARGOS_NS_CLIPS = "a6905000-0000-4000-8000-000000000002"; // clips de video
 
 const CORS = {
   "Access-Control-Allow-Origin": "*",
@@ -104,88 +105,99 @@ Deno.serve(async (req: Request) => {
   if (!salud?.raices?.some((r) => r.ok)) { await diag("nas_caido"); return json({ ok: true, skip: "nas-caido" }); }
 
   const ahoraMs = Date.now();
-  const errores: string[] = [];
 
-  // ─── FASE 1: copiar buzón → NAS ────────────────────────────────────────────
-  const { data: pend } = await admin
-    .from("monitor_capturas")
-    .select("id, user_id, path, created_at")
-    .is("nas_path", null)
-    .not("path", "is", null)
-    .order("created_at", { ascending: true })
-    .limit(LOTE);
-  const aCopiar = (pend ?? []) as Fila[];
-  let movidas = 0;
-  await enTandas(aCopiar, CONCURRENCIA, async (f) => {
-    if (!f.path) return;
-    const dl = await admin.storage.from("monitor-capturas").download(f.path);
-    if (dl.error || !dl.data) { errores.push(`bajar: ${dl.error?.message ?? "vacio"}`); return; }
-    const bytes = new Uint8Array(await dl.data.arrayBuffer());
-    const nasKey = `${ARGOS_NS}/${f.user_id}/${f.id}`;
-    const permiso = await firmar({ op: "put", k: nasKey, max: bytes.length, e: ahoraMas(VENCE_SUBIR) });
-    let ok = false;
-    try {
-      const resp = await fetch(`${NAS}/o?t=${permiso}`, { method: "PUT", body: bytes, signal: AbortSignal.timeout(20_000) });
-      if (resp.status === 409) ok = true;
-      else if (resp.ok) {
-        const cuerpo = await resp.json().catch(() => ({})) as { recibo?: string };
-        const rec = cuerpo.recibo ? await verificar(cuerpo.recibo) : null;
-        ok = !!rec && rec.op === "recibo" && rec.k === nasKey;
-        if (!ok) errores.push("recibo-invalido");
-      } else errores.push(`put ${resp.status}`);
-    } catch (e) { errores.push(`put: ${(e as Error).message}`); }
-    if (!ok) return;
-    const { error: upErr } = await admin.from("monitor_capturas").update({ nas_path: nasKey }).eq("id", f.id);
-    if (upErr) { errores.push(`nas_path: ${upErr.message}`); return; }
-    movidas++;
-  });
+  // El ciclo buzón→NAS→borrado, igual para fotos (monitor_capturas) y clips
+  // (monitor_clips): misma mecánica, distinta tabla y espacio en el NAS (ns).
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const procesar = async (tabla: string, ns: string): Promise<{ movidas: number; pedidas: number; liberadas: number; purgadas: number; errores: string[] }> => {
+    const errores: string[] = [];
 
-  // ─── FASE 2: borrar del buzón lo que ya está en el NAS y tiene > HORAS_BUZON ─
-  const corteBuzon = new Date(ahoraMs - HORAS_BUZON * 3600_000).toISOString();
-  const { data: aBorrar } = await admin
-    .from("monitor_capturas")
-    .select("id, path")
-    .not("nas_path", "is", null)
-    .eq("en_nas", false)
-    .not("path", "is", null)
-    .lt("created_at", corteBuzon)
-    .order("created_at", { ascending: true })
-    .limit(BORRAR_LOTE);
-  const borrarFilas = (aBorrar ?? []) as Array<{ id: string; path: string }>;
-  let liberadas = 0;
-  if (borrarFilas.length) {
-    const paths = borrarFilas.map((r) => r.path);
-    const { error: rmErr } = await admin.storage.from("monitor-capturas").remove(paths);
-    if (rmErr) errores.push(`remove: ${rmErr.message}`);
-    // Aunque el remove falle en alguno, marcamos en_nas (la copia del NAS existe):
-    // el objeto huérfano del buzón lo barre un remove futuro; nunca se pierde la foto.
-    const { error: mErr } = await admin.from("monitor_capturas").update({ en_nas: true }).in("id", borrarFilas.map((r) => r.id));
-    if (mErr) errores.push(`en_nas: ${mErr.message}`); else liberadas = borrarFilas.length;
-  }
-
-  // ─── FASE 3: retención — borrar del NAS y de la base lo de > DIAS_RETENCION ──
-  const corteRet = new Date(ahoraMs - DIAS_RETENCION * 86400_000).toISOString();
-  const { data: aPurgar } = await admin
-    .from("monitor_capturas")
-    .select("id, path, nas_path, en_nas")
-    .lt("created_at", corteRet)
-    .order("created_at", { ascending: true })
-    .limit(BORRAR_LOTE);
-  const purgar = (aPurgar ?? []) as Array<{ id: string; path: string | null; nas_path: string | null; en_nas: boolean }>;
-  let purgadas = 0;
-  if (purgar.length) {
-    // Borra del NAS las que estén allá.
-    await enTandas(purgar.filter((p) => p.nas_path), CONCURRENCIA, async (p) => {
-      const permiso = await firmar({ op: "borrar", k: p.nas_path, e: ahoraMas(VENCE_BORRAR) });
-      await fetch(`${NAS}/o?t=${permiso}`, { method: "DELETE", signal: AbortSignal.timeout(15_000) }).catch(() => {});
+    // ─── FASE 1: copiar buzón → NAS ──────────────────────────────────────────
+    const { data: pend } = await admin
+      .from(tabla)
+      .select("id, user_id, path, created_at")
+      .is("nas_path", null)
+      .not("path", "is", null)
+      .order("created_at", { ascending: true })
+      .limit(LOTE);
+    const aCopiar = (pend ?? []) as Fila[];
+    let movidas = 0;
+    await enTandas(aCopiar, CONCURRENCIA, async (f) => {
+      if (!f.path) return;
+      const dl = await admin.storage.from("monitor-capturas").download(f.path);
+      if (dl.error || !dl.data) { errores.push(`bajar: ${dl.error?.message ?? "vacio"}`); return; }
+      const bytes = new Uint8Array(await dl.data.arrayBuffer());
+      const nasKey = `${ns}/${f.user_id}/${f.id}`;
+      const permiso = await firmar({ op: "put", k: nasKey, max: bytes.length, e: ahoraMas(VENCE_SUBIR) });
+      let ok = false;
+      try {
+        const resp = await fetch(`${NAS}/o?t=${permiso}`, { method: "PUT", body: bytes, signal: AbortSignal.timeout(30_000) });
+        if (resp.status === 409) ok = true;
+        else if (resp.ok) {
+          const cuerpo = await resp.json().catch(() => ({})) as { recibo?: string };
+          const rec = cuerpo.recibo ? await verificar(cuerpo.recibo) : null;
+          ok = !!rec && rec.op === "recibo" && rec.k === nasKey;
+          if (!ok) errores.push("recibo-invalido");
+        } else errores.push(`put ${resp.status}`);
+      } catch (e) { errores.push(`put: ${(e as Error).message}`); }
+      if (!ok) return;
+      const { error: upErr } = await admin.from(tabla).update({ nas_path: nasKey }).eq("id", f.id);
+      if (upErr) { errores.push(`nas_path: ${upErr.message}`); return; }
+      movidas++;
     });
-    // Barre del buzón las que no llegaron a mudarse.
-    const enBuzon = purgar.filter((p) => !p.en_nas && p.path).map((p) => p.path!) as string[];
-    if (enBuzon.length) await admin.storage.from("monitor-capturas").remove(enBuzon).catch(() => {});
-    const { error: dErr } = await admin.from("monitor_capturas").delete().in("id", purgar.map((p) => p.id));
-    if (dErr) errores.push(`purgar: ${dErr.message}`); else purgadas = purgar.length;
-  }
 
-  await diag("fin", { movidas, pedidas: aCopiar.length, liberadas, purgadas, errores: errores.slice(0, 5) });
-  return json({ ok: true, movidas, liberadas, purgadas, errores: errores.slice(0, 5) });
+    // ─── FASE 2: borrar del buzón lo que ya está en el NAS y tiene > HORAS_BUZON ─
+    const corteBuzon = new Date(ahoraMs - HORAS_BUZON * 3600_000).toISOString();
+    const { data: aBorrar } = await admin
+      .from(tabla)
+      .select("id, path")
+      .not("nas_path", "is", null)
+      .eq("en_nas", false)
+      .not("path", "is", null)
+      .lt("created_at", corteBuzon)
+      .order("created_at", { ascending: true })
+      .limit(BORRAR_LOTE);
+    const borrarFilas = (aBorrar ?? []) as Array<{ id: string; path: string }>;
+    let liberadas = 0;
+    if (borrarFilas.length) {
+      const paths = borrarFilas.map((r) => r.path);
+      const { error: rmErr } = await admin.storage.from("monitor-capturas").remove(paths);
+      if (rmErr) errores.push(`remove: ${rmErr.message}`);
+      const { error: mErr } = await admin.from(tabla).update({ en_nas: true }).in("id", borrarFilas.map((r) => r.id));
+      if (mErr) errores.push(`en_nas: ${mErr.message}`); else liberadas = borrarFilas.length;
+    }
+
+    // ─── FASE 3: retención — borrar del NAS y de la base lo de > DIAS_RETENCION ──
+    const corteRet = new Date(ahoraMs - DIAS_RETENCION * 86400_000).toISOString();
+    const { data: aPurgar } = await admin
+      .from(tabla)
+      .select("id, path, nas_path, en_nas")
+      .lt("created_at", corteRet)
+      .order("created_at", { ascending: true })
+      .limit(BORRAR_LOTE);
+    const purgar = (aPurgar ?? []) as Array<{ id: string; path: string | null; nas_path: string | null; en_nas: boolean }>;
+    let purgadas = 0;
+    if (purgar.length) {
+      await enTandas(purgar.filter((p) => p.nas_path), CONCURRENCIA, async (p) => {
+        const permiso = await firmar({ op: "borrar", k: p.nas_path, e: ahoraMas(VENCE_BORRAR) });
+        await fetch(`${NAS}/o?t=${permiso}`, { method: "DELETE", signal: AbortSignal.timeout(15_000) }).catch(() => {});
+      });
+      const enBuzon = purgar.filter((p) => !p.en_nas && p.path).map((p) => p.path!) as string[];
+      if (enBuzon.length) await admin.storage.from("monitor-capturas").remove(enBuzon).catch(() => {});
+      const { error: dErr } = await admin.from(tabla).delete().in("id", purgar.map((p) => p.id));
+      if (dErr) errores.push(`purgar: ${dErr.message}`); else purgadas = purgar.length;
+    }
+
+    return { movidas, pedidas: aCopiar.length, liberadas, purgadas, errores };
+  };
+
+  const fotos = await procesar("monitor_capturas", ARGOS_NS);
+  const clips = await procesar("monitor_clips", ARGOS_NS_CLIPS);
+
+  await diag("fin", {
+    movidas: fotos.movidas, pedidas: fotos.pedidas, liberadas: fotos.liberadas, purgadas: fotos.purgadas,
+    clips: { movidas: clips.movidas, pedidas: clips.pedidas, liberadas: clips.liberadas, purgadas: clips.purgadas },
+    errores: [...fotos.errores, ...clips.errores].slice(0, 5),
+  });
+  return json({ ok: true, fotos, clips });
 });

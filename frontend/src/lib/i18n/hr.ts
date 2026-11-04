@@ -1087,6 +1087,13 @@ export const hr = {
   "hr.exp.calendario": { es: "Calendario", en: "Calendar" },
   "hr.exp.error": { es: "No se pudo cargar el expediente", en: "Could not load the record" },
   "hr.exp.volverArgos": { es: "Volver a Argos", en: "Back to Argos" },
+  // Clips de video del expediente
+  "hr.exp.clipsDia": { es: "Clips de video del día", en: "Video clips of the day" },
+  "hr.exp.sinClips": { es: "Sin clips este día", en: "No clips this day" },
+  "hr.exp.clipArchivado": { es: "Archivado en el NAS", en: "Archived in the NAS" },
+  "hr.exp.clipDistraido": { es: "Distraído", en: "Distracted" },
+  "hr.exp.clipSeFue": { es: "No miraba la cámara", en: "Not looking at camera" },
+  "hr.exp.clipLejos": { es: "Fuera de cuadro", en: "Off frame" },
   // Mensaje corto por color de semáforo, para la muralla de pantallazos
   "hr.sem.msg.verde": { es: "En lo suyo", en: "On task" },
   "hr.sem.msg.amarillo": { es: "En pausa — ojo", en: "On a break — watch" },
