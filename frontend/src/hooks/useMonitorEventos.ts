@@ -102,10 +102,14 @@ export function useMonitorEventos(limite = 300) {
   };
 }
 
-/** URL firmada (2 min) para ver una captura del BUZÓN (bucket privado de Supabase). */
+/** URL firmada (1 hora) para ver una captura del BUZÓN (bucket privado de Supabase).
+ *  Antes caducaba a los 2 min: si el supervisor dejaba el Expediente abierto un
+ *  rato, TODAS las miniaturas se rompían (ícono de imagen rota) porque la firma
+ *  vencía y no se re-firmaba. 1 h cubre cualquier sesión de revisión (igual que
+ *  el resto de firmados de la app). Alvaro, 04/11. */
 export async function urlCaptura(path: string): Promise<string | null> {
   try {
-    const { data } = await supabase.storage.from("monitor-capturas").createSignedUrl(path, 120);
+    const { data } = await supabase.storage.from("monitor-capturas").createSignedUrl(path, 3600);
     return data?.signedUrl ?? null;
   } catch {
     return null;

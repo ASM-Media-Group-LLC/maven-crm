@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
@@ -81,6 +81,17 @@ function TiraDelDia({ capturas, t }: { capturas: CapturaDia[]; t: Tr }) {
   const visibles = useMemo(() => momentos.slice(0, TOPE_MOMENTOS), [momentos]);
   const [urls, setUrls] = useState<Record<string, string>>({});
 
+  // Si una miniatura del buzón falla (p. ej. la firma venció tras una sesión
+  // larga), se RE-FIRMA sola una vez — así nunca queda el ícono de imagen rota.
+  // Las del NAS se firman por argos-foto, no acá. Alvaro, 04/11.
+  const refirmados = useRef<Set<string>>(new Set());
+  const reFirmar = async (c: CapturaDia | null) => {
+    if (!c || c.enNas || refirmados.current.has(c.path)) return;
+    refirmados.current.add(c.path);
+    const u = await urlCaptura(c.path);
+    if (u) setUrls((prev) => ({ ...prev, [c.path]: u }));
+  };
+
   useEffect(() => {
     let vivo = true;
     void (async () => {
@@ -159,7 +170,7 @@ function TiraDelDia({ capturas, t }: { capturas: CapturaDia[]; t: Tr }) {
                     {/* GRANDE: la pantalla; si no compartía, una X */}
                     {m.pantalla ? (
                       urlP ? (
-                        <img src={urlP} alt={hora} loading="lazy" className="h-full w-full object-cover" />
+                        <img src={urlP} alt={hora} loading="lazy" onError={() => reFirmar(m.pantalla)} className="h-full w-full object-cover" />
                       ) : (
                         <div className="flex h-full w-full items-center justify-center text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /></div>
                       )
@@ -173,7 +184,7 @@ function TiraDelDia({ capturas, t }: { capturas: CapturaDia[]; t: Tr }) {
                     <div className="absolute bottom-1 right-1 h-11 w-16 overflow-hidden rounded-control border-2 border-background/80 shadow-md">
                       {m.camara ? (
                         urlC ? (
-                          <img src={urlC} alt="" loading="lazy" className="h-full w-full object-cover" />
+                          <img src={urlC} alt="" loading="lazy" onError={() => reFirmar(m.camara)} className="h-full w-full object-cover" />
                         ) : (
                           <div className="flex h-full w-full items-center justify-center bg-muted/60 text-muted-foreground"><Loader2 className="h-3 w-3 animate-spin" /></div>
                         )
