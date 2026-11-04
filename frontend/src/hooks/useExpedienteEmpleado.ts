@@ -102,12 +102,15 @@ export function useExpedienteEmpleado(userId: string | null, anio: number, mes: 
 
       // nota por día: pantalla 30 / cámara 30 / atención 30 / horas 10 (Alvaro).
       for (const d of dias.values()) {
-        // Pantalla% y cámara% se miden sobre TODO el tiempo CONECTADA, no solo el
-        // ratito en Cowork (Alvaro, 02/11): de todos los MOMENTOS que Argos la vio
-        // (capturas de cámara = estuvo conectada), ¿en cuántos compartió pantalla?
-        // Así alguien conectada 8 h que comparte 1 h sale 12%, no 100%.
-        const momCamara = d.capturas.filter((c) => c.tipo === "camara").length;
-        const momPantalla = d.capturas.filter((c) => c.tipo === "pantalla").length;
+        // Pantalla% y cámara% se miden por MOMENTOS de tiempo (ventanas de 2 min),
+        // no por número de fotos (Alvaro, 04/11): el vigilante de app toma muchas
+        // fotos de cámara y el capturador de Cowork toma la pantalla a otro ritmo;
+        // contar fotos sueltas hundía el % (alguien compartiendo casi todo salía
+        // 10%). Por momentos distintos, pantalla% = momentos compartiendo ÷ momentos
+        // con cámara, que sí refleja cuánto compartió. (Igual que argos_momentos_dia.)
+        const bkt = (iso: string) => Math.floor(Date.parse(iso) / 120000);
+        const momCamara = new Set(d.capturas.filter((c) => c.tipo === "camara").map((c) => bkt(c.createdAt))).size;
+        const momPantalla = new Set(d.capturas.filter((c) => c.tipo === "pantalla").map((c) => bkt(c.createdAt))).size;
         const faltasCamara = d.faltas.filter((x) => x.tipo === "camara_apagada" || x.tipo === "camara_tapada" || x.tipo === "se_fue").length;
         const pantallaPct = momCamara > 0 ? Math.min(1, momPantalla / momCamara) : undefined;
         const camaraPct = momCamara > 0 ? momCamara / (momCamara + faltasCamara) : undefined;
