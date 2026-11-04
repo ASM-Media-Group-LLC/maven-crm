@@ -69,11 +69,25 @@ const STORAGE_KEY = "maven-skin";
 export const isSkinId = (value: unknown): value is SkinId =>
   SKINS.some((s) => s.id === value);
 
+// El hue del --primary por DEFECTO (Maven), base para rotar la atmósfera.
+const BASE_HUE = 255;
+const hueDeSkin = (skin: SkinId): number => {
+  const def = SKINS.find((s) => s.id === skin);
+  const m = def?.primary.match(/hsl\(\s*(\d+)/);
+  return m ? Number(m[1]) : BASE_HUE;
+};
+
 // Setea/limpia data-skin en <html>. maven = sin atributo (los tokens base de
 // index.css ya son maven), cualquier otro id matchea su bloque [data-skin].
+// Además fija `--skin-rot`: la ROTACIÓN de hue de TODA la escena (fondos, glows,
+// detalles) para que sigan el color del skin, no solo el acento. Es la distancia
+// del hue del skin al morado base; Maven = 0 (queda intacto). Decisión de Alvaro
+// (03/11): al elegir un skin, todo recolorea, sin morado suelto.
 export const applySkin = (skin: SkinId) => {
   if (skin === "maven") delete document.documentElement.dataset.skin;
   else document.documentElement.dataset.skin = skin;
+  const rot = skin === "maven" ? 0 : ((hueDeSkin(skin) - BASE_HUE + 360) % 360);
+  document.documentElement.style.setProperty("--skin-rot", `${rot}deg`);
 };
 
 export const getStoredSkin = (): SkinId => {
@@ -265,6 +279,8 @@ export const applyCustomHue = (hue: number | null) => {
   style.setProperty("--ring", primary);
   style.setProperty("--sidebar-primary", primary);
   style.setProperty("--sidebar-ring", primary);
+  // El hue libre también rota la atmósfera (fondos/glows), igual que un skin.
+  style.setProperty("--skin-rot", `${((h - 255 + 360) % 360)}deg`);
 };
 
 // Estado DERIVADO completo de apariencia → atributos/vars en <html>. Es

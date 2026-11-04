@@ -1279,6 +1279,8 @@ All colors MUST be HSL. Light mode in :root, dark mode in .dark.
 .vidrio-glow::before {
   content: ""; position: absolute; inset: 0; pointer-events: none; opacity: .6; z-index: 0;
   background: radial-gradient(70% 90% at 90% 0%, var(--glow, rgba(106,166,255,.22)), transparent 60%);
+  /* El glow sigue el color del skin: se rota su hue como toda la atmósfera. */
+  filter: hue-rotate(var(--skin-rot, 0deg));
 }
 .vidrio-glow > .v-cont { position: relative; z-index: 1; }
 .glow-b { --glow: rgba(106,166,255,.22); }
@@ -1397,6 +1399,14 @@ All colors MUST be HSL. Light mode in :root, dark mode in .dark.
   background-attachment: fixed;
 }
 :root[data-contrast="high"] .fondo-glass-sutil { background: hsl(var(--background)); }
+
+/* RECOLOR POR SKIN: la atmósfera del fondo (radiales morado/azul/ámbar hechos a
+   mano) rota su hue por --skin-rot para seguir el color del skin elegido, no
+   solo el acento. Maven = 0deg (queda idéntico). Decisión de Alvaro (03/11): al
+   cambiar el skin, todo recolorea. Alto contraste ya pone fondo plano, no aplica. */
+.fondo-glass, .fondo-glass-sutil { filter: hue-rotate(var(--skin-rot, 0deg)); }
+:root[data-contrast="high"] .fondo-glass,
+:root[data-contrast="high"] .fondo-glass-sutil { filter: none; }
 
 /* Áreas seguras del teléfono (notch, barra de inicio). Valen 0 donde no aplica,
    así que van sin condición y no cambian nada en escritorio. Con
