@@ -88,8 +88,13 @@ const hueDeSkin = (skin: SkinId): number => {
 export const applySkin = (skin: SkinId) => {
   if (skin === "maven") delete document.documentElement.dataset.skin;
   else document.documentElement.dataset.skin = skin;
-  const rot = skin === "maven" ? 0 : ((hueDeSkin(skin) - BASE_HUE + 360) % 360);
+  const h = hueDeSkin(skin);
+  const rot = skin === "maven" ? 0 : ((h - BASE_HUE + 360) % 360);
   document.documentElement.style.setProperty("--skin-rot", `${rot}deg`);
+  // --skin-h: el HUE crudo del skin. Los radiales de la atmósfera (index.css)
+  // se pintan con hsl(var(--skin-h) …) SIN filtro, así el fondo entero toma el
+  // color del skin y el contenido (texto, íconos, swatches) nunca se tiñe.
+  document.documentElement.style.setProperty("--skin-h", `${h}`);
 };
 
 export const getStoredSkin = (): SkinId => {
@@ -281,8 +286,9 @@ export const applyCustomHue = (hue: number | null) => {
   style.setProperty("--ring", primary);
   style.setProperty("--sidebar-primary", primary);
   style.setProperty("--sidebar-ring", primary);
-  // El hue libre también rota la atmósfera (fondos/glows), igual que un skin.
+  // El hue libre también tiñe la atmósfera (fondos/glows), igual que un skin.
   style.setProperty("--skin-rot", `${((h - 255 + 360) % 360)}deg`);
+  style.setProperty("--skin-h", `${h}`);
 };
 
 // Estado DERIVADO completo de apariencia → atributos/vars en <html>. Es

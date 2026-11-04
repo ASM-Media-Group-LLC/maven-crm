@@ -1367,9 +1367,9 @@ All colors MUST be HSL. Light mode in :root, dark mode in .dark.
 .fondo-glass {
   background:
     repeating-linear-gradient(90deg, transparent 0 calc(16.6667% - 1.5px), rgba(120,90,50,.05) calc(16.6667% - 1.5px) 16.6667%),
-    radial-gradient(60% 46% at 50% 82%, rgba(255,184,96,.55), transparent 62%),
-    radial-gradient(46% 42% at 14% 16%, rgba(150,120,230,.26), transparent 60%),
-    radial-gradient(40% 40% at 88% 12%, rgba(92,162,232,.3), transparent 60%),
+    radial-gradient(60% 46% at 50% 82%, hsl(var(--skin-h, 213) 85% 62% / .42), transparent 62%),
+    radial-gradient(46% 42% at 14% 16%, hsl(calc(var(--skin-h, 213) + 22) 78% 66% / .30), transparent 60%),
+    radial-gradient(40% 40% at 88% 12%, hsl(calc(var(--skin-h, 213) - 14) 80% 62% / .32), transparent 60%),
     linear-gradient(180deg, #efe7d6 0%, #ecd9c3 48%, #e7ecf6 100%);
   background-attachment: fixed;
 }
@@ -1377,9 +1377,9 @@ All colors MUST be HSL. Light mode in :root, dark mode in .dark.
    el mockup porque aquí hay huecos entre tarjetas donde asoma el fondo). */
 .dark .fondo-glass {
   background:
-    radial-gradient(60% 46% at 50% 70%, rgba(72,104,196,.34), transparent 64%),
-    radial-gradient(44% 42% at 14% 16%, rgba(124,92,228,.30), transparent 62%),
-    radial-gradient(42% 42% at 90% 12%, rgba(52,140,210,.28), transparent 62%),
+    radial-gradient(60% 46% at 50% 70%, hsl(var(--skin-h, 213) 60% 52% / .40), transparent 64%),
+    radial-gradient(44% 42% at 14% 16%, hsl(calc(var(--skin-h, 213) + 22) 62% 56% / .34), transparent 62%),
+    radial-gradient(42% 42% at 90% 12%, hsl(calc(var(--skin-h, 213) - 14) 58% 50% / .32), transparent 62%),
     linear-gradient(180deg, #0a0f1d 0%, #0b1020 40%, #080a16 72%, #050610 90%, #030308 100%);
   background-attachment: fixed;
 }
@@ -1393,30 +1393,32 @@ All colors MUST be HSL. Light mode in :root, dark mode in .dark.
 .fondo-glass-sutil {
   background:
     repeating-linear-gradient(90deg, transparent 0 calc(16.6667% - 1.5px), rgba(120,90,50,.04) calc(16.6667% - 1.5px) 16.6667%),
-    radial-gradient(64% 48% at 50% 96%, rgba(255,184,96,.34), transparent 62%),
-    radial-gradient(48% 44% at 8% 2%, rgba(150,120,230,.18), transparent 60%),
-    radial-gradient(42% 42% at 94% 0%, rgba(92,162,232,.2), transparent 60%),
+    radial-gradient(64% 48% at 50% 96%, hsl(var(--skin-h, 213) 82% 62% / .26), transparent 62%),
+    radial-gradient(48% 44% at 8% 2%, hsl(calc(var(--skin-h, 213) + 22) 76% 66% / .20), transparent 60%),
+    radial-gradient(42% 42% at 94% 0%, hsl(calc(var(--skin-h, 213) - 14) 78% 62% / .22), transparent 60%),
     linear-gradient(180deg, #f3eee2 0%, #eee6f2 60%, #e9edf6 100%);
   background-attachment: fixed;
 }
 .dark .fondo-glass-sutil {
   background:
     repeating-linear-gradient(90deg, transparent 0 calc(20% - 2.5px), rgba(10,8,12,.4) calc(20% - 2.5px) calc(20% + .5px), transparent calc(20% + .5px) 20%),
-    radial-gradient(58% 44% at 50% 90%, rgba(64,92,170,.15), transparent 62%),
-    radial-gradient(42% 40% at 10% 4%, rgba(104,80,200,.12), transparent 60%),
-    radial-gradient(38% 38% at 92% 2%, rgba(42,120,180,.11), transparent 60%),
+    radial-gradient(58% 44% at 50% 90%, hsl(var(--skin-h, 213) 58% 50% / .22), transparent 62%),
+    radial-gradient(42% 40% at 10% 4%, hsl(calc(var(--skin-h, 213) + 22) 60% 54% / .18), transparent 60%),
+    radial-gradient(38% 38% at 92% 2%, hsl(calc(var(--skin-h, 213) - 14) 56% 48% / .16), transparent 60%),
     linear-gradient(180deg, #080b14 0%, #070912 50%, #050710 100%);
   background-attachment: fixed;
 }
 :root[data-contrast="high"] .fondo-glass-sutil { background: hsl(var(--background)); }
 
-/* El fondo NO se tiñe con el skin. Probamos rotar su hue por --skin-rot (03/11),
-   pero .fondo-glass es el contenedor raíz de toda la app: un `filter` ahí arrastra
-   a TODOS sus hijos (swatches, avatar, íconos, texto) y los deja con el color
-   equivocado, y además la escena multicolor (ámbar+azul+violeta) al rotarla sale
-   embarrada. El sistema de diseño pide atmósfera NEUTRA fría constante. Así que el
-   skin recolorea acento + detalles + glows (capa aparte, sin contenido: ver
-   .vidrio-glow::before, que sí usa --skin-rot con seguridad), y el fondo queda igual. */
+/* RECOLOR POR SKIN — cómo cambia TODA la atmósfera con el color elegido sin
+   romper nada (Alvaro, 03/11: "el color tiene que cambiar con todo"):
+   los radiales de la atmósfera (arriba) se pintan con hsl(var(--skin-h) …), el
+   HUE del skin (useSkin lo fija en <html>). NO se usa `filter` sobre el fondo:
+   el primer intento rotaba el hue con filter en .fondo-glass —el contenedor raíz—
+   y eso teñía a TODOS sus hijos (texto, íconos, swatches) y embarraba la escena.
+   Cambiando los COLORES del background directo, el fondo entero toma el color del
+   skin y el contenido queda intacto. Los glows (.vidrio-glow::before, capa aparte
+   sin contenido) sí rotan con --skin-rot. Alto contraste pone fondo plano. */
 
 /* Áreas seguras del teléfono (notch, barra de inicio). Valen 0 donde no aplica,
    así que van sin condición y no cambian nada en escritorio. Con
