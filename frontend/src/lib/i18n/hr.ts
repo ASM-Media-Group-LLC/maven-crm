@@ -1151,7 +1151,7 @@ export const hr = {
   "hr.panel.error": { es: "No se pudo cargar el panel", en: "Couldn't load the board" },
   "hr.resumen.bajon.camara": { es: "Cámara apagada", en: "Camera off" },
   "hr.resumen.bajon.seFue": { es: "Se fue de cámara", en: "Left the camera" },
-  "hr.resumen.bajon.sinSenal": { es: "Sin señal", en: "No signal" },
+  "hr.resumen.bajon.sinSenal": { es: "Argos no la ve", en: "Out of sight" },
   "hr.resumen.bajon.pausa": { es: "Pausa de más", en: "Break overrun" },
   // ── Ajustes de Argos: voz y situaciones ──
   "hr.argosaj.vozTitulo": { es: "La voz de Argos", en: "Argos's voice" },
