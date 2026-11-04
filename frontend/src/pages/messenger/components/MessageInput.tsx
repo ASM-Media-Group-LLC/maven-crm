@@ -20,7 +20,7 @@ import SelectorDeEmojis from "@/components/chat/SelectorDeEmojis";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { ScriptsButton } from "@/components/chat/ScriptsButton";
 
-import { MAX_FILES, MAX_FILE_SIZE_MB, MAX_FILE_SIZE_BYTES, formatFileSize, uploadFileWithTUS } from "../uploadUtils";
+import { MAX_FILES, MAX_FILE_SIZE_MB, MAX_FILE_SIZE_BYTES, formatFileSize, uploadFileWithTUS, uploadSmallWithRetry } from "../uploadUtils";
 import { claveSeguraParaArchivo } from "@/lib/claveDeArchivo";
 import { contenidoDeAdjunto } from "@/lib/mensajeConAdjunto";
 import { getDraft, getDraftDoc, setDraft, clearDraft } from "../drafts";
@@ -285,14 +285,16 @@ const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(({
         // rechaza la clave entera. Cualquier tilde o eñe la rompía igual.
         const path = `${user!.id}/${Date.now()}-${claveSeguraParaArchivo(pf.file.name)}`;
 
-        // Use XHR for files > 5MB for progress, SDK for small files
+        // Use XHR for files > 5MB for progress, SDK (con reintento) for small files
         let uploadError: string | null = null;
         if (pf.file.size > 5 * 1024 * 1024) {
           const result = await uploadFileWithProgress(pf.file, path);
           uploadError = result.error;
         } else {
-          const { error } = await supabase.storage.from("chat-files").upload(path, pf.file);
-          uploadError = error?.message || null;
+          // Reintenta: la conexión del equipo corta la respuesta a ratos y antes
+          // la imagen fallaba de un tiro (ver uploadSmallWithRetry).
+          const result = await uploadSmallWithRetry(pf.file, path);
+          uploadError = result.error;
         }
 
         if (uploadError === "cancelled") {

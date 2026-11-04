@@ -188,3 +188,35 @@ export async function uploadFileWithTUS(
     return { error: err.message || traducir("messenger.upload.errorInesperado") };
   }
 }
+
+/**
+ * Sube un archivo CHICO (vía el SDK, no TUS) CON REINTENTOS.
+ *
+ * EL BUG (04/11/2026, reportado por Alvaro: "no me deja enviar imágenes"):
+ * el camino de archivos chicos —la mayoría de las imágenes pegadas— subía de UN
+ * solo tiro, sin reintentar. La conexión del equipo (Colombia → Supabase) corta
+ * la respuesta a ratos: en los logs de Storage se ve "ABORTED RES" y, aun así,
+ * el objeto QUEDA creado (evento ObjectCreated) — o sea el archivo sí sube, pero
+ * el cliente recibe un error y la imagen "no se deja enviar". El camino de los
+ * archivos grandes (TUS) ya reintentaba 3 veces; el chico, cero. Ahora reintenta
+ * con `upsert` (misma clave, así un intento abortado que ya dejó el objeto no da
+ * "duplicado" al reintentar). Un corte puntual se recupera solo.
+ */
+export async function uploadSmallWithRetry(
+  file: File,
+  path: string,
+  intentos = 3,
+): Promise<{ error: string | null }> {
+  let ultimo: string | null = null;
+  for (let i = 1; i <= intentos; i++) {
+    const { error } = await supabase.storage.from("chat-files").upload(path, file, {
+      upsert: true,
+      contentType: file.type || undefined,
+    });
+    if (!error) return { error: null };
+    ultimo = error.message || "upload error";
+    // Espera corta y creciente antes de reintentar (300ms, 600ms…).
+    if (i < intentos) await new Promise((r) => setTimeout(r, 300 * i));
+  }
+  return { error: ultimo };
+}

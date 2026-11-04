@@ -28,7 +28,7 @@ import VoiceNoteRecorder from "./VoiceNoteRecorder";
 import { formatTime, formatDate, safeFileUrl, remitenteVisible } from "../utils";
 import EtiquetaApi from "./EtiquetaApi";
 
-import { EMOJIS, MAX_FILE_SIZE_BYTES, formatFileSize, uploadFileWithTUS } from "../uploadUtils";
+import { EMOJIS, MAX_FILE_SIZE_BYTES, formatFileSize, uploadFileWithTUS, uploadSmallWithRetry } from "../uploadUtils";
 import { claveSeguraParaArchivo } from "@/lib/claveDeArchivo";
 import NotaDeVoz from "./NotaDeVoz";
 import { useLanguage } from "@/hooks/useLanguage";
@@ -144,8 +144,10 @@ export default function ThreadPanel({
       const result = await uploadFileWithProgress(file, path);
       uploadError = result.error;
     } else {
-      const { error } = await supabase.storage.from("chat-files").upload(path, file);
-      uploadError = error?.message || null;
+      // Reintenta: la conexión del equipo corta la respuesta a ratos (ver
+      // uploadSmallWithRetry). Antes la imagen fallaba de un solo tiro.
+      const result = await uploadSmallWithRetry(file, path);
+      uploadError = result.error;
     }
     if (uploadError === "cancelled") { toast(t("messenger.input.subidaCancelada")); return null; }
     if (uploadError) { toast.error(t("messenger.thread.error", { error: uploadError })); return null; }

@@ -291,10 +291,13 @@ const FACTOR_LBL: Record<string, TranslationKey> = {
 // (al poner el cursor sobre un número) y en el pop-up de clic, para que la nota
 // nunca sea una cifra a ciegas. La evidencia (pantallazos con su cámara y el
 // juicio de la IA) está abajo en la misma página.
-function DesgloseNotaContenido({ dia, atencion, t }: {
+function DesgloseNotaContenido({ dia, atencion, t, compacto }: {
   dia: DiaExpediente;
   atencion: { pct: number; ok: number; n: number } | null;
   t: Tr;
+  /** inline bajo la nota (siempre visible): sin el número grande repetido ni la
+   *  lista de faltas (que ya está abajo en la página). */
+  compacto?: boolean;
 }) {
   const nota = dia.nota;
   const presentes = nota.factores.filter((f) => f.sub != null);
