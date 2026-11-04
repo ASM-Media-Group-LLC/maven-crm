@@ -1,9 +1,10 @@
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { LayoutDashboard, Loader2, AlertTriangle, RefreshCw, ChevronRight, ChevronDown, Camera, ScreenShare, Sparkles, Trophy, Eye } from "lucide-react";
+import { LayoutDashboard, Loader2, AlertTriangle, RefreshCw, ChevronRight, ChevronLeft, ChevronDown, Camera, ScreenShare, Sparkles, Trophy, Eye, Clock } from "lucide-react";
 import { useLanguage } from "@/hooks/useLanguage";
 import { UserAvatar } from "@/components/UserAvatar";
 import { useResumenDia, type PersonaResumen, type BajonDia } from "@/hooks/useResumenDia";
+import { ArgosTendencia } from "@/components/hr/ArgosTendencia";
 import type { TranslationKey } from "@/lib/i18n";
 
 // PANEL DEL DÍA — la PORTADA de Argos (Alvaro, 03/11). Responde de un vistazo:
@@ -27,6 +28,14 @@ const LBL_BAJON: Record<string, TranslationKey> = {
 
 const prom = (arr: number[]): number | null =>
   arr.length ? Math.round(arr.reduce((a, b) => a + b, 0) / arr.length) : null;
+
+// Sumar/restar días a una fecha YYYY-MM-DD (para ‹ ayer / hoy ›).
+function sumarDias(ymd: string, delta: number): string {
+  const [y, m, d] = ymd.split("-").map(Number);
+  const dt = new Date(Date.UTC(y, m - 1, d));
+  dt.setUTCDate(dt.getUTCDate() + delta);
+  return dt.toISOString().slice(0, 10);
+}
 
 const fallasDe = (p: PersonaResumen) => ({
   veces: p.bajones.length,
@@ -130,8 +139,14 @@ function EquipoFila({ p, t, onClick }: { p: PersonaResumen; t: Tr; onClick: () =
             </span>
           )}
         </div>
-        {/* La nota EXPLICADA: los 4 factores. Pantalla baja en rojo. */}
-        <div className="flex flex-wrap gap-x-3 gap-y-0.5">
+        {/* La nota EXPLICADA: los 4 factores + CONECTADO (el chequeo de Alvaro:
+            '0% pantalla con 4h' = trabajó sin compartir; '0% con 0h' = ni se
+            conectó). Pantalla baja en rojo. */}
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5">
+          <span className={`inline-flex items-center gap-1 text-[11px] font-medium ${p.horas >= 0.05 ? "text-foreground/75" : "text-muted-foreground/60"}`}>
+            <Clock className="h-3 w-3 shrink-0" />
+            {p.horas >= 0.05 ? t("hr.panel.conectadoH", { h: p.horas.toFixed(1) }) : t("hr.panel.noConecto")}
+          </span>
           <FactorChip label={t("hr.resumen.pantalla")} sub={factor("pantalla")} alerta />
           <FactorChip label={t("hr.resumen.camara")} sub={factor("camara")} />
           <FactorChip label={t("hr.resumen.atencion")} sub={factor("atencion")} />
@@ -177,7 +192,17 @@ function CajaEquipo({ titulo, punto, gente, abierta, t, onPersona }: {
 export function ArgosPanelDia() {
   const { t } = useLanguage();
   const navigate = useNavigate();
-  const { personas, cargando, error, refrescar } = useResumenDia(new Date().toLocaleDateString("en-CA", { timeZone: "America/Bogota" }));
+  // El Panel ya no es solo HOY (Alvaro, 04/11): se puede ver cualquier día pasado
+  // con ‹ ayer / hoy ›. El día vive acá y se le pasa a useResumenDia (el RPC ya
+  // recibe fecha). No se puede avanzar más allá de hoy.
+  const hoy = useMemo(() => new Date().toLocaleDateString("en-CA", { timeZone: "America/Bogota" }), []);
+  const [dia, setDia] = useState(hoy);
+  const esHoy = dia === hoy;
+  const moverDia = (delta: number) => {
+    const s = sumarDias(dia, delta);
+    if (s <= hoy) setDia(s);
+  };
+  const { personas, cargando, error, refrescar } = useResumenDia(dia);
 
   const d = useMemo(() => {
     // Solo quien tuvo actividad hoy (horas, nota o alguna falla) entra al podio
@@ -207,7 +232,7 @@ export function ArgosPanelDia() {
   }, [personas]);
 
   const irA = (id: string) => navigate(`/hr/expediente/${id}`, { state: { volverA: "/hr/monitor-ia?t=panel" } });
-  const hoyTxt = new Date().toLocaleDateString("es-CO", { weekday: "long", day: "numeric", month: "long" });
+  const diaTxt = new Date(dia + "T12:00:00").toLocaleDateString("es-CO", { weekday: "long", day: "numeric", month: "long" });
 
   return (
     <section className="vidrio sube p-4 lg:p-5">
@@ -219,12 +244,25 @@ export function ArgosPanelDia() {
           </span>
           <div className="min-w-0 flex-1">
             <h2 className="font-display text-base font-bold leading-tight tracking-tight">{t("hr.panel.title")}</h2>
-            <p className="text-xs capitalize text-muted-foreground">{t("hr.panel.hoy")} · {hoyTxt}</p>
+            {/* Navegación de día: ‹ ayer / hoy › (no se puede pasar de hoy). */}
+            <div className="mt-0.5 flex items-center gap-1">
+              <button type="button" onClick={() => moverDia(-1)} aria-label={t("hr.exp.diaAnterior")} className="flex h-6 w-6 items-center justify-center rounded-lg text-muted-foreground transition hover:bg-foreground/5 hover:text-foreground">
+                <ChevronLeft className="h-3.5 w-3.5" />
+              </button>
+              <span className="min-w-[8.5rem] text-center text-xs capitalize text-muted-foreground">{esHoy ? `${t("hr.panel.hoy")} · ` : ""}{diaTxt}</span>
+              <button type="button" onClick={() => moverDia(1)} disabled={esHoy} aria-label={t("hr.exp.diaSiguiente")} className="flex h-6 w-6 items-center justify-center rounded-lg text-muted-foreground transition hover:bg-foreground/5 hover:text-foreground disabled:opacity-30">
+                <ChevronRight className="h-3.5 w-3.5" />
+              </button>
+            </div>
           </div>
           <button type="button" onClick={() => void refrescar()} className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-foreground/5 hover:text-foreground" title={t("hr.pantallazos.reintentar")} aria-label={t("hr.pantallazos.reintentar")}>
             <RefreshCw className={`h-4 w-4 ${cargando ? "animate-spin" : ""}`} />
           </button>
         </div>
+
+        {/* Gráfica de tendencia (últimos 14 días) — siempre visible, aparte del
+            día elegido abajo. Argos ya no es solo "hoy" (Alvaro, 04/11). */}
+        <ArgosTendencia />
 
         {error ? (
           <div className="flex flex-col items-center gap-2 py-10 text-center text-muted-foreground"><AlertTriangle className="h-7 w-7 text-destructive/70" /><p className="text-sm">{t("hr.panel.error")}</p></div>
