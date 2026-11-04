@@ -38,16 +38,23 @@ const fallaPrincipal = (bajones: BajonDia[]): BajonDia | null =>
   bajones.length ? [...bajones].sort((a, b) => b.minutos - a.minutos)[0] : null;
 
 // Un número grande del día (tile sobrio): etiqueta, cifra y una línea chica.
-// `malo` pone la cifra en ROJO: así el número problemático salta a la vista.
-function Tile({ icon: Icon, label, valor, sub, malo }: { icon: typeof Camera; label: string; valor: string; sub?: string; malo?: boolean }) {
+// `malo` pone la cifra en ROJO (problema que salta). `flojo` marca en ÁMBAR que
+// el número NO es de fiar todavía (muestra chica o sin medir) — el "chequeo"
+// que pidió Alvaro: nunca mostrar un 100% como si fuera verdad probada.
+function Tile({ icon: Icon, label, valor, sub, malo, flojo }: { icon: typeof Camera; label: string; valor: string; sub?: string; malo?: boolean; flojo?: boolean }) {
   return (
-    <div className={`flex flex-col gap-2 rounded-2xl border p-4 ${malo ? "border-destructive/40 bg-destructive/5" : "border-border/40 bg-card/20"}`}>
+    <div className={`flex flex-col gap-2 rounded-2xl border p-4 ${malo ? "border-destructive/40 bg-destructive/5" : flojo ? "border-warning/40 bg-warning/5" : "border-border/40 bg-card/20"}`}>
       <div className="flex items-center gap-2 text-muted-foreground">
-        <Icon className={`h-4 w-4 shrink-0 ${malo ? "text-destructive/80" : ""}`} />
+        <Icon className={`h-4 w-4 shrink-0 ${malo ? "text-destructive/80" : flojo ? "text-warning/80" : ""}`} />
         <span className="truncate text-xs">{label}</span>
       </div>
-      <div className={`font-display text-2xl font-bold leading-none tabular-nums ${malo ? "text-destructive" : ""}`}>{valor}</div>
-      {sub && <div className="text-[11px] text-muted-foreground">{sub}</div>}
+      <div className={`font-display text-2xl font-bold leading-none tabular-nums ${malo ? "text-destructive" : flojo ? "text-warning" : ""}`}>{valor}</div>
+      {sub && (
+        <div className={`flex items-center gap-1 text-[11px] ${flojo ? "text-warning/90" : "text-muted-foreground"}`}>
+          {flojo && <AlertTriangle className="h-3 w-3 shrink-0" />}
+          <span className="truncate">{sub}</span>
+        </div>
+      )}
     </div>
   );
 }
@@ -177,6 +184,7 @@ export function ArgosPanelDia() {
     // y a los promedios; quien no se conectó no es "el mejor" por 0 fallas.
     const activos = personas.filter((p) => p.horas > 0 || p.bajones.length > 0 || p.nota.valor != null);
     const atencion = prom(personas.map((p) => p.atencionPct).filter((x): x is number => x != null));
+    const juzgadasTotal = personas.reduce((a, p) => a + p.juzgadas, 0);
     const camara = prom(personas.map((p) => p.camaraPct).filter((x): x is number => x != null));
     const pantalla = prom(personas.map((p) => p.pantallaPct).filter((x): x is number => x != null));
     const enProblema = personas.filter((p) => p.bajones.some((b) => b.abierto) || (p.nota.valor != null && p.nota.valor < 60)).length;
@@ -189,7 +197,7 @@ export function ArgosPanelDia() {
     const caja = (b: string | null) => personas.filter((p) => (p.nota.banda ?? "sin") === b);
     return {
       total: personas.length,
-      atencion, camara, pantalla, enProblema,
+      atencion, camara, pantalla, enProblema, juzgadasTotal,
       mejores: porFallas.slice(0, 3),
       peores: [...porFallas].reverse().slice(0, 3),
       mal: caja("mal"), ojo: caja("ojo"), bien: caja("bien"), sin: caja("sin"),
@@ -226,8 +234,20 @@ export function ArgosPanelDia() {
           <>
             {/* Números de DISCIPLINA del día (nada de producción: eso es del Centro) */}
             <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-              <Tile icon={Sparkles} label={t("hr.panel.numAtencion")} valor={d.atencion == null ? "—" : `${d.atencion}%`} sub={t("hr.panel.promDe")} />
-              <Tile icon={Camera} label={t("hr.panel.numCamara")} valor={d.camara == null ? "—" : `${d.camara}%`} sub={t("hr.panel.promDe")} />
+              <Tile
+                icon={Sparkles}
+                label={t("hr.panel.numAtencion")}
+                valor={d.atencion == null ? "—" : `${d.atencion}%`}
+                sub={d.juzgadasTotal > 0 ? t("hr.panel.miradas", { n: d.juzgadasTotal }) : t("hr.panel.camaraSinMedir")}
+                flojo={d.juzgadasTotal < 30}
+              />
+              <Tile
+                icon={Camera}
+                label={t("hr.panel.numCamara")}
+                valor={d.camara == null ? "—" : `${d.camara}%`}
+                sub={t("hr.panel.camaraSinMedir")}
+                flojo
+              />
               <Tile icon={ScreenShare} label={t("hr.panel.numPantalla")} valor={d.pantalla == null ? "—" : `${d.pantalla}%`} sub={t("hr.panel.promDe")} malo={d.pantalla != null && d.pantalla < 50} />
               <Tile icon={AlertTriangle} label={t("hr.panel.numProblema")} valor={`${d.enProblema}`} sub={t("hr.panel.numProblemaSub", { n: d.total })} malo={d.enProblema > 0} />
             </div>

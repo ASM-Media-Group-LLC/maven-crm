@@ -32,6 +32,8 @@ export interface PersonaResumen {
   pantallaPct: number | null; // 0–100
   camaraPct: number | null;
   atencionPct: number | null;
+  /** Cuántas pantallas juzgó la IA hoy (el "tamaño de muestra" de atención). */
+  juzgadas: number;
   horas: number;
   bajones: BajonDia[];
 }
@@ -110,6 +112,7 @@ export function useResumenDia(dia: string) {
           pantallaPct: pantallaPct == null ? null : Math.round(pantallaPct * 100),
           camaraPct: camaraPct == null ? null : Math.round(camaraPct * 100),
           atencionPct: atencionPct == null ? null : Math.round(atencionPct * 100),
+          juzgadas: at?.n ?? 0,
           horas,
           bajones,
         };
