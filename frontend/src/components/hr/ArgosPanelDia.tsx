@@ -1,6 +1,6 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { LayoutDashboard, Loader2, AlertTriangle, RefreshCw, ChevronRight, Camera, ScreenShare, Sparkles, Trophy, Eye } from "lucide-react";
+import { LayoutDashboard, Loader2, AlertTriangle, RefreshCw, ChevronRight, ChevronDown, Camera, ScreenShare, Sparkles, Trophy, Eye } from "lucide-react";
 import { useLanguage } from "@/hooks/useLanguage";
 import { UserAvatar } from "@/components/UserAvatar";
 import { useResumenDia, type PersonaResumen, type BajonDia } from "@/hooks/useResumenDia";
@@ -137,6 +137,36 @@ function EquipoFila({ p, t, onClick }: { p: PersonaResumen; t: Tr; onClick: () =
   );
 }
 
+// Una CAJA del equipo por estado (Mal / Ojo / Bien / Sin datos): cabecera con
+// su color y conteo, colapsable. Mal y Ojo abren por defecto; Bien y Sin datos
+// vienen cerradas, para que el Panel no se vea "todo abierto" (Alvaro, 04/11).
+function CajaEquipo({ titulo, punto, gente, abierta, t, onPersona }: {
+  titulo: string; punto: string; gente: PersonaResumen[]; abierta: boolean; t: Tr; onPersona: (id: string) => void;
+}) {
+  const [open, setOpen] = useState(abierta);
+  if (gente.length === 0) return null;
+  return (
+    <div className="rounded-2xl border border-border/40 bg-card/10">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="flex w-full items-center gap-2 px-3.5 py-2.5 text-left"
+        aria-expanded={open}
+      >
+        <span className={`h-2 w-2 shrink-0 rounded-full ${punto}`} />
+        <span className="text-sm font-semibold">{titulo}</span>
+        <span className="text-xs tabular-nums text-muted-foreground">· {gente.length}</span>
+        <ChevronDown className={`ml-auto h-4 w-4 shrink-0 text-muted-foreground transition-transform ${open ? "rotate-180" : ""}`} />
+      </button>
+      {open && (
+        <div className="flex flex-col gap-2 px-2 pb-2">
+          {gente.map((p) => <EquipoFila key={p.userId} p={p} t={t} onClick={() => onPersona(p.userId)} />)}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function ArgosPanelDia() {
   const { t } = useLanguage();
   const navigate = useNavigate();
@@ -155,11 +185,14 @@ export function ArgosPanelDia() {
       const fa = fallasDe(a), fb = fallasDe(b);
       return (fa.min - fb.min) || (fa.veces - fb.veces);
     });
+    // Equipo en CAJAS por estado (semáforo), para no verlo "todo abierto".
+    const caja = (b: string | null) => personas.filter((p) => (p.nota.banda ?? "sin") === b);
     return {
       total: personas.length,
       atencion, camara, pantalla, enProblema,
       mejores: porFallas.slice(0, 3),
       peores: [...porFallas].reverse().slice(0, 3),
+      mal: caja("mal"), ojo: caja("ojo"), bien: caja("bien"), sin: caja("sin"),
     };
   }, [personas]);
 
@@ -221,12 +254,14 @@ export function ArgosPanelDia() {
               </div>
             </div>
 
-            {/* Todo el equipo — clic en alguien abre su día (expediente) */}
-            <div>
-              <p className="mb-2 text-xs font-medium text-muted-foreground">{t("hr.panel.equipoTitulo")} · {d.total}</p>
-              <div className="flex flex-col gap-2">
-                {personas.map((p) => <EquipoFila key={p.userId} p={p} t={t} onClick={() => irA(p.userId)} />)}
-              </div>
+            {/* El equipo EN CAJAS por estado — clic en alguien abre su día. Mal
+                y Ojo abren solas; Bien y Sin datos vienen cerradas. */}
+            <div className="space-y-2">
+              <p className="text-xs font-medium text-muted-foreground">{t("hr.panel.equipoTitulo")} · {d.total}</p>
+              <CajaEquipo titulo={t("hr.panel.cajaMal")} punto="bg-destructive" gente={d.mal} abierta t={t} onPersona={irA} />
+              <CajaEquipo titulo={t("hr.panel.cajaOjo")} punto="bg-warning" gente={d.ojo} abierta t={t} onPersona={irA} />
+              <CajaEquipo titulo={t("hr.panel.cajaBien")} punto="bg-success" gente={d.bien} abierta={false} t={t} onPersona={irA} />
+              <CajaEquipo titulo={t("hr.panel.cajaSin")} punto="bg-muted-foreground/40" gente={d.sin} abierta={false} t={t} onPersona={irA} />
             </div>
           </>
         )}

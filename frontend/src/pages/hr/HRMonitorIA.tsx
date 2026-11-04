@@ -19,7 +19,6 @@ import { RondinVivoPanel } from "@/components/hr/RondinVivoPanel";
 import { PantallazosVivoPanel } from "@/components/hr/PantallazosVivoPanel";
 import { ContextoEmpresaPanel } from "@/components/hr/ContextoEmpresaPanel";
 import { AtencionAhoraPanel } from "@/components/hr/AtencionAhoraPanel";
-import { ResumenDiaPanel } from "@/components/hr/ResumenDiaPanel";
 import { ArgosPanelDia } from "@/components/hr/ArgosPanelDia";
 import { ArgosAjustesContenido } from "@/pages/hr/ArgosAjustes";
 import type { TranslationKey } from "@/lib/i18n";
@@ -129,9 +128,9 @@ export default function HRMonitorIA() {
   // vivo y las alertas quedan en sus pestañas. La pestaña vive en la URL (?t=…)
   // para que al entrar a un perfil y volver (atrás del navegador) Argos te deje
   // DONDE ESTABAS, no reiniciado (Álvaro, 02/11).
-  type TabArgos = "panel" | "equipo" | "envivo" | "atencion" | "resumen" | "ajustes";
+  type TabArgos = "panel" | "equipo" | "envivo" | "atencion" | "ajustes";
   const [searchParams, setSearchParams] = useSearchParams();
-  const TABS_VALIDAS: TabArgos[] = ["panel", "equipo", "envivo", "atencion", "resumen", "ajustes"];
+  const TABS_VALIDAS: TabArgos[] = ["panel", "equipo", "envivo", "atencion", "ajustes"];
   const tabURL = searchParams.get("t") as TabArgos | null;
   const tab: TabArgos = tabURL && TABS_VALIDAS.includes(tabURL) ? tabURL : "panel";
   const setTab = (k: TabArgos) => setSearchParams((prev) => { const n = new URLSearchParams(prev); n.set("t", k); return n; }, { replace: true });
@@ -164,7 +163,6 @@ export default function HRMonitorIA() {
           { k: "equipo", label: t("hr.monia.tab.equipo") },
           { k: "envivo", label: t("hr.monia.tab.envivo") },
           { k: "atencion", label: t("hr.monia.tab.atencion") },
-          { k: "resumen", label: t("hr.monia.tab.resumen") },
           ...(isAdmin ? [{ k: "ajustes" as TabArgos, label: t("hr.monia.tab.ajustes") }] : []),
         ];
         return (
@@ -191,9 +189,6 @@ export default function HRMonitorIA() {
 
       {/* Pantallazos en vivo: la muralla (Muralla/Cuadrícula/Lista). */}
       {tab === "envivo" && <div className="mt-5"><PantallazosVivoPanel /></div>}
-
-      {/* Resumen del día: quién va mejor/peor hoy, con la película del día. */}
-      {tab === "resumen" && <div className="mt-5"><ResumenDiaPanel /></div>}
 
       {/* Atención ahora + el rondín (estado de cada quien AHORA). */}
       {tab === "atencion" && (
