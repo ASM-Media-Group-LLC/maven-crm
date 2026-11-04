@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { MonitorPlay, Loader2, AlertTriangle, ScreenShare, RefreshCw, Sparkles, LayoutGrid, Grid3x3 } from "lucide-react";
+import { MonitorPlay, Loader2, AlertTriangle, ScreenShare, RefreshCw, Sparkles, LayoutGrid, Grid3x3, Check, Eye } from "lucide-react";
 import { useLanguage } from "@/hooks/useLanguage";
 import { UserAvatar } from "@/components/UserAvatar";
 import { useCapturasVivo, type PersonaVivo } from "@/hooks/useCapturasVivo";
@@ -127,6 +127,22 @@ const TEXTO_SEM: Record<Semaforo, string> = {
   verde: "text-success", amarillo: "text-warning", naranja: "text-orange-500", rojo: "text-destructive", gris: "text-muted-foreground",
 };
 
+// EL SELLO de la pantalla compartida (Alvaro, 04/11): cuando alguien comparte,
+// Argos juzga si lo que se ve es TRABAJO. El sello lo dice de un golpe —
+// "Trabajando" (verde) o "Revisar" (rojo, salta) — sin tener que leer el
+// análisis chico. Solo aparece si hay pantalla; si la IA aún no juzgó, "Revisando…".
+function SelloPantalla({ p, t, chico }: { p: PersonaVivo; t: Tr; chico?: boolean }) {
+  if (!p.tienePantalla) return null;
+  const base = `absolute right-1.5 top-1.5 inline-flex items-center gap-1 rounded-control font-semibold backdrop-blur-sm ${chico ? "px-1 py-0.5 text-[9px]" : "px-1.5 py-0.5 text-[10px]"}`;
+  if (p.fueraDeLugar === true) {
+    return <span className={`${base} bg-destructive text-destructive-foreground`}><Eye className="h-3 w-3" />{t("hr.pantallazos.selloRevisar")}</span>;
+  }
+  if (p.fueraDeLugar === false) {
+    return <span className={`${base} bg-success text-success-foreground`}><Check className="h-3 w-3" />{t("hr.pantallazos.selloTrabajando")}</span>;
+  }
+  return <span className={`${base} bg-black/55 text-white`}><Sparkles className="h-3 w-3" />{t("hr.pantallazos.selloMirando")}</span>;
+}
+
 // ── Vista MURALLA: tarjeta grande (foto + semáforo + mensaje + análisis) ──
 function CardMuralla({ p, t, hace, sem, onClick }: { p: PersonaVivo; t: Tr; hace: (iso: string) => string; sem: Semaforo; onClick: () => void }) {
   const nombre = p.nombre || t("hr.noName");
@@ -148,11 +164,8 @@ function CardMuralla({ p, t, hace, sem, onClick }: { p: PersonaVivo; t: Tr; hace
             <ScreenShare className="h-3 w-3" />{t("hr.pantallazos.pantalla")}
           </span>
         )}
-        {p.fueraDeLugar && (
-          <span className="absolute right-1.5 top-1.5 inline-flex items-center gap-1 rounded-control bg-destructive px-1.5 py-0.5 text-[10px] font-semibold text-destructive-foreground">
-            <AlertTriangle className="h-3 w-3" />{t("hr.pantallazos.fueraDeLugar")}
-          </span>
-        )}
+        {/* El SELLO de Argos: ¿la pantalla compartida es trabajo? Trabajando / Revisar */}
+        <SelloPantalla p={p} t={t} />
         {p.camaraUrl && p.tienePantalla && (
           <img src={p.camaraUrl} alt={nombre} loading="lazy" className="absolute bottom-1.5 right-1.5 h-14 w-20 rounded-lg border-2 border-background/80 object-cover shadow-md" />
         )}
@@ -199,6 +212,8 @@ function CeldaCuadricula({ p, t, sem, onClick }: { p: PersonaVivo; t: Tr; sem: S
         )}
         {/* El semáforo en la esquina */}
         <span className={`absolute left-1 top-1 h-2.5 w-2.5 rounded-full ring-2 ring-black/40 ${PUNTO_SEM[sem]}`} />
+        {/* El sello de Argos (Trabajando / Revisar) también en la cuadrícula */}
+        <SelloPantalla p={p} t={t} chico />
         <span className="absolute inset-x-0 bottom-0 truncate bg-gradient-to-t from-black/70 to-transparent px-1.5 pb-1 pt-4 text-[11px] font-semibold text-white">{nombre}</span>
       </div>
     </button>
