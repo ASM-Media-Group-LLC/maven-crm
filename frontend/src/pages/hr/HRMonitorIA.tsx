@@ -41,7 +41,6 @@ function PanelAjustes({ t }: { t: Tr }) {
   const [activo, setActivo] = useState(true);
   const [intervalo, setIntervalo] = useState(120);
   const [avisar, setAvisar] = useState(true);
-  const [vigilanciaApp, setVigilanciaApp] = useState(false);
   const [avisarCaptura, setAvisarCaptura] = useState(true);
   const [guardando, setGuardando] = useState(false);
 
@@ -50,7 +49,6 @@ function PanelAjustes({ t }: { t: Tr }) {
     setActivo(config.activo);
     setIntervalo(config.intervaloIaSeg);
     setAvisar(config.avisarSupervisor);
-    setVigilanciaApp(config.vigilanciaApp);
     setAvisarCaptura(config.avisarCaptura);
   }, [config]);
 
@@ -61,7 +59,7 @@ function PanelAjustes({ t }: { t: Tr }) {
         activo,
         intervalo_ia_seg: Math.max(30, Math.min(900, Math.round(intervalo))),
         avisar_supervisor: avisar,
-        vigilancia_app: vigilanciaApp,
+        vigilancia_app: false,
         avisar_captura: avisarCaptura,
         updated_at: new Date().toISOString(),
       }).eq("id", 1);
@@ -80,13 +78,6 @@ function PanelAjustes({ t }: { t: Tr }) {
         <div className="flex items-center gap-3">
           <Switch checked={activo} onCheckedChange={setActivo} id="monia-activo" />
           <Label htmlFor="monia-activo" className="cursor-pointer text-sm">{t("hr.monia.cfg.activo")}</Label>
-        </div>
-        <div className="flex flex-col gap-1">
-          <div className="flex items-center gap-3">
-            <Switch checked={vigilanciaApp} onCheckedChange={setVigilanciaApp} id="monia-vigapp" />
-            <Label htmlFor="monia-vigapp" className="cursor-pointer text-sm font-medium">{t("hr.monia.cfg.vigilanciaApp")}</Label>
-          </div>
-          <p className="max-w-xs text-[11px] text-muted-foreground">{t("hr.monia.cfg.vigilanciaAppHint")}</p>
         </div>
         <div className="flex flex-col gap-1">
           <div className="flex items-center gap-3">

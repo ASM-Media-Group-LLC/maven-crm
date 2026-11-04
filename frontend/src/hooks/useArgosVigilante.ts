@@ -1,74 +1,30 @@
-import { useEffect, useRef, useState } from "react";
-import { useAuth } from "@/hooks/useAuth";
-import { useMonitorEstado } from "@/hooks/useMonitorEstado";
-import { useFaceWatch } from "@/hooks/useFaceWatch";
-import { useMonitorCamara } from "@/hooks/useMonitorCamara";
-
-// ARGOS VIGILANTE — el monitor a nivel de TODA la app, independiente de LiveKit
-// (modelo Hubstaff). Mientras la persona esté logueada en Maven y el admin tenga
-// la vigilancia-app encendida, Argos prende SU PROPIA cámara (getUserMedia, sin
-// la sala de video) y reusa toda la maquinaria que ya existe: el detector de
-// cara (useFaceWatch) + el registro de faltas y el latido del rondín + el ojo de
-// IA (useMonitorCamara). Así Argos vigila aunque Cowork/LiveKit esté caído.
+// ARGOS VIGILANTE — DESACTIVADO A PROPÓSITO (Álvaro, 04/11/2026).
 //
-// Gates (todo tiene que ser verdad): logueado · NO admin · monitor activo
-// (interruptor maestro) · vigilancia-app encendida (interruptor de arranque,
-// off por defecto). useMonitorCamara vuelve a validar admin/activo del lado del
-// hook, así que esto queda doblemente protegido.
+// Antes este hook prendía LA CÁMARA DE LA PERSONA por su cuenta (getUserMedia a
+// nivel de toda la app, modelo Hubstaff) para vigilarla aunque no estuviera en
+// una llamada. Álvaro lo cortó: Argos NO prende la cámara sin consentimiento.
+// «No quiero prenderles una cámara sin permiso. Si la prenden o la apagan, es
+// problema de ellos». La cámara solo se mide cuando la propia persona la prende
+// en una llamada de Cowork (ahí el monitor corre dentro de LiveKitCallView, con
+// el track que ella misma encendió). No tener la cámara prendida no es una falta
+// de permiso: cuenta como «no compartió cámara» y por eso le baja la nota del
+// día, pero la cámara nunca se enciende a escondidas.
+//
+// Se deja el hook (inerte) y su componente para no romper el import del AppShell
+// y para tener el lugar exacto si algún día se hace una vigilancia-app CON
+// consentimiento explícito. Hoy no prende nada, no pide permisos y no registra
+// faltas app-wide.
 
 export interface EstadoVigilante {
-  /** Está vigilando de verdad (hay cámara viva). */
+  /** Está vigilando de verdad (hay cámara viva). Siempre false: ya no vigila app-wide. */
   vigilando: boolean;
-  /** Debe vigilar pero la persona no dio permiso de cámara. */
+  /** Debe vigilar pero la persona no dio permiso de cámara. Siempre false. */
   permisoNegado: boolean;
-  /** La config pide vigilar a esta persona (aunque falte el permiso). */
+  /** La config pide vigilar a esta persona. Siempre false: la vigilancia-app se retiró. */
   debeVigilar: boolean;
 }
 
 export function useArgosVigilante(): EstadoVigilante {
-  const { user } = useAuth();
-  const { esAdmin, activo, vigilanciaApp } = useMonitorEstado(!!user);
-  const debeVigilar = !!user && esAdmin === false && activo === true && vigilanciaApp === true;
-
-  const [track, setTrack] = useState<MediaStreamTrack | null>(null);
-  const [permisoNegado, setPermisoNegado] = useState(false);
-  const streamRef = useRef<MediaStream | null>(null);
-
-  // Prende/apaga la cámara propia según la config. Al apagar, suelta el stream
-  // (se apaga la lucecita de la cámara) — importante para la confianza de la gente.
-  useEffect(() => {
-    const apagar = () => {
-      streamRef.current?.getTracks().forEach((t) => t.stop());
-      streamRef.current = null;
-      setTrack(null);
-    };
-    if (!debeVigilar || typeof navigator === "undefined" || !navigator.mediaDevices?.getUserMedia) {
-      apagar();
-      return;
-    }
-    let vivo = true;
-    void (async () => {
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: { width: { ideal: 640 }, height: { ideal: 480 } },
-          audio: false,
-        });
-        if (!vivo) { stream.getTracks().forEach((t) => t.stop()); return; }
-        streamRef.current = stream;
-        setTrack(stream.getVideoTracks()[0] ?? null);
-        setPermisoNegado(false);
-      } catch {
-        if (vivo) { setPermisoNegado(true); setTrack(null); }
-      }
-    })();
-    return () => { vivo = false; apagar(); };
-  }, [debeVigilar]);
-
-  // El detector de cara corre sobre la cámara propia; el monitor registra faltas,
-  // deja el latido del rondín y pasa el ojo de IA. roomNombre "maven" = vigilancia
-  // de app (no una sala de Cowork puntual).
-  const faceWatch = useFaceWatch(track, debeVigilar && !!track);
-  useMonitorCamara({ track, camaraRealOn: !!track, faceWatch, activo: debeVigilar, roomNombre: "maven" });
-
-  return { vigilando: debeVigilar && !!track, permisoNegado, debeVigilar };
+  // Sin efectos, sin getUserMedia, sin detector: Argos no toca la cámara.
+  return { vigilando: false, permisoNegado: false, debeVigilar: false };
 }
