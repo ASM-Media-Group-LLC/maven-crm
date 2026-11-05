@@ -140,7 +140,7 @@ function EquipoFila({ p, t, onClick }: { p: PersonaResumen; t: Tr; onClick: () =
             </span>
           )}
         </div>
-        {/* La nota EXPLICADA: los 4 factores + CONECTADO (el chequeo de Alvaro:
+        {/* La nota EXPLICADA: los 3 factores + CONECTADO (el chequeo de Alvaro:
             '0% pantalla con 4h' = trabajó sin compartir; '0% con 0h' = ni se
             conectó). Pantalla baja en rojo. */}
         <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5">
@@ -151,7 +151,6 @@ function EquipoFila({ p, t, onClick }: { p: PersonaResumen; t: Tr; onClick: () =
           <FactorChip label={t("hr.resumen.pantalla")} sub={factor("pantalla")} alerta />
           <FactorChip label={t("hr.resumen.camara")} sub={factor("camara")} />
           <FactorChip label={t("hr.resumen.atencion")} sub={factor("atencion")} />
-          <FactorChip label={t("hr.panel.factorHoras")} sub={factor("horas")} />
         </div>
       </div>
       <span className={`shrink-0 font-display text-lg font-bold tabular-nums ${sem.texto}`}>{p.nota.valor ?? "—"}</span>

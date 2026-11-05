@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
-import { calcularNota, type Nota } from "@/lib/notaEmpleado";
+import { calcularNota, fraccionJornada, type Nota } from "@/lib/notaEmpleado";
 
 // EL EXPEDIENTE del empleado (Argos): el mes día por día — qué hizo cada día,
 // con su nota, y al abrir un día el detalle (horas, faltas, pausas, pantallazos
@@ -10,16 +10,18 @@ import { calcularNota, type Nota } from "@/lib/notaEmpleado";
 // (pantallazos/cámara). Lo ven supervisor+ (lo fuerza la RLS).
 
 export interface FaltaDia { id: string; tipo: string; fuente: string; detalle: string | null; capturaPath: string | null; createdAt: string; }
-export interface CapturaDia { id: string; tipo: "pantalla" | "camara"; path: string; nasPath: string | null; enNas: boolean; fueraDeLugar: boolean | null; veredicto: string | null; caraVisible: boolean | null; createdAt: string; }
+export interface CapturaDia { id: string; tipo: "pantalla" | "camara"; path: string; nasPath: string | null; enNas: boolean; fueraDeLugar: boolean | null; veredicto: string | null; caraVisible: boolean | null; perdonado: boolean; createdAt: string; }
 export interface DiaExpediente {
   fecha: string;         // YYYY-MM-DD
   horas: number;
   faltas: FaltaDia[];
   minutosPausaDeMas: number;
   capturas: CapturaDia[];
-  segEnSala: number;      // segundos en sala de Cowork (para pantalla%/cámara%)
-  segSinPantalla: number;
-  segSinCamara: number;
+  // Segundos por estado del día (para pantalla%/cámara% sobre la jornada).
+  segActivo?: number;
+  segSinPantalla?: number;
+  segSinCamara?: number;
+  segFueraCamara?: number;
   nota: Nota;
 }
 export interface Expediente {
@@ -30,7 +32,6 @@ export interface Expediente {
 }
 
 const SERIAS = ["camara_apagada", "se_fue", "celular", "distraido", "no_mira", "pantalla_distraccion"];
-const META_DIA = 8; // meta de horas del día (Alvaro, 02/11)
 
 type RpcDb = { rpc: (f: string, a: unknown) => Promise<{ data: unknown[] | null; error: { message: string } | null }> };
 
@@ -62,25 +63,27 @@ export function useExpedienteEmpleado(userId: string | null, anio: number, mes: 
         db.rpc("cowork_tiempo_diario", { _desde: desde, _hasta: hasta, _user_id: userId, _limit: 100, _offset: 0 }),
         supabase.from("monitor_eventos").select("id, tipo, fuente, detalle, captura_path, created_at, estado").eq("user_id", userId!).neq("estado", "descartado").gte("created_at", inicioISO).lte("created_at", finISO).order("created_at", { ascending: false }).limit(1000),
         db.rpc("cowork_pausas_resumen", { _desde: desde, _hasta: hasta, _session_id: null, _user_id: userId, _limit: 100, _offset: 0 }),
-        supabase.from("monitor_capturas").select("id, tipo, path, nas_path, en_nas, fuera_de_lugar, veredicto, cara_visible, created_at").eq("user_id", userId!).gte("created_at", inicioISO).lte("created_at", finISO).order("created_at", { ascending: false }).limit(3000),
+        supabase.from("monitor_capturas").select("id, tipo, path, nas_path, en_nas, fuera_de_lugar, veredicto, cara_visible, perdonado, created_at").eq("user_id", userId!).gte("created_at", inicioISO).lte("created_at", finISO).order("created_at", { ascending: false }).limit(3000),
       ]);
 
       const dias = new Map<string, DiaExpediente>();
       const asegura = (f: string): DiaExpediente => {
         let d = dias.get(f);
-        if (!d) { d = { fecha: f, horas: 0, faltas: [], minutosPausaDeMas: 0, capturas: [], segEnSala: 0, segSinPantalla: 0, segSinCamara: 0, nota: { valor: null, banda: null, factores: [] } }; dias.set(f, d); }
+        if (!d) { d = { fecha: f, horas: 0, faltas: [], minutosPausaDeMas: 0, capturas: [], segActivo: 0, segSinPantalla: 0, segSinCamara: 0, segFueraCamara: 0, nota: { valor: null, banda: null, factores: [] } }; dias.set(f, d); }
         return d;
       };
 
-      // horas + segundos de sala/pantalla/cámara por día (para la nota)
-      for (const r of (tiempoRes.data ?? []) as Array<{ dia: string; seg_activo: number | string; seg_en_sala?: number | string; seg_sin_pantalla?: number | string; seg_sin_camara?: number | string }>) {
+      // segundos por estado por día (para la nota) + horas de trabajo
+      for (const r of (tiempoRes.data ?? []) as Array<{ dia: string; seg_activo: number | string; seg_sin_pantalla?: number | string; seg_sin_camara?: number | string; seg_fuera_de_camara?: number | string }>) {
         const f = r.dia?.slice(0, 10);
         if (!f) continue;
         const d = asegura(f);
-        d.horas = Number(r.seg_activo) / 3600;
-        d.segEnSala = Number(r.seg_en_sala ?? 0);
+        d.segActivo = Number(r.seg_activo ?? 0);
         d.segSinPantalla = Number(r.seg_sin_pantalla ?? 0);
         d.segSinCamara = Number(r.seg_sin_camara ?? 0);
+        d.segFueraCamara = Number(r.seg_fuera_de_camara ?? 0);
+        // Horas de trabajo (todos los estados de trabajo, no solo activo).
+        d.horas = (d.segActivo + d.segSinPantalla + d.segSinCamara + d.segFueraCamara) / 3600;
       }
       // faltas por día
       for (const e of (eventosRes.data ?? []) as Array<{ id: string; tipo: string; fuente: string; detalle: string | null; captura_path: string | null; created_at: string }>) {
@@ -95,38 +98,29 @@ export function useExpedienteEmpleado(userId: string | null, anio: number, mes: 
         asegura(f).minutosPausaDeMas += (banoDeMas + Number(r.seg_break_de_mas ?? 0) + Number(r.seg_almuerzo_de_mas ?? 0)) / 60;
       }
       // capturas por día
-      for (const c of (capturasRes.data ?? []) as Array<{ id: string; tipo: "pantalla" | "camara"; path: string; nas_path: string | null; en_nas: boolean; fuera_de_lugar: boolean | null; veredicto: string | null; cara_visible: boolean | null; created_at: string }>) {
+      for (const c of (capturasRes.data ?? []) as Array<{ id: string; tipo: "pantalla" | "camara"; path: string; nas_path: string | null; en_nas: boolean; fuera_de_lugar: boolean | null; veredicto: string | null; cara_visible: boolean | null; perdonado: boolean | null; created_at: string }>) {
         const f = diaDe(c.created_at);
-        asegura(f).capturas.push({ id: c.id, tipo: c.tipo, path: c.path, nasPath: c.nas_path, enNas: c.en_nas === true, fueraDeLugar: c.fuera_de_lugar, veredicto: c.veredicto, caraVisible: c.cara_visible, createdAt: c.created_at });
+        asegura(f).capturas.push({ id: c.id, tipo: c.tipo, path: c.path, nasPath: c.nas_path, enNas: c.en_nas === true, fueraDeLugar: c.fuera_de_lugar, veredicto: c.veredicto, caraVisible: c.cara_visible, perdonado: c.perdonado === true, createdAt: c.created_at });
       }
 
-      // nota por día: pantalla 30 / cámara 30 / atención 30 / horas 10 (Alvaro).
+      // nota por día (v2, Alvaro 05/11): pantalla 45 / cámara 35 / distracción 20.
+      // Pantalla/cámara en SEGUNDOS sobre la jornada de 8 h (pausa libre descontada),
+      // así las horas quedan metidas y medio día ≈ 50.
       for (const d of dias.values()) {
-        // Pantalla% y cámara% se miden por MOMENTOS de tiempo (ventanas de 2 min),
-        // no por número de fotos (Alvaro, 04/11): el vigilante de app toma muchas
-        // fotos de cámara y el capturador de Cowork toma la pantalla a otro ritmo;
-        // contar fotos sueltas hundía el % (alguien compartiendo casi todo salía
-        // 10%). Por momentos distintos, pantalla% = momentos compartiendo ÷ momentos
-        // con cámara, que sí refleja cuánto compartió. (Igual que argos_momentos_dia.)
-        const bkt = (iso: string) => Math.floor(Date.parse(iso) / 120000);
-        const momCamara = new Set(d.capturas.filter((c) => c.tipo === "camara").map((c) => bkt(c.createdAt))).size;
-        const momPantalla = new Set(d.capturas.filter((c) => c.tipo === "pantalla").map((c) => bkt(c.createdAt))).size;
-        const pantallaPct = momCamara > 0 ? Math.min(1, momPantalla / momCamara) : undefined;
-        // Cámara% REAL (Alvaro, 04/11): momentos con CARA visible ÷ momentos de
-        // cámara que se pudieron medir (cara_visible no nulo). Ya no es el 100% de
-        // adorno de antes (fotos/(fotos+faltas) con faltas siempre en 0).
-        const momCaraOk = new Set(d.capturas.filter((c) => c.tipo === "camara" && c.caraVisible === true).map((c) => bkt(c.createdAt))).size;
-        const momCaraMedida = new Set(d.capturas.filter((c) => c.tipo === "camara" && c.caraVisible != null).map((c) => bkt(c.createdAt))).size;
-        // Cámara apagada mientras trabajaba SÍ baja: denominador = momentos de trabajo
-        // (pantalla) o los medidos, el mayor (decisión de Alvaro, 05/11).
-        const denomCam = Math.max(momPantalla, momCaraMedida);
-        const camaraPct = denomCam > 0 ? Math.min(1, momCaraOk / denomCam) : undefined;
-        // Atención: de los pantallazos de pantalla que la IA ya juzgó, cuántos en lo suyo.
+        const act = d.segActivo ?? 0, sinPant = d.segSinPantalla ?? 0;
+        const sinCam = d.segSinCamara ?? 0, fueraCam = d.segFueraCamara ?? 0;
+        const segPantalla = act + sinCam + fueraCam;  // compartiendo pantalla
+        const segCamara = act + sinPant;              // cámara/cara bien
+        const hayTiempo = (act + sinPant + sinCam + fueraCam) > 0;
+        const pantallaPct = hayTiempo ? fraccionJornada(segPantalla) : undefined;
+        const camaraPct = hayTiempo ? fraccionJornada(segCamara) : undefined;
+        // Distracción: de los pantallazos juzgados, cuántos en lo suyo. Las
+        // PERDONADAS cuentan como en lo suyo (no bajan la nota).
         const juzgadas = d.capturas.filter((c) => c.tipo === "pantalla" && c.veredicto != null);
         const atencionPct = juzgadas.length > 0
-          ? juzgadas.filter((c) => c.fueraDeLugar !== true).length / juzgadas.length
+          ? juzgadas.filter((c) => c.fueraDeLugar !== true || c.perdonado).length / juzgadas.length
           : undefined;
-        d.nota = calcularNota({ pantallaPct, camaraPct, atencionPct, horasHechas: d.horas, horasMeta: META_DIA });
+        d.nota = calcularNota({ pantallaPct, camaraPct, atencionPct });
       }
 
       const p = perfRes.data as { full_name: string | null; avatar_url: string | null; avatar_seed: string | null } | null;
