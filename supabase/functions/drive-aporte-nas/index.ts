@@ -121,7 +121,7 @@ interface Aporte {
 }
 
 /** Un archivo que ACABA de aterrizar en el Drive (para el correo por tanda). */
-interface Noti { carpeta: string | null; quien: string | null; nombre: string }
+interface Noti { id: string; carpeta: string | null; quien: string | null; nombre: string }
 
 // deno-lint-ignore no-explicit-any
 type Admin = any;
@@ -132,7 +132,7 @@ async function finalizar(admin: Admin, a: Aporte, itemId: string, size: number, 
   await admin.from("drive_items").update({ estado: "listo", size: tam, sha256: sha }).eq("id", itemId);
   await admin.from("drive_aportes").update({ en_nas: true, estado: "en_nas", drive_item_id: itemId }).eq("id", a.id);
   await admin.storage.from(BUCKET).remove([a.storage_path]).then(() => {}, () => {});
-  notis.push({ carpeta: a.item_id, quien: a.quien, nombre: a.nombre_archivo });
+  notis.push({ id: a.id, carpeta: a.item_id, quien: a.quien, nombre: a.nombre_archivo });
 }
 
 /** Procesa un aporte. Devuelve cuántas "partes" de presupuesto consumió. */
@@ -242,6 +242,14 @@ function escapar(s: string): string {
  *  contenido nuevo. Reusa send-notification-email (resuelve correos con los ids). */
 async function avisarContenidoNuevo(admin: Admin, notis: Noti[]): Promise<number> {
   if (!notis.length) return 0;
+  // Reclamar el aviso (false→true) para no mandarlo dos veces si corren dos
+  // migraciones a la vez: solo seguimos con los que ESTA corrida ganó.
+  const { data: ganados } = await admin.from("drive_aportes")
+    .update({ avisado: true }).in("id", notis.map((n) => n.id)).eq("avisado", false).select("id");
+  const ganadosSet = new Set(((ganados ?? []) as Array<{ id: string }>).map((r) => r.id));
+  notis = notis.filter((n) => ganadosSet.has(n.id));
+  if (!notis.length) return 0;
+
   // Destinatarios: todos los del Drive full.
   const { data: dest } = await admin.rpc("drive_acceso_total_ids");
   const ids = ((dest ?? []) as Array<string | { drive_acceso_total_ids?: string }>)
