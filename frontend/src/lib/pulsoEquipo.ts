@@ -78,15 +78,25 @@ function promedio(nums: number[]): number | null {
   return Math.round(nums.reduce((a, b) => a + b, 0) / nums.length);
 }
 
-/** Arma el pulso a partir del roster visible (ya filtrado por jerarquía) y el
- *  estado en vivo de cada quien (del rondín). Quien no tiene estado = ausente. */
+/** Arma el pulso a partir del roster visible (ya filtrado por jerarquía), el
+ *  estado de calidad del rondín de Argos (si hay) y, sobre todo, QUIÉN ESTÁ ONLINE
+ *  (presencia real de la app, el mismo puntito verde de los avatares).
+ *
+ *  Conectado = está en `online`. El estado del rondín (trabajando/pausa/problema)
+ *  se superpone cuando existe; si está online pero Argos no lo está midiendo,
+ *  queda "presente" (conectado, sin problema detectado). Offline = no está online
+ *  y el rondín no lo vio. Así "conectado" cuadra con la tarjeta de arriba. */
 export function construirPulso(
   roster: Array<{ userId: string; nombre: string; avatarUrl: string | null; avatarSeed: string | null; equipo: string }>,
   estadoPor: Map<string, { estado: EstadoVivo; desde: string | null }>,
+  online: Set<string>,
 ): Pulso {
   const personas: PersonaPulso[] = roster.map((r) => {
     const ev = estadoPor.get(r.userId);
-    const estado: EstadoVivo = ev?.estado ?? "ausente";
+    let estado: EstadoVivo = ev?.estado ?? "ausente";
+    // La presencia real manda: si está online pero el rondín no lo vio (o lo dio
+    // por ausente), igual está conectado → "presente".
+    if (estado === "ausente" && online.has(r.userId)) estado = "presente";
     return {
       ...r,
       estado,

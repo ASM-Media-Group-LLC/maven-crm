@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useRondinVivo } from "@/hooks/useRondinVivo";
+import { useOnlinePresence } from "@/hooks/useOnlinePresence";
 import { equipoDeRoles } from "@/hooks/useTurnoPersonas";
 import { construirPulso, puedeVerPulso, nivelesVisibles, type Pulso } from "@/lib/pulsoEquipo";
 
@@ -27,6 +28,7 @@ export interface PulsoEquipo {
 export function usePulsoEquipo(): PulsoEquipo {
   const { user } = useAuth();
   const rondin = useRondinVivo();
+  const { onlineUsers } = useOnlinePresence();
 
   // El nivel del que mira (barato, cacheado): decide a quién puede ver.
   const nivelQ = useQuery({
@@ -76,13 +78,15 @@ export function usePulsoEquipo(): PulsoEquipo {
   });
 
   const estadoPor = new Map(rondin.personas.map((p) => [p.userId, { estado: p.estado, desde: p.desde }]));
-  const pulso = puedeVer && rosterQ.data ? construirPulso(rosterQ.data, estadoPor) : null;
+  const pulso = puedeVer && rosterQ.data ? construirPulso(rosterQ.data, estadoPor, onlineUsers) : null;
 
   return {
     puedeVer,
     nivel,
     pulso,
-    cargando: nivelQ.isLoading || (puedeVer && (rosterQ.isLoading || rondin.cargando)),
+    // El rondín es solo una CAPA de calidad encima; no bloquea (la presencia
+    // online llega al instante del contexto). Basta con nivel + roster.
+    cargando: nivelQ.isLoading || (puedeVer && rosterQ.isLoading),
     error: (nivelQ.error as Error | null) ?? (rosterQ.error as Error | null) ?? rondin.error ?? null,
     ultimaRonda: rondin.resumen.ultimaRonda,
   };

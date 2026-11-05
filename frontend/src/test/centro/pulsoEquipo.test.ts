@@ -47,20 +47,30 @@ describe("construirPulso: nota viva + quién la baja + cajas", () => {
     persona("d", "PR"), persona("e", "PR"),
   ];
 
+  const TODOS = new Set(["a", "b", "c", "d", "e"]);
+
   it("la nota viva promedia SOLO a los conectados (el offline no cuenta)", () => {
     const estados = new Map([
       ["a", estado("trabajando")], // 100
       ["b", estado("trabajando")], // 100
-      // c sin estado → ausente (offline): no cuenta
       ["d", estado("pausa")],      // 55
       ["e", estado("celular")],    // 15
     ]);
-    const p = construirPulso(roster, estados);
+    // c está offline (no está en el set online) → no cuenta.
+    const p = construirPulso(roster, estados, new Set(["a", "b", "d", "e"]));
     // conectados: a,b,d,e → (100+100+55+15)/4 = 67.5 → 68
     expect(p.conectados).toBe(4);
     expect(p.notaViva).toBe(68);
     expect(p.total).toBe(5);
     expect(p.trabajando).toBe(2);
+  });
+
+  it("online sin dato de Argos = presente (conectado), no offline", () => {
+    // Nadie tiene estado de rondín, pero 3 están online.
+    const p = construirPulso(roster, new Map(), new Set(["a", "b", "c"]));
+    expect(p.conectados).toBe(3);
+    expect(p.notaViva).toBe(70); // presente = 70
+    expect(p.cajas.reduce((n, c) => n + c.conProblema, 0)).toBe(0);
   });
 
   it("quién la baja = solo los que están en problema, de peor a menos mal", () => {
@@ -70,7 +80,7 @@ describe("construirPulso: nota viva + quién la baja + cajas", () => {
       ["c", estado("no_mira")],  // 30
       ["d", estado("celular")],  // 15
     ]);
-    const p = construirPulso(roster, estados);
+    const p = construirPulso(roster, estados, TODOS);
     expect(p.conProblema).toBe(3);
     // los de 15 (se_fue, celular) antes que el de 30 (no_mira)
     expect(p.quienLaBaja.map((x) => x.userId).slice(0, 2).sort()).toEqual(["b", "d"]);
@@ -82,7 +92,7 @@ describe("construirPulso: nota viva + quién la baja + cajas", () => {
       ["a", estado("trabajando")], ["b", estado("trabajando")], ["c", estado("trabajando")],
       ["d", estado("trabajando")], ["e", estado("celular")], // PR tiene un problema
     ]);
-    const p = construirPulso(roster, estados);
+    const p = construirPulso(roster, estados, TODOS);
     expect(p.cajas).toHaveLength(2);
     // PR (con problema) va primero aunque Chatters tenga mejor nota
     expect(p.cajas[0].equipo).toBe("PR");
@@ -93,7 +103,7 @@ describe("construirPulso: nota viva + quién la baja + cajas", () => {
   });
 
   it("si nadie está conectado, la nota viva es null (no 0)", () => {
-    const p = construirPulso(roster, new Map());
+    const p = construirPulso(roster, new Map(), new Set());
     expect(p.notaViva).toBeNull();
     expect(p.conectados).toBe(0);
     expect(p.cajas).toHaveLength(2); // las cajas igual existen, en gris
