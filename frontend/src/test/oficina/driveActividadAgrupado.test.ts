@@ -19,6 +19,20 @@ function ev(actorId: string, accion: AccionDrive, nombre: string, segundos: numb
     accion,
     nombre,
     createdAt: new Date(BASE - segundos * 1000).toISOString(),
+    viaLink: false,
+    quien: null,
+  };
+}
+
+// Un aporte por el link público: sin actor interno, con el nombre que tecleó quien subió.
+function evLink(quien: string | null, nombre: string, segundos: number): EventoActividad {
+  return {
+    ...ev("", "subio", nombre, segundos),
+    id: `link-${quien}-${segundos}`,
+    actorId: null,
+    actorNombre: quien ?? "",
+    viaLink: true,
+    quien,
   };
 }
 
@@ -46,6 +60,19 @@ describe("agrupar actividad del Drive", () => {
     // 0 s y 200 s caen en buckets de 120 s distintos.
     const grupos = agrupar([ev("ana", "subio", "a.jpg", 0), ev("ana", "subio", "b.jpg", 200)]);
     expect(grupos).toHaveLength(2);
+  });
+
+  it("separa dos invitados distintos del link (aunque ambos tengan actor null)", () => {
+    const grupos = agrupar([evLink("Belial", "a.mp4", 0), evLink("Carolane", "b.mp4", 1)]);
+    expect(grupos).toHaveLength(2);
+    expect(grupos[0].viaLink).toBe(true);
+    expect(grupos[0].quien).toBe("Belial");
+  });
+
+  it("junta las subidas del mismo invitado por link en un grupo", () => {
+    const grupos = agrupar([evLink("Belial", "a.mp4", 0), evLink("Belial", "b.mp4", 1)]);
+    expect(grupos).toHaveLength(1);
+    expect(grupos[0].items).toHaveLength(2);
   });
 
   it("no agrega nombres vacíos a la lista del grupo", () => {

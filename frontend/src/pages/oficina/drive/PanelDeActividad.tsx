@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import { format, isToday, isYesterday } from "date-fns";
 import { es } from "date-fns/locale";
-import { Activity, AlertTriangle, FolderInput, FolderPlus, Loader2, Pencil, RotateCcw, Trash2, Upload, type LucideIcon } from "lucide-react";
+import { Activity, AlertTriangle, FolderInput, FolderPlus, Link2, Loader2, Pencil, RotateCcw, Trash2, Upload, type LucideIcon } from "lucide-react";
 import { useLanguage } from "@/hooks/useLanguage";
 import { UserAvatar } from "@/components/UserAvatar";
 import { useActividadDrive, type AccionDrive, type EventoActividad } from "@/hooks/useActividadDrive";
@@ -34,21 +34,28 @@ interface Grupo {
   items: string[];
   createdAt: string;
   bkt: number;
+  viaLink: boolean;
+  quien: string | null;
 }
 
 // Agrupa eventos seguidos del mismo actor y acción en la misma ventana de 2 min.
+// Los de link (actor null) se separan por `quien`: dos invitados distintos no se
+// juntan en una línea.
 export function agrupar(eventos: EventoActividad[]): Grupo[] {
   const bkt = (iso: string) => Math.floor(Date.parse(iso) / 120000);
   const grupos: Grupo[] = [];
   for (const e of eventos) {
     const ult = grupos[grupos.length - 1];
-    if (ult && ult.actorId === e.actorId && ult.accion === e.accion && ult.bkt === bkt(e.createdAt)) {
+    if (
+      ult && ult.actorId === e.actorId && ult.accion === e.accion && ult.bkt === bkt(e.createdAt) &&
+      ult.viaLink === e.viaLink && ult.quien === e.quien
+    ) {
       if (e.nombre) ult.items.push(e.nombre);
     } else {
       grupos.push({
         actorId: e.actorId, actorNombre: e.actorNombre, actorAvatarUrl: e.actorAvatarUrl,
         actorAvatarSeed: e.actorAvatarSeed, accion: e.accion, items: e.nombre ? [e.nombre] : [],
-        createdAt: e.createdAt, bkt: bkt(e.createdAt),
+        createdAt: e.createdAt, bkt: bkt(e.createdAt), viaLink: e.viaLink, quien: e.quien,
       });
     }
   }
@@ -107,17 +114,26 @@ export default function PanelDeActividad({ itemId, activo }: { itemId: string | 
         const frase = t(VERBO[g.accion], { n, cosa: cosaDe(g.accion, n, t) });
         const Icono = ICONO[g.accion];
         const extra = g.items.length - TOPE_ITEMS;
+        // Nombre a mostrar: del link usa `quien` (o "Invitado"); si no, el perfil.
+        const nombreMostrado = g.viaLink
+          ? (g.quien || t("drive.actividad.invitado"))
+          : (g.actorNombre || t("hr.noName"));
         return (
           <div key={i}>
             {nuevoDia && (
               <p className="mb-1.5 mt-3 border-b border-border/50 pb-1 text-xs font-semibold capitalize text-muted-foreground first:mt-0">{dia}</p>
             )}
             <div className="flex gap-3 rounded-xl px-1 py-2">
-              <UserAvatar name={g.actorNombre || t("hr.noName")} src={g.actorAvatarUrl} seed={g.actorAvatarSeed} size="sm" />
+              <UserAvatar name={nombreMostrado} src={g.actorAvatarUrl} seed={g.actorAvatarSeed} size="sm" />
               <div className="min-w-0 flex-1">
                 <p className="text-sm leading-snug">
-                  <span className="font-semibold">{g.actorNombre || t("hr.noName")}</span>{" "}
+                  <span className="font-semibold">{nombreMostrado}</span>{" "}
                   <span className="text-muted-foreground">{frase}</span>
+                  {g.viaLink && (
+                    <span className="ml-1.5 inline-flex items-center gap-0.5 rounded-full border border-primary/30 bg-primary/10 px-1.5 py-px align-middle text-[10px] font-medium text-primary">
+                      <Link2 className="h-2.5 w-2.5" />{t("drive.actividad.porLink")}
+                    </span>
+                  )}
                 </p>
                 <p className="mt-0.5 flex items-center gap-1 text-[11px] text-muted-foreground">
                   <Icono className="h-3 w-3 shrink-0" />

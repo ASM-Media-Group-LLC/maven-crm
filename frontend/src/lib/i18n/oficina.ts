@@ -533,6 +533,8 @@ export const oficina = {
   "drive.actividad.aPapelera": { es: "envió a la papelera {n} {cosa}", en: "sent {n} {cosa} to trash" },
   "drive.actividad.restauro": { es: "restauró {n} {cosa}", en: "restored {n} {cosa}" },
   "drive.actividad.borro": { es: "borró {n} {cosa}", en: "deleted {n} {cosa}" },
+  "drive.actividad.porLink": { es: "por link", en: "via link" },
+  "drive.actividad.invitado": { es: "Invitado", en: "Guest" },
   "drive.detalles.vacio": {
     es: "Selecciona un archivo o una carpeta para ver sus detalles.",
     en: "Select a file or folder to see its details.",

@@ -20,6 +20,10 @@ export interface EventoActividad {
   accion: AccionDrive;
   nombre: string | null;
   createdAt: string;
+  // Subido por el link público: no es de nadie interno. `quien` = el nombre que
+  // tecleó quien subió (o null = invitado sin nombre).
+  viaLink: boolean;
+  quien: string | null;
 }
 
 interface FilaActividad {
@@ -29,6 +33,7 @@ interface FilaActividad {
   accion: AccionDrive;
   nombre: string | null;
   created_at: string;
+  detalle: { via_link?: boolean; quien?: string | null } | null;
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -43,7 +48,7 @@ export function useActividadDrive(itemId: string | null, habilitado: boolean) {
     queryFn: async (): Promise<EventoActividad[]> => {
       const { data, error } = await sinTipar
         .from("drive_actividad")
-        .select("id, item_id, actor_id, accion, nombre, created_at")
+        .select("id, item_id, actor_id, accion, nombre, created_at, detalle")
         .or(`item_id.eq.${itemId},parent_id.eq.${itemId}`)
         .order("created_at", { ascending: false })
         .limit(200);
@@ -62,17 +67,21 @@ export function useActividadDrive(itemId: string | null, habilitado: boolean) {
       }
 
       return filas.map((f) => {
+        const viaLink = f.detalle?.via_link === true;
+        const quien = (f.detalle?.quien ?? null)?.trim() || null;
         const perfil = f.actor_id ? perfilPor.get(f.actor_id) : undefined;
         return {
           id: f.id,
           itemId: f.item_id,
           actorId: f.actor_id,
-          actorNombre: perfil?.full_name?.trim() || "",
-          actorAvatarUrl: perfil?.avatar_url ?? null,
-          actorAvatarSeed: perfil?.avatar_seed ?? null,
+          actorNombre: viaLink ? (quien ?? "") : (perfil?.full_name?.trim() || ""),
+          actorAvatarUrl: viaLink ? null : (perfil?.avatar_url ?? null),
+          actorAvatarSeed: viaLink ? (quien ?? "link") : (perfil?.avatar_seed ?? null),
           accion: f.accion,
           nombre: f.nombre,
           createdAt: f.created_at,
+          viaLink,
+          quien,
         };
       });
     },
