@@ -68,7 +68,8 @@ Deno.serve(async (req) => {
       const path = `${token}/${crypto.randomUUID()}-${nombre}`;
       const { data, error } = await admin.storage.from(BUCKET).createSignedUploadUrl(path);
       if (error || !data) return json({ error: error?.message ?? "no se pudo iniciar" }, 500);
-      return json({ path: data.path, uploadToken: data.token });
+      // signedUrl para subir con PROGRESO real (XHR) desde el navegador.
+      return json({ path: data.path, uploadToken: data.token, signedUrl: data.signedUrl });
     }
 
     // Confirma que un archivo ya se subió: registra el aporte.
