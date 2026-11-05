@@ -1,8 +1,9 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { MonitorPlay, Loader2, AlertTriangle, ScreenShare, RefreshCw, Sparkles, LayoutGrid, Grid3x3, Check, Eye } from "lucide-react";
+import { MonitorPlay, Loader2, AlertTriangle, ScreenShare, RefreshCw, Sparkles, LayoutGrid, Grid3x3, Check, Eye, X, FileClock } from "lucide-react";
 import { useLanguage } from "@/hooks/useLanguage";
 import { UserAvatar } from "@/components/UserAvatar";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { useCapturasVivo, type PersonaVivo } from "@/hooks/useCapturasVivo";
 import { useSemaforos, PUNTO_SEM, type Semaforo } from "@/hooks/useSemaforos";
 
@@ -31,6 +32,8 @@ export function PantallazosVivoPanel() {
   // Filtro por empleado (Alvaro, 04/11): elige una persona y ves solo lo suyo.
   // Si el filtrado desaparece de la ventana, cae solo a "Todos".
   const [persona, setPersona] = useState<string>("todos");
+  // Clic en una tarjeta = ver ESE pantallazo en grande (no ir al expediente).
+  const [verPantallazo, setVerPantallazo] = useState<PersonaVivo | null>(null);
   const lista = persona !== "todos" && personas.some((p) => p.userId === persona)
     ? personas.filter((p) => p.userId === persona)
     : personas;
@@ -117,15 +120,61 @@ export function PantallazosVivoPanel() {
           </div>
         ) : modo === "muralla" ? (
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-            {lista.map((p) => <CardMuralla key={p.userId} p={p} t={t} hace={hace} sem={semaforoDe(p.userId, p.fueraDeLugar, p.veredicto, p.tienePantalla)} onClick={() => irA(p.userId)} />)}
+            {lista.map((p) => <CardMuralla key={p.userId} p={p} t={t} hace={hace} sem={semaforoDe(p.userId, p.fueraDeLugar, p.veredicto, p.tienePantalla)} onClick={() => setVerPantallazo(p)} />)}
           </div>
         ) : (
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 2xl:grid-cols-6">
-            {lista.map((p) => <CeldaCuadricula key={p.userId} p={p} t={t} sem={semaforoDe(p.userId, p.fueraDeLugar, p.veredicto, p.tienePantalla)} onClick={() => irA(p.userId)} />)}
+            {lista.map((p) => <CeldaCuadricula key={p.userId} p={p} t={t} sem={semaforoDe(p.userId, p.fueraDeLugar, p.veredicto, p.tienePantalla)} onClick={() => setVerPantallazo(p)} />)}
           </div>
         )}
       </div>
+
+      {verPantallazo && (
+        <VisorVivo
+          p={verPantallazo}
+          t={t}
+          hace={hace}
+          onClose={() => setVerPantallazo(null)}
+          onExpediente={() => { const id = verPantallazo.userId; setVerPantallazo(null); irA(id); }}
+        />
+      )}
     </section>
+  );
+}
+
+// Visor del pantallazo en vivo (Alvaro, 05/11): clic en una tarjeta abre ESE
+// pantallazo en grande (pantalla + cámara + qué hace), con botón al expediente.
+function VisorVivo({ p, t, hace, onClose, onExpediente }: {
+  p: PersonaVivo; t: Tr; hace: (iso: string) => string; onClose: () => void; onExpediente: () => void;
+}) {
+  const nombre = p.nombre || t("hr.noName");
+  return (
+    <Dialog open onOpenChange={(o) => { if (!o) onClose(); }}>
+      <DialogContent className="max-h-[90vh] max-w-3xl overflow-y-auto p-0">
+        <DialogTitle className="sr-only">{nombre}</DialogTitle>
+        <div className="relative aspect-[16/10] w-full bg-muted/40">
+          {p.pantallaUrl ? (
+            <img src={p.pantallaUrl} alt={nombre} className="h-full w-full object-contain" />
+          ) : (
+            <div className="flex h-full w-full items-center justify-center text-muted-foreground"><Loader2 className="h-6 w-6 animate-spin" /></div>
+          )}
+          {p.camaraUrl && (
+            <img src={p.camaraUrl} alt={nombre} className="absolute bottom-2 right-2 h-24 w-32 rounded-lg border-2 border-background/80 object-cover shadow-lg" />
+          )}
+          <button type="button" onClick={onClose} aria-label={t("common.close")} className="absolute right-2 top-2 flex h-8 w-8 items-center justify-center rounded-full bg-black/55 text-white backdrop-blur-sm transition hover:bg-black/75"><X className="h-4 w-4" /></button>
+        </div>
+        <div className="flex flex-wrap items-center gap-3 p-4">
+          <UserAvatar name={nombre} src={p.avatarUrl} seed={p.avatarSeed} size="sm" />
+          <div className="min-w-0 flex-1">
+            <div className="truncate text-sm font-semibold">{nombre}</div>
+            <div className="truncate text-xs text-muted-foreground">{hace(p.ultima)} · {p.veredicto || t("hr.pantallazos.analizando")}</div>
+          </div>
+          <button type="button" onClick={onExpediente} className="inline-flex shrink-0 items-center gap-1.5 rounded-xl border border-primary/40 bg-primary/10 px-3 py-1.5 text-xs font-semibold text-primary transition hover:bg-primary/20">
+            <FileClock className="h-3.5 w-3.5" />{t("hr.pantallazos.verExpedienteBtn")}
+          </button>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 

@@ -52,13 +52,18 @@ type Turno = typeof TURNOS[number];
 //   atención < 95 → tuvo pantallazos "fuera de lugar" (distraído)
 //   cámara   < 80 → cámara apagada / sin cara buena parte del tiempo
 //   pantalla < 80 → no compartió pantalla buena parte del tiempo
-function fallasDe(p: PersonaTurno, t: Tr): string[] {
+type TipoFalla = "fuera" | "camara" | "pantalla";
+function tiposFallaDe(p: PersonaTurno): TipoFalla[] {
   const sub = (c: string) => p.nota.factores.find((x) => x.clave === c)?.sub ?? null;
-  const out: string[] = [];
-  if ((sub("atencion") ?? 100) < 95) out.push(t("hr.hist.flagFuera"));
-  if ((sub("camara") ?? 100) < 80) out.push(t("hr.hist.flagCamara"));
-  if ((sub("pantalla") ?? 100) < 80) out.push(t("hr.hist.flagPantalla"));
+  const out: TipoFalla[] = [];
+  if ((sub("atencion") ?? 100) < 95) out.push("fuera");
+  if ((sub("camara") ?? 100) < 80) out.push("camara");
+  if ((sub("pantalla") ?? 100) < 80) out.push("pantalla");
   return out;
+}
+const FLAG_LBL: Record<TipoFalla, TranslationKey> = { fuera: "hr.hist.flagFuera", camara: "hr.hist.flagCamara", pantalla: "hr.hist.flagPantalla" };
+function fallasDe(p: PersonaTurno, t: Tr): string[] {
+  return tiposFallaDe(p).map((tf) => t(FLAG_LBL[tf]));
 }
 
 // Una persona del turno: cara, nombre, sus 3 factores, las fallas (chips) y la
@@ -98,11 +103,21 @@ function TurnoDetalle({ turno, dia, resumen, t, onVolver, onPersona }: {
   t: Tr; onVolver: () => void; onPersona: (id: string) => void;
 }) {
   const { personas, cargando } = useTurnoPersonas(dia, turno.from, turno.to, true);
-  const [soloFallas, setSoloFallas] = useState(false);
+  const [filtroTipo, setFiltroTipo] = useState<"todos" | TipoFalla>("todos");
   const conNota = personas.filter((p) => p.nota.valor != null);
   const enProblema = conNota.filter((p) => (p.nota.valor as number) < 60).length;
-  const conFallas = personas.filter((p) => fallasDe(p, t).length > 0);
-  const mostradas = soloFallas ? conFallas : personas;
+  const conteos = {
+    fuera: personas.filter((p) => tiposFallaDe(p).includes("fuera")).length,
+    camara: personas.filter((p) => tiposFallaDe(p).includes("camara")).length,
+    pantalla: personas.filter((p) => tiposFallaDe(p).includes("pantalla")).length,
+  };
+  const mostradas = filtroTipo === "todos" ? personas : personas.filter((p) => tiposFallaDe(p).includes(filtroTipo));
+  const chips: Array<{ k: "todos" | TipoFalla; lbl: string; n?: number }> = [
+    { k: "todos", lbl: t("hr.hist.filtroTodos") },
+    { k: "fuera", lbl: t("hr.hist.filtroFuera"), n: conteos.fuera },
+    { k: "camara", lbl: t("hr.hist.filtroCamara"), n: conteos.camara },
+    { k: "pantalla", lbl: t("hr.hist.filtroPantalla"), n: conteos.pantalla },
+  ];
   const Icono = turno.icon;
   return (
     <div className="space-y-4">
@@ -136,16 +151,20 @@ function TurnoDetalle({ turno, dia, resumen, t, onVolver, onPersona }: {
 
       {/* La gente del turno */}
       <div>
-        <div className="mb-2 flex flex-wrap items-center gap-2">
-          <p className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground"><Eye className="h-3.5 w-3.5" />{t("hr.hist.gente")}</p>
-          <button type="button" onClick={() => setSoloFallas((s) => !s)} className={`ml-auto inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] font-medium transition ${soloFallas ? "border-warning/50 bg-warning/15 text-warning" : "border-border/50 text-muted-foreground hover:bg-foreground/5"}`}>
-            <AlertTriangle className="h-3 w-3" />{t("hr.hist.soloFallas", { n: conFallas.length })}
-          </button>
+        <p className="mb-2 flex items-center gap-1.5 text-xs font-semibold text-muted-foreground"><Eye className="h-3.5 w-3.5" />{t("hr.hist.gente")}</p>
+        {/* Filtros por TIPO de falla: toca uno y ves solo a quienes la tienen. */}
+        <div className="mb-3 flex flex-wrap items-center gap-2">
+          {chips.map((c) => (
+            <button key={c.k} type="button" onClick={() => setFiltroTipo(c.k)} className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition ${filtroTipo === c.k ? "border-primary/50 bg-primary/10 text-primary" : "border-border/50 text-muted-foreground hover:bg-foreground/5"}`}>
+              {c.lbl}
+              {c.n != null && c.n > 0 && <span className={`rounded-full px-1.5 py-0.5 text-[10px] tabular-nums ${filtroTipo === c.k ? "bg-primary/20" : "bg-warning/20 text-warning"}`}>{c.n}</span>}
+            </button>
+          ))}
         </div>
         {cargando ? (
           <div className="flex justify-center py-6"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
         ) : mostradas.length === 0 ? (
-          <p className="py-4 text-center text-sm text-muted-foreground">{soloFallas ? t("hr.hist.sinFallas") : t("hr.hist.sinGente")}</p>
+          <p className="py-4 text-center text-sm text-muted-foreground">{filtroTipo === "todos" ? t("hr.hist.sinGente") : t("hr.hist.sinFallas")}</p>
         ) : (
           <div className="flex flex-col gap-1.5">
             {mostradas.map((p) => <PersonaFilaTurno key={p.userId} p={p} t={t} onClick={() => onPersona(p.userId)} />)}
