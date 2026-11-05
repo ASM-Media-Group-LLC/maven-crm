@@ -1,43 +1,58 @@
-// La NOTA diaria del empleado (Monitor IA · Argos). Alvaro, 02/11/2026.
+// La NOTA diaria del empleado (Monitor IA · Argos). Alvaro, 05/11/2026 (v2).
 //
-// Una sola cifra 0–100 con color que responde lo único que importa: ¿trabajó
-// FULL el día, sí o no? Se arma de los CUATRO factores que Alvaro eligió, con sus
-// pesos:
-//   · Comparte pantalla  30 %  — lo más importante: que se le vea la pantalla.
-//   · En cámara          30 %  — que esté en cámara, la cara visible.
-//   · Atención           30 %  — que lo que tiene en pantalla sea TRABAJO (no ocio).
-//   · Horas conectado    10 %  — cuánto del día cumplió (meta 8 h).
+// Una sola cifra 0–100 que responde lo único que importa: ¿trabajó FULL el turno,
+// sí o no? Tres factores con los pesos que eligió Alvaro:
+//   · Comparte pantalla  45 %  — lo más fuerte: que se le vea la pantalla.
+//   · En cámara          35 %  — que esté en cámara, la cara visible.
+//   · Distracción        20 %  — que lo que hace sea TRABAJO (no fuera de lugar).
 //
-// REGLA DURA: si NO comparte pantalla en todo el día, la nota NO puede pasar de
-// 50 (rojo), por bien que haga lo demás. Compartir pantalla no se negocia.
+// LAS HORAS VAN METIDAS DENTRO de pantalla/cámara: se miden sobre el TURNO COMPLETO
+// (8 h menos la pausa libre), no sobre el ratito que estuvo. Así medio turno ≈ 50 %
+// y nadie llega arriba sin haber trabajado la jornada entera compartiendo. Por eso
+// ya no hay un factor "Horas" aparte (era lo que confundía).
 //
-// Cuando un factor viene "sin dato", su peso se REPARTE entre los que sí hay (no
-// se pierde ni castiga). Si no hay NINGÚN dato, la nota es null.
+// La pausa libre (baño + comida) NO castiga: se descuenta del denominador. En esta
+// primera versión es fija (baño 10 + comida 30 = 40 min); el panel del admin la
+// hará por rol/persona.
 //
-// Función pura y determinista: así el guard la ata sin tocar la red. Más adelante
-// Alvaro sumará indicadores POR ROL; entran como un factor más y se re-reparte.
+// REGLA DURA: si NO comparte pantalla en todo el turno, la nota NO pasa de 50
+// (rojo), por bien que haga lo demás. Compartir pantalla no se negocia.
+//
+// Cuando un factor viene "sin dato", su peso se REPARTE entre los que sí hay. Si no
+// hay NINGÚN dato, la nota es null. Función pura y determinista (el guard la ata sin
+// tocar la red).
 
 export type BandaNota = "bien" | "ojo" | "mal";
 
-/** Señales crudas de una persona en un período (Hoy o Semana). */
-export interface SenalesEmpleado {
-  /** Fracción 0–1 del tiempo conectado con la PANTALLA compartida. undefined = sin dato. */
-  pantallaPct?: number;
-  /** Fracción 0–1 del tiempo con la CÁMARA/cara visible. undefined = sin dato. */
-  camaraPct?: number;
-  /** Fracción 0–1 de pantallazos juzgados EN LO SUYO (no fuera de lugar). undefined = sin dato. */
-  atencionPct?: number;
-  /** Horas de reloj efectivas (de cowork_tiempo_diario: seg_activo/3600). */
-  horasHechas: number;
-  /** Meta de horas del período. undefined = 8 h (jornada). */
-  horasMeta?: number;
+// Pausa libre exenta del denominador (segundos). Fija por ahora (baño 10 + comida
+// 30); el panel del admin la hará configurable por rol/persona.
+export const EXENTO_SEG = 40 * 60;
+// Jornada por defecto (horas) si el que llama no pasa otra.
+export const JORNADA_HORAS = 8;
+
+/** Fracción 0–1 de la JORNADA que cubren esos segundos de trabajo (pantalla o
+ *  cámara), con la pausa libre ya descontada del denominador. Tope 1. */
+export function fraccionJornada(segundos: number, horasJornada = JORNADA_HORAS): number {
+  const denom = Math.max(1, horasJornada * 3600 - EXENTO_SEG);
+  return Math.min(1, Math.max(0, segundos) / denom);
 }
 
-/** Un factor de la nota: su sub-puntaje 0–100 y su peso. El texto legible lo
- *  arma la UI con t(), para que el idioma se traduzca. */
+/** Señales crudas de una persona en un período. */
+export interface SenalesEmpleado {
+  /** Fracción 0–1 del TURNO con la PANTALLA compartida. undefined = sin dato / no se califica. */
+  pantallaPct?: number;
+  /** Fracción 0–1 del TURNO con la CÁMARA/cara visible. undefined = sin dato / no se califica. */
+  camaraPct?: number;
+  /** Fracción 0–1 de pantallazos juzgados EN LO SUYO (no fuera de lugar; las
+   *  perdonadas cuentan como en lo suyo). undefined = sin dato. */
+  atencionPct?: number;
+}
+
+/** Un factor de la nota: su sub-puntaje 0–100 y su peso. El texto legible lo arma
+ *  la UI con t(). */
 export interface FactorNota {
-  clave: "pantalla" | "camara" | "atencion" | "horas";
-  /** 0–100, o null si no había dato para calcularlo. */
+  clave: "pantalla" | "camara" | "atencion";
+  /** 0–100, o null si no había dato. */
   sub: number | null;
   /** Peso relativo del factor (antes de repartir). */
   peso: number;
@@ -51,9 +66,7 @@ export interface Nota {
 }
 
 // Pesos base (suman 1). Si un factor no tiene dato, su peso se reparte.
-const PESO = { pantalla: 0.3, camara: 0.3, atencion: 0.3, horas: 0.1 } as const;
-// Meta de horas por defecto (jornada completa, elección de Alvaro).
-const META_HORAS_FALLBACK = 8;
+const PESO = { pantalla: 0.45, camara: 0.35, atencion: 0.2 } as const;
 // Si compartió MENOS que esto de pantalla, cuenta como "no compartió": tope 50.
 const UMBRAL_SIN_PANTALLA = 0.05;
 const TOPE_SIN_PANTALLA = 50;
@@ -67,18 +80,12 @@ export function bandaDeNota(valor: number): BandaNota {
   return "mal";
 }
 
-/**
- * Calcula la nota 0–100 de una persona a partir de sus señales.
- */
+/** Calcula la nota 0–100 de una persona a partir de sus señales. */
 export function calcularNota(s: SenalesEmpleado): Nota {
-  const meta = s.horasMeta && s.horasMeta > 0 ? s.horasMeta : META_HORAS_FALLBACK;
-  const subHoras = clamp((s.horasHechas / meta) * 100);
-
   const factores: FactorNota[] = [
     { clave: "pantalla", sub: pct(s.pantallaPct), peso: PESO.pantalla },
     { clave: "camara", sub: pct(s.camaraPct), peso: PESO.camara },
     { clave: "atencion", sub: pct(s.atencionPct), peso: PESO.atencion },
-    { clave: "horas", sub: subHoras, peso: PESO.horas },
   ];
 
   // Promedio ponderado SOLO con los factores que tienen dato; el peso de los que
@@ -90,8 +97,8 @@ export function calcularNota(s: SenalesEmpleado): Nota {
   }
   let valor = Math.round(presentes.reduce((a, f) => a + (f.sub as number) * f.peso, 0) / pesoTotal);
 
-  // REGLA DURA: sin compartir pantalla en todo el día → tope 50 (rojo), aunque
-  // lo demás vaya perfecto. Solo aplica si SABEMOS que no compartió (hay dato).
+  // REGLA DURA: sin compartir pantalla en todo el turno → tope 50 (rojo). Solo
+  // aplica si SABEMOS que no compartió (hay dato).
   if (s.pantallaPct !== undefined && s.pantallaPct < UMBRAL_SIN_PANTALLA) {
     valor = Math.min(valor, TOPE_SIN_PANTALLA);
   }

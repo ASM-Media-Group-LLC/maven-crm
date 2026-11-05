@@ -1,11 +1,12 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { calcularNota, type Nota } from "@/lib/notaEmpleado";
+import { calcularNota, fraccionJornada, type Nota } from "@/lib/notaEmpleado";
 
-// La gente de un TURNO del día (Alvaro, 04/11): para el drill-down del Historial.
-// Por persona que trabajó en ese rango de horas: su nota del turno y sus factores
-// (pantalla/cámara/atención). Respeta roles_calificados (a quién se le cuenta
-// cámara/pantalla). Lo arma el RPC argos_momentos_turno.
+// La gente de un TURNO del día (Alvaro, 04/11; nota v2 05/11): para el drill-down
+// del Historial. Por persona que trabajó en ese rango de horas: su nota del turno
+// y sus factores. Pantalla/cámara se miden en SEGUNDOS sobre el turno completo
+// (no un ratio) con el RPC argos_dia_personas, así las horas quedan metidas y medio
+// turno ≈ 50. Respeta roles_calificados (a quién se le cuenta cámara/pantalla).
 
 export interface PersonaTurno {
   userId: string;
@@ -34,7 +35,12 @@ export function equipoDeRoles(roles: Set<string> | undefined): string {
   return "Otros";
 }
 
-interface FilaMom { user_id: string; mom_camara: number | string; mom_pantalla: number | string; juzgadas: number | string; juzgadas_ok: number | string; mom_cara_ok: number | string; mom_cara_medida: number | string; }
+interface FilaDia {
+  user_id: string;
+  seg_activo: number | string; seg_sin_pantalla: number | string;
+  seg_sin_camara: number | string; seg_fuera_camara: number | string;
+  juzgadas: number | string; juzgadas_ok: number | string;
+}
 
 type RpcDb = { rpc: (f: string, a: unknown) => Promise<{ data: unknown[] | null; error: { message: string } | null }> };
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -47,10 +53,11 @@ export function useTurnoPersonas(dia: string, hDesde: number, hHasta: number, ha
     staleTime: 60_000,
     queryFn: async (): Promise<PersonaTurno[]> => {
       const db = supabase as unknown as RpcDb;
-      const { data, error } = await db.rpc("argos_momentos_turno", { _dia: dia, _h_desde: hDesde, _h_hasta: hHasta });
+      const { data, error } = await db.rpc("argos_dia_personas", { _dia: dia, _h_desde: hDesde, _h_hasta: hHasta });
       if (error) throw new Error(error.message);
-      const filas = (data ?? []) as FilaMom[];
+      const filas = (data ?? []) as FilaDia[];
       if (filas.length === 0) return [];
+      const horasJornada = Math.max(1, hHasta - hDesde);
 
       const ids = [...new Set(filas.map((f) => f.user_id))];
       const [perfRes, rolesRes, cfgRes] = await Promise.all([
@@ -75,16 +82,17 @@ export function useTurnoPersonas(dia: string, hDesde: number, hHasta: number, ha
       };
 
       const personas: PersonaTurno[] = filas.map((f) => {
-        const camara = Number(f.mom_camara), pantalla = Number(f.mom_pantalla);
-        const caraOk = Number(f.mom_cara_ok), caraMedida = Number(f.mom_cara_medida);
+        // Segundos sobre el turno: pantalla compartida = activo + sin_cámara +
+        // fuera_cámara; cámara bien = activo + sin_pantalla. El denominador es la
+        // jornada menos la pausa libre (dentro de fraccionJornada).
+        const segPantalla = Number(f.seg_activo) + Number(f.seg_sin_camara) + Number(f.seg_fuera_camara);
+        const segCamara = Number(f.seg_activo) + Number(f.seg_sin_pantalla);
         const juz = Number(f.juzgadas), juzOk = Number(f.juzgadas_ok);
         const calificado = esCalificado(f.user_id);
-        const pantallaPct = calificado && camara > 0 ? Math.min(1, pantalla / camara) : undefined;
-        // Cámara apagada mientras trabaja SÍ baja (denominador = momentos de trabajo).
-        const denomCam = Math.max(pantalla, caraMedida);
-        const camaraPct = calificado && denomCam > 0 ? Math.min(1, caraOk / denomCam) : undefined;
+        const pantallaPct = calificado ? fraccionJornada(segPantalla, horasJornada) : undefined;
+        const camaraPct = calificado ? fraccionJornada(segCamara, horasJornada) : undefined;
         const atencionPct = juz > 0 ? juzOk / juz : undefined;
-        const nota = calcularNota({ pantallaPct, camaraPct, atencionPct, horasHechas: 0, horasMeta: 8 });
+        const nota = calcularNota({ pantallaPct, camaraPct, atencionPct });
         const perfil = perfilPor.get(f.user_id);
         return {
           userId: f.user_id,

@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
-import { ArrowLeft, ChevronLeft, ChevronRight, AlertTriangle, ScreenShare, ScreenShareOff, CameraOff, ImageIcon, Loader2, Gauge, CalendarDays, Sparkles } from "lucide-react";
+import { ArrowLeft, ChevronLeft, ChevronRight, AlertTriangle, ScreenShare, ScreenShareOff, CameraOff, ImageIcon, Loader2, Gauge, CalendarDays, Sparkles, ShieldCheck, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useLanguage } from "@/hooks/useLanguage";
 import { UserAvatar } from "@/components/UserAvatar";
@@ -10,6 +10,7 @@ import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Page } from "@/components/ui/page";
 import { PageHeader } from "@/components/ui/page-header";
 import { useExpedienteEmpleado, type DiaExpediente, type CapturaDia } from "@/hooks/useExpedienteEmpleado";
+import { usePerdonarCaptura, usePuedePerdonar } from "@/hooks/usePerdonarCaptura";
 import { urlCaptura, urlsDeNas } from "@/hooks/useMonitorEventos";
 import { LABEL_FALTA, type FaltaTipo } from "@/lib/monitorFaltas";
 import type { BandaNota } from "@/lib/notaEmpleado";
@@ -44,7 +45,7 @@ const abrirPath = async (path: string) => { const u = await urlCaptura(path); if
 
 // Un MOMENTO del día: una pantalla con su cámara pegada (o, si no hay pantalla,
 // la cámara sola). Se emparejan por cercanía en el tiempo (≤ 90 s).
-interface Momento { id: string; createdAt: string; pantalla: CapturaDia | null; camara: CapturaDia | null; fueraDeLugar: boolean | null; veredicto: string | null; }
+interface Momento { id: string; createdAt: string; pantalla: CapturaDia | null; camara: CapturaDia | null; fueraDeLugar: boolean | null; veredicto: string | null; capId: string; perdonado: boolean; }
 
 function construirMomentos(capturas: CapturaDia[]): Momento[] {
   const desc = (a: CapturaDia, b: CapturaDia) => (a.createdAt < b.createdAt ? 1 : -1);
@@ -61,11 +62,11 @@ function construirMomentos(capturas: CapturaDia[]): Momento[] {
       if (d < bestD) { bestD = d; best = cam; }
     }
     if (best && bestD <= 90_000) usadas.add(best.id); else best = null;
-    momentos.push({ id: p.id, createdAt: p.createdAt, pantalla: p, camara: best, fueraDeLugar: p.fueraDeLugar, veredicto: p.veredicto });
+    momentos.push({ id: p.id, createdAt: p.createdAt, pantalla: p, camara: best, fueraDeLugar: p.fueraDeLugar, veredicto: p.veredicto, capId: p.id, perdonado: p.perdonado });
   }
   for (const cam of camaras) {
     if (usadas.has(cam.id)) continue;
-    momentos.push({ id: cam.id, createdAt: cam.createdAt, pantalla: null, camara: cam, fueraDeLugar: cam.fueraDeLugar, veredicto: cam.veredicto });
+    momentos.push({ id: cam.id, createdAt: cam.createdAt, pantalla: null, camara: cam, fueraDeLugar: cam.fueraDeLugar, veredicto: cam.veredicto, capId: cam.id, perdonado: cam.perdonado });
   }
   return momentos.sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
 }
@@ -132,6 +133,8 @@ function TiraDelDia({ capturas, t }: { capturas: CapturaDia[]; t: Tr }) {
   // Visor pop-up: índice del momento abierto dentro de `visibles`. Flechas del
   // teclado pasan entre momentos; Esc cierra. (visibles va de más nuevo a más viejo.)
   const [visorIdx, setVisorIdx] = useState<number | null>(null);
+  const puedePerdonar = usePuedePerdonar();
+  const perdonar = usePerdonarCaptura();
   useEffect(() => {
     if (visorIdx === null) return;
     const onKey = (e: KeyboardEvent) => {
@@ -295,9 +298,32 @@ function TiraDelDia({ capturas, t }: { capturas: CapturaDia[]; t: Tr }) {
                 </div>
                 {/* Veredicto de la IA */}
                 {m.veredicto && (
-                  <div className={`flex items-start gap-2 rounded-lg border border-border/40 bg-card/40 px-3 py-2 text-sm ${m.fueraDeLugar ? "text-destructive" : "text-muted-foreground"}`}>
+                  <div className={`flex items-start gap-2 rounded-lg border border-border/40 bg-card/40 px-3 py-2 text-sm ${m.fueraDeLugar && !m.perdonado ? "text-destructive" : "text-muted-foreground"}`}>
                     <Sparkles className="mt-0.5 h-4 w-4 shrink-0 opacity-70" /><span>{m.veredicto}</span>
                   </div>
+                )}
+                {/* Perdonar la falta (solo dueño + admins): no baja la nota. Ej.: un
+                    PR que SÍ puede ver redes de sus creadoras. */}
+                {m.fueraDeLugar && (
+                  m.perdonado ? (
+                    <div className="flex items-center justify-between gap-2 rounded-lg border border-success/30 bg-success/10 px-3 py-2 text-sm text-success">
+                      <span className="flex items-center gap-2"><Check className="h-4 w-4 shrink-0" />{t("hr.exp.perdonada")}</span>
+                      {puedePerdonar && (
+                        <button type="button" disabled={perdonar.isPending}
+                          onClick={() => perdonar.mutate({ id: m.capId, perdonar: false })}
+                          className="text-xs font-medium text-muted-foreground underline-offset-2 hover:underline disabled:opacity-50">
+                          {t("hr.exp.perdonarQuitar")}
+                        </button>
+                      )}
+                    </div>
+                  ) : puedePerdonar ? (
+                    <button type="button" disabled={perdonar.isPending}
+                      onClick={() => perdonar.mutate({ id: m.capId, perdonar: true })}
+                      className="flex items-center justify-center gap-2 rounded-lg border border-primary/30 bg-primary/10 px-3 py-2 text-sm font-semibold text-primary transition hover:bg-primary/15 disabled:opacity-50">
+                      {perdonar.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <ShieldCheck className="h-4 w-4" />}
+                      {t("hr.exp.perdonar")}
+                    </button>
+                  ) : null
                 )}
                 {/* Navegación entre momentos */}
                 <div className="flex items-center justify-between">
@@ -472,7 +498,8 @@ export default function HRExpediente() {
   const atencion = useMemo(() => {
     const juzgadas = dia.capturas.filter((x) => x.tipo === "pantalla" && x.veredicto != null);
     if (juzgadas.length === 0) return null;
-    const ok = juzgadas.filter((x) => x.fueraDeLugar !== true).length;
+    // Las PERDONADAS cuentan como en lo suyo (no bajan la nota).
+    const ok = juzgadas.filter((x) => x.fueraDeLugar !== true || x.perdonado).length;
     return { pct: Math.round((ok / juzgadas.length) * 100), ok, n: juzgadas.length };
   }, [dia]);
   const tonoAt = atencion == null ? "" : atencion.pct >= 80 ? "text-success" : atencion.pct >= 60 ? "text-warning" : "text-destructive";

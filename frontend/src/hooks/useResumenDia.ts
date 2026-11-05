@@ -1,15 +1,13 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { calcularNota, type Nota } from "@/lib/notaEmpleado";
+import { calcularNota, fraccionJornada, type Nota } from "@/lib/notaEmpleado";
 
-// RESUMEN DEL DÍA de Argos (Álvaro, 02/11): quién va mejor o peor HOY, con la
-// PELÍCULA del día (no solo el número final). Por persona: su nota del día
-// (pantalla 30 / cámara 30 / atención 30 / horas 10), las barras de cada factor,
-// y sus BAJONES (momentos malos del día: sin pantalla, cámara, ocio) con hora y
-// duración — para distinguir «tuvo un bache puntual» de «va mal todo el día».
-// Lo ve el dueño (lo fuerza la RLS de las fuentes).
-
-const META_DIA = 8;
+// RESUMEN DEL DÍA de Argos (Álvaro, 02/11; nota v2 05/11): quién va mejor o peor
+// HOY, con la PELÍCULA del día (no solo el número final). Por persona: su nota del
+// día (pantalla 45 / cámara 35 / distracción 20), las barras de cada factor, y sus
+// BAJONES (momentos malos del día) con hora y duración. Pantalla/cámara se miden en
+// SEGUNDOS sobre la jornada de 8 h (RPC argos_dia_personas), así las horas quedan
+// metidas: medio día ≈ 50. Lo ve el dueño (lo fuerza la RLS de las fuentes).
 
 type RpcDb = { rpc: (f: string, a: unknown) => Promise<{ data: unknown[] | null; error: { message: string } | null }> };
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -44,8 +42,12 @@ export interface PersonaResumen {
   calificado: boolean;
 }
 
-interface FilaTiempo { user_id: string; seg_activo: number | string; }
-interface FilaMomentos { user_id: string; mom_camara: number | string; mom_pantalla: number | string; faltas_camara: number | string; juzgadas: number | string; juzgadas_ok: number | string; mom_cara_ok: number | string; mom_cara_medida: number | string; }
+interface FilaDia {
+  user_id: string;
+  seg_activo: number | string; seg_sin_pantalla: number | string;
+  seg_sin_camara: number | string; seg_fuera_camara: number | string;
+  juzgadas: number | string; juzgadas_ok: number | string;
+}
 interface FilaAlerta { user_id: string; tipo: string; detalle: string | null; abierta_at: string; cerrada_at: string | null; }
 
 export function useResumenDia(dia: string) {
@@ -58,25 +60,24 @@ export function useResumenDia(dia: string) {
       const inicioISO = `${dia}T00:00:00-05:00`;
       const finISO = `${dia}T23:59:59-05:00`;
 
-      const [tiempoRes, momentosRes, alertasRes] = await Promise.all([
-        db.rpc("cowork_tiempo_diario", { _desde: dia, _hasta: dia, _user_id: null, _limit: 500, _offset: 0 }),
-        db.rpc("argos_momentos_dia", { _dia: dia }),
+      const [diaRes, alertasRes] = await Promise.all([
+        db.rpc("argos_dia_personas", { _dia: dia, _h_desde: 0, _h_hasta: 24 }),
         sinTipar.from("argos_alertas").select("user_id, tipo, detalle, abierta_at, cerrada_at").gte("abierta_at", inicioISO).lte("abierta_at", finISO).limit(5000),
       ]);
-      if (tiempoRes.error) throw new Error(tiempoRes.error.message);
-      if (momentosRes.error) throw new Error(momentosRes.error.message);
+      if (diaRes.error) throw new Error(diaRes.error.message);
 
-      // Horas conectadas (reloj de Cowork) por persona, solo para el factor horas.
-      const horasPor = new Map<string, number>();
-      for (const r of (tiempoRes.data ?? []) as FilaTiempo[]) horasPor.set(r.user_id, Number(r.seg_activo) / 3600);
-
-      // Momentos por persona: de TODO el tiempo conectada (capturas de cámara),
-      // cuántos compartió pantalla y cuántos juzgó la IA en lo suyo. Pantalla% y
-      // cámara% salen de aquí, no del ratito en Cowork (Alvaro, 02/11).
-      const momPor = new Map<string, { camara: number; pantalla: number; caraOk: number; caraMedida: number }>();
+      // Por persona: segundos en cada estado (sobre la jornada de 8 h) y los
+      // pantallazos que la IA juzgó / en lo suyo. Pantalla/cámara y horas salen de
+      // aquí (un solo RPC sobre cowork_tiempo_segmentos), ya consistente con el turno.
+      const segPor = new Map<string, { pantalla: number; camara: number; horas: number }>();
       const atPor = new Map<string, { ok: number; n: number }>();
-      for (const m of (momentosRes.data ?? []) as FilaMomentos[]) {
-        momPor.set(m.user_id, { camara: Number(m.mom_camara), pantalla: Number(m.mom_pantalla), caraOk: Number(m.mom_cara_ok), caraMedida: Number(m.mom_cara_medida) });
+      for (const m of (diaRes.data ?? []) as FilaDia[]) {
+        const activo = Number(m.seg_activo), sinPant = Number(m.seg_sin_pantalla);
+        const sinCam = Number(m.seg_sin_camara), fueraCam = Number(m.seg_fuera_camara);
+        const segPantalla = activo + sinCam + fueraCam;      // compartiendo pantalla
+        const segCamara = activo + sinPant;                   // cámara/cara bien
+        const horas = (activo + sinPant + sinCam + fueraCam) / 3600; // tiempo de trabajo
+        segPor.set(m.user_id, { pantalla: segPantalla, camara: segCamara, horas });
         atPor.set(m.user_id, { ok: Number(m.juzgadas_ok), n: Number(m.juzgadas) });
       }
 
@@ -91,8 +92,8 @@ export function useResumenDia(dia: string) {
         bajonesPor.set(a.user_id, arr);
       }
 
-      // Roster del día: quien tuvo momentos (capturas), horas o alertas.
-      const ids = new Set<string>([...momPor.keys(), ...horasPor.keys(), ...bajonesPor.keys()]);
+      // Roster del día: quien tuvo tiempo/pantallazos o alertas.
+      const ids = new Set<string>([...segPor.keys(), ...atPor.keys(), ...bajonesPor.keys()]);
       if (ids.size === 0) return [];
 
       const [perfRes, rolesRes, cfgRes] = await Promise.all([
@@ -121,26 +122,19 @@ export function useResumenDia(dia: string) {
       };
 
       const personas: PersonaResumen[] = [...ids].map((id) => {
-        const m = momPor.get(id);
+        const m = segPor.get(id);
         const at = atPor.get(id);
         const calificado = esCalificado(id);
-        // Pantalla% = de todos los momentos conectada (cámara), cuántos compartió.
-        const pantallaRaw = m && m.camara > 0 ? Math.min(1, m.pantalla / m.camara) : undefined;
-        // Cámara% REAL: momentos con cara ÷ momentos de TRABAJO (los que compartió
-        // pantalla, o los que midió cámara: el que sea mayor). Así la cámara APAGADA
-        // mientras trabajaba SÍ baja la nota (decisión de Alvaro, 05/11). Sin ningún
-        // momento (ni pantalla ni cámara) = sin dato, no cuenta.
-        const denomCam = m ? Math.max(m.pantalla, m.caraMedida) : 0;
-        const camaraRaw = denomCam > 0 ? Math.min(1, m!.caraOk / denomCam) : undefined;
-        // Si el rol NO se califica en cámara/pantalla (supervisor, finanzas…), esos
-        // factores quedan en N/A: no cuentan para la nota ni lo tiran a "Mal" por 0%.
-        const pantallaPct = calificado ? pantallaRaw : undefined;
-        const camaraPct = calificado ? camaraRaw : undefined;
+        // Pantalla% y cámara% sobre la JORNADA de 8 h (pausa libre descontada): así
+        // medio día ≈ 50 y las horas quedan metidas. Si el rol NO se califica
+        // (supervisor, finanzas…), esos factores quedan en N/A: no cuentan.
+        const pantallaPct = calificado && m ? fraccionJornada(m.pantalla) : undefined;
+        const camaraPct = calificado && m ? fraccionJornada(m.camara) : undefined;
         const atencionPct = at && at.n > 0 ? at.ok / at.n : undefined;
-        const horas = horasPor.get(id) ?? 0;
-        // Activo = estuvo en Maven ese día por CUALQUIER señal, no solo Cowork.
-        const activo = horas > 0 || (!!m && (m.camara > 0 || m.pantalla > 0)) || (!!at && at.n > 0) || (bajonesPor.get(id)?.length ?? 0) > 0;
-        const nota = calcularNota({ pantallaPct, camaraPct, atencionPct, horasHechas: horas, horasMeta: META_DIA });
+        const horas = m?.horas ?? 0;
+        // Activo = estuvo en Maven ese día por CUALQUIER señal.
+        const activo = horas > 0 || (!!at && at.n > 0) || (bajonesPor.get(id)?.length ?? 0) > 0;
+        const nota = calcularNota({ pantallaPct, camaraPct, atencionPct });
         const perfil = perfilPor.get(id);
         const bajones = (bajonesPor.get(id) ?? []).sort((a, b) => b.minutos - a.minutos).slice(0, 8);
         return {
