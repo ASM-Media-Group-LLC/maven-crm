@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceArea } from "recharts";
 import { Clock, Loader2, AlertTriangle, ChevronLeft, ChevronRight, Sunrise, Sun, Moon, Eye } from "lucide-react";
 import { useLanguage } from "@/hooks/useLanguage";
@@ -200,9 +200,9 @@ function PersonasConFiltro({ personas, cargando, t, onPersona, agruparPorEquipo 
 // VISTA EQUIPOS (Alvaro, 05/11): cajas por equipo (Chatters, PR, Warming,
 // Editores, Finanzas…) con su promedio; clic en una caja = la gente de ese
 // equipo (con los mismos filtros por tipo de falla). Peor equipo primero.
-function EquiposVista({ dia, t, onPersona }: { dia: string; t: Tr; onPersona: (id: string) => void }) {
+function EquiposVista({ dia, t, onPersona, equipoInicial }: { dia: string; t: Tr; onPersona: (id: string, eq?: string) => void; equipoInicial?: string | null }) {
   const { personas, cargando } = useTurnoPersonas(dia, 0, 24, true);
-  const [equipoSel, setEquipoSel] = useState<string | null>(null);
+  const [equipoSel, setEquipoSel] = useState<string | null>(equipoInicial ?? null);
   const equipos = useMemo(() => {
     const m = new Map<string, PersonaTurno[]>();
     for (const p of personas) (m.get(p.equipo) ?? m.set(p.equipo, []).get(p.equipo)!).push(p);
@@ -230,7 +230,7 @@ function EquiposVista({ dia, t, onPersona }: { dia: string; t: Tr; onPersona: (i
           <span className="font-display text-base font-bold">{equipoSel}</span>
           <span className="text-xs text-muted-foreground">· {gente.length}</span>
         </div>
-        <PersonasConFiltro personas={gente} cargando={cargando} t={t} onPersona={onPersona} />
+        <PersonasConFiltro personas={gente} cargando={cargando} t={t} onPersona={(id) => onPersona(id, equipoSel ?? undefined)} />
       </div>
     );
   }
@@ -275,13 +275,20 @@ export function ArgosHistorial() {
   const { t } = useLanguage();
   const navigate = useNavigate();
   const hoy = useMemo(() => new Date().toLocaleDateString("en-CA", { timeZone: "America/Bogota" }), []);
+  // Para que el "volver" desde el expediente regrese al MISMO lugar (equipo),
+  // la vista y el equipo abierto viajan en la URL (Alvaro, 05/11).
+  const [params] = useSearchParams();
   const [dia, setDia] = useState(hoy);
   const [turnoSel, setTurnoSel] = useState<Turno | null>(null);
-  const [vista, setVista] = useState<"turno" | "equipos">("turno");
+  const [vista, setVista] = useState<"turno" | "equipos">(params.get("vista") === "equipos" ? "equipos" : "turno");
+  const eqInicial = params.get("eq");
   const esHoy = dia === hoy;
   const moverDia = (delta: number) => { const s = sumarDias(dia, delta); if (s <= hoy) setDia(s); };
   const { horas, cargando, error, refrescar } = useHorasDia(dia, true);
-  const irAExpediente = (id: string) => navigate(`/hr/expediente/${id}`, { state: { volverA: "/hr/monitor-ia?t=historial" } });
+  const irAExpediente = (id: string, eq?: string) => {
+    const volverA = `/hr/monitor-ia?t=historial${eq ? `&vista=equipos&eq=${encodeURIComponent(eq)}` : ""}`;
+    navigate(`/hr/expediente/${id}`, { state: { volverA } });
+  };
 
   const data = useMemo(() => horas.map((h) => ({ hourNum: h.hourNum, pantalla: h.pantalla, camara: h.camara, atencion: h.atencion })), [horas]);
   const diaTxt = new Date(dia + "T12:00:00").toLocaleDateString("es-CO", { weekday: "long", day: "numeric", month: "long" });
@@ -317,7 +324,7 @@ export function ArgosHistorial() {
         </div>
 
         {vista === "equipos" ? (
-          <EquiposVista dia={dia} t={t} onPersona={irAExpediente} />
+          <EquiposVista dia={dia} t={t} onPersona={irAExpediente} equipoInicial={eqInicial} />
         ) : turnoSel ? (
           <TurnoDetalle
             turno={turnoSel}
