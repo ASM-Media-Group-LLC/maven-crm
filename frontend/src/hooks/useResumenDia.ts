@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { calcularNota, fraccionJornada, type Nota } from "@/lib/notaEmpleado";
+import { cargarExoneracion, esExento } from "@/lib/exoneracionCamara";
 
 // RESUMEN DEL DÍA de Argos (Álvaro, 02/11; nota v2 05/11): quién va mejor o peor
 // HOY, con la PELÍCULA del día (no solo el número final). Por persona: su nota del
@@ -96,10 +97,11 @@ export function useResumenDia(dia: string) {
       const ids = new Set<string>([...segPor.keys(), ...atPor.keys(), ...bajonesPor.keys()]);
       if (ids.size === 0) return [];
 
-      const [perfRes, rolesRes, cfgRes] = await Promise.all([
+      const [perfRes, rolesRes, cfgRes, exo] = await Promise.all([
         supabase.from("profiles").select("id, full_name, avatar_url, avatar_seed").in("id", [...ids]),
         sinTipar.from("user_roles").select("user_id, role").in("user_id", [...ids]),
         sinTipar.from("monitor_config").select("roles_calificados").eq("id", 1).maybeSingle(),
+        cargarExoneracion([...ids]),
       ]);
       const perfilPor = new Map(((perfRes.data ?? []) as Array<{ id: string; full_name: string | null; avatar_url: string | null; avatar_seed: string | null }>).map((p) => [p.id, p]));
 
@@ -124,7 +126,8 @@ export function useResumenDia(dia: string) {
       const personas: PersonaResumen[] = [...ids].map((id) => {
         const m = segPor.get(id);
         const at = atPor.get(id);
-        const calificado = esCalificado(id);
+        // No se califica en cámara/pantalla si el rol no se califica, o si está exonerado.
+        const calificado = esCalificado(id) && !esExento(exo, id, rolesPor.get(id));
         // Pantalla% y cámara% sobre la JORNADA de 8 h (pausa libre descontada): así
         // medio día ≈ 50 y las horas quedan metidas. Si el rol NO se califica
         // (supervisor, finanzas…), esos factores quedan en N/A: no cuentan.

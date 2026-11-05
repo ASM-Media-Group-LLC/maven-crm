@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { calcularNota, fraccionJornada, type Nota } from "@/lib/notaEmpleado";
+import { cargarExoneracion, esExento } from "@/lib/exoneracionCamara";
 
 // EL EXPEDIENTE del empleado (Argos): el mes día por día — qué hizo cada día,
 // con su nota, y al abrir un día el detalle (horas, faltas, pausas, pantallazos
@@ -58,13 +59,18 @@ export function useExpedienteEmpleado(userId: string | null, anio: number, mes: 
       const inicioISO = `${desde}T00:00:00-05:00`;
       const finISO = `${hasta}T23:59:59-05:00`;
 
-      const [perfRes, tiempoRes, eventosRes, pausasRes, capturasRes] = await Promise.all([
+      const [perfRes, tiempoRes, eventosRes, pausasRes, capturasRes, exo, rolesRes] = await Promise.all([
         supabase.from("profiles").select("full_name, avatar_url, avatar_seed").eq("id", userId!).maybeSingle(),
         db.rpc("cowork_tiempo_diario", { _desde: desde, _hasta: hasta, _user_id: userId, _limit: 100, _offset: 0 }),
         supabase.from("monitor_eventos").select("id, tipo, fuente, detalle, captura_path, created_at, estado").eq("user_id", userId!).neq("estado", "descartado").gte("created_at", inicioISO).lte("created_at", finISO).order("created_at", { ascending: false }).limit(1000),
         db.rpc("cowork_pausas_resumen", { _desde: desde, _hasta: hasta, _session_id: null, _user_id: userId, _limit: 100, _offset: 0 }),
         supabase.from("monitor_capturas").select("id, tipo, path, nas_path, en_nas, fuera_de_lugar, veredicto, cara_visible, perdonado, created_at").eq("user_id", userId!).gte("created_at", inicioISO).lte("created_at", finISO).order("created_at", { ascending: false }).limit(3000),
+        cargarExoneracion([userId!]),
+        (supabase as unknown as { from: (t: string) => { select: (c: string) => { eq: (k: string, v: string) => Promise<{ data: Array<{ role: string }> | null }> } } }).from("user_roles").select("role").eq("user_id", userId!),
       ]);
+      // ¿Exonerado de cámara/pantalla? (por persona o por rol) → no se califica en esos factores.
+      const rolesUser = new Set(((rolesRes.data ?? []) as Array<{ role: string }>).map((r) => r.role));
+      const exentoCamPant = esExento(exo, userId!, rolesUser);
 
       const dias = new Map<string, DiaExpediente>();
       const asegura = (f: string): DiaExpediente => {
@@ -112,8 +118,9 @@ export function useExpedienteEmpleado(userId: string | null, anio: number, mes: 
         const segPantalla = act + sinCam + fueraCam;  // compartiendo pantalla
         const segCamara = act + sinPant;              // cámara/cara bien
         const hayTiempo = (act + sinPant + sinCam + fueraCam) > 0;
-        const pantallaPct = hayTiempo ? fraccionJornada(segPantalla) : undefined;
-        const camaraPct = hayTiempo ? fraccionJornada(segCamara) : undefined;
+        // Exonerado → no se califica en cámara/pantalla (quedan en N/A, se reparte el peso).
+        const pantallaPct = exentoCamPant || !hayTiempo ? undefined : fraccionJornada(segPantalla);
+        const camaraPct = exentoCamPant || !hayTiempo ? undefined : fraccionJornada(segCamara);
         // Distracción: de los pantallazos juzgados, cuántos en lo suyo. Las
         // PERDONADAS cuentan como en lo suyo (no bajan la nota).
         const juzgadas = d.capturas.filter((c) => c.tipo === "pantalla" && c.veredicto != null);

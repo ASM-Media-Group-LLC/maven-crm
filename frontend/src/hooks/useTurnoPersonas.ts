@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { calcularNota, fraccionJornada, type Nota } from "@/lib/notaEmpleado";
+import { cargarExoneracion, esExento } from "@/lib/exoneracionCamara";
 
 // La gente de un TURNO del día (Alvaro, 04/11; nota v2 05/11): para el drill-down
 // del Historial. Por persona que trabajó en ese rango de horas: su nota del turno
@@ -60,10 +61,11 @@ export function useTurnoPersonas(dia: string, hDesde: number, hHasta: number, ha
       const horasJornada = Math.max(1, hHasta - hDesde);
 
       const ids = [...new Set(filas.map((f) => f.user_id))];
-      const [perfRes, rolesRes, cfgRes] = await Promise.all([
+      const [perfRes, rolesRes, cfgRes, exo] = await Promise.all([
         supabase.from("profiles").select("id, full_name, avatar_url, avatar_seed").in("id", ids),
         sinTipar.from("user_roles").select("user_id, role").in("user_id", ids),
         sinTipar.from("monitor_config").select("roles_calificados").eq("id", 1).maybeSingle(),
+        cargarExoneracion(ids),
       ]);
       const perfilPor = new Map(((perfRes.data ?? []) as Array<{ id: string; full_name: string | null; avatar_url: string | null; avatar_seed: string | null }>).map((p) => [p.id, p]));
       const rolesPor = new Map<string, Set<string>>();
@@ -88,7 +90,8 @@ export function useTurnoPersonas(dia: string, hDesde: number, hHasta: number, ha
         const segPantalla = Number(f.seg_activo) + Number(f.seg_sin_camara) + Number(f.seg_fuera_camara);
         const segCamara = Number(f.seg_activo) + Number(f.seg_sin_pantalla);
         const juz = Number(f.juzgadas), juzOk = Number(f.juzgadas_ok);
-        const calificado = esCalificado(f.user_id);
+        // Calificado en cámara/pantalla si su rol se califica Y no está exonerado.
+        const calificado = esCalificado(f.user_id) && !esExento(exo, f.user_id, rolesPor.get(f.user_id));
         const pantallaPct = calificado ? fraccionJornada(segPantalla, horasJornada) : undefined;
         const camaraPct = calificado ? fraccionJornada(segCamara, horasJornada) : undefined;
         const atencionPct = juz > 0 ? juzOk / juz : undefined;

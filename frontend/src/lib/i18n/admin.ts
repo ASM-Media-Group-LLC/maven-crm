@@ -755,4 +755,13 @@ export const admin = {
   "admin.drive.dado": { es: "Listo: Drive full dado", en: "Done: full Drive granted" },
   "admin.drive.quitado": { es: "Listo: Drive full quitado", en: "Done: full Drive removed" },
   "admin.drive.error": { es: "No se pudo cambiar el acceso al Drive", en: "Couldn't change Drive access" },
+  // Exonerar de cámara/pantalla (solo dueño): a esta persona/rol no se le pide
+  // cámara ni compartir pantalla, y no se le califica en esos factores.
+  "admin.exonera.darHint": { es: "Se le pide cámara y pantalla — clic para exonerar (no se le califica)", en: "Camera & screen required — click to exempt (not graded)" },
+  "admin.exonera.quitarHint": { es: "Exonerado de cámara y pantalla — clic para volver a pedírselas", en: "Exempt from camera & screen — click to require again" },
+  "admin.exonera.dado": { es: "Listo: exonerado de cámara y pantalla", en: "Done: exempt from camera & screen" },
+  "admin.exonera.quitado": { es: "Listo: se le vuelve a pedir cámara y pantalla", en: "Done: camera & screen required again" },
+  "admin.exonera.error": { es: "No se pudo cambiar la exoneración", en: "Couldn't change the exemption" },
+  "admin.exonera.rolLabel": { es: "Exonerar de cámara y pantalla", en: "Exempt from camera & screen" },
+  "admin.exonera.rolHint": { es: "A todos los de este rol no se les pide cámara ni compartir pantalla (no se les califica en esos factores). Solo el dueño.", en: "Nobody in this role is asked for camera or screen share (not graded on those). Owner only." },
 } as const satisfies Record<string, { es: string; en: string }>;

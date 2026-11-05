@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useUserRole } from "@/hooks/useUserRole";
 import { FRANJA_POR_TIER, ROLE_TIER_LABELS, type RoleConfig, type RoleTier } from "./useRoles";
 import { useLanguage } from "@/hooks/useLanguage";
+import { ExonerarRolToggle } from "./ExonerarRolToggle";
 
 // Dos campos que juntos forman la jerarquía (Jhon, 08/09):
 //   · Nivel de acceso (tipo)  → la FRANJA: Empleado < Supervisor < Management < Admin.
@@ -118,6 +119,8 @@ const EditRoleModal = ({ open, onOpenChange, role, onConfirm, isLoading }: EditR
             <Input type="number" min={0} value={aiQuota} onChange={(e) => setAiQuota(e.target.value)} placeholder="20 (default)" />
             <p className="text-xs text-muted-foreground">{t("admin.editRole.aiQuotaHint")}</p>
           </div>
+          {/* Exonerar de cámara/pantalla a todo el rol (solo dueño; se guarda solo). */}
+          {role && <ExonerarRolToggle roleName={role.name} />}
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>{t("common.cancel")}</Button>

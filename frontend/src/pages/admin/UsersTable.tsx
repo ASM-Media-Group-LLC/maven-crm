@@ -12,6 +12,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { useLanguage } from "@/hooks/useLanguage";
 import { DriveFullToggle } from "./DriveFullToggle";
+import { ExonerarCamaraToggle } from "./ExonerarCamaraToggle";
 
 const roleBadgeVariant: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
   admin: "destructive",
@@ -160,6 +161,7 @@ const UsersTable = ({ users, onEditRole, onEdit, onResetPassword, onMigrarCorreo
                     {/* Adendum de Drive: visible para toda fila (muestra el estado);
                         el candado real de escritura está en la RPC. */}
                     <DriveFullToggle user={user} />
+                    <ExonerarCamaraToggle user={user} />
                     {/* Jerarquía (24/08): estas solo se muestran si la RPC dijo que
                         puedes gestionar esa cuenta (nivel menor al tuyo y no eres tú).
                         Es UX — el candado real está en las edge functions. */}
