@@ -1,8 +1,12 @@
 import { useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceArea } from "recharts";
-import { Clock, Loader2, AlertTriangle, ChevronLeft, ChevronRight, Sunrise, Sun, Moon } from "lucide-react";
+import { Clock, Loader2, AlertTriangle, ChevronLeft, ChevronRight, Sunrise, Sun, Moon, Eye } from "lucide-react";
 import { useLanguage } from "@/hooks/useLanguage";
+import { UserAvatar } from "@/components/UserAvatar";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { useHorasDia, type HoraDia } from "@/hooks/useHorasDia";
+import { useTurnoPersonas, type PersonaTurno } from "@/hooks/useTurnoPersonas";
 import type { TranslationKey } from "@/lib/i18n";
 
 // HISTORIAL del día (Alvaro, 04/11): el día partido en 3 turnos (hora Colombia).
@@ -42,6 +46,86 @@ function resumenTurno(rows: HoraDia[], from: number, to: number) {
   };
 }
 
+const SEM_NOTA: Record<string, string> = { bien: "text-success", ojo: "text-warning", mal: "text-destructive" };
+type Turno = typeof TURNOS[number];
+
+// Una persona del turno: cara, nombre, sus 3 factores y la nota; clic → su
+// expediente (y sus pantallazos de ese día). Ordenadas de peor a mejor.
+function PersonaFilaTurno({ p, t, onClick }: { p: PersonaTurno; t: Tr; onClick: () => void }) {
+  const color = p.nota.banda ? SEM_NOTA[p.nota.banda] : "text-muted-foreground";
+  const f = (c: string) => p.nota.factores.find((x) => x.clave === c)?.sub ?? null;
+  const txt = (v: number | null) => (v == null ? "—" : `${v}%`);
+  return (
+    <button type="button" onClick={onClick} title={t("hr.hist.verExpediente")} className="group flex w-full items-center gap-3 rounded-xl border border-border/40 bg-card/20 px-3 py-2 text-left transition hover:border-primary/30 hover:bg-card/40">
+      <UserAvatar name={p.nombre || t("hr.noName")} src={p.avatarUrl} seed={p.avatarSeed} size="sm" />
+      <div className="min-w-0 flex-1">
+        <div className="truncate text-sm font-medium">{p.nombre || t("hr.noName")}</div>
+        <div className="flex flex-wrap gap-x-2.5 text-[11px] text-muted-foreground">
+          <span>{t("hr.resumen.pantalla")} <span className="tabular-nums">{txt(f("pantalla"))}</span></span>
+          <span>{t("hr.resumen.camara")} <span className="tabular-nums">{txt(f("camara"))}</span></span>
+          <span>{t("hr.resumen.atencion")} <span className="tabular-nums">{txt(f("atencion"))}</span></span>
+        </div>
+      </div>
+      <span className={`shrink-0 font-display text-base font-bold tabular-nums ${color}`}>{p.nota.valor ?? "—"}</span>
+      <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground/60 transition group-hover:translate-x-0.5 group-hover:text-foreground" />
+    </button>
+  );
+}
+
+// Drill-down de un turno: diagnóstico (promedios + mejores/ojo-con + en problema)
+// y la lista de la gente que trabajó ese turno.
+function TurnoDetalle({ turno, dia, resumen, t, onClose, onPersona }: {
+  turno: Turno; dia: string; resumen: { pantalla: number | null; camara: number | null; atencion: number | null; personas: number };
+  t: Tr; onClose: () => void; onPersona: (id: string) => void;
+}) {
+  const { personas, cargando } = useTurnoPersonas(dia, turno.from, turno.to, true);
+  const conNota = personas.filter((p) => p.nota.valor != null);
+  const enProblema = conNota.filter((p) => (p.nota.valor as number) < 60).length;
+  const Icono = turno.icon;
+  return (
+    <Dialog open onOpenChange={(o) => { if (!o) onClose(); }}>
+      <DialogContent className="max-h-[85vh] max-w-lg overflow-y-auto">
+        <DialogTitle className="flex items-center gap-2 text-base">
+          <span className="flex h-6 w-6 items-center justify-center rounded-full" style={{ background: `${turno.color}1f`, color: turno.color }}><Icono className="h-4 w-4" /></span>
+          {t(turno.lbl)}<span className="text-xs font-normal text-muted-foreground">{t("hr.hist.horario", { a: turno.from, b: turno.to })}</span>
+        </DialogTitle>
+
+        {/* Diagnóstico: los 3 promedios + en problema */}
+        <div className="grid grid-cols-4 gap-2">
+          {[
+            { lbl: t("hr.resumen.pantalla"), v: resumen.pantalla, c: COLOR.pantalla },
+            { lbl: t("hr.resumen.camara"), v: resumen.camara, c: COLOR.camara },
+            { lbl: t("hr.resumen.atencion"), v: resumen.atencion, c: COLOR.atencion },
+          ].map((m) => (
+            <div key={m.lbl} className="rounded-xl border border-border/40 bg-card/20 p-2 text-center">
+              <div className="font-display text-base font-bold tabular-nums" style={{ color: m.c }}>{m.v == null ? "—" : `${m.v}%`}</div>
+              <div className="text-[10px] text-muted-foreground">{m.lbl}</div>
+            </div>
+          ))}
+          <div className={`rounded-xl border p-2 text-center ${enProblema > 0 ? "border-destructive/40 bg-destructive/5" : "border-border/40 bg-card/20"}`}>
+            <div className={`font-display text-base font-bold tabular-nums ${enProblema > 0 ? "text-destructive" : ""}`}>{enProblema}</div>
+            <div className="text-[10px] text-muted-foreground">{t("hr.hist.enProblemaLbl")}</div>
+          </div>
+        </div>
+
+        {/* La gente del turno (peor → mejor) */}
+        <div className="mt-1">
+          <p className="mb-2 flex items-center gap-1.5 text-xs font-semibold text-muted-foreground"><Eye className="h-3.5 w-3.5" />{t("hr.hist.gente")}</p>
+          {cargando ? (
+            <div className="flex justify-center py-6"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
+          ) : personas.length === 0 ? (
+            <p className="py-4 text-center text-sm text-muted-foreground">{t("hr.hist.sinGente")}</p>
+          ) : (
+            <div className="flex flex-col gap-1.5">
+              {personas.map((p) => <PersonaFilaTurno key={p.userId} p={p} t={t} onClick={() => onPersona(p.userId)} />)}
+            </div>
+          )}
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 function Metrica({ label, valor, color }: { label: string; valor: number | null; color: string }) {
   return (
     <div className="flex items-center justify-between text-xs">
@@ -53,11 +137,14 @@ function Metrica({ label, valor, color }: { label: string; valor: number | null;
 
 export function ArgosHistorial() {
   const { t } = useLanguage();
+  const navigate = useNavigate();
   const hoy = useMemo(() => new Date().toLocaleDateString("en-CA", { timeZone: "America/Bogota" }), []);
   const [dia, setDia] = useState(hoy);
+  const [turnoSel, setTurnoSel] = useState<Turno | null>(null);
   const esHoy = dia === hoy;
   const moverDia = (delta: number) => { const s = sumarDias(dia, delta); if (s <= hoy) setDia(s); };
   const { horas, cargando, error, refrescar } = useHorasDia(dia, true);
+  const irAExpediente = (id: string) => navigate(`/hr/expediente/${id}`, { state: { volverA: "/hr/monitor-ia?t=historial" } });
 
   const data = useMemo(() => horas.map((h) => ({ hourNum: h.hourNum, pantalla: h.pantalla, camara: h.camara, atencion: h.atencion })), [horas]);
   const diaTxt = new Date(dia + "T12:00:00").toLocaleDateString("es-CO", { weekday: "long", day: "numeric", month: "long" });
@@ -129,13 +216,21 @@ export function ArgosHistorial() {
                   const r = resumenTurno(horas, turno.from, turno.to);
                   const Icono = turno.icon;
                   return (
-                    <div key={turno.key} className="rounded-2xl border border-border/40 bg-card/20 p-3.5">
+                    <button
+                      key={turno.key}
+                      type="button"
+                      onClick={() => setTurnoSel(turno)}
+                      disabled={!r.hayDatos}
+                      title={t("hr.hist.gente")}
+                      className="rounded-2xl border border-border/40 bg-card/20 p-3.5 text-left transition hover:border-primary/40 hover:bg-card/40 disabled:cursor-default disabled:opacity-70 disabled:hover:border-border/40 disabled:hover:bg-card/20"
+                    >
                       <div className="mb-2.5 flex items-center gap-2">
                         <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full" style={{ background: `${turno.color}1f`, color: turno.color }}><Icono className="h-4 w-4" /></span>
-                        <div className="min-w-0">
+                        <div className="min-w-0 flex-1">
                           <div className="text-sm font-semibold leading-tight">{t(turno.lbl)}</div>
                           <div className="text-[10px] text-muted-foreground">{t("hr.hist.horario", { a: turno.from, b: turno.to })}</div>
                         </div>
+                        {r.hayDatos && <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground/50" />}
                       </div>
                       {r.hayDatos ? (
                         <div className="space-y-1.5">
@@ -147,7 +242,7 @@ export function ArgosHistorial() {
                       ) : (
                         <p className="py-2 text-[11px] text-muted-foreground">{t("hr.hist.turnoSinDatos")}</p>
                       )}
-                    </div>
+                    </button>
                   );
                 })}
               </div>
@@ -155,6 +250,18 @@ export function ArgosHistorial() {
           </>
         )}
       </div>
+
+      {/* Drill-down: al tocar un turno, diagnóstico + la gente de ese turno. */}
+      {turnoSel && (
+        <TurnoDetalle
+          turno={turnoSel}
+          dia={dia}
+          resumen={resumenTurno(horas, turnoSel.from, turnoSel.to)}
+          t={t}
+          onClose={() => setTurnoSel(null)}
+          onPersona={irAExpediente}
+        />
+      )}
     </section>
   );
 }
