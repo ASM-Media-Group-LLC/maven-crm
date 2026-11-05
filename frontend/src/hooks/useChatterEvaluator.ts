@@ -901,6 +901,44 @@ export interface ChatterEvaluatorOption {
   avatar_url: string | null;
 }
 
+// Examinadores agregados o sacados A MANO (pestaña Admin; Grace, 05/11/2026:
+// «no deja agregar ni quitar personal»). Sin fila, manda el rol. Ver la
+// migración 20261105150000_chatter_examinadores.sql.
+export interface ExaminadorAMano {
+  user_id: string;
+  permitido: boolean;
+}
+
+export const useExaminadoresAMano = () =>
+  useQuery({
+    queryKey: ["chatter-examinadores"],
+    queryFn: async (): Promise<ExaminadorAMano[]> => {
+      const { data, error } = await sb.from("chatter_examinadores").select("user_id, permitido");
+      if (error) throw error;
+      return (data ?? []) as ExaminadorAMano[];
+    },
+  });
+
+/** permitido true = agregar, false = sacar, null = volver a lo que diga su rol. */
+export const useCambiarExaminador = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ userId, permitido }: { userId: string; permitido: boolean | null }) => {
+      const { error } = permitido === null
+        ? await sb.from("chatter_examinadores").delete().eq("user_id", userId)
+        : await sb.from("chatter_examinadores").upsert(
+          { user_id: userId, permitido, cambiado_at: new Date().toISOString() },
+          { onConflict: "tenant_id,user_id" },
+        );
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["chatter-examinadores"] });
+      qc.invalidateQueries({ queryKey: ["chatter-evaluators"] });
+    },
+  });
+};
+
 export const useChatterEvaluators = () =>
   useQuery({
     queryKey: ["chatter-evaluators"],
