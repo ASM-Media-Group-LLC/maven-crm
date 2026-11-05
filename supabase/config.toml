@@ -269,6 +269,9 @@ verify_jwt = false  # chat QA (Mike); auth propia
 [functions.chatter-public]
 verify_jwt = false  # endpoint público del chatter workspace
 
+[functions.drive-aporte]
+verify_jwt = false  # subida pública por link al Drive (valida el token del link, da URL firmada)
+
 [functions.chatter-mp-ingest]
 verify_jwt = false  # ingesta MercadoPago chatter; webhook sin JWT
 

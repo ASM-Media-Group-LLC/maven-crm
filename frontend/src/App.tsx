@@ -44,6 +44,7 @@ const Credentials = import.meta.env.DEV ? lazy(() => import("./pages/Credentials
 const ForgotPassword = lazy(() => import("./pages/ForgotPassword"));
 const ResetPassword = lazy(() => import("./pages/ResetPassword"));
 const ChatterPublicView = lazy(() => import("./pages/ChatterPublicView"));
+const PaginaAportar = lazy(() => import("./pages/aportar/PaginaAportar"));
 const VideoCallPage = lazy(() => import("./pages/VideoCallPage"));
 const CoworkPage = lazy(() => import("./pages/cowork/CoworkPage"));
 const MeetPage = lazy(() => import("./pages/meet/MeetPage"));
@@ -294,6 +295,8 @@ const App = () => (
               <Route path="/reset-password" element={<ResetPassword />} />
               {/* Chatter public view — no auth, accessible via /chatter/<sessionId> */}
               <Route path="/chatter/:sessionId" element={<ChatterPublicView />} />
+              {/* Subida pública por link: la gente sube contenido al Drive SIN cuenta. */}
+              <Route path="/aportar/:token" element={<PaginaAportar />} />
               {/* Invitado a un Meet sin cuenta en Maven: pide entrada y espera que
                   alguien de adentro lo admita. Pública a propósito. */}
               <Route path="/entrar/:code" element={<MeetGuestPage />} />

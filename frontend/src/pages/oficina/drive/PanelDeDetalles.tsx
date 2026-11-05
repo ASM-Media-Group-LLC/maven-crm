@@ -11,6 +11,7 @@ import { tamano } from "@/lib/drive/formato";
 import { tipoDeFicha } from "@/lib/drive/tipoDeArchivo";
 import { textoDeTamano, useCuantos } from "@/pages/oficina/drive/Tamanos";
 import PanelDeActividad from "@/pages/oficina/drive/PanelDeActividad";
+import { LinkDeSubida } from "@/components/oficina/LinkDeSubida";
 
 // EL PANEL DE DETALLES (ⓘ) de Google Drive (Jhon, 03/10: «no veo el tamaño de
 // los archivos por ningún lado; la fecha tampoco es clara»). De lo elegido (o
@@ -227,6 +228,8 @@ function DetallesDeUno({ item, duenoDe, nombreDe, unidades, icono, onIrA, tamano
           {t("drive.versiones.boton")}
         </button>
       )}
+      {/* Link PÚBLICO de subida (solo carpetas): la gente sube aquí sin cuenta. */}
+      {esCarpeta && !item.trashed_at && <LinkDeSubida itemId={item.id} />}
     </div>
   );
 }
