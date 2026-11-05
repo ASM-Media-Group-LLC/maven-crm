@@ -75,9 +75,24 @@ const TOPE_MOMENTOS = 72; // lo más reciente primero; el resto se cuenta aparte
 // La TIRA de pantallazos del día (modelo Hubstaff): agrupada por hora, cada
 // momento con su pantalla grande y su cámara pegada en la esquina. Firma las URLs
 // de lo visible y se re-firma al cambiar de día (caducan a 2 min).
+type FiltroCaptura = "todos" | "fuera" | "camara" | "pantalla";
+const sinCamaraMom = (m: Momento): boolean => !m.camara || m.camara.caraVisible === false;
+function pasaFiltro(m: Momento, f: FiltroCaptura): boolean {
+  if (f === "fuera") return m.fueraDeLugar === true;
+  if (f === "camara") return sinCamaraMom(m);
+  if (f === "pantalla") return !m.pantalla;
+  return true;
+}
+
 function TiraDelDia({ capturas, t }: { capturas: CapturaDia[]; t: Tr }) {
   const momentos = useMemo(() => construirMomentos(capturas), [capturas]);
-  const visibles = useMemo(() => momentos.slice(0, TOPE_MOMENTOS), [momentos]);
+  const [filtro, setFiltro] = useState<FiltroCaptura>("todos");
+  const conteos = useMemo(() => ({
+    fuera: momentos.filter((m) => m.fueraDeLugar === true).length,
+    camara: momentos.filter(sinCamaraMom).length,
+    pantalla: momentos.filter((m) => !m.pantalla).length,
+  }), [momentos]);
+  const visibles = useMemo(() => momentos.filter((m) => pasaFiltro(m, filtro)).slice(0, TOPE_MOMENTOS), [momentos, filtro]);
   const [urls, setUrls] = useState<Record<string, string>>({});
 
   // Si una miniatura del buzón falla (p. ej. la firma venció tras una sesión
@@ -146,9 +161,33 @@ function TiraDelDia({ capturas, t }: { capturas: CapturaDia[]; t: Tr }) {
     else grupos.push({ hora, items: [m] });
   }
 
+  const chips: Array<{ k: FiltroCaptura; lbl: string; n?: number }> = [
+    { k: "todos", lbl: t("hr.exp.filtroTodos") },
+    { k: "fuera", lbl: t("hr.exp.filtroFuera"), n: conteos.fuera },
+    { k: "camara", lbl: t("hr.exp.filtroCamara"), n: conteos.camara },
+    { k: "pantalla", lbl: t("hr.exp.filtroPantalla"), n: conteos.pantalla },
+  ];
+
   return (
     <div className="flex flex-col gap-5">
-      {grupos.map((g) => (
+      {/* Filtros: ver solo fuera de lugar, sin cámara o sin pantalla. */}
+      <div className="flex flex-wrap items-center gap-2">
+        {chips.map((c) => (
+          <button
+            key={c.k}
+            type="button"
+            onClick={() => setFiltro(c.k)}
+            className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition ${filtro === c.k ? "border-primary/50 bg-primary/10 text-primary" : "border-border/50 text-muted-foreground hover:bg-foreground/5"}`}
+          >
+            {c.lbl}
+            {c.n != null && c.n > 0 && <span className={`rounded-full px-1.5 py-0.5 text-[10px] tabular-nums ${filtro === c.k ? "bg-primary/20" : "bg-warning/20 text-warning"}`}>{c.n}</span>}
+          </button>
+        ))}
+      </div>
+
+      {visibles.length === 0 ? (
+        <p className="py-10 text-center text-sm text-muted-foreground">{t("hr.exp.filtroVacio")}</p>
+      ) : grupos.map((g) => (
         <div key={g.hora}>
           <p className="mb-2 text-xs font-semibold text-muted-foreground">{g.hora}</p>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-5">
