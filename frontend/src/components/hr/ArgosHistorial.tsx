@@ -103,21 +103,7 @@ function TurnoDetalle({ turno, dia, resumen, t, onVolver, onPersona }: {
   t: Tr; onVolver: () => void; onPersona: (id: string) => void;
 }) {
   const { personas, cargando } = useTurnoPersonas(dia, turno.from, turno.to, true);
-  const [filtroTipo, setFiltroTipo] = useState<"todos" | TipoFalla>("todos");
-  const conNota = personas.filter((p) => p.nota.valor != null);
-  const enProblema = conNota.filter((p) => (p.nota.valor as number) < 60).length;
-  const conteos = {
-    fuera: personas.filter((p) => tiposFallaDe(p).includes("fuera")).length,
-    camara: personas.filter((p) => tiposFallaDe(p).includes("camara")).length,
-    pantalla: personas.filter((p) => tiposFallaDe(p).includes("pantalla")).length,
-  };
-  const mostradas = filtroTipo === "todos" ? personas : personas.filter((p) => tiposFallaDe(p).includes(filtroTipo));
-  const chips: Array<{ k: "todos" | TipoFalla; lbl: string; n?: number }> = [
-    { k: "todos", lbl: t("hr.hist.filtroTodos") },
-    { k: "fuera", lbl: t("hr.hist.filtroFuera"), n: conteos.fuera },
-    { k: "camara", lbl: t("hr.hist.filtroCamara"), n: conteos.camara },
-    { k: "pantalla", lbl: t("hr.hist.filtroPantalla"), n: conteos.pantalla },
-  ];
+  const enProblema = personas.filter((p) => p.nota.valor != null && (p.nota.valor as number) < 60).length;
   const Icono = turno.icon;
   return (
     <div className="space-y-4">
@@ -149,28 +135,129 @@ function TurnoDetalle({ turno, dia, resumen, t, onVolver, onPersona }: {
         </div>
       </div>
 
-      {/* La gente del turno */}
+      {/* La gente del turno: filtros por tipo + lista agrupada por equipo */}
       <div>
         <p className="mb-2 flex items-center gap-1.5 text-xs font-semibold text-muted-foreground"><Eye className="h-3.5 w-3.5" />{t("hr.hist.gente")}</p>
-        {/* Filtros por TIPO de falla: toca uno y ves solo a quienes la tienen. */}
-        <div className="mb-3 flex flex-wrap items-center gap-2">
-          {chips.map((c) => (
-            <button key={c.k} type="button" onClick={() => setFiltroTipo(c.k)} className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition ${filtroTipo === c.k ? "border-primary/50 bg-primary/10 text-primary" : "border-border/50 text-muted-foreground hover:bg-foreground/5"}`}>
-              {c.lbl}
-              {c.n != null && c.n > 0 && <span className={`rounded-full px-1.5 py-0.5 text-[10px] tabular-nums ${filtroTipo === c.k ? "bg-primary/20" : "bg-warning/20 text-warning"}`}>{c.n}</span>}
-            </button>
+        <PersonasConFiltro personas={personas} cargando={cargando} t={t} onPersona={onPersona} agruparPorEquipo />
+      </div>
+    </div>
+  );
+}
+
+// La LISTA de personas con filtros por tipo de falla, reutilizable (turno y
+// equipo). Opcionalmente agrupada por equipo (subtítulos). Evita duplicar el
+// filtro en dos lugares (barrido de coherencia, Alvaro 05/11).
+function PersonasConFiltro({ personas, cargando, t, onPersona, agruparPorEquipo = false }: {
+  personas: PersonaTurno[]; cargando: boolean; t: Tr; onPersona: (id: string) => void; agruparPorEquipo?: boolean;
+}) {
+  const [filtroTipo, setFiltroTipo] = useState<"todos" | TipoFalla>("todos");
+  const conteos = {
+    fuera: personas.filter((p) => tiposFallaDe(p).includes("fuera")).length,
+    camara: personas.filter((p) => tiposFallaDe(p).includes("camara")).length,
+    pantalla: personas.filter((p) => tiposFallaDe(p).includes("pantalla")).length,
+  };
+  const mostradas = filtroTipo === "todos" ? personas : personas.filter((p) => tiposFallaDe(p).includes(filtroTipo));
+  const chips: Array<{ k: "todos" | TipoFalla; lbl: string; n?: number }> = [
+    { k: "todos", lbl: t("hr.hist.filtroTodos") },
+    { k: "fuera", lbl: t("hr.hist.filtroFuera"), n: conteos.fuera },
+    { k: "camara", lbl: t("hr.hist.filtroCamara"), n: conteos.camara },
+    { k: "pantalla", lbl: t("hr.hist.filtroPantalla"), n: conteos.pantalla },
+  ];
+  const grupos = agruparPorEquipo
+    ? [...mostradas.reduce((m, p) => { (m.get(p.equipo) ?? m.set(p.equipo, []).get(p.equipo)!).push(p); return m; }, new Map<string, PersonaTurno[]>())].sort((a, b) => a[0].localeCompare(b[0], "es"))
+    : null;
+  const fila = (p: PersonaTurno) => <PersonaFilaTurno key={p.userId} p={p} t={t} onClick={() => onPersona(p.userId)} />;
+  return (
+    <div>
+      <div className="mb-3 flex flex-wrap items-center gap-2">
+        {chips.map((c) => (
+          <button key={c.k} type="button" onClick={() => setFiltroTipo(c.k)} className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition ${filtroTipo === c.k ? "border-primary/50 bg-primary/10 text-primary" : "border-border/50 text-muted-foreground hover:bg-foreground/5"}`}>
+            {c.lbl}
+            {c.n != null && c.n > 0 && <span className={`rounded-full px-1.5 py-0.5 text-[10px] tabular-nums ${filtroTipo === c.k ? "bg-primary/20" : "bg-warning/20 text-warning"}`}>{c.n}</span>}
+          </button>
+        ))}
+      </div>
+      {cargando ? (
+        <div className="flex justify-center py-6"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
+      ) : mostradas.length === 0 ? (
+        <p className="py-4 text-center text-sm text-muted-foreground">{filtroTipo === "todos" ? t("hr.hist.sinGente") : t("hr.hist.sinFallas")}</p>
+      ) : grupos ? (
+        <div className="flex flex-col gap-4">
+          {grupos.map(([eq, gente]) => (
+            <div key={eq}>
+              <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground/80">{eq} · {gente.length}</p>
+              <div className="flex flex-col gap-1.5">{gente.map(fila)}</div>
+            </div>
           ))}
         </div>
-        {cargando ? (
-          <div className="flex justify-center py-6"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
-        ) : mostradas.length === 0 ? (
-          <p className="py-4 text-center text-sm text-muted-foreground">{filtroTipo === "todos" ? t("hr.hist.sinGente") : t("hr.hist.sinFallas")}</p>
-        ) : (
-          <div className="flex flex-col gap-1.5">
-            {mostradas.map((p) => <PersonaFilaTurno key={p.userId} p={p} t={t} onClick={() => onPersona(p.userId)} />)}
-          </div>
-        )}
+      ) : (
+        <div className="flex flex-col gap-1.5">{mostradas.map(fila)}</div>
+      )}
+    </div>
+  );
+}
+
+// VISTA EQUIPOS (Alvaro, 05/11): cajas por equipo (Chatters, PR, Warming,
+// Editores, Finanzas…) con su promedio; clic en una caja = la gente de ese
+// equipo (con los mismos filtros por tipo de falla). Peor equipo primero.
+function EquiposVista({ dia, t, onPersona }: { dia: string; t: Tr; onPersona: (id: string) => void }) {
+  const { personas, cargando } = useTurnoPersonas(dia, 0, 24, true);
+  const [equipoSel, setEquipoSel] = useState<string | null>(null);
+  const equipos = useMemo(() => {
+    const m = new Map<string, PersonaTurno[]>();
+    for (const p of personas) (m.get(p.equipo) ?? m.set(p.equipo, []).get(p.equipo)!).push(p);
+    const avg = (gente: PersonaTurno[], f: (p: PersonaTurno) => number | null) => {
+      const v = gente.map(f).filter((x): x is number => x != null);
+      return v.length ? Math.round(v.reduce((a, b) => a + b, 0) / v.length) : null;
+    };
+    return [...m.entries()].map(([eq, gente]) => {
+      const conNota = gente.filter((p) => p.nota.valor != null);
+      return {
+        eq, gente,
+        nota: conNota.length ? Math.round(conNota.reduce((a, p) => a + (p.nota.valor as number), 0) / conNota.length) : null,
+        pantalla: avg(gente, (p) => p.pantallaPct), camara: avg(gente, (p) => p.camaraPct), atencion: avg(gente, (p) => p.atencionPct),
+        conFallas: gente.filter((p) => tiposFallaDe(p).length > 0).length,
+      };
+    }).sort((a, b) => (a.nota ?? 101) - (b.nota ?? 101));
+  }, [personas]);
+
+  if (equipoSel) {
+    const gente = personas.filter((p) => p.equipo === equipoSel);
+    return (
+      <div className="space-y-4">
+        <div className="flex items-center gap-3">
+          <button type="button" onClick={() => setEquipoSel(null)} className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-xs text-muted-foreground transition hover:bg-foreground/5 hover:text-foreground"><ChevronLeft className="h-4 w-4" />{t("hr.hist.volverEquipos")}</button>
+          <span className="font-display text-base font-bold">{equipoSel}</span>
+          <span className="text-xs text-muted-foreground">· {gente.length}</span>
+        </div>
+        <PersonasConFiltro personas={gente} cargando={cargando} t={t} onPersona={onPersona} />
       </div>
+    );
+  }
+  if (cargando) return <div className="flex justify-center py-10"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>;
+  if (equipos.length === 0) return <p className="py-8 text-center text-sm text-muted-foreground">{t("hr.hist.sinGente")}</p>;
+  return (
+    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+      {equipos.map((e) => {
+        const color = e.nota == null ? "text-muted-foreground" : e.nota < 60 ? "text-destructive" : e.nota < 80 ? "text-warning" : "text-success";
+        return (
+          <button key={e.eq} type="button" onClick={() => setEquipoSel(e.eq)} className="rounded-2xl border border-border/40 bg-card/20 p-3.5 text-left transition hover:border-primary/40 hover:bg-card/40">
+            <div className="mb-2 flex items-center gap-2">
+              <span className="min-w-0 flex-1 truncate text-sm font-semibold">{e.eq}</span>
+              <span className="shrink-0 text-[11px] text-muted-foreground">{e.gente.length}</span>
+              <span className={`shrink-0 font-display text-xl font-bold tabular-nums ${color}`}>{e.nota ?? "—"}</span>
+            </div>
+            <div className="space-y-1.5">
+              <Metrica label={t("hr.resumen.pantalla")} valor={e.pantalla} color={COLOR.pantalla} />
+              <Metrica label={t("hr.resumen.camara")} valor={e.camara} color={COLOR.camara} />
+              <Metrica label={t("hr.resumen.atencion")} valor={e.atencion} color={COLOR.atencion} />
+            </div>
+            <div className={`mt-2 flex items-center gap-1 border-t border-border/40 pt-2 text-[11px] ${e.conFallas > 0 ? "text-warning" : "text-muted-foreground"}`}>
+              {e.conFallas > 0 ? <><AlertTriangle className="h-3 w-3" />{t("hr.hist.equipoConFallas", { n: e.conFallas })}</> : t("hr.hist.equipoSinFallas")}
+            </div>
+          </button>
+        );
+      })}
     </div>
   );
 }
@@ -190,6 +277,7 @@ export function ArgosHistorial() {
   const hoy = useMemo(() => new Date().toLocaleDateString("en-CA", { timeZone: "America/Bogota" }), []);
   const [dia, setDia] = useState(hoy);
   const [turnoSel, setTurnoSel] = useState<Turno | null>(null);
+  const [vista, setVista] = useState<"turno" | "equipos">("turno");
   const esHoy = dia === hoy;
   const moverDia = (delta: number) => { const s = sumarDias(dia, delta); if (s <= hoy) setDia(s); };
   const { horas, cargando, error, refrescar } = useHorasDia(dia, true);
@@ -218,9 +306,19 @@ export function ArgosHistorial() {
               <button type="button" onClick={() => moverDia(1)} disabled={esHoy} aria-label={t("hr.exp.diaSiguiente")} className="flex h-6 w-6 items-center justify-center rounded-lg text-muted-foreground transition hover:bg-foreground/5 hover:text-foreground disabled:opacity-30"><ChevronRight className="h-3.5 w-3.5" /></button>
             </div>
           </div>
+          {/* Toggle: ver por turno (gráfica + turnos) o por EQUIPO (cajas). */}
+          <div className="flex shrink-0 items-center gap-1 rounded-xl border border-border/50 bg-card/20 p-1">
+            {([["turno", "hr.hist.porTurnoBtn"], ["equipos", "hr.hist.equiposBtn"]] as const).map(([v, k]) => (
+              <button key={v} type="button" onClick={() => { setVista(v); setTurnoSel(null); }} className={`rounded-lg px-3 py-1 text-xs font-medium transition ${vista === v ? "bg-primary/15 text-primary" : "text-muted-foreground hover:text-foreground"}`}>
+                {t(k)}
+              </button>
+            ))}
+          </div>
         </div>
 
-        {turnoSel ? (
+        {vista === "equipos" ? (
+          <EquiposVista dia={dia} t={t} onPersona={irAExpediente} />
+        ) : turnoSel ? (
           <TurnoDetalle
             turno={turnoSel}
             dia={dia}

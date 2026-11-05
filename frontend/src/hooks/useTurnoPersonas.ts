@@ -12,10 +12,26 @@ export interface PersonaTurno {
   nombre: string;
   avatarUrl: string | null;
   avatarSeed: string | null;
+  equipo: string;
   nota: Nota;
   pantallaPct: number | null;
   camaraPct: number | null;
   atencionPct: number | null;
+}
+
+// El EQUIPO de una persona a partir de su puesto (los UUIDs del campo cowork.equipo
+// son salas, no equipos). Se agrupa en los equipos reales de la agencia.
+const EQUIPO_POR_ROL: Record<string, string> = {
+  "Chatter": "Chatters", "Chatter Supervisor": "Chatters",
+  "PR": "PR", "Warming": "Warming",
+  "Coordinador": "Editores", "Coordinador Supervisor": "Editores",
+  "Finanzas": "Finanzas", "Closer": "Closers",
+  "Operations Sales": "Operaciones", "admin": "Admin",
+  "HHRR": "RRHH", "RRHH": "RRHH",
+};
+export function equipoDeRoles(roles: Set<string> | undefined): string {
+  if (roles) for (const r of roles) { const e = EQUIPO_POR_ROL[r]; if (e) return e; }
+  return "Otros";
 }
 
 interface FilaMom { user_id: string; mom_camara: number | string; mom_pantalla: number | string; juzgadas: number | string; juzgadas_ok: number | string; mom_cara_ok: number | string; mom_cara_medida: number | string; }
@@ -75,6 +91,7 @@ export function useTurnoPersonas(dia: string, hDesde: number, hHasta: number, ha
           nombre: perfil?.full_name?.trim() || "",
           avatarUrl: perfil?.avatar_url ?? null,
           avatarSeed: perfil?.avatar_seed ?? null,
+          equipo: equipoDeRoles(rolesPor.get(f.user_id)),
           nota,
           pantallaPct: pantallaPct == null ? null : Math.round(pantallaPct * 100),
           camaraPct: camaraPct == null ? null : Math.round(camaraPct * 100),
