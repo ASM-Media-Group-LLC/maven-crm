@@ -129,19 +129,22 @@ export default function PaginaAportar() {
               <input id="quien" value={quien} onChange={(e) => setQuien(e.target.value)} className="w-full rounded-xl border border-border/60 bg-card/40 px-3 py-2.5 text-sm outline-none ring-primary/40 focus:ring-2" autoComplete="name" />
             </div>
 
-            <button
-              type="button"
-              onClick={() => inputRef.current?.click()}
+            {/* Un <label> que ENVUELVE el input real: el clic es un gesto nativo del
+                navegador, así el selector de archivos abre también dentro de los
+                navegadores embebidos de Instagram/WhatsApp (un .click() simulado a
+                un input oculto NO abre ahí). El input va visualmente escondido
+                (sr-only), pero presente y activo. */}
+            <label
               onDragOver={(e) => { e.preventDefault(); setArrastrando(true); }}
               onDragLeave={() => setArrastrando(false)}
               onDrop={(e) => { e.preventDefault(); setArrastrando(false); agregar(e.dataTransfer.files); }}
-              className={`flex flex-col items-center gap-2 rounded-2xl border border-dashed px-6 py-8 text-center transition ${arrastrando ? "border-primary bg-primary/10" : "border-border/70 bg-card/20 hover:border-primary/50 hover:bg-card/40"}`}
+              className={`flex cursor-pointer flex-col items-center gap-2 rounded-2xl border border-dashed px-6 py-8 text-center transition ${arrastrando ? "border-primary bg-primary/10" : "border-border/70 bg-card/20 hover:border-primary/50 hover:bg-card/40"}`}
             >
               <FileUp className="h-7 w-7 text-primary" />
               <span className="text-sm font-semibold">{t("drive.aportar.elegir")}</span>
               <span className="text-xs text-muted-foreground">{t("drive.aportar.arrastra")}</span>
-            </button>
-            <input ref={inputRef} type="file" multiple hidden onChange={(e) => { agregar(e.target.files); e.target.value = ""; }} />
+              <input ref={inputRef} type="file" multiple className="sr-only" onChange={(e) => { agregar(e.target.files); e.target.value = ""; }} />
+            </label>
 
             {items.length > 0 && (
               <div className="flex flex-col gap-2">
