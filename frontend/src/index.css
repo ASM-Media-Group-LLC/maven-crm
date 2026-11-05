@@ -1296,6 +1296,7 @@ All colors MUST be HSL. Light mode in :root, dark mode in .dark.
 .glow-b { --glow: rgba(106,166,255,.22); }
 .glow-g { --glow: rgba(73,227,166,.20); }
 .glow-a { --glow: rgba(255,179,107,.22); }
+.glow-r { --glow: rgba(240,90,110,.22); }
 .glow-v { --glow: rgba(179,155,255,.22); }
 :root[data-contrast="high"] .vidrio-glow::before { display: none; }
 

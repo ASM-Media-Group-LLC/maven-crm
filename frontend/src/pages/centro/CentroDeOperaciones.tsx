@@ -3,6 +3,7 @@ import { Link, useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { ArrowRight, BarChart3, Clock, DoorOpen, Headset, MessageCircle, Timer, Users } from "lucide-react";
 import SelectorDeTablero from "@/pages/dashboard/SelectorDeTablero";
+import PulsoEquipoVivo from "@/components/centro/PulsoEquipoVivo";
 import { Button } from "@/components/ui/button";
 import { useCoworkSession, type AdminSessionRow } from "@/hooks/useCoworkSession";
 import { useEquipoTiempoCowork } from "@/hooks/useEquipoTiempoCowork";
@@ -179,6 +180,10 @@ export default function CentroDeOperaciones() {
           </Button>
         </div>
       </div>
+
+      {/* Pulso del equipo en vivo (solo supervisor+): nota viva + quién la baja +
+          cajas por equipo. Devuelve null para quien no vigila. */}
+      <PulsoEquipoVivo />
 
       {/* Tarjetas resumen: compactas, lo vivo primero */}
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
