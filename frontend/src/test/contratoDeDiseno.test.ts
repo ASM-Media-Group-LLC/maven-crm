@@ -48,6 +48,9 @@ const FUERA_DEL_SHELL = new Set([
   // ResetPassword), y PortalLayout es su marco (monta un <Outlet>). Sus páginas
   // (PortalInicio, PortalFicha, PortalAjustes) sí cumplen el contrato.
   "PortalEntrar", "PortalContrasena", "PortalLayout",
+  // Subida pública por link (/aportar/:token): la abre gente SIN cuenta, no lleva
+  // el shell de la app. Como la portada y el Portal de creadoras.
+  "PaginaAportar",
 ]);
 
 /**

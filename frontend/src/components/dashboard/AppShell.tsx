@@ -11,6 +11,7 @@ import { TypingInboxProvider } from "@/hooks/useTypingInbox";
 import { MessengerDockProvider } from "@/components/messenger/MessengerDock";
 import AnnouncementPopup from "@/components/dashboard/AnnouncementPopup";
 import { ArgosVigilante } from "@/components/ArgosVigilante";
+import { AvisoNasCaido } from "@/components/oficina/AvisoNasCaido";
 import { useAnnouncementsByChannel } from "@/hooks/useAnnouncements";
 import { useWaInboxNotifications } from "@/hooks/useWaInboxNotifications";
 import { useTgInboxNotifications } from "@/hooks/useTgInboxNotifications";
@@ -102,6 +103,7 @@ const AppShell = () => {
         <div className="flex flex-1 flex-col min-w-0 gap-2 py-2 pr-2">
           <DashboardTopbar />
           <BackToDashboardBar />
+          <AvisoNasCaido />
           <main className="vidrio-panel relative flex flex-1 flex-col min-h-0 overflow-hidden">
             <Suspense fallback={<ContentLoadingFallback />}>
               <Outlet />
