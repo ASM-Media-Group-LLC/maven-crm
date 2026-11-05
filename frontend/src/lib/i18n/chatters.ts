@@ -615,6 +615,20 @@ export const chatters = {
   // ─── Admin del evaluador (AdminContent) ─────────────────────────────────────
   // Los labels de los criterios (ES y EN) son DATO de chatter_criteria: se
   // muestran como están guardados.
+  "chatters.admin.examinadores": { es: "Examinadores", en: "Examiners" },
+  "chatters.admin.examinadoresDesc": { es: "Quién aparece en «Asignar a» al crear una sesión. Puedes agregar a alguien aunque su rol no tenga el evaluador, o sacar a quien no evalúa.", en: "Who shows up in “Assign to” when creating a session. You can add someone even if their role has no evaluator access, or remove someone who doesn’t evaluate." },
+  "chatters.admin.agregarExaminador": { es: "Agregar examinador", en: "Add examiner" },
+  "chatters.admin.buscarPersona": { es: "Buscar persona…", en: "Search person…" },
+  "chatters.admin.sinCandidatos": { es: "No hay más personas para agregar.", en: "No more people to add." },
+  "chatters.admin.agregadoAMano": { es: "Agregado a mano", en: "Added manually" },
+  "chatters.admin.porSuRol": { es: "Por su rol", en: "By role" },
+  "chatters.admin.sacarExaminador": { es: "Sacar", en: "Remove" },
+  "chatters.admin.sacados": { es: "Sacados de la lista", en: "Removed from the list" },
+  "chatters.admin.volverASuRol": { es: "Volver a su rol", en: "Back to role" },
+  "chatters.admin.examinadorAgregado": { es: "{name} ya puede recibir sesiones", en: "{name} can now receive sessions" },
+  "chatters.admin.examinadorSacado": { es: "{name} ya no recibe sesiones", en: "{name} no longer receives sessions" },
+  "chatters.admin.examinadorDevuelto": { es: "{name} vuelve a lo que diga su rol", en: "{name} is back to what their role says" },
+  "chatters.admin.reintentar": { es: "Reintentar", en: "Retry" },
   "chatters.admin.models": { es: "Modelos", en: "Models" },
   "chatters.admin.modelsDesc": { es: "Personajes que los chatters interpretan durante una sesión.", en: "Characters the chatters play during a session." },
   "chatters.admin.noModels": { es: "Todavía no hay modelos.", en: "No models yet." },

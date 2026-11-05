@@ -41,6 +41,7 @@ import {
   useDeleteChatterProfile,
 } from "@/hooks/useChatterEvaluator";
 import { NewProfileDialog } from "./NewProfileDialog";
+import ExaminadoresSection from "./ExaminadoresSection";
 import type { ChatterProfile } from "./types";
 import {
   Popover,
@@ -721,6 +722,7 @@ const ChatterAdminContent = () => (
     <ChatterEvaluatorHeader />
     <div className="flex-1 overflow-y-auto p-6 space-y-6">
       <ProfilesSection />
+      <ExaminadoresSection />
       <CriteriaSection />
       <ConfigSection />
     </div>

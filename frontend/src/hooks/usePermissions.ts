@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
 import { useUserRole } from "@/hooks/useUserRole";
 import { moduloEstaOculto } from "@/lib/modulosOcultos";
 
@@ -62,6 +63,25 @@ export const usePermissions = () => {
 
   const permissions = permissionsData ?? [];
 
+  // Examinador agregado o sacado A MANO en Chatter Evaluator → Admin (Grace,
+  // 05/11/2026): manda sobre el rol, solo para Chatters → Evaluator (igual que
+  // has_chatter_evaluator_access en la base).
+  const { user } = useAuth();
+  const { data: examinadorAMano } = useQuery({
+    queryKey: ["chatter-examinador-yo", user?.id],
+    enabled: !!user?.id && !isAdmin,
+    staleTime: 5 * 60 * 1000,
+    queryFn: async (): Promise<boolean | null> => {
+      const { data, error } = await supabase
+        .from("chatter_examinadores" as never)
+        .select("permitido")
+        .eq("user_id", user!.id)
+        .maybeSingle();
+      if (error) throw error;
+      return (data as { permitido: boolean } | null)?.permitido ?? null;
+    },
+  });
+
   // Modules everyone can reach unless an admin explicitly turned them
   // off in the role config. The check happens AFTER explicit perm
   // lookup so a `can_access: false` row still wins; this matters for
@@ -82,6 +102,10 @@ export const usePermissions = () => {
     // admin (el admin los sigue viendo) y ANTES de los permisos de rol, así que
     // esconde aunque el rol tenga el módulo concedido. Tapa menú y rutas de una.
     if (moduloEstaOculto(module, submodule)) return false;
+
+    if (module === "Chatters" && submodule === "Evaluator" && typeof examinadorAMano === "boolean") {
+      return examinadorAMano;
+    }
 
     // No permissions configured for this role at all → only universal
     // modules are reachable (everything else is locked).
