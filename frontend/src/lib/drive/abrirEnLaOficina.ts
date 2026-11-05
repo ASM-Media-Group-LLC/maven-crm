@@ -65,7 +65,7 @@ interface ItemParaAbrir {
   tipo: "carpeta" | "archivo";
   nombre: string;
   mime: string | null;
-  estado: "subiendo" | "listo";
+  estado: "subiendo" | "procesando" | "listo";
 }
 
 /** Lo que muestra el diálogo de una vista del Drive: las carpetas (para poder
