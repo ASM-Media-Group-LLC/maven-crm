@@ -1,9 +1,11 @@
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { LayoutDashboard, Loader2, AlertTriangle, RefreshCw, ChevronRight, ChevronDown, Camera, ScreenShare, Sparkles, Trophy, Eye } from "lucide-react";
+import { LayoutDashboard, Loader2, AlertTriangle, RefreshCw, ChevronRight, ChevronLeft, ChevronDown, Camera, ScreenShare, Sparkles, Trophy, Eye, Clock, CalendarDays } from "lucide-react";
 import { useLanguage } from "@/hooks/useLanguage";
 import { UserAvatar } from "@/components/UserAvatar";
 import { useResumenDia, type PersonaResumen, type BajonDia } from "@/hooks/useResumenDia";
+import { ArgosTendencia } from "@/components/hr/ArgosTendencia";
+import { useTendenciaMes } from "@/hooks/useTendenciaMes";
 import type { TranslationKey } from "@/lib/i18n";
 
 // PANEL DEL DÍA — la PORTADA de Argos (Alvaro, 03/11). Responde de un vistazo:
@@ -27,6 +29,14 @@ const LBL_BAJON: Record<string, TranslationKey> = {
 
 const prom = (arr: number[]): number | null =>
   arr.length ? Math.round(arr.reduce((a, b) => a + b, 0) / arr.length) : null;
+
+// Sumar/restar días a una fecha YYYY-MM-DD (para ‹ ayer / hoy ›).
+function sumarDias(ymd: string, delta: number): string {
+  const [y, m, d] = ymd.split("-").map(Number);
+  const dt = new Date(Date.UTC(y, m - 1, d));
+  dt.setUTCDate(dt.getUTCDate() + delta);
+  return dt.toISOString().slice(0, 10);
+}
 
 const fallasDe = (p: PersonaResumen) => ({
   veces: p.bajones.length,
@@ -130,8 +140,14 @@ function EquipoFila({ p, t, onClick }: { p: PersonaResumen; t: Tr; onClick: () =
             </span>
           )}
         </div>
-        {/* La nota EXPLICADA: los 4 factores. Pantalla baja en rojo. */}
-        <div className="flex flex-wrap gap-x-3 gap-y-0.5">
+        {/* La nota EXPLICADA: los 4 factores + CONECTADO (el chequeo de Alvaro:
+            '0% pantalla con 4h' = trabajó sin compartir; '0% con 0h' = ni se
+            conectó). Pantalla baja en rojo. */}
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5">
+          <span className={`inline-flex items-center gap-1 text-[11px] font-medium ${p.activo ? "text-foreground/75" : "text-muted-foreground/60"}`}>
+            <Clock className="h-3 w-3 shrink-0" />
+            {!p.activo ? t("hr.panel.noConecto") : p.horas >= 0.05 ? t("hr.panel.conectadoH", { h: p.horas.toFixed(1) }) : t("hr.panel.activoSinHoras")}
+          </span>
           <FactorChip label={t("hr.resumen.pantalla")} sub={factor("pantalla")} alerta />
           <FactorChip label={t("hr.resumen.camara")} sub={factor("camara")} />
           <FactorChip label={t("hr.resumen.atencion")} sub={factor("atencion")} />
@@ -177,7 +193,36 @@ function CajaEquipo({ titulo, punto, gente, abierta, t, onPersona }: {
 export function ArgosPanelDia() {
   const { t } = useLanguage();
   const navigate = useNavigate();
-  const { personas, cargando, error, refrescar } = useResumenDia(new Date().toLocaleDateString("en-CA", { timeZone: "America/Bogota" }));
+  // El Panel ya no es solo HOY (Alvaro, 04/11): se puede ver cualquier día pasado
+  // con ‹ ayer / hoy ›. El día vive acá y se le pasa a useResumenDia (el RPC ya
+  // recibe fecha). No se puede avanzar más allá de hoy.
+  const hoy = useMemo(() => new Date().toLocaleDateString("en-CA", { timeZone: "America/Bogota" }), []);
+  const [dia, setDia] = useState(hoy);
+  const [verCalendario, setVerCalendario] = useState(false);
+  const esHoy = dia === hoy;
+  const moverDia = (delta: number) => {
+    const s = sumarDias(dia, delta);
+    if (s <= hoy) { setDia(s); setVerCalendario(false); }
+  };
+  const { personas, cargando, error, refrescar } = useResumenDia(dia);
+
+  // Celdas del mes del día elegido, para el calendario (lunes primero), igual
+  // que el Expediente — así se puede saltar a cualquier fecha pasada.
+  const anio = Number(dia.slice(0, 4));
+  const mes = Number(dia.slice(5, 7));
+  const celdas = useMemo(() => {
+    const primero = new Date(anio, mes - 1, 1).getDay();
+    const offset = (primero + 6) % 7;
+    const totalDias = new Date(anio, mes, 0).getDate();
+    const out: (string | null)[] = [];
+    for (let i = 0; i < offset; i++) out.push(null);
+    for (let dd = 1; dd <= totalDias; dd++) out.push(`${anio}-${String(mes).padStart(2, "0")}-${String(dd).padStart(2, "0")}`);
+    return out;
+  }, [anio, mes]);
+  const mesTexto = useMemo(() => new Date(anio, mes - 1, 1).toLocaleDateString("es-CO", { month: "long", year: "numeric" }), [anio, mes]);
+  // Dato por día del mes (para pintar el calendario: qué días hay info y cómo
+  // estuvo la pantalla del equipo). Solo cuando el calendario está abierto.
+  const { porDia } = useTendenciaMes(anio, mes, hoy);
 
   const d = useMemo(() => {
     // Solo quien tuvo actividad hoy (horas, nota o alguna falla) entra al podio
@@ -207,7 +252,7 @@ export function ArgosPanelDia() {
   }, [personas]);
 
   const irA = (id: string) => navigate(`/hr/expediente/${id}`, { state: { volverA: "/hr/monitor-ia?t=panel" } });
-  const hoyTxt = new Date().toLocaleDateString("es-CO", { weekday: "long", day: "numeric", month: "long" });
+  const diaTxt = new Date(dia + "T12:00:00").toLocaleDateString("es-CO", { weekday: "long", day: "numeric", month: "long" });
 
   return (
     <section className="vidrio sube p-4 lg:p-5">
@@ -219,12 +264,67 @@ export function ArgosPanelDia() {
           </span>
           <div className="min-w-0 flex-1">
             <h2 className="font-display text-base font-bold leading-tight tracking-tight">{t("hr.panel.title")}</h2>
-            <p className="text-xs capitalize text-muted-foreground">{t("hr.panel.hoy")} · {hoyTxt}</p>
+            {/* Navegación de día: ‹ ayer / hoy › (no se puede pasar de hoy). */}
+            <div className="mt-0.5 flex items-center gap-1">
+              <button type="button" onClick={() => moverDia(-1)} aria-label={t("hr.exp.diaAnterior")} className="flex h-6 w-6 items-center justify-center rounded-lg text-muted-foreground transition hover:bg-foreground/5 hover:text-foreground">
+                <ChevronLeft className="h-3.5 w-3.5" />
+              </button>
+              <span className="min-w-[8.5rem] text-center text-xs capitalize text-muted-foreground">{esHoy ? `${t("hr.panel.hoy")} · ` : ""}{diaTxt}</span>
+              <button type="button" onClick={() => moverDia(1)} disabled={esHoy} aria-label={t("hr.exp.diaSiguiente")} className="flex h-6 w-6 items-center justify-center rounded-lg text-muted-foreground transition hover:bg-foreground/5 hover:text-foreground disabled:opacity-30">
+                <ChevronRight className="h-3.5 w-3.5" />
+              </button>
+            </div>
           </div>
+          <button type="button" onClick={() => setVerCalendario((v) => !v)} className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full border transition ${verCalendario ? "border-primary/50 text-primary" : "border-transparent text-muted-foreground hover:bg-foreground/5 hover:text-foreground"}`} title={t("hr.exp.calendario")} aria-label={t("hr.exp.calendario")}>
+            <CalendarDays className="h-4 w-4" />
+          </button>
           <button type="button" onClick={() => void refrescar()} className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-foreground/5 hover:text-foreground" title={t("hr.pantallazos.reintentar")} aria-label={t("hr.pantallazos.reintentar")}>
             <RefreshCw className={`h-4 w-4 ${cargando ? "animate-spin" : ""}`} />
           </button>
         </div>
+
+        {/* Calendario opcional: saltar a cualquier día pasado. Compacto (no ocupa
+            toda la pantalla) y cada día con DATO: un punto verde/ámbar/rojo según
+            cómo estuvo la pantalla del equipo; los días sin info van apagados. */}
+        {verCalendario && (
+          <div className="mx-auto w-full max-w-[26rem] rounded-2xl border border-border/40 bg-card/30 p-3">
+            <p className="mb-2 text-center text-xs capitalize text-muted-foreground">{mesTexto}</p>
+            <div className="mb-1 grid grid-cols-7 gap-1 text-center text-[10px] font-semibold text-muted-foreground">
+              {["L", "M", "M", "J", "V", "S", "D"].map((dl, i) => <div key={i}>{dl}</div>)}
+            </div>
+            <div className="grid grid-cols-7 gap-1">
+              {celdas.map((f, i) => {
+                if (!f) return <div key={i} />;
+                const futuro = f > hoy;
+                const sel = f === dia;
+                const info = porDia.get(f);
+                const hayDato = !!info && info.personas > 0;
+                const banda = !info || info.pantalla == null ? null
+                  : info.pantalla >= 70 ? "bg-success" : info.pantalla >= 50 ? "bg-warning" : "bg-destructive";
+                return (
+                  <button
+                    key={i}
+                    type="button"
+                    disabled={futuro}
+                    onClick={() => { setDia(f); setVerCalendario(false); }}
+                    title={hayDato ? t("hr.panel.calDiaInfo", { p: info!.pantalla ?? 0, n: info!.personas }) : undefined}
+                    className={`flex aspect-square flex-col items-center justify-center gap-0.5 rounded-lg border text-xs tabular-nums transition disabled:opacity-25
+                      ${sel ? "border-primary bg-primary/15 ring-1 ring-primary"
+                        : hayDato ? "border-border/40 bg-card/40 hover:border-primary/40"
+                        : "border-border/20 bg-transparent hover:border-primary/30"}`}
+                  >
+                    <span className={sel ? "text-primary" : f === hoy ? "font-bold text-primary" : hayDato ? "text-foreground/85" : "text-muted-foreground/50"}>{Number(f.slice(8))}</span>
+                    {banda && <span className={`h-1 w-1 rounded-full ${banda}`} />}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* Gráfica de tendencia (últimos 14 días) — siempre visible, aparte del
+            día elegido abajo. Argos ya no es solo "hoy" (Alvaro, 04/11). */}
+        <ArgosTendencia />
 
         {error ? (
           <div className="flex flex-col items-center gap-2 py-10 text-center text-muted-foreground"><AlertTriangle className="h-7 w-7 text-destructive/70" /><p className="text-sm">{t("hr.panel.error")}</p></div>

@@ -36,6 +36,12 @@ export interface PersonaResumen {
   juzgadas: number;
   horas: number;
   bajones: BajonDia[];
+  /** Estuvo activo en Maven ese día (capturas, cámara, pantalla, atención, horas
+   *  o alguna alerta) — no solo el reloj de Cowork. Para distinguir «no apareció». */
+  activo: boolean;
+  /** Su rol se CALIFICA en cámara/pantalla (config roles_calificados). Si no, esos
+   *  factores no cuentan para su nota (ej. supervisores, finanzas). */
+  calificado: boolean;
 }
 
 interface FilaTiempo { user_id: string; seg_activo: number | string; }
@@ -89,20 +95,49 @@ export function useResumenDia(dia: string) {
       const ids = new Set<string>([...momPor.keys(), ...horasPor.keys(), ...bajonesPor.keys()]);
       if (ids.size === 0) return [];
 
-      const { data: perfiles } = await supabase.from("profiles").select("id, full_name, avatar_url, avatar_seed").in("id", [...ids]);
-      const perfilPor = new Map((perfiles ?? []).map((p) => [p.id as string, p as { full_name: string | null; avatar_url: string | null; avatar_seed: string | null }]));
+      const [perfRes, rolesRes, cfgRes] = await Promise.all([
+        supabase.from("profiles").select("id, full_name, avatar_url, avatar_seed").in("id", [...ids]),
+        sinTipar.from("user_roles").select("user_id, role").in("user_id", [...ids]),
+        sinTipar.from("monitor_config").select("roles_calificados").eq("id", 1).maybeSingle(),
+      ]);
+      const perfilPor = new Map(((perfRes.data ?? []) as Array<{ id: string; full_name: string | null; avatar_url: string | null; avatar_seed: string | null }>).map((p) => [p.id, p]));
+
+      // Qué roles tiene cada persona (puede tener varios) y qué roles SE CALIFICAN
+      // en cámara/pantalla (config del dueño). Sin config = se califica a todos
+      // (comportamiento viejo); con config, solo esos roles cuentan en esos factores.
+      const rolesPor = new Map<string, Set<string>>();
+      for (const r of (rolesRes.data ?? []) as Array<{ user_id: string; role: string }>) {
+        const s = rolesPor.get(r.user_id) ?? new Set<string>();
+        s.add(r.role);
+        rolesPor.set(r.user_id, s);
+      }
+      const rolesCalif: string[] | null = (cfgRes.data as { roles_calificados: string[] | null } | null)?.roles_calificados ?? null;
+      const esCalificado = (id: string): boolean => {
+        if (!rolesCalif || rolesCalif.length === 0) return true;
+        const roles = rolesPor.get(id);
+        if (!roles) return false;
+        for (const r of roles) if (rolesCalif.includes(r)) return true;
+        return false;
+      };
 
       const personas: PersonaResumen[] = [...ids].map((id) => {
         const m = momPor.get(id);
         const at = atPor.get(id);
+        const calificado = esCalificado(id);
         // Pantalla% = de todos los momentos conectada (cámara), cuántos compartió.
-        const pantallaPct = m && m.camara > 0 ? Math.min(1, m.pantalla / m.camara) : undefined;
+        const pantallaRaw = m && m.camara > 0 ? Math.min(1, m.pantalla / m.camara) : undefined;
         // Cámara% REAL: de los momentos de cámara que SE PUDIERON MEDIR, en cuántos
         // había cara. Sin momentos medidos (no prendió cámara en ninguna llamada) =
         // sin dato: no cuenta ni a favor ni en contra (ya no es el 100% de adorno).
-        const camaraPct = m && m.caraMedida > 0 ? m.caraOk / m.caraMedida : undefined;
+        const camaraRaw = m && m.caraMedida > 0 ? m.caraOk / m.caraMedida : undefined;
+        // Si el rol NO se califica en cámara/pantalla (supervisor, finanzas…), esos
+        // factores quedan en N/A: no cuentan para la nota ni lo tiran a "Mal" por 0%.
+        const pantallaPct = calificado ? pantallaRaw : undefined;
+        const camaraPct = calificado ? camaraRaw : undefined;
         const atencionPct = at && at.n > 0 ? at.ok / at.n : undefined;
         const horas = horasPor.get(id) ?? 0;
+        // Activo = estuvo en Maven ese día por CUALQUIER señal, no solo Cowork.
+        const activo = horas > 0 || (!!m && (m.camara > 0 || m.pantalla > 0)) || (!!at && at.n > 0) || (bajonesPor.get(id)?.length ?? 0) > 0;
         const nota = calcularNota({ pantallaPct, camaraPct, atencionPct, horasHechas: horas, horasMeta: META_DIA });
         const perfil = perfilPor.get(id);
         const bajones = (bajonesPor.get(id) ?? []).sort((a, b) => b.minutos - a.minutos).slice(0, 8);
@@ -118,6 +153,8 @@ export function useResumenDia(dia: string) {
           juzgadas: at?.n ?? 0,
           horas,
           bajones,
+          activo,
+          calificado,
         };
       });
 

@@ -18,6 +18,7 @@ import { ConectadosAhoraPanel } from "@/components/hr/ConectadosAhoraPanel";
 import { PantallazosVivoPanel } from "@/components/hr/PantallazosVivoPanel";
 import { ContextoEmpresaPanel } from "@/components/hr/ContextoEmpresaPanel";
 import { ArgosPanelDia } from "@/components/hr/ArgosPanelDia";
+import { ArgosHistorial } from "@/components/hr/ArgosHistorial";
 import { ArgosAjustesContenido } from "@/pages/hr/ArgosAjustes";
 import type { TranslationKey } from "@/lib/i18n";
 
@@ -117,9 +118,9 @@ export default function HRMonitorIA() {
   // vivo y las alertas quedan en sus pestañas. La pestaña vive en la URL (?t=…)
   // para que al entrar a un perfil y volver (atrás del navegador) Argos te deje
   // DONDE ESTABAS, no reiniciado (Álvaro, 02/11).
-  type TabArgos = "panel" | "equipo" | "envivo" | "ajustes";
+  type TabArgos = "panel" | "equipo" | "envivo" | "historial" | "ajustes";
   const [searchParams, setSearchParams] = useSearchParams();
-  const TABS_VALIDAS: TabArgos[] = ["panel", "equipo", "envivo", "ajustes"];
+  const TABS_VALIDAS: TabArgos[] = ["panel", "equipo", "envivo", "historial", "ajustes"];
   const tabURL = searchParams.get("t") as TabArgos | null;
   const tab: TabArgos = tabURL && TABS_VALIDAS.includes(tabURL) ? tabURL : "panel";
   const setTab = (k: TabArgos) => setSearchParams((prev) => { const n = new URLSearchParams(prev); n.set("t", k); return n; }, { replace: true });
@@ -151,6 +152,7 @@ export default function HRMonitorIA() {
           { k: "panel", label: t("hr.monia.tab.panel") },
           { k: "equipo", label: t("hr.monia.tab.equipo") },
           { k: "envivo", label: t("hr.monia.tab.envivo") },
+          ...(isAdmin ? [{ k: "historial" as TabArgos, label: t("hr.monia.tab.historial") }] : []),
           ...(isAdmin ? [{ k: "ajustes" as TabArgos, label: t("hr.monia.tab.ajustes") }] : []),
         ];
         return (
@@ -177,6 +179,9 @@ export default function HRMonitorIA() {
 
       {/* Pantallazos en vivo: la muralla (Muralla/Cuadrícula/Lista). */}
       {tab === "envivo" && <div className="mt-5"><PantallazosVivoPanel /></div>}
+
+      {/* Historial del día: gráfica por hora + 3 cajas por turno (dueño/admin). */}
+      {tab === "historial" && isAdmin && <div className="mt-5"><ArgosHistorial /></div>}
 
       {/* Ajustes (solo dueño): 4 secciones limpias — Argos general, la voz, qué
           avisa (situaciones) y el contexto. Lo viejo (KPIs de faltas, lista de
