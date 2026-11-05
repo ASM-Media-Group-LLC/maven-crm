@@ -18,6 +18,9 @@ export interface AdminUser {
   email: string;
   created_at: string;
   role: AppRole | null;
+  /** jerarquía profiles.nivel (dueno/admin/manager/supervisor/agente). Decide,
+   *  junto con el rol, si ya tiene Drive full "por rol". */
+  nivel: string | null;
   linked_employee: { id: string; first_name: string; last_name: string } | null;
   ai_daily_quota_override: number | null; // override de cuota IA del inbox (null = usar la del rol)
 }
@@ -32,7 +35,7 @@ export const useAdminUsers = () => {
       // Fetch profiles
       const { data: profiles, error: profilesError } = await (supabase as any)
         .from("profiles")
-        .select("id, full_name, avatar_url, avatar_seed, created_at, ai_daily_quota_override")
+        .select("id, full_name, avatar_url, avatar_seed, created_at, ai_daily_quota_override, nivel")
         // Las eliminadas viven en la papelera 30 días: no van en el listado
         // normal, se ven (y se recuperan) en su propia pantalla.
         .is("deleted_at", null);
@@ -93,6 +96,7 @@ export const useAdminUsers = () => {
         email: emailsMap.get(p.id) || "",
         created_at: p.created_at || "",
         role: rolesMap.get(p.id) ?? null,
+        nivel: (p as { nivel?: string | null }).nivel ?? null,
         // manageable = la RPC ya comparó niveles: false para uno mismo y para
         // cualquiera de nivel >= al propio. El front lo usa SOLO para esconder
         // botones (UX); el candado real está en las edge functions.

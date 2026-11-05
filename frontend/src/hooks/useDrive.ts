@@ -18,7 +18,7 @@ export interface DriveItem {
   nombre: string;
   mime: string | null;
   size: number | null;
-  estado: "subiendo" | "listo";
+  estado: "subiendo" | "procesando" | "listo";
   created_at: string;
   updated_at: string;
   last_opened_at: string | null;
@@ -220,9 +220,11 @@ export function useBuscarEnDrive(q: string, extensiones: string[] | null) {
   });
 }
 
-/** Una subida que todavía no terminó solo la ve quien la está subiendo. */
+/** Una subida a medias ("subiendo") solo la ve quien la sube. Un aporte por link
+ *  ("procesando") lo ve TODO el equipo: ya está a salvo, solo falta que termine
+ *  de migrar al NAS. */
 function visibles(data: unknown, yo: string): DriveItem[] {
-  return ((data ?? []) as DriveItem[]).filter((i) => i.estado === "listo" || i.owner_id === yo);
+  return ((data ?? []) as DriveItem[]).filter((i) => i.estado === "listo" || i.estado === "procesando" || i.owner_id === yo);
 }
 
 /** La ruta hasta una carpeta, para las «migas»: Mi unidad › Contabilidad › 2026.

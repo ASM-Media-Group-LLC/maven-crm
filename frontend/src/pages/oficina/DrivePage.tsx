@@ -559,7 +559,9 @@ export default function DrivePage() {
   /** La línea chica debajo del nombre en las tarjetas: tamaño (y fecha). */
   const pieDe = (i: DriveItem) => (i.tipo === "carpeta"
     ? tamanoDeFicha(i)
-    : <>{tamano(i.size)} · {fechaCorta(i)}</>);
+    : i.estado === "procesando"
+      ? <span className="inline-flex items-center gap-1 text-primary"><Loader2 className="h-3 w-3 animate-spin" />{t("drive.procesando")}</span>
+      : <>{tamano(i.size)} · {fechaCorta(i)}</>);
 
   /** Una fila de la lista (la vista de siempre). */
   const filaDeLista = (i: DriveItem) => {

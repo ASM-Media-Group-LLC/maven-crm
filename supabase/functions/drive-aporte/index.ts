@@ -11,7 +11,16 @@ import { createClient } from "jsr:@supabase/supabase-js@2";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+const CRON_TOKEN = Deno.env.get("CRON_INTERNAL_TOKEN") ?? "";
 const BUCKET = "drive-aportes";
+
+const MIMES: Record<string, string> = {
+  mp4: "video/mp4", mov: "video/quicktime", m4v: "video/x-m4v", webm: "video/webm", mkv: "video/x-matroska",
+  avi: "video/x-msvideo", jpg: "image/jpeg", jpeg: "image/jpeg", png: "image/png", gif: "image/gif",
+  webp: "image/webp", heic: "image/heic", heif: "image/heif", mp3: "audio/mpeg", wav: "audio/wav",
+  m4a: "audio/mp4", aac: "audio/aac", pdf: "application/pdf", zip: "application/zip",
+};
+const mimeDe = (nombre: string): string => MIMES[(nombre.split(".").pop() ?? "").toLowerCase()] ?? "application/octet-stream";
 
 const CORS = {
   "Access-Control-Allow-Origin": "*",
@@ -34,7 +43,7 @@ function claveSegura(nombre: string): string {
 
 async function linkActivo(token: string) {
   const { data } = await admin.from("drive_upload_links")
-    .select("token, item_id, tenant_id, activo").eq("token", token).maybeSingle();
+    .select("token, item_id, tenant_id, activo, created_by").eq("token", token).maybeSingle();
   return data && data.activo ? data : null;
 }
 
@@ -68,23 +77,46 @@ Deno.serve(async (req) => {
       const path = `${token}/${crypto.randomUUID()}-${nombre}`;
       const { data, error } = await admin.storage.from(BUCKET).createSignedUploadUrl(path);
       if (error || !data) return json({ error: error?.message ?? "no se pudo iniciar" }, 500);
-      return json({ path: data.path, uploadToken: data.token });
+      // signedUrl para subir con PROGRESO real (XHR) desde el navegador.
+      return json({ path: data.path, uploadToken: data.token, signedUrl: data.signedUrl });
     }
 
-    // Confirma que un archivo ya se subió: registra el aporte.
+    // Confirma que un archivo ya se subió: crea la ficha "procesando" YA (para que
+    // el equipo la vea en la carpeta al instante) y dispara la migración al NAS.
     if (action === "confirmar") {
       const path = String(body.path ?? "");
       if (!path.startsWith(token + "/")) return json({ error: "ruta inválida" }, 400);
+      const nombre = String(body.nombre_archivo ?? "archivo").slice(0, 300);
+      const size = typeof body.size === "number" ? body.size : null;
+      const quien = (String(body.quien ?? "").trim() || null)?.slice(0, 120) ?? null;
+
+      // Ficha visible de una, como "procesando"; el cron la pasa a "listo".
+      const itemId = crypto.randomUUID();
+      const up = crypto.randomUUID();
+      const storageKey = `${link.tenant_id}/${itemId}`;
+      const { error: eFicha } = await admin.from("drive_items").insert({
+        id: itemId, tenant_id: link.tenant_id, owner_id: link.created_by ?? null, parent_id: link.item_id,
+        tipo: "archivo", nombre, mime: mimeDe(nombre), size, storage_key: storageKey, estado: "procesando",
+      });
+      if (eFicha) return json({ error: eFicha.message }, 500);
+
       const { error } = await admin.from("drive_aportes").insert({
-        token,
-        item_id: link.item_id,
-        tenant_id: link.tenant_id,
-        nombre_archivo: String(body.nombre_archivo ?? "archivo").slice(0, 300),
-        storage_path: path,
-        size: typeof body.size === "number" ? body.size : null,
-        quien: (String(body.quien ?? "").trim() || null)?.slice(0, 120) ?? null,
+        token, item_id: link.item_id, tenant_id: link.tenant_id, nombre_archivo: nombre,
+        storage_path: path, size, quien, nas_item_id: itemId, nas_up: up, nas_parte: 0,
       });
       if (error) return json({ error: error.message }, 500);
+
+      // Arranca la migración de una (no esperar al cron). Fire-and-forget.
+      if (CRON_TOKEN) {
+        const tarea = fetch(`${SUPABASE_URL}/functions/v1/drive-aporte-nas`, {
+          method: "POST",
+          headers: { "Authorization": `Bearer ${SERVICE_KEY}`, "X-Cron-Token": CRON_TOKEN, "Content-Type": "application/json" },
+          body: "{}",
+        }).then(() => {}, () => {});
+        // deno-lint-ignore no-explicit-any
+        const rt = (globalThis as any).EdgeRuntime;
+        if (rt?.waitUntil) rt.waitUntil(tarea); else await tarea.catch(() => {});
+      }
       return json({ ok: true });
     }
 

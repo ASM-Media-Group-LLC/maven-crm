@@ -29,6 +29,7 @@ const SECRETO = Deno.env.get("DRIVE_SECRETO") ?? "";
 const RESEND = Deno.env.get("RESEND_API_KEY") ?? "";
 const AVISO_A = Deno.env.get("DRIVE_NAS_AVISO_EMAIL") ?? "rusin24@gmail.com";
 const AVISO_FROM = Deno.env.get("DRIVE_NAS_AVISO_FROM") ?? "Maven <noreply@mail.maven-ai.me>";
+const APP_URL = (Deno.env.get("APP_URL") ?? "https://app.maven-ai.me").replace(/\/+$/, "");
 
 const BUCKET = "drive-aportes";
 const TAMANO_PARTE = 32 * 1024 * 1024; // el NAS rechaza > 95 MB por pedido
@@ -115,23 +116,27 @@ async function conRecibo(
 
 interface Aporte {
   id: string; token: string; item_id: string | null; tenant_id: string;
-  nombre_archivo: string; storage_path: string; size: number | null;
+  nombre_archivo: string; storage_path: string; size: number | null; quien: string | null;
   nas_up: string | null; nas_parte: number | null; nas_item_id: string | null;
 }
+
+/** Un archivo que ACABA de aterrizar en el Drive (para el correo por tanda). */
+interface Noti { id: string; carpeta: string | null; quien: string | null; nombre: string }
 
 // deno-lint-ignore no-explicit-any
 type Admin = any;
 
-async function finalizar(admin: Admin, a: Aporte, itemId: string, size: number, rec: Record<string, unknown> | "existe") {
+async function finalizar(admin: Admin, a: Aporte, itemId: string, size: number, rec: Record<string, unknown> | "existe", notis: Noti[]) {
   const tam = rec !== "existe" && Number.isFinite(Number(rec.size)) ? Number(rec.size) : size;
   const sha = rec !== "existe" ? String(rec.sha256 ?? "") || null : null;
   await admin.from("drive_items").update({ estado: "listo", size: tam, sha256: sha }).eq("id", itemId);
   await admin.from("drive_aportes").update({ en_nas: true, estado: "en_nas", drive_item_id: itemId }).eq("id", a.id);
   await admin.storage.from(BUCKET).remove([a.storage_path]).then(() => {}, () => {});
+  notis.push({ id: a.id, carpeta: a.item_id, quien: a.quien, nombre: a.nombre_archivo });
 }
 
 /** Procesa un aporte. Devuelve cuántas "partes" de presupuesto consumió. */
-async function procesar(admin: Admin, a: Aporte, errores: string[]): Promise<number> {
+async function procesar(admin: Admin, a: Aporte, errores: string[], notis: Noti[]): Promise<number> {
   const size = Number(a.size ?? 0);
   if (!Number.isFinite(size) || size <= 0) { errores.push(`${a.id}: size`); return 1; }
 
@@ -164,7 +169,7 @@ async function procesar(admin: Admin, a: Aporte, errores: string[]): Promise<num
       const bytes = await bajarRango(fuente, 0, size - 1);
       const rec = await conRecibo(await permisoNas({ op: "put", k: storageKey(), max: size }), "PUT", bytes, storageKey());
       if (!rec) { errores.push(`${a.id}: put`); return 1; }
-      await finalizar(admin, a, itemId, size, rec);
+      await finalizar(admin, a, itemId, size, rec, notis);
       return 1;
     }
 
@@ -185,7 +190,7 @@ async function procesar(admin: Admin, a: Aporte, errores: string[]): Promise<num
     if (i >= total) {
       const rec = await conRecibo(await permisoNas({ op: "completar", k: storageKey(), up, n: total, max: size }), "POST", null, storageKey());
       if (!rec) { errores.push(`${a.id}: completar`); return consumidas || 1; }
-      await finalizar(admin, a, itemId, size, rec);
+      await finalizar(admin, a, itemId, size, rec, notis);
     }
     return consumidas || 1;
   } catch (e) {
@@ -229,6 +234,65 @@ async function registrarSalud(admin: Admin, caido: boolean, pendientes: number):
   await admin.from("drive_nas_salud").upsert({ id: 1, caido: true, desde, pendientes, ultimo_aviso: ultimoAviso, actualizado: ahora }).then(() => {}, () => {});
 }
 
+function escapar(s: string): string {
+  return s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c] as string));
+}
+
+/** Avisa por correo (1 por carpeta + quién) a todos los del Drive full que entró
+ *  contenido nuevo. Reusa send-notification-email (resuelve correos con los ids). */
+async function avisarContenidoNuevo(admin: Admin, notis: Noti[]): Promise<number> {
+  if (!notis.length) return 0;
+  // Reclamar el aviso (false→true) para no mandarlo dos veces si corren dos
+  // migraciones a la vez: solo seguimos con los que ESTA corrida ganó.
+  const { data: ganados } = await admin.from("drive_aportes")
+    .update({ avisado: true }).in("id", notis.map((n) => n.id)).eq("avisado", false).select("id");
+  const ganadosSet = new Set(((ganados ?? []) as Array<{ id: string }>).map((r) => r.id));
+  notis = notis.filter((n) => ganadosSet.has(n.id));
+  if (!notis.length) return 0;
+
+  // Destinatarios: todos los del Drive full.
+  const { data: dest } = await admin.rpc("drive_acceso_total_ids");
+  const ids = ((dest ?? []) as Array<string | { drive_acceso_total_ids?: string }>)
+    .map((x) => (typeof x === "string" ? x : x.drive_acceso_total_ids)).filter(Boolean) as string[];
+  if (!ids.length) return 0;
+
+  // Agrupar por carpeta + quién subió.
+  const grupos = new Map<string, { carpeta: string | null; quien: string; archivos: string[] }>();
+  for (const n of notis) {
+    const quien = (n.quien ?? "").trim() || "Alguien";
+    const key = `${n.carpeta ?? ""}|${quien}`;
+    const g = grupos.get(key) ?? { carpeta: n.carpeta, quien, archivos: [] };
+    g.archivos.push(n.nombre);
+    grupos.set(key, g);
+  }
+
+  let enviados = 0;
+  for (const g of grupos.values()) {
+    let carpetaNombre = "una carpeta";
+    if (g.carpeta) {
+      const { data: c } = await admin.from("drive_items").select("nombre").eq("id", g.carpeta).maybeSingle();
+      if (c?.nombre) carpetaNombre = c.nombre;
+    }
+    const n = g.archivos.length;
+    const lista = g.archivos.slice(0, 20).map((a) => `<li style="margin:2px 0">${escapar(a)}</li>`).join("");
+    const mas = n > 20 ? `<li style="margin:2px 0;color:#888">y ${n - 20} más…</li>` : "";
+    const subject = `Nuevo contenido en «${carpetaNombre}» — ${n} archivo${n === 1 ? "" : "s"}`;
+    const html =
+      `<div style="font-family:system-ui,Arial,sans-serif;font-size:15px;color:#111;line-height:1.5">` +
+      `<h2 style="margin:0 0 8px">📥 Llegó contenido nuevo al Drive</h2>` +
+      `<p><b>${escapar(g.quien)}</b> subió <b>${n}</b> archivo${n === 1 ? "" : "s"} a <b>${escapar(carpetaNombre)}</b>.</p>` +
+      `<ul style="margin:8px 0 12px;padding-left:20px">${lista}${mas}</ul>` +
+      `<p><a href="${APP_URL}/oficina/drive" style="display:inline-block;background:#7c5cff;color:#fff;text-decoration:none;padding:9px 16px;border-radius:10px;font-weight:600">Abrir el Drive</a></p>` +
+      `</div>`;
+    const { error } = await admin.functions.invoke("send-notification-email", {
+      headers: { Authorization: `Bearer ${SERVICE_KEY}` },
+      body: { to: [], subject, html, tag: "drive-aporte", also_include_user_ids: ids },
+    });
+    if (!error) enviados++;
+  }
+  return enviados;
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
   if (req.method !== "POST") return json({ ok: false, error: "method" }, 405);
@@ -254,20 +318,25 @@ Deno.serve(async (req: Request) => {
   await registrarSalud(admin, false, pend);
 
   const { data: filas } = await admin.from("drive_aportes")
-    .select("id, token, item_id, tenant_id, nombre_archivo, storage_path, size, nas_up, nas_parte, nas_item_id")
+    .select("id, token, item_id, tenant_id, nombre_archivo, storage_path, size, quien, nas_up, nas_parte, nas_item_id")
     .eq("en_nas", false)
     .order("created_at", { ascending: true })
     .limit(APORTES_POR_RONDA);
   const aportes = (filas ?? []) as Aporte[];
 
   const errores: string[] = [];
+  const notis: Noti[] = [];
   let presupuesto = PARTES_POR_RONDA;
   let tocados = 0;
   for (const a of aportes) {
     if (presupuesto <= 0) break;
-    presupuesto -= await procesar(admin, a, errores);
+    presupuesto -= await procesar(admin, a, errores, notis);
     tocados++;
   }
 
-  return json({ ok: true, pendientes: pend, tocados, errores: errores.slice(0, 5) });
+  // Aviso por correo: 1 por tanda (carpeta + quien subió) a todos los del Drive full.
+  let avisos = 0;
+  try { avisos = await avisarContenidoNuevo(admin, notis); } catch (e) { errores.push(`aviso: ${(e as Error).message}`); }
+
+  return json({ ok: true, pendientes: pend, tocados, avisos, errores: errores.slice(0, 5) });
 });

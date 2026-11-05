@@ -49,8 +49,10 @@ let ultimoAvisoCaptura = 0;
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const sinTipar = supabase as unknown as { from: (t: string) => any };
 
-/** Saca un JPEG (base64 sin prefijo) del track local. null si no se pudo. */
-async function capturarJPEG(track: MediaStreamTrack): Promise<string | null> {
+/** Saca un JPEG (base64 sin prefijo) del track local. null si no se pudo.
+ *  `maxAncho`/`calidad`: la CÁMARA va chica (una cara se ve bien en 640); la
+ *  PANTALLA va grande (1600) para que se lea el texto de los chats y las tabs. */
+async function capturarJPEG(track: MediaStreamTrack, maxAncho = 640, calidad = 0.6): Promise<string | null> {
   return await new Promise((resolve) => {
     let listo = false;
     const video = document.createElement("video");
@@ -66,7 +68,7 @@ async function capturarJPEG(track: MediaStreamTrack): Promise<string | null> {
       if (video.readyState < 2 || !video.videoWidth) return;
       listo = true;
       try {
-        const w = Math.min(640, video.videoWidth);
+        const w = Math.min(maxAncho, video.videoWidth);
         const h = Math.round((video.videoHeight / video.videoWidth) * w);
         const canvas = document.createElement("canvas");
         canvas.width = w;
@@ -74,7 +76,7 @@ async function capturarJPEG(track: MediaStreamTrack): Promise<string | null> {
         const ctx = canvas.getContext("2d");
         if (!ctx) { limpiar(); resolve(null); return; }
         ctx.drawImage(video, 0, 0, w, h);
-        const dataUrl = canvas.toDataURL("image/jpeg", 0.6);
+        const dataUrl = canvas.toDataURL("image/jpeg", calidad);
         limpiar();
         resolve(dataUrl.split(",")[1] ?? null);
       } catch {
@@ -120,7 +122,8 @@ async function guardarEnBuzon(
   roomNombre: string | null,
   caraVisible: boolean | null,
 ): Promise<void> {
-  const b64 = await capturarJPEG(track);
+  // Pantalla nítida (1600) para leer el texto; cámara chica (640) basta para una cara.
+  const b64 = tipo === "pantalla" ? await capturarJPEG(track, 1600, 0.8) : await capturarJPEG(track);
   if (!b64) return;
   const path = `${userId}/${fechaBogota()}/${tipo}/${Date.now()}.jpg`;
   const sub = await supabase.storage

@@ -64,7 +64,9 @@ export function useTurnoPersonas(dia: string, hDesde: number, hHasta: number, ha
         const juz = Number(f.juzgadas), juzOk = Number(f.juzgadas_ok);
         const calificado = esCalificado(f.user_id);
         const pantallaPct = calificado && camara > 0 ? Math.min(1, pantalla / camara) : undefined;
-        const camaraPct = calificado && caraMedida > 0 ? caraOk / caraMedida : undefined;
+        // Cámara apagada mientras trabaja SÍ baja (denominador = momentos de trabajo).
+        const denomCam = Math.max(pantalla, caraMedida);
+        const camaraPct = calificado && denomCam > 0 ? Math.min(1, caraOk / denomCam) : undefined;
         const atencionPct = juz > 0 ? juzOk / juz : undefined;
         const nota = calcularNota({ pantallaPct, camaraPct, atencionPct, horasHechas: 0, horasMeta: 8 });
         const perfil = perfilPor.get(f.user_id);

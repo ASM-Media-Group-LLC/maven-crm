@@ -117,7 +117,10 @@ export function useExpedienteEmpleado(userId: string | null, anio: number, mes: 
         // adorno de antes (fotos/(fotos+faltas) con faltas siempre en 0).
         const momCaraOk = new Set(d.capturas.filter((c) => c.tipo === "camara" && c.caraVisible === true).map((c) => bkt(c.createdAt))).size;
         const momCaraMedida = new Set(d.capturas.filter((c) => c.tipo === "camara" && c.caraVisible != null).map((c) => bkt(c.createdAt))).size;
-        const camaraPct = momCaraMedida > 0 ? momCaraOk / momCaraMedida : undefined;
+        // Cámara apagada mientras trabajaba SÍ baja: denominador = momentos de trabajo
+        // (pantalla) o los medidos, el mayor (decisión de Alvaro, 05/11).
+        const denomCam = Math.max(momPantalla, momCaraMedida);
+        const camaraPct = denomCam > 0 ? Math.min(1, momCaraOk / denomCam) : undefined;
         // Atención: de los pantallazos de pantalla que la IA ya juzgó, cuántos en lo suyo.
         const juzgadas = d.capturas.filter((c) => c.tipo === "pantalla" && c.veredicto != null);
         const atencionPct = juzgadas.length > 0

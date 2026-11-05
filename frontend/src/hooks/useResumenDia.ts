@@ -126,10 +126,12 @@ export function useResumenDia(dia: string) {
         const calificado = esCalificado(id);
         // Pantalla% = de todos los momentos conectada (cámara), cuántos compartió.
         const pantallaRaw = m && m.camara > 0 ? Math.min(1, m.pantalla / m.camara) : undefined;
-        // Cámara% REAL: de los momentos de cámara que SE PUDIERON MEDIR, en cuántos
-        // había cara. Sin momentos medidos (no prendió cámara en ninguna llamada) =
-        // sin dato: no cuenta ni a favor ni en contra (ya no es el 100% de adorno).
-        const camaraRaw = m && m.caraMedida > 0 ? m.caraOk / m.caraMedida : undefined;
+        // Cámara% REAL: momentos con cara ÷ momentos de TRABAJO (los que compartió
+        // pantalla, o los que midió cámara: el que sea mayor). Así la cámara APAGADA
+        // mientras trabajaba SÍ baja la nota (decisión de Alvaro, 05/11). Sin ningún
+        // momento (ni pantalla ni cámara) = sin dato, no cuenta.
+        const denomCam = m ? Math.max(m.pantalla, m.caraMedida) : 0;
+        const camaraRaw = denomCam > 0 ? Math.min(1, m!.caraOk / denomCam) : undefined;
         // Si el rol NO se califica en cámara/pantalla (supervisor, finanzas…), esos
         // factores quedan en N/A: no cuentan para la nota ni lo tiran a "Mal" por 0%.
         const pantallaPct = calificado ? pantallaRaw : undefined;

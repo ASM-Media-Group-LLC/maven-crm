@@ -24,6 +24,7 @@ const u = (
   full_name,
   email,
   role: role as AdminUser["role"],
+  nivel: null,
   avatar_seed,
   avatar_url: null,
   created_at: "2026-08-21T20:33:52Z",

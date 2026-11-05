@@ -749,4 +749,10 @@ export const admin = {
   "admin.cvh.noConnection": { es: "sin conexión {h}", en: "disconnected {h}" },
   "admin.cvh.includesDrops": { es: "El reloj incluye {h} de caídas de la sala (se pagan hasta 10 min por hora).", en: "The clock includes {h} of room drops (up to 10 min per hour is paid)." },
   "admin.cvh.stoppedBy": { es: "Detenido por", en: "Stopped by" },
+  "admin.drive.porRol": { es: "Drive full — ya lo tiene por su rol (admin/manager/coordinador)", en: "Full Drive — already has it by role (admin/manager/coordinator)" },
+  "admin.drive.darHint": { es: "Sin Drive full — clic para darle acceso a todo el NAS", en: "No full Drive — click to grant access to the whole NAS" },
+  "admin.drive.quitarHint": { es: "Drive full (adendum) — clic para quitar", en: "Full Drive (add-on) — click to remove" },
+  "admin.drive.dado": { es: "Listo: Drive full dado", en: "Done: full Drive granted" },
+  "admin.drive.quitado": { es: "Listo: Drive full quitado", en: "Done: full Drive removed" },
+  "admin.drive.error": { es: "No se pudo cambiar el acceso al Drive", en: "Couldn't change Drive access" },
 } as const satisfies Record<string, { es: string; en: string }>;
