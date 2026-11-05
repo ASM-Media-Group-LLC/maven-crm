@@ -43,6 +43,8 @@ const FUERA_DEL_SHELL = new Set([
   "DiagnosticoPantalla",
   // Portal de creadoras: entrar y elegir contraseña, públicas como Login y ResetPassword.
   "PortalEntrar", "PortalContrasena",
+  // Subir contenido por link público (/aportar/:token): fuera del shell, la ventana scrollea sola.
+  "PaginaAportar",
 ]);
 
 /** El scroll de un MODAL no es el scroll de la página.
