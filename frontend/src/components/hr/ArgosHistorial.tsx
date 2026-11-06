@@ -92,7 +92,12 @@ function PersonaFilaTurno({ p, t, onClick }: { p: PersonaTurno; t: Tr; onClick: 
         {(p.horasTurno > 0 || p.entroHHMM) && (
           <div className="mt-0.5 flex flex-wrap items-center gap-x-2.5 text-[11px] text-primary/80">
             <span className="tabular-nums font-semibold">{p.horasTurno.toFixed(1)}h</span>
-            {p.entroHHMM && <span className="tabular-nums text-muted-foreground">· entró {p.entroHHMM}</span>}
+            {p.entroHHMM && (
+              <span className={`tabular-nums ${p.tardeMin != null && p.tardeMin > 0 ? "text-destructive font-semibold" : "text-muted-foreground"}`}>
+                · entró {p.entroHHMM}
+                {p.tardeMin != null && p.tardeMin > 0 && <span className="ml-1">(+{p.tardeMin}m)</span>}
+              </span>
+            )}
             {p.salioHHMM && <span className="tabular-nums text-muted-foreground">· salió {p.salioHHMM}</span>}
           </div>
         )}
@@ -165,6 +170,7 @@ function DeptosDelTurno({ personas, cargando, t, onPersona }: {
       gente,
       total: gente.length,
       conFallas: gente.filter((p) => tiposFallaDe(p).length > 0).length,
+      conTarde: gente.filter((p) => p.tardeMin != null && p.tardeMin > 0).length,
       notaProm: (() => {
         const con = gente.map((p) => p.nota.valor).filter((n): n is number => n != null);
         return con.length ? Math.round(con.reduce((a, b) => a + b, 0) / con.length) : null;
@@ -216,11 +222,14 @@ function DeptosDelTurno({ personas, cargando, t, onPersona }: {
                   <span className="truncate text-sm font-semibold">{d.nombre}</span>
                   <span className="text-[11px] text-muted-foreground tabular-nums">{t("hr.hist.deptoGente", { n: d.total })}</span>
                 </div>
-                <div className="mt-0.5 flex flex-wrap items-center gap-x-2 text-[11px]">
+                <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px]">
                   {d.conFallas > 0 ? (
                     <span className="inline-flex items-center gap-1 text-destructive"><AlertTriangle className="h-3 w-3" />{t("hr.hist.deptoConFallas", { n: d.conFallas })}</span>
                   ) : (
                     <span className="text-success">{t("hr.hist.deptoSinFallas")}</span>
+                  )}
+                  {d.conTarde > 0 && (
+                    <span className="inline-flex items-center gap-1 text-warning">· <Clock className="h-3 w-3" />{t("hr.hist.deptoTarde", { n: d.conTarde })}</span>
                   )}
                 </div>
               </div>
@@ -288,7 +297,32 @@ function PersonasConFiltro({ personas, cargando, t, onPersona, agruparPorEquipo 
           ))}
         </div>
       ) : (
-        <div className="flex flex-col gap-1.5">{mostradas.map(fila)}</div>
+        // Alvaro 05/11: dentro del depto, separar en "Llegó tarde" arriba (rojo)
+        // y "A tiempo" abajo. "Tarde" = pasó la tolerancia del rol/persona.
+        (() => {
+          const tarde = mostradas.filter((p) => p.tardeMin != null && p.tardeMin > 0);
+          const puntuales = mostradas.filter((p) => !(p.tardeMin != null && p.tardeMin > 0));
+          return (
+            <div className="flex flex-col gap-4">
+              {tarde.length > 0 && (
+                <div>
+                  <p className="mb-1.5 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-destructive">
+                    <Clock className="h-3 w-3" />{t("hr.hist.secTarde", { n: tarde.length })}
+                  </p>
+                  <div className="flex flex-col gap-1.5">{tarde.map(fila)}</div>
+                </div>
+              )}
+              {puntuales.length > 0 && (
+                <div>
+                  <p className="mb-1.5 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-success">
+                    <Clock className="h-3 w-3" />{t("hr.hist.secATiempo", { n: puntuales.length })}
+                  </p>
+                  <div className="flex flex-col gap-1.5">{puntuales.map(fila)}</div>
+                </div>
+              )}
+            </div>
+          );
+        })()
       )}
     </div>
   );

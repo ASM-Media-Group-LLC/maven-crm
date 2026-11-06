@@ -14,11 +14,12 @@ export interface HorarioResuelto {
   exentoSeg: number;    // baño + comida en segundos (no cuenta en contra), default 40 min
   entrada: string | null; // HH:MM:SS del horario asignado (persona o rol); null si no hay
   salida: string | null;
+  toleranciaMin: number;  // minutos de gracia antes de contar "tarde"; default 5
 }
 
-const DEFAULT: HorarioResuelto = { jornadaHoras: 8, exentoSeg: 40 * 60, entrada: null, salida: null };
+const DEFAULT: HorarioResuelto = { jornadaHoras: 8, exentoSeg: 40 * 60, entrada: null, salida: null, toleranciaMin: 5 };
 
-interface RolSched { name: string; hora_entrada: string | null; hora_salida: string | null; comida_min: number | null; bano_min: number | null }
+interface RolSched { name: string; hora_entrada: string | null; hora_salida: string | null; comida_min: number | null; bano_min: number | null; tolerancia_min: number | null }
 interface PerfilSched { id: string; hora_entrada: string | null; hora_salida: string | null; comida_min: number | null; bano_min: number | null }
 
 /** Minutos desde medianoche de un "HH:MM[:SS]". null si no hay. */
@@ -46,7 +47,7 @@ export async function cargarHorarios(ids: string[]): Promise<Map<string, Horario
   const [perfRes, rolesRes, rolSchedRes] = await Promise.all([
     sinTipar.from("profiles").select("id, hora_entrada, hora_salida, comida_min, bano_min").in("id", ids),
     sinTipar.from("user_roles").select("user_id, role").in("user_id", ids),
-    sinTipar.from("roles_config").select("name, hora_entrada, hora_salida, comida_min, bano_min").eq("is_active", true),
+    sinTipar.from("roles_config").select("name, hora_entrada, hora_salida, comida_min, bano_min, tolerancia_min").eq("is_active", true),
   ]);
 
   const perfilPor = new Map<string, PerfilSched>(((perfRes.data ?? []) as PerfilSched[]).map((p) => [p.id, p]));
@@ -73,7 +74,10 @@ export async function cargarHorarios(ids: string[]): Promise<Map<string, Horario
     const banosRol = roles.map((r) => r.bano_min).filter((n): n is number => n != null);
     const comida = perfil?.comida_min ?? (comidasRol.length ? Math.max(...comidasRol) : 30);
     const bano = perfil?.bano_min ?? (banosRol.length ? Math.max(...banosRol) : 10);
-    out.set(id, { jornadaHoras, exentoSeg: (Math.max(0, comida) + Math.max(0, bano)) * 60, entrada, salida });
+    // Tolerancia de tardanza: el MAYOR entre sus roles; si no tiene, default 5 min.
+    const tolsRol = roles.map((r) => r.tolerancia_min).filter((n): n is number => n != null);
+    const toleranciaMin = tolsRol.length ? Math.max(...tolsRol) : 5;
+    out.set(id, { jornadaHoras, exentoSeg: (Math.max(0, comida) + Math.max(0, bano)) * 60, entrada, salida, toleranciaMin });
   }
   return out;
 }

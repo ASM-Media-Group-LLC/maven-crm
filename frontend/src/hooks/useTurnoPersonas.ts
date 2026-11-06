@@ -26,6 +26,9 @@ export interface PersonaTurno {
   entroHHMM: string | null;
   /** Última hora detectada dentro del rango del turno (primer_ingreso del último segmento), HH:MM. */
   salioHHMM: string | null;
+  /** Minutos de tardanza respecto al horario asignado, pasada la tolerancia. null si
+   *  no tiene horario asignado o no se registró ingreso. Positivo = llegó tarde. */
+  tardeMin: number | null;
 }
 
 // El EQUIPO de una persona a partir de su puesto (los UUIDs del campo cowork.equipo
@@ -134,6 +137,18 @@ export function useTurnoPersonas(dia: string, hDesde: number, hHasta: number, ha
         // Horas de trabajo dentro del turno + entrada/salida.
         const segTrabajoTurno = Number(f.seg_activo) + Number(f.seg_sin_pantalla) + Number(f.seg_sin_camara) + Number(f.seg_fuera_camara);
         const h = horariosPorPers.get(f.user_id);
+        // Minutos tarde (si tiene horario asignado y se pasó la tolerancia).
+        // Comparación SIEMPRE en hora Bogotá, no en la zona del navegador.
+        const horPers = horarioDe(horarios, f.user_id);
+        let tardeMin: number | null = null;
+        if (horPers.entrada && h) {
+          const [eh, em] = horPers.entrada.split(":").map(Number);
+          const asignadoMin = eh * 60 + (em || 0);
+          const [rh, rm] = hhmmBogota(h.primero).split(":").map(Number);
+          const realMin = rh * 60 + rm;
+          const dif = realMin - asignadoMin;
+          tardeMin = dif > horPers.toleranciaMin ? dif : null;
+        }
         return {
           userId: f.user_id,
           nombre: perfil?.full_name?.trim() || "",
@@ -147,6 +162,7 @@ export function useTurnoPersonas(dia: string, hDesde: number, hHasta: number, ha
           horasTurno: segTrabajoTurno / 3600,
           entroHHMM: h ? hhmmBogota(h.primero) : null,
           salioHHMM: h ? hhmmBogota(h.ultimo) : null,
+          tardeMin,
         };
       });
 
