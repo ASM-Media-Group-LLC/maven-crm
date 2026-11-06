@@ -1,8 +1,8 @@
 import { useState, useMemo } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Search, LayoutGrid, List, Shield, UserCog, Users, User, Plus, ArrowLeft } from "lucide-react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { Search, LayoutGrid, List, Shield, UserCog, Users, User, Plus, ArrowLeft, Clock } from "lucide-react";
+import { useLocation, useNavigate, Link } from "react-router-dom";
 import StatChip from "@/components/StatChip";
 import { useAdminUsers, type AdminUser } from "./useAdminUsers";
 import UsersTable from "./UsersTable";
@@ -177,17 +177,22 @@ const AdminUsuarios = () => {
                 title={t("admin.users.title")}
                 subtitle={t("admin.users.subtitle")}
                 actions={
-                  activeTab === "usuarios" ? (
-                    <Button variant="outline" size="sm" onClick={() => setAddUserOpen(true)}>
-                      <Plus className="h-4 w-4 mr-1" />
-                      {t("admin.users.addUser")}
+                  <div className="flex items-center gap-2">
+                    <Button asChild variant="outline" size="sm">
+                      <Link to="/admin/horarios"><Clock className="h-4 w-4 mr-1" />{t("admin.horarios.titulo")}</Link>
                     </Button>
-                  ) : activeTab === "roles" ? (
-                    <Button variant="outline" size="sm" onClick={() => setCreateRoleOpen(true)}>
-                      <Plus className="h-4 w-4 mr-1" />
-                      {t("admin.users.newRole")}
-                    </Button>
-                  ) : null
+                    {activeTab === "usuarios" ? (
+                      <Button variant="outline" size="sm" onClick={() => setAddUserOpen(true)}>
+                        <Plus className="h-4 w-4 mr-1" />
+                        {t("admin.users.addUser")}
+                      </Button>
+                    ) : activeTab === "roles" ? (
+                      <Button variant="outline" size="sm" onClick={() => setCreateRoleOpen(true)}>
+                        <Plus className="h-4 w-4 mr-1" />
+                        {t("admin.users.newRole")}
+                      </Button>
+                    ) : null}
+                  </div>
                 }
               />
             </header>

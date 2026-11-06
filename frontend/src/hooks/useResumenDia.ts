@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { calcularNota, fraccionJornada, type Nota } from "@/lib/notaEmpleado";
 import { cargarExoneracion, esExento } from "@/lib/exoneracionCamara";
+import { cargarHorarios, horarioDe } from "@/lib/horarioEmpleado";
 
 // RESUMEN DEL DÍA de Argos (Álvaro, 02/11; nota v2 05/11): quién va mejor o peor
 // HOY, con la PELÍCULA del día (no solo el número final). Por persona: su nota del
@@ -97,11 +98,12 @@ export function useResumenDia(dia: string) {
       const ids = new Set<string>([...segPor.keys(), ...atPor.keys(), ...bajonesPor.keys()]);
       if (ids.size === 0) return [];
 
-      const [perfRes, rolesRes, cfgRes, exo] = await Promise.all([
+      const [perfRes, rolesRes, cfgRes, exo, horarios] = await Promise.all([
         supabase.from("profiles").select("id, full_name, avatar_url, avatar_seed").in("id", [...ids]),
         sinTipar.from("user_roles").select("user_id, role").in("user_id", [...ids]),
         sinTipar.from("monitor_config").select("roles_calificados").eq("id", 1).maybeSingle(),
         cargarExoneracion([...ids]),
+        cargarHorarios([...ids]),
       ]);
       const perfilPor = new Map(((perfRes.data ?? []) as Array<{ id: string; full_name: string | null; avatar_url: string | null; avatar_seed: string | null }>).map((p) => [p.id, p]));
 
@@ -131,8 +133,9 @@ export function useResumenDia(dia: string) {
         // Pantalla% y cámara% sobre la JORNADA de 8 h (pausa libre descontada): así
         // medio día ≈ 50 y las horas quedan metidas. Si el rol NO se califica
         // (supervisor, finanzas…), esos factores quedan en N/A: no cuentan.
-        const pantallaPct = calificado && m ? fraccionJornada(m.pantalla) : undefined;
-        const camaraPct = calificado && m ? fraccionJornada(m.camara) : undefined;
+        const h = horarioDe(horarios, id);
+        const pantallaPct = calificado && m ? fraccionJornada(m.pantalla, h.jornadaHoras, h.exentoSeg) : undefined;
+        const camaraPct = calificado && m ? fraccionJornada(m.camara, h.jornadaHoras, h.exentoSeg) : undefined;
         const atencionPct = at && at.n > 0 ? at.ok / at.n : undefined;
         const horas = m?.horas ?? 0;
         // Activo = estuvo en Maven ese día por CUALQUIER señal.

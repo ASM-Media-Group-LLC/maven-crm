@@ -31,9 +31,10 @@ export const EXENTO_SEG = 40 * 60;
 export const JORNADA_HORAS = 8;
 
 /** Fracción 0–1 de la JORNADA que cubren esos segundos de trabajo (pantalla o
- *  cámara), con la pausa libre ya descontada del denominador. Tope 1. */
-export function fraccionJornada(segundos: number, horasJornada = JORNADA_HORAS): number {
-  const denom = Math.max(1, horasJornada * 3600 - EXENTO_SEG);
+ *  cámara), con la pausa libre (baño + comida) ya descontada del denominador.
+ *  Tope 1. `exentoSeg` por rol/persona (default baño 10 + comida 30 = 40 min). */
+export function fraccionJornada(segundos: number, horasJornada = JORNADA_HORAS, exentoSeg = EXENTO_SEG): number {
+  const denom = Math.max(1, horasJornada * 3600 - Math.max(0, exentoSeg));
   return Math.min(1, Math.max(0, segundos) / denom);
 }
 
