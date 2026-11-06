@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Clock, Loader2, Plus, Save, Trash2 } from "lucide-react";
+import { Link } from "react-router-dom";
+import { AlertTriangle, Clock, Loader2, Plus, Save, Trash2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useLanguage } from "@/hooks/useLanguage";
 import { useToast } from "@/hooks/use-toast";
@@ -203,7 +204,12 @@ export default function HorariosPage() {
 
   return (
     <div className="flex-1 min-h-0 overflow-y-auto p-4 pb-24 md:p-6">
-      <PageHeader icon={<Clock className="h-5 w-5" />} title={t("admin.horarios.titulo")} subtitle={t("admin.horarios.sub")} />
+      <PageHeader icon={<Clock className="h-5 w-5" />} title={t("admin.horarios.titulo")} subtitle={t("admin.horarios.sub")}
+        actions={
+          <Button asChild variant="outline" size="sm" className="rounded-control">
+            <Link to="/admin/tardanzas"><AlertTriangle className="mr-1.5 h-4 w-4" />{t("admin.tardanzas.verLink")}</Link>
+          </Button>
+        } />
       <p className="mb-3 mt-1 rounded-panel border border-border/40 bg-card/30 px-3 py-2 text-xs text-muted-foreground">
         {t("admin.horarios.nota")}
       </p>
