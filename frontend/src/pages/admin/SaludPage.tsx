@@ -8,8 +8,6 @@ import { useLanguage } from "@/hooks/useLanguage";
 import { useToast } from "@/hooks/use-toast";
 import { PageHeader } from "@/components/ui/page-header";
 import { Button } from "@/components/ui/button";
-import { correoTardanzaHTML } from "@/lib/correoTardanzaHtml";
-
 // SALUD del sistema (Alvaro, 06/11). "Un dashboard entero bien hecho que corrobore
 // que todo funciona". Consulta la RPC salud_sistema() que mira NAS, crons, correos
 // y Argos, y ofrece un botón "probar ahora" para forzar un envío real al dueño.
@@ -81,12 +79,10 @@ export default function SaludPage() {
   const probarCorreo = async () => {
     setProbando(true);
     try {
-      const html = correoTardanzaHTML({ nombre: "Laura Gómez", rol: "Chatter", horario: "08:00", entro: "08:12", tardeMin: 12, esPrueba: true });
-      const { error } = await supabase.functions.invoke("send-notification-email", {
-        body: { to: ["rusin24@gmail.com"], subject: "🧪 PRUEBA — Maven · Constancia de entrada tarde", html, tag: "salud-prueba" },
-      });
+      const { data, error } = await supabase.functions.invoke("correo-prueba-tardanza", { body: {} });
       if (error) throw new Error(error.message);
-      toast({ title: t("admin.tardanzas.pruebaEnviada"), description: "rusin24@gmail.com" });
+      const donde = (data as { enviado_a?: string } | null)?.enviado_a ?? "rusin24@gmail.com";
+      toast({ title: t("admin.tardanzas.pruebaEnviada"), description: donde });
     } catch (e) {
       toast({ title: t("admin.tardanzas.pruebaError"), description: (e as Error).message, variant: "destructive" });
     } finally {

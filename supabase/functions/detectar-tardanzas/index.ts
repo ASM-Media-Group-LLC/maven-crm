@@ -72,7 +72,6 @@ function correoHTML({ nombre, rol, horario, entro, tardeMin }: { nombre: string;
         <div style="display:flex;justify-content:space-between;align-items:center;padding:13px 16px;font-size:14px;border-bottom:1px solid #e7e9f0"><span style="color:#6b7183">Horario de entrada</span><span style="font-weight:700;font-variant-numeric:tabular-nums">${horario}</span></div>
         <div style="display:flex;justify-content:space-between;align-items:center;padding:13px 16px;font-size:14px"><span style="color:#6b7183">Entró a las</span><span style="font-weight:700;color:#e23d5b;font-variant-numeric:tabular-nums">${entro}</span></div>
       </div>
-      <div style="display:flex;gap:10px;background:#fff8f3;border:1px solid #ffe2cf;border-radius:12px;padding:13px 15px;font-size:13px;color:#8a4b1f;line-height:1.5"><span>⚠️</span><span>Estos <b>${tardeMin} minutos no se recuperan ni se cobran</b>. La sanción no afecta la nota de Argos: se cuenta aparte, como constancia de asistencia.</span></div>
     </div>
     <div style="text-align:center;padding:18px;font-size:11.5px;color:#9aa0b2;background:#f6f7fb;border-top:1px solid #e7e9f0">Maven · generado automáticamente por Argos</div>
   </div>

@@ -58,16 +58,13 @@ export default function TardanzasPage() {
   const enviarPrueba = async () => {
     setEnviandoPrueba(true);
     try {
-      const html = correoTardanzaHTML(DEMO_CORREO);
-      const { error } = await supabase.functions.invoke("send-notification-email", {
-        body: {
-          to: ["rusin24@gmail.com"],
-          subject: "🧪 PRUEBA — Constancia de entrada tarde (Maven)",
-          html, tag: "tardanza-prueba",
-        },
-      });
+      // La edge valida al admin con su JWT y después manda el correo con service_role.
+      // (send-notification-email rechaza llamadas directas con {to, subject, html}
+      // desde el navegador — solo acepta plantillas fijas por seguridad.)
+      const { data, error } = await supabase.functions.invoke("correo-prueba-tardanza", { body: {} });
       if (error) throw new Error(error.message);
-      toast({ title: t("admin.tardanzas.pruebaEnviada"), description: "rusin24@gmail.com" });
+      const donde = (data as { enviado_a?: string } | null)?.enviado_a ?? "rusin24@gmail.com";
+      toast({ title: t("admin.tardanzas.pruebaEnviada"), description: donde });
     } catch (e) {
       toast({ title: t("admin.tardanzas.pruebaError"), description: (e as Error).message, variant: "destructive" });
     } finally {
