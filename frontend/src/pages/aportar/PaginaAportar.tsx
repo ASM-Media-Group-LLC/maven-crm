@@ -56,41 +56,66 @@ export default function PaginaAportar() {
     setItems((prev) => prev.map((it) => (it.id === id ? { ...it, ...cambio } : it)));
 
   // Sube con PROGRESO real (XHR a la URL firmada): un video grande muestra el %.
-  function subirConProgreso(signedUrl: string, file: File, onPct: (p: number) => void): Promise<void> {
+  // Devuelve "ok" si subió, "red" si fue error de red (reintentable), "fatal" si no.
+  function subirConProgreso(signedUrl: string, file: File, onPct: (p: number) => void): Promise<"ok"> {
     return new Promise((resolve, reject) => {
       const xhr = new XMLHttpRequest();
       xhr.open("PUT", signedUrl);
       xhr.setRequestHeader("x-upsert", "true");
       if (file.type) xhr.setRequestHeader("Content-Type", file.type);
+      // 30 min por intento (videos grandes desde Colombia con red flaky).
+      xhr.timeout = 30 * 60 * 1000;
       xhr.upload.onprogress = (e) => { if (e.lengthComputable) onPct(Math.round((e.loaded / e.total) * 100)); };
-      xhr.onload = () => (xhr.status >= 200 && xhr.status < 300 ? resolve() : reject(new Error(`HTTP ${xhr.status}`)));
+      xhr.onload = () => (xhr.status >= 200 && xhr.status < 300 ? resolve("ok") : reject(new Error(`HTTP ${xhr.status}`)));
       xhr.onerror = () => reject(new Error("red"));
+      xhr.ontimeout = () => reject(new Error("timeout"));
       xhr.onabort = () => reject(new Error("cancelado"));
       xhr.send(file);
     });
   }
 
+  // Delay con escalera: 2s, 5s, 12s. Para videos grandes que fallan por red.
+  const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
+
   async function subirUno(it: Item) {
     marcar(it.id, { estado: "subiendo", pct: 0 });
-    try {
-      const ini = await invocar("iniciar", { token, nombre_archivo: it.file.name });
-      if (!ini?.path || !ini?.uploadToken) throw new Error("no iniciar");
-      // Primero con PROGRESO (XHR); si eso fallara, el método probado de supabase
-      // (sin barra, pero seguro) para no dejar a nadie sin poder subir.
-      let subido = false;
-      if (ini.signedUrl) {
-        try { await subirConProgreso(ini.signedUrl, it.file, (p) => marcar(it.id, { pct: p })); subido = true; }
-        catch { subido = false; }
+    const MAX_INTENTOS = 3;
+    for (let intento = 1; intento <= MAX_INTENTOS; intento++) {
+      try {
+        // Pedimos una signedUrl NUEVA en cada intento (si una caducó, la siguiente vale).
+        const ini = await invocar("iniciar", { token, nombre_archivo: it.file.name });
+        if (!ini?.path || !ini?.uploadToken) throw new Error("no iniciar");
+        let subido = false;
+        if (ini.signedUrl) {
+          try { await subirConProgreso(ini.signedUrl, it.file, (p) => marcar(it.id, { pct: p })); subido = true; }
+          catch { subido = false; }
+        }
+        if (!subido) {
+          marcar(it.id, { pct: 0 });
+          const { error } = await supabaseAnon.storage.from(BUCKET).uploadToSignedUrl(ini.path, ini.uploadToken, it.file);
+          if (error) throw error;
+        }
+        // Confirmar es CRÍTICO: si esto falla, el objeto queda huérfano en storage.
+        // Con reintento propio (3x) antes de considerar fatal.
+        let confirmado = false;
+        for (let c = 1; c <= 3 && !confirmado; c++) {
+          try {
+            await invocar("confirmar", { token, path: ini.path, nombre_archivo: it.file.name, size: it.file.size, quien });
+            confirmado = true;
+          } catch { await sleep(2000 * c); }
+        }
+        if (!confirmado) throw new Error("no confirma");
+        marcar(it.id, { estado: "ok", pct: 100 });
+        return;
+      } catch {
+        if (intento < MAX_INTENTOS) {
+          // Delay creciente antes del siguiente intento.
+          await sleep([2000, 5000, 12000][intento - 1] ?? 5000);
+          marcar(it.id, { pct: 0 });
+        } else {
+          marcar(it.id, { estado: "fallo" });
+        }
       }
-      if (!subido) {
-        marcar(it.id, { pct: 0 });
-        const { error } = await supabaseAnon.storage.from(BUCKET).uploadToSignedUrl(ini.path, ini.uploadToken, it.file);
-        if (error) throw error;
-      }
-      await invocar("confirmar", { token, path: ini.path, nombre_archivo: it.file.name, size: it.file.size, quien });
-      marcar(it.id, { estado: "ok", pct: 100 });
-    } catch {
-      marcar(it.id, { estado: "fallo" });
     }
   }
 
@@ -169,8 +194,20 @@ export default function PaginaAportar() {
               </div>
             )}
 
+            {/* Mensaje de ÉXITO ENORME y persistente (Alvaro, 06/11): que la creadora
+                no tenga duda de que su archivo llegó. No se puede cerrar, queda
+                hasta que recargue o cierre la pestaña. */}
             {subidos > 0 && !enCurso && (
-              <div className="rounded-xl border border-success/40 bg-success/10 px-4 py-3 text-center text-sm font-medium text-success">{t("drive.aportar.listoN", { n: subidos })}</div>
+              <div role="status" className="rounded-2xl border-2 border-success bg-success/15 px-5 py-6 text-center shadow-[0_0_30px_rgba(34,197,94,0.25)]">
+                <div className="mb-3 flex justify-center">
+                  <span className="flex h-14 w-14 items-center justify-center rounded-full bg-success text-success-foreground shadow-lg">
+                    <CheckCircle2 className="h-9 w-9" />
+                  </span>
+                </div>
+                <h2 className="font-display text-2xl font-bold text-success">{t("drive.aportar.exitoTitulo")}</h2>
+                <p className="mt-1 text-base text-success/90">{t("drive.aportar.exitoDetalle", { n: subidos })}</p>
+                <p className="mt-3 text-[11px] text-muted-foreground">{t("drive.aportar.exitoPie")}</p>
+              </div>
             )}
 
             <p className="text-center text-[11px] text-muted-foreground">{t("drive.aportar.pie")}</p>
