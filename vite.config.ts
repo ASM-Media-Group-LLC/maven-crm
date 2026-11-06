@@ -95,7 +95,10 @@ export default defineConfig(({ mode }) => ({
           "assets/vendor-*.js",
         ],
         navigateFallback: undefined,
-        navigateFallbackDenylist: [/^\/~oauth/],
+        // /aportar/ también queda fuera del fallback del SW: nunca debería
+        // servirse HTML cacheado para ese link público (ver fetch handler en
+        // sw-push.js que además auto-desinstala el SW cuando lo ve).
+        navigateFallbackDenylist: [/^\/~oauth/, /^\/aportar\//],
         runtimeCaching: [
           {
             // Los chunks de página: se guardan la primera vez que alguien entra

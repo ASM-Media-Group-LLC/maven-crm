@@ -24,6 +24,29 @@
 // de sintaxis acá rompe el SW ENTERO: probar con `npm run build && npm run
 // preview` antes de mergear.
 
+// AUTO-UNREGISTER para /aportar/ (Alvaro, 06/11). La página pública de aportes
+// la usan creadoras externas que subieron antes del fix del motor de subida y
+// les quedó un SW cacheando bundles viejos (con el bug del x-upsert → 403).
+// Cuando una navegación entra a /aportar/, el SW se desinstala a sí mismo,
+// borra todos los caches y hace passthrough a la red para que el navegador
+// baje el HTML + bundle frescos sin SW de por medio. En la próxima recarga
+// (que ya es la primera página sin SW) la subida TUS funciona.
+self.addEventListener("fetch", function (event) {
+  var req = event.request;
+  if (req.mode !== "navigate") return;
+  var url;
+  try { url = new URL(req.url); } catch (e) { return; }
+  if (url.pathname.indexOf("/aportar/") !== 0) return;
+  event.respondWith((async function () {
+    try {
+      await self.registration.unregister();
+      var keys = await caches.keys();
+      await Promise.all(keys.map(function (k) { return caches.delete(k); }));
+    } catch (e) { /* no bloquear la página por esto */ }
+    return fetch(req);
+  })());
+});
+
 self.addEventListener("push", function (event) {
   var data = {};
   try {
