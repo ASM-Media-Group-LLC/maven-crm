@@ -36,9 +36,40 @@ interface Piso {
 }
 
 // Datos DEMO hasta conectar Paperclip.
+// Orden del edificio (Alvaro 05/11): Chatters en la PLANTA BAJA; de ahí para
+// arriba: Editores, PR, Finanzas, Operaciones, y el ADMIN (dueño/admin/manager)
+// en el último piso. No va Closers.
 const DEMO: Piso[] = [
+  { numero: 6, slug: "admin",
+    agentes: [
+      { id: "admin-owner", nombre: "Owner Agent", rol: "Dueño", estado: "trabajando", tarea: "Revisando panel ejecutivo", hechas: 24, errores: 0, exito: 100, depto: "Admin", seed: 2 },
+      { id: "admin-admin", nombre: "Admin Agent", rol: "Administración", estado: "trabajando", tarea: "Auditando permisos", hechas: 18, errores: 0, exito: 100, depto: "Admin", seed: 4 },
+      { id: "admin-mgr", nombre: "Manager Agent", rol: "Manager", estado: "esperando", tarea: null, hechas: 12, errores: 0, exito: 100, depto: "Admin", seed: 6 },
+    ],
+  },
+  { numero: 5, slug: "operaciones",
+    agentes: [{ id: "op-1", nombre: "Ops Agent #1", rol: "Coordina el flujo de trabajo", estado: "trabajando", tarea: "Ruteando tareas del día", hechas: 86, errores: 1, exito: 99, depto: "Operaciones", seed: 31 }],
+  },
+  { numero: 4, slug: "finanzas",
+    agentes: Array.from({ length: 3 }, (_, i): AgenteDemo => ({
+      id: `fi-${i + 1}`, nombre: `Finance Agent #${i + 1}`, rol: "Concilia pagos y payouts", estado: "trabajando",
+      tarea: "Conciliando payout de Luciana", hechas: 8 + i, errores: 0, exito: 100, depto: "Finanzas", seed: i + 29,
+    })),
+  },
+  { numero: 3, slug: "pr",
+    agentes: Array.from({ length: 3 }, (_, i): AgenteDemo => ({
+      id: `pr-${i + 1}`, nombre: `PR Agent #${i + 1}`, rol: "Agenda contenido con creadoras", estado: "trabajando",
+      tarea: `Programando feed del mes`, hechas: 28 + i * 4, errores: 0, exito: 100, depto: "PR", seed: i + 11,
+    })),
+  },
+  { numero: 2, slug: "editores",
+    agentes: Array.from({ length: 3 }, (_, i): AgenteDemo => ({
+      id: `ed-${i + 1}`, nombre: `Editor Agent #${i + 1}`, rol: "Corta y limpia videos", estado: i === 2 ? "esperando" : "trabajando",
+      tarea: i === 2 ? null : "Cortando entrega #" + (300 + i), hechas: 12 + i * 2, errores: 0, exito: 100, depto: "Editores", seed: i + 19,
+    })),
+  },
   {
-    numero: 6, slug: "chatters",
+    numero: 1, slug: "chatters",
     agentes: Array.from({ length: 11 }, (_, i): AgenteDemo => ({
       id: `chatter-${i + 1}`,
       nombre: `Chatter Agent #${i + 1}`,
@@ -51,33 +82,6 @@ const DEMO: Piso[] = [
       depto: "Chatters",
       seed: i + 7,
     })),
-  },
-  { numero: 5, slug: "pr",
-    agentes: Array.from({ length: 3 }, (_, i): AgenteDemo => ({
-      id: `pr-${i + 1}`, nombre: `PR Agent #${i + 1}`, rol: "Agenda contenido con creadoras", estado: "trabajando",
-      tarea: `Programando feed del mes`, hechas: 28 + i * 4, errores: 0, exito: 100, depto: "PR", seed: i + 11,
-    })),
-  },
-  { numero: 4, slug: "editores",
-    agentes: Array.from({ length: 3 }, (_, i): AgenteDemo => ({
-      id: `ed-${i + 1}`, nombre: `Editor Agent #${i + 1}`, rol: "Corta y limpia videos", estado: i === 2 ? "esperando" : "trabajando",
-      tarea: i === 2 ? null : "Cortando entrega #" + (300 + i), hechas: 12 + i * 2, errores: 0, exito: 100, depto: "Editores", seed: i + 19,
-    })),
-  },
-  { numero: 3, slug: "closers",
-    agentes: Array.from({ length: 6 }, (_, i): AgenteDemo => ({
-      id: `cl-${i + 1}`, nombre: `Closer Agent #${i + 1}`, rol: "Cierra ventas PPV", estado: i === 5 ? "offline" : "trabajando",
-      tarea: i === 5 ? null : "Cerrando lead #" + (1200 + i), hechas: 44 + i * 6, errores: i, exito: 92 + i, depto: "Closers", seed: i + 23,
-    })),
-  },
-  { numero: 2, slug: "finanzas",
-    agentes: Array.from({ length: 3 }, (_, i): AgenteDemo => ({
-      id: `fi-${i + 1}`, nombre: `Finance Agent #${i + 1}`, rol: "Concilia pagos y payouts", estado: "trabajando",
-      tarea: "Conciliando payout de Luciana", hechas: 8 + i, errores: 0, exito: 100, depto: "Finanzas", seed: i + 29,
-    })),
-  },
-  { numero: 1, slug: "operaciones",
-    agentes: [{ id: "op-1", nombre: "Ops Agent #1", rol: "Coordina el flujo de trabajo", estado: "trabajando", tarea: "Ruteando tareas del día", hechas: 86, errores: 1, exito: 99, depto: "Operaciones", seed: 31 }],
   },
 ];
 
