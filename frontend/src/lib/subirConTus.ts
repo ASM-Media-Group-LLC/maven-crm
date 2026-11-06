@@ -34,7 +34,9 @@ export function subirConTus({ bucket, path, file, onPct }: SubirConTusArgs): Pro
       headers: {
         authorization: `Bearer ${SUPABASE_PUBLISHABLE_KEY}`,
         apikey: SUPABASE_PUBLISHABLE_KEY,
-        "x-upsert": "true",
+        // Sin x-upsert: el path trae un UUID random (edge drive-aporte),
+        // así que nunca hay colisión. Con x-upsert el servidor exige permiso
+        // UPDATE y eso lo rechaza la publishable key → 403 RLS.
       },
       uploadDataDuringCreation: true,
       removeFingerprintOnSuccess: true,
