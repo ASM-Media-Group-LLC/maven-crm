@@ -1,10 +1,14 @@
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Clock, AlertTriangle, Loader2, Mail, Send } from "lucide-react";
+import { Clock, AlertTriangle, Eye, Loader2, Mail, Send } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useLanguage } from "@/hooks/useLanguage";
+import { useToast } from "@/hooks/use-toast";
 import { PageHeader } from "@/components/ui/page-header";
 import { UserAvatar } from "@/components/UserAvatar";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
+import { correoTardanzaHTML, type DatosCorreoTardanza } from "@/lib/correoTardanzaHtml";
 
 // TARDANZAS del día (Alvaro, 06/11). "Un link donde yo pueda ver cuando alguien
 // entra tarde". Cada tardanza ya tiene correo enviado en el momento (edge
@@ -37,7 +41,39 @@ function hhmm(iso: string): string {
 
 export default function TardanzasPage() {
   const { t } = useLanguage();
+  const { toast } = useToast();
   const [diasAtras, setDiasAtras] = useState(0);
+  const [preview, setPreview] = useState<DatosCorreoTardanza | null>(null);
+  const [enviandoPrueba, setEnviandoPrueba] = useState(false);
+
+  const DEMO_CORREO: DatosCorreoTardanza = {
+    nombre: "Laura Gómez",
+    rol: "Chatter",
+    horario: "08:00",
+    entro: "08:12",
+    tardeMin: 12,
+    esPrueba: true,
+  };
+
+  const enviarPrueba = async () => {
+    setEnviandoPrueba(true);
+    try {
+      const html = correoTardanzaHTML(DEMO_CORREO);
+      const { error } = await supabase.functions.invoke("send-notification-email", {
+        body: {
+          to: ["rusin24@gmail.com"],
+          subject: "🧪 PRUEBA — Constancia de entrada tarde (Maven)",
+          html, tag: "tardanza-prueba",
+        },
+      });
+      if (error) throw new Error(error.message);
+      toast({ title: t("admin.tardanzas.pruebaEnviada"), description: "rusin24@gmail.com" });
+    } catch (e) {
+      toast({ title: t("admin.tardanzas.pruebaError"), description: (e as Error).message, variant: "destructive" });
+    } finally {
+      setEnviandoPrueba(false);
+    }
+  };
   const dia = useMemo(() => {
     const d = new Date();
     d.setUTCDate(d.getUTCDate() - diasAtras);
@@ -76,7 +112,18 @@ export default function TardanzasPage() {
 
   return (
     <div className="flex-1 min-h-0 overflow-y-auto p-4 pb-24 md:p-6 space-y-5">
-      <PageHeader icon={<Clock className="h-5 w-5" />} title={t("admin.tardanzas.titulo")} subtitle={t("admin.tardanzas.sub")} />
+      <PageHeader icon={<Clock className="h-5 w-5" />} title={t("admin.tardanzas.titulo")} subtitle={t("admin.tardanzas.sub")}
+        actions={
+          <div className="flex gap-2">
+            <Button variant="outline" size="sm" className="rounded-control" onClick={() => setPreview(DEMO_CORREO)}>
+              <Eye className="mr-1.5 h-4 w-4" />{t("admin.tardanzas.verCorreo")}
+            </Button>
+            <Button size="sm" className="rounded-control" onClick={() => void enviarPrueba()} disabled={enviandoPrueba}>
+              {enviandoPrueba ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Send className="mr-1.5 h-4 w-4" />}
+              {t("admin.tardanzas.enviarPrueba")}
+            </Button>
+          </div>
+        } />
 
       {/* Navegación por día + KPIs */}
       <div className="flex flex-wrap items-center gap-3">
@@ -137,6 +184,13 @@ export default function TardanzasPage() {
                     {f.correo_enviado ? <><Send className="h-3 w-3" />{t("admin.tardanzas.correoEnviado", { n: f.correo_a?.length ?? 0 })}</> : <>{t("admin.tardanzas.correoNoEnviado")}</>}
                   </span>
                 </div>
+                <button type="button" onClick={() => setPreview({
+                  nombre: f.nombre, rol: f.turno_nombre ?? null,
+                  horario: f.horario_asignado.slice(0, 5), entro: hhmm(f.entro_at),
+                  tardeMin: f.tarde_min, esPrueba: false,
+                })} className="rounded-lg border border-border/60 bg-card/40 px-2 py-1 text-[11px] font-medium text-muted-foreground transition hover:bg-foreground/5 hover:text-foreground">
+                  <Eye className="inline h-3 w-3 mr-1" />{t("admin.tardanzas.verCorreoDeEsta")}
+                </button>
               </div>
             </div>
           ))}
@@ -146,6 +200,16 @@ export default function TardanzasPage() {
       <p className="rounded-panel border border-border/40 bg-card/20 px-3 py-2 text-[11px] text-muted-foreground">
         {t("admin.tardanzas.nota")}
       </p>
+
+      {/* Modal de preview del correo (igualito al que se envía). */}
+      <Dialog open={!!preview} onOpenChange={(o) => { if (!o) setPreview(null); }}>
+        <DialogContent className="max-w-2xl p-0 overflow-hidden">
+          <DialogTitle className="p-4 border-b border-border/40">{t("admin.tardanzas.previewTitulo")}</DialogTitle>
+          {preview && (
+            <iframe title="email preview" srcDoc={correoTardanzaHTML(preview)} className="w-full border-0" style={{ height: "min(70vh, 720px)", background: "#eef1f6" }} />
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

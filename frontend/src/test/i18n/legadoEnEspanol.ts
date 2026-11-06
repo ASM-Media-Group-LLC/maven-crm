@@ -21,6 +21,10 @@
 // para traducirse igual. Lo que la lista garantiza es que el problema no se
 // EXTIENDA a archivos nuevos.
 export const LEGADO_EN_ESPANOL: string[] = [
+  // El HTML del correo de tardanza va al empleado SIEMPRE en español (el equipo
+  // está en Colombia; el correo no pasa por i18n del frontend). Se duplica la
+  // misma plantilla en la edge detectar-tardanzas/index.ts.
+  "lib/correoTardanzaHtml.ts",
   // Traducido en pantalla: ReportScheduleModal dibuja admin.metric.<key> (etiquetasMetricas.ts); el `label` queda en español como respaldo y lo ata adminEnIngles.test.tsx al `es` del diccionario.
   "hooks/reportMetricsCatalog.ts",
   // Traducido; quedan los criterios originales del scorecard (ORIGINAL_CRITERIA), que se guardan en la base con su label_en al lado: son dato.
