@@ -3,12 +3,14 @@ import { useParams } from "react-router-dom";
 import { CloudUpload, Loader2, CheckCircle2, AlertCircle, FileUp, Lock } from "lucide-react";
 import { supabaseAnon } from "@/integrations/supabase/client";
 import { useLanguage } from "@/hooks/useLanguage";
+import { subirConTus } from "@/lib/subirConTus";
 
 // PÁGINA PÚBLICA de subida por link (Alvaro, 04/11). Cualquiera abre /aportar/:token
 // SIN cuenta y sube archivos a una carpeta del Drive. El token se valida en la
-// edge drive-aporte, que entrega una URL firmada por archivo; el navegador sube
-// directo (sirve para videos grandes). Los archivos van a Supabase y migran al
-// NAS aparte. Pensada para el celular (la gente sube desde ahí).
+// edge drive-aporte, que entrega el path destino; el navegador sube directo con
+// TUS (chunks resumibles de 6 MB, ver lib/subirConTus.ts) para que un video de
+// 10+ min aguante una red flaky y pueda reanudar si se corta. Los archivos van a
+// Supabase y migran al NAS aparte.
 
 type EstadoLink = "cargando" | "ok" | "cerrado" | "noExiste";
 type EstadoArchivo = "pendiente" | "subiendo" | "ok" | "fallo";
@@ -55,26 +57,6 @@ export default function PaginaAportar() {
   const marcar = (id: string, cambio: Partial<Item>) =>
     setItems((prev) => prev.map((it) => (it.id === id ? { ...it, ...cambio } : it)));
 
-  // Sube con PROGRESO real (XHR a la URL firmada): un video grande muestra el %.
-  // Devuelve "ok" si subió, "red" si fue error de red (reintentable), "fatal" si no.
-  function subirConProgreso(signedUrl: string, file: File, onPct: (p: number) => void): Promise<"ok"> {
-    return new Promise((resolve, reject) => {
-      const xhr = new XMLHttpRequest();
-      xhr.open("PUT", signedUrl);
-      xhr.setRequestHeader("x-upsert", "true");
-      if (file.type) xhr.setRequestHeader("Content-Type", file.type);
-      // 30 min por intento (videos grandes desde Colombia con red flaky).
-      xhr.timeout = 30 * 60 * 1000;
-      xhr.upload.onprogress = (e) => { if (e.lengthComputable) onPct(Math.round((e.loaded / e.total) * 100)); };
-      xhr.onload = () => (xhr.status >= 200 && xhr.status < 300 ? resolve("ok") : reject(new Error(`HTTP ${xhr.status}`)));
-      xhr.onerror = () => reject(new Error("red"));
-      xhr.ontimeout = () => reject(new Error("timeout"));
-      xhr.onabort = () => reject(new Error("cancelado"));
-      xhr.send(file);
-    });
-  }
-
-  // Delay con escalera: 2s, 5s, 12s. Para videos grandes que fallan por red.
   const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
   async function subirUno(it: Item) {
@@ -82,21 +64,22 @@ export default function PaginaAportar() {
     const MAX_INTENTOS = 3;
     for (let intento = 1; intento <= MAX_INTENTOS; intento++) {
       try {
-        // Pedimos una signedUrl NUEVA en cada intento (si una caducó, la siguiente vale).
+        // "iniciar" valida el token y nos da el path destino en el bucket.
         const ini = await invocar("iniciar", { token, nombre_archivo: it.file.name });
-        if (!ini?.path || !ini?.uploadToken) throw new Error("no iniciar");
-        let subido = false;
-        if (ini.signedUrl) {
-          try { await subirConProgreso(ini.signedUrl, it.file, (p) => marcar(it.id, { pct: p })); subido = true; }
-          catch { subido = false; }
-        }
-        if (!subido) {
-          marcar(it.id, { pct: 0 });
-          const { error } = await supabaseAnon.storage.from(BUCKET).uploadToSignedUrl(ini.path, ini.uploadToken, it.file);
-          if (error) throw error;
-        }
-        // Confirmar es CRÍTICO: si esto falla, el objeto queda huérfano en storage.
-        // Con reintento propio (3x) antes de considerar fatal.
+        if (!ini?.path) throw new Error("no iniciar");
+
+        // Subida TUS: chunks de 6 MB, reintenta cada uno. Si la creadora vuelve
+        // a elegir el MISMO archivo después de cerrar la pestaña, reanuda desde
+        // donde quedó (fingerprint en localStorage por nombre+tamaño+lastModified).
+        await subirConTus({
+          bucket: BUCKET,
+          path: ini.path,
+          file: it.file,
+          onPct: (p) => marcar(it.id, { pct: p }),
+        });
+
+        // Confirmar es CRÍTICO: si esto falla, el objeto queda huérfano en
+        // storage y lo barre el rescatador. 3 intentos antes de considerar fatal.
         let confirmado = false;
         for (let c = 1; c <= 3 && !confirmado; c++) {
           try {
@@ -109,9 +92,9 @@ export default function PaginaAportar() {
         return;
       } catch {
         if (intento < MAX_INTENTOS) {
-          // Delay creciente antes del siguiente intento.
           await sleep([2000, 5000, 12000][intento - 1] ?? 5000);
-          marcar(it.id, { pct: 0 });
+          // No reseteamos a 0 el pct: TUS retoma desde el offset real, así que
+          // mantener el progreso visual acompaña la realidad del protocolo.
         } else {
           marcar(it.id, { estado: "fallo" });
         }
