@@ -128,6 +128,7 @@ const CentroOperaciones = lazy(() => import("./pages/admin/CentroOperaciones"));
 const AuditoriaRoles = lazy(() => import("./pages/admin/AuditoriaRoles"));
 const CoworkVsHubstaff = lazy(() => import("./pages/admin/CoworkVsHubstaff"));
 const HorariosPage = lazy(() => import("./pages/admin/HorariosPage"));
+const VirtualOfficePage = lazy(() => import("./pages/oficina-ai/VirtualOfficePage"));
 
 
 // Misc
@@ -467,6 +468,7 @@ const App = () => (
                 <Route path="/admin/centro-de-operaciones" element={<AdminRoute><CentroOperaciones /></AdminRoute>} />
                 <Route path="/admin/cowork-vs-hubstaff" element={<AdminRoute><CoworkVsHubstaff /></AdminRoute>} />
                 <Route path="/admin/horarios" element={<AdminRoute><HorariosPage /></AdminRoute>} />
+                <Route path="/oficina-ai" element={<VirtualOfficePage />} />
               </Route>
 
               {/* Full-screen routes that intentionally bypass the shell */}

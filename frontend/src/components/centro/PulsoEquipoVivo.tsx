@@ -1,26 +1,25 @@
-import { useMemo, useState, type ReactNode } from "react";
+import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { formatDistanceToNowStrict } from "date-fns";
 import { es as esLocale } from "date-fns/locale";
-import { Activity, AlertTriangle, CheckCircle2, ChevronRight, Loader2, ShieldAlert, Users } from "lucide-react";
+import { Activity, AlertTriangle, CheckCircle2, ChevronRight, Loader2, ShieldAlert, Users, Gauge } from "lucide-react";
 import { useLanguage } from "@/hooks/useLanguage";
 import { UserAvatar } from "@/components/UserAvatar";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
+import { TarjetaKpi } from "@/components/ui/TarjetaKpi";
 import { usePulsoEquipo } from "@/hooks/usePulsoEquipo";
 import type { EstadoVivo } from "@/hooks/useRondinVivo";
 import type { CajaEquipo, PersonaPulso } from "@/lib/pulsoEquipo";
 import type { TranslationKey } from "@/lib/i18n";
 
 // EL PULSO DEL EQUIPO EN VIVO (Centro de operaciones · Alvaro, 05/11). Solo para
-// quien vigila (supervisor+). Mismo lenguaje glassy del resto (tarjetas .vidrio):
-// arriba, CONECTADOS (en Cowork · con la app) y la NOTA VIVA; quién la está
-// bajando; y las cajas por equipo con cada persona en tiempo real. Clic en una
-// caja → pop-up con los NOMBRES y su estado. Se refresca solo cada 15 s.
+// quien vigila (supervisor+). Mismo lenguaje glassy del resto (TarjetaKpi + .vidrio
+// compartido). Arriba 2 KPIs — En Cowork y Nota viva —; debajo "Quién la baja"
+// como su propia sección y las cajas por equipo. Clic en caja → pop-up con nombres.
+// Se refresca solo cada 15 s.
 
 type Tr = (k: TranslationKey, v?: Record<string, string | number>) => string;
 
-// Color por estado en vivo (semáforo): verde trabajando, ámbar pausa, rojo
-// problema, gris offline. Sin morado en fondos (atmósfera neutra fría del sistema).
 const ESTADO_UI: Record<EstadoVivo, { punto: string; anillo: string; texto: string }> = {
   trabajando:     { punto: "bg-success",     anillo: "ring-success/40",     texto: "text-success" },
   presente:       { punto: "bg-success/70",  anillo: "ring-success/30",     texto: "text-success" },
@@ -40,11 +39,11 @@ const ESTADO_LBL: Record<EstadoVivo, TranslationKey> = {
   ausente: "dashboard.pulso.estado.ausente",
 };
 
-function tono(nota: number | null): { texto: string; glow: string } {
-  if (nota == null) return { texto: "text-muted-foreground", glow: "" };
-  if (nota >= 80) return { texto: "text-success", glow: "glow-g" };
-  if (nota >= 60) return { texto: "text-warning", glow: "glow-a" };
-  return { texto: "text-destructive", glow: "glow-r" };
+function tonoBanda(nota: number | null): { texto: string; tono: "primary" | "success" | "warning" | "danger"; glow: string } {
+  if (nota == null) return { texto: "text-muted-foreground", tono: "primary", glow: "glow-b" };
+  if (nota >= 80) return { texto: "text-success", tono: "success", glow: "glow-g" };
+  if (nota >= 60) return { texto: "text-warning", tono: "warning", glow: "glow-a" };
+  return { texto: "text-destructive", tono: "danger", glow: "glow-r" };
 }
 
 function hace(iso: string | null, lang: string): string | null {
@@ -79,21 +78,11 @@ function FilaPersona({ p, t, lang, onAbrir, problema }: { p: PersonaPulso; t: Tr
   );
 }
 
-/** Tarjeta glassy (como las KPI del resto del tablero). */
-function Tarjeta({ children, glow, className }: { children: ReactNode; glow?: string; className?: string }) {
-  return (
-    <div className={`vidrio vidrio-glow ${glow ?? "glow-b"} p-4 ${className ?? ""}`}>
-      <div className="v-cont">{children}</div>
-    </div>
-  );
-}
-
-/** Una caja de equipo (clic → pop-up con los nombres): conectados/total, su nota
- *  viva y cada persona como ficha (letra) coloreada por su estado en vivo. */
+/** Caja de equipo con el mismo lenguaje glassy (clic → pop-up con los nombres). */
 function Caja({ caja, t, onVer }: { caja: CajaEquipo; t: Tr; onVer: () => void }) {
-  const tn = tono(caja.nota);
+  const tn = tonoBanda(caja.nota);
   return (
-    <button type="button" onClick={onVer} className={`vidrio vidrio-glow vidrio-lift ${tn.glow || "glow-b"} p-3.5 text-left`}>
+    <button type="button" onClick={onVer} className={`vidrio vidrio-glow vidrio-lift ${tn.glow} p-3.5 text-left`}>
       <div className="v-cont flex flex-col gap-2.5">
         <div className="flex items-center justify-between gap-2">
           <span className="truncate text-sm font-semibold">{caja.equipo}</span>
@@ -139,11 +128,11 @@ export default function PulsoEquipoVivo({ coworkConectados }: { coworkConectados
 
   if (!puedeVer) return null;
 
-  const tn = tono(pulso?.notaViva ?? null);
+  const tn = tonoBanda(pulso?.notaViva ?? null);
 
   return (
     <section className="space-y-3">
-      {/* Cabecera */}
+      {/* Cabecera del Pulso (solo título + en vivo + aviso) */}
       <div className="flex flex-wrap items-center justify-between gap-2 px-0.5">
         <h2 className="flex items-center gap-2 text-sm font-semibold">
           <span className="flex h-7 w-7 items-center justify-center rounded-panel bg-primary/10 text-primary"><Activity className="h-4 w-4" /></span>
@@ -161,59 +150,67 @@ export default function PulsoEquipoVivo({ coworkConectados }: { coworkConectados
         </span>
       </div>
 
-      {error ? (
-        <Tarjeta><p className="text-sm text-muted-foreground">—</p></Tarjeta>
-      ) : cargando && !pulso ? (
-        <Tarjeta><div className="flex items-center gap-2 py-4 text-muted-foreground"><Loader2 className="h-5 w-5 animate-spin" /></div></Tarjeta>
-      ) : !pulso || pulso.total === 0 ? (
-        <Tarjeta><p className="py-2 text-sm text-muted-foreground">{t("dashboard.pulso.sinEquipo")}</p></Tarjeta>
+      {cargando && !pulso ? (
+        <div className="vidrio p-6 flex items-center gap-2 text-muted-foreground"><Loader2 className="h-5 w-5 animate-spin" /></div>
+      ) : error || !pulso || pulso.total === 0 ? (
+        <div className="vidrio p-4"><p className="text-sm text-muted-foreground">{error ? "—" : t("dashboard.pulso.sinEquipo")}</p></div>
       ) : (
         <>
-          {/* Arriba: CONECTADOS (en Cowork · con la app) + NOTA VIVA + quién la baja. */}
-          <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.4fr)]">
-            <Tarjeta glow="glow-g">
-              <div className="flex items-center gap-3">
-                <div className="font-display text-5xl font-bold leading-none tabular-nums text-success">
-                  {coworkConectados == null ? "–" : coworkConectados}
-                </div>
-                <div className="min-w-0">
-                  <div className="text-xs font-semibold text-muted-foreground">{t("dashboard.pulso.enCowork")}</div>
-                  <div className="mt-1 text-[11px] text-muted-foreground tabular-nums">{t("dashboard.pulso.conApp", { n: pulso.conectados })}</div>
-                </div>
-              </div>
-            </Tarjeta>
+          {/* MISMAS TARJETAS KPI que el resto del dashboard: ícono + etiqueta +
+              número grande + detalle. Todo con el lenguaje glassy compartido. */}
+          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+            <TarjetaKpi
+              indice={0}
+              icono={Users}
+              tono="success"
+              etiqueta={t("dashboard.pulso.enCowork")}
+              valor={coworkConectados == null ? "–" : coworkConectados}
+              detalle={t("dashboard.pulso.conApp", { n: pulso.conectados })}
+            />
+            <TarjetaKpi
+              indice={1}
+              icono={Gauge}
+              tono={tn.tono}
+              etiqueta={t("dashboard.pulso.notaViva")}
+              valor={pulso.notaViva ?? "—"}
+              detalle={pulso.conectados === 0
+                ? t("dashboard.pulso.sinConectados")
+                : t("dashboard.pulso.trabajandoProblema", { trabajando: pulso.trabajando, problema: pulso.conProblema })}
+            />
+            <TarjetaKpi
+              indice={2}
+              icono={CheckCircle2}
+              tono="success"
+              etiqueta={t("dashboard.pulso.trabajando")}
+              valor={pulso.trabajando}
+              detalle={ultima ? t("dashboard.pulso.ultimaRonda", { hace: ultima }) : "—"}
+            />
+            <TarjetaKpi
+              indice={3}
+              icono={AlertTriangle}
+              tono={pulso.conProblema > 0 ? "danger" : "success"}
+              etiqueta={t("dashboard.pulso.conProblema")}
+              valor={pulso.conProblema}
+              detalle={pulso.conProblema === 0 ? t("dashboard.pulso.todoEnOrden") : t("dashboard.pulso.hazClicProblema")}
+            />
+          </div>
 
-            <Tarjeta glow={tn.glow || "glow-b"}>
-              <div className="flex items-center gap-3">
-                <div className={`font-display text-5xl font-bold leading-none tabular-nums ${tn.texto}`}>{pulso.notaViva ?? "—"}</div>
-                <div className="min-w-0">
-                  <div className="text-xs font-semibold text-muted-foreground">{t("dashboard.pulso.notaViva")}</div>
-                  <div className="mt-1 text-[11px] leading-snug text-muted-foreground">
-                    {pulso.conectados === 0
-                      ? t("dashboard.pulso.sinConectados")
-                      : t("dashboard.pulso.trabajandoProblema", { trabajando: pulso.trabajando, problema: pulso.conProblema })}
-                  </div>
-                  {ultima && <div className="mt-0.5 text-[10px] text-muted-foreground/70">{t("dashboard.pulso.ultimaRonda", { hace: ultima })}</div>}
+          {/* "Quién la está bajando" como su propia sección glassy */}
+          {pulso.conProblema > 0 && (
+            <div className="vidrio vidrio-glow glow-r p-4">
+              <div className="v-cont space-y-2.5">
+                <div className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground">
+                  <AlertTriangle className="h-3.5 w-3.5 text-destructive" />
+                  {t("dashboard.pulso.quienLaBaja")}
                 </div>
-              </div>
-            </Tarjeta>
-
-            <Tarjeta glow={pulso.conProblema > 0 ? "glow-r" : "glow-g"}>
-              <div className="mb-1.5 flex items-center gap-1.5 text-xs font-semibold text-muted-foreground">
-                {pulso.conProblema > 0 ? <AlertTriangle className="h-3.5 w-3.5 text-destructive" /> : <CheckCircle2 className="h-3.5 w-3.5 text-success" />}
-                {t("dashboard.pulso.quienLaBaja")}
-              </div>
-              {pulso.conProblema === 0 ? (
-                <p className="text-sm font-medium text-success">{t("dashboard.pulso.todoEnOrden")}</p>
-              ) : (
-                <div className="grid gap-1.5 sm:grid-cols-2">
-                  {pulso.quienLaBaja.slice(0, 6).map((p) => (
+                <div className="grid gap-1.5 sm:grid-cols-2 lg:grid-cols-3">
+                  {pulso.quienLaBaja.slice(0, 9).map((p) => (
                     <FilaPersona key={p.userId} p={p} t={t} lang={language} problema onAbrir={() => abrir(p.userId)} />
                   ))}
                 </div>
-              )}
-            </Tarjeta>
-          </div>
+              </div>
+            </div>
+          )}
 
           {/* Cajas por equipo (clic → nombres) */}
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">

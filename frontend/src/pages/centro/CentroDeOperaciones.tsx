@@ -1,9 +1,10 @@
-import { useMemo, type ReactNode } from "react";
+import { useMemo } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowRight, BarChart3, Clock, DoorOpen, Headset, MessageCircle, Timer, Users } from "lucide-react";
+import { ArrowRight, BarChart3, Building2, Clock, DoorOpen, Headset, MessageCircle, Timer, Users } from "lucide-react";
 import SelectorDeTablero from "@/pages/dashboard/SelectorDeTablero";
 import PulsoEquipoVivo from "@/components/centro/PulsoEquipoVivo";
+import { TarjetaKpi } from "@/components/ui/TarjetaKpi";
 import { Button } from "@/components/ui/button";
 import { useCoworkSession, type AdminSessionRow } from "@/hooks/useCoworkSession";
 import { useEquipoTiempoCowork } from "@/hooks/useEquipoTiempoCowork";
@@ -51,38 +52,7 @@ const segundosBonitos = (s: number) => {
   return m > 0 ? `${m} m ${String(seg).padStart(2, "0")} s` : `${seg} s`;
 };
 
-function TarjetaKpi({ icono: Icono, etiqueta, valor, detalle, tono = "primary", indice = 0 }: {
-  icono: typeof Users;
-  etiqueta: string;
-  valor: ReactNode;
-  detalle: ReactNode;
-  tono?: "primary" | "success" | "warning";
-  /** Orden de entrada: escalona la animación "sube" (como el link). */
-  indice?: number;
-}) {
-  const chip =
-    tono === "success" ? "bg-success/10 text-success"
-    : tono === "warning" ? "bg-warning/10 text-warning"
-    : "bg-primary/10 text-primary";
-  const glow =
-    tono === "success" ? "glow-g"
-    : tono === "warning" ? "glow-a"
-    : "glow-b";
-  return (
-    <div className={`vidrio vidrio-glow vidrio-lift sube ${glow} p-4`} style={{ animationDelay: `${indice * 0.06}s` }}>
-      <div className="v-cont flex flex-col gap-3">
-        <div className="flex items-center gap-2.5">
-          <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-panel ${chip}`}>
-            <Icono className="h-[18px] w-[18px]" />
-          </span>
-          <span className="text-xs font-medium text-muted-foreground">{etiqueta}</span>
-        </div>
-        <div className="font-display text-[22px] sm:text-[26px] font-bold leading-tight tracking-tight tabular-nums [text-wrap:balance]">{valor}</div>
-        <div className="text-xs text-muted-foreground">{detalle}</div>
-      </div>
-    </div>
-  );
-}
+// TarjetaKpi vive en components/ui/TarjetaKpi.tsx (compartida con el Pulso).
 
 export default function CentroDeOperaciones() {
   const { t } = useLanguage();
@@ -171,7 +141,10 @@ export default function CentroDeOperaciones() {
             </p>
           )}
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
+          <Button asChild variant="outline" size="sm" className="rounded-control">
+            <Link to="/oficina-ai"><Building2 className="mr-1.5 h-4 w-4" />{t("dashboard.centro.virtualOffice")}</Link>
+          </Button>
           <Button asChild variant="outline" size="sm" className="rounded-control">
             <Link to="/cowork"><Headset className="mr-1.5 h-4 w-4" />{t("dashboard.centro.abrirCowork")}</Link>
           </Button>
