@@ -24,13 +24,25 @@ export interface SubirConTusArgs {
   onPct: (p: number) => void;
 }
 
+// Chunks de 2 MB: en redes colombianas flakys un chunk de 6 MB completo era muy
+// difícil de que llegue (Alvaro, 06/11, 3 videos de creadoras en falla). Con 2
+// MB cada PATCH es mucho más probable que complete. Más chunks = más overhead,
+// pero mejor "lento y seguro" que "rápido y nunca".
+const CHUNK_SIZE = 2 * 1024 * 1024;
+
+// Escalera de retries ancha: 0s, 3s, 10s, 30s, 60s, 120s, 300s. Para un chunk
+// que falla por red, intentamos durante casi 9 minutos antes de rendirnos.
+// tus-js-client hace resume desde el offset exacto que el servidor confirmó,
+// así que no se repiten bytes ya subidos.
+const RETRY_DELAYS = [0, 3_000, 10_000, 30_000, 60_000, 120_000, 300_000];
+
 export function subirConTus({ bucket, path, file, onPct }: SubirConTusArgs): Promise<void> {
   const endpoint = `${SUPABASE_URL}/storage/v1/upload/resumable`;
   return new Promise((resolve, reject) => {
     const upload = new tus.Upload(file, {
       endpoint,
-      retryDelays: [0, 2000, 5000, 10000, 20000, 30000],
-      chunkSize: 6 * 1024 * 1024,
+      retryDelays: RETRY_DELAYS,
+      chunkSize: CHUNK_SIZE,
       headers: {
         authorization: `Bearer ${SUPABASE_PUBLISHABLE_KEY}`,
         apikey: SUPABASE_PUBLISHABLE_KEY,

@@ -59,46 +59,51 @@ export default function PaginaAportar() {
 
   const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
+  // Reintento robusto para el "iniciar": el navegador puede estar con red
+  // flaky y el primer POST al edge falla. Hasta 5 intentos con backoff antes
+  // de rendirse.
+  async function iniciarConRetry(nombreArchivo: string): Promise<{ path: string } | null> {
+    for (let c = 1; c <= 5; c++) {
+      try {
+        const ini = await invocar("iniciar", { token, nombre_archivo: nombreArchivo });
+        if (ini?.path) return { path: ini.path as string };
+      } catch { /* reintento abajo */ }
+      await sleep([1000, 3000, 8000, 20000, 40000][c - 1] ?? 10000);
+    }
+    return null;
+  }
+
   async function subirUno(it: Item) {
     marcar(it.id, { estado: "subiendo", pct: 0 });
-    const MAX_INTENTOS = 3;
-    for (let intento = 1; intento <= MAX_INTENTOS; intento++) {
-      try {
-        // "iniciar" valida el token y nos da el path destino en el bucket.
-        const ini = await invocar("iniciar", { token, nombre_archivo: it.file.name });
-        if (!ini?.path) throw new Error("no iniciar");
+    try {
+      const ini = await iniciarConRetry(it.file.name);
+      if (!ini) { marcar(it.id, { estado: "fallo" }); return; }
 
-        // Subida TUS: chunks de 6 MB, reintenta cada uno. Si la creadora vuelve
-        // a elegir el MISMO archivo después de cerrar la pestaña, reanuda desde
-        // donde quedó (fingerprint en localStorage por nombre+tamaño+lastModified).
-        await subirConTus({
-          bucket: BUCKET,
-          path: ini.path,
-          file: it.file,
-          onPct: (p) => marcar(it.id, { pct: p }),
-        });
+      // Subida TUS: chunks de 2 MB con escalera de retries interna de ~9 min
+      // (ver lib/subirConTus.ts). Cada PATCH que falla se reintenta solo ese
+      // chunk desde el offset exacto que el servidor confirmó. Por eso NO
+      // envolvemos esto en otro for de reintentos: tus-js-client ya reintenta
+      // mucho internamente. Si aún así falla → fallo real (no fue red).
+      await subirConTus({
+        bucket: BUCKET,
+        path: ini.path,
+        file: it.file,
+        onPct: (p) => marcar(it.id, { pct: p }),
+      });
 
-        // Confirmar es CRÍTICO: si esto falla, el objeto queda huérfano en
-        // storage y lo barre el rescatador. 3 intentos antes de considerar fatal.
-        let confirmado = false;
-        for (let c = 1; c <= 3 && !confirmado; c++) {
-          try {
-            await invocar("confirmar", { token, path: ini.path, nombre_archivo: it.file.name, size: it.file.size, quien });
-            confirmado = true;
-          } catch { await sleep(2000 * c); }
-        }
-        if (!confirmado) throw new Error("no confirma");
-        marcar(it.id, { estado: "ok", pct: 100 });
-        return;
-      } catch {
-        if (intento < MAX_INTENTOS) {
-          await sleep([2000, 5000, 12000][intento - 1] ?? 5000);
-          // No reseteamos a 0 el pct: TUS retoma desde el offset real, así que
-          // mantener el progreso visual acompaña la realidad del protocolo.
-        } else {
-          marcar(it.id, { estado: "fallo" });
-        }
+      // Confirmar es CRÍTICO: si esto falla, el objeto queda huérfano en
+      // storage y lo barre el rescatador. 5 intentos con backoff.
+      let confirmado = false;
+      for (let c = 1; c <= 5 && !confirmado; c++) {
+        try {
+          await invocar("confirmar", { token, path: ini.path, nombre_archivo: it.file.name, size: it.file.size, quien });
+          confirmado = true;
+        } catch { await sleep([1000, 3000, 8000, 20000, 40000][c - 1] ?? 10000); }
       }
+      if (!confirmado) { marcar(it.id, { estado: "fallo" }); return; }
+      marcar(it.id, { estado: "ok", pct: 100 });
+    } catch {
+      marcar(it.id, { estado: "fallo" });
     }
   }
 
