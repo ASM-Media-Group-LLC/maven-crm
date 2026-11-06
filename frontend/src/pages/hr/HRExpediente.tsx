@@ -355,6 +355,73 @@ const FACTOR_LBL: Record<string, TranslationKey> = {
 // (al poner el cursor sobre un número) y en el pop-up de clic, para que la nota
 // nunca sea una cifra a ciegas. La evidencia (pantallazos con su cámara y el
 // juicio de la IA) está abajo en la misma página.
+// ASISTENCIA del día (Alvaro, 05/11): horario asignado + entró/salió reales +
+// diferencia (tarde/temprano). No toca la nota (son sanciones aparte). Si no hay
+// horario asignado o no se registró ingreso, se dice así, no se inventa.
+function AsistenciaDia({ horario, dia, t }: {
+  horario: { entrada: string | null; salida: string | null };
+  dia: DiaExpediente;
+  t: Tr;
+}) {
+  const hhmm = (iso: string | null | undefined): string | null => {
+    if (!iso) return null;
+    try {
+      return new Date(iso).toLocaleTimeString("es-CO", { timeZone: "America/Bogota", hour: "2-digit", minute: "2-digit", hour12: false });
+    } catch { return null; }
+  };
+  const entradaReal = hhmm(dia.entroAt);
+  const salidaReal = hhmm(dia.salioAt);
+  const minDif = (hAsig: string | null, hReal: string | null): number | null => {
+    if (!hAsig || !hReal) return null;
+    const [ha, ma] = hAsig.split(":").map(Number);
+    const [hr, mr] = hReal.split(":").map(Number);
+    if (Number.isNaN(ha) || Number.isNaN(hr)) return null;
+    return (hr * 60 + mr) - (ha * 60 + ma);
+  };
+  const difEntrada = minDif(horario.entrada, entradaReal);  // + = tarde, − = antes
+  const difSalida = minDif(horario.salida, salidaReal);     // − = temprano, + = de más
+
+  const diasTardes = difEntrada != null && difEntrada > 5; // tolerancia fija 5 min aquí
+  const dioSalidaTemprano = difSalida != null && difSalida < -5;
+
+  return (
+    <div className="mt-3 rounded-2xl border border-border/40 bg-card/20 p-3.5">
+      <p className="mb-2.5 flex items-center gap-2 text-xs font-semibold text-muted-foreground">
+        <Gauge className="h-3.5 w-3.5 text-primary" />{t("hr.exp.asistencia")}
+      </p>
+      <div className="grid gap-2.5 sm:grid-cols-4">
+        <div className="rounded-panel border border-border/40 bg-card/30 p-2.5">
+          <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{t("hr.exp.asigHorario")}</div>
+          <div className="mt-1 font-display text-sm font-bold tabular-nums">
+            {horario.entrada && horario.salida ? `${horario.entrada} — ${horario.salida}` : t("hr.exp.sinHorarioAsignado")}
+          </div>
+        </div>
+        <div className={`rounded-panel border p-2.5 ${diasTardes ? "border-destructive/40 bg-destructive/5" : "border-border/40 bg-card/30"}`}>
+          <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{t("hr.exp.entroHora")}</div>
+          <div className={`mt-1 font-display text-sm font-bold tabular-nums ${diasTardes ? "text-destructive" : ""}`}>
+            {entradaReal ?? "—"}
+            {difEntrada != null && difEntrada > 5 && <span className="ml-1.5 text-[10px] font-semibold text-destructive">+{difEntrada}m</span>}
+          </div>
+        </div>
+        <div className={`rounded-panel border p-2.5 ${dioSalidaTemprano ? "border-warning/40 bg-warning/5" : "border-border/40 bg-card/30"}`}>
+          <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{t("hr.exp.salioHora")}</div>
+          <div className={`mt-1 font-display text-sm font-bold tabular-nums ${dioSalidaTemprano ? "text-warning" : ""}`}>
+            {salidaReal ?? "—"}
+            {difSalida != null && difSalida < -5 && <span className="ml-1.5 text-[10px] font-semibold text-warning">{difSalida}m</span>}
+          </div>
+        </div>
+        <div className="rounded-panel border border-border/40 bg-card/30 p-2.5">
+          <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{t("hr.exp.horasTrabajadas")}</div>
+          <div className="mt-1 font-display text-sm font-bold tabular-nums text-success">{dia.horas.toFixed(1)}h</div>
+        </div>
+      </div>
+      {(diasTardes || dioSalidaTemprano) && (
+        <p className="mt-2 text-[11px] text-muted-foreground">{t("hr.exp.asistenciaNota")}</p>
+      )}
+    </div>
+  );
+}
+
 function DesgloseNotaContenido({ dia, atencion, t, compacto }: {
   dia: DiaExpediente;
   atencion: { pct: number; ok: number; n: number } | null;
@@ -602,6 +669,10 @@ export default function HRExpediente() {
               <div className="text-[10px] text-muted-foreground">{t("hr.exp.pausas")}</div>
             </div>
           </div>
+
+          {/* ASISTENCIA (Alvaro, 05/11): horario asignado + entró + salió + tarde/
+              temprano. Para responder "a qué horas llegó" sin tener que buscar. */}
+          {expediente && <AsistenciaDia horario={expediente.horario} dia={dia} t={t} />}
 
           {/* Desglose de la nota SIEMPRE A LA VISTA (Alvaro, 04/11): de qué se
               arma el número — cada factor con su %, su aporte y la prueba. Sin

@@ -24,12 +24,17 @@ export interface DiaExpediente {
   segSinPantalla?: number;
   segSinCamara?: number;
   segFueraCamara?: number;
+  // Asistencia del día (Alvaro 05/11): entró y salió reales + comparado al horario.
+  entroAt?: string | null;  // ISO
+  salioAt?: string | null;  // ISO
   nota: Nota;
 }
 export interface Expediente {
   nombre: string;
   avatarUrl: string | null;
   avatarSeed: string | null;
+  /** Horario asignado (entrada/salida HH:MM) para comparar entró/salió reales. */
+  horario: { entrada: string | null; salida: string | null };
   dias: Map<string, DiaExpediente>;  // por YYYY-MM-DD
 }
 
@@ -83,8 +88,8 @@ export function useExpedienteEmpleado(userId: string | null, anio: number, mes: 
         return d;
       };
 
-      // segundos por estado por día (para la nota) + horas de trabajo
-      for (const r of (tiempoRes.data ?? []) as Array<{ dia: string; seg_activo: number | string; seg_sin_pantalla?: number | string; seg_sin_camara?: number | string; seg_fuera_de_camara?: number | string }>) {
+      // segundos por estado por día (para la nota) + horas de trabajo + entró/salió
+      for (const r of (tiempoRes.data ?? []) as Array<{ dia: string; seg_activo: number | string; seg_sin_pantalla?: number | string; seg_sin_camara?: number | string; seg_fuera_de_camara?: number | string; primer_ingreso?: string | null; ultima_salida?: string | null }>) {
         const f = r.dia?.slice(0, 10);
         if (!f) continue;
         const d = asegura(f);
@@ -92,8 +97,9 @@ export function useExpedienteEmpleado(userId: string | null, anio: number, mes: 
         d.segSinPantalla = Number(r.seg_sin_pantalla ?? 0);
         d.segSinCamara = Number(r.seg_sin_camara ?? 0);
         d.segFueraCamara = Number(r.seg_fuera_de_camara ?? 0);
-        // Horas de trabajo (todos los estados de trabajo, no solo activo).
         d.horas = (d.segActivo + d.segSinPantalla + d.segSinCamara + d.segFueraCamara) / 3600;
+        d.entroAt = r.primer_ingreso ?? null;
+        d.salioAt = r.ultima_salida ?? null;
       }
       // faltas por día
       for (const e of (eventosRes.data ?? []) as Array<{ id: string; tipo: string; fuente: string; detalle: string | null; captura_path: string | null; created_at: string }>) {
@@ -135,10 +141,12 @@ export function useExpedienteEmpleado(userId: string | null, anio: number, mes: 
       }
 
       const p = perfRes.data as { full_name: string | null; avatar_url: string | null; avatar_seed: string | null } | null;
+      const toHHMM = (s: string | null) => (s ? s.slice(0, 5) : null);
       return {
         nombre: p?.full_name?.trim() || "",
         avatarUrl: p?.avatar_url ?? null,
         avatarSeed: p?.avatar_seed ?? null,
+        horario: { entrada: toHHMM(horarioUser.entrada), salida: toHHMM(horarioUser.salida) },
         dias,
       };
     },

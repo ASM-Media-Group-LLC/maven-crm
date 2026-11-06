@@ -12,9 +12,11 @@ const sinTipar = supabase as unknown as { from: (t: string) => any };
 export interface HorarioResuelto {
   jornadaHoras: number; // horas del turno (salida − entrada), default 8
   exentoSeg: number;    // baño + comida en segundos (no cuenta en contra), default 40 min
+  entrada: string | null; // HH:MM:SS del horario asignado (persona o rol); null si no hay
+  salida: string | null;
 }
 
-const DEFAULT: HorarioResuelto = { jornadaHoras: 8, exentoSeg: 40 * 60 };
+const DEFAULT: HorarioResuelto = { jornadaHoras: 8, exentoSeg: 40 * 60, entrada: null, salida: null };
 
 interface RolSched { name: string; hora_entrada: string | null; hora_salida: string | null; comida_min: number | null; bano_min: number | null }
 interface PerfilSched { id: string; hora_entrada: string | null; hora_salida: string | null; comida_min: number | null; bano_min: number | null }
@@ -71,7 +73,7 @@ export async function cargarHorarios(ids: string[]): Promise<Map<string, Horario
     const banosRol = roles.map((r) => r.bano_min).filter((n): n is number => n != null);
     const comida = perfil?.comida_min ?? (comidasRol.length ? Math.max(...comidasRol) : 30);
     const bano = perfil?.bano_min ?? (banosRol.length ? Math.max(...banosRol) : 10);
-    out.set(id, { jornadaHoras, exentoSeg: (Math.max(0, comida) + Math.max(0, bano)) * 60 });
+    out.set(id, { jornadaHoras, exentoSeg: (Math.max(0, comida) + Math.max(0, bano)) * 60, entrada, salida });
   }
   return out;
 }

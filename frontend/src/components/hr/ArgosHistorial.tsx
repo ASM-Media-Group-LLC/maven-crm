@@ -246,7 +246,14 @@ function PersonasConFiltro({ personas, cargando, t, onPersona, agruparPorEquipo 
     camara: personas.filter((p) => tiposFallaDe(p).includes("camara")).length,
     pantalla: personas.filter((p) => tiposFallaDe(p).includes("pantalla")).length,
   };
-  const mostradas = filtroTipo === "todos" ? personas : personas.filter((p) => tiposFallaDe(p).includes(filtroTipo));
+  // Alvaro 05/11: por defecto ORDENADAS POR HORA DE ENTRADA (los que llegaron
+  // primero arriba). Los que no tengan entró quedan al final.
+  const base = filtroTipo === "todos" ? personas : personas.filter((p) => tiposFallaDe(p).includes(filtroTipo));
+  const mostradas = [...base].sort((a, b) => {
+    const ea = a.entroHHMM ?? "99:99";
+    const eb = b.entroHHMM ?? "99:99";
+    return ea.localeCompare(eb) || a.nombre.localeCompare(b.nombre, "es");
+  });
   const chips: Array<{ k: "todos" | TipoFalla; lbl: string; n?: number }> = [
     { k: "todos", lbl: t("hr.hist.filtroTodos") },
     { k: "fuera", lbl: t("hr.hist.filtroFuera"), n: conteos.fuera },
