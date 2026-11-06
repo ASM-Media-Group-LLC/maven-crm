@@ -513,6 +513,7 @@ export const oficina = {
   "drive.nas.caidoCuerpo": { es: "Hay {n} aporte(s) subido(s) por link esperando pasar al Drive. Están a salvo en Supabase y Maven reintenta cada 5 min; aparecerán en la carpeta en cuanto el NAS vuelva.", en: "{n} link upload(s) are waiting to reach the Drive. They're safe in Supabase and Maven retries every 5 min; they'll appear in the folder once the NAS is back." },
   "drive.nas.desde": { es: "Caído desde {t}", en: "Down since {t}" },
   "drive.nas.cerrar": { es: "Entendido", en: "Got it" },
+  "drive.nas.permanente": { es: "Este aviso no se puede cerrar: se irá solo cuando el NAS vuelva.", en: "This alert can't be dismissed: it'll go away on its own when the NAS is back." },
   "drive.procesando": { es: "procesándose…", en: "processing…" },
   "drive.actividad.titulo": { es: "Actividad", en: "Activity" },
   "drive.actividad.vacio": { es: "Sin actividad todavía.", en: "No activity yet." },
