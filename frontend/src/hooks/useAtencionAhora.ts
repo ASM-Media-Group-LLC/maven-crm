@@ -18,7 +18,9 @@ export type TipoAlerta =
 // PROBLEMAS (acción) vs PAUSAS/ojo. Una pausa (baño/break/almuerzo) nunca cuenta
 // como problema; lo grave es dejar de trabajar o estar fuera de lugar. Lo usan
 // el panel de Atención y el semáforo de Conectados ahora.
-export const TIPOS_GRAVES = new Set<TipoAlerta>(["fuera_de_lugar", "sin_senal", "sin_pantalla", "camara_apagada", "se_fue", "celular", "no_mira"]);
+// "sin_senal" ya NO cuenta como problema grave: es fallo del rastreo, no del
+// empleado (Alvaro, 05/11: "no quiero escuchar esa mierda, no tiene nada que ver").
+export const TIPOS_GRAVES = new Set<TipoAlerta>(["fuera_de_lugar", "sin_pantalla", "camara_apagada", "se_fue", "celular", "no_mira"]);
 
 export interface AlertaViva {
   id: string;

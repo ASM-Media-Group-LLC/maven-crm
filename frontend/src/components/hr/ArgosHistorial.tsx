@@ -88,6 +88,14 @@ function PersonaFilaTurno({ p, t, onClick }: { p: PersonaTurno; t: Tr; onClick: 
           <span>{t("hr.resumen.camara")} <span className="tabular-nums">{txt(f("camara"))}</span></span>
           <span>{t("hr.resumen.atencion")} <span className="tabular-nums">{txt(f("atencion"))}</span></span>
         </div>
+        {/* Horas trabajadas en el turno + entró/salió (Alvaro 05/11: "¿a qué horas?"). */}
+        {(p.horasTurno > 0 || p.entroHHMM) && (
+          <div className="mt-0.5 flex flex-wrap items-center gap-x-2.5 text-[11px] text-primary/80">
+            <span className="tabular-nums font-semibold">{p.horasTurno.toFixed(1)}h</span>
+            {p.entroHHMM && <span className="tabular-nums text-muted-foreground">· entró {p.entroHHMM}</span>}
+            {p.salioHHMM && <span className="tabular-nums text-muted-foreground">· salió {p.salioHHMM}</span>}
+          </div>
+        )}
       </div>
       <span className={`shrink-0 font-display text-base font-bold tabular-nums ${color}`}>{p.nota.valor ?? "—"}</span>
       <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground/60 transition group-hover:translate-x-0.5 group-hover:text-foreground" />
@@ -135,10 +143,92 @@ function TurnoDetalle({ turno, dia, resumen, t, onVolver, onPersona }: {
         </div>
       </div>
 
-      {/* La gente del turno: filtros por tipo + lista agrupada por equipo */}
-      <div>
-        <p className="mb-2 flex items-center gap-1.5 text-xs font-semibold text-muted-foreground"><Eye className="h-3.5 w-3.5" />{t("hr.hist.gente")}</p>
-        <PersonasConFiltro personas={personas} cargando={cargando} t={t} onPersona={onPersona} agruparPorEquipo />
+      {/* La gente del turno: CAJAS POR DEPARTAMENTO (Alvaro 05/11: "quisiera
+          ver por departamento, no un putazo de gente toda revuelta"). Clic en
+          una caja → ves solo la gente de ese depto en este turno. */}
+      <DeptosDelTurno personas={personas} cargando={cargando} t={t} onPersona={onPersona} />
+    </div>
+  );
+}
+
+// Cajas por departamento dentro de un turno + drill-in (Alvaro 05/11). Peor
+// departamento primero (más con problema). Clic → ves solo esa gente.
+function DeptosDelTurno({ personas, cargando, t, onPersona }: {
+  personas: PersonaTurno[]; cargando: boolean; t: Tr; onPersona: (id: string) => void;
+}) {
+  const [deptoSel, setDeptoSel] = useState<string | null>(null);
+  const deptos = useMemo(() => {
+    const m = new Map<string, PersonaTurno[]>();
+    for (const p of personas) (m.get(p.equipo) ?? m.set(p.equipo, []).get(p.equipo)!).push(p);
+    return [...m.entries()].map(([nombre, gente]) => ({
+      nombre,
+      gente,
+      total: gente.length,
+      conFallas: gente.filter((p) => tiposFallaDe(p).length > 0).length,
+      notaProm: (() => {
+        const con = gente.map((p) => p.nota.valor).filter((n): n is number => n != null);
+        return con.length ? Math.round(con.reduce((a, b) => a + b, 0) / con.length) : null;
+      })(),
+    })).sort((a, b) =>
+      // Primero los que tienen problema; luego por peor nota.
+      (b.conFallas > 0 ? 1 : 0) - (a.conFallas > 0 ? 1 : 0)
+      || (a.notaProm ?? 101) - (b.notaProm ?? 101)
+      || a.nombre.localeCompare(b.nombre, "es"),
+    );
+  }, [personas]);
+
+  if (cargando) return <p className="py-8 text-center text-sm text-muted-foreground">{t("hr.hist.cargando")}</p>;
+  if (deptos.length === 0) return <p className="py-8 text-center text-sm text-muted-foreground">{t("hr.hist.sinGente")}</p>;
+
+  // Drill: gente del depto seleccionado (con los mismos filtros de tipo).
+  if (deptoSel) {
+    const d = deptos.find((x) => x.nombre === deptoSel);
+    if (!d) { setDeptoSel(null); return null; }
+    return (
+      <div className="space-y-3">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <button type="button" onClick={() => setDeptoSel(null)} className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-xs text-muted-foreground transition hover:bg-foreground/5 hover:text-foreground"><ChevronLeft className="h-4 w-4" />{t("hr.hist.volverDeptos")}</button>
+          <span className="flex items-center gap-2 text-sm">
+            <span className="font-semibold">{d.nombre}</span>
+            <span className="text-xs text-muted-foreground">· {t("hr.hist.deptoGente", { n: d.total })}{d.conFallas > 0 ? ` · ${t("hr.hist.deptoConFallas", { n: d.conFallas })}` : ""}</span>
+          </span>
+        </div>
+        <PersonasConFiltro personas={d.gente} cargando={false} t={t} onPersona={onPersona} />
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <p className="mb-2 flex items-center gap-1.5 text-xs font-semibold text-muted-foreground"><Eye className="h-3.5 w-3.5" />{t("hr.hist.deptos")}</p>
+      <div className="grid gap-2.5 sm:grid-cols-2 lg:grid-cols-3">
+        {deptos.map((d) => {
+          const tono = d.conFallas > 0 ? "border-destructive/30 hover:border-destructive/50" :
+            (d.notaProm ?? 100) < 60 ? "border-warning/30 hover:border-warning/50" :
+            "border-border/40 hover:border-primary/40";
+          const notaColor = d.notaProm == null ? "text-muted-foreground" :
+            d.notaProm >= 80 ? "text-success" : d.notaProm >= 60 ? "text-warning" : "text-destructive";
+          return (
+            <button key={d.nombre} type="button" onClick={() => setDeptoSel(d.nombre)}
+              className={`group flex items-center gap-3 rounded-xl border bg-card/20 px-3 py-2.5 text-left transition hover:bg-card/40 ${tono}`}>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-baseline gap-2">
+                  <span className="truncate text-sm font-semibold">{d.nombre}</span>
+                  <span className="text-[11px] text-muted-foreground tabular-nums">{t("hr.hist.deptoGente", { n: d.total })}</span>
+                </div>
+                <div className="mt-0.5 flex flex-wrap items-center gap-x-2 text-[11px]">
+                  {d.conFallas > 0 ? (
+                    <span className="inline-flex items-center gap-1 text-destructive"><AlertTriangle className="h-3 w-3" />{t("hr.hist.deptoConFallas", { n: d.conFallas })}</span>
+                  ) : (
+                    <span className="text-success">{t("hr.hist.deptoSinFallas")}</span>
+                  )}
+                </div>
+              </div>
+              <span className={`shrink-0 font-display text-lg font-bold tabular-nums ${notaColor}`}>{d.notaProm ?? "—"}</span>
+              <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground/60 transition group-hover:translate-x-0.5 group-hover:text-foreground" />
+            </button>
+          );
+        })}
       </div>
     </div>
   );

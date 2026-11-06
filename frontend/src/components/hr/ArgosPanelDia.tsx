@@ -43,9 +43,12 @@ const fallasDe = (p: PersonaResumen) => ({
   min: p.bajones.reduce((a, b) => a + b.minutos, 0),
 });
 
-// La falla principal (más minutos) para el renglón del equipo.
-const fallaPrincipal = (bajones: BajonDia[]): BajonDia | null =>
-  bajones.length ? [...bajones].sort((a, b) => b.minutos - a.minutos)[0] : null;
+// La falla principal (más minutos) para el renglón del equipo. "Sin señal" NO
+// cuenta (es fallo del rastreo, no del empleado; Alvaro 05/11).
+const fallaPrincipal = (bajones: BajonDia[]): BajonDia | null => {
+  const reales = bajones.filter((b) => b.tipo !== "sin_senal");
+  return reales.length ? [...reales].sort((a, b) => b.minutos - a.minutos)[0] : null;
+};
 
 // Un número grande del día (tile sobrio): etiqueta, cifra y una línea chica.
 // `malo` pone la cifra en ROJO (problema que salta). `flojo` marca en ÁMBAR que

@@ -6,6 +6,7 @@ import { useLanguage } from "@/hooks/useLanguage";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/ui/page-header";
+import HorariosPorPersona from "./HorariosPorPersona";
 
 // HORARIOS POR ROL (Alvaro, 05/11): una tabla con todos los roles para ponerles de
 // una el horario (entrada/salida), el cupo de baño/comida (minutos que NO cuentan
@@ -94,6 +95,7 @@ function FilaRol({ rol }: { rol: RolHorario }) {
 
 export default function HorariosPage() {
   const { t } = useLanguage();
+  const [tab, setTab] = useState<"rol" | "persona">("rol");
 
   const q = useQuery({
     queryKey: ["horarios-roles"],
@@ -111,17 +113,33 @@ export default function HorariosPage() {
   return (
     <div className="flex-1 min-h-0 overflow-y-auto p-4 pb-24 md:p-6">
       <PageHeader icon={<Clock className="h-5 w-5" />} title={t("admin.horarios.titulo")} subtitle={t("admin.horarios.sub")} />
-      <p className="mb-4 mt-1 rounded-panel border border-border/40 bg-card/30 px-3 py-2 text-xs text-muted-foreground">
+      <p className="mb-3 mt-1 rounded-panel border border-border/40 bg-card/30 px-3 py-2 text-xs text-muted-foreground">
         {t("admin.horarios.nota")}
       </p>
-      {q.isLoading ? (
-        <div className="flex items-center gap-2 py-10 text-muted-foreground"><Loader2 className="h-5 w-5 animate-spin" />{t("admin.horarios.cargando")}</div>
-      ) : (q.data ?? []).length === 0 ? (
-        <p className="py-10 text-sm text-muted-foreground">{t("admin.horarios.sinRoles")}</p>
+      {/* Tabs: Por rol / Por persona */}
+      <div className="mb-4 inline-flex gap-1 rounded-panel border border-border/50 bg-card/30 p-1">
+        {(["rol", "persona"] as const).map((k) => (
+          <button key={k} type="button" onClick={() => setTab(k)}
+            className={`rounded-control px-3 py-1.5 text-xs font-semibold transition ${
+              tab === k ? "bg-primary/15 text-primary" : "text-muted-foreground hover:text-foreground"
+            }`}>
+            {t(k === "rol" ? "admin.horarios.tabRol" : "admin.horarios.tabPersona")}
+          </button>
+        ))}
+      </div>
+
+      {tab === "rol" ? (
+        q.isLoading ? (
+          <div className="flex items-center gap-2 py-10 text-muted-foreground"><Loader2 className="h-5 w-5 animate-spin" />{t("admin.horarios.cargando")}</div>
+        ) : (q.data ?? []).length === 0 ? (
+          <p className="py-10 text-sm text-muted-foreground">{t("admin.horarios.sinRoles")}</p>
+        ) : (
+          <div className="flex flex-col gap-2.5">
+            {(q.data ?? []).map((rol) => <FilaRol key={rol.name} rol={rol} />)}
+          </div>
+        )
       ) : (
-        <div className="flex flex-col gap-2.5">
-          {(q.data ?? []).map((rol) => <FilaRol key={rol.name} rol={rol} />)}
-        </div>
+        <HorariosPorPersona />
       )}
     </div>
   );

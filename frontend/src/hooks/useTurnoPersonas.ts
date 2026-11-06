@@ -20,6 +20,12 @@ export interface PersonaTurno {
   pantallaPct: number | null;
   camaraPct: number | null;
   atencionPct: number | null;
+  /** Horas de TRABAJO dentro del turno (activo+sin_pantalla+sin_cámara+fuera_cámara). */
+  horasTurno: number;
+  /** Primera hora que se conectó dentro del rango del turno, HH:MM; null si no hay datos. */
+  entroHHMM: string | null;
+  /** Última hora detectada dentro del rango del turno (primer_ingreso del último segmento), HH:MM. */
+  salioHHMM: string | null;
 }
 
 // El EQUIPO de una persona a partir de su puesto (los UUIDs del campo cowork.equipo
@@ -62,13 +68,37 @@ export function useTurnoPersonas(dia: string, hDesde: number, hHasta: number, ha
       const horasJornada = Math.max(1, hHasta - hDesde);
 
       const ids = [...new Set(filas.map((f) => f.user_id))];
-      const [perfRes, rolesRes, cfgRes, exo, horarios] = await Promise.all([
+      // Rango del turno en Bogotá (para primer_ingreso / ultima_salida).
+      const pad = (n: number) => String(n).padStart(2, "0");
+      const inicioISO = `${dia}T${pad(hDesde)}:00:00-05:00`;
+      const finISO = `${dia}T${pad(Math.min(hHasta, 23))}:${hHasta >= 24 ? "59" : "00"}:00-05:00`;
+      const [perfRes, rolesRes, cfgRes, exo, horarios, segRes] = await Promise.all([
         supabase.from("profiles").select("id, full_name, avatar_url, avatar_seed").in("id", ids),
         sinTipar.from("user_roles").select("user_id, role").in("user_id", ids),
         sinTipar.from("monitor_config").select("roles_calificados").eq("id", 1).maybeSingle(),
         cargarExoneracion(ids),
         cargarHorarios(ids),
+        // Para entró/salió dentro del turno: primer/último segmento de trabajo
+        // (no cuenta pausa ni sin_conexion) en el rango.
+        sinTipar.from("cowork_tiempo_segmentos")
+          .select("user_id, started_at, seconds, estado")
+          .in("user_id", ids)
+          .in("estado", ["activo", "sin_pantalla", "sin_camara", "fuera_de_camara"])
+          .gte("started_at", inicioISO)
+          .lt("started_at", finISO)
+          .order("started_at", { ascending: true }),
       ]);
+      // Primer / último minuto trabajado por persona dentro del turno.
+      const horariosPorPers = new Map<string, { primero: Date; ultimo: Date }>();
+      for (const s of (segRes.data ?? []) as Array<{ user_id: string; started_at: string; seconds: number }>) {
+        const t0 = new Date(s.started_at);
+        const t1 = new Date(t0.getTime() + Number(s.seconds) * 1000);
+        const prev = horariosPorPers.get(s.user_id);
+        if (!prev) horariosPorPers.set(s.user_id, { primero: t0, ultimo: t1 });
+        else { if (t0 < prev.primero) prev.primero = t0; if (t1 > prev.ultimo) prev.ultimo = t1; }
+      }
+      const hhmmBogota = (d: Date): string =>
+        d.toLocaleTimeString("es-CO", { timeZone: "America/Bogota", hour: "2-digit", minute: "2-digit", hour12: false });
       const perfilPor = new Map(((perfRes.data ?? []) as Array<{ id: string; full_name: string | null; avatar_url: string | null; avatar_seed: string | null }>).map((p) => [p.id, p]));
       const rolesPor = new Map<string, Set<string>>();
       for (const r of (rolesRes.data ?? []) as Array<{ user_id: string; role: string }>) {
@@ -101,6 +131,9 @@ export function useTurnoPersonas(dia: string, hDesde: number, hHasta: number, ha
         const atencionPct = juz > 0 ? juzOk / juz : undefined;
         const nota = calcularNota({ pantallaPct, camaraPct, atencionPct });
         const perfil = perfilPor.get(f.user_id);
+        // Horas de trabajo dentro del turno + entrada/salida.
+        const segTrabajoTurno = Number(f.seg_activo) + Number(f.seg_sin_pantalla) + Number(f.seg_sin_camara) + Number(f.seg_fuera_camara);
+        const h = horariosPorPers.get(f.user_id);
         return {
           userId: f.user_id,
           nombre: perfil?.full_name?.trim() || "",
@@ -111,6 +144,9 @@ export function useTurnoPersonas(dia: string, hDesde: number, hHasta: number, ha
           pantallaPct: pantallaPct == null ? null : Math.round(pantallaPct * 100),
           camaraPct: camaraPct == null ? null : Math.round(camaraPct * 100),
           atencionPct: atencionPct == null ? null : Math.round(atencionPct * 100),
+          horasTurno: segTrabajoTurno / 3600,
+          entroHHMM: h ? hhmmBogota(h.primero) : null,
+          salioHHMM: h ? hhmmBogota(h.ultimo) : null,
         };
       });
 

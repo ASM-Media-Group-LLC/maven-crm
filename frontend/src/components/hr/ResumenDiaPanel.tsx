@@ -37,6 +37,9 @@ interface Grupo {
 function agrupar(bajones: BajonDia[]): Grupo[] {
   const m = new Map<string, Grupo>();
   for (const b of bajones) {
+    // "Sin señal" no es un problema del empleado (es fallo del rastreo); fuera
+    // (Alvaro, 05/11: "ya no quiero escuchar esa mierda, no tiene nada que ver").
+    if (b.tipo === "sin_senal") continue;
     const g = m.get(b.tipo) ?? { tipo: b.tipo, veces: 0, minutos: 0, abierto: false };
     g.veces += 1;
     g.minutos += b.minutos;

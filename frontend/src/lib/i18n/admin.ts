@@ -779,4 +779,9 @@ export const admin = {
   "admin.horarios.cargando": { es: "Cargando roles…", en: "Loading roles…" },
   "admin.horarios.sinRoles": { es: "No hay roles para configurar.", en: "No roles to configure." },
   "admin.horarios.nota": { es: "La pantalla y la cámara se miden sobre el turno completo MENOS el baño + la comida. Si llega más tarde que la tolerancia, cuenta como tardanza (sanción aparte, no toca la nota).", en: "Screen and camera are measured over the full shift MINUS bathroom + lunch. Arriving later than the grace counts as lateness (a separate sanction, doesn't touch the score)." },
+  "admin.horarios.tabRol": { es: "Por rol", en: "By role" },
+  "admin.horarios.tabPersona": { es: "Por persona", en: "By person" },
+  "admin.horariosPersona.hoy": { es: "Hoy", en: "Today" },
+  "admin.horariosPersona.semana": { es: "7 días", en: "7 days" },
+  "admin.horariosPersona.vacio": { es: "Sin personas que mostrar.", en: "No people to show." },
 } as const satisfies Record<string, { es: string; en: string }>;
