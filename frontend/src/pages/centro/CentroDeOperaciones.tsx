@@ -181,19 +181,13 @@ export default function CentroDeOperaciones() {
         </div>
       </div>
 
-      {/* Pulso del equipo en vivo (solo supervisor+): nota viva + quién la baja +
-          cajas por equipo. Devuelve null para quien no vigila. */}
-      <PulsoEquipoVivo />
+      {/* Pulso del equipo en vivo (solo supervisor+): conectados + nota viva +
+          quién la baja + cajas por equipo. Devuelve null para quien no vigila.
+          Le pasamos los conectados EN COWORK (de LiveKit) para el número de arriba. */}
+      <PulsoEquipoVivo coworkConectados={sesionesQ.isLoading ? null : vivo.conectados} />
 
-      {/* Tarjetas resumen: compactas, lo vivo primero */}
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <TarjetaKpi
-          indice={0}
-          icono={Users}
-          etiqueta={t("dashboard.centro.conectados")}
-          valor={sesionesQ.isLoading ? "…" : vivo.conectados == null ? "–" : vivo.conectados}
-          detalle={t("dashboard.centro.enSalas", { salas: vivo.salasConGente, sesiones: vivo.sesiones })}
-        />
+      {/* Tarjetas resumen: compactas (los conectados ya van arriba en el Pulso). */}
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         <TarjetaKpi
           indice={1}
           icono={Clock}

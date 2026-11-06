@@ -103,6 +103,8 @@ export const dashboard = {
   "dashboard.pulso.notaViva": { es: "Nota viva del equipo", en: "Live team score" },
   "dashboard.pulso.deConectados": { es: "{trabajando} trabajando · {problema} con problema · de {conectados} conectados", en: "{trabajando} working · {problema} with issues · of {conectados} online" },
   "dashboard.pulso.conectadosAhora": { es: "Conectados ahora", en: "Online now" },
+  "dashboard.pulso.enCowork": { es: "En Cowork ahora", en: "In Cowork now" },
+  "dashboard.pulso.conApp": { es: "{n} con la app abierta", en: "{n} with the app open" },
   "dashboard.pulso.deTotal": { es: "de {total} en tu equipo", en: "of {total} in your team" },
   "dashboard.pulso.trabajandoProblema": { es: "{trabajando} trabajando · {problema} con problema", en: "{trabajando} working · {problema} with issues" },
   "dashboard.pulso.verQuienes": { es: "Ver quiénes", en: "See who" },

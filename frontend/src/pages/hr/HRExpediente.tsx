@@ -364,9 +364,6 @@ function DesgloseNotaContenido({ dia, atencion, t, compacto }: {
   compacto?: boolean;
 }) {
   const nota = dia.nota;
-  const presentes = nota.factores.filter((f) => f.sub != null);
-  const pesoTotal = presentes.reduce((a, f) => a + f.peso, 0) || 1;
-  const aporte = (sub: number, peso: number) => Math.round(sub * (peso / pesoTotal));
   const bandaTono = nota.banda ? TONO[nota.banda] : null;
   const pantallaFactor = nota.factores.find((f) => f.clave === "pantalla");
   const reglaDura = pantallaFactor?.sub != null && pantallaFactor.sub < 5;
@@ -405,18 +402,12 @@ function DesgloseNotaContenido({ dia, atencion, t, compacto }: {
             <div key={f.clave} className="space-y-1">
               <div className="flex items-baseline gap-2">
                 <span className="text-sm font-medium">{t(FACTOR_LBL[f.clave] ?? "hr.resumen.pantalla")}</span>
-                <span className="text-[11px] text-muted-foreground">{t("hr.exp.factorPeso", { n: Math.round(f.peso * 100) })}</span>
                 <span className="ml-auto text-sm font-semibold tabular-nums">
                   {f.sub == null ? <span className="text-xs font-normal text-muted-foreground">{t("hr.exp.factorSinDato")}</span> : `${Math.round(f.sub)}%`}
                 </span>
               </div>
-              <div className="flex items-center gap-2">
-                <div className="h-2 flex-1 overflow-hidden rounded-full bg-foreground/10">
-                  <div className={`h-full rounded-full ${f.sub == null ? "bg-transparent" : "bg-primary/70"}`} style={{ width: `${f.sub == null ? 0 : Math.round(f.sub)}%` }} />
-                </div>
-                {f.sub != null && (
-                  <span className="w-20 shrink-0 text-right text-[11px] text-muted-foreground">{t("hr.exp.factorAporta", { n: aporte(f.sub, f.peso) })}</span>
-                )}
+              <div className="h-2 overflow-hidden rounded-full bg-foreground/10">
+                <div className={`h-full rounded-full ${f.sub == null ? "bg-transparent" : "bg-primary/70"}`} style={{ width: `${f.sub == null ? 0 : Math.round(f.sub)}%` }} />
               </div>
               {pr && <p className="text-[11px] text-muted-foreground">{pr}</p>}
             </div>
