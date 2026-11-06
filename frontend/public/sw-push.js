@@ -36,7 +36,7 @@ self.addEventListener("fetch", function (event) {
   if (req.mode !== "navigate") return;
   var url;
   try { url = new URL(req.url); } catch (e) { return; }
-  if (url.pathname.indexOf("/aportar/") !== 0) return;
+  if (url.pathname.indexOf("/aportar/") !== 0 && url.pathname.indexOf("/subir/") !== 0) return;
   event.respondWith((async function () {
     try {
       await self.registration.unregister();

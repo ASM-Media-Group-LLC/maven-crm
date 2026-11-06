@@ -73,7 +73,7 @@ export async function initPWA() {
   // acá no registramos SW nuevo Y además desregistramos cualquier SW anterior +
   // borramos los caches, forzando al navegador a bajar el bundle fresco en la
   // próxima recarga. La creadora ve el aviso y refresca una sola vez.
-  if (window.location.pathname.startsWith("/aportar/")) {
+  if (window.location.pathname.startsWith("/aportar/") || window.location.pathname.startsWith("/subir/")) {
     void (async () => {
       try {
         if ("serviceWorker" in navigator) {

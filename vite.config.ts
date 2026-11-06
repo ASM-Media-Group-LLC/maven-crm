@@ -98,7 +98,7 @@ export default defineConfig(({ mode }) => ({
         // /aportar/ también queda fuera del fallback del SW: nunca debería
         // servirse HTML cacheado para ese link público (ver fetch handler en
         // sw-push.js que además auto-desinstala el SW cuando lo ve).
-        navigateFallbackDenylist: [/^\/~oauth/, /^\/aportar\//],
+        navigateFallbackDenylist: [/^\/~oauth/, /^\/aportar\//, /^\/subir\//],
         runtimeCaching: [
           {
             // Los chunks de página: se guardan la primera vez que alguien entra

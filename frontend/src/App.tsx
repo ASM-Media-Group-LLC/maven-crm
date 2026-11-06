@@ -299,8 +299,14 @@ const App = () => (
               <Route path="/reset-password" element={<ResetPassword />} />
               {/* Chatter public view — no auth, accessible via /chatter/<sessionId> */}
               <Route path="/chatter/:sessionId" element={<ChatterPublicView />} />
-              {/* Subida pública por link: la gente sube contenido al Drive SIN cuenta. */}
+              {/* Subida pública por link: la gente sube contenido al Drive SIN cuenta.
+                  /subir/ es el alias nuevo para esquivar SWs cacheados en navegadores
+                  que ya habían entrado a /aportar/ antes del fix del motor TUS
+                  (Alvaro, 06/11): el SW viejo no intercepta /subir/, el navegador
+                  va directo al servidor y baja el bundle fresco. Misma página, mismo
+                  token; se pueden usar ambos en paralelo. */}
               <Route path="/aportar/:token" element={<PaginaAportar />} />
+              <Route path="/subir/:token" element={<PaginaAportar />} />
               {/* Invitado a un Meet sin cuenta en Maven: pide entrada y espera que
                   alguien de adentro lo admita. Pública a propósito. */}
               <Route path="/entrar/:code" element={<MeetGuestPage />} />
