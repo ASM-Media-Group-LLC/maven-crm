@@ -79,9 +79,10 @@ export default function SaludPage() {
   const probarCorreo = async () => {
     setProbando(true);
     try {
-      const { data, error } = await supabase.functions.invoke("correo-prueba-tardanza", { body: {} });
+      const { data, error } = await (supabase as unknown as { rpc: (f: string, a: unknown) => Promise<{ data: { enviado_a?: string } | null; error: { message: string } | null }> })
+        .rpc("enviar_prueba_tardanza_ahora", { _to: null });
       if (error) throw new Error(error.message);
-      const donde = (data as { enviado_a?: string } | null)?.enviado_a ?? "rusin24@gmail.com";
+      const donde = data?.enviado_a ?? "rusin24@gmail.com";
       toast({ title: t("admin.tardanzas.pruebaEnviada"), description: donde });
     } catch (e) {
       toast({ title: t("admin.tardanzas.pruebaError"), description: (e as Error).message, variant: "destructive" });

@@ -58,12 +58,12 @@ export default function TardanzasPage() {
   const enviarPrueba = async () => {
     setEnviandoPrueba(true);
     try {
-      // La edge valida al admin con su JWT y después manda el correo con service_role.
-      // (send-notification-email rechaza llamadas directas con {to, subject, html}
-      // desde el navegador — solo acepta plantillas fijas por seguridad.)
-      const { data, error } = await supabase.functions.invoke("correo-prueba-tardanza", { body: {} });
+      // RPC que hace net.http_post directo a send-notification-email con X-Cron-Token
+      // (pipeline SQL → edge ya probado y funciona). Evita el edge intermediario.
+      const { data, error } = await (supabase as unknown as { rpc: (f: string, a: unknown) => Promise<{ data: { enviado_a?: string } | null; error: { message: string } | null }> })
+        .rpc("enviar_prueba_tardanza_ahora", { _to: null });
       if (error) throw new Error(error.message);
-      const donde = (data as { enviado_a?: string } | null)?.enviado_a ?? "rusin24@gmail.com";
+      const donde = data?.enviado_a ?? "rusin24@gmail.com";
       toast({ title: t("admin.tardanzas.pruebaEnviada"), description: donde });
     } catch (e) {
       toast({ title: t("admin.tardanzas.pruebaError"), description: (e as Error).message, variant: "destructive" });
