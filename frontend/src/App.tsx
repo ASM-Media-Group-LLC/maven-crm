@@ -130,6 +130,7 @@ const CoworkVsHubstaff = lazy(() => import("./pages/admin/CoworkVsHubstaff"));
 const HorariosPage = lazy(() => import("./pages/admin/HorariosPage"));
 const TardanzasPage = lazy(() => import("./pages/admin/TardanzasPage"));
 const SaludPage = lazy(() => import("./pages/admin/SaludPage"));
+const ReporteHorasPage = lazy(() => import("./pages/admin/ReporteHorasPage"));
 const VirtualOfficePage = lazy(() => import("./pages/oficina-ai/VirtualOfficePage"));
 
 
@@ -478,6 +479,7 @@ const App = () => (
                 <Route path="/admin/horarios" element={<AdminRoute><HorariosPage /></AdminRoute>} />
                 <Route path="/admin/tardanzas" element={<AdminRoute><TardanzasPage /></AdminRoute>} />
                 <Route path="/admin/salud" element={<AdminRoute><SaludPage /></AdminRoute>} />
+                <Route path="/admin/reporte-horas" element={<AdminRoute><ReporteHorasPage /></AdminRoute>} />
                 <Route path="/oficina-ai" element={<VirtualOfficePage />} />
               </Route>
 

@@ -833,4 +833,16 @@ export const admin = {
   "admin.salud.tardanzasHoy": { es: "{n} tardanzas hoy ({ok} con correo)", en: "{n} lateness today ({ok} with email)" },
   "admin.salud.probar": { es: "Probar ahora", en: "Test now" },
   "admin.salud.cargando": { es: "Chequeando…", en: "Checking…" },
+  // Reporte de horas en PDF (Alvaro, 06/11)
+  "admin.reporte.titulo": { es: "Reporte de horas", en: "Hours report" },
+  "admin.reporte.sub": { es: "Baja un PDF con el desglose de todo el mes para todas las personas", en: "Download a PDF with the full-month breakdown for everyone" },
+  "admin.reporte.mes": { es: "Mes", en: "Month" },
+  "admin.reporte.anio": { es: "Año", en: "Year" },
+  "admin.reporte.bajar": { es: "Bajar PDF", en: "Download PDF" },
+  "admin.reporte.listo": { es: "PDF listo", en: "PDF ready" },
+  "admin.reporte.listoDetalle": { es: "{n} personas incluidas", en: "{n} people included" },
+  "admin.reporte.sinDatos": { es: "Sin datos", en: "No data" },
+  "admin.reporte.sinDatosDetalle": { es: "No hay actividad registrada en {mes} {anio}", en: "No activity recorded in {mes} {anio}" },
+  "admin.reporte.error": { es: "No se pudo generar el PDF", en: "Couldn't generate the PDF" },
+  "admin.reporte.ayuda": { es: "Incluye una tabla resumen con todas las personas y una sección por persona con timeline día a día (atendiendo, pausas, baño, almuerzo, descansos).", en: "Includes a summary table with everyone and a per-person section with day-by-day timeline." },
 } as const satisfies Record<string, { es: string; en: string }>;
