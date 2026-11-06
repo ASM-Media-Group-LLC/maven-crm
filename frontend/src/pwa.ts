@@ -67,10 +67,33 @@ export async function initPWA() {
 
   // /aportar/<token> es la página pública de creadoras externas que suben videos
   // grandes. Si salta "Nueva versión · Recargar" en medio de una subida y le dan
-  // click, se pierde todo el avance (el formulario se reinicia en blanco). Esa
-  // página es efímera: entra, sube, cierra. No necesita actualizarse. Saltamos
-  // todo el registro del SW en esa ruta.
-  if (window.location.pathname.startsWith("/aportar/")) return;
+  // click, se pierde todo el avance. Además, el SW que les quedó instalado en
+  // visitas anteriores les seguía sirviendo bundles cacheados VIEJOS (con bugs
+  // ya arreglados, p.ej. el x-upsert que daba 403 al subir con TUS). Entonces
+  // acá no registramos SW nuevo Y además desregistramos cualquier SW anterior +
+  // borramos los caches, forzando al navegador a bajar el bundle fresco en la
+  // próxima recarga. La creadora ve el aviso y refresca una sola vez.
+  if (window.location.pathname.startsWith("/aportar/")) {
+    void (async () => {
+      try {
+        if ("serviceWorker" in navigator) {
+          const regs = await navigator.serviceWorker.getRegistrations();
+          const habiaSw = regs.length > 0;
+          await Promise.all(regs.map((r) => r.unregister().catch(() => false)));
+          if ("caches" in window) {
+            const names = await caches.keys();
+            await Promise.all(names.map((n) => caches.delete(n).catch(() => false)));
+          }
+          if (habiaSw) {
+            // Había un SW viejo sirviendo bundles cacheados: una recarga trae
+            // el bundle fresco ya sin SW en el medio.
+            window.location.reload();
+          }
+        }
+      } catch { /* no bloquear la página por esto */ }
+    })();
+    return;
+  }
 
   try {
     // Static-string dynamic import: Vite resolves this at build time and
