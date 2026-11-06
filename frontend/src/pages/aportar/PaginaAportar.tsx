@@ -14,7 +14,7 @@ import { subirConTus } from "@/lib/subirConTus";
 
 type EstadoLink = "cargando" | "ok" | "cerrado" | "noExiste";
 type EstadoArchivo = "pendiente" | "subiendo" | "ok" | "fallo";
-interface Item { id: string; file: File; estado: EstadoArchivo; pct: number; }
+interface Item { id: string; file: File; estado: EstadoArchivo; pct: number; razonFallo?: string; }
 
 const BUCKET = "drive-aportes";
 
@@ -59,51 +59,81 @@ export default function PaginaAportar() {
 
   const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
-  // Reintento robusto para el "iniciar": el navegador puede estar con red
-  // flaky y el primer POST al edge falla. Hasta 5 intentos con backoff antes
-  // de rendirse.
-  async function iniciarConRetry(nombreArchivo: string): Promise<{ path: string } | null> {
+  // Manda al servidor un reporte del fallo (sin bloquear). El admin lo lee en
+  // la tabla drive_aportar_errores y así ve qué pasa realmente en navegadores
+  // que no podemos inspeccionar.
+  function logError(it: Item, etapa: string, err: unknown, intento?: number) {
+    const e = err as { message?: string; originalResponse?: { getStatus?: () => number } } | undefined;
+    const status = e?.originalResponse?.getStatus ? e.originalResponse.getStatus() : undefined;
+    const mensaje = e?.message ?? String(err).slice(0, 400);
+    void invocar("log_error", {
+      token, nombre_archivo: it.file.name, size_bytes: it.file.size,
+      etapa, mensaje, status, intento,
+    }).catch(() => {});
+  }
+
+  // Convierte un error del flujo en una razón visible para la creadora.
+  function razonVisible(etapa: string, err: unknown): string {
+    const e = err as { message?: string; originalResponse?: { getStatus?: () => number } } | undefined;
+    const status = e?.originalResponse?.getStatus ? e.originalResponse.getStatus() : null;
+    if (status && status >= 400) return `Error ${status} (${etapa})`;
+    const msg = (e?.message ?? String(err)).toLowerCase();
+    if (msg.includes("failed to fetch") || msg.includes("networkerror") || msg.includes("network")) return `Problema de red (${etapa})`;
+    if (msg.includes("timeout")) return `Tiempo agotado (${etapa})`;
+    return `Error (${etapa}): ${(e?.message ?? "desconocido").slice(0, 80)}`;
+  }
+
+  async function iniciarConRetry(it: Item): Promise<{ path: string } | null> {
+    let ultimo: unknown = null;
     for (let c = 1; c <= 5; c++) {
       try {
-        const ini = await invocar("iniciar", { token, nombre_archivo: nombreArchivo });
+        const ini = await invocar("iniciar", { token, nombre_archivo: it.file.name });
         if (ini?.path) return { path: ini.path as string };
-      } catch { /* reintento abajo */ }
+        ultimo = new Error("sin path");
+      } catch (err) { ultimo = err; }
+      logError(it, "iniciar", ultimo, c);
       await sleep([1000, 3000, 8000, 20000, 40000][c - 1] ?? 10000);
     }
+    marcar(it.id, { razonFallo: razonVisible("iniciar", ultimo) });
     return null;
   }
 
   async function subirUno(it: Item) {
-    marcar(it.id, { estado: "subiendo", pct: 0 });
+    marcar(it.id, { estado: "subiendo", pct: 0, razonFallo: undefined });
     try {
-      const ini = await iniciarConRetry(it.file.name);
+      const ini = await iniciarConRetry(it);
       if (!ini) { marcar(it.id, { estado: "fallo" }); return; }
 
-      // Subida TUS: chunks de 2 MB con escalera de retries interna de ~9 min
-      // (ver lib/subirConTus.ts). Cada PATCH que falla se reintenta solo ese
-      // chunk desde el offset exacto que el servidor confirmó. Por eso NO
-      // envolvemos esto en otro for de reintentos: tus-js-client ya reintenta
-      // mucho internamente. Si aún así falla → fallo real (no fue red).
-      await subirConTus({
-        bucket: BUCKET,
-        path: ini.path,
-        file: it.file,
-        onPct: (p) => marcar(it.id, { pct: p }),
-      });
+      try {
+        await subirConTus({
+          bucket: BUCKET,
+          path: ini.path,
+          file: it.file,
+          onPct: (p) => marcar(it.id, { pct: p }),
+        });
+      } catch (err) {
+        logError(it, "tus", err);
+        marcar(it.id, { estado: "fallo", razonFallo: razonVisible("subida", err) });
+        return;
+      }
 
-      // Confirmar es CRÍTICO: si esto falla, el objeto queda huérfano en
-      // storage y lo barre el rescatador. 5 intentos con backoff.
       let confirmado = false;
+      let ultimo: unknown = null;
       for (let c = 1; c <= 5 && !confirmado; c++) {
         try {
           await invocar("confirmar", { token, path: ini.path, nombre_archivo: it.file.name, size: it.file.size, quien });
           confirmado = true;
-        } catch { await sleep([1000, 3000, 8000, 20000, 40000][c - 1] ?? 10000); }
+        } catch (err) { ultimo = err; await sleep([1000, 3000, 8000, 20000, 40000][c - 1] ?? 10000); }
       }
-      if (!confirmado) { marcar(it.id, { estado: "fallo" }); return; }
+      if (!confirmado) {
+        logError(it, "confirmar", ultimo);
+        marcar(it.id, { estado: "fallo", razonFallo: razonVisible("confirmar", ultimo) });
+        return;
+      }
       marcar(it.id, { estado: "ok", pct: 100 });
-    } catch {
-      marcar(it.id, { estado: "fallo" });
+    } catch (err) {
+      logError(it, "subirUno", err);
+      marcar(it.id, { estado: "fallo", razonFallo: razonVisible("general", err) });
     }
   }
 
@@ -172,6 +202,9 @@ export default function PaginaAportar() {
                         <button type="button" onClick={() => void subirUno(it)} className="flex shrink-0 items-center gap-1 text-[11px] text-destructive hover:underline"><AlertCircle className="h-3.5 w-3.5" />{t("drive.aportar.fallo")}</button>
                       )}
                     </div>
+                    {it.estado === "fallo" && it.razonFallo && (
+                      <p className="text-[10px] text-destructive/80">{it.razonFallo}</p>
+                    )}
                     {it.estado === "subiendo" && (
                       <div className="h-1.5 w-full overflow-hidden rounded-full bg-border/50">
                         <div className="h-full rounded-full bg-primary transition-all duration-200" style={{ width: `${Math.max(4, it.pct)}%` }} />

@@ -68,6 +68,22 @@ Deno.serve(async (req) => {
       return json({ existe: true, activo: l.activo === true, carpeta: di?.nombre ?? null, etiqueta: l.nombre ?? null });
     }
 
+    // Telemetría de fallas (ANTES del check de link para que también funcione si
+    // el link fue cerrado mientras la creadora subía).
+    if (action === "log_error") {
+      await admin.from("drive_aportar_errores").insert({
+        token,
+        nombre_archivo: String(body.nombre_archivo ?? "").slice(0, 300),
+        size_bytes: typeof body.size_bytes === "number" ? body.size_bytes : null,
+        etapa: String(body.etapa ?? "").slice(0, 60),
+        mensaje: String(body.mensaje ?? "").slice(0, 500),
+        status: typeof body.status === "number" ? body.status : null,
+        intento: typeof body.intento === "number" ? body.intento : null,
+        user_agent: (req.headers.get("user-agent") ?? "").slice(0, 300),
+      }).then(() => {}, () => {});
+      return json({ ok: true });
+    }
+
     const link = await linkActivo(token);
     if (!link) return json({ error: "El link no es válido o ya fue cerrado." }, 403);
 
