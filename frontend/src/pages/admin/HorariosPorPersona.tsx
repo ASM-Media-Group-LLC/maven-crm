@@ -33,6 +33,8 @@ interface FilaPersona {
   bano: number | null;
   horasHoy: number;
   horasSemana: number;
+  turnoId: string | null;
+  turnosDelRol: Array<{ id: string; nombre: string; hora_entrada: string; hora_salida: string }>;
 }
 
 const hhmm = (t: string | null) => (t ? t.slice(0, 5) : "");
@@ -51,6 +53,21 @@ function HorarioPersonaFila({ p, onCambio }: { p: FilaPersona; onCambio: () => v
   const [comida, setComida] = useState(p.comida == null ? "" : String(p.comida));
   const [bano, setBano] = useState(p.bano == null ? "" : String(p.bano));
   const [guardando, setGuardando] = useState(false);
+  const [asigTurno, setAsigTurno] = useState(false);
+
+  const asignarTurno = async (turnoId: string | null) => {
+    setAsigTurno(true);
+    try {
+      const { error } = await sinTipar.rpc("argos_asignar_turno", { _user: p.id, _turno: turnoId });
+      if (error) throw new Error(error.message);
+      toast({ title: t("admin.horarios.guardado") });
+      onCambio();
+    } catch (e) {
+      toast({ title: t("admin.horarios.error"), description: (e as Error).message, variant: "destructive" });
+    } finally {
+      setAsigTurno(false);
+    }
+  };
 
   const guardar = async () => {
     setGuardando(true);
@@ -91,6 +108,19 @@ function HorarioPersonaFila({ p, onCambio }: { p: FilaPersona; onCambio: () => v
             <div className="text-[11px] text-muted-foreground">{p.role ?? "—"}</div>
           </div>
         </div>
+        {p.turnosDelRol.length > 0 && (
+          <label className="flex flex-col gap-1 text-[11px] text-muted-foreground">
+            {t("admin.horarios.turno")}
+            <select value={p.turnoId ?? ""} disabled={asigTurno}
+              onChange={(e) => void asignarTurno(e.target.value || null)}
+              className="rounded-lg border border-border/60 bg-card/40 px-2 py-1.5 text-sm outline-none ring-primary/40 focus:ring-2">
+              <option value="">{t("admin.horarios.sinTurno")}</option>
+              {p.turnosDelRol.map((tu) => (
+                <option key={tu.id} value={tu.id}>{tu.nombre} ({hhmm(tu.hora_entrada)}–{hhmm(tu.hora_salida)})</option>
+              ))}
+            </select>
+          </label>
+        )}
         <label className="flex flex-col gap-1 text-[11px] text-muted-foreground">{t("admin.horarios.entrada")}{campoHora(entrada, setEntrada)}</label>
         <label className="flex flex-col gap-1 text-[11px] text-muted-foreground">{t("admin.horarios.salida")}{campoHora(salida, setSalida)}</label>
         <label className="flex flex-col gap-1 text-[11px] text-muted-foreground">{t("admin.horarios.comida")}{campoNum(comida, setComida, "rol")}</label>
@@ -121,7 +151,7 @@ export default function HorariosPorPersona() {
     queryFn: async (): Promise<FilaPersona[]> => {
       // Personas activas.
       const { data: perfiles } = await sinTipar.from("profiles")
-        .select("id, full_name, avatar_url, avatar_seed, hora_entrada, hora_salida, comida_min, bano_min")
+        .select("id, full_name, avatar_url, avatar_seed, hora_entrada, hora_salida, comida_min, bano_min, turno_id")
         .is("deleted_at", null)
         .order("full_name");
       const ids = ((perfiles ?? []) as Array<{ id: string }>).map((p) => p.id);
@@ -132,6 +162,17 @@ export default function HorariosPorPersona() {
       const rolPor = new Map<string, string>();
       for (const r of (roles ?? []) as Array<{ user_id: string; role: string }>) {
         if (!rolPor.has(r.user_id)) rolPor.set(r.user_id, r.role);
+      }
+
+      // Turnos definidos por rol (Chatter AM/PM/Madrugada, etc.).
+      const { data: turnos } = await sinTipar.from("rol_turnos")
+        .select("id, role, nombre, hora_entrada, hora_salida, orden")
+        .order("orden");
+      const turnosPorRol = new Map<string, Array<{ id: string; nombre: string; hora_entrada: string; hora_salida: string }>>();
+      for (const tu of (turnos ?? []) as Array<{ id: string; role: string; nombre: string; hora_entrada: string; hora_salida: string }>) {
+        const arr = turnosPorRol.get(tu.role) ?? [];
+        arr.push({ id: tu.id, nombre: tu.nombre, hora_entrada: tu.hora_entrada, hora_salida: tu.hora_salida });
+        turnosPorRol.set(tu.role, arr);
       }
 
       // Horas de HOY y de la SEMANA (últimos 7 días, Bogotá).
@@ -146,21 +187,25 @@ export default function HorariosPorPersona() {
       const horasSemPor = new Map<string, number>();
       for (const r of (tiempoSem ?? [])) horasSemPor.set(r.user_id, (horasSemPor.get(r.user_id) ?? 0) + Number(r.seg_activo) / 3600);
 
-      return ((perfiles ?? []) as Array<{ id: string; full_name: string | null; avatar_url: string | null; avatar_seed: string | null; hora_entrada: string | null; hora_salida: string | null; comida_min: number | null; bano_min: number | null }>)
-        .map((p): FilaPersona => ({
-          id: p.id,
-          nombre: p.full_name?.trim() || "",
-          avatar_url: p.avatar_url,
-          avatar_seed: p.avatar_seed,
-          role: rolPor.get(p.id) ?? null,
-          entrada: p.hora_entrada,
-          salida: p.hora_salida,
-          comida: p.comida_min,
-          bano: p.bano_min,
-          horasHoy: horasHoyPor.get(p.id) ?? 0,
-          horasSemana: horasSemPor.get(p.id) ?? 0,
-        }))
-        // Los que más trabajaron hoy primero (útil para ver quién produjo).
+      return ((perfiles ?? []) as Array<{ id: string; full_name: string | null; avatar_url: string | null; avatar_seed: string | null; hora_entrada: string | null; hora_salida: string | null; comida_min: number | null; bano_min: number | null; turno_id: string | null }>)
+        .map((p): FilaPersona => {
+          const rol = rolPor.get(p.id) ?? null;
+          return {
+            id: p.id,
+            nombre: p.full_name?.trim() || "",
+            avatar_url: p.avatar_url,
+            avatar_seed: p.avatar_seed,
+            role: rol,
+            entrada: p.hora_entrada,
+            salida: p.hora_salida,
+            comida: p.comida_min,
+            bano: p.bano_min,
+            horasHoy: horasHoyPor.get(p.id) ?? 0,
+            horasSemana: horasSemPor.get(p.id) ?? 0,
+            turnoId: p.turno_id,
+            turnosDelRol: rol ? (turnosPorRol.get(rol) ?? []) : [],
+          };
+        })
         .sort((a, b) => b.horasHoy - a.horasHoy || a.nombre.localeCompare(b.nombre, "es"));
     },
     staleTime: 60_000,

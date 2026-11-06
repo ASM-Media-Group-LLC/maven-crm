@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Clock, Loader2, Save } from "lucide-react";
+import { Clock, Loader2, Plus, Save, Trash2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useLanguage } from "@/hooks/useLanguage";
 import { useToast } from "@/hooks/use-toast";
@@ -89,6 +89,97 @@ function FilaRol({ rol }: { rol: RolHorario }) {
           {t("admin.horarios.guardar")}
         </Button>
       </div>
+      {/* Turnos del rol (Alvaro 06/11): un rol puede tener varios turnos (Chatter
+          AM/PM/Madrugada). Las personas eligen su turno en "Por persona". */}
+      <TurnosDelRol role={rol.name} />
+    </div>
+  );
+}
+
+// Sub-panel: los turnos de un rol (AM/PM/Madrugada). Editor inline.
+function TurnosDelRol({ role }: { role: string }) {
+  const { t } = useLanguage();
+  const { toast } = useToast();
+  const qc = useQueryClient();
+  const q = useQuery({
+    queryKey: ["rol-turnos", role],
+    queryFn: async () => {
+      const { data } = await sinTipar.from("rol_turnos")
+        .select("id, nombre, hora_entrada, hora_salida, orden")
+        .eq("role", role)
+        .order("orden");
+      return (data ?? []) as Array<{ id: string; nombre: string; hora_entrada: string; hora_salida: string; orden: number }>;
+    },
+    staleTime: 60_000,
+  });
+  const [addMode, setAddMode] = useState(false);
+  const [nuevoNombre, setNuevoNombre] = useState("");
+  const [nuevaEntrada, setNuevaEntrada] = useState("");
+  const [nuevaSalida, setNuevaSalida] = useState("");
+
+  const guardarNuevo = async () => {
+    try {
+      const { error } = await sinTipar.rpc("argos_turno_rol_set", {
+        _role: role, _nombre: nuevoNombre, _entrada: nuevaEntrada, _salida: nuevaSalida,
+        _orden: (q.data?.length ?? 0) + 1,
+      });
+      if (error) throw new Error(error.message);
+      toast({ title: t("admin.horarios.guardado") });
+      setAddMode(false); setNuevoNombre(""); setNuevaEntrada(""); setNuevaSalida("");
+      await qc.invalidateQueries({ queryKey: ["rol-turnos", role] });
+      await qc.invalidateQueries({ queryKey: ["horarios-por-persona"] });
+    } catch (e) {
+      toast({ title: t("admin.horarios.error"), description: (e as Error).message, variant: "destructive" });
+    }
+  };
+  const borrar = async (id: string) => {
+    try {
+      const { error } = await sinTipar.rpc("argos_turno_rol_borrar", { _id: id });
+      if (error) throw new Error(error.message);
+      toast({ title: t("admin.horarios.turnoBorrado") });
+      await qc.invalidateQueries({ queryKey: ["rol-turnos", role] });
+      await qc.invalidateQueries({ queryKey: ["horarios-por-persona"] });
+    } catch (e) {
+      toast({ title: t("admin.horarios.error"), description: (e as Error).message, variant: "destructive" });
+    }
+  };
+
+  return (
+    <div className="mt-3 border-t border-border/40 pt-3">
+      <div className="mb-2 flex items-center justify-between gap-2">
+        <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">{t("admin.horarios.turnosDelRol")}</span>
+        <Button size="sm" variant="outline" className="rounded-control h-7 px-2 text-[11px]" onClick={() => setAddMode((v) => !v)}>
+          <Plus className="mr-1 h-3 w-3" />{t("admin.horarios.agregarTurno")}
+        </Button>
+      </div>
+      <div className="flex flex-wrap gap-2">
+        {(q.data ?? []).map((tu) => (
+          <span key={tu.id} className="inline-flex items-center gap-1.5 rounded-panel border border-border/50 bg-card/40 px-2.5 py-1 text-xs">
+            <b>{tu.nombre}</b>
+            <span className="text-muted-foreground tabular-nums">{tu.hora_entrada.slice(0,5)}–{tu.hora_salida.slice(0,5)}</span>
+            <button type="button" onClick={() => void borrar(tu.id)} className="ml-1 text-muted-foreground hover:text-destructive" aria-label={t("admin.horarios.turnoBorrar")}>
+              <Trash2 className="h-3 w-3" />
+            </button>
+          </span>
+        ))}
+        {q.data?.length === 0 && !addMode && (
+          <span className="text-[11px] text-muted-foreground italic">{t("admin.horarios.sinTurnos")}</span>
+        )}
+      </div>
+      {addMode && (
+        <div className="mt-2 flex flex-wrap items-end gap-2">
+          <input type="text" placeholder={t("admin.horarios.nombreTurno")} value={nuevoNombre}
+            onChange={(e) => setNuevoNombre(e.target.value.slice(0, 40))}
+            className="w-28 rounded-lg border border-border/60 bg-card/40 px-2 py-1.5 text-sm outline-none ring-primary/40 focus:ring-2" />
+          <input type="time" value={nuevaEntrada} onChange={(e) => setNuevaEntrada(e.target.value)}
+            className="rounded-lg border border-border/60 bg-card/40 px-2 py-1.5 text-sm tabular-nums outline-none ring-primary/40 focus:ring-2" />
+          <input type="time" value={nuevaSalida} onChange={(e) => setNuevaSalida(e.target.value)}
+            className="rounded-lg border border-border/60 bg-card/40 px-2 py-1.5 text-sm tabular-nums outline-none ring-primary/40 focus:ring-2" />
+          <Button size="sm" onClick={() => void guardarNuevo()} disabled={!nuevoNombre || !nuevaEntrada || !nuevaSalida} className="rounded-control h-8">
+            <Save className="mr-1 h-3 w-3" />{t("admin.horarios.guardar")}
+          </Button>
+        </div>
+      )}
     </div>
   );
 }

@@ -784,4 +784,13 @@ export const admin = {
   "admin.horariosPersona.hoy": { es: "Hoy", en: "Today" },
   "admin.horariosPersona.semana": { es: "7 días", en: "7 days" },
   "admin.horariosPersona.vacio": { es: "Sin personas que mostrar.", en: "No people to show." },
+  // Turnos del rol (Alvaro, 06/11)
+  "admin.horarios.turnosDelRol": { es: "Turnos del rol", en: "Role shifts" },
+  "admin.horarios.agregarTurno": { es: "Agregar turno", en: "Add shift" },
+  "admin.horarios.nombreTurno": { es: "AM / PM / Madrugada", en: "AM / PM / Night" },
+  "admin.horarios.sinTurnos": { es: "Sin turnos — este rol usa el horario único de arriba", en: "No shifts — this role uses the single schedule above" },
+  "admin.horarios.turnoBorrado": { es: "Turno borrado", en: "Shift deleted" },
+  "admin.horarios.turnoBorrar": { es: "Borrar turno", en: "Delete shift" },
+  "admin.horarios.turno": { es: "Turno", en: "Shift" },
+  "admin.horarios.sinTurno": { es: "— del rol", en: "— role default" },
 } as const satisfies Record<string, { es: string; en: string }>;
