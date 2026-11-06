@@ -220,18 +220,50 @@ async function enviarAviso(pendientes: number, desdeISO: string): Promise<boolea
   } catch { return false; }
 }
 
-async function registrarSalud(admin: Admin, caido: boolean, pendientes: number): Promise<void> {
+// Umbral anti-flapping (Alvaro, 06/11): el NAS tiene hipos de segundos y el
+// aviso se encendía/apagaba. Ahora solo se declara caído cuando acumula
+// >= FALLOS_MINIMOS corridas seguidas Y hay > PENDIENTES_MINIMOS esperando.
+// Si el NAS responde, el contador vuelve a 0.
+const FALLOS_MINIMOS = 3;
+const PENDIENTES_MINIMOS = 5;
+
+async function registrarSalud(admin: Admin, arriba: boolean, pendientes: number): Promise<void> {
   const ahora = new Date().toISOString();
-  if (!caido) {
-    await admin.from("drive_nas_salud").upsert({ id: 1, caido: false, desde: null, pendientes, actualizado: ahora }).then(() => {}, () => {});
+  const { data: prev } = await admin.from("drive_nas_salud")
+    .select("desde, ultimo_aviso, fallos_consecutivos, caido").eq("id", 1).maybeSingle();
+
+  if (arriba) {
+    // Cualquier respuesta buena resetea el contador y limpia el aviso.
+    await admin.from("drive_nas_salud").upsert({
+      id: 1, caido: false, desde: null, pendientes,
+      fallos_consecutivos: 0, actualizado: ahora,
+    }).then(() => {}, () => {});
     return;
   }
-  const { data: prev } = await admin.from("drive_nas_salud").select("desde, ultimo_aviso").eq("id", 1).maybeSingle();
+
+  const fallosPrev = Number((prev?.fallos_consecutivos as number | null) ?? 0);
+  const fallos = fallosPrev + 1;
+  const marcarCaido = fallos >= FALLOS_MINIMOS && pendientes > PENDIENTES_MINIMOS;
+
+  if (!marcarCaido) {
+    // Falló esta vez pero todavía no cumple el umbral: ni header ni correo.
+    // Guardamos el contador y caido=false (lo que el frontend respeta).
+    await admin.from("drive_nas_salud").upsert({
+      id: 1, caido: false, desde: null, pendientes,
+      fallos_consecutivos: fallos, actualizado: ahora,
+    }).then(() => {}, () => {});
+    return;
+  }
+
+  // Umbral alcanzado: se declara caído y, con freno horario, se manda el correo.
   const desde = (prev?.desde as string | null) ?? ahora;
   let ultimoAviso = (prev?.ultimo_aviso as string | null) ?? null;
   const vencido = !ultimoAviso || (Date.now() - new Date(ultimoAviso).getTime()) > AVISO_CADA_MIN * 60_000;
-  if (pendientes > 0 && vencido && await enviarAviso(pendientes, desde)) ultimoAviso = ahora;
-  await admin.from("drive_nas_salud").upsert({ id: 1, caido: true, desde, pendientes, ultimo_aviso: ultimoAviso, actualizado: ahora }).then(() => {}, () => {});
+  if (vencido && await enviarAviso(pendientes, desde)) ultimoAviso = ahora;
+  await admin.from("drive_nas_salud").upsert({
+    id: 1, caido: true, desde, pendientes, ultimo_aviso: ultimoAviso,
+    fallos_consecutivos: fallos, actualizado: ahora,
+  }).then(() => {}, () => {});
 }
 
 function escapar(s: string): string {
@@ -312,10 +344,12 @@ Deno.serve(async (req: Request) => {
   const arriba = !!salud?.raices?.some((r) => r.ok);
 
   if (!arriba) {
-    await registrarSalud(admin, true, pend);
+    // No procesamos aportes cuando el NAS no responde (fallarían los uploads),
+    // pero el aviso visible solo se enciende cuando pase el umbral de registrarSalud.
+    await registrarSalud(admin, false, pend);
     return json({ ok: true, skip: "nas-caido", pendientes: pend });
   }
-  await registrarSalud(admin, false, pend);
+  await registrarSalud(admin, true, pend);
 
   const { data: filas } = await admin.from("drive_aportes")
     .select("id, token, item_id, tenant_id, nombre_archivo, storage_path, size, quien, nas_up, nas_parte, nas_item_id")

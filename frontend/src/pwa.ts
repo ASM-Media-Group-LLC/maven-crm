@@ -65,6 +65,13 @@ export async function initPWA() {
   // so virtual:pwa-register doesn't exist during `npm run dev`.
   if (import.meta.env.DEV) return;
 
+  // /aportar/<token> es la página pública de creadoras externas que suben videos
+  // grandes. Si salta "Nueva versión · Recargar" en medio de una subida y le dan
+  // click, se pierde todo el avance (el formulario se reinicia en blanco). Esa
+  // página es efímera: entra, sube, cierra. No necesita actualizarse. Saltamos
+  // todo el registro del SW en esa ruta.
+  if (window.location.pathname.startsWith("/aportar/")) return;
+
   try {
     // Static-string dynamic import: Vite resolves this at build time and
     // emits a real chunk for the SW registration. Using a literal string
