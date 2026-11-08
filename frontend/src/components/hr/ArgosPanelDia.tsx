@@ -192,7 +192,7 @@ function CajaEquipo({ titulo, punto, gente, abierta, t, onPersona }: {
   );
 }
 
-export function ArgosPanelDia() {
+export function ArgosPanelDia({ sinTendencia = false }: { sinTendencia?: boolean } = {}) {
   const { t } = useLanguage();
   const navigate = useNavigate();
   // El Panel ya no es solo HOY (Alvaro, 04/11): se puede ver cualquier día pasado
@@ -324,9 +324,9 @@ export function ArgosPanelDia() {
           </div>
         )}
 
-        {/* Gráfica de tendencia (últimos 14 días) — siempre visible, aparte del
-            día elegido abajo. Argos ya no es solo "hoy" (Alvaro, 04/11). */}
-        <ArgosTendencia />
+        {/* Gráfica de tendencia (últimos 14 días). Se oculta cuando va debajo del
+            Historial en "El día" para no duplicar gráfica (Alvaro, 08/11). */}
+        {!sinTendencia && <ArgosTendencia />}
 
         {error ? (
           <div className="flex flex-col items-center gap-2 py-10 text-center text-muted-foreground"><AlertTriangle className="h-7 w-7 text-destructive/70" /><p className="text-sm">{t("hr.panel.error")}</p></div>

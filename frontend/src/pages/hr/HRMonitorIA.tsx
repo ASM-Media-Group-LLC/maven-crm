@@ -190,7 +190,16 @@ export default function HRMonitorIA() {
           quien no es admin, cae al resumen simple. */}
       {tab === "dia" && (
         <div className="mt-5 flex flex-col gap-5">
-          {isAdmin ? <ArgosHistorial /> : <ArgosPanelDia />}
+          {isAdmin ? (
+            <>
+              {/* Historial primero (turnos + 1 gráfica); debajo los números de
+                  disciplina + podio + cajas, SIN la tendencia duplicada. */}
+              <ArgosHistorial />
+              <ArgosPanelDia sinTendencia />
+            </>
+          ) : (
+            <ArgosPanelDia />
+          )}
         </div>
       )}
 
