@@ -15,6 +15,9 @@ import { urlCaptura, urlsDeNas } from "@/hooks/useMonitorEventos";
 import { LABEL_FALTA, type FaltaTipo } from "@/lib/monitorFaltas";
 import type { BandaNota } from "@/lib/notaEmpleado";
 import type { TranslationKey } from "@/lib/i18n";
+import { supabase } from "@/integrations/supabase/client";
+import { correoTardanzaHTML } from "@/lib/correoTardanzaHtml";
+import { Mail } from "lucide-react";
 
 // Expediente del empleado, estilo Hubstaff: se abre en HOY, con su nota y sus
 // horas arriba, y la TIRA de pantallazos del día —cada pantalla con su cámara
@@ -358,9 +361,11 @@ const FACTOR_LBL: Record<string, TranslationKey> = {
 // ASISTENCIA del día (Alvaro, 05/11): horario asignado + entró/salió reales +
 // diferencia (tarde/temprano). No toca la nota (son sanciones aparte). Si no hay
 // horario asignado o no se registró ingreso, se dice así, no se inventa.
-function AsistenciaDia({ horario, dia, t }: {
+function AsistenciaDia({ horario, dia, userId, nombre, t }: {
   horario: { entrada: string | null; salida: string | null };
   dia: DiaExpediente;
+  userId: string | undefined;
+  nombre: string;
   t: Tr;
 }) {
   const hhmm = (iso: string | null | undefined): string | null => {
@@ -418,6 +423,166 @@ function AsistenciaDia({ horario, dia, t }: {
       {(diasTardes || dioSalidaTemprano) && (
         <p className="mt-2 text-[11px] text-muted-foreground">{t("hr.exp.asistenciaNota")}</p>
       )}
+
+      {/* PRUEBA de la tardanza (Alvaro, 08/11): foto del momento que entró + hora
+          exacta + a quién/cuándo llegó el correo + ver el correo. Nada de adivinar. */}
+      {diasTardes && (
+        <PruebaTardanza
+          userId={userId}
+          fecha={dia.fecha}
+          nombre={nombre}
+          entroAt={dia.entroAt ?? null}
+          horarioEntrada={horario.entrada}
+          entradaReal={entradaReal}
+          tardeMin={difEntrada ?? 0}
+          capturas={dia.capturas}
+          t={t}
+        />
+      )}
+    </div>
+  );
+}
+
+// Busca la captura de CÁMARA más cercana a la hora de entrada (±15 min).
+function fotoDeEntrada(capturas: CapturaDia[], entroAt: string | null): CapturaDia | null {
+  if (!entroAt) return null;
+  const t0 = Date.parse(entroAt);
+  if (Number.isNaN(t0)) return null;
+  let best: CapturaDia | null = null;
+  let bestD = 15 * 60 * 1000;
+  for (const c of capturas) {
+    if (c.tipo !== "camara") continue;
+    const d = Math.abs(Date.parse(c.createdAt) - t0);
+    if (d < bestD) { bestD = d; best = c; }
+  }
+  return best;
+}
+
+function PruebaTardanza({ userId, fecha, nombre, entroAt, horarioEntrada, entradaReal, tardeMin, capturas, t }: {
+  userId: string | undefined;
+  fecha: string;
+  nombre: string;
+  entroAt: string | null;
+  horarioEntrada: string | null;
+  entradaReal: string | null;
+  tardeMin: number;
+  capturas: CapturaDia[];
+  t: Tr;
+}) {
+  const foto = useMemo(() => fotoDeEntrada(capturas, entroAt), [capturas, entroAt]);
+  const [urlFoto, setUrlFoto] = useState<string | null>(null);
+  const [verGrande, setVerGrande] = useState(false);
+  const [verCorreo, setVerCorreo] = useState(false);
+  const [correo, setCorreo] = useState<{ a: string[] | null; enviadoAt: string | null; rol: string | null } | null>(null);
+
+  const hhmm = (iso: string | null): string | null => {
+    if (!iso) return null;
+    try { return new Date(iso).toLocaleTimeString("es-CO", { timeZone: "America/Bogota", hour: "2-digit", minute: "2-digit", hour12: false }); } catch { return null; }
+  };
+
+  // Firma la foto de entrada (caduca ~2 min; se re-firma al abrir en grande).
+  useEffect(() => {
+    let vivo = true;
+    void (async () => {
+      const path = foto ? (foto.enNas ? foto.nasPath : foto.path) : null;
+      if (!path) { setUrlFoto(null); return; }
+      const u = await urlCaptura(path);
+      if (vivo) setUrlFoto(u ?? null);
+    })();
+    return () => { vivo = false; };
+  }, [foto]);
+
+  // ¿Se mandó el correo de constancia? A quién y cuándo (tardanzas_registro).
+  useEffect(() => {
+    let vivo = true;
+    void (async () => {
+      if (!userId) return;
+      const { data } = await (supabase as unknown as { from: (t: string) => { select: (c: string) => { eq: (k: string, v: string) => { eq: (k: string, v: string) => { maybeSingle: () => Promise<{ data: { correo_a: string[] | null; correo_enviado_at: string | null; turno_nombre: string | null } | null }> } } } } })
+        .from("tardanzas_registro").select("correo_a, correo_enviado_at, turno_nombre").eq("user_id", userId).eq("dia", fecha).maybeSingle();
+      if (vivo) setCorreo(data ? { a: data.correo_a, enviadoAt: data.correo_enviado_at, rol: data.turno_nombre } : null);
+    })();
+    return () => { vivo = false; };
+  }, [userId, fecha]);
+
+  const correoHoraTxt = hhmm(correo?.enviadoAt ?? null);
+
+  return (
+    <div className="mt-3 rounded-2xl border border-destructive/25 bg-destructive/5 p-3.5">
+      <p className="mb-3 flex items-center gap-2 text-xs font-semibold text-destructive">
+        <AlertTriangle className="h-3.5 w-3.5" />{t("hr.exp.prueba.titulo")}
+        <span className="font-normal text-muted-foreground">· {t("hr.exp.prueba.entroTarde", { min: tardeMin })}</span>
+      </p>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-stretch">
+        {/* Foto del momento de entrada */}
+        <div className="shrink-0">
+          {urlFoto ? (
+            <button type="button" onClick={() => setVerGrande(true)} className="group relative block h-28 w-40 overflow-hidden rounded-xl border border-border/50">
+              <img src={urlFoto} alt="" className="h-full w-full object-cover transition group-hover:scale-105" />
+              <span className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 to-transparent px-2 py-1 text-left text-[10px] font-semibold text-white tabular-nums">
+                {t("hr.exp.prueba.fotoEntrada", { hora: hhmm(foto?.createdAt ?? null) ?? entradaReal ?? "—" })}
+              </span>
+            </button>
+          ) : (
+            <div className="flex h-28 w-40 flex-col items-center justify-center gap-1.5 rounded-xl border border-dashed border-border/50 bg-card/20 text-center text-muted-foreground">
+              <CameraOff className="h-5 w-5 opacity-50" />
+              <span className="px-2 text-[10px]">{t("hr.exp.prueba.sinFoto")}</span>
+            </div>
+          )}
+        </div>
+
+        {/* Info del correo + botón */}
+        <div className="flex min-w-0 flex-1 flex-col justify-between gap-2 rounded-xl border border-border/40 bg-card/30 p-3">
+          <div className="flex items-start gap-2">
+            <Mail className={`mt-0.5 h-4 w-4 shrink-0 ${correo?.enviadoAt ? "text-success" : "text-muted-foreground"}`} />
+            <div className="min-w-0">
+              <p className={`text-sm font-semibold ${correo?.enviadoAt ? "text-success" : "text-muted-foreground"}`}>
+                {correo?.enviadoAt
+                  ? t("hr.exp.prueba.correoSi", { n: correo.a?.length ?? 0, hora: correoHoraTxt ?? "—" })
+                  : t("hr.exp.prueba.correoNo")}
+              </p>
+              {correo?.a && correo.a.length > 0 && (
+                <p className="mt-0.5 truncate text-[11px] text-muted-foreground">{correo.a.join(" · ")}</p>
+              )}
+            </div>
+          </div>
+          <Button variant="outline" size="sm" className="self-start rounded-control" onClick={() => setVerCorreo(true)}>
+            <Mail className="mr-1.5 h-3.5 w-3.5" />{t("hr.exp.prueba.verCorreo")}
+          </Button>
+        </div>
+      </div>
+
+      {/* Foto grande */}
+      <Dialog open={verGrande} onOpenChange={setVerGrande}>
+        <DialogContent className="max-w-2xl p-2">
+          <DialogTitle className="sr-only">{t("hr.exp.prueba.titulo")}</DialogTitle>
+          {urlFoto && <img src={urlFoto} alt="" className="max-h-[80vh] w-full rounded-lg object-contain" />}
+        </DialogContent>
+      </Dialog>
+
+      {/* El correo exacto que se mandó */}
+      <Dialog open={verCorreo} onOpenChange={setVerCorreo}>
+        <DialogContent className="max-w-2xl overflow-hidden p-0">
+          <DialogTitle className="border-b border-border/40 p-4">{t("hr.exp.prueba.correoTitulo")}</DialogTitle>
+          {correo?.a && correo.a.length > 0 && (
+            <p className="px-4 pt-3 text-[11px] text-muted-foreground">
+              <span className="font-semibold">{t("hr.exp.prueba.destinatarios")}</span> {correo.a.join(" · ")}
+            </p>
+          )}
+          <iframe
+            title="email"
+            srcDoc={correoTardanzaHTML({
+              nombre,
+              rol: correo?.rol ?? null,
+              horario: horarioEntrada ?? "—",
+              entro: entradaReal ?? "—",
+              tardeMin,
+              esPrueba: false,
+            })}
+            className="w-full border-0"
+            style={{ height: "min(70vh, 640px)", background: "#eef1f6" }}
+          />
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -672,7 +837,7 @@ export default function HRExpediente() {
 
           {/* ASISTENCIA (Alvaro, 05/11): horario asignado + entró + salió + tarde/
               temprano. Para responder "a qué horas llegó" sin tener que buscar. */}
-          {expediente && <AsistenciaDia horario={expediente.horario} dia={dia} t={t} />}
+          {expediente && <AsistenciaDia horario={expediente.horario} dia={dia} userId={userId} nombre={nombre} t={t} />}
 
           {/* Desglose de la nota SIEMPRE A LA VISTA (Alvaro, 04/11): de qué se
               arma el número — cada factor con su %, su aporte y la prueba. Sin
