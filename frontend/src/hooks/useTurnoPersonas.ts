@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { calcularNota, fraccionJornada, type Nota } from "@/lib/notaEmpleado";
 import { cargarExoneracion, esExento } from "@/lib/exoneracionCamara";
 import { cargarHorarios, horarioDe } from "@/lib/horarioEmpleado";
+import { a12 } from "@/lib/horaBogota";
 
 // La gente de un TURNO del día (Alvaro, 04/11; nota v2 05/11): para el drill-down
 // del Historial. Por persona que trabajó en ese rango de horas: su nota del turno
@@ -173,8 +174,8 @@ export function useTurnoPersonas(dia: string, hDesde: number, hHasta: number, ha
           camaraPct: camaraPct == null ? null : Math.round(camaraPct * 100),
           atencionPct: atencionPct == null ? null : Math.round(atencionPct * 100),
           horasTurno: segTrabajoTurno / 3600,
-          entroHHMM: h ? hhmmBogota(h.primero) : null,
-          salioHHMM: h ? hhmmBogota(h.ultimo) : null,
+          entroHHMM: h ? a12(hhmmBogota(h.primero)) : null,
+          salioHHMM: h ? a12(hhmmBogota(h.ultimo)) : null,
           tardeMin,
           turnoAsignado: turnoDeEntrada(horPers.entrada),
         };

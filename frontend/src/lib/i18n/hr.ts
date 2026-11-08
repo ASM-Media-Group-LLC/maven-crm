@@ -1120,7 +1120,7 @@ export const hr = {
   "hr.exp.prueba.entroTarde": { es: "Entró {min} min tarde", en: "Clocked in {min} min late" },
   "hr.exp.prueba.fotoEntrada": { es: "Foto al entrar · {hora}", en: "Photo on entry · {hora}" },
   "hr.exp.prueba.sinFoto": { es: "No hay foto del momento de entrada", en: "No photo of the entry moment" },
-  "hr.exp.prueba.correoSi": { es: "Correo enviado a {n} · {hora}", en: "Email sent to {n} · {hora}" },
+  "hr.exp.prueba.correoSi": { es: "Correo enviado a {n} personas · {hora}", en: "Email sent to {n} people · {hora}" },
   "hr.exp.prueba.correoNo": { es: "Aún no se mandó el correo (Argos lo manda en minutos)", en: "Email not sent yet (Argos sends it within minutes)" },
   "hr.exp.prueba.verCorreo": { es: "Ver el correo que llegó", en: "See the email that was sent" },
   "hr.exp.prueba.verCorreoPreview": { es: "Ver cómo se verá el correo", en: "Preview the email" },

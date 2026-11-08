@@ -17,6 +17,7 @@ import type { BandaNota } from "@/lib/notaEmpleado";
 import type { TranslationKey } from "@/lib/i18n";
 import { supabase } from "@/integrations/supabase/client";
 import { correoTardanzaHTML } from "@/lib/correoTardanzaHtml";
+import { a12, rango12 } from "@/lib/horaBogota";
 import { Mail } from "lucide-react";
 
 // Expediente del empleado, estilo Hubstaff: se abre en HOY, con su nota y sus
@@ -200,7 +201,7 @@ function TiraDelDia({ capturas, t }: { capturas: CapturaDia[]; t: Tr }) {
             {g.items.map((m) => {
               const urlP = m.pantalla ? urls[claveFoto(m.pantalla)!] : undefined;
               const urlC = m.camara ? urls[claveFoto(m.camara)!] : undefined;
-              const hora = format(new Date(m.createdAt), "HH:mm");
+              const hora = a12(format(new Date(m.createdAt), "HH:mm"));
               const abrir = () => setVisorIdx(visibles.indexOf(m)); // pop-up, no pestaña nueva
               return (
                 <button
@@ -333,7 +334,7 @@ function TiraDelDia({ capturas, t }: { capturas: CapturaDia[]; t: Tr }) {
                   <button type="button" onClick={() => setVisorIdx((i) => (i === null ? i : Math.min(visibles.length - 1, i + 1)))} disabled={visorIdx >= visibles.length - 1} className="flex h-9 items-center gap-1.5 rounded-lg border border-border/50 bg-card/40 px-3 text-sm font-medium text-muted-foreground transition hover:text-foreground disabled:opacity-40">
                     <ChevronLeft className="h-4 w-4" />{t("hr.exp.masViejo")}
                   </button>
-                  <span className="text-xs tabular-nums text-muted-foreground">{format(new Date(m.createdAt), "HH:mm")} · {visibles.length - visorIdx}/{visibles.length}</span>
+                  <span className="text-xs tabular-nums text-muted-foreground">{a12(format(new Date(m.createdAt), "HH:mm"))} · {visibles.length - visorIdx}/{visibles.length}</span>
                   <button type="button" onClick={() => setVisorIdx((i) => (i === null ? i : Math.max(0, i - 1)))} disabled={visorIdx <= 0} className="flex h-9 items-center gap-1.5 rounded-lg border border-border/50 bg-card/40 px-3 text-sm font-medium text-muted-foreground transition hover:text-foreground disabled:opacity-40">
                     {t("hr.exp.masNuevo")}<ChevronRight className="h-4 w-4" />
                   </button>
@@ -398,20 +399,20 @@ function AsistenciaDia({ horario, dia, userId, nombre, t }: {
         <div className="rounded-panel border border-border/40 bg-card/30 p-2.5">
           <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{t("hr.exp.asigHorario")}</div>
           <div className="mt-1 font-display text-sm font-bold tabular-nums">
-            {horario.entrada && horario.salida ? `${horario.entrada} — ${horario.salida}` : t("hr.exp.sinHorarioAsignado")}
+            {horario.entrada && horario.salida ? rango12(horario.entrada, horario.salida) : t("hr.exp.sinHorarioAsignado")}
           </div>
         </div>
         <div className={`rounded-panel border p-2.5 ${diasTardes ? "border-destructive/40 bg-destructive/5" : "border-border/40 bg-card/30"}`}>
           <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{t("hr.exp.entroHora")}</div>
           <div className={`mt-1 font-display text-sm font-bold tabular-nums ${diasTardes ? "text-destructive" : ""}`}>
-            {entradaReal ?? "—"}
+            {a12(entradaReal) ?? "—"}
             {difEntrada != null && difEntrada > 5 && <span className="ml-1.5 text-[10px] font-semibold text-destructive">+{difEntrada}m</span>}
           </div>
         </div>
         <div className={`rounded-panel border p-2.5 ${dioSalidaTemprano ? "border-warning/40 bg-warning/5" : "border-border/40 bg-card/30"}`}>
           <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{t("hr.exp.salioHora")}</div>
           <div className={`mt-1 font-display text-sm font-bold tabular-nums ${dioSalidaTemprano ? "text-warning" : ""}`}>
-            {salidaReal ?? "—"}
+            {a12(salidaReal) ?? "—"}
             {difSalida != null && difSalida < -5 && <span className="ml-1.5 text-[10px] font-semibold text-warning">{difSalida}m</span>}
           </div>
         </div>
@@ -504,7 +505,7 @@ function PruebaTardanza({ userId, fecha, nombre, entroAt, horarioEntrada, entrad
     return () => { vivo = false; };
   }, [userId, fecha]);
 
-  const correoHoraTxt = hhmm(correo?.enviadoAt ?? null);
+  const correoHoraTxt = a12(hhmm(correo?.enviadoAt ?? null));
 
   return (
     <div className="mt-3 rounded-2xl border border-destructive/25 bg-destructive/5 p-3.5">
@@ -519,7 +520,7 @@ function PruebaTardanza({ userId, fecha, nombre, entroAt, horarioEntrada, entrad
             <button type="button" onClick={() => setVerGrande(true)} className="group relative block h-28 w-40 overflow-hidden rounded-xl border border-border/50">
               <img src={urlFoto} alt="" className="h-full w-full object-cover transition group-hover:scale-105" />
               <span className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 to-transparent px-2 py-1 text-left text-[10px] font-semibold text-white tabular-nums">
-                {t("hr.exp.prueba.fotoEntrada", { hora: hhmm(foto?.createdAt ?? null) ?? entradaReal ?? "—" })}
+                {t("hr.exp.prueba.fotoEntrada", { hora: a12(hhmm(foto?.createdAt ?? null) ?? entradaReal) ?? "—" })}
               </span>
             </button>
           ) : (
