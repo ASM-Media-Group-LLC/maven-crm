@@ -238,6 +238,8 @@ const ANTES: Record<Clave, [Record<string, string | number> | undefined, string]
   recurso_desconocido: [{ recurso: "x" }, "Recurso desconocido: x"],
   creadora_no_encontrada: [undefined, "Creadora no encontrada"],
   contacto_no_encontrado: [undefined, "Contacto no encontrado"],
+  empleado_no_encontrado: [undefined, "Empleado no encontrado"],
+  argos_rutas: [undefined, "Usa /argos/notas o /argos/screens"],
   kind_invalido: [{ opciones: "modelo | agencia | ex_creadora" }, "kind invalido. Usa: modelo | agencia | ex_creadora"],
   sales_sub_recurso_desconocido: [{ sub: "x" }, "Sub-recurso de sales desconocido: x"],
   cowork_rutas: [undefined, "Usa /cowork/time, /cowork/time/segments, /cowork/breaks o /cowork/meets"],
