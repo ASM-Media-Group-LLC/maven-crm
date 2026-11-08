@@ -1198,6 +1198,7 @@ export const hr = {
   "hr.panel.conectadoH": { es: "conectado {h}h", en: "connected {h}h" },
   "hr.panel.noConecto": { es: "no se conectó", en: "didn't connect" },
   "hr.panel.activoSinHoras": { es: "estuvo activo", en: "was active" },
+  "hr.panel.conectadoMin": { es: "solo {m} min en su turno", en: "only {m} min in their shift" },
   "hr.panel.tendenciaTitulo": { es: "Tendencia", en: "Trend" },
   "hr.panel.tendenciaDias": { es: "últimos {n} días", en: "last {n} days" },
   "hr.panel.tendenciaVacio": { es: "Aún no hay suficientes días para la tendencia.", en: "Not enough days yet for a trend." },

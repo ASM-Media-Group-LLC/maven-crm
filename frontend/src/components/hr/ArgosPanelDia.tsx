@@ -132,7 +132,7 @@ function EquipoFila({ p, t, onClick }: { p: PersonaResumen; t: Tr; onClick: () =
         <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5">
           <span className={`inline-flex items-center gap-1 text-[11px] font-medium ${p.activo ? "text-foreground/75" : "text-muted-foreground/60"}`}>
             <Clock className="h-3 w-3 shrink-0" />
-            {!p.activo ? t("hr.panel.noConecto") : p.horas >= 0.05 ? t("hr.panel.conectadoH", { h: p.horas.toFixed(1) }) : t("hr.panel.activoSinHoras")}
+            {!p.activo ? t("hr.panel.noConecto") : p.horas >= 0.05 ? t("hr.panel.conectadoH", { h: p.horas.toFixed(1) }) : p.horas > 0 ? t("hr.panel.conectadoMin", { m: Math.max(1, Math.round(p.horas * 60)) }) : t("hr.panel.activoSinHoras")}
           </span>
           <FactorChip label={t("hr.resumen.pantalla")} sub={factor("pantalla")} alerta />
           <FactorChip label={t("hr.resumen.camara")} sub={factor("camara")} />

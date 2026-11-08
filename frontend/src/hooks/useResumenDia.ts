@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { calcularNota, fraccionJornada, type Nota } from "@/lib/notaEmpleado";
 import { cargarExoneracion, esExento } from "@/lib/exoneracionCamara";
 import { cargarHorarios, horarioDe } from "@/lib/horarioEmpleado";
+import { turnoDeEntrada } from "@/hooks/useTurnoPersonas";
 
 // RESUMEN DEL DÍA de Argos (Álvaro, 02/11; nota v2 05/11): quién va mejor o peor
 // HOY, con la PELÍCULA del día (no solo el número final). Por persona: su nota del
@@ -62,26 +63,42 @@ export function useResumenDia(dia: string) {
       const inicioISO = `${dia}T00:00:00-05:00`;
       const finISO = `${dia}T23:59:59-05:00`;
 
-      const [diaRes, alertasRes] = await Promise.all([
-        db.rpc("argos_dia_personas", { _dia: dia, _h_desde: 0, _h_hasta: 24 }),
+      // A cada quien se le juzga SOLO dentro de su turno asignado (Alvaro, 08/11):
+      // el tiempo que se queda FUERA de su turno queda registrado pero no cuenta.
+      // Traemos los 3 turnos (madrugada 0-8, AM 8-16, PM 16-24) y a cada persona
+      // le tomamos los datos de SU turno. Quien no tiene turno asignado: todo el día.
+      const [madRes, amRes, pmRes, alertasRes] = await Promise.all([
+        db.rpc("argos_dia_personas", { _dia: dia, _h_desde: 0, _h_hasta: 8 }),
+        db.rpc("argos_dia_personas", { _dia: dia, _h_desde: 8, _h_hasta: 16 }),
+        db.rpc("argos_dia_personas", { _dia: dia, _h_desde: 16, _h_hasta: 24 }),
         sinTipar.from("argos_alertas").select("user_id, tipo, detalle, abierta_at, cerrada_at").gte("abierta_at", inicioISO).lte("abierta_at", finISO).limit(5000),
       ]);
-      if (diaRes.error) throw new Error(diaRes.error.message);
+      const err = madRes.error ?? amRes.error ?? pmRes.error;
+      if (err) throw new Error(err.message);
 
-      // Por persona: segundos en cada estado (sobre la jornada de 8 h) y los
-      // pantallazos que la IA juzgó / en lo suyo. Pantalla/cámara y horas salen de
-      // aquí (un solo RPC sobre cowork_tiempo_segmentos), ya consistente con el turno.
-      const segPor = new Map<string, { pantalla: number; camara: number; horas: number }>();
-      const atPor = new Map<string, { ok: number; n: number }>();
-      for (const m of (diaRes.data ?? []) as FilaDia[]) {
-        const activo = Number(m.seg_activo), sinPant = Number(m.seg_sin_pantalla);
-        const sinCam = Number(m.seg_sin_camara), fueraCam = Number(m.seg_fuera_camara);
-        const segPantalla = activo + sinCam + fueraCam;      // compartiendo pantalla
-        const segCamara = activo + sinPant;                   // cámara/cara bien
-        const horas = (activo + sinPant + sinCam + fueraCam) / 3600; // tiempo de trabajo
-        segPor.set(m.user_id, { pantalla: segPantalla, camara: segCamara, horas });
-        atPor.set(m.user_id, { ok: Number(m.juzgadas_ok), n: Number(m.juzgadas) });
-      }
+      type Metrica = { pantalla: number; camara: number; horas: number; juzOk: number; juz: number };
+      const sumarVentana = (data: unknown[] | null): Map<string, Metrica> => {
+        const m = new Map<string, Metrica>();
+        for (const row of (data ?? []) as FilaDia[]) {
+          const activo = Number(row.seg_activo), sinPant = Number(row.seg_sin_pantalla);
+          const sinCam = Number(row.seg_sin_camara), fueraCam = Number(row.seg_fuera_camara);
+          m.set(row.user_id, {
+            pantalla: activo + sinCam + fueraCam,
+            camara: activo + sinPant,
+            horas: (activo + sinPant + sinCam + fueraCam) / 3600,
+            juzOk: Number(row.juzgadas_ok), juz: Number(row.juzgadas),
+          });
+        }
+        return m;
+      };
+      const ventanas: Record<"madrugada" | "am" | "pm", Map<string, Metrica>> = {
+        madrugada: sumarVentana(madRes.data), am: sumarVentana(amRes.data), pm: sumarVentana(pmRes.data),
+      };
+      const sumaDia = (id: string): Metrica => {
+        const z: Metrica = { pantalla: 0, camara: 0, horas: 0, juzOk: 0, juz: 0 };
+        for (const v of Object.values(ventanas)) { const m = v.get(id); if (m) { z.pantalla += m.pantalla; z.camara += m.camara; z.horas += m.horas; z.juzOk += m.juzOk; z.juz += m.juz; } }
+        return z;
+      };
 
       // Bajones por persona (momentos malos del día).
       const ahora = Date.now();
@@ -94,8 +111,10 @@ export function useResumenDia(dia: string) {
         bajonesPor.set(a.user_id, arr);
       }
 
-      // Roster del día: quien tuvo tiempo/pantallazos o alertas.
-      const ids = new Set<string>([...segPor.keys(), ...atPor.keys(), ...bajonesPor.keys()]);
+      // Roster del día: quien tuvo tiempo/pantallazos en CUALQUIER turno, o alertas.
+      const ids = new Set<string>([
+        ...ventanas.madrugada.keys(), ...ventanas.am.keys(), ...ventanas.pm.keys(), ...bajonesPor.keys(),
+      ]);
       if (ids.size === 0) return [];
 
       const [perfRes, rolesRes, cfgRes, exo, horarios] = await Promise.all([
@@ -126,14 +145,16 @@ export function useResumenDia(dia: string) {
       };
 
       const personas: PersonaResumen[] = [...ids].map((id) => {
-        const m = segPor.get(id);
-        const at = atPor.get(id);
+        const h = horarioDe(horarios, id);
+        // SU turno asignado decide qué ventana se le juzga; sin turno → todo el día.
+        const turno = turnoDeEntrada(h.entrada);
+        const m = turno ? ventanas[turno].get(id) : sumaDia(id);
+        const at = m ? { ok: m.juzOk, n: m.juz } : undefined;
         // No se califica en cámara/pantalla si el rol no se califica, o si está exonerado.
         const calificado = esCalificado(id) && !esExento(exo, id, rolesPor.get(id));
         // Pantalla% y cámara% sobre la JORNADA de 8 h (pausa libre descontada): así
         // medio día ≈ 50 y las horas quedan metidas. Si el rol NO se califica
         // (supervisor, finanzas…), esos factores quedan en N/A: no cuentan.
-        const h = horarioDe(horarios, id);
         const pantallaPct = calificado && m ? fraccionJornada(m.pantalla, h.jornadaHoras, h.exentoSeg) : undefined;
         const camaraPct = calificado && m ? fraccionJornada(m.camara, h.jornadaHoras, h.exentoSeg) : undefined;
         const atencionPct = at && at.n > 0 ? at.ok / at.n : undefined;
