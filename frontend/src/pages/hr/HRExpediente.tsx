@@ -395,7 +395,7 @@ function AsistenciaDia({ horario, dia, userId, nombre, t }: {
       <p className="mb-2.5 flex items-center gap-2 text-xs font-semibold text-muted-foreground">
         <Gauge className="h-3.5 w-3.5 text-primary" />{t("hr.exp.asistencia")}
       </p>
-      <div className="grid gap-2.5 sm:grid-cols-4">
+      <div className="grid gap-2.5 sm:grid-cols-3">
         <div className="rounded-panel border border-border/40 bg-card/30 p-2.5">
           <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{t("hr.exp.asigHorario")}</div>
           <div className="mt-1 font-display text-sm font-bold tabular-nums">
@@ -415,10 +415,6 @@ function AsistenciaDia({ horario, dia, userId, nombre, t }: {
             {a12(salidaReal) ?? "—"}
             {difSalida != null && difSalida < -5 && <span className="ml-1.5 text-[10px] font-semibold text-warning">{difSalida}m</span>}
           </div>
-        </div>
-        <div className="rounded-panel border border-border/40 bg-card/30 p-2.5">
-          <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{t("hr.exp.horasTrabajadas")}</div>
-          <div className="mt-1 font-display text-sm font-bold tabular-nums text-success">{dia.horas.toFixed(1)}h</div>
         </div>
       </div>
       {(diasTardes || dioSalidaTemprano) && (

@@ -127,7 +127,7 @@ function TurnoDetalle({ turno, dia, resumen, t, onVolver, onPersona }: {
   const personas = todas.filter((p) => p.turnoAsignado === turno.key);
   const sinTurno = todas.filter((p) => p.turnoAsignado === null);
   const enProblema = personas.filter((p) => p.nota.valor != null && (p.nota.valor as number) < 60).length;
-  const [vista, setVista] = useState<"personas" | "deptos">("personas");
+  const [vista, setVista] = useState<"personas" | "deptos">("deptos");
   const Icono = turno.icon;
   return (
     <div className="space-y-4">
@@ -347,15 +347,15 @@ function PersonasConFiltro({ personas, cargando, t, onPersona, agruparPorEquipo 
             <div className="flex flex-col gap-4">
               {tarde.length > 0 && (
                 <div>
-                  <p className="mb-1.5 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-destructive">
-                    <Clock className="h-3 w-3" />{t("hr.hist.secTarde", { n: tarde.length })}
+                  <p className="mb-1.5 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                    <Clock className="h-3 w-3 text-warning/70" />{t("hr.hist.secTarde", { n: tarde.length })}
                   </p>
                   <div className="flex flex-col gap-1.5">{tarde.map(fila)}</div>
                 </div>
               )}
               {puntuales.length > 0 && (
                 <div>
-                  <p className="mb-1.5 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-success">
+                  <p className="mb-1.5 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground/70">
                     <Clock className="h-3 w-3" />{t("hr.hist.secATiempo", { n: puntuales.length })}
                   </p>
                   <div className="flex flex-col gap-1.5">{puntuales.map(fila)}</div>
