@@ -28,6 +28,8 @@ export type SkinId =
   | "dorado"
   | "kash"
   | "diva"
+  | "gris"
+  | "negro"
   | "unlimited"
   | "unlok";
 
@@ -60,6 +62,9 @@ export const SKINS: SkinDef[] = [
   definirSkin({ id: "dorado", primary: "hsl(43 80% 30%)", accent: "hsl(30 85% 45%)" }, "int.skin.dorado"),
   definirSkin({ id: "kash", primary: "hsl(350 80% 42%)", accent: "hsl(15 90% 50%)" }, "int.skin.kash"),
   definirSkin({ id: "diva", primary: "hsl(330 85% 48%)", accent: "hsl(350 90% 60%)" }, "int.skin.diva"),
+  // Neutros (gris / negro): solo acento; la atmósfera NO se tiñe (ver applySkin).
+  definirSkin({ id: "gris", primary: "hsl(220 8% 38%)", accent: "hsl(220 8% 48%)" }, "int.skin.gris"),
+  definirSkin({ id: "negro", primary: "hsl(220 10% 20%)", accent: "hsl(220 9% 34%)" }, "int.skin.negro"),
   // Líneas de negocio — van después del separador "Líneas" del picker
   // (Kash ya tiene su preset propio arriba, "Rojo Kash").
   definirSkin({ id: "unlimited", primary: "hsl(150 56% 33%)", accent: "hsl(190 90% 45%)", group: "linea" }, "int.skin.unlimited"),
@@ -85,15 +90,23 @@ const hueDeSkin = (skin: SkinId): number => {
 // detalles) para que sigan el color del skin, no solo el acento. Es la distancia
 // del hue del skin al morado base; Maven = 0 (queda intacto). Decisión de Alvaro
 // (03/11): al elegir un skin, todo recolorea, sin morado suelto.
+// Skins neutros (gris/negro): como son casi sin color, teñir toda la escena con
+// su "hue" se vería sucio. Se tratan como Maven para la atmósfera (fondo azul
+// base, sin rotar); solo cambia el ACENTO (botones/enlaces/ring), que es lo que
+// pidió Alvaro. "Los fondos quedan igual", como dice el texto del picker.
+const SKINS_NEUTROS = new Set<SkinId>(["gris", "negro"]);
+
 export const applySkin = (skin: SkinId) => {
   if (skin === "maven") delete document.documentElement.dataset.skin;
   else document.documentElement.dataset.skin = skin;
-  const h = hueDeSkin(skin);
-  const rot = skin === "maven" ? 0 : ((h - BASE_HUE + 360) % 360);
+  const neutro = SKINS_NEUTROS.has(skin);
+  const h = neutro ? hueDeSkin("maven") : hueDeSkin(skin);
+  const rot = skin === "maven" || neutro ? 0 : ((h - BASE_HUE + 360) % 360);
   document.documentElement.style.setProperty("--skin-rot", `${rot}deg`);
   // --skin-h: el HUE crudo del skin. Los radiales de la atmósfera (index.css)
   // se pintan con hsl(var(--skin-h) …) SIN filtro, así el fondo entero toma el
   // color del skin y el contenido (texto, íconos, swatches) nunca se tiñe.
+  // Para los neutros se deja el azul base de Maven (fondo intacto).
   document.documentElement.style.setProperty("--skin-h", `${h}`);
 };
 
