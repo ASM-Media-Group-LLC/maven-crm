@@ -55,19 +55,25 @@ const fallaPrincipal = (bajones: BajonDia[]): BajonDia | null => {
 // el número NO es de fiar todavía (muestra chica o sin medir) — el "chequeo"
 // que pidió Alvaro: nunca mostrar un 100% como si fuera verdad probada.
 function Tile({ icon: Icon, label, valor, sub, malo, flojo }: { icon: typeof Camera; label: string; valor: string; sub?: string; malo?: boolean; flojo?: boolean }) {
+  // Lenguaje glassy del resto de Maven (Alvaro, 08/11: "el rojo se ve de la
+  // verga"). En vez de un cajón con borde rojo plano, tarjeta de vidrio con glow
+  // SUTIL: rojo si hay problema, ámbar si el dato no es de fiar, azul normal.
+  const glow = malo ? "glow-r" : flojo ? "glow-a" : "glow-b";
   return (
-    <div className={`flex flex-col gap-2 rounded-2xl border p-4 ${malo ? "border-destructive/40 bg-destructive/5" : flojo ? "border-warning/40 bg-warning/5" : "border-border/40 bg-card/20"}`}>
-      <div className="flex items-center gap-2 text-muted-foreground">
-        <Icon className={`h-4 w-4 shrink-0 ${malo ? "text-destructive/80" : flojo ? "text-warning/80" : ""}`} />
-        <span className="truncate text-xs">{label}</span>
-      </div>
-      <div className={`font-display text-2xl font-bold leading-none tabular-nums ${malo ? "text-destructive" : flojo ? "text-warning" : ""}`}>{valor}</div>
-      {sub && (
-        <div className={`flex items-center gap-1 text-[11px] ${flojo ? "text-warning/90" : "text-muted-foreground"}`}>
-          {flojo && <AlertTriangle className="h-3 w-3 shrink-0" />}
-          <span className="truncate">{sub}</span>
+    <div className={`vidrio vidrio-glow ${glow} p-4`}>
+      <div className="v-cont flex flex-col gap-2">
+        <div className="flex items-center gap-2 text-muted-foreground">
+          <Icon className={`h-4 w-4 shrink-0 ${malo ? "text-destructive/80" : flojo ? "text-warning/80" : ""}`} />
+          <span className="truncate text-xs">{label}</span>
         </div>
-      )}
+        <div className={`font-display text-2xl font-bold leading-none tabular-nums ${malo ? "text-destructive" : flojo ? "text-warning" : ""}`}>{valor}</div>
+        {sub && (
+          <div className={`flex items-center gap-1 text-[11px] ${flojo ? "text-warning/90" : "text-muted-foreground"}`}>
+            {flojo && <AlertTriangle className="h-3 w-3 shrink-0" />}
+            <span className="truncate">{sub}</span>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
