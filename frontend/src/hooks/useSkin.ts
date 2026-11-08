@@ -90,10 +90,10 @@ const hueDeSkin = (skin: SkinId): number => {
 // detalles) para que sigan el color del skin, no solo el acento. Es la distancia
 // del hue del skin al morado base; Maven = 0 (queda intacto). Decisión de Alvaro
 // (03/11): al elegir un skin, todo recolorea, sin morado suelto.
-// Skins neutros (gris/negro): como son casi sin color, teñir toda la escena con
-// su "hue" se vería sucio. Se tratan como Maven para la atmósfera (fondo azul
-// base, sin rotar); solo cambia el ACENTO (botones/enlaces/ring), que es lo que
-// pidió Alvaro. "Los fondos quedan igual", como dice el texto del picker.
+// Skins neutros (gris/negro): su escena (fondo gris/negro) la pinta el CSS
+// directo (bloques html[data-skin="gris"|"negro"] .fondo-glass en index.css),
+// no el hue. Acá solo se evita rotar los glows de las tarjetas (rot = 0) y se
+// deja --skin-h en el base, ya que para estos skins la atmósfera no lo usa.
 const SKINS_NEUTROS = new Set<SkinId>(["gris", "negro"]);
 
 export const applySkin = (skin: SkinId) => {
