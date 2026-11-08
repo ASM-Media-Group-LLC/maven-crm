@@ -114,15 +114,21 @@ export default function HRMonitorIA() {
   const { isAdmin } = useUserRole();
   const { config } = useMonitorConfig(true);
 
-  // Argos en PESTAÑAS. Entra en «Conectados ahora» (el tablero de personal); el
-  // vivo y las alertas quedan en sus pestañas. La pestaña vive en la URL (?t=…)
-  // para que al entrar a un perfil y volver (atrás del navegador) Argos te deje
-  // DONDE ESTABAS, no reiniciado (Álvaro, 02/11).
-  type TabArgos = "panel" | "equipo" | "envivo" | "historial" | "ajustes";
+  // Argos en 3 PESTAÑAS (Alvaro, 08/11): antes eran 5 y se pisaban.
+  //   · Ahora  = el piso en vivo: tablero de caras con semáforo + muralla de pantallazos.
+  //   · El día = resumen del día (números + tendencia) + historial por turno.
+  //   · Ajustes.
+  // La pestaña vive en la URL (?t=…) para volver DONDE ESTABAS al entrar a un
+  // perfil y pulsar atrás. Mapeamos los nombres viejos (panel/equipo/envivo/
+  // historial) a los nuevos para no romper links guardados.
+  type TabArgos = "ahora" | "dia" | "ajustes";
   const [searchParams, setSearchParams] = useSearchParams();
-  const TABS_VALIDAS: TabArgos[] = ["panel", "equipo", "envivo", "historial", "ajustes"];
-  const tabURL = searchParams.get("t") as TabArgos | null;
-  const tab: TabArgos = tabURL && TABS_VALIDAS.includes(tabURL) ? tabURL : "panel";
+  const VIEJO_A_NUEVO: Record<string, TabArgos> = {
+    ahora: "ahora", dia: "dia", ajustes: "ajustes",
+    equipo: "ahora", envivo: "ahora", panel: "dia", historial: "dia", resumen: "dia", atencion: "ahora",
+  };
+  const tabURL = searchParams.get("t");
+  const tab: TabArgos = (tabURL && VIEJO_A_NUEVO[tabURL]) || "ahora";
   const setTab = (k: TabArgos) => setSearchParams((prev) => { const n = new URLSearchParams(prev); n.set("t", k); return n; }, { replace: true });
 
   const monitorOff = config ? !config.activo : false;
@@ -146,13 +152,11 @@ export default function HRMonitorIA() {
         }
       />
 
-      {/* Pestañas de Argos */}
+      {/* Pestañas de Argos (3) */}
       {(() => {
         const tabs: Array<{ k: TabArgos; label: string }> = [
-          { k: "panel", label: t("hr.monia.tab.panel") },
-          { k: "equipo", label: t("hr.monia.tab.equipo") },
-          { k: "envivo", label: t("hr.monia.tab.envivo") },
-          ...(isAdmin ? [{ k: "historial" as TabArgos, label: t("hr.monia.tab.historial") }] : []),
+          { k: "ahora", label: t("hr.monia.tab.ahora") },
+          { k: "dia", label: t("hr.monia.tab.dia") },
           ...(isAdmin ? [{ k: "ajustes" as TabArgos, label: t("hr.monia.tab.ajustes") }] : []),
         ];
         return (
@@ -171,17 +175,21 @@ export default function HRMonitorIA() {
         );
       })()}
 
-      {/* PORTADA — Panel del día: números de disciplina + podio + equipo. */}
-      {tab === "panel" && <div className="mt-5"><ArgosPanelDia /></div>}
+      {/* AHORA — el piso en vivo: tablero de caras con semáforo + muralla de pantallazos. */}
+      {tab === "ahora" && (
+        <div className="mt-5 flex flex-col gap-5">
+          <ConectadosAhoraPanel />
+          <PantallazosVivoPanel />
+        </div>
+      )}
 
-      {/* Conectados ahora: el equipo y su día; clic en alguien → su día. */}
-      {tab === "equipo" && <div className="mt-5"><ConectadosAhoraPanel /></div>}
-
-      {/* Pantallazos en vivo: la muralla (Muralla/Cuadrícula/Lista). */}
-      {tab === "envivo" && <div className="mt-5"><PantallazosVivoPanel /></div>}
-
-      {/* Historial del día: gráfica por hora + 3 cajas por turno (dueño/admin). */}
-      {tab === "historial" && isAdmin && <div className="mt-5"><ArgosHistorial /></div>}
+      {/* EL DÍA — resumen (números + tendencia) + historial por turno (solo admin). */}
+      {tab === "dia" && (
+        <div className="mt-5 flex flex-col gap-5">
+          <ArgosPanelDia />
+          {isAdmin && <ArgosHistorial />}
+        </div>
+      )}
 
       {/* Ajustes (solo dueño): 4 secciones limpias — Argos general, la voz, qué
           avisa (situaciones) y el contexto. Lo viejo (KPIs de faltas, lista de

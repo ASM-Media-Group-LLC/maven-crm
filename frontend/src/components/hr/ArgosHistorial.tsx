@@ -417,7 +417,7 @@ export function ArgosHistorial() {
   const moverDia = (delta: number) => { const s = sumarDias(dia, delta); if (s <= hoy) setDia(s); };
   const { horas, cargando, error, refrescar } = useHorasDia(dia, true);
   const irAExpediente = (id: string, eq?: string) => {
-    const volverA = `/hr/monitor-ia?t=historial${eq ? `&vista=equipos&eq=${encodeURIComponent(eq)}` : ""}`;
+    const volverA = `/hr/monitor-ia?t=dia${eq ? `&vista=equipos&eq=${encodeURIComponent(eq)}` : ""}`;
     navigate(`/hr/expediente/${id}`, { state: { volverA } });
   };
 

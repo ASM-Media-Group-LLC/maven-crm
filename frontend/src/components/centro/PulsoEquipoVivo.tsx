@@ -176,7 +176,7 @@ export default function PulsoEquipoVivo({ coworkConectados }: { coworkConectados
               de Argos. El home es el vistazo rápido; el detalle, un clic allá. */}
           <button
             type="button"
-            onClick={() => navigate("/hr/monitor-ia?t=equipo")}
+            onClick={() => navigate("/hr/monitor-ia?t=ahora")}
             className="vidrio vidrio-glow vidrio-lift glow-b flex w-full items-center gap-3 p-3.5 text-left"
           >
             <span className="v-cont flex w-full items-center gap-3">

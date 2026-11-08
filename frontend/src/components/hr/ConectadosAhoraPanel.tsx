@@ -152,7 +152,7 @@ export function ConectadosAhoraPanel() {
                 <button
                   key={p.userId}
                   type="button"
-                  onClick={() => navigate(`/hr/expediente/${p.userId}`, { state: { volverA: "/hr/monitor-ia?t=equipo" } })}
+                  onClick={() => navigate(`/hr/expediente/${p.userId}`, { state: { volverA: "/hr/monitor-ia?t=ahora" } })}
                   title={`${nombre} · ${estado}`}
                   className={`group flex flex-col items-center gap-1.5 rounded-2xl border bg-card/20 px-2 py-3 text-center transition-colors hover:bg-card/40 ${sem === "rojo" || sem === "naranja" ? "border-destructive/40" : "border-border/40 hover:border-primary/40"}`}
                 >

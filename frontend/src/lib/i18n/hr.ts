@@ -1042,6 +1042,14 @@ export const hr = {
   "hr.monia.tab.panel": { es: "Panel del día", en: "Day board" },
   "hr.monia.tab.equipo": { es: "Conectados ahora", en: "Connected now" },
   "hr.monia.tab.envivo": { es: "Pantallazos en vivo", en: "Live screenshots" },
+  // Pestañas nuevas (Alvaro, 08/11): de 5 pestañas a 3 — Ahora (conectados +
+  // pantallazos), El día (resumen + historial) y Ajustes.
+  "hr.monia.tab.ahora": { es: "Ahora", en: "Now" },
+  "hr.monia.tab.dia": { es: "El día", en: "The day" },
+  "hr.monia.secc.tablero": { es: "El piso ahora mismo", en: "The floor right now" },
+  "hr.monia.secc.pantallazos": { es: "Pantallazos en vivo", en: "Live screenshots" },
+  "hr.monia.secc.resumen": { es: "Resumen del día", en: "Day summary" },
+  "hr.monia.secc.historial": { es: "Historial por turno", en: "History by shift" },
   "hr.monia.tab.atencion": { es: "Atención ahora", en: "Attention now" },
   "hr.monia.tab.resumen": { es: "Resumen del día", en: "Day summary" },
   "hr.monia.tab.ajustes": { es: "Ajustes", en: "Settings" },
