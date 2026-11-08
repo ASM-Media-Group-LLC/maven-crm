@@ -1218,6 +1218,7 @@ export const hr = {
   "hr.hist.enProblema": { es: "{n} en problema", en: "{n} with issues" },
   "hr.hist.enProblemaLbl": { es: "en problema", en: "with issues" },
   "hr.hist.sinGente": { es: "Nadie trabajó este turno.", en: "Nobody worked this shift." },
+  "hr.hist.sinTurnoAsignado": { es: "Sin turno asignado · {n} (estuvieron activos en esta franja)", en: "No assigned shift · {n} (active in this window)" },
   "hr.hist.cargando": { es: "Cargando…", en: "Loading…" },
   "hr.hist.deptos": { es: "Por departamento", en: "By department" },
   "hr.hist.deptoGente": { es: "{n} personas", en: "{n} people" },

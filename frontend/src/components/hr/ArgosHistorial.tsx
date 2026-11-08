@@ -115,7 +115,12 @@ function TurnoDetalle({ turno, dia, resumen, t, onVolver, onPersona }: {
   turno: Turno; dia: string; resumen: { pantalla: number | null; camara: number | null; atencion: number | null; personas: number };
   t: Tr; onVolver: () => void; onPersona: (id: string) => void;
 }) {
-  const { personas, cargando } = useTurnoPersonas(dia, turno.from, turno.to, true);
+  const { personas: todas, cargando } = useTurnoPersonas(dia, turno.from, turno.to, true);
+  // Solo la gente ASIGNADA a este turno por su horario (Alvaro, 08/11): Eric es
+  // de madrugada y seguía conectado a las 8 → NO aparece en AM. Los que no tienen
+  // horario asignado van a un apartado "Sin turno asignado", no se mezclan.
+  const personas = todas.filter((p) => p.turnoAsignado === turno.key);
+  const sinTurno = todas.filter((p) => p.turnoAsignado === null);
   const enProblema = personas.filter((p) => p.nota.valor != null && (p.nota.valor as number) < 60).length;
   const Icono = turno.icon;
   return (
@@ -152,6 +157,19 @@ function TurnoDetalle({ turno, dia, resumen, t, onVolver, onPersona }: {
           ver por departamento, no un putazo de gente toda revuelta"). Clic en
           una caja → ves solo la gente de ese depto en este turno. */}
       <DeptosDelTurno personas={personas} cargando={cargando} t={t} onPersona={onPersona} />
+
+      {/* Apartado aparte: quienes estuvieron activos en esta franja pero NO tienen
+          turno asignado. No se mezclan con los del turno. */}
+      {!cargando && sinTurno.length > 0 && (
+        <details className="rounded-2xl border border-dashed border-border/40 bg-card/10 p-3">
+          <summary className="cursor-pointer select-none text-xs font-medium text-muted-foreground">
+            {t("hr.hist.sinTurnoAsignado", { n: sinTurno.length })}
+          </summary>
+          <div className="mt-3">
+            <PersonasConFiltro personas={sinTurno} cargando={false} t={t} onPersona={onPersona} />
+          </div>
+        </details>
+      )}
     </div>
   );
 }

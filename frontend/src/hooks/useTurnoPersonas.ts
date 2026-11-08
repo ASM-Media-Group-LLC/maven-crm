@@ -29,6 +29,19 @@ export interface PersonaTurno {
   /** Minutos de tardanza respecto al horario asignado, pasada la tolerancia. null si
    *  no tiene horario asignado o no se registró ingreso. Positivo = llegó tarde. */
   tardeMin: number | null;
+  /** Turno al que la persona está ASIGNADA por su horario (no por cuándo estuvo
+   *  activa). "madrugada" 0-8, "am" 8-16, "pm" 16-24; null si no tiene horario. */
+  turnoAsignado: "madrugada" | "am" | "pm" | null;
+}
+
+/** Turno asignado a partir de la hora de entrada (HH:MM). */
+export function turnoDeEntrada(entrada: string | null): "madrugada" | "am" | "pm" | null {
+  if (!entrada) return null;
+  const h = Number(entrada.split(":")[0]);
+  if (Number.isNaN(h)) return null;
+  if (h < 8) return "madrugada";
+  if (h < 16) return "am";
+  return "pm";
 }
 
 // El EQUIPO de una persona a partir de su puesto (los UUIDs del campo cowork.equipo
@@ -163,6 +176,7 @@ export function useTurnoPersonas(dia: string, hDesde: number, hHasta: number, ha
           entroHHMM: h ? hhmmBogota(h.primero) : null,
           salioHHMM: h ? hhmmBogota(h.ultimo) : null,
           tardeMin,
+          turnoAsignado: turnoDeEntrada(horPers.entrada),
         };
       });
 
