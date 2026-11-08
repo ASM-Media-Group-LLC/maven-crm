@@ -227,32 +227,35 @@ function DeptosDelTurno({ personas, cargando, t, onPersona }: {
       <p className="mb-2 flex items-center gap-1.5 text-xs font-semibold text-muted-foreground"><Eye className="h-3.5 w-3.5" />{t("hr.hist.deptos")}</p>
       <div className="grid gap-2.5 sm:grid-cols-2 lg:grid-cols-3">
         {deptos.map((d) => {
-          const tono = d.conFallas > 0 ? "border-destructive/30 hover:border-destructive/50" :
-            (d.notaProm ?? 100) < 60 ? "border-warning/30 hover:border-warning/50" :
-            "border-border/40 hover:border-primary/40";
-          const notaColor = d.notaProm == null ? "text-muted-foreground" :
-            d.notaProm >= 80 ? "text-success" : d.notaProm >= 60 ? "text-warning" : "text-destructive";
+          // Glassy (Alvaro 08/11): tarjeta de vidrio con glow sutil según cómo
+          // va el depto; la nota ya no es un número gigante suelto a la derecha,
+          // sino un tile chico tintado.
+          const glow = d.conFallas > 0 ? "glow-r" : (d.notaProm ?? 100) < 80 ? "glow-a" : "glow-g";
+          const notaTile = d.notaProm == null ? "bg-muted/40 text-muted-foreground" :
+            d.notaProm >= 80 ? "bg-success/15 text-success" : d.notaProm >= 60 ? "bg-warning/15 text-warning" : "bg-destructive/15 text-destructive";
           return (
             <button key={d.nombre} type="button" onClick={() => setDeptoSel(d.nombre)}
-              className={`group flex items-center gap-3 rounded-xl border bg-card/20 px-3 py-2.5 text-left transition hover:bg-card/40 ${tono}`}>
-              <div className="min-w-0 flex-1">
-                <div className="flex items-baseline gap-2">
-                  <span className="truncate text-sm font-semibold">{d.nombre}</span>
-                  <span className="text-[11px] text-muted-foreground tabular-nums">{t("hr.hist.deptoGente", { n: d.total })}</span>
+              className={`group vidrio vidrio-glow vidrio-lift ${glow} text-left`}>
+              <div className="v-cont flex items-center gap-3 px-3.5 py-2.5">
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-baseline gap-2">
+                    <span className="truncate text-sm font-semibold">{d.nombre}</span>
+                    <span className="text-[11px] text-muted-foreground tabular-nums">{t("hr.hist.deptoGente", { n: d.total })}</span>
+                  </div>
+                  <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px]">
+                    {d.conFallas > 0 ? (
+                      <span className="inline-flex items-center gap-1 text-destructive"><AlertTriangle className="h-3 w-3" />{t("hr.hist.deptoConFallas", { n: d.conFallas })}</span>
+                    ) : (
+                      <span className="text-success">{t("hr.hist.deptoSinFallas")}</span>
+                    )}
+                    {d.conTarde > 0 && (
+                      <span className="inline-flex items-center gap-1 text-warning">· <Clock className="h-3 w-3" />{t("hr.hist.deptoTarde", { n: d.conTarde })}</span>
+                    )}
+                  </div>
                 </div>
-                <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px]">
-                  {d.conFallas > 0 ? (
-                    <span className="inline-flex items-center gap-1 text-destructive"><AlertTriangle className="h-3 w-3" />{t("hr.hist.deptoConFallas", { n: d.conFallas })}</span>
-                  ) : (
-                    <span className="text-success">{t("hr.hist.deptoSinFallas")}</span>
-                  )}
-                  {d.conTarde > 0 && (
-                    <span className="inline-flex items-center gap-1 text-warning">· <Clock className="h-3 w-3" />{t("hr.hist.deptoTarde", { n: d.conTarde })}</span>
-                  )}
-                </div>
+                <span className={`shrink-0 rounded-lg px-2 py-1 font-display text-sm font-bold tabular-nums ${notaTile}`}>{d.notaProm ?? "—"}</span>
+                <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground/60 transition group-hover:translate-x-0.5 group-hover:text-foreground" />
               </div>
-              <span className={`shrink-0 font-display text-lg font-bold tabular-nums ${notaColor}`}>{d.notaProm ?? "—"}</span>
-              <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground/60 transition group-hover:translate-x-0.5 group-hover:text-foreground" />
             </button>
           );
         })}
