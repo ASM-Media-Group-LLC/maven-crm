@@ -546,7 +546,7 @@ function PruebaTardanza({ userId, fecha, nombre, entroAt, horarioEntrada, entrad
             </div>
           </div>
           <Button variant="outline" size="sm" className="self-start rounded-control" onClick={() => setVerCorreo(true)}>
-            <Mail className="mr-1.5 h-3.5 w-3.5" />{t("hr.exp.prueba.verCorreo")}
+            <Mail className="mr-1.5 h-3.5 w-3.5" />{correo?.enviadoAt ? t("hr.exp.prueba.verCorreo") : t("hr.exp.prueba.verCorreoPreview")}
           </Button>
         </div>
       </div>
@@ -562,7 +562,7 @@ function PruebaTardanza({ userId, fecha, nombre, entroAt, horarioEntrada, entrad
       {/* El correo exacto que se mandó */}
       <Dialog open={verCorreo} onOpenChange={setVerCorreo}>
         <DialogContent className="max-w-2xl overflow-hidden p-0">
-          <DialogTitle className="border-b border-border/40 p-4">{t("hr.exp.prueba.correoTitulo")}</DialogTitle>
+          <DialogTitle className="border-b border-border/40 p-4">{correo?.enviadoAt ? t("hr.exp.prueba.correoTitulo") : t("hr.exp.prueba.verCorreoPreview")}</DialogTitle>
           {correo?.a && correo.a.length > 0 && (
             <p className="px-4 pt-3 text-[11px] text-muted-foreground">
               <span className="font-semibold">{t("hr.exp.prueba.destinatarios")}</span> {correo.a.join(" · ")}
@@ -576,7 +576,7 @@ function PruebaTardanza({ userId, fecha, nombre, entroAt, horarioEntrada, entrad
               horario: horarioEntrada ?? "—",
               entro: entradaReal ?? "—",
               tardeMin,
-              esPrueba: false,
+              esPrueba: !correo?.enviadoAt,
             })}
             className="w-full border-0"
             style={{ height: "min(70vh, 640px)", background: "#eef1f6" }}
