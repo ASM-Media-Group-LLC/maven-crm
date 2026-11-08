@@ -346,7 +346,11 @@ Deno.serve(async (req) => {
         { path: "/contacts", scope: "contacts:read" },
         { path: "/contacts/{id}", scope: "contacts:read" },
         { path: "/employees", scope: "employees:read" },
+        { path: "/employees/{id}", scope: "employees:read" },
         { path: "/hubstaff", scope: "hubstaff:read" },
+        { path: "/attendance", scope: "attendance:read" },
+        { path: "/argos/notas", scope: "argos:read" },
+        { path: "/argos/screens", scope: "argos:read" },
         { path: "/cowork/time", scope: "cowork:read" },
         { path: "/cowork/time/segments", scope: "cowork:read" },
         { path: "/cowork/breaks", scope: "cowork:read" },
@@ -590,6 +594,43 @@ Deno.serve(async (req) => {
   // ===== /employees =====
   if (resource === "employees") {
     if (!need("employees:read")) return json(req, { error: "forbidden", message: msg(idioma, "falta_scope", { scope: "employees:read" }) }, 403);
+
+    // /employees/{id} → perfil completo (nivel, turno, horarios, status, deleted_at).
+    if (sub) {
+      const { data: p, error } = await admin
+        .from("profiles")
+        .select("id, full_name, avatar_url, is_owner, nivel, hora_entrada, hora_salida, comida_min, bano_min, turno_id, status, status_text, status_expires_at, exonera_camara_pantalla, deleted_at, deleted_by, created_at")
+        .eq("id", sub)
+        .maybeSingle();
+      if (error) return json(req, { error: "server_error", message: error.message }, 500);
+      if (!p) return json(req, { error: "not_found", message: "empleado no encontrado" }, 404);
+      const row = p as Record<string, unknown>;
+      const { data: ur } = await admin.from("user_roles").select("role").eq("user_id", sub).maybeSingle();
+      let turno: Record<string, unknown> | null = null;
+      if (row.turno_id) {
+        const { data: t } = await admin.from("rol_turnos").select("id, nombre, hora_entrada, hora_salida").eq("id", row.turno_id).maybeSingle();
+        turno = (t ?? null) as Record<string, unknown> | null;
+      }
+      return json(req, {
+        object: "employee", id: row.id,
+        name: row.full_name ?? null, role: (ur as { role?: string } | null)?.role ?? null,
+        level: row.nivel ?? null,
+        is_owner: row.is_owner ?? false,
+        avatar_url: row.avatar_url ?? null,
+        status: row.status ?? null, status_text: row.status_text ?? null, status_expires_at: row.status_expires_at ?? null,
+        shift: turno,
+        schedule: {
+          entry_time: row.hora_entrada ?? turno?.hora_entrada ?? null,
+          exit_time: row.hora_salida ?? turno?.hora_salida ?? null,
+          lunch_minutes: row.comida_min ?? null,
+          bathroom_minutes: row.bano_min ?? null,
+        },
+        camera_screen_exempt: row.exonera_camara_pantalla === true,
+        deleted_at: row.deleted_at ?? null, deleted_by: row.deleted_by ?? null,
+        created_at: row.created_at ?? null,
+      });
+    }
+
     const { limit, offset } = pageParams(url);
     const roleFilter = url.searchParams.get("role");
 
@@ -804,6 +845,87 @@ Deno.serve(async (req) => {
     });
     if (error) return json(req, { error: "server_error", message: error.message }, 500);
     return json(req, { object: "list", resource: "promolog", count: (data ?? []).length, limit, offset, data: data ?? [] });
+  }
+
+  // ===== /attendance (clock-in/out, horas trabajadas, tardanzas) =====
+  if (resource === "attendance") {
+    if (!need("attendance:read")) return json(req, { error: "forbidden", message: msg(idioma, "falta_scope", { scope: "attendance:read" }) }, 403);
+    const { limit, offset } = pageParams(url);
+    const { data, error } = await admin.rpc("api_attendance", {
+      _from: url.searchParams.get("from"),
+      _to: url.searchParams.get("to"),
+      _profile_id: url.searchParams.get("profile_id"),
+      _limit: limit, _offset: offset,
+    });
+    if (error) return json(req, { error: "server_error", message: error.message }, 500);
+    const r = (data ?? { data: [], count: 0 }) as { data: unknown[]; count: number };
+    return json(req, { object: "list", resource: "attendance", count: r.count ?? (r.data ?? []).length, limit, offset, data: r.data ?? [] });
+  }
+
+  // ===== /argos (notas + screens) =====
+  if (resource === "argos") {
+    if (!need("argos:read")) return json(req, { error: "forbidden", message: msg(idioma, "falta_scope", { scope: "argos:read" }) }, 403);
+    const { limit, offset } = pageParams(url);
+
+    if (sub === "notas") {
+      const { data, error } = await admin.rpc("api_argos_notas", {
+        _from: url.searchParams.get("from"),
+        _to: url.searchParams.get("to"),
+        _profile_id: url.searchParams.get("profile_id"),
+        _limit: limit, _offset: offset,
+      });
+      if (error) return json(req, { error: "server_error", message: error.message }, 500);
+      const r = (data ?? { data: [], count: 0 }) as { data: unknown[]; count: number };
+      return json(req, { object: "list", resource: "argos/notas", count: r.count ?? (r.data ?? []).length, limit, offset, data: r.data ?? [] });
+    }
+
+    if (sub === "screens") {
+      // Pantallazos de la cámara y de la pantalla, con el veredicto de la IA.
+      // URL firmada (10 min) para la imagen original. Tope de limit 200.
+      const topeLimit = Math.min(200, limit);
+      const tipo = url.searchParams.get("tipo"); // "camara" | "pantalla" | null
+      const from = url.searchParams.get("from");
+      const to = url.searchParams.get("to");
+      const profileId = url.searchParams.get("profile_id");
+
+      let q = admin.from("monitor_capturas")
+        .select("id, user_id, tipo, path, veredicto, cara_visible, fuera_de_lugar, room_nombre, created_at, en_nas, perdonado", { count: "exact" });
+      if (profileId) q = q.eq("user_id", profileId);
+      if (tipo && (tipo === "camara" || tipo === "pantalla")) q = q.eq("tipo", tipo);
+      if (from) q = q.gte("created_at", from);
+      if (to) q = q.lte("created_at", to);
+      q = q.order("created_at", { ascending: false }).range(offset, offset + topeLimit - 1);
+      const { data: rows, count, error } = await q;
+      if (error) return json(req, { error: "server_error", message: error.message }, 500);
+
+      const paths = ((rows ?? []) as Array<{ path: string | null }>).map((r) => r.path).filter(Boolean) as string[];
+      const urlPorPath = new Map<string, string>();
+      if (paths.length > 0) {
+        // Firma de un rango (10 min). El bucket donde viven las capturas es "monitor".
+        const { data: firmadas } = await admin.storage.from("monitor-capturas").createSignedUrls(paths, 600);
+        for (const f of (firmadas ?? []) as Array<{ path?: string; signedUrl?: string }>) {
+          if (f.path && f.signedUrl) urlPorPath.set(f.path, f.signedUrl);
+        }
+      }
+
+      const data = ((rows ?? []) as Array<Record<string, unknown>>).map((r) => ({
+        id: r.id,
+        employee_id: r.user_id,
+        kind: r.tipo,
+        captured_at: r.created_at,
+        room: r.room_nombre ?? null,
+        verdict: r.veredicto ?? null,
+        face_visible: r.cara_visible ?? null,
+        off_task: r.fuera_de_lugar === true,
+        forgiven: r.perdonado === true,
+        archived_in_nas: r.en_nas === true,
+        image_url: r.path ? (urlPorPath.get(r.path as string) ?? null) : null,
+        image_url_expires_in_seconds: r.path && urlPorPath.has(r.path as string) ? 600 : null,
+      }));
+      return json(req, { object: "list", resource: "argos/screens", count: count ?? data.length, limit: topeLimit, offset, data });
+    }
+
+    return json(req, { error: "not_found", message: `/argos/${sub ?? ""} no existe. Usá /argos/notas o /argos/screens.` }, 404);
   }
 
   return json(req, { error: "not_found", message: msg(idioma, "recurso_desconocido", { recurso: resource }) }, 404);

@@ -126,6 +126,16 @@ export const AISLAMIENTO_POR_RECURSO: MapaDeAislamiento = congelar({
     pendiente: "el dato es por persona: las RPC de cowork pueden filtrar por tenant_members " +
       "cuando tenant_members sea confiable",
   },
+  attendance: {
+    tipo: "sin_agencia",
+    pendiente: "el dato es por persona: api_attendance puede filtrar por tenant_members " +
+      "cuando tenant_members sea confiable",
+  },
+  argos: {
+    tipo: "sin_agencia",
+    pendiente: "el dato es por persona: api_argos_notas y monitor_capturas pueden filtrar " +
+      "por tenant_members cuando tenant_members sea confiable",
+  },
 });
 
 /** Tablas y funciones que public-api usa para AUTENTICAR, no para servir datos. */
@@ -174,6 +184,8 @@ export const FUENTES_POR_RECURSO: Record<string, string[]> = {
   "sales/chatters": ["chatter_daily_sales"],
   promolog: ["api_promolog_daily"],
   hubstaff: ["api_hubstaff_daily"],
+  attendance: ["api_attendance", "cowork_tiempo_segmentos", "tardanzas_registro"],
+  argos: ["api_argos_notas", "monitor_capturas", "cowork_tiempo_segmentos"],
   cowork: [
     "cowork_tiempo_diario",
     "cowork_pausas_resumen",
