@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { LayoutDashboard, Loader2, AlertTriangle, RefreshCw, ChevronRight, ChevronLeft, ChevronDown, Camera, ScreenShare, Sparkles, Trophy, Eye, Clock, CalendarDays } from "lucide-react";
+import { LayoutDashboard, Loader2, AlertTriangle, RefreshCw, ChevronRight, ChevronLeft, ChevronDown, Camera, ScreenShare, Clock, CalendarDays } from "lucide-react";
 import { useLanguage } from "@/hooks/useLanguage";
 import { UserAvatar } from "@/components/UserAvatar";
 import { useResumenDia, type PersonaResumen, type BajonDia } from "@/hooks/useResumenDia";
@@ -92,29 +92,6 @@ function FactorChip({ label, sub, alerta }: { label: string; sub: number | null;
 }
 
 // Una persona del podio: puesto, cara, nombre y su resumen de fallas.
-function PodioFila({ i, p, t, onClick }: { i: number; p: PersonaResumen; t: Tr; onClick: () => void }) {
-  const f = fallasDe(p);
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="group flex w-full items-center gap-3 rounded-xl px-2 py-2 text-left transition-colors hover:bg-card/40"
-    >
-      <span className="w-4 shrink-0 text-center text-sm font-semibold tabular-nums text-muted-foreground">{i + 1}</span>
-      <UserAvatar name={p.nombre || t("hr.noName")} src={p.avatarUrl} seed={p.avatarSeed} size="sm" />
-      <span className="min-w-0 flex-1 truncate text-sm font-medium">{p.nombre || t("hr.noName")}</span>
-      <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
-        {f.veces === 0
-          ? t("hr.panel.sinFallas")
-          : f.veces === 1
-            ? t("hr.panel.fallaResumenUno", { min: f.min })
-            : t("hr.panel.fallasResumen", { veces: f.veces, min: f.min })}
-      </span>
-      <ChevronRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground/50 transition group-hover:translate-x-0.5 group-hover:text-foreground" />
-    </button>
-  );
-}
-
 // Un renglón del equipo: SEMÁFORO (barra de color = su banda, los rojos saltan),
 // cara, nombre, la falla principal, la nota 0–100 EXPLICADA (sus 4 factores) y el
 // puntaje. Pantalla baja marcada en rojo (el problema #1 que Alvaro quiere ver).
@@ -336,53 +313,19 @@ export function ArgosPanelDia({ sinTendencia = false }: { sinTendencia?: boolean
           <div className="flex flex-col items-center gap-2 py-10 text-center text-muted-foreground"><LayoutDashboard className="h-7 w-7 opacity-40" /><p className="text-sm">{t("hr.panel.vacio")}</p></div>
         ) : (
           <>
-            {/* Números de DISCIPLINA del día (nada de producción: eso es del Centro) */}
-            <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-              <Tile
-                icon={Sparkles}
-                label={t("hr.panel.numAtencion")}
-                valor={d.atencion == null ? "—" : `${d.atencion}%`}
-                sub={d.juzgadasTotal > 0 ? t("hr.panel.miradas", { n: d.juzgadasTotal }) : t("hr.panel.sinMiradas")}
-                flojo={d.juzgadasTotal < 30}
-              />
-              <Tile
-                icon={Camera}
-                label={t("hr.panel.numCamara")}
-                valor={d.camara == null ? "—" : `${d.camara}%`}
-                sub={d.camaraMedidos > 0 ? t("hr.panel.camaraSobre", { n: d.camaraMedidos }) : t("hr.panel.camaraNadie")}
-                flojo={d.camaraMedidos > 0 && d.camaraMedidos < 3}
-              />
+            {/* Números de DISCIPLINA del día — 3 claros (Alvaro, 08/11: se quitó el
+                de "atención" porque la IA aún no juzga y quedaba siempre en "—").
+                Sin podio: estorbaba. Lo importante es quién está mal, abajo. */}
+            <div className="grid grid-cols-3 gap-3">
+              <Tile icon={Camera} label={t("hr.panel.numCamara")} valor={d.camara == null ? "—" : `${d.camara}%`} sub={d.camaraMedidos > 0 ? t("hr.panel.camaraSobre", { n: d.camaraMedidos }) : t("hr.panel.camaraNadie")} flojo={d.camaraMedidos > 0 && d.camaraMedidos < 3} />
               <Tile icon={ScreenShare} label={t("hr.panel.numPantalla")} valor={d.pantalla == null ? "—" : `${d.pantalla}%`} sub={t("hr.panel.promDe")} malo={d.pantalla != null && d.pantalla < 50} />
               <Tile icon={AlertTriangle} label={t("hr.panel.numProblema")} valor={`${d.enProblema}`} sub={t("hr.panel.numProblemaSub", { n: d.total })} malo={d.enProblema > 0} />
             </div>
 
-            {/* Podio: mejores / ojo con — por MENOS fallas del día */}
-            <div className="grid gap-3 md:grid-cols-2">
-              <div className="rounded-2xl border border-border/40 bg-card/10 p-3">
-                <p className="mb-1 flex items-center gap-2 px-2 text-xs font-medium text-muted-foreground">
-                  <Trophy className="h-3.5 w-3.5 text-success/80" />{t("hr.panel.mejores")}
-                  <span className="text-muted-foreground/60">· {t("hr.panel.porMenosFallas")}</span>
-                </p>
-                <div className="flex flex-col">
-                  {d.mejores.map((p, i) => <PodioFila key={p.userId} i={i} p={p} t={t} onClick={() => irA(p.userId)} />)}
-                </div>
-              </div>
-              <div className="rounded-2xl border border-border/40 bg-card/10 p-3">
-                <p className="mb-1 flex items-center gap-2 px-2 text-xs font-medium text-muted-foreground">
-                  <Eye className="h-3.5 w-3.5 text-destructive/80" />{t("hr.panel.peores")}
-                  <span className="text-muted-foreground/60">· {t("hr.panel.porMasFallas")}</span>
-                </p>
-                <div className="flex flex-col">
-                  {d.peores.map((p, i) => <PodioFila key={p.userId} i={i} p={p} t={t} onClick={() => irA(p.userId)} />)}
-                </div>
-              </div>
-            </div>
-
-            {/* El equipo EN CAJAS por estado — clic en alguien abre su día. Mal
-                y Ojo abren solas; Bien y Sin datos vienen cerradas. */}
+            {/* El equipo EN CAJAS por estado — lo accionable: quién está mal.
+                Clic en alguien abre su día. */}
             <div className="space-y-2">
               <p className="text-xs font-medium text-muted-foreground">{t("hr.panel.equipoTitulo")} · {d.total}</p>
-              {/* Todas vienen CERRADAS (Alvaro, 04/11): él abre la que necesite. */}
               <CajaEquipo titulo={t("hr.panel.cajaMal")} punto="bg-destructive" gente={d.mal} abierta={false} t={t} onPersona={irA} />
               <CajaEquipo titulo={t("hr.panel.cajaOjo")} punto="bg-warning" gente={d.ojo} abierta={false} t={t} onPersona={irA} />
               <CajaEquipo titulo={t("hr.panel.cajaBien")} punto="bg-success" gente={d.bien} abierta={false} t={t} onPersona={irA} />
