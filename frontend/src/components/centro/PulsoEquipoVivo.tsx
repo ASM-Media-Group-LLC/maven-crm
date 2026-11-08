@@ -1,15 +1,14 @@
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { formatDistanceToNowStrict } from "date-fns";
 import { es as esLocale } from "date-fns/locale";
 import { Activity, AlertTriangle, CheckCircle2, ChevronRight, Loader2, ShieldAlert, Users, Gauge } from "lucide-react";
 import { useLanguage } from "@/hooks/useLanguage";
 import { UserAvatar } from "@/components/UserAvatar";
-import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { TarjetaKpi } from "@/components/ui/TarjetaKpi";
 import { usePulsoEquipo } from "@/hooks/usePulsoEquipo";
 import type { EstadoVivo } from "@/hooks/useRondinVivo";
-import type { CajaEquipo, PersonaPulso } from "@/lib/pulsoEquipo";
+import type { PersonaPulso } from "@/lib/pulsoEquipo";
 import type { TranslationKey } from "@/lib/i18n";
 
 // EL PULSO DEL EQUIPO EN VIVO (Centro de operaciones · Alvaro, 05/11). Solo para
@@ -78,53 +77,13 @@ function FilaPersona({ p, t, lang, onAbrir, problema }: { p: PersonaPulso; t: Tr
   );
 }
 
-/** Caja de equipo con el mismo lenguaje glassy (clic → pop-up con los nombres). */
-function Caja({ caja, t, onVer }: { caja: CajaEquipo; t: Tr; onVer: () => void }) {
-  const tn = tonoBanda(caja.nota);
-  return (
-    <button type="button" onClick={onVer} className={`vidrio vidrio-glow vidrio-lift ${tn.glow} p-3.5 text-left`}>
-      <div className="v-cont flex flex-col gap-2.5">
-        <div className="flex items-center justify-between gap-2">
-          <span className="truncate text-sm font-semibold">{caja.equipo}</span>
-          <span className="flex shrink-0 items-center gap-2">
-            <span className="text-[11px] font-medium text-muted-foreground tabular-nums">
-              {t("dashboard.pulso.conectadosCaja", { conectados: caja.conectados, total: caja.total })}
-            </span>
-            <span className={`font-display text-base font-bold tabular-nums ${tn.texto}`}>{caja.nota ?? "—"}</span>
-          </span>
-        </div>
-        <div className="flex flex-wrap gap-1.5">
-          {caja.miembros.map((m) => {
-            const ui = ESTADO_UI[m.estado];
-            const letra = (m.nombre || "·").trim().charAt(0).toUpperCase() || "·";
-            return (
-              <span key={m.userId} title={`${m.nombre || "—"} · ${t(ESTADO_LBL[m.estado])}`}
-                className={`relative flex h-7 w-7 items-center justify-center rounded-full text-[11px] font-bold ${
-                  m.conectado ? "bg-card text-foreground ring-2" : "bg-muted/40 text-muted-foreground/60 ring-1"
-                } ${ui.anillo}`}>
-                {letra}
-                <span className={`absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full ring-2 ring-background ${ui.punto} ${m.problema ? "animate-pulse" : ""}`} />
-              </span>
-            );
-          })}
-        </div>
-        <span className="flex items-center gap-1 text-[11px] font-medium text-primary/80">
-          <Users className="h-3 w-3" />{t("dashboard.pulso.verQuienes")}
-        </span>
-      </div>
-    </button>
-  );
-}
-
 export default function PulsoEquipoVivo({ coworkConectados }: { coworkConectados?: number | null }) {
   const { t, language } = useLanguage();
   const navigate = useNavigate();
   const { puedeVer, pulso, cargando, error, ultimaRonda } = usePulsoEquipo();
-  const [equipoAbierto, setEquipoAbierto] = useState<string | null>(null);
 
   const ultima = useMemo(() => (ultimaRonda ? hace(ultimaRonda.toISOString(), language) : null), [ultimaRonda, language]);
   const abrir = (id: string) => navigate(`/hr/expediente/${id}`);
-  const cajaAbierta = equipoAbierto ? pulso?.cajas.find((c) => c.equipo === equipoAbierto) ?? null : null;
 
   if (!puedeVer) return null;
 
@@ -212,35 +171,27 @@ export default function PulsoEquipoVivo({ coworkConectados }: { coworkConectados
             </div>
           )}
 
-          {/* Cajas por equipo (clic → nombres) */}
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {pulso.cajas.map((caja) => (
-              <Caja key={caja.equipo} caja={caja} t={t} onVer={() => setEquipoAbierto(caja.equipo)} />
-            ))}
-          </div>
+          {/* El detalle por equipo YA NO vive en el home (Alvaro, 08/11): era una
+              grilla densa de círculos-letra que se pisaba con "Conectados ahora"
+              de Argos. El home es el vistazo rápido; el detalle, un clic allá. */}
+          <button
+            type="button"
+            onClick={() => navigate("/hr/monitor-ia?t=equipo")}
+            className="vidrio vidrio-glow vidrio-lift glow-b flex w-full items-center gap-3 p-3.5 text-left"
+          >
+            <span className="v-cont flex w-full items-center gap-3">
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-panel bg-primary/10 text-primary">
+                <Users className="h-5 w-5" />
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block text-sm font-semibold leading-tight">{t("dashboard.pulso.verEquipo")}</span>
+                <span className="block text-[11px] text-muted-foreground leading-tight">{t("dashboard.pulso.verEquipoSub")}</span>
+              </span>
+              <ChevronRight className="h-5 w-5 shrink-0 text-muted-foreground/60" />
+            </span>
+          </button>
         </>
       )}
-
-      {/* Pop-up: QUIÉNES están detrás de la caja (nombres + estado). */}
-      <Dialog open={!!cajaAbierta} onOpenChange={(o) => { if (!o) setEquipoAbierto(null); }}>
-        <DialogContent className="max-w-md">
-          {cajaAbierta && (
-            <>
-              <DialogTitle className="flex items-center justify-between gap-2 pr-6">
-                <span>{cajaAbierta.equipo}</span>
-                <span className="text-xs font-normal text-muted-foreground tabular-nums">
-                  {t("dashboard.pulso.conectadosCaja", { conectados: cajaAbierta.conectados, total: cajaAbierta.total })}
-                </span>
-              </DialogTitle>
-              <div className="mt-2 flex max-h-[60vh] flex-col gap-1.5 overflow-y-auto pr-1">
-                {cajaAbierta.miembros.map((m) => (
-                  <FilaPersona key={m.userId} p={m} t={t} lang={language} problema={m.problema} onAbrir={() => { setEquipoAbierto(null); abrir(m.userId); }} />
-                ))}
-              </div>
-            </>
-          )}
-        </DialogContent>
-      </Dialog>
     </section>
   );
 }

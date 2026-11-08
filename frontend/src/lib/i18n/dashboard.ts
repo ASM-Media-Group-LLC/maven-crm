@@ -137,6 +137,8 @@ export const dashboard = {
   "dashboard.pulso.ultimaRonda": { es: "última ronda {hace}", en: "last sweep {hace}" },
   "dashboard.pulso.sinConectados": { es: "Nadie conectado ahora mismo", en: "Nobody online right now" },
   "dashboard.pulso.quienLaBaja": { es: "Quién la está bajando", en: "Who's dragging it down" },
+  "dashboard.pulso.verEquipo": { es: "Ver el equipo completo", en: "See the full team" },
+  "dashboard.pulso.verEquipoSub": { es: "Quién está conectado, por equipo, en Argos", en: "Who's online, by team, in Argos" },
   "dashboard.pulso.todoEnOrden": { es: "Todo el equipo en orden ✓", en: "Whole team on track ✓" },
   "dashboard.pulso.soloVigilancia": { es: "Solo visible para quien vigila al equipo.", en: "Only visible to those who oversee the team." },
   "dashboard.pulso.conectadosCaja": { es: "{conectados}/{total} conectados", en: "{conectados}/{total} online" },
