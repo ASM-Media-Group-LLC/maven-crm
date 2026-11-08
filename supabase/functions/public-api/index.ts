@@ -603,7 +603,7 @@ Deno.serve(async (req) => {
         .eq("id", sub)
         .maybeSingle();
       if (error) return json(req, { error: "server_error", message: error.message }, 500);
-      if (!p) return json(req, { error: "not_found", message: "empleado no encontrado" }, 404);
+      if (!p) return json(req, { error: "not_found", message: msg(idioma, "empleado_no_encontrado") }, 404);
       const row = p as Record<string, unknown>;
       const { data: ur } = await admin.from("user_roles").select("role").eq("user_id", sub).maybeSingle();
       let turno: Record<string, unknown> | null = null;
@@ -925,7 +925,7 @@ Deno.serve(async (req) => {
       return json(req, { object: "list", resource: "argos/screens", count: count ?? data.length, limit: topeLimit, offset, data });
     }
 
-    return json(req, { error: "not_found", message: `/argos/${sub ?? ""} no existe. Usá /argos/notas o /argos/screens.` }, 404);
+    return json(req, { error: "not_found", message: msg(idioma, "argos_rutas") }, 404);
   }
 
   return json(req, { error: "not_found", message: msg(idioma, "recurso_desconocido", { recurso: resource }) }, 404);

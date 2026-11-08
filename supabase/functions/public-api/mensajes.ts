@@ -177,6 +177,11 @@ export const MENSAJES = {
   recurso_desconocido: { es: "Recurso desconocido: {recurso}", en: "Unknown resource: {recurso}", vars: ["recurso"] },
   creadora_no_encontrada: { es: "Creadora no encontrada", en: "Creator not found" },
   contacto_no_encontrado: { es: "Contacto no encontrado", en: "Contact not found" },
+  empleado_no_encontrado: { es: "Empleado no encontrado", en: "Employee not found" },
+  argos_rutas: {
+    es: "Usa /argos/notas o /argos/screens",
+    en: "Use /argos/notas or /argos/screens",
+  },
   kind_invalido: { es: "kind invalido. Usa: {opciones}", en: "Invalid kind. Use: {opciones}", vars: ["opciones"] },
   sales_sub_recurso_desconocido: {
     es: "Sub-recurso de sales desconocido: {sub}",

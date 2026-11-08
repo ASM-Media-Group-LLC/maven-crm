@@ -178,7 +178,7 @@ export const FUENTES_POR_RECURSO: Record<string, string[]> = {
     "api_messenger_borrar",
   ],
   sales: ["creator_daily_earnings"],
-  employees: ["profiles", "user_roles"],
+  employees: ["profiles", "user_roles", "rol_turnos"],
   creators: ["creators", "creator_of_accounts"],
   contacts: ["closers_contacts"],
   "sales/chatters": ["chatter_daily_sales"],
