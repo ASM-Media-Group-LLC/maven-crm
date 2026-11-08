@@ -128,7 +128,9 @@ export default function HRMonitorIA() {
     equipo: "ahora", envivo: "ahora", panel: "dia", historial: "dia", resumen: "dia", atencion: "ahora",
   };
   const tabURL = searchParams.get("t");
-  const tab: TabArgos = (tabURL && VIEJO_A_NUEVO[tabURL]) || "ahora";
+  // Al entrar a Argos se cae en "El día" (ahí están los días para ir hacia
+  // atrás), no en "En vivo" (Alvaro, 08/11).
+  const tab: TabArgos = (tabURL && VIEJO_A_NUEVO[tabURL]) || "dia";
   const setTab = (k: TabArgos) => setSearchParams((prev) => { const n = new URLSearchParams(prev); n.set("t", k); return n; }, { replace: true });
 
   const monitorOff = config ? !config.activo : false;
@@ -155,8 +157,8 @@ export default function HRMonitorIA() {
       {/* Pestañas de Argos (3) */}
       {(() => {
         const tabs: Array<{ k: TabArgos; label: string }> = [
-          { k: "ahora", label: t("hr.monia.tab.ahora") },
           { k: "dia", label: t("hr.monia.tab.dia") },
+          { k: "ahora", label: t("hr.monia.tab.ahora") },
           ...(isAdmin ? [{ k: "ajustes" as TabArgos, label: t("hr.monia.tab.ajustes") }] : []),
         ];
         return (

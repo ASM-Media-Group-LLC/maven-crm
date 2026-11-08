@@ -1044,7 +1044,7 @@ export const hr = {
   "hr.monia.tab.envivo": { es: "Pantallazos en vivo", en: "Live screenshots" },
   // Pestañas nuevas (Alvaro, 08/11): de 5 pestañas a 3 — Ahora (conectados +
   // pantallazos), El día (resumen + historial) y Ajustes.
-  "hr.monia.tab.ahora": { es: "Ahora", en: "Now" },
+  "hr.monia.tab.ahora": { es: "En vivo", en: "Live" },
   "hr.monia.tab.dia": { es: "El día", en: "The day" },
   "hr.monia.secc.tablero": { es: "El piso ahora mismo", en: "The floor right now" },
   "hr.monia.secc.pantallazos": { es: "Pantallazos en vivo", en: "Live screenshots" },
