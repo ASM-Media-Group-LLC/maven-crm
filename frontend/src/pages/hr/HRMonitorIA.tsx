@@ -185,11 +185,12 @@ export default function HRMonitorIA() {
         </div>
       )}
 
-      {/* EL DÍA — resumen (números + tendencia) + historial por turno (solo admin). */}
+      {/* EL DÍA — el HISTORIAL primero (turnos), una sola gráfica (Alvaro, 08/11).
+          Se quitó el "Panel del día" (tenía una 2ª tendencia duplicada). Para
+          quien no es admin, cae al resumen simple. */}
       {tab === "dia" && (
         <div className="mt-5 flex flex-col gap-5">
-          <ArgosPanelDia />
-          {isAdmin && <ArgosHistorial />}
+          {isAdmin ? <ArgosHistorial /> : <ArgosPanelDia />}
         </div>
       )}
 

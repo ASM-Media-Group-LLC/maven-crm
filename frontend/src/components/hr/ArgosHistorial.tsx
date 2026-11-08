@@ -473,36 +473,8 @@ export function ArgosHistorial() {
           <div className="flex flex-col items-center gap-2 py-10 text-center text-muted-foreground"><Clock className="h-7 w-7 opacity-40" /><p className="text-sm">{t("hr.hist.vacio")}</p></div>
         ) : (
           <>
-            {/* GRÁFICA por hora con las franjas de turno */}
-            <div className="rounded-2xl border border-border/40 bg-card/20 p-4">
-              <div className="mb-3 flex flex-wrap items-center gap-2">
-                <span className="text-sm font-semibold">{t("hr.hist.porHora")}</span>
-                <div className="ml-auto flex flex-wrap items-center gap-3">
-                  {series.map((s) => (
-                    <span key={s.key} className="inline-flex items-center gap-1.5 text-[11px] text-muted-foreground"><span className="h-2 w-2 shrink-0 rounded-full" style={{ background: COLOR[s.key] }} />{s.label}</span>
-                  ))}
-                </div>
-              </div>
-              <div className="h-60 w-full">
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={data} margin={{ top: 6, right: 10, left: 0, bottom: 0 }}>
-                    {/* Franjas de turno al fondo */}
-                    <ReferenceArea x1={0} x2={8} fill="hsl(255 70% 62%)" fillOpacity={0.06} />
-                    <ReferenceArea x1={8} x2={16} fill="hsl(38 92% 55%)" fillOpacity={0.06} />
-                    <ReferenceArea x1={16} x2={24} fill="hsl(199 89% 56%)" fillOpacity={0.06} />
-                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
-                    <XAxis dataKey="hourNum" type="number" domain={[0, 24]} ticks={[0, 4, 8, 12, 16, 20, 24]} tickFormatter={(h) => `${h}h`} tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} tickLine={false} axisLine={{ stroke: "hsl(var(--border))" }} />
-                    <YAxis domain={[0, 100]} ticks={[0, 25, 50, 75, 100]} tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} tickLine={false} axisLine={false} unit="%" width={44} />
-                    <Tooltip contentStyle={{ background: "hsl(var(--popover))", border: "1px solid hsl(var(--border))", borderRadius: 12, fontSize: 12, color: "hsl(var(--popover-foreground))" }} labelStyle={{ color: "hsl(var(--muted-foreground))" }} labelFormatter={(h) => `${h}:00`} formatter={(v: number | null, name) => [v == null ? "—" : `${v}%`, name]} />
-                    {series.map((s) => (
-                      <Line key={s.key} type="monotone" dataKey={s.key} name={s.label} stroke={COLOR[s.key]} strokeWidth={2} dot={{ r: 2, strokeWidth: 0, fill: COLOR[s.key] }} activeDot={{ r: 4 }} connectNulls isAnimationActive={false} />
-                    ))}
-                  </LineChart>
-                </ResponsiveContainer>
-              </div>
-            </div>
-
-            {/* 3 CAJAS por turno */}
+            {/* 3 CAJAS por turno — PRIMERO (Alvaro, 08/11): lo primero al entrar
+                a "El día" es cómo va cada turno, no la gráfica. */}
             <div>
               <p className="mb-2 text-xs font-medium text-muted-foreground">{t("hr.hist.turnos")}</p>
               <div className="grid gap-3 sm:grid-cols-3">
@@ -539,6 +511,34 @@ export function ArgosHistorial() {
                     </button>
                   );
                 })}
+              </div>
+            </div>
+
+            {/* GRÁFICA por hora — DESPUÉS de los turnos (la única del día). */}
+            <div className="rounded-2xl border border-border/40 bg-card/20 p-4">
+              <div className="mb-3 flex flex-wrap items-center gap-2">
+                <span className="text-sm font-semibold">{t("hr.hist.porHora")}</span>
+                <div className="ml-auto flex flex-wrap items-center gap-3">
+                  {series.map((s) => (
+                    <span key={s.key} className="inline-flex items-center gap-1.5 text-[11px] text-muted-foreground"><span className="h-2 w-2 shrink-0 rounded-full" style={{ background: COLOR[s.key] }} />{s.label}</span>
+                  ))}
+                </div>
+              </div>
+              <div className="h-60 w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={data} margin={{ top: 6, right: 10, left: 0, bottom: 0 }}>
+                    <ReferenceArea x1={0} x2={8} fill="hsl(255 70% 62%)" fillOpacity={0.06} />
+                    <ReferenceArea x1={8} x2={16} fill="hsl(38 92% 55%)" fillOpacity={0.06} />
+                    <ReferenceArea x1={16} x2={24} fill="hsl(199 89% 56%)" fillOpacity={0.06} />
+                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
+                    <XAxis dataKey="hourNum" type="number" domain={[0, 24]} ticks={[0, 4, 8, 12, 16, 20, 24]} tickFormatter={(h) => `${h}h`} tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} tickLine={false} axisLine={{ stroke: "hsl(var(--border))" }} />
+                    <YAxis domain={[0, 100]} ticks={[0, 25, 50, 75, 100]} tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} tickLine={false} axisLine={false} unit="%" width={44} />
+                    <Tooltip contentStyle={{ background: "hsl(var(--popover))", border: "1px solid hsl(var(--border))", borderRadius: 12, fontSize: 12, color: "hsl(var(--popover-foreground))" }} labelStyle={{ color: "hsl(var(--muted-foreground))" }} labelFormatter={(h) => `${h}:00`} formatter={(v: number | null, name) => [v == null ? "—" : `${v}%`, name]} />
+                    {series.map((s) => (
+                      <Line key={s.key} type="monotone" dataKey={s.key} name={s.label} stroke={COLOR[s.key]} strokeWidth={2} dot={{ r: 2, strokeWidth: 0, fill: COLOR[s.key] }} activeDot={{ r: 4 }} connectNulls isAnimationActive={false} />
+                    ))}
+                  </LineChart>
+                </ResponsiveContainer>
               </div>
             </div>
           </>
