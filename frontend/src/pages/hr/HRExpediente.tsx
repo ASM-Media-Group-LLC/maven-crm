@@ -19,6 +19,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { correoTardanzaHTML } from "@/lib/correoTardanzaHtml";
 import { a12, rango12 } from "@/lib/horaBogota";
 import { ClipsDelDia } from "@/components/hr/ClipsDelDia";
+import { AvisosDeArgos } from "@/components/hr/AvisosDeArgos";
 import { Mail } from "lucide-react";
 
 // Expediente del empleado, estilo Hubstaff: se abre en HOY, con su nota y sus
@@ -905,6 +906,9 @@ export default function HRExpediente() {
 
       {/* Videos de Argos del día (si los hubo). Se esconde solo si no hay. */}
       {userId && <ClipsDelDia userId={userId} fecha={dia.fecha} />}
+
+      {/* Qué le dijo Argos ese día: cronología de nudges (Alvaro, 09/11). */}
+      {userId && <AvisosDeArgos userId={userId} fecha={dia.fecha} />}
 
       {/* La tira de pantallazos del día (Hubstaff) */}
       <section className="vidrio sube mt-5 p-4 lg:p-5" style={{ animationDelay: "0.05s" }}>
