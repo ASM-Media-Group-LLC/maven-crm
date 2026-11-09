@@ -1,8 +1,9 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { formatDistanceToNowStrict } from "date-fns";
 import { es as esLocale } from "date-fns/locale";
 import { Activity, AlertCircle, CheckCircle2, CloudOff, Database, Mail, Users, UserMinus, HardDrive, Loader2 } from "lucide-react";
+import { SaludDiagnosticoModal } from "./SaludDiagnosticoModal";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useLanguage } from "@/hooks/useLanguage";
@@ -57,12 +58,16 @@ function Pastilla({ estado, texto }: { estado: Estado; texto: string }) {
 
 // Un chequeo: ícono + título + estado + detalle. Vidrio glow sutil por estado
 // (verde/rojo/amarillo), mismo lenguaje que el resto del dashboard.
-function Chequeo({ icono: Icono, titulo, estado, detalle, loading }: {
+function Chequeo({ icono: Icono, titulo, estado, detalle, loading, onClick }: {
   icono: typeof Database; titulo: string; estado: Estado; detalle: string; loading?: boolean;
+  /** Si viene, la caja es clickeable y abre el modal de diagnóstico en vivo. */
+  onClick?: () => void;
 }) {
   const glow = estado === "ok" ? "glow-g" : estado === "mal" ? "glow-r" : "glow-a";
+  const clickeable = !!onClick;
   return (
-    <div className={`vidrio vidrio-glow ${glow} p-3`}>
+    <button type="button" onClick={onClick} disabled={!clickeable}
+      className={`vidrio vidrio-glow ${glow} p-3 text-left w-full ${clickeable ? "transition hover:brightness-110 cursor-pointer" : "cursor-default"}`}>
       <div className="v-cont flex items-start gap-3">
         <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-panel bg-primary/10 text-primary">
           <Icono className="h-4.5 w-4.5" />
@@ -77,7 +82,7 @@ function Chequeo({ icono: Icono, titulo, estado, detalle, loading }: {
           <p className="mt-0.5 text-[11px] text-muted-foreground">{detalle}</p>
         </div>
       </div>
-    </div>
+    </button>
   );
 }
 
@@ -143,6 +148,7 @@ export default function SaludPlataformaBloque() {
     },
   });
   const incPor = incidentes.data ?? {};
+  const [diagTipo, setDiagTipo] = useState<string | null>(null);
 
   // 2) Entradas de HOY: cuántas personas distintas dejaron latido hoy.
   const entradasHoy = useQuery<{ total: number }>({
@@ -259,10 +265,10 @@ export default function SaludPlataformaBloque() {
       {/* 4 chequeos funcionales — visibles para dueño/admin. Nombres neutros
           (Drive/Correo/Mensajería/Argos); los proveedores reales solo si es dueño. */}
       <div className="grid gap-2.5 sm:grid-cols-2 lg:grid-cols-4">
-        <Chequeo icono={HardDrive} titulo={t("dashboard.centro.salud.drive")} estado={nasEstado} detalle={nasDetalle} loading={cargando} />
-        <Chequeo icono={Mail} titulo={t("dashboard.centro.salud.correo")} estado={correoEstado} detalle={correoDetalle} loading={cargando} />
-        <Chequeo icono={Activity} titulo={t("dashboard.centro.salud.mensajeria")} estado={mensajeriaEstado} detalle={mensajeriaDetalle} />
-        <Chequeo icono={Database} titulo={t("dashboard.centro.salud.argos")} estado={argosEstado} detalle={argosDetalle} loading={cargando} />
+        <Chequeo icono={HardDrive} titulo={t("dashboard.centro.salud.drive")} estado={nasEstado} detalle={nasDetalle} loading={cargando} onClick={() => setDiagTipo("drive")} />
+        <Chequeo icono={Mail} titulo={t("dashboard.centro.salud.correo")} estado={correoEstado} detalle={correoDetalle} loading={cargando} onClick={() => setDiagTipo("correo")} />
+        <Chequeo icono={Activity} titulo={t("dashboard.centro.salud.mensajeria")} estado={mensajeriaEstado} detalle={mensajeriaDetalle} onClick={() => setDiagTipo("mensajeria")} />
+        <Chequeo icono={Database} titulo={t("dashboard.centro.salud.argos")} estado={argosEstado} detalle={argosDetalle} loading={cargando} onClick={() => setDiagTipo("argos")} />
       </div>
 
       {/* Bloque técnico (solo dueño): crons + nombres de proveedores. */}
@@ -313,6 +319,7 @@ export default function SaludPlataformaBloque() {
         )}
       </div>
       )}
+      <SaludDiagnosticoModal tipo={diagTipo} abierto={!!diagTipo} onCerrar={() => setDiagTipo(null)} />
     </section>
   );
 }

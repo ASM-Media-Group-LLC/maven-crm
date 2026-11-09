@@ -43,9 +43,11 @@ async function pingNAS(): Promise<{ arriba: boolean; motivo: string }> {
   // está haciendo su trabajo). Alvaro (08/11): "el NAS sigue sin aparecer y
   // tú dices OK — pega tu criterio a lo real".
   const hace30 = new Date(Date.now() - 30 * 60_000).toISOString();
+  // Ignorar basura de 0 bytes (archivos vacíos que nunca podrán subir).
   const { count: pendientesViejos } = await admin.from("drive_aportes")
     .select("id", { count: "exact", head: true })
     .eq("en_nas", false)
+    .gt("size", 0)
     .lt("created_at", hace30);
   const n = pendientesViejos ?? 0;
   if (n > 0) return { arriba: false, motivo: `${n} aporte(s) atascado(s) hace +30 min` };
