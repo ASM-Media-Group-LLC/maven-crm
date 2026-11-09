@@ -486,6 +486,7 @@ const DashboardSidebar = () => {
           icon={Home}
           active={isMenuActive}
           collapsedItems={menuCollapsedItems}
+          collapsedHref="/dashboard"
         >
             <SidebarMenu>
               {mainMenu.map((item) => (

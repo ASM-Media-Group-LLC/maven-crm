@@ -38,6 +38,9 @@ interface Props {
   icon: ComponentType<{ className?: string }>;
   active?: boolean;
   collapsedItems?: CollapsedItem[];
+  /** Cuando el riel está colapsado y se toca el icono, navega aquí en vez de
+   *  abrir el dropdown (Alvaro, 08/11: la casita va directa al Dashboard). */
+  collapsedHref?: string;
   children: ReactNode;
 }
 
@@ -48,6 +51,7 @@ export const CollapsibleSidebarGroup = ({
   icon: Icon,
   active = false,
   collapsedItems,
+  collapsedHref,
   children,
 }: Props) => {
   const { state, isMobile } = useSidebar();
@@ -70,6 +74,28 @@ export const CollapsibleSidebarGroup = ({
   }, [open, storageKey]);
 
   if (collapsed) {
+    // Si viene collapsedHref, el icono es un enlace directo (Alvaro, 08/11:
+    // la casita debe mandar al Dashboard, no abrir un menú flotante).
+    if (collapsedHref) {
+      return (
+        <SidebarGroup className="p-0">
+          <SidebarGroupContent>
+            <SidebarMenu>
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  tooltip={label}
+                  onClick={() => navigate(collapsedHref)}
+                  className={`sidebar-glass-hover ${active ? "sidebar-glass-active font-medium" : ""}`}
+                >
+                  <Icon className="h-4 w-4 shrink-0" />
+                  <span>{label}</span>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+      );
+    }
     return (
       <SidebarGroup className="p-0">
         <SidebarGroupContent>
