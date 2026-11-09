@@ -281,6 +281,9 @@ verify_jwt = true  # usuario logueado; ping EN VIVO al NAS para el bloque de Sal
 [functions.salud-vigilante]
 verify_jwt = false  # solo cron (X-Cron-Token); abre/cierra salud_incidentes + push
 
+[functions.equipo-vigilante]
+verify_jwt = false  # solo cron (X-Cron-Token); vigila al equipo y hace push al dueño
+
 [functions.detectar-tardanzas]
 verify_jwt = true  # cron (X-Cron-Token) o service_role; detecta tardanzas y manda correo
 
