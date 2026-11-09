@@ -221,8 +221,12 @@ export function useMonitorCamara({ track, trackPantalla = null, camaraRealOn, fa
   const enVueloRef = useRef(false);
   const guardandoRef = useRef(false);
 
+  // Si hay PANTALLA compartida, la ESCALERA DE CLIP (useArgosEscaleraClip) corre
+  // en Cowork y ya se encarga de llamar a monitor-vision con su propio ritmo
+  // adaptativo (1 min → 30 s → 20 s → graba). No duplicamos las llamadas acá.
+  const escaleraCorriendo = !!trackPantalla;
   useEffect(() => {
-    if (!activoIA) return;
+    if (!activoIA || escaleraCorriendo) return;
     const disparar = async () => {
       if (enVueloRef.current) return;
       if (!camRef.current) return; // cámara apagada: ya lo marca lo gratis
@@ -244,7 +248,7 @@ export function useMonitorCamara({ track, trackPantalla = null, camaraRealOn, fa
     };
     const iv = window.setInterval(() => { void disparar(); }, Math.max(30, intervaloSeg) * 1000);
     return () => window.clearInterval(iv);
-  }, [activoIA, intervaloSeg]);
+  }, [activoIA, intervaloSeg, escaleraCorriendo]);
 
   // ── 3) Captura periódica al buzón (modelo Hubstaff) ──
   // Cada minuto deja un pantallazo de la CÁMARA y, si hay pantalla compartida
