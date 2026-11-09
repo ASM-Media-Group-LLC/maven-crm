@@ -15,7 +15,10 @@ import type { TranslationKey } from "@/lib/i18n";
 
 type Tr = (k: TranslationKey, v?: Record<string, string | number>) => string;
 
-const COLOR = { pantalla: "hsl(var(--primary))", camara: "hsl(199 89% 56%)", atencion: "hsl(262 83% 66%)" } as const;
+// Tonos APAGADOS, no neón (Alvaro 09/11: "los colores muy encendidos me hacen
+// mierda"). Se bajó la saturación del azul (cámara) y el morado (atención) para
+// que el número se insinúe, no grite. Pantalla sigue el primario de la skin.
+const COLOR = { pantalla: "hsl(var(--primary))", camara: "hsl(205 42% 62%)", atencion: "hsl(256 30% 66%)" } as const;
 
 // Turnos (hora Colombia): Madrugada 0-8, AM 8-16, PM 16-24. Se muestran en el
 // orden que pidió Alvaro: AM, PM, Madrugada.
