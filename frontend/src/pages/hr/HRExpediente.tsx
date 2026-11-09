@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
-import { ArrowLeft, ChevronLeft, ChevronRight, AlertTriangle, ScreenShare, ScreenShareOff, CameraOff, ImageIcon, Loader2, Gauge, CalendarDays, Sparkles, ShieldCheck, Check } from "lucide-react";
+import { ArrowLeft, ChevronLeft, ChevronRight, ChevronDown, AlertTriangle, ScreenShare, ScreenShareOff, CameraOff, ImageIcon, Loader2, Gauge, CalendarDays, Sparkles, ShieldCheck, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useLanguage } from "@/hooks/useLanguage";
 import { UserAvatar } from "@/components/UserAvatar";
@@ -584,6 +584,35 @@ function PruebaTardanza({ userId, fecha, nombre, entroAt, horarioEntrada, entrad
   );
 }
 
+// El desglose en MINUTOS de un factor (Alvaro 08/11): de dónde sale el %.
+// Pantalla = compartió vs no; Cámara = con cámara vs sin / fuera de cuadro.
+function desgloseDeFactor(
+  clave: string,
+  dia: DiaExpediente,
+  atencion: { pct: number; ok: number; n: number } | null,
+  t: Tr,
+): { lbl: string; valor: string; color: string }[] {
+  const min = (s: number | undefined) => `${Math.round((Number(s) || 0) / 60)} min`;
+  const act = dia.segActivo ?? 0, sp = dia.segSinPantalla ?? 0, sc = dia.segSinCamara ?? 0, fc = dia.segFueraCamara ?? 0;
+  if (clave === "pantalla") {
+    return [
+      { lbl: t("hr.exp.desg.compartio"), valor: min(act + sc + fc), color: "hsl(var(--primary))" },
+      { lbl: t("hr.exp.desg.sinPantalla"), valor: min(sp), color: "hsl(var(--muted-foreground))" },
+    ];
+  }
+  if (clave === "camara") {
+    return [
+      { lbl: t("hr.exp.desg.conCamara"), valor: min(act + sp), color: "hsl(var(--primary))" },
+      { lbl: t("hr.exp.desg.sinCamara"), valor: min(sc), color: "hsl(var(--muted-foreground))" },
+      ...(fc > 0 ? [{ lbl: t("hr.exp.desg.fueraCuadro"), valor: min(fc), color: "hsl(var(--warning))" }] : []),
+    ];
+  }
+  if (clave === "atencion" && atencion && atencion.n > 0) {
+    return [{ lbl: t("hr.exp.desg.pantallazosBien"), valor: `${atencion.ok} / ${atencion.n}`, color: "hsl(var(--primary))" }];
+  }
+  return [];
+}
+
 function DesgloseNotaContenido({ dia, atencion, t, compacto }: {
   dia: DiaExpediente;
   atencion: { pct: number; ok: number; n: number } | null;
@@ -593,6 +622,7 @@ function DesgloseNotaContenido({ dia, atencion, t, compacto }: {
   compacto?: boolean;
 }) {
   const nota = dia.nota;
+  const [factorAbierto, setFactorAbierto] = useState<string | null>(null);
   const bandaTono = nota.banda ? TONO[nota.banda] : null;
   const pantallaFactor = nota.factores.find((f) => f.clave === "pantalla");
   const reglaDura = pantallaFactor?.sub != null && pantallaFactor.sub < 5;
@@ -623,22 +653,46 @@ function DesgloseNotaContenido({ dia, atencion, t, compacto }: {
         </div>
       )}
 
-      {/* Los factores: % real, barra, aporte en puntos y la prueba */}
-      <div className="flex flex-col gap-3">
+      {/* Los factores: % real, barra, aporte en puntos y la prueba. EXPANDIBLES
+          (Alvaro 08/11): al tocar uno se abre el desglose en MINUTOS reales —
+          cuánto compartió pantalla y cuánto no, cuánto con cámara y cuánto no —
+          para ver de dónde sale el %. */}
+      <div className="flex flex-col gap-2.5">
         {nota.factores.map((f) => {
           const pr = prueba(f.clave);
+          const filas = desgloseDeFactor(f.clave, dia, atencion, t);
+          const abierto = factorAbierto === f.clave;
+          const puedeAbrir = filas.length > 0;
           return (
-            <div key={f.clave} className="space-y-1">
-              <div className="flex items-baseline gap-2">
-                <span className="text-sm font-medium">{t(FACTOR_LBL[f.clave] ?? "hr.resumen.pantalla")}</span>
-                <span className="ml-auto text-sm font-semibold tabular-nums">
-                  {f.sub == null ? <span className="text-xs font-normal text-muted-foreground">{t("hr.exp.factorSinDato")}</span> : `${Math.round(f.sub)}%`}
-                </span>
-              </div>
-              <div className="h-2 overflow-hidden rounded-full bg-foreground/10">
-                <div className={`h-full rounded-full ${f.sub == null ? "bg-transparent" : "bg-primary/70"}`} style={{ width: `${f.sub == null ? 0 : Math.round(f.sub)}%` }} />
-              </div>
-              {pr && <p className="text-[11px] text-muted-foreground">{pr}</p>}
+            <div key={f.clave} className="rounded-xl border border-border/40 bg-card/20">
+              <button type="button" disabled={!puedeAbrir}
+                onClick={() => setFactorAbierto(abierto ? null : f.clave)}
+                className={`w-full space-y-1 px-3 py-2 text-left ${puedeAbrir ? "transition hover:bg-card/40" : ""}`}>
+                <div className="flex items-baseline gap-2">
+                  <span className="text-sm font-medium">{t(FACTOR_LBL[f.clave] ?? "hr.resumen.pantalla")}</span>
+                  {puedeAbrir && <ChevronDown className={`h-3.5 w-3.5 text-muted-foreground/60 transition ${abierto ? "rotate-180" : ""}`} />}
+                  <span className="ml-auto text-sm font-semibold tabular-nums">
+                    {f.sub == null ? <span className="text-xs font-normal text-muted-foreground">{t("hr.exp.factorSinDato")}</span> : `${Math.round(f.sub)}%`}
+                  </span>
+                </div>
+                <div className="h-2 overflow-hidden rounded-full bg-foreground/10">
+                  <div className={`h-full rounded-full ${f.sub == null ? "bg-transparent" : "bg-primary/70"}`} style={{ width: `${f.sub == null ? 0 : Math.round(f.sub)}%` }} />
+                </div>
+                {pr && <p className="text-[11px] text-muted-foreground">{pr}</p>}
+              </button>
+              {abierto && (
+                <div className="border-t border-border/40 px-3 py-2">
+                  <div className="flex flex-col gap-1">
+                    {filas.map((r) => (
+                      <div key={r.lbl} className="flex items-baseline gap-2 text-[12px]">
+                        <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: r.color }} />
+                        <span className="text-muted-foreground">{r.lbl}</span>
+                        <span className="ml-auto font-semibold tabular-nums">{r.valor}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           );
         })}
