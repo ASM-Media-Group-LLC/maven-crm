@@ -125,6 +125,25 @@ export default function SaludPlataformaBloque() {
     retry: 0,
   });
 
+  // 1ter) Incidentes ABIERTOS del vigilante (Alvaro 08/11 noche: "el problema
+  // tiene que aparecer en la caja, no en un cartel arriba"). Mapeamos tipo →
+  // mensaje para pintar la caja correspondiente en ROJO con el detalle real.
+  const incidentes = useQuery<Record<string, string>>({
+    queryKey: ["centro-salud-incidentes"],
+    staleTime: 15_000,
+    refetchInterval: 30_000,
+    enabled: !!user && esDueno === true,
+    queryFn: async () => {
+      const { data, error } = await sinTipar.from("salud_incidentes")
+        .select("tipo, mensaje").is("cerrado_at", null);
+      if (error) return {};
+      const m: Record<string, string> = {};
+      for (const inc of (data ?? []) as Array<{ tipo: string; mensaje: string }>) m[inc.tipo] = inc.mensaje;
+      return m;
+    },
+  });
+  const incPor = incidentes.data ?? {};
+
   // 2) Entradas de HOY: cuántas personas distintas dejaron latido hoy.
   const entradasHoy = useQuery<{ total: number }>({
     queryKey: ["centro-salud-entradas", onlineUsers.size], // reevaluar al cambiar presencia
@@ -169,24 +188,29 @@ export default function SaludPlataformaBloque() {
   const cargando = salud.isLoading;
 
   // Estados para cada chequeo.
-  // Drive/NAS: el PING EN VIVO manda (la tabla puede quedar vieja). Si el ping
-  // dice "no responde", decimos mal aunque la tabla diga ok. Fallback a tabla
-  // si el ping todavía no llega.
+  // Drive/NAS: el INCIDENTE abierto del vigilante manda si hay. Si no, ping en
+  // vivo. Si tampoco llega, tabla. Así la caja pinta ROJA con el motivo real
+  // del vigilante (Alvaro 08/11 noche).
   const pingSabe = nasPing.isSuccess && nasPing.data;
-  const nasArribaReal = pingSabe ? nasPing.data!.arriba : !s?.nas?.caido;
-  const nasEstado: Estado = (cargando && nasPing.isLoading) ? "duda" : nasArribaReal ? "ok" : "mal";
+  const incNas = incPor["nas_caido"];
+  const nasArribaReal = !incNas && (pingSabe ? nasPing.data!.arriba : !s?.nas?.caido);
+  const nasEstado: Estado = incNas ? "mal" : (cargando && nasPing.isLoading) ? "duda" : nasArribaReal ? "ok" : "mal";
   const pendientes = s?.nas?.pendientes ?? 0;
-  const nasDetalle = nasArribaReal
-    ? t("dashboard.centro.salud.nasOk", { n: pendientes })
-    : t("dashboard.centro.salud.nasMal", { n: pendientes });
+  const nasDetalle = incNas
+    ? incNas
+    : nasArribaReal
+      ? t("dashboard.centro.salud.nasOk", { n: pendientes })
+      : t("dashboard.centro.salud.nasMal", { n: pendientes });
 
   // Correo: si HOY hubo tardanzas detectadas y TODAS se mandaron → ok. Si no
   // hubo ninguna (día limpio), quedamos neutros "ok". Si hubo y faltan → mal.
-  const correoEstado: Estado = cargando ? "duda"
+  const incCorreo = incPor["correo_atascado"];
+  const correoEstado: Estado = incCorreo ? "mal" : cargando ? "duda"
     : s?.tardanzas_hoy ? (s.tardanzas_hoy.total === 0 || s.tardanzas_hoy.con_correo === s.tardanzas_hoy.total ? "ok" : "mal") : "ok";
-  const correoDetalle = s?.tardanzas_hoy?.ultimo_correo
-    ? t("dashboard.centro.salud.correoUltimo", { t: hace(s.tardanzas_hoy.ultimo_correo, language) ?? "—" })
-    : t("dashboard.centro.salud.correoSinHoy");
+  const correoDetalle = incCorreo ? incCorreo
+    : s?.tardanzas_hoy?.ultimo_correo
+      ? t("dashboard.centro.salud.correoUltimo", { t: hace(s.tardanzas_hoy.ultimo_correo, language) ?? "—" })
+      : t("dashboard.centro.salud.correoSinHoy");
 
   // Mensajería: hay realtime online (onlineUsers) + algún latido hace < 10 min.
   // Proxy razonable sin pedir una RPC nueva. Si todo el equipo se cae de golpe
@@ -198,16 +222,20 @@ export default function SaludPlataformaBloque() {
     : t("dashboard.centro.salud.msgDuda");
 
   // Técnico (solo dueño): Supabase + Edge + Argos IA.
-  const argosEstado: Estado = cargando ? "duda"
+  const incArgos = incPor["argos_sin_juzgar"];
+  const argosEstado: Estado = incArgos ? "mal" : cargando ? "duda"
     : s?.argos_ia ? (minutosDesde(s.argos_ia.ultima_captura_juzgada) < 15 ? "ok" : s.argos_ia.ultima_captura_juzgada ? "duda" : "mal") : "duda";
-  const argosDetalle = s?.argos_ia
-    ? t("dashboard.centro.salud.argosDet", { n: s.argos_ia.juzgadas_hoy, t: hace(s.argos_ia.ultima_captura_juzgada, language) ?? "—" })
-    : t("dashboard.centro.salud.cargando");
+  const argosDetalle = incArgos ? incArgos
+    : s?.argos_ia
+      ? t("dashboard.centro.salud.argosDet", { n: s.argos_ia.juzgadas_hoy, t: hace(s.argos_ia.ultima_captura_juzgada, language) ?? "—" })
+      : t("dashboard.centro.salud.cargando");
 
-  const cronEstado: Estado = cargando ? "duda" : (s?.cron_nas?.activo && s?.cron_tardanzas?.activo) ? "ok" : "mal";
-  const cronDetalle = s?.cron_tardanzas?.ultima_corrida
-    ? t("dashboard.centro.salud.cronDet", { t: hace(s.cron_tardanzas.ultima_corrida, language) ?? "—" })
-    : t("dashboard.centro.salud.cargando");
+  const incCron = incPor["cron_parado"];
+  const cronEstado: Estado = incCron ? "mal" : cargando ? "duda" : (s?.cron_nas?.activo && s?.cron_tardanzas?.activo) ? "ok" : "mal";
+  const cronDetalle = incCron ? incCron
+    : s?.cron_tardanzas?.ultima_corrida
+      ? t("dashboard.centro.salud.cronDet", { t: hace(s.cron_tardanzas.ultima_corrida, language) ?? "—" })
+      : t("dashboard.centro.salud.cargando");
 
   const desconectados = desc.data ?? [];
   const entradas = entradasHoy.data?.total ?? 0;

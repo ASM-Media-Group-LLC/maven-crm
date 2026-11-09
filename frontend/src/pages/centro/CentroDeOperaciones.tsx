@@ -5,7 +5,6 @@ import { ArrowRight, BarChart3, Building2, Clock, DoorOpen, Headset, MessageCirc
 import SelectorDeTablero from "@/pages/dashboard/SelectorDeTablero";
 import PulsoEquipoVivo from "@/components/centro/PulsoEquipoVivo";
 import SaludPlataformaBloque from "@/components/centro/SaludPlataformaBloque";
-import BannerSaludIncidentes from "@/components/centro/BannerSaludIncidentes";
 import { TarjetaKpi } from "@/components/ui/TarjetaKpi";
 import { Button } from "@/components/ui/button";
 import { useCoworkSession, type AdminSessionRow } from "@/hooks/useCoworkSession";
@@ -159,9 +158,6 @@ export default function CentroDeOperaciones() {
       {/* Pulso del equipo en vivo (solo supervisor+): conectados + nota viva +
           quién la baja + cajas por equipo. Devuelve null para quien no vigila.
           Le pasamos los conectados EN COWORK (de LiveKit) para el número de arriba. */}
-      {/* Banner rojo si hay incidentes abiertos de salud (vigilante). Solo dueño. */}
-      <BannerSaludIncidentes />
-
       <PulsoEquipoVivo coworkConectados={sesionesQ.isLoading ? null : vivo.conectados} />
 
       {/* Salud de la plataforma (Alvaro, 08/11 noche): "¿está todo trabajando bien?"

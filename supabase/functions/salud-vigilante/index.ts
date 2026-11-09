@@ -27,14 +27,29 @@ interface Senal { tipo: Tipo; mal: boolean; mensaje: string }
 
 const admin = createClient(SUPABASE_URL, SERVICE_KEY);
 
-async function pingNAS(): Promise<boolean> {
-  if (!NAS) return true; // sin NAS configurado no se escala
+async function pingNAS(): Promise<{ arriba: boolean; motivo: string }> {
+  if (!NAS) return { arriba: true, motivo: "sin NAS configurado" };
+  let arribaPing = false;
   try {
     const r = await fetch(`${NAS}/salud`, { signal: AbortSignal.timeout(6000) });
-    if (!r.ok) return false;
-    const body = await r.json().catch(() => null) as { raices?: Array<{ ok: boolean }> } | null;
-    return !!body?.raices?.some((x) => x.ok);
-  } catch { return false; }
+    if (r.ok) {
+      const body = await r.json().catch(() => null) as { raices?: Array<{ ok: boolean }> } | null;
+      arribaPing = !!body?.raices?.some((x) => x.ok);
+    }
+  } catch { arribaPing = false; }
+  if (!arribaPing) return { arriba: false, motivo: "no responde al ping" };
+  // El ping dice "estoy", pero si los aportes NO fluyen hace >30 min aunque
+  // haya pendientes, igual es caído (el NAS está arriba como proceso pero no
+  // está haciendo su trabajo). Alvaro (08/11): "el NAS sigue sin aparecer y
+  // tú dices OK — pega tu criterio a lo real".
+  const hace30 = new Date(Date.now() - 30 * 60_000).toISOString();
+  const { count: pendientesViejos } = await admin.from("drive_aportes")
+    .select("id", { count: "exact", head: true })
+    .eq("en_nas", false)
+    .lt("created_at", hace30);
+  const n = pendientesViejos ?? 0;
+  if (n > 0) return { arriba: false, motivo: `${n} aporte(s) atascado(s) hace +30 min` };
+  return { arriba: true, motivo: "responde y aportes fluyen" };
 }
 
 async function chequearCorreo(): Promise<Senal> {
@@ -141,7 +156,8 @@ Deno.serve(async (req) => {
     return new Response(JSON.stringify({ ok: false, error: "auth" }), { status: 401, headers: { "Content-Type": "application/json" } });
   }
   const senales: Senal[] = [];
-  senales.push({ tipo: "nas_caido", mal: !(await pingNAS()), mensaje: "NAS no responde al ping" });
+  const nas = await pingNAS();
+  senales.push({ tipo: "nas_caido", mal: !nas.arriba, mensaje: `NAS: ${nas.motivo}` });
   senales.push(await chequearCorreo());
   senales.push(await chequearArgos());
   // chequearCrons depende de un RPC sql_salud_cron_hace que puede no existir aún:
