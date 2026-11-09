@@ -3,6 +3,7 @@ import { useSearchParams } from "react-router-dom";
 import { Eye, Loader2 } from "lucide-react";
 import { useLanguage } from "@/hooks/useLanguage";
 import { useUserRole } from "@/hooks/useUserRole";
+import { useEsRh } from "@/hooks/useEsRh";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
@@ -112,6 +113,10 @@ function PanelAjustes({ t }: { t: Tr }) {
 export default function HRMonitorIA() {
   const { t } = useLanguage();
   const { isAdmin } = useUserRole();
+  const { esRh } = useEsRh();
+  // HR (Andrea) ve la vista COMPLETA igual que un admin (el historial por turno),
+  // aunque su nivel sea agente. La RLS ya filtra que no vea a los admins.
+  const vistaCompleta = isAdmin || esRh === true;
   const { config } = useMonitorConfig(true);
 
   // Argos en 3 PESTAÑAS (Alvaro, 08/11): antes eran 5 y se pisaban.
@@ -191,7 +196,7 @@ export default function HRMonitorIA() {
           revuelto. Quien no es admin cae al resumen simple. */}
       {tab === "dia" && (
         <div className="mt-5 flex flex-col gap-5">
-          {isAdmin ? <ArgosHistorial /> : <ArgosPanelDia />}
+          {vistaCompleta ? <ArgosHistorial /> : <ArgosPanelDia />}
         </div>
       )}
 
