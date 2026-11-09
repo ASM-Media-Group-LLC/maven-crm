@@ -25,6 +25,7 @@ import { useFaceWatch, faceStateLabel, type FaceWatch } from "@/hooks/useFaceWat
 import { useFaceNudge, useScreenShareNudge } from "@/hooks/useFaceNudge";
 import { useMonitorCamara } from "@/hooks/useMonitorCamara";
 import { useArgosEscaleraClip } from "@/hooks/useArgosEscaleraClip";
+import { useArgosNudgePersona } from "@/hooks/useArgosNudgePersona";
 import { latirEnLlamada, salirDeLlamada, LATIDO_LLAMADA_MS } from "@/lib/llamadaEnMaven";
 import { useRegistrarLlamados } from "@/hooks/useRegistrarLlamados";
 import { esBlur, alternarBlur, leerFondoGuardado, guardarFondo, type BackgroundEffect } from "@/lib/fondoDeLlamada";
@@ -642,6 +643,17 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
   useArgosEscaleraClip({
     trackCamara: localCameraTrack,
     trackPantalla: localScreenTrack,
+    faceWatch,
+    activo: !!supervisorEncuadre && conSalaViva,
+    roomNombre: roomName,
+  });
+  // Nudge a la PERSONA cuando se raja en vivo (toast + voz Javi, tono jefe).
+  // Si no se corrige en 5 min, el edge argos-escalar-persona escala al
+  // Chatter Supervisor (si es chatter) o HR+admin+dueño (si es otro rol).
+  useArgosNudgePersona({
+    trackCamara: localCameraTrack,
+    trackPantalla: localScreenTrack,
+    camaraRealOn,
     faceWatch,
     activo: !!supervisorEncuadre && conSalaViva,
     roomNombre: roomName,

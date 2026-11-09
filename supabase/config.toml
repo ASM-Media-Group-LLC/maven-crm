@@ -284,6 +284,9 @@ verify_jwt = false  # solo cron (X-Cron-Token); abre/cierra salud_incidentes + p
 [functions.equipo-vigilante]
 verify_jwt = false  # solo cron (X-Cron-Token); vigila al equipo y hace push al dueño
 
+[functions.argos-escalar-persona]
+verify_jwt = false  # solo cron; escala al supervisor/HR/dueño si la persona ignoró el aviso 5 min
+
 [functions.detectar-tardanzas]
 verify_jwt = true  # cron (X-Cron-Token) o service_role; detecta tardanzas y manda correo
 
