@@ -390,8 +390,15 @@ function AsistenciaDia({ horario, dia, userId, nombre, t }: {
   const difEntrada = minDif(horario.entrada, entradaReal);  // + = tarde, − = antes
   const difSalida = minDif(horario.salida, salidaReal);     // − = temprano, + = de más
 
+  // ¿Sigue EN SALA ahora? (hoy + última captura fresca). Si es así no mostramos
+  // "Salió": lo que se calculaba como salida puede ser un break o el último latido
+  // de alguien que sigue trabajando (Alvaro, 09/11).
+  const hoyBog = new Date().toLocaleDateString("en-CA", { timeZone: "America/Bogota" });
+  const ultimaCap = dia.capturas.reduce((mx, c) => (c.createdAt > mx ? c.createdAt : mx), "");
+  const enSalaAhora = dia.fecha === hoyBog && !!ultimaCap && Date.now() - Date.parse(ultimaCap) < 5 * 60_000;
+
   const diasTardes = difEntrada != null && difEntrada > 5; // tolerancia fija 5 min aquí
-  const dioSalidaTemprano = difSalida != null && difSalida < -5;
+  const dioSalidaTemprano = !enSalaAhora && difSalida != null && difSalida < -5;
 
   return (
     <div className="mt-3 rounded-2xl border border-border/40 bg-card/20 p-3.5">
@@ -412,12 +419,18 @@ function AsistenciaDia({ horario, dia, userId, nombre, t }: {
             {difEntrada != null && difEntrada > 5 && <span className="ml-1.5 text-[10px] font-semibold text-destructive">+{difEntrada}m</span>}
           </div>
         </div>
-        <div className={`rounded-panel border p-2.5 ${dioSalidaTemprano ? "border-warning/40 bg-warning/5" : "border-border/40 bg-card/30"}`}>
+        <div className={`rounded-panel border p-2.5 ${enSalaAhora ? "border-success/40 bg-success/5" : dioSalidaTemprano ? "border-warning/40 bg-warning/5" : "border-border/40 bg-card/30"}`}>
           <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{t("hr.exp.salioHora")}</div>
-          <div className={`mt-1 font-display text-sm font-bold tabular-nums ${dioSalidaTemprano ? "text-warning" : ""}`}>
-            {a12(salidaReal) ?? "—"}
-            {difSalida != null && difSalida < -5 && <span className="ml-1.5 text-[10px] font-semibold text-warning">{difSalida}m</span>}
-          </div>
+          {enSalaAhora ? (
+            <div className="mt-1 flex items-center gap-1.5 font-display text-sm font-bold text-success">
+              <span className="h-1.5 w-1.5 rounded-full bg-success" />{t("hr.exp.enSala")}
+            </div>
+          ) : (
+            <div className={`mt-1 font-display text-sm font-bold tabular-nums ${dioSalidaTemprano ? "text-warning" : ""}`}>
+              {a12(salidaReal) ?? "—"}
+              {difSalida != null && difSalida < -5 && <span className="ml-1.5 text-[10px] font-semibold text-warning">{difSalida}m</span>}
+            </div>
+          )}
         </div>
       </div>
       {(diasTardes || dioSalidaTemprano) && (

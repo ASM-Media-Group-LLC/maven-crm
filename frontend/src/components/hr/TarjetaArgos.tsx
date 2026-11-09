@@ -88,6 +88,11 @@ export function TarjetaArgos({ nombre, dia, horario }: {
     const fPant = dia.nota.factores.find((f) => f.clave === "pantalla")?.sub ?? null;
     const difEnt = minDif(horario.entrada, hhmm(dia.entroAt));
     const difSal = minDif(horario.salida, hhmm(dia.salioAt));
+    // ¿Sigue EN SALA ahora? (hoy + última captura fresca). Si es así, NO "salió":
+    // el cálculo de salida puede confundir un break o un latido con una salida.
+    const hoyB = new Date().toLocaleDateString("en-CA", { timeZone: "America/Bogota" });
+    const ultCap = dia.capturas.reduce((mx, c) => (c.createdAt > mx ? c.createdAt : mx), "");
+    const enSala = dia.fecha === hoyB && !!ultCap && Date.now() - Date.parse(ultCap) < 5 * 60_000;
 
     const titular: Frase = banda === "bien" ? { k: "hr.exp.mgr.bien", p: { n: nom } }
       : banda === "ojo" ? { k: "hr.exp.mgr.ojo", p: { n: nom } }
@@ -99,7 +104,8 @@ export function TarjetaArgos({ nombre, dia, horario }: {
     const hechos: Array<{ k: TranslationKey; p?: Record<string, string | number>; tono: "neutro" | "rojo" | "ambar" }> = [];
     if (juzgadas.length > 0) hechos.push({ k: "hr.exp.mgr.hecho.momentos", p: { n: juzgadas.length }, tono: "neutro" });
     if (fuera.length > 0) hechos.push({ k: "hr.exp.mgr.hecho.fuera", p: { n: fuera.length }, tono: "rojo" });
-    if (difSal != null && difSal < -5) hechos.push({ k: "hr.exp.mgr.hecho.salioAntes", p: { min: Math.abs(difSal) }, tono: "ambar" });
+    if (enSala) hechos.push({ k: "hr.exp.mgr.hecho.enSala", tono: "neutro" });
+    else if (difSal != null && difSal < -5) hechos.push({ k: "hr.exp.mgr.hecho.salioAntes", p: { min: Math.abs(difSal) }, tono: "ambar" });
     if (difEnt != null && difEnt > 5) hechos.push({ k: "hr.exp.mgr.hecho.entroTarde", p: { min: difEnt }, tono: "ambar" });
     if (fPant != null && fPant < 50) hechos.push({ k: "hr.exp.mgr.hecho.pantalla", p: { pct: Math.round(fPant) }, tono: "ambar" });
     if (fCam != null && fCam < 50) hechos.push({ k: "hr.exp.mgr.hecho.camara", p: { pct: Math.round(fCam) }, tono: "ambar" });

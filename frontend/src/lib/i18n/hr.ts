@@ -1134,6 +1134,7 @@ export const hr = {
   "hr.exp.mgr.hecho.momentos": { es: "{n} momentos mirados", en: "{n} moments checked" },
   "hr.exp.mgr.hecho.fuera": { es: "{n} fuera de lugar", en: "{n} off-task" },
   "hr.exp.mgr.hecho.salioAntes": { es: "salió {min} min antes", en: "left {min} min early" },
+  "hr.exp.mgr.hecho.enSala": { es: "en sala ahora", en: "in the room now" },
   "hr.exp.mgr.hecho.entroTarde": { es: "entró {min} min tarde", en: "clocked in {min} min late" },
   "hr.exp.mgr.hecho.pantalla": { es: "pantalla {pct}%", en: "screen {pct}%" },
   "hr.exp.mgr.hecho.camara": { es: "cámara {pct}%", en: "camera {pct}%" },
@@ -1162,6 +1163,7 @@ export const hr = {
   "hr.exp.sinHorarioAsignado": { es: "Sin asignar", en: "Not assigned" },
   "hr.exp.entroHora": { es: "Entró", en: "Clocked in" },
   "hr.exp.salioHora": { es: "Salió", en: "Clocked out" },
+  "hr.exp.enSala": { es: "En sala ahora", en: "In the room now" },
   "hr.exp.horasTrabajadas": { es: "Horas trabajadas", en: "Hours worked" },
   "hr.exp.asistenciaNota": { es: "Las tardanzas y salidas tempranas son sanción aparte: no tocan la nota.", en: "Lateness and early-outs are separate: they don't touch the score." },
   // Prueba de tardanza (Alvaro, 08/11): foto del momento que entró + hora + correo.
