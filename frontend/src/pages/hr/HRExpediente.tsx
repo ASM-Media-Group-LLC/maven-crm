@@ -20,7 +20,7 @@ import { correoTardanzaHTML } from "@/lib/correoTardanzaHtml";
 import { a12, rango12 } from "@/lib/horaBogota";
 import { ClipsDelDia } from "@/components/hr/ClipsDelDia";
 import { AvisosDeArgos } from "@/components/hr/AvisosDeArgos";
-import { QueVioArgos } from "@/components/hr/QueVioArgos";
+import { TarjetaArgos } from "@/components/hr/TarjetaArgos";
 import { Mail } from "lucide-react";
 
 // Expediente del empleado, estilo Hubstaff: se abre en HOY, con su nota y sus
@@ -750,6 +750,7 @@ export default function HRExpediente() {
   // Se abre en HOY. El día elegido manda; el mes sale de él (para cargar y para el calendario).
   const [diaSel, setDiaSel] = useState<string>(hoyStr);
   const [verCalendario, setVerCalendario] = useState(false);
+  const [verDesglose, setVerDesglose] = useState(false);
   const anio = Number(diaSel.slice(0, 4));
   const mes = Number(diaSel.slice(5, 7));
   const { expediente, cargando, error, hoy } = useExpedienteEmpleado(userId ?? null, anio, mes);
@@ -888,26 +889,34 @@ export default function HRExpediente() {
               <div className="text-[10px] text-muted-foreground">{t("hr.exp.pausas")}</div>
             </div>
           </div>
-
-          {/* ASISTENCIA (Alvaro, 05/11): horario asignado + entró + salió + tarde/
-              temprano. Para responder "a qué horas llegó" sin tener que buscar. */}
-          {expediente && <AsistenciaDia horario={expediente.horario} dia={dia} userId={userId} nombre={nombre} t={t} />}
-
-          {/* Desglose de la nota SIEMPRE A LA VISTA (Alvaro, 04/11): de qué se
-              arma el número — cada factor con su %, su aporte y la prueba. Sin
-              hover ni clic, para que se entienda de una. */}
-          <div className="mt-3 rounded-2xl border border-border/40 bg-card/20 p-3.5">
-            <p className="mb-2.5 flex items-center gap-2 text-xs font-semibold text-muted-foreground">
-              <Gauge className="h-3.5 w-3.5 text-primary" />{t("hr.exp.desgloseTitulo")}
-            </p>
-            <DesgloseNotaContenido dia={dia} atencion={atencion} t={t} compacto />
-          </div>
         </div>
       </section>
 
-      {/* Qué vio Argos hoy: el resumen en seco de lo que la IA juzgó, para no
-          tener que abrir foto por foto (Alvaro, 09/11). */}
-      <QueVioArgos capturas={dia.capturas} />
+      {/* Argos como MANAGER del día: lo PRIMERO, juzga el día con criterio
+          (Alvaro, 09/11). Reemplaza las barras abiertas de pantalla/cámara. */}
+      <TarjetaArgos nombre={nombre} dia={dia} horario={expediente?.horario ?? { entrada: null, salida: null }} />
+
+      {/* Asistencia + el desglose técnico, ya COLAPSADO: el perfil abre limpio y
+          el detalle (pantalla/cámara/atención) se abre solo si se quiere. */}
+      <section className="vidrio sube mt-4 p-4 lg:p-5">
+        <div className="v-cont">
+          {expediente && <AsistenciaDia horario={expediente.horario} dia={dia} userId={userId} nombre={nombre} t={t} />}
+
+          <button
+            type="button"
+            onClick={() => setVerDesglose((v) => !v)}
+            className="mt-3 flex w-full items-center justify-between rounded-2xl border border-border/40 bg-card/20 px-3.5 py-2.5 text-xs font-semibold text-muted-foreground transition hover:bg-card/40"
+          >
+            <span className="flex items-center gap-2"><Gauge className="h-3.5 w-3.5 text-primary" />{verDesglose ? t("hr.exp.ocultarDesglose") : t("hr.exp.verDesglose")}</span>
+            <ChevronDown className={`h-4 w-4 transition-transform ${verDesglose ? "rotate-180" : ""}`} />
+          </button>
+          {verDesglose && (
+            <div className="mt-2 rounded-2xl border border-border/40 bg-card/20 p-3.5">
+              <DesgloseNotaContenido dia={dia} atencion={atencion} t={t} compacto />
+            </div>
+          )}
+        </div>
+      </section>
 
       {/* Videos de Argos del día (si los hubo). Se esconde solo si no hay. */}
       {userId && <ClipsDelDia userId={userId} fecha={dia.fecha} />}
