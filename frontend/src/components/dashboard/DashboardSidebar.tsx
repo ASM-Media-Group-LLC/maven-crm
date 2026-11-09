@@ -2,6 +2,7 @@ import {
   Activity, AlertTriangle, BarChart3, Bell, BookOpen, Bot, Briefcase, Calculator, CalendarDays, CalendarRange, ChevronRight, Clapperboard, ClipboardCheck, Clock, DollarSign, Eye, FileSpreadsheet, FileText, Gauge, Gift, GraduationCap, HardDrive, Headphones, Home, Inbox, LayoutDashboard, Mail, Map, Megaphone, MessageCircle, Moon, Palette, Phone, Presentation, RefreshCw, Rocket, Search, Settings, Shield, Smartphone, Sun, Ticket, UserCheck, UserCog, UserPlus, Users, Users2, Video, Wallet,
 } from "lucide-react";
 import { useEffect, useState } from "react";
+import { useIncidentesSalud } from "@/hooks/useIncidentesSalud";
 import { useTheme } from "next-themes";
 import { useAuth } from "@/hooks/useAuth";
 import { UserAvatar } from "@/components/UserAvatar";
@@ -464,6 +465,20 @@ const DashboardSidebar = () => {
     );
   }
 
+  // Icono Home con puntito rojo si hay incidente de salud abierto (Alvaro 09/11).
+  // Así ves la salud estés donde estés: Cowork, Messenger, lo que sea.
+  const HomeConPuntito = ({ className }: { className?: string }) => {
+    const { hayAbiertos } = useIncidentesSalud();
+    return (
+      <span className="relative inline-flex">
+        <Home className={className} />
+        {hayAbiertos && (
+          <span className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-destructive ring-2 ring-background" aria-label="Hay un problema de salud" />
+        )}
+      </span>
+    );
+  };
+
   return (
     <Sidebar collapsible="icon" variant="floating">
       {/* Rediseño 09/2026: la marca va centrada y con aire arriba (como en el
@@ -483,7 +498,7 @@ const DashboardSidebar = () => {
         <CollapsibleSidebarGroup
           label={t("sidebar.menu")}
           storageKey="menu"
-          icon={Home}
+          icon={HomeConPuntito}
           active={isMenuActive}
           collapsedItems={menuCollapsedItems}
           collapsedHref="/dashboard"
