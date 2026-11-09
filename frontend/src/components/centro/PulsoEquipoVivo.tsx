@@ -171,25 +171,9 @@ export default function PulsoEquipoVivo({ coworkConectados }: { coworkConectados
             </div>
           )}
 
-          {/* El detalle por equipo YA NO vive en el home (Alvaro, 08/11): era una
-              grilla densa de círculos-letra que se pisaba con "Conectados ahora"
-              de Argos. El home es el vistazo rápido; el detalle, un clic allá. */}
-          <button
-            type="button"
-            onClick={() => navigate("/hr/monitor-ia?t=ahora")}
-            className="vidrio vidrio-glow vidrio-lift glow-b flex w-full items-center gap-3 p-3.5 text-left"
-          >
-            <span className="v-cont flex w-full items-center gap-3">
-              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-panel bg-primary/10 text-primary">
-                <Users className="h-5 w-5" />
-              </span>
-              <span className="min-w-0 flex-1">
-                <span className="block text-sm font-semibold leading-tight">{t("dashboard.pulso.verEquipo")}</span>
-                <span className="block text-[11px] text-muted-foreground leading-tight">{t("dashboard.pulso.verEquipoSub")}</span>
-              </span>
-              <ChevronRight className="h-5 w-5 shrink-0 text-muted-foreground/60" />
-            </span>
-          </button>
+          {/* Alvaro (08/11 noche): el botón "Ver el equipo completo" sobraba —
+              el Pulso ya es el vistazo; para el detalle se entra por Argos
+              desde el menú. Fuera. */}
         </>
       )}
     </section>

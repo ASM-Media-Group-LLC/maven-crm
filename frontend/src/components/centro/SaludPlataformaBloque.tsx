@@ -273,17 +273,22 @@ export default function SaludPlataformaBloque() {
         </div>
       )}
 
-      {/* Entradas de hoy + tira de desconectados recientes. */}
+      {/* Entradas de hoy + tira de desconectados recientes. Alvaro (08/11 noche):
+          cajas vacías no van — si no hay nada que mostrar, no aparece. */}
+      {(entradas > 0 || avatares.length > 0) && (
       <div className="mt-3 grid gap-2.5 sm:grid-cols-[auto_1fr] sm:items-stretch">
-        <div className="vidrio vidrio-glow glow-b p-3">
-          <div className="v-cont flex items-center gap-3">
-            <span className="flex h-10 w-10 items-center justify-center rounded-panel bg-primary/10 text-primary"><Users className="h-5 w-5" /></span>
-            <div>
-              <div className="font-display text-2xl font-bold tabular-nums leading-none">{entradas}</div>
-              <div className="mt-0.5 text-[11px] text-muted-foreground">{t("dashboard.centro.salud.entraronHoy")}</div>
+        {entradas > 0 && (
+          <div className="vidrio vidrio-glow glow-b p-3">
+            <div className="v-cont flex items-center gap-3">
+              <span className="flex h-10 w-10 items-center justify-center rounded-panel bg-primary/10 text-primary"><Users className="h-5 w-5" /></span>
+              <div>
+                <div className="font-display text-2xl font-bold tabular-nums leading-none">{entradas}</div>
+                <div className="mt-0.5 text-[11px] text-muted-foreground">{t("dashboard.centro.salud.entraronHoy")}</div>
+              </div>
             </div>
           </div>
-        </div>
+        )}
+        {avatares.length > 0 && (
         <div className="vidrio p-3">
           <div className="v-cont flex items-center gap-3">
             <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-panel bg-foreground/5 text-muted-foreground"><UserMinus className="h-5 w-5" /></span>
@@ -292,24 +297,22 @@ export default function SaludPlataformaBloque() {
                 <span className="text-sm font-semibold">{t("dashboard.centro.salud.desconectados")}</span>
                 <span className="text-[11px] text-muted-foreground">{t("dashboard.centro.salud.desconectadosNota")}</span>
               </div>
-              {avatares.length === 0 ? (
-                <p className="mt-1 text-[11px] text-muted-foreground">{t("dashboard.centro.salud.nadieDesc")}</p>
-              ) : (
-                <div className="mt-1.5 flex items-center -space-x-1.5">
-                  {avatares.map((p) => (
-                    <span key={p.userId} title={`${p.nombre ?? ""} · ${hace(p.ultimo, language) ?? ""}`}>
-                      <UserAvatar name={p.nombre || "—"} src={p.avatarUrl} seed={p.avatarSeed} size="xs" />
-                    </span>
-                  ))}
-                  {desconectados.length > avatares.length && (
-                    <span className="ml-2 text-[11px] font-medium text-muted-foreground tabular-nums">+{desconectados.length - avatares.length}</span>
-                  )}
-                </div>
-              )}
+              <div className="mt-1.5 flex items-center -space-x-1.5">
+                {avatares.map((p) => (
+                  <span key={p.userId} title={`${p.nombre ?? ""} · ${hace(p.ultimo, language) ?? ""}`}>
+                    <UserAvatar name={p.nombre || "—"} src={p.avatarUrl} seed={p.avatarSeed} size="xs" />
+                  </span>
+                ))}
+                {desconectados.length > avatares.length && (
+                  <span className="ml-2 text-[11px] font-medium text-muted-foreground tabular-nums">+{desconectados.length - avatares.length}</span>
+                )}
+              </div>
             </div>
           </div>
         </div>
+        )}
       </div>
+      )}
     </section>
   );
 }
