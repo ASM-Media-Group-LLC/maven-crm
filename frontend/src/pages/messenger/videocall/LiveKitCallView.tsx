@@ -25,7 +25,6 @@ import { useFaceWatch, faceStateLabel, type FaceWatch } from "@/hooks/useFaceWat
 import { useFaceNudge, useScreenShareNudge } from "@/hooks/useFaceNudge";
 import { useMonitorCamara } from "@/hooks/useMonitorCamara";
 import { useArgosEscaleraClip } from "@/hooks/useArgosEscaleraClip";
-import { useArgosNudgePersona } from "@/hooks/useArgosNudgePersona";
 import { latirEnLlamada, salirDeLlamada, LATIDO_LLAMADA_MS } from "@/lib/llamadaEnMaven";
 import { useRegistrarLlamados } from "@/hooks/useRegistrarLlamados";
 import { esBlur, alternarBlur, leerFondoGuardado, guardarFondo, type BackgroundEffect } from "@/lib/fondoDeLlamada";
@@ -647,17 +646,9 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
     activo: !!supervisorEncuadre && conSalaViva,
     roomNombre: roomName,
   });
-  // Nudge a la PERSONA cuando se raja en vivo (toast + voz Javi, tono jefe).
-  // Si no se corrige en 5 min, el edge argos-escalar-persona escala al
-  // Chatter Supervisor (si es chatter) o HR+admin+dueño (si es otro rol).
-  useArgosNudgePersona({
-    trackCamara: localCameraTrack,
-    trackPantalla: localScreenTrack,
-    camaraRealOn,
-    faceWatch,
-    activo: !!supervisorEncuadre && conSalaViva,
-    roomNombre: roomName,
-  });
+  // El aviso de voz a la persona + su registro en el expediente los hace el
+  // mismo useFaceNudge/useScreenShareNudge (voz Javi + argos_nudges). El hook
+  // aparte era redundante y su registro estaba roto: se quitó (Alvaro, 09/11).
   // Cualquier llamada que NO es la sala de Cowork (Messenger, Meet, la 1:1 con
   // el coordinador) deja un latido en localStorage mientras está montada: el
   // supervisor de encuadre de Cowork lo consulta en cada tic y se calla — estar

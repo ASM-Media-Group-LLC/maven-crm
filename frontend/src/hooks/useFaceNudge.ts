@@ -1,12 +1,22 @@
 import { useEffect, useRef } from "react";
 import { toast } from "sonner";
 import type { FaceWatch } from "@/hooks/useFaceWatch";
+import { useAuth } from "@/hooks/useAuth";
 import { playMessageNotification } from "@/lib/notificationSound";
 import { anunciar } from "@/lib/anunciarVoz";
 import { estaEnPausa } from "@/lib/coworkPausa";
 import { estaEnLlamadaDeMaven } from "@/lib/llamadaEnMaven";
 import { reglasActuales, reglaDeEstado } from "@/lib/coworkReglas";
 import { traducir, type TranslationKey } from "@/lib/i18n";
+import { VOZ_ARGOS, tipoDeEncuadre, registrarNudge, cerrarNudge } from "@/lib/argosNudge";
+
+// Mensaje LEGIBLE que queda en el expediente por cada tipo (distinto de la frase
+// hablada, que rota). Es lo que el dueño ve: "Argos le dijo: …".
+const MENSAJE_PERFIL: Record<string, string> = {
+  camara_apagada: "Tenía la cámara apagada",
+  fuera_cuadro: "Estaba fuera de cuadro",
+  sin_pantalla: "No compartía la pantalla",
+};
 
 // Avisarle a la PROPIA PERSONA que no se le ve.
 //
@@ -136,6 +146,7 @@ export function useFaceNudge(
   enPausaProp?: boolean,
   onPasaAlCoordinador?: (segundosFuera: number) => void,
 ) {
+  const { user } = useAuth();
   const ultimoAviso = useRef(0);
   const avisadoCoordinador = useRef(false);
   const alCoordinadorRef = useRef(onPasaAlCoordinador);
@@ -146,6 +157,8 @@ export function useFaceNudge(
     if (!esProblemaDeEncuadre(watch.state)) {
       ultimoAviso.current = 0;
       avisadoCoordinador.current = false;
+      // Se corrigió: cerrar el episodio abierto en el expediente (si lo había).
+      if (user) { void cerrarNudge(user.id, "camara_apagada"); void cerrarNudge(user.id, "fuera_cuadro"); }
       return;
     }
 
@@ -205,8 +218,12 @@ export function useFaceNudge(
         // sigue siendo caro, y la persona ya tuvo avisos hablados para
         // corregirlo sola.
         playMessageNotification(0.5);
-        void anunciar(siguienteFrase(watch.state), { volumen: conSonido ? 0.9 : 0.7 });
+        void anunciar(siguienteFrase(watch.state), { volumen: conSonido ? 0.9 : 0.7, voiceId: VOZ_ARGOS });
         ultimoAviso.current = ahora;
+        // Registrar en el expediente que Argos le llamó la atención (una fila por
+        // episodio; el índice parcial evita duplicar mientras no se corrija).
+        const tipo = tipoDeEncuadre(watch.state);
+        if (tipo && user) void registrarNudge(user.id, tipo, MENSAJE_PERFIL[tipo], null);
       }
 
       // Con `supervisorSeg` en null la sesión decidió que el coordinador no se
@@ -220,7 +237,7 @@ export function useFaceNudge(
     tick();
     const id = window.setInterval(tick, 5_000);
     return () => window.clearInterval(id);
-  }, [watch, enPausaProp]);
+  }, [watch, enPausaProp, user]);
 }
 
 // ── Compartir pantalla ──────────────────────────────────────────────────────
@@ -292,11 +309,17 @@ const FRASES_SIN_PANTALLA = [
 let idxSinPantalla = 0;
 
 export function useScreenShareNudge(compartiendo: boolean, activo: boolean) {
+  const { user } = useAuth();
   const ultimo = useRef(0);
   const desde = useRef<number | null>(null);
 
   useEffect(() => {
-    if (!activo || compartiendo) { desde.current = null; ultimo.current = 0; return; }
+    if (!activo || compartiendo) {
+      desde.current = null; ultimo.current = 0;
+      // Volvió a compartir: cerrar el episodio en el expediente (si lo había).
+      if (compartiendo && user) void cerrarNudge(user.id, "sin_pantalla");
+      return;
+    }
     if (desde.current === null) desde.current = Date.now();
 
     const tick = () => {
@@ -315,16 +338,17 @@ export function useScreenShareNudge(compartiendo: boolean, activo: boolean) {
       if (ahora - ultimo.current < regla.repetirSeg * 1000) return;
       ultimo.current = ahora;
       playMessageNotification(0.5);
-      void anunciar(FRASES_SIN_PANTALLA[idxSinPantalla++ % FRASES_SIN_PANTALLA.length]);
+      void anunciar(FRASES_SIN_PANTALLA[idxSinPantalla++ % FRASES_SIN_PANTALLA.length], { voiceId: VOZ_ARGOS });
       toast.warning(traducir("int.face.noScreen"), {
         description: traducir("int.face.noScreenDesc"),
         duration: 10_000,
         id: "sin-pantalla",
       });
+      if (user) void registrarNudge(user.id, "sin_pantalla", MENSAJE_PERFIL.sin_pantalla, null);
     };
 
     tick();
     const id = window.setInterval(tick, 5_000);
     return () => window.clearInterval(id);
-  }, [compartiendo, activo]);
+  }, [compartiendo, activo, user]);
 }
