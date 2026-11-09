@@ -1124,6 +1124,13 @@ export const hr = {
   "hr.exp.argos.tipo.fuera": { es: "Fuera de cuadro", en: "Out of frame" },
   "hr.exp.argos.tipo.pantalla": { es: "Sin compartir pantalla", en: "Not sharing screen" },
   "hr.exp.argos.tipo.distraido": { es: "Distraído", en: "Distracted" },
+  // "Qué vio Argos hoy" (Alvaro, 09/11): el resumen en seco de lo que la IA juzgó.
+  "hr.exp.argosvio.titulo": { es: "Qué vio Argos hoy", en: "What Argos saw today" },
+  "hr.exp.argosvio.limpio": { es: "Argos miró {n} momentos de trabajo y en todos estaba en lo suyo. Ninguna distracción.", en: "Argos looked at {n} work moments and in all of them they were on task. No distractions." },
+  "hr.exp.argosvio.conFuera": { es: "Argos miró {total} momentos: {fuera} fuera de lugar. El resto, en lo suyo.", en: "Argos looked at {total} moments: {fuera} off-task. The rest, on task." },
+  "hr.exp.argosvio.enQue": { es: "En qué pasó el tiempo", en: "Where the time went" },
+  "hr.exp.argosvio.fueraTitulo": { es: "Lo que Argos marcó fuera de lugar", en: "What Argos flagged as off-task" },
+  "hr.exp.argosvio.ultimo": { es: "Lo último que vio ({hora}):", en: "Last thing it saw ({hora}):" },
   "hr.exp.factorPeso": { es: "peso {n}%", en: "weight {n}%" },
   "hr.exp.reglaDura": { es: "No compartió pantalla: la nota no pasa de 50, por bien que vaya lo demás.", en: "Didn't share screen: the score can't exceed 50, however good the rest is." },
   "hr.exp.pruebaCamara": { es: "cámara: {n} momentos medidos", en: "camera: {n} moments measured" },

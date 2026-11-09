@@ -20,6 +20,7 @@ import { correoTardanzaHTML } from "@/lib/correoTardanzaHtml";
 import { a12, rango12 } from "@/lib/horaBogota";
 import { ClipsDelDia } from "@/components/hr/ClipsDelDia";
 import { AvisosDeArgos } from "@/components/hr/AvisosDeArgos";
+import { QueVioArgos } from "@/components/hr/QueVioArgos";
 import { Mail } from "lucide-react";
 
 // Expediente del empleado, estilo Hubstaff: se abre en HOY, con su nota y sus
@@ -903,6 +904,10 @@ export default function HRExpediente() {
           </div>
         </div>
       </section>
+
+      {/* Qué vio Argos hoy: el resumen en seco de lo que la IA juzgó, para no
+          tener que abrir foto por foto (Alvaro, 09/11). */}
+      <QueVioArgos capturas={dia.capturas} />
 
       {/* Videos de Argos del día (si los hubo). Se esconde solo si no hay. */}
       {userId && <ClipsDelDia userId={userId} fecha={dia.fecha} />}

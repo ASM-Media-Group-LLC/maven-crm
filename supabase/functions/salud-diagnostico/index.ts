@@ -9,6 +9,8 @@ const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
 const NAS = (Deno.env.get("DRIVE_NAS_URL") ?? "").replace(/\/+$/, "");
+const GEMINI_KEY = Deno.env.get("GEMINI_API_KEY") ?? "";
+const GEMINI_MODEL = Deno.env.get("ARGOS_GEMINI_MODEL") ?? "gemini-3.8-flash";
 
 const ALLOWED_ORIGINS = [
   "https://app.maven-ai.me","https://maven-ai.me",
@@ -32,40 +34,39 @@ type Prueba = { nombre: string; estado: "ok" | "mal" | "duda"; detalle: string }
 
 async function pruebasArgos(): Promise<Prueba[]> {
   const out: Prueba[] = [];
-  // 1) Edge monitor-vision responde (sin llamar a Gemini: mandamos body inválido
-  // y chequeamos que RESPONDA, no que acierte).
+  // 1) Llave de Gemini — llamada DIRECTA a Google (no vía edge) para que el
+  // error que devuelve sea el real: cuota agotada, llave rota, modelo apagado.
+  if (!GEMINI_KEY) {
+    out.push({ nombre: "Llave de Gemini", estado: "mal", detalle: "Falta GEMINI_API_KEY en Supabase" });
+  } else {
+    try {
+      const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_KEY}`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ contents: [{ parts: [{ text: "ping" }] }], generationConfig: { maxOutputTokens: 5, thinkingConfig: { thinkingBudget: 0 } } }),
+        signal: AbortSignal.timeout(10000),
+      });
+      const txt = await r.text().catch(() => "");
+      if (r.ok) out.push({ nombre: "Llave de Gemini", estado: "ok", detalle: `Google respondió 200 al modelo ${GEMINI_MODEL}` });
+      else out.push({ nombre: "Llave de Gemini", estado: "mal", detalle: `Google dice ${r.status}: ${txt.slice(0, 200)}` });
+    } catch (e) {
+      out.push({ nombre: "Llave de Gemini", estado: "mal", detalle: (e as Error).message });
+    }
+  }
+
+  // 2) Edge argos-mirar responde (que es el que juzga pantallazos de verdad).
   try {
-    const r = await fetch(`${SUPABASE_URL}/functions/v1/monitor-vision`, {
+    const r = await fetch(`${SUPABASE_URL}/functions/v1/argos-mirar`, {
       method: "POST", headers: {
         "Content-Type": "application/json", Authorization: `Bearer ${SERVICE_KEY}`,
       }, body: JSON.stringify({}), signal: AbortSignal.timeout(8000),
     });
     out.push({
-      nombre: "Edge monitor-vision responde",
-      estado: r.status === 400 || r.status === 200 || r.status === 503 ? "ok" : "mal",
+      nombre: "Edge argos-mirar responde",
+      estado: r.status >= 400 && r.status < 500 ? "ok" : r.status === 200 ? "ok" : "mal",
       detalle: `http ${r.status}`,
     });
   } catch (e) {
-    out.push({ nombre: "Edge monitor-vision responde", estado: "mal", detalle: (e as Error).message });
-  }
-
-  // 2) Llave de Gemini: miramos si el edge arranca con clave (si no, responde 503 "no-key").
-  try {
-    const r = await fetch(`${SUPABASE_URL}/functions/v1/monitor-vision`, {
-      method: "POST", headers: {
-        "Content-Type": "application/json", Authorization: `Bearer ${SERVICE_KEY}`,
-      }, body: JSON.stringify({ imagen_base64: "a", mime: "image/jpeg" }), signal: AbortSignal.timeout(10000),
-    });
-    const body = await r.text().catch(() => "");
-    if (r.status === 503 && body.includes("no-key")) {
-      out.push({ nombre: "Llave de Gemini", estado: "mal", detalle: "El servidor dice NO hay llave (poner GEMINI_API_KEY)" });
-    } else if (body.includes("vision")) {
-      out.push({ nombre: "Llave de Gemini", estado: "mal", detalle: `Gemini falló: ${body.slice(0, 120)}` });
-    } else {
-      out.push({ nombre: "Llave de Gemini", estado: "ok", detalle: "El edge aceptó la llamada" });
-    }
-  } catch (e) {
-    out.push({ nombre: "Llave de Gemini", estado: "duda", detalle: (e as Error).message });
+    out.push({ nombre: "Edge argos-mirar responde", estado: "mal", detalle: (e as Error).message });
   }
 
   // 3) Captura reciente del equipo (hay pantallazos nuevos → el cliente manda; si 0, nadie en Cowork).
