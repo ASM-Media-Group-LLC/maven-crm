@@ -25,6 +25,7 @@ import {
 import { useLanguage } from "@/hooks/useLanguage";
 import { usePermissions } from "@/hooks/usePermissions";
 import { useEsDueno } from "@/hooks/useEsDueno";
+import { useEsRh } from "@/hooks/useEsRh";
 import { CollapsibleSidebarGroup } from "@/components/dashboard/CollapsibleSidebarGroup";
 import WhatsAppIcon from "@/components/icons/WhatsAppIcon";
 import TelegramIcon from "@/components/icons/TelegramIcon";
@@ -86,6 +87,10 @@ const DashboardSidebar = () => {
   const { canAccess, isLoading: permisosCargando, hayError: permisosFallaron, reintentar: reintentarPermisos } = usePermissions();
   // Argos (por ahora) solo lo ve el dueño de la empresa, aunque tenga el permiso.
   const { esDueno } = useEsDueno();
+  const { esRh } = useEsRh();
+  // Argos/Monitor IA lo ve el dueño y también HR (Andrea). La RLS filtra que HR
+  // no vea a los admins; aquí solo se abre el acceso del menú.
+  const veArgos = esDueno === true || esRh === true;
 
   const unreadChatCount = useUnreadChatCount();
   const { promologCount, leadgenCount, closersCount, waInboxCount, tgInboxCount, coworkRequestsCount, correoUnreadCount } = useSidebarBadges();
@@ -250,7 +255,7 @@ const DashboardSidebar = () => {
   // Filter HR items the role can't actually reach so the sidebar
   // doesn't show entries that just bounce back to /dashboard.
   const filterHRItems = (items?: HRItem[]) =>
-    items?.filter((i) => !i.submodule || (canAccess("HR", i.submodule) && (i.submodule !== "Monitor IA" || esDueno === true)));
+    items?.filter((i) => !i.submodule || (canAccess("HR", i.submodule) && (i.submodule !== "Monitor IA" || veArgos)));
   const hrGroups: HRGroup[] = hrGroupsAll
     .map((g) => ({
       ...g,
@@ -517,7 +522,7 @@ const DashboardSidebar = () => {
         {/* Argos: su PROPIO botón en el riel (Alvaro), no dentro del flyout de
             Menú. Monitor del equipo en vivo; por ahora solo lo ve el DUEÑO de la
             empresa (gate HR/Monitor IA + tenant_owners). */}
-        {canAccess("HR", "Monitor IA") && esDueno === true && (
+        {canAccess("HR", "Monitor IA") && veArgos && (
           <SidebarMenu>
             <SidebarMenuItem>
               <SidebarMenuButton asChild tooltip={t("nav.argos")}>
