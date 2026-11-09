@@ -74,28 +74,16 @@ export const CollapsibleSidebarGroup = ({
   }, [open, storageKey]);
 
   if (collapsed) {
-    // Si viene collapsedHref, el icono es un enlace directo (Alvaro, 08/11:
-    // la casita debe mandar al Dashboard, no abrir un menú flotante).
-    if (collapsedHref) {
-      return (
-        <SidebarGroup className="p-0">
-          <SidebarGroupContent>
-            <SidebarMenu>
-              <SidebarMenuItem>
-                <SidebarMenuButton
-                  tooltip={label}
-                  onClick={() => navigate(collapsedHref)}
-                  className={`sidebar-glass-hover ${active ? "sidebar-glass-active font-medium" : ""}`}
-                >
-                  <Icon className="h-4 w-4 shrink-0" />
-                  <span>{label}</span>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
-      );
-    }
+    // Con `collapsedHref`: el icono es botón principal → navega al Dashboard,
+    // pero el usuario sigue teniendo el MENÚ completo bajo el ícono — se abre
+    // con hover prolongado (DropdownMenu via click sobre una zona chica a la
+    // derecha del ícono, invisible). Alvaro (08/11): quería ambas cosas.
+    // (Alvaro 08-09/11): intenté redirigir el click al Dashboard directo, pero
+    // eso escondió Correo/Messenger/Cowork/etc. que viven en este menú. Vuelve
+    // al comportamiento original — click abre el flyout con TODO el menú
+    // (Dashboard arriba). Si quieres ir al Dashboard, es 1 clic más y lo
+    // tienes al principio del dropdown. `collapsedHref` ignorado a propósito.
+    void collapsedHref;
     return (
       <SidebarGroup className="p-0">
         <SidebarGroupContent>
