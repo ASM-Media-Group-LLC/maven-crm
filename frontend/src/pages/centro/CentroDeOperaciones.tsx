@@ -126,9 +126,9 @@ export default function CentroDeOperaciones() {
   return (
     // flex-1 min-h-0 overflow-y-auto: el scroll propio de la página. El <main>
     // del AppShell es overflow-hidden (cada página pone su scroll), si no, recorta.
-    <div className="flex-1 min-h-0 overflow-y-auto p-4 pb-24 md:p-6 space-y-5">
+    <div className="flex-1 min-h-0 overflow-y-auto p-4 pb-24 md:p-6 flex flex-col gap-5">
       {/* Cabecera */}
-      <div className="flex flex-wrap items-end justify-between gap-3">
+      <div className="order-first flex flex-wrap items-end justify-between gap-3">
         <div>
           <SelectorDeTablero actual="centro" />
           <p className="mt-0.5 text-sm text-muted-foreground">{t("dashboard.centro.subtitulo")}</p>
@@ -242,8 +242,10 @@ export default function CentroDeOperaciones() {
         )}
       </section>
 
-      {/* Salas en vivo */}
-      <section className="vidrio sube p-4" style={{ animationDelay: "0.26s" }}>
+      {/* Salas en vivo — Alvaro (08/11): lo primero del home es "quién está activo
+          ahora y dónde", así que esta sección sube al primer lugar del contenido
+          (order negativo), justo debajo del encabezado y antes del resumen. */}
+      <section className="order-[-1] vidrio sube p-4" style={{ animationDelay: "0.05s" }}>
         <div className="mb-3 flex items-center justify-between gap-3">
           <h2 className="flex items-center gap-2 text-sm font-semibold">
             <span className="flex h-7 w-7 items-center justify-center rounded-panel bg-primary/10 text-primary"><DoorOpen className="h-4 w-4" /></span>
