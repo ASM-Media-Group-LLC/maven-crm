@@ -18,6 +18,7 @@ import type { TranslationKey } from "@/lib/i18n";
 import { supabase } from "@/integrations/supabase/client";
 import { correoTardanzaHTML } from "@/lib/correoTardanzaHtml";
 import { a12, rango12 } from "@/lib/horaBogota";
+import { ClipsDelDia } from "@/components/hr/ClipsDelDia";
 import { Mail } from "lucide-react";
 
 // Expediente del empleado, estilo Hubstaff: se abre en HOY, con su nota y sus
@@ -901,6 +902,9 @@ export default function HRExpediente() {
           </div>
         </div>
       </section>
+
+      {/* Videos de Argos del día (si los hubo). Se esconde solo si no hay. */}
+      {userId && <ClipsDelDia userId={userId} fecha={dia.fecha} />}
 
       {/* La tira de pantallazos del día (Hubstaff) */}
       <section className="vidrio sube mt-5 p-4 lg:p-5" style={{ animationDelay: "0.05s" }}>

@@ -24,6 +24,7 @@ import { toast } from "sonner";
 import { useFaceWatch, faceStateLabel, type FaceWatch } from "@/hooks/useFaceWatch";
 import { useFaceNudge, useScreenShareNudge } from "@/hooks/useFaceNudge";
 import { useMonitorCamara } from "@/hooks/useMonitorCamara";
+import { useArgosEscaleraClip } from "@/hooks/useArgosEscaleraClip";
 import { latirEnLlamada, salirDeLlamada, LATIDO_LLAMADA_MS } from "@/lib/llamadaEnMaven";
 import { useRegistrarLlamados } from "@/hooks/useRegistrarLlamados";
 import { esBlur, alternarBlur, leerFondoGuardado, guardarFondo, type BackgroundEffect } from "@/lib/fondoDeLlamada";
@@ -629,6 +630,18 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
     track: localCameraTrack,
     trackPantalla: localScreenTrack,
     camaraRealOn,
+    faceWatch,
+    activo: !!supervisorEncuadre && conSalaViva,
+    roomNombre: roomName,
+  });
+  // Argos — escalera de muestreo + grabación al distraerse (Alvaro, 08/11).
+  // Solo corre cuando hay PANTALLA compartida (nada que grabar sin eso); el
+  // propio hook excluye admins y respeta monitor_config.activo. Reemplaza el
+  // tick normal de IA de useMonitorCamara mientras esté activo (ese se apaga
+  // solo al detectar trackPantalla).
+  useArgosEscaleraClip({
+    trackCamara: localCameraTrack,
+    trackPantalla: localScreenTrack,
     faceWatch,
     activo: !!supervisorEncuadre && conSalaViva,
     roomNombre: roomName,
