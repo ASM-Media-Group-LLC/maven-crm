@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { ArrowRight, BarChart3, Building2, Clock, DoorOpen, Headset, MessageCircle, Timer, Users } from "lucide-react";
 import SelectorDeTablero from "@/pages/dashboard/SelectorDeTablero";
 import PulsoEquipoVivo from "@/components/centro/PulsoEquipoVivo";
+import SaludPlataformaBloque from "@/components/centro/SaludPlataformaBloque";
 import { TarjetaKpi } from "@/components/ui/TarjetaKpi";
 import { Button } from "@/components/ui/button";
 import { useCoworkSession, type AdminSessionRow } from "@/hooks/useCoworkSession";
@@ -126,9 +127,9 @@ export default function CentroDeOperaciones() {
   return (
     // flex-1 min-h-0 overflow-y-auto: el scroll propio de la página. El <main>
     // del AppShell es overflow-hidden (cada página pone su scroll), si no, recorta.
-    <div className="flex-1 min-h-0 overflow-y-auto p-4 pb-24 md:p-6 flex flex-col gap-5">
+    <div className="flex-1 min-h-0 overflow-y-auto p-4 pb-24 md:p-6 space-y-5">
       {/* Cabecera */}
-      <div className="order-first flex flex-wrap items-end justify-between gap-3">
+      <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <SelectorDeTablero actual="centro" />
           <p className="mt-0.5 text-sm text-muted-foreground">{t("dashboard.centro.subtitulo")}</p>
@@ -158,6 +159,11 @@ export default function CentroDeOperaciones() {
           quién la baja + cajas por equipo. Devuelve null para quien no vigila.
           Le pasamos los conectados EN COWORK (de LiveKit) para el número de arriba. */}
       <PulsoEquipoVivo coworkConectados={sesionesQ.isLoading ? null : vivo.conectados} />
+
+      {/* Salud de la plataforma (Alvaro, 08/11 noche): "¿está todo trabajando bien?"
+          — NAS/Drive, Correo, Mensajería, Argos + entradas/desconexiones del día.
+          El propio bloque se oculta a quien no es admin/dueño. */}
+      <SaludPlataformaBloque />
 
       {/* Tarjetas resumen: compactas (los conectados ya van arriba en el Pulso). */}
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
@@ -242,10 +248,9 @@ export default function CentroDeOperaciones() {
         )}
       </section>
 
-      {/* Salas en vivo — Alvaro (08/11): lo primero del home es "quién está activo
-          ahora y dónde", así que esta sección sube al primer lugar del contenido
-          (order negativo), justo debajo del encabezado y antes del resumen. */}
-      <section className="order-[-1] vidrio sube p-4" style={{ animationDelay: "0.05s" }}>
+      {/* Salas en vivo — Alvaro (08/11 noche): el Pulso vuelve arriba (como estaba),
+          Salud nuevo bloque debajo, y las Salas quedan tercero. */}
+      <section className="vidrio sube p-4" style={{ animationDelay: "0.26s" }}>
         <div className="mb-3 flex items-center justify-between gap-3">
           <h2 className="flex items-center gap-2 text-sm font-semibold">
             <span className="flex h-7 w-7 items-center justify-center rounded-panel bg-primary/10 text-primary"><DoorOpen className="h-4 w-4" /></span>
