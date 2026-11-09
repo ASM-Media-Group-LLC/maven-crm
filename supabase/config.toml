@@ -275,6 +275,9 @@ verify_jwt = false  # subida pública por link al Drive (valida el token del lin
 [functions.drive-aporte-nas]
 verify_jwt = true  # solo cron (X-Cron-Token); mueve los aportes del link al NAS
 
+[functions.salud-nas-ping]
+verify_jwt = true  # usuario logueado; ping EN VIVO al NAS para el bloque de Salud
+
 [functions.detectar-tardanzas]
 verify_jwt = true  # cron (X-Cron-Token) o service_role; detecta tardanzas y manda correo
 

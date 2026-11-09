@@ -110,6 +110,21 @@ export default function SaludPlataformaBloque() {
     },
   });
 
+  // 1bis) Ping EN VIVO al NAS (Alvaro, 08/11): la tabla puede quedar
+  // desactualizada si no hay aportes; el ping dice la verdad del momento.
+  const nasPing = useQuery<{ arriba: boolean; motivo?: string } | null>({
+    queryKey: ["centro-salud-nas-ping"],
+    staleTime: 20_000,
+    refetchInterval: 45_000,
+    enabled: !!user && (esDueno === true || isAdmin),
+    queryFn: async () => {
+      const { data, error } = await supabase.functions.invoke("salud-nas-ping", { body: {} });
+      if (error) return { arriba: false, motivo: error.message };
+      return data as { arriba: boolean; motivo?: string };
+    },
+    retry: 0,
+  });
+
   // 2) Entradas de HOY: cuántas personas distintas dejaron latido hoy.
   const entradasHoy = useQuery<{ total: number }>({
     queryKey: ["centro-salud-entradas", onlineUsers.size], // reevaluar al cambiar presencia
@@ -153,11 +168,17 @@ export default function SaludPlataformaBloque() {
   const s = salud.data;
   const cargando = salud.isLoading;
 
-  // Estados para cada chequeo. NAS: `caido` es la verdad (ya aplana anti-flapping).
-  const nasEstado: Estado = cargando ? "duda" : s?.nas?.caido ? "mal" : "ok";
-  const nasDetalle = s?.nas
-    ? s.nas.caido ? t("dashboard.centro.salud.nasMal", { n: s.nas.pendientes }) : t("dashboard.centro.salud.nasOk", { n: s.nas.pendientes })
-    : t("dashboard.centro.salud.cargando");
+  // Estados para cada chequeo.
+  // Drive/NAS: el PING EN VIVO manda (la tabla puede quedar vieja). Si el ping
+  // dice "no responde", decimos mal aunque la tabla diga ok. Fallback a tabla
+  // si el ping todavía no llega.
+  const pingSabe = nasPing.isSuccess && nasPing.data;
+  const nasArribaReal = pingSabe ? nasPing.data!.arriba : !s?.nas?.caido;
+  const nasEstado: Estado = (cargando && nasPing.isLoading) ? "duda" : nasArribaReal ? "ok" : "mal";
+  const pendientes = s?.nas?.pendientes ?? 0;
+  const nasDetalle = nasArribaReal
+    ? t("dashboard.centro.salud.nasOk", { n: pendientes })
+    : t("dashboard.centro.salud.nasMal", { n: pendientes });
 
   // Correo: si HOY hubo tardanzas detectadas y TODAS se mandaron → ok. Si no
   // hubo ninguna (día limpio), quedamos neutros "ok". Si hubo y faltan → mal.
