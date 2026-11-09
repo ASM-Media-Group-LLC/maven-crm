@@ -36,10 +36,10 @@ const SECCIONES: readonly string[] = ["docx", "xlsx", "pptx"];
 // ese modo, «volver» cierra la ventana en vez de navegar.
 export default function DocumentoPage({ solo = false }: { solo?: boolean } = {}) {
   const { id } = useParams<{ id: string }>();
-  return <DocumentoAbierto key={id} id={id} />;
+  return <DocumentoAbierto key={id} id={id} solo={solo} />;
 }
 
-function DocumentoAbierto({ id }: { id: string | undefined }) {
+function DocumentoAbierto({ id, solo = false }: { id: string | undefined; solo?: boolean }) {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { t } = useLanguage();
@@ -55,14 +55,16 @@ function DocumentoAbierto({ id }: { id: string | undefined }) {
   // hook remonta solo. Es más barato que recargar la página entera, que es lo
   // que sugiere ONLYOFFICE.
   const historial = useHistorialDeOficina(id, () => {
-    if (id) abrir.mutate({ id, tema: resolvedTheme === "dark" ? "dark" : "light" });
+    // En su ventana propia (solo) el editor va SIEMPRE claro, como Google Sheets.
+    if (id) abrir.mutate({ id, tema: solo ? "light" : (resolvedTheme === "dark" ? "dark" : "light") });
   });
   const { estado, error } = useEditorDeOffice(CONTENEDOR, abrir.data, historial);
 
   // Pedir la configuración apenas se sabe qué documento es.
   useEffect(() => {
     if (!id) return;
-    abrir.mutate({ id, tema: resolvedTheme === "dark" ? "dark" : "light" });
+    // En su ventana propia (solo) el editor va SIEMPRE claro, como Google Sheets.
+    abrir.mutate({ id, tema: solo ? "light" : (resolvedTheme === "dark" ? "dark" : "light") });
     // Solo al cambiar de documento.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
@@ -116,12 +118,11 @@ function DocumentoAbierto({ id }: { id: string | undefined }) {
     // `scroll={false}`: el editor maneja su propio alto y su propio scroll, como
     // una llamada o el Messenger. Con el scroll de la página, ONLYOFFICE queda
     // dentro de un contenedor sin altura y se dibuja de 0 px.
-    <Page scroll={false}>
-      <div className="flex min-h-0 flex-1 flex-col gap-3">
-        <PageHeader
-          icon={<FileText />}
-          // Como Google Docs: clic en el nombre, se escribe, Enter guarda.
-          title={(
+    <Page scroll={false} padded={!solo}>
+      <div className={`flex min-h-0 flex-1 flex-col ${solo ? "" : "gap-3"}`}>
+        {/* El nombre editable, reutilizado por las dos cabeceras. */}
+        {(() => {
+          const nombre = (
             <NombreEditable
               valor={cargado.title}
               vacio={t("oficina.untitled")}
@@ -134,45 +135,56 @@ function DocumentoAbierto({ id }: { id: string | undefined }) {
                 throw e;
               })}
             />
-          )}
-          subtitle={t("oficina.doc.version", { n: cargado.version })}
-          actions={
-            <>
-              {/* Abrir y Compartir van JUNTOS en un div: el encabezado pliega
-                  detrás de «⋯» más de dos acciones en el teléfono, y la flecha
-                  de volver quedaba escondida en esa hoja. */}
-              <div className="flex shrink-0 items-center gap-2">
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="shrink-0 rounded-full"
-                  onClick={() => setAbriendoArchivo(true)}
-                  aria-label={t("oficina.abrir.titulo")}
-                  title={t("oficina.abrir.botonAyuda", { atajo: atajoDeAbrir() })}
-                >
-                  <FolderOpen className="h-4 w-4 sm:mr-1.5" />
-                  <span className="hidden sm:inline">{t("oficina.abrir.boton")}</span>
-                </Button>
-                {/* Un solo botón: adentro del diálogo están las personas
-                    concretas Y el acceso general. Antes eran dos controles
-                    separados para contestar la misma pregunta. */}
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="shrink-0 rounded-full"
-                  onClick={() => setCompartiendo(true)}
-                >
-                  <Share2 className="mr-1.5 h-4 w-4" />
-                  {t("doc.compartir")}
-                </Button>
+          );
+          const botonAbrir = (
+            <Button size="sm" variant="outline" className="shrink-0 rounded-full"
+              onClick={() => setAbriendoArchivo(true)}
+              aria-label={t("oficina.abrir.titulo")} title={t("oficina.abrir.botonAyuda", { atajo: atajoDeAbrir() })}>
+              <FolderOpen className="h-4 w-4 sm:mr-1.5" />
+              <span className="hidden sm:inline">{t("oficina.abrir.boton")}</span>
+            </Button>
+          );
+          const botonCompartir = (
+            <Button size="sm" variant="outline" className="shrink-0 rounded-full" onClick={() => setCompartiendo(true)}>
+              <Share2 className="mr-1.5 h-4 w-4" />{t("doc.compartir")}
+            </Button>
+          );
+          const botonVolver = (
+            <Button size="icon" variant="ghost" className="h-9 w-9 shrink-0 rounded-full"
+              aria-label={t("oficina.backToOffice")} onClick={() => (solo ? window.close() : navigate("/oficina"))}>
+              <ArrowLeft className="h-4 w-4" />
+            </Button>
+          );
+          // SOLO (ventana propia, como Google Sheets): barra DELGADA y clara, sin
+          // el bloque grande de título. El editor se come todo el alto.
+          if (solo) {
+            return (
+              <div className="flex shrink-0 items-center gap-2 border-b border-border/70 bg-card px-3 py-1.5">
+                <FileText className="h-4 w-4 shrink-0 text-primary" />
+                <div className="flex min-w-0 items-baseline gap-2">
+                  <span className="truncate text-sm font-semibold">{nombre}</span>
+                  <span className="shrink-0 text-[11px] text-muted-foreground tabular-nums">{t("oficina.doc.version", { n: cargado.version })}</span>
+                </div>
+                <div className="ml-auto flex shrink-0 items-center gap-1.5">
+                  {botonAbrir}{botonCompartir}{botonVolver}
+                </div>
               </div>
-              <Button size="icon" variant="ghost" className="h-9 w-9 shrink-0 rounded-full"
-                aria-label={t("oficina.backToOffice")} onClick={() => (solo ? window.close() : navigate("/oficina"))}>
-                <ArrowLeft className="h-4 w-4" />
-              </Button>
-            </>
+            );
           }
-        />
+          return (
+            <PageHeader
+              icon={<FileText />}
+              title={nombre}
+              subtitle={t("oficina.doc.version", { n: cargado.version })}
+              actions={
+                <>
+                  <div className="flex shrink-0 items-center gap-2">{botonAbrir}{botonCompartir}</div>
+                  {botonVolver}
+                </>
+              }
+            />
+          );
+        })()}
 
         {fallo && (
           <div className="flex items-start gap-2 rounded-panel border border-warning/40 bg-warning/10 px-3 py-2 text-xs">
@@ -183,7 +195,7 @@ function DocumentoAbierto({ id }: { id: string | undefined }) {
           </div>
         )}
 
-        <div className="relative min-h-0 flex-1 overflow-hidden rounded-panel border border-border/60">
+        <div className={`relative min-h-0 flex-1 overflow-hidden ${solo ? "" : "rounded-panel border border-border/60"}`}>
           {estado === "cargando" && !fallo && (
             <div className="absolute inset-0 z-10 grid place-items-center bg-background">
               <div className="flex flex-col items-center gap-3">
