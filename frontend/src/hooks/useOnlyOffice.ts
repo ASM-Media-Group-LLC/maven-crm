@@ -70,6 +70,32 @@ export function useCrearDocumentoOffice() {
   });
 }
 
+// Exportar las horas del equipo (un rango) a una HOJA de la Oficina (Alvaro,
+// 08/11). El edge arma el .xlsx con reporte_horas_mes y crea el documento; acá
+// solo se pide y se devuelve el id para abrir la hoja. Solo admin/dueño (lo
+// exige la función de la base).
+export function useExportarHorasAHoja() {
+  return useMutation({
+    mutationFn: async ({ desde, hasta }: { desde: string; hasta: string }): Promise<{ id: string }> => {
+      const { data: sesion } = await supabase.auth.getSession();
+      const token = sesion.session?.access_token;
+      if (!token) throw new Error("Sin sesión");
+      const { data, error } = await supabase.functions.invoke("oficina-doc", {
+        body: { action: "exportar-reporte", desde, hasta },
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (error) {
+        const payload = (data ?? {}) as { error?: string };
+        throw new Error(payload.error || error.message);
+      }
+      const payload = data as { id?: string; error?: string };
+      if (payload?.error) throw new Error(payload.error);
+      if (!payload?.id) throw new Error("No se pudo exportar");
+      return { id: payload.id };
+    },
+  });
+}
+
 /** Lo que el panel de historial de ONLYOFFICE espera recibir. Los nombres son
  *  los de su API, no los nuestros: son un contrato con el editor. */
 export interface ListaDeHistorial {

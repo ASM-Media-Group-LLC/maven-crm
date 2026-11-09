@@ -30,6 +30,7 @@
 // función con 256 MB de memoria para no ganar nada.
 import { createClient, type SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2.49.4";
 import { AwsClient } from "https://esm.sh/aws4fetch@1.0.20";
+import * as XLSX from "https://esm.sh/xlsx@0.18.5";
 import {
   archivoDeLaVersion, armarHistorial,
   type DocumentoParaHistorial, type FilaDeVersion,
@@ -116,6 +117,35 @@ const MIME: Record<string, string> = {
   xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
   pptx: "application/vnd.openxmlformats-officedocument.presentationml.presentation",
 };
+
+// Exportar a hoja (Alvaro, 08/11): aplana el JSON de reporte_horas_mes en filas
+// de una hoja de cálculo. Segundos → horas. Una fila por persona con sus totales.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function filasDeReporteHoras(rep: any): (string | number)[][] {
+  const hrs = (seg: unknown) => Math.round((Number(seg ?? 0) / 3600) * 100) / 100;
+  const personas: any[] = Array.isArray(rep?.personas) ? rep.personas : [];
+  const filas: (string | number)[][] = [[
+    "Nombre", "Nivel", "Rol",
+    "Activo (h)", "Sin cámara (h)", "Sin pantalla (h)", "Fuera de cámara (h)",
+    "Pausa (h)", "Baño (h)", "Comida (h)", "Total trabajado (h)",
+  ]];
+  for (const p of personas) {
+    const e = p?.totales_estado ?? {};
+    const b = p?.totales_breaks ?? {};
+    const activo = Number(e.activo ?? 0), sinCam = Number(e.sin_camara ?? 0);
+    const sinPant = Number(e.sin_pantalla ?? 0), fueraCam = Number(e.fuera_de_camara ?? 0);
+    const pausa = Number(e.pausa ?? 0);
+    const bano = Number(b.bano ?? b["baño"] ?? b.bathroom ?? 0);
+    const comida = Number(b.comida ?? b.lunch ?? 0);
+    const totalTrab = activo + sinCam + sinPant + fueraCam;
+    filas.push([
+      p?.full_name ?? "", p?.nivel ?? "", p?.role ?? "",
+      hrs(activo), hrs(sinCam), hrs(sinPant), hrs(fueraCam),
+      hrs(pausa), hrs(bano), hrs(comida), hrs(totalTrab),
+    ]);
+  }
+  return filas;
+}
 
 // ── El Drive (NAS) ──────────────────────────────────────────────────────────
 // Los archivos del Drive viven en el NAS, no en R2. Para que ONLYOFFICE (o esta
@@ -564,6 +594,42 @@ Deno.serve(async (req) => {
         .update({ storage_key: llave, size_bytes: bytes.length })
         .eq("id", id);
 
+      return responder({ id });
+    }
+
+    // ── Exportar el reporte de horas a una HOJA (Alvaro, 08/11) ───────────
+    // Genera un .xlsx con las horas del equipo en un rango y lo crea como un
+    // documento de la Oficina (se abre en su ventana, como cualquier hoja).
+    // reporte_horas_mes ya exige admin/dueño: si no lo es, lanza y lo devolvemos.
+    if (accion === "exportar-reporte") {
+      const desde = String(body.desde ?? "");
+      const hasta = String(body.hasta ?? "");
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(desde) || !/^\d{4}-\d{2}-\d{2}$/.test(hasta)) {
+        throw new HttpError("Fechas inválidas (YYYY-MM-DD)", 400);
+      }
+      const { data: reporte, error: eRep } = await comoLaPersona.rpc("reporte_horas_mes", { _desde: desde, _hasta: hasta });
+      if (eRep) {
+        const esPermiso = /solo admin/i.test(eRep.message);
+        throw new HttpError(esPermiso ? "Solo admin o dueño puede exportar" : eRep.message, esPermiso ? 403 : 400);
+      }
+      const filas = filasDeReporteHoras(reporte);
+      const wb = XLSX.utils.book_new();
+      const ws = XLSX.utils.aoa_to_sheet(filas);
+      XLSX.utils.book_append_sheet(wb, ws, "Horas");
+      const ab = XLSX.write(wb, { type: "array", bookType: "xlsx" }) as ArrayBuffer;
+      const bytes = new Uint8Array(ab);
+
+      const titulo = `Horas ${desde} a ${hasta}`;
+      const { data: fila, error } = await comoLaPersona
+        .from("documents")
+        .insert({ title: titulo.slice(0, 200), visibility: "privado", owner_id: user.id, updated_by: user.id, extension: "xlsx" })
+        .select("id")
+        .single();
+      if (error) throw new HttpError(error.message, 400);
+      const id = (fila as { id: string }).id;
+      const llave = `documentos/${id}/v1.xlsx`;
+      await subir(llave, bytes, MIME.xlsx);
+      await admin.from("documents").update({ storage_key: llave, size_bytes: bytes.length }).eq("id", id);
       return responder({ id });
     }
 

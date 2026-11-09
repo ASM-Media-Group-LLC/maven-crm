@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
-import { Eye, Loader2 } from "lucide-react";
+import { Eye, Loader2, FileSpreadsheet } from "lucide-react";
 import { useLanguage } from "@/hooks/useLanguage";
 import { useUserRole } from "@/hooks/useUserRole";
 import { useEsRh } from "@/hooks/useEsRh";
+import { useExportarHorasAHoja } from "@/hooks/useOnlyOffice";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
@@ -117,6 +118,18 @@ export default function HRMonitorIA() {
   // HR (Andrea) ve la vista COMPLETA igual que un admin (el historial por turno),
   // aunque su nivel sea agente. La RLS ya filtra que no vea a los admins.
   const vistaCompleta = isAdmin || esRh === true;
+  // Exportar las horas del MES (del 1 a hoy) a una hoja, de un clic (Alvaro 08/11).
+  const exportar = useExportarHorasAHoja();
+  const exportarHoras = () => {
+    const hoy = new Date();
+    const yyyyMmDd = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    const desde = yyyyMmDd(new Date(hoy.getFullYear(), hoy.getMonth(), 1));
+    const hasta = yyyyMmDd(hoy);
+    exportar.mutate({ desde, hasta }, {
+      onSuccess: ({ id }) => window.open(`/hoja/${id}`, "_blank"),
+      onError: (e) => toast({ title: t("hr.monia.exportError"), description: (e as Error).message, variant: "destructive" }),
+    });
+  };
   const { config } = useMonitorConfig(true);
 
   // Argos en 3 PESTAÑAS (Alvaro, 08/11): antes eran 5 y se pisaban.
@@ -148,6 +161,12 @@ export default function HRMonitorIA() {
         icon={<Eye className="h-5 w-5" />}
         actions={
           <>
+            {vistaCompleta && (
+              <Button variant="outline" size="sm" className="rounded-full" onClick={exportarHoras} disabled={exportar.isPending}>
+                {exportar.isPending ? <Loader2 className="h-4 w-4 animate-spin sm:mr-1.5" /> : <FileSpreadsheet className="h-4 w-4 sm:mr-1.5" />}
+                <span className="hidden sm:inline">{t("hr.monia.exportarHoras")}</span>
+              </Button>
+            )}
             <Badge
               variant="outline"
               className={`gap-1.5 px-3 py-1.5 text-xs font-medium ${monitorOff ? "border-warning/50 bg-warning/10 text-warning" : "border-success/50 bg-success/10 text-success"}`}

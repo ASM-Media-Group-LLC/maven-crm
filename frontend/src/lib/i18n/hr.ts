@@ -865,6 +865,8 @@ export const hr = {
   "hr.monia.subtitle": { es: "El guardián que nunca duerme · rendimiento del equipo en vivo", en: "The guardian that never sleeps · team performance live" },
   "hr.monia.activo": { es: "Monitor activo", en: "Monitor on" },
   "hr.monia.apagado": { es: "Monitor apagado", en: "Monitor off" },
+  "hr.monia.exportarHoras": { es: "Exportar horas", en: "Export hours" },
+  "hr.monia.exportError": { es: "No se pudo exportar", en: "Could not export" },
   "hr.monia.refrescar": { es: "Actualizar", en: "Refresh" },
   "hr.monia.kpi.hoy": { es: "Faltas hoy", en: "Issues today" },
   "hr.monia.kpi.hoySub": { es: "Total del día", en: "Day total" },
