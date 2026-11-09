@@ -327,6 +327,20 @@ const App = () => (
                 <Route path="*" element={<Navigate to="/portal" replace />} />
               </Route>
 
+              {/* Hoja/documento en su PROPIA ventana (Alvaro, 08/11): fuera del
+                  AppShell = sin el menú lateral de Maven, solo el editor a
+                  pantalla completa, como Google Sheets. Se abre con window.open
+                  desde la lista de Oficina. Mismo permiso que /oficina/:id. */}
+              <Route path="/hoja/:id" element={
+                <ProtectedRoute>
+                  <PermissionRoute module="Oficina">
+                    <div className="flex h-[100dvh] w-full flex-col bg-background">
+                      <DocumentoPage solo />
+                    </div>
+                  </PermissionRoute>
+                </ProtectedRoute>
+              } />
+
               {/* Protected routes that share the AppShell — Sidebar +
                   Topbar mount once and persist across nav between these
                   routes. Only the full-screen video pages stay outside. */}

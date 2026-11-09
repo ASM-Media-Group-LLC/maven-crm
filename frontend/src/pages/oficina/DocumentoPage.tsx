@@ -31,7 +31,10 @@ const SECCIONES: readonly string[] = ["docx", "xlsx", "pptx"];
  *  sobre un contenedor que el esqueleto de carga acababa de sacar: el nuevo
  *  podía buscar el div antes de que volviera a existir. Remontar todo deja el
  *  mismo camino que abrirlo desde la lista. */
-export default function DocumentoPage() {
+// `solo`: la hoja vive en su PROPIA ventana (sin el menú de Maven), como Google
+// Sheets (Alvaro, 08/11). Se abre con window.open desde la lista de Oficina. En
+// ese modo, «volver» cierra la ventana en vez de navegar.
+export default function DocumentoPage({ solo = false }: { solo?: boolean } = {}) {
   const { id } = useParams<{ id: string }>();
   return <DocumentoAbierto key={id} id={id} />;
 }
@@ -164,7 +167,7 @@ function DocumentoAbierto({ id }: { id: string | undefined }) {
                 </Button>
               </div>
               <Button size="icon" variant="ghost" className="h-9 w-9 shrink-0 rounded-full"
-                aria-label={t("oficina.backToOffice")} onClick={() => navigate("/oficina")}>
+                aria-label={t("oficina.backToOffice")} onClick={() => (solo ? window.close() : navigate("/oficina"))}>
                 <ArrowLeft className="h-4 w-4" />
               </Button>
             </>

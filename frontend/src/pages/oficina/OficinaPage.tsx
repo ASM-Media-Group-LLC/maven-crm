@@ -91,7 +91,9 @@ export default function OficinaPage({ formato = "docx" }: { formato?: FormatoDeO
 
   const nuevo = () => {
     crear.mutate({ extension: formato }, {
-      onSuccess: ({ id }) => navigate(`/oficina/${id}`),
+      // La hoja/doc nuevo abre en su PROPIA ventana (Alvaro, 08/11), como Google
+      // Sheets. La pestaña actual se queda en la lista.
+      onSuccess: ({ id }) => window.open(`/hoja/${id}`, "_blank"),
       onError: (e) => toast.error((e as Error).message || t("oficina.createError")),
     });
   };
@@ -257,7 +259,7 @@ export default function OficinaPage({ formato = "docx" }: { formato?: FormatoDeO
                   >
                     <button
                       type="button"
-                      onClick={() => !enPapelera && navigate(`/oficina/${d.id}`)}
+                      onClick={() => !enPapelera && window.open(`/hoja/${d.id}`, "_blank")}
                       disabled={enPapelera}
                       className="flex min-w-0 flex-1 items-center gap-3 text-left disabled:cursor-default"
                     >
