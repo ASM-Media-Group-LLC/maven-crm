@@ -78,6 +78,32 @@ All colors MUST be HSL. Light mode in :root, dark mode in .dark.
     --chart-6: 340 78% 59%;  /* pink #e8467c */
   }
 
+  /* HOJA CLARA (Alvaro, 08/11): el editor de hojas en su ventana propia (/hoja)
+     debe verse como Google Sheets — CLARO, aunque Maven esté en oscuro. Reaplica
+     los tokens claros en ese subárbol, así la cabecera, los botones y el fondo
+     van en blanco igual que el editor (que se abre en theme-white). Las vars se
+     declaran acá mismo: ganan a las de `.dark` del <html> por estar más cerca. */
+  .hoja-clara {
+    color-scheme: light;
+    --background: 240 20% 98%;
+    --foreground: 240 20% 12%;
+    --card: 0 0% 100%;
+    --card-foreground: 240 20% 12%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 240 20% 12%;
+    --primary: 255 72% 50%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 240 16% 95%;
+    --secondary-foreground: 240 18% 12%;
+    --muted: 240 16% 95%;
+    --muted-foreground: 240 8% 42%;
+    --accent: 268 74% 58%;
+    --accent-foreground: 0 0% 100%;
+    --border: 240 14% 90%;
+    --input: 240 14% 90%;
+    --ring: 255 72% 50%;
+  }
+
   .dark {
     /* Negro de verdad con un guiño frío (hue 240, sat baja): el fondo ya no
        "tira a morado". El morado vive en primary/accent/ring y en los estados

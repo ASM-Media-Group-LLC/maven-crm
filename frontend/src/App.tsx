@@ -334,7 +334,7 @@ const App = () => (
               <Route path="/hoja/:id" element={
                 <ProtectedRoute>
                   <PermissionRoute module="Oficina">
-                    <div className="flex h-[100dvh] w-full flex-col bg-background">
+                    <div className="hoja-clara flex h-[100dvh] w-full flex-col bg-background text-foreground">
                       <DocumentoPage solo />
                     </div>
                   </PermissionRoute>
