@@ -10,6 +10,7 @@ import { LanguageProvider } from "@/hooks/useLanguage";
 import UsersTable from "@/pages/admin/UsersTable";
 import UsersGrid from "@/pages/admin/UsersGrid";
 import type { AdminUser } from "@/pages/admin/useAdminUsers";
+import BancoNas from "./bancoNas";
 import "@/index.css";
 
 // Gente real del roster (nombre, rol y avatar_seed salidos de prod) para que los
@@ -53,7 +54,15 @@ const noop = () => {};
 // UsersTable y UsersGrid llaman a useLanguage(), que tira sin proveedor: sin
 // esto la página se caía al montar. Con él también se puede mirar en inglés
 // (localStorage app-language=en y recargar).
+// /harness.html?ver=nas → el medidor del NAS con datos reales.
+const verNas = new URLSearchParams(window.location.search).get("ver") === "nas";
+
 createRoot(document.getElementById("root")!).render(
+  verNas ? (
+    <StrictMode>
+      <LanguageProvider><BancoNas /></LanguageProvider>
+    </StrictMode>
+  ) :
   <StrictMode>
     <LanguageProvider>
       <MemoryRouter>
