@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { ReactNode } from "react";
+import { MemoryRouter } from "react-router-dom";
 import { cuantoFalta, partesDeLoUsado, pctUsado, tamanoNas, tonoDelNas } from "@/lib/espacioNas";
 
 // GUARD del medidor del NAS (Alvaro, 10/11/2026): "¿cuánto tengo, cuánto me
@@ -56,7 +57,10 @@ vi.mock("@/hooks/useLanguage", () => ({
 import EspacioNasBloque from "@/components/centro/EspacioNasBloque";
 
 const envolver = ({ children }: { children: ReactNode }) => (
-  <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>{children}</QueryClientProvider>
+  // El bloque lleva «Ver detalle» (un Link): necesita el enrutador.
+  <MemoryRouter>
+    <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>{children}</QueryClientProvider>
+  </MemoryRouter>
 );
 
 describe("el bloque del Centro", () => {
@@ -87,5 +91,7 @@ describe("el bloque del Centro", () => {
     expect(screen.getByText(/dashboard.centro.nas.falta.meses/)).toHaveTextContent("19"); // 82 semanas al ritmo del último año
     expect(screen.getByText("KASH-CONTENT-VPS")).toBeInTheDocument();
     expect(screen.getByText("dashboard.centro.nas.miUnidad")).toBeInTheDocument();
+    // En el Centro, el bloque lleva a la página completa.
+    expect(screen.getByRole("link", { name: /dashboard.centro.nas.verDetalle/ })).toHaveAttribute("href", "/oficina/espacio-nas");
   });
 });

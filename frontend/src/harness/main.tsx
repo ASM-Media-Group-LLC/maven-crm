@@ -54,13 +54,14 @@ const noop = () => {};
 // UsersTable y UsersGrid llaman a useLanguage(), que tira sin proveedor: sin
 // esto la página se caía al montar. Con él también se puede mirar en inglés
 // (localStorage app-language=en y recargar).
-// /harness.html?ver=nas → el medidor del NAS con datos reales.
-const verNas = new URLSearchParams(window.location.search).get("ver") === "nas";
+// /harness.html?ver=nas → el medidor del NAS; ?ver=nas-pagina → su página completa.
+const ver = new URLSearchParams(window.location.search).get("ver");
+const verNas = ver === "nas" || ver === "nas-pagina";
 
 createRoot(document.getElementById("root")!).render(
   verNas ? (
     <StrictMode>
-      <LanguageProvider><BancoNas /></LanguageProvider>
+      <LanguageProvider><BancoNas pagina={ver === "nas-pagina"} /></LanguageProvider>
     </StrictMode>
   ) :
   <StrictMode>

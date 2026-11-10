@@ -1,8 +1,13 @@
-// Banco visual del medidor del NAS (/harness.html?ver=nas). Datos REALES de
-// nas_espacio_resumen del 10/11/2026 15:32 UTC (medición del disco + qué ocupa),
-// para mirar el bloque sin iniciar sesión. No se compila en producción.
-import { EspacioNasVista } from "@/components/centro/EspacioNasBloque";
+// Banco visual del medidor del NAS. No se compila en producción.
+//   /harness.html?ver=nas         → el bloque del Centro de operaciones
+//   /harness.html?ver=nas-pagina  → la página completa (/oficina/espacio-nas)
+// Datos REALES de nas_espacio_resumen y de las cuatro lecturas de la página
+// (10/11/2026), para mirarlos sin iniciar sesión.
+import { MemoryRouter } from "react-router-dom";
+import { EspacioNasVista, RUTA_ESPACIO_NAS } from "@/components/centro/EspacioNasBloque";
+import { EspacioNasPaginaVista, type EstadoDe } from "@/pages/oficina/EspacioNasPage";
 import type { ResumenNas } from "@/lib/espacioNas";
+import { HISTORIA_REAL, LIBERAR_REAL, MODELOS_REAL, SEMANA_REAL } from "./datosNasPagina";
 
 export const RESUMEN_REAL: ResumenNas = {
   medido_at: new Date(Date.now() - 4 * 60_000).toISOString(),
@@ -28,10 +33,23 @@ export const RESUMEN_REAL: ResumenNas = {
   alertas: [],
 };
 
-export default function BancoNas() {
+const listo = <T,>(data: T): EstadoDe<T> => ({ data, isLoading: false, isError: false, refetch: () => undefined });
+
+export default function BancoNas({ pagina = false }: { pagina?: boolean }) {
+  const bloque = (enlace: boolean) => (
+    <EspacioNasVista resumen={RESUMEN_REAL} cargando={false} fallo={false} onReintentar={() => {}}
+      enlaceDetalle={enlace ? RUTA_ESPACIO_NAS : undefined} />
+  );
   return (
-    <div className="mx-auto flex max-w-4xl flex-col gap-6 p-6">
-      <EspacioNasVista resumen={RESUMEN_REAL} cargando={false} fallo={false} onReintentar={() => {}} />
-    </div>
+    <MemoryRouter>
+      {pagina ? (
+        <EspacioNasPaginaVista
+          resumen={bloque(false)}
+          historia={listo(HISTORIA_REAL)} entro={listo(SEMANA_REAL)} modelos={listo(MODELOS_REAL)} liberar={listo(LIBERAR_REAL)}
+        />
+      ) : (
+        <div className="mx-auto flex max-w-4xl flex-col gap-6 p-6">{bloque(true)}</div>
+      )}
+    </MemoryRouter>
   );
 }

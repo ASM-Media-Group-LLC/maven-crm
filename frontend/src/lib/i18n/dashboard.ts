@@ -144,11 +144,11 @@ export const dashboard = {
   // Página completa del NAS (Alvaro, 10/11/2026)
   "dashboard.centro.nas.pagina.volver": { es: "Volver al inicio", en: "Back to home" },
   "dashboard.centro.nas.pagina.titulo": { es: "Espacio del NAS", en: "NAS storage" },
-  "dashboard.centro.nas.pagina.intro": { es: "Todo lo que guarda el Drive vive en el NAS de la oficina: 2 discos de 24 TB. Acá ves qué tan lleno está, a qué ritmo crece, qué ocupa más y qué se podría liberar. Nada se borra desde esta página.", en: "Everything in the Drive lives on the office NAS: 2 disks of 24 TB. Here you see how full it is, how fast it grows, what takes the most space and what could be freed. Nothing is deleted from this page." },
+  "dashboard.centro.nas.pagina.intro": { es: "Todo lo que guarda el Drive vive en el NAS de la oficina: 2 discos de 24 TB. Aquí ves qué tan lleno está, a qué ritmo crece, qué ocupa más y qué se podría liberar. Nada se borra desde esta página.", en: "Everything in the Drive lives on the office NAS: 2 disks of 24 TB. Here you see how full it is, how fast it grows, what takes the most space and what could be freed. Nothing is deleted from this page." },
   "dashboard.centro.nas.pagina.soloAdmins": { es: "Esta página la ven solo el dueño y los admins.", en: "Only the owner and admins can see this page." },
   "dashboard.centro.nas.pagina.historia": { es: "Cómo se ha ido llenando", en: "How it has been filling up" },
   "dashboard.centro.nas.pagina.historiaNota": { es: "TB guardados mes a mes, según la fecha de cada archivo (lo que se trajo de antes conserva su fecha original). Las líneas marcan el aviso (80 %) y el tope real (95 %).", en: "TB stored month by month, by each file's date (older imported files keep their original date). The lines mark the alert (80%) and the real limit (95%)." },
-  "dashboard.centro.nas.pagina.mediciones": { es: "Además, desde el 10/11 se guarda la medición real del disco cada hora: {n} días medidos.", en: "Also, since Nov 10 the real disk reading is saved every hour: {n} days measured." },
+  "dashboard.centro.nas.pagina.mediciones": { es: "Además, desde el 10/11 se guarda la medición real del disco cada hora (días medidos: {n}).", en: "Also, since Nov 10 the real disk reading is saved every hour (days measured: {n})." },
   "dashboard.centro.nas.pagina.guardado": { es: "Guardado", en: "Stored" },
   "dashboard.centro.nas.pagina.entroMes": { es: "Entró ese mes", en: "Added that month" },
   "dashboard.centro.nas.pagina.semana": { es: "Qué entró esta semana", en: "What came in this week" },

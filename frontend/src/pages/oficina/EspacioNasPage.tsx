@@ -25,14 +25,14 @@ const sinTipar = supabase as unknown as { rpc: (f: string, a?: unknown) => Promi
 /** Capacidad de los discos, para las líneas de aviso y tope de la gráfica. */
 const CAPACIDAD_TB = 48;
 
-function useRpc<T>(nombre: string, habilitado: boolean): UseQueryResult<T> {
+function useRpc<T>(rpc: string, on: boolean): UseQueryResult<T> {
   return useQuery<T>({
-    queryKey: ["espacio-nas", nombre],
-    enabled: habilitado,
+    queryKey: ["espacio-nas", rpc],
+    enabled: on,
     staleTime: 10 * 60_000,
     retry: 1,
     queryFn: async () => {
-      const { data, error } = await sinTipar.rpc(nombre);
+      const { data, error } = await sinTipar.rpc(rpc);
       if (error) throw new Error(error.message);
       return data as T;
     },
@@ -121,15 +121,15 @@ export default function EspacioNasPage() {
   return (
     <EspacioNasPaginaVista
       resumen={<EspacioNasBloque conEnlace={false} />}
-      historia={historia} semana={semana} modelos={modelos} liberar={liberar}
+      historia={historia} entro={semana} modelos={modelos} liberar={liberar}
     />
   );
 }
 
 /** La vista: solo dibuja (se mira con datos reales en /harness.html?ver=nas-pagina). */
-export function EspacioNasPaginaVista({ resumen, historia, semana, modelos, liberar }: {
+export function EspacioNasPaginaVista({ resumen, historia, entro: semana, modelos, liberar }: {
   resumen: ReactNode;
-  historia: EstadoDe<HistoriaNas>; semana: EstadoDe<EntroSemana>; modelos: EstadoDe<PorModelo>; liberar: EstadoDe<QueLiberar>;
+  historia: EstadoDe<HistoriaNas>; entro: EstadoDe<EntroSemana>; modelos: EstadoDe<PorModelo>; liberar: EstadoDe<QueLiberar>;
 }) {
   const { t, language } = useLanguage();
   const loc = language === "es" ? "es-CO" : "en-US";
