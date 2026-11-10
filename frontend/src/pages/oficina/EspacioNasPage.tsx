@@ -4,6 +4,9 @@ import { useQuery, type UseQueryResult } from "@tanstack/react-query";
 import { Area, AreaChart, CartesianGrid, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { AlertTriangle, ArrowLeft, Copy, HardDrive, Loader2, RefreshCw, Trash2, TrendingUp, Upload, Users } from "lucide-react";
 import EspacioNasBloque from "@/components/centro/EspacioNasBloque";
+import { Button } from "@/components/ui/button";
+import { Page } from "@/components/ui/page";
+import { PageHeader } from "@/components/ui/page-header";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useEsDueno } from "@/hooks/useEsDueno";
@@ -83,16 +86,23 @@ function Fila({ nombre, detalle, valor, pct }: { nombre: ReactNode; detalle?: Re
   );
 }
 
+/** El encabezado estándar de Maven, con «Volver al inicio». */
 function Encabezado() {
   const { t } = useLanguage();
   return (
-    <div className="flex flex-col gap-2">
-      <Link to="/dashboard" className="inline-flex w-fit items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground">
-        <ArrowLeft className="h-3.5 w-3.5" />{t("dashboard.centro.nas.pagina.volver")}
-      </Link>
-      <h1 className="font-display text-2xl font-bold tracking-tight">{t("dashboard.centro.nas.pagina.titulo")}</h1>
-      <p className="max-w-3xl text-sm text-muted-foreground">{t("dashboard.centro.nas.pagina.intro")}</p>
-    </div>
+    <PageHeader
+      title={t("dashboard.centro.nas.pagina.titulo")}
+      subtitle={t("dashboard.centro.nas.pagina.intro")}
+      icon={<HardDrive />}
+      actions={(
+        <Button asChild variant="outline">
+          <Link to="/dashboard" aria-label={t("dashboard.centro.nas.pagina.volver")}>
+            <ArrowLeft className="h-4 w-4 sm:mr-1.5" />
+            <span className="hidden sm:inline">{t("dashboard.centro.nas.pagina.volver")}</span>
+          </Link>
+        </Button>
+      )}
+    />
   );
 }
 
@@ -110,23 +120,24 @@ export default function EspacioNasPage() {
   const modelos = useRpc<PorModelo>("nas_por_modelo", habilitado);
   const liberar = useRpc<QueLiberar>("nas_que_liberar", habilitado);
 
-  if (!puede) {
-    return (
-      <div className="mx-auto flex w-full max-w-5xl flex-col gap-4 p-4 sm:p-6">
-        <Encabezado />
-        <p className="vidrio p-4 text-sm text-muted-foreground">{t("dashboard.centro.nas.pagina.soloAdmins")}</p>
-      </div>
-    );
-  }
+  // <Page> trae el scroll propio: el AppShell recorta lo que se pasa de la pantalla.
   return (
-    <EspacioNasPaginaVista
-      resumen={<EspacioNasBloque conEnlace={false} />}
-      historia={historia} entro={semana} modelos={modelos} liberar={liberar}
-    />
+    <Page>
+      <Encabezado />
+      {puede ? (
+        <EspacioNasPaginaVista
+          resumen={<EspacioNasBloque conEnlace={false} />}
+          historia={historia} entro={semana} modelos={modelos} liberar={liberar}
+        />
+      ) : (
+        <p className="vidrio p-4 text-sm text-muted-foreground">{t("dashboard.centro.nas.pagina.soloAdmins")}</p>
+      )}
+    </Page>
   );
 }
 
-/** La vista: solo dibuja (se mira con datos reales en /harness.html?ver=nas-pagina). */
+/** La vista: solo dibuja el cuerpo (el marco y el encabezado los pone el contenedor).
+ *  Se mira con datos reales en /harness.html?ver=nas-pagina. */
 export function EspacioNasPaginaVista({ resumen, historia, entro: semana, modelos, liberar }: {
   resumen: ReactNode;
   historia: EstadoDe<HistoriaNas>; entro: EstadoDe<EntroSemana>; modelos: EstadoDe<PorModelo>; liberar: EstadoDe<QueLiberar>;
@@ -137,9 +148,7 @@ export function EspacioNasPaginaVista({ resumen, historia, entro: semana, modelo
   const tam = (b: number) => tamanoNas(b, language);
 
   return (
-    <div className="mx-auto flex w-full max-w-5xl flex-col gap-4 p-4 sm:p-6">
-      <Encabezado />
-
+    <div className="flex w-full flex-col gap-4">
       {/* Lo de siempre: qué tan lleno está, cuánto falta, qué unidad ocupa más. */}
       {resumen}
 
@@ -262,32 +271,20 @@ export function EspacioNasPaginaVista({ resumen, historia, entro: semana, modelo
             {l.top.length > 0 && (
               <div className="flex flex-col gap-2">
                 <p className="text-xs text-muted-foreground">{t("dashboard.centro.nas.pagina.copiasAviso")}</p>
-                <div className="overflow-x-auto">
-                  <table className="w-full min-w-[520px] text-sm">
-                    <thead>
-                      <tr className="border-b border-border/60 text-left text-[11px] text-muted-foreground">
-                        <th className="py-1.5 pr-3 font-medium">{t("dashboard.centro.nas.pagina.archivo")}</th>
-                        <th className="py-1.5 pr-3 text-right font-medium">{t("dashboard.centro.nas.pagina.peso")}</th>
-                        <th className="py-1.5 pr-3 text-right font-medium">{t("dashboard.centro.nas.pagina.veces")}</th>
-                        <th className="py-1.5 pr-3 text-right font-medium">{t("dashboard.centro.nas.pagina.recupera")}</th>
-                        <th className="py-1.5 font-medium">{t("dashboard.centro.nas.pagina.dondeEsta")}</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {l.top.map((c) => (
-                        <tr key={`${c.nombre}-${c.size}`} className="border-b border-border/30 last:border-0">
-                          <td className="max-w-[16rem] truncate py-1.5 pr-3" title={c.nombre}>{c.nombre}</td>
-                          <td className="py-1.5 pr-3 text-right tabular-nums">{tam(c.size)}</td>
-                          <td className="py-1.5 pr-3 text-right tabular-nums">{c.copias}</td>
-                          <td className="py-1.5 pr-3 text-right font-medium tabular-nums">{tam(c.recupera)}</td>
-                          <td className="max-w-[14rem] truncate py-1.5 text-xs text-muted-foreground">
-                            {c.unidades.map((u) => u || t("dashboard.centro.nas.miUnidad")).join(" · ")}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                <ul className="flex flex-col divide-y divide-border/40">
+                  {l.top.map((c) => (
+                    <li key={`${c.nombre}-${c.size}`} className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-3 gap-y-0.5 py-2">
+                      <span className="truncate text-sm" title={c.nombre}>{c.nombre}</span>
+                      <span className="text-right text-sm font-medium tabular-nums">{tam(c.recupera)}</span>
+                      <span className="truncate text-[11px] text-muted-foreground">
+                        {c.unidades.map((u) => u || t("dashboard.centro.nas.miUnidad")).join(" · ")}
+                      </span>
+                      <span className="text-right text-[11px] text-muted-foreground tabular-nums">
+                        {t("dashboard.centro.nas.pagina.copiasDe", { n: c.copias, tam: tam(c.size) })}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
               </div>
             )}
           </div>
