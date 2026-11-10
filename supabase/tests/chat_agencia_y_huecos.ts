@@ -105,6 +105,16 @@ const FIXTURE_HASTA = "20260929180000";
 // el motivo. Si SÍ cambia el Messenger, lo que hay que hacer es sumar al fixture
 // lo que le falta.
 const NO_TOCAN_EL_MESSENGER: Record<string, string> = {
+  "20261105170000_exonerar_camara_pantalla.sql":
+    "Argos: le suma exonera_camara_pantalla (columna opcional) a profiles y a roles_config. Nombra profiles por el " +
+    "alter, pero no cambia nada que use el Messenger; necesita roles_config, que este fixture no trae. Desde el 09/11 " +
+    "tumbaba este banco en todo PR con migración.",
+  "20261105190000_horarios_por_rol.sql":
+    "Argos: horario y cupo de baño/comida por rol y por persona (columnas opcionales en profiles y roles_config). " +
+    "No cambia nada que use el Messenger; necesita roles_config, que este fixture no trae.",
+  "20261106000000_turnos_por_rol.sql":
+    "Argos: turnos por rol (rol_turnos) y profiles.turno_id (opcional). No cambia nada que use el Messenger; lee " +
+    "roles_config, que este fixture no trae.",
   "20261030120000_monitor_camara_ia.sql":
     "el monitor de cámara de Cowork; solo toca el Messenger porque su trigger inserta avisos en notifications, pero " +
     "crea sus propias tablas y el bucket de storage, y no aporta nada al Messenger. Se prueba en frontend/test/monitor.",

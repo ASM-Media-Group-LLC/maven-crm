@@ -1,5 +1,9 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
+import {
+  agruparPorLink, llaveDeModelo, nivelesPorAvisar, REARME_PCT, resumenDelDisco, type RaizDelNas,
+  tamanoLegible, textoDelAviso, tocaMuestra,
+} from "../_shared/aporte-y-espacio.ts";
 
 // drive-aporte-nas — mueve los aportes del link público (bucket drive-aportes de
 // Supabase) al NAS y crea la ficha DENTRO de la carpeta del Drive (Alvaro, 05/11).
@@ -120,8 +124,8 @@ interface Aporte {
   nas_up: string | null; nas_parte: number | null; nas_item_id: string | null;
 }
 
-/** Un archivo que ACABA de aterrizar en el Drive (para el correo por tanda). */
-interface Noti { id: string; carpeta: string | null; quien: string | null; nombre: string }
+/** Un archivo que ACABA de aterrizar en el Drive (para el correo y la campana por tanda). */
+interface Noti { id: string; token: string; carpeta: string | null; quien: string | null; nombre: string; size: number }
 
 // deno-lint-ignore no-explicit-any
 type Admin = any;
@@ -132,7 +136,7 @@ async function finalizar(admin: Admin, a: Aporte, itemId: string, size: number, 
   await admin.from("drive_items").update({ estado: "listo", size: tam, sha256: sha }).eq("id", itemId);
   await admin.from("drive_aportes").update({ en_nas: true, estado: "en_nas", drive_item_id: itemId }).eq("id", a.id);
   await admin.storage.from(BUCKET).remove([a.storage_path]).then(() => {}, () => {});
-  notis.push({ id: a.id, carpeta: a.item_id, quien: a.quien, nombre: a.nombre_archivo });
+  notis.push({ id: a.id, token: a.token, carpeta: a.item_id, quien: a.quien, nombre: a.nombre_archivo, size: tam });
 }
 
 /** Procesa un aporte. Devuelve cuántas "partes" de presupuesto consumió. */
@@ -270,16 +274,94 @@ function escapar(s: string): string {
   return s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c] as string));
 }
 
-/** Avisa por correo (1 por carpeta + quién) a todos los del Drive full que entró
- *  contenido nuevo. Reusa send-notification-email (resuelve correos con los ids). */
-async function avisarContenidoNuevo(admin: Admin, notis: Noti[]): Promise<number> {
-  if (!notis.length) return 0;
-  // Reclamar el aviso (false→true) para no mandarlo dos veces si corren dos
-  // migraciones a la vez: solo seguimos con los que ESTA corrida ganó.
+/** Reclama el aviso (false→true) para no mandarlo dos veces si corren dos
+ *  migraciones a la vez: solo seguimos con los que ESTA corrida ganó. El
+ *  correo y la campana usan esta misma tanda. */
+async function reclamarAvisos(admin: Admin, notis: Noti[]): Promise<Noti[]> {
+  if (!notis.length) return [];
   const { data: ganados } = await admin.from("drive_aportes")
     .update({ avisado: true }).in("id", notis.map((n) => n.id)).eq("avisado", false).select("id");
   const ganadosSet = new Set(((ganados ?? []) as Array<{ id: string }>).map((r) => r.id));
-  notis = notis.filter((n) => ganadosSet.has(n.id));
+  return notis.filter((n) => ganadosSet.has(n.id));
+}
+
+/** CAMPANA (Alvaro, 10/11): cuando el contenido de una modelo ATERRIZA en el
+ *  Drive, UN aviso por link y por tanda a:
+ *    · quien mandó el link → con el enlace directo a la carpeta;
+ *    · los chatters del grupo de esa modelo → solo informativo (no tienen
+ *      acceso a la carpeta; decisión de Alvaro), con a quién pedírselo.
+ *  La modelo se reconoce porque la carpeta del link lleva su usuario
+ *  (MIMIMOUSE ↔ grupo «Mimimouse»); si no casa con ningún grupo, el aviso va
+ *  solo a quien mandó el link. Inserta en notifications → dispara su push. */
+async function avisarCampana(admin: Admin, notis: Noti[]): Promise<number> {
+  if (!notis.length) return 0;
+  const tandas = agruparPorLink(notis);
+
+  // Grupos de chatters vigentes con su modelo (≈70 filas: se traen una vez).
+  const ahoraISO = new Date().toISOString();
+  const { data: gc } = await admin.from("chatter_group_creators")
+    .select("group_id, creator_handle, valid_to").or(`valid_to.is.null,valid_to.gt.${ahoraISO}`);
+  const gruposDe = new Map<string, Set<string>>();
+  for (const g of (gc ?? []) as Array<{ group_id: string; creator_handle: string | null }>) {
+    const k = llaveDeModelo(g.creator_handle);
+    if (!k) continue;
+    gruposDe.set(k, (gruposDe.get(k) ?? new Set()).add(g.group_id));
+  }
+
+  let avisos = 0;
+  for (const t of tandas) {
+    const { data: link } = await admin.from("drive_upload_links").select("created_by, item_id").eq("token", t.token).maybeSingle();
+    const carpetaId = (link?.item_id as string | null) ?? t.carpeta;
+    const { data: c } = carpetaId
+      ? await admin.from("drive_items").select("nombre").eq("id", carpetaId).maybeSingle()
+      : { data: null };
+    const carpetaNombre = (c?.nombre as string | undefined) ?? "una carpeta";
+    const duenoId = (link?.created_by as string | null) ?? null;
+    let duenoNombre: string | null = null;
+    if (duenoId) {
+      const { data: p } = await admin.from("profiles").select("full_name").eq("id", duenoId).maybeSingle();
+      duenoNombre = (p?.full_name as string | null) ?? null;
+    }
+
+    // Chatters del grupo de la modelo (vigentes, con cuenta en Maven).
+    const chatters = new Set<string>();
+    const grupos = [...(gruposDe.get(llaveDeModelo(carpetaNombre)) ?? [])];
+    if (grupos.length) {
+      const { data: miembros } = await admin.from("chatter_group_members")
+        .select("identity_id, valid_to").in("group_id", grupos).or(`valid_to.is.null,valid_to.gt.${ahoraISO}`);
+      const ids = [...new Set(((miembros ?? []) as Array<{ identity_id: string }>).map((m) => m.identity_id))];
+      if (ids.length) {
+        const { data: ident } = await admin.from("chatter_identity")
+          .select("maven_user_id").in("id", ids).eq("active", true).not("maven_user_id", "is", null);
+        for (const i of (ident ?? []) as Array<{ maven_user_id: string }>) {
+          if (i.maven_user_id !== duenoId) chatters.add(i.maven_user_id);
+        }
+      }
+    }
+
+    const filas: Record<string, unknown>[] = [];
+    const comun = {
+      type: "drive_aporte", reference_id: carpetaId, reference_type: "drive_carpeta",
+      module_origin: "Oficina", priority: "medium", status: "new", visibility_scope: "personal",
+    };
+    if (duenoId) {
+      filas.push({ ...comun, ...textoDelAviso(t, carpetaNombre, duenoNombre, false), user_id: duenoId,
+        deep_link_url: carpetaId ? `/oficina/drive?carpeta=${carpetaId}` : "/oficina/drive" });
+    }
+    for (const uid of chatters) {
+      filas.push({ ...comun, ...textoDelAviso(t, carpetaNombre, duenoNombre, true), user_id: uid, deep_link_url: null });
+    }
+    if (!filas.length) continue;
+    const { error } = await admin.from("notifications").insert(filas);
+    if (!error) avisos += filas.length;
+  }
+  return avisos;
+}
+
+/** Avisa por correo (1 por carpeta + quién) a todos los del Drive full que entró
+ *  contenido nuevo. Reusa send-notification-email (resuelve correos con los ids).
+ *  Recibe la tanda YA reclamada (reclamarAvisos). */
+async function avisarContenidoNuevo(admin: Admin, notis: Noti[]): Promise<number> {
   if (!notis.length) return 0;
 
   // Destinatarios: todos los del Drive full.
@@ -325,6 +407,65 @@ async function avisarContenidoNuevo(admin: Admin, notis: Noti[]): Promise<number
   return enviados;
 }
 
+/** ESPACIO DEL NAS (Alvaro, 10/11): una muestra por hora en nas_espacio (el
+ *  medidor del Centro de operaciones calcula el ritmo con ellas) y el aviso al
+ *  80 % y al 90 % — UNA vez por nivel, a dueños y admins por campana, y a los
+ *  dueños por correo. Si el uso baja del 75 %, el aviso se rearma. */
+async function registrarEspacio(admin: Admin, raices: RaizDelNas[] | undefined): Promise<string | null> {
+  const disco = resumenDelDisco(raices);
+  if (!disco) return null;
+  const { data: ult } = await admin.from("nas_espacio").select("medido_at").order("medido_at", { ascending: false }).limit(1).maybeSingle();
+  if (!tocaMuestra(ult?.medido_at as string | undefined, Date.now())) return null;
+
+  const { error } = await admin.from("nas_espacio").insert({ total_bytes: disco.total, libre_bytes: disco.libre, discos: disco.discos });
+  if (error) return `espacio: ${error.message}`;
+
+  const { data: hechas } = await admin.from("nas_espacio_alertas").select("nivel");
+  const avisados = ((hechas ?? []) as Array<{ nivel: number }>).map((h) => Number(h.nivel));
+  if (disco.pct < REARME_PCT) {
+    if (avisados.length) await admin.from("nas_espacio_alertas").delete().in("nivel", avisados);
+    return null;
+  }
+  for (const nivel of nivelesPorAvisar(disco.pct, avisados)) {
+    // La fila es el candado: si otra corrida ya la puso, no se avisa dos veces.
+    const { data: gane } = await admin.from("nas_espacio_alertas")
+      .upsert({ nivel, pct: Number(disco.pct.toFixed(2)) }, { onConflict: "nivel", ignoreDuplicates: true }).select("nivel");
+    if (!gane?.length) continue;
+
+    const { data: duenos } = await admin.from("tenant_owners").select("user_id");
+    const { data: admins } = await admin.from("user_roles").select("user_id").ilike("role", "admin");
+    const candidatos = [...new Set([...(duenos ?? []), ...(admins ?? [])].map((r: { user_id: string }) => r.user_id))];
+    const { data: vivos } = candidatos.length
+      ? await admin.from("profiles").select("id").in("id", candidatos).is("deleted_at", null)
+      : { data: [] };
+    const ids = ((vivos ?? []) as Array<{ id: string }>).map((p) => p.id);
+    const util = Math.max(0, disco.total * 0.95 - (disco.total - disco.libre));
+    const title = `El NAS ya va al ${Math.floor(disco.pct)} %`;
+    const message = `Usado ${tamanoLegible(disco.total - disco.libre)} de ${tamanoLegible(disco.total)}. ` +
+      `Quedan ${tamanoLegible(util)} útiles antes de llenarse. Hay que planear más disco o liberar espacio.`;
+    if (ids.length) {
+      await admin.from("notifications").insert(ids.map((uid) => ({
+        user_id: uid, type: "nas_espacio", title, message, reference_type: "nas_espacio",
+        module_origin: "Oficina", priority: nivel >= 90 ? "high" : "medium", status: "new",
+        visibility_scope: "personal", deep_link_url: "/dashboard",
+      })));
+    }
+    const duenosIds = ((duenos ?? []) as Array<{ user_id: string }>).map((d) => d.user_id);
+    if (duenosIds.length) {
+      await admin.functions.invoke("send-notification-email", {
+        headers: { Authorization: `Bearer ${SERVICE_KEY}` },
+        body: {
+          to: [], subject: `💾 ${title}`, tag: "nas-espacio", also_include_user_ids: duenosIds,
+          html: `<div style="font-family:system-ui,Arial,sans-serif;font-size:15px;color:#111;line-height:1.5">` +
+            `<h2 style="margin:0 0 8px">💾 ${escapar(title)}</h2><p>${escapar(message)}</p>` +
+            `<p><a href="${APP_URL}/dashboard" style="display:inline-block;background:#7c5cff;color:#fff;text-decoration:none;padding:9px 16px;border-radius:10px;font-weight:600">Ver el medidor</a></p></div>`,
+        },
+      }).then(() => {}, () => {});
+    }
+  }
+  return null;
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
   if (req.method !== "POST") return json({ ok: false, error: "method" }, 405);
@@ -340,7 +481,7 @@ Deno.serve(async (req: Request) => {
   const pend = pendientes ?? 0;
 
   const salud = await fetch(`${NAS}/salud`, { signal: AbortSignal.timeout(8000) })
-    .then((r) => r.json()).catch(() => null) as { raices?: { ok: boolean }[] } | null;
+    .then((r) => r.json()).catch(() => null) as { raices?: RaizDelNas[] } | null;
   const arriba = !!salud?.raices?.some((r) => r.ok);
 
   if (!arriba) {
@@ -351,6 +492,13 @@ Deno.serve(async (req: Request) => {
   }
   await registrarSalud(admin, true, pend);
 
+  // El medidor nunca frena el paso de los aportes: si falla, se anota y sigue.
+  const errores: string[] = [];
+  try {
+    const e = await registrarEspacio(admin, salud?.raices);
+    if (e) errores.push(e);
+  } catch (e) { errores.push(`espacio: ${(e as Error).message}`); }
+
   const { data: filas } = await admin.from("drive_aportes")
     .select("id, token, item_id, tenant_id, nombre_archivo, storage_path, size, quien, nas_up, nas_parte, nas_item_id")
     .eq("en_nas", false)
@@ -358,7 +506,6 @@ Deno.serve(async (req: Request) => {
     .limit(APORTES_POR_RONDA);
   const aportes = (filas ?? []) as Aporte[];
 
-  const errores: string[] = [];
   const notis: Noti[] = [];
   let presupuesto = PARTES_POR_RONDA;
   let tocados = 0;
@@ -368,9 +515,14 @@ Deno.serve(async (req: Request) => {
     tocados++;
   }
 
-  // Aviso por correo: 1 por tanda (carpeta + quien subió) a todos los del Drive full.
+  // Avisos de lo que aterrizó: se reclama la tanda una vez y de ahí salen el
+  // correo (Drive full) y la campana (quien mandó el link + chatters de la modelo).
   let avisos = 0;
-  try { avisos = await avisarContenidoNuevo(admin, notis); } catch (e) { errores.push(`aviso: ${(e as Error).message}`); }
+  let campana = 0;
+  let ganados: Noti[] = [];
+  try { ganados = await reclamarAvisos(admin, notis); } catch (e) { errores.push(`reclamar: ${(e as Error).message}`); }
+  try { avisos = await avisarContenidoNuevo(admin, ganados); } catch (e) { errores.push(`aviso: ${(e as Error).message}`); }
+  try { campana = await avisarCampana(admin, ganados); } catch (e) { errores.push(`campana: ${(e as Error).message}`); }
 
-  return json({ ok: true, pendientes: pend, tocados, avisos, errores: errores.slice(0, 5) });
+  return json({ ok: true, pendientes: pend, tocados, avisos, campana, errores: errores.slice(0, 5) });
 });
