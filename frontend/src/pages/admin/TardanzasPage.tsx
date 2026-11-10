@@ -4,6 +4,7 @@ import { Clock, AlertTriangle, Eye, Loader2, Mail, Send } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useLanguage } from "@/hooks/useLanguage";
 import { useToast } from "@/hooks/use-toast";
+import { Page } from "@/components/ui/page";
 import { PageHeader } from "@/components/ui/page-header";
 import { UserAvatar } from "@/components/UserAvatar";
 import { Button } from "@/components/ui/button";
@@ -108,105 +109,107 @@ export default function TardanzasPage() {
   const correosOk = (q.data ?? []).filter((f) => f.correo_enviado).length;
 
   return (
-    <div className="flex-1 min-h-0 overflow-y-auto p-4 pb-24 md:p-6 space-y-5">
-      <PageHeader icon={<Clock className="h-5 w-5" />} title={t("admin.tardanzas.titulo")} subtitle={t("admin.tardanzas.sub")}
-        actions={
-          <div className="flex gap-2">
-            <Button variant="outline" size="sm" className="rounded-control" onClick={() => setPreview(DEMO_CORREO)}>
-              <Eye className="mr-1.5 h-4 w-4" />{t("admin.tardanzas.verCorreo")}
-            </Button>
-            <Button size="sm" className="rounded-control" onClick={() => void enviarPrueba()} disabled={enviandoPrueba}>
-              {enviandoPrueba ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Send className="mr-1.5 h-4 w-4" />}
-              {t("admin.tardanzas.enviarPrueba")}
-            </Button>
-          </div>
-        } />
+    <Page>
+      <div className="space-y-5">
+        <PageHeader icon={<Clock className="h-5 w-5" />} title={t("admin.tardanzas.titulo")} subtitle={t("admin.tardanzas.sub")}
+          actions={
+            <>
+              <Button variant="outline" size="sm" className="rounded-control" onClick={() => setPreview(DEMO_CORREO)}>
+                <Eye className="mr-1.5 h-4 w-4" />{t("admin.tardanzas.verCorreo")}
+              </Button>
+              <Button size="sm" className="rounded-control" onClick={() => void enviarPrueba()} disabled={enviandoPrueba}>
+                {enviandoPrueba ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Send className="mr-1.5 h-4 w-4" />}
+                {t("admin.tardanzas.enviarPrueba")}
+              </Button>
+            </>
+          } />
 
-      {/* Navegación por día + KPIs */}
-      <div className="flex flex-wrap items-center gap-3">
-        <div className="inline-flex gap-1 rounded-panel border border-border/50 bg-card/30 p-1">
-          <button onClick={() => setDiasAtras((d) => d + 1)} className="rounded-control px-3 py-1.5 text-xs font-semibold text-muted-foreground hover:text-foreground transition">← {t("admin.tardanzas.anterior")}</button>
-          <span className="rounded-control bg-primary/15 text-primary px-3 py-1.5 text-xs font-semibold">
-            {diasAtras === 0 ? t("admin.tardanzas.hoy") : dia}
-          </span>
-          <button disabled={diasAtras === 0} onClick={() => setDiasAtras((d) => Math.max(0, d - 1))} className="rounded-control px-3 py-1.5 text-xs font-semibold text-muted-foreground hover:text-foreground transition disabled:opacity-40">{t("admin.tardanzas.siguiente")} →</button>
+        {/* Navegación por día + KPIs */}
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="inline-flex gap-1 rounded-panel border border-border/50 bg-card/30 p-1">
+            <button onClick={() => setDiasAtras((d) => d + 1)} className="rounded-control px-3 py-1.5 text-xs font-semibold text-muted-foreground hover:text-foreground transition">← {t("admin.tardanzas.anterior")}</button>
+            <span className="rounded-control bg-primary/15 text-primary px-3 py-1.5 text-xs font-semibold">
+              {diasAtras === 0 ? t("admin.tardanzas.hoy") : dia}
+            </span>
+            <button disabled={diasAtras === 0} onClick={() => setDiasAtras((d) => Math.max(0, d - 1))} className="rounded-control px-3 py-1.5 text-xs font-semibold text-muted-foreground hover:text-foreground transition disabled:opacity-40">{t("admin.tardanzas.siguiente")} →</button>
+          </div>
         </div>
-      </div>
 
-      <div className="grid grid-cols-3 gap-3">
-        <div className="vidrio vidrio-glow glow-r p-4">
-          <div className="v-cont flex flex-col gap-1">
-            <div className="flex items-center gap-2"><AlertTriangle className="h-4 w-4 text-destructive" /><span className="text-xs font-semibold text-muted-foreground">{t("admin.tardanzas.kpi.total")}</span></div>
-            <div className="font-display text-3xl font-bold tabular-nums text-destructive">{total}</div>
-          </div>
-        </div>
-        <div className="vidrio vidrio-glow glow-a p-4">
-          <div className="v-cont flex flex-col gap-1">
-            <div className="flex items-center gap-2"><Clock className="h-4 w-4 text-warning" /><span className="text-xs font-semibold text-muted-foreground">{t("admin.tardanzas.kpi.minutos")}</span></div>
-            <div className="font-display text-3xl font-bold tabular-nums text-warning">{minutosTotal}m</div>
-          </div>
-        </div>
-        <div className="vidrio vidrio-glow glow-g p-4">
-          <div className="v-cont flex flex-col gap-1">
-            <div className="flex items-center gap-2"><Mail className="h-4 w-4 text-success" /><span className="text-xs font-semibold text-muted-foreground">{t("admin.tardanzas.kpi.correos")}</span></div>
-            <div className="font-display text-3xl font-bold tabular-nums text-success">{correosOk}</div>
-          </div>
-        </div>
-      </div>
-
-      {q.isLoading ? (
-        <div className="flex items-center gap-2 py-10 text-muted-foreground"><Loader2 className="h-5 w-5 animate-spin" />{t("admin.tardanzas.cargando")}</div>
-      ) : total === 0 ? (
-        <div className="vidrio p-8 text-center">
-          <p className="text-sm font-semibold text-success">✓ {t("admin.tardanzas.ninguna")}</p>
-          <p className="mt-1 text-xs text-muted-foreground">{t("admin.tardanzas.ningunaDetalle")}</p>
-        </div>
-      ) : (
-        <div className="flex flex-col gap-2">
-          {q.data?.map((f) => (
-            <div key={f.id} className="vidrio vidrio-glow glow-r p-3.5">
-              <div className="v-cont flex flex-wrap items-center gap-3">
-                <UserAvatar name={f.nombre} src={f.avatar_url} seed={f.avatar_seed} size="sm" />
-                <div className="min-w-0 flex-1">
-                  <div className="truncate text-sm font-semibold">{f.nombre}</div>
-                  <div className="text-[11px] text-muted-foreground tabular-nums">
-                    {f.turno_nombre && <span className="mr-2 rounded-full border border-border/50 bg-card/40 px-1.5 py-0.5 text-[10px]">{f.turno_nombre}</span>}
-                    {t("admin.tardanzas.esperaba", { h: f.horario_asignado.slice(0, 5) })} ·
-                    {t("admin.tardanzas.entroA", { h: hhmm(f.entro_at) })}
-                  </div>
-                </div>
-                <div className="flex flex-col items-end gap-0.5">
-                  <span className="font-display text-xl font-bold tabular-nums text-destructive">+{f.tarde_min}m</span>
-                  <span className={`inline-flex items-center gap-1 text-[10px] font-medium ${f.correo_enviado ? "text-success" : "text-muted-foreground"}`}>
-                    {f.correo_enviado ? <><Send className="h-3 w-3" />{t("admin.tardanzas.correoEnviado", { n: f.correo_a?.length ?? 0 })}</> : <>{t("admin.tardanzas.correoNoEnviado")}</>}
-                  </span>
-                </div>
-                <button type="button" onClick={() => setPreview({
-                  nombre: f.nombre, rol: f.turno_nombre ?? null,
-                  horario: f.horario_asignado.slice(0, 5), entro: hhmm(f.entro_at),
-                  tardeMin: f.tarde_min, esPrueba: false,
-                })} className="rounded-lg border border-border/60 bg-card/40 px-2 py-1 text-[11px] font-medium text-muted-foreground transition hover:bg-foreground/5 hover:text-foreground">
-                  <Eye className="inline h-3 w-3 mr-1" />{t("admin.tardanzas.verCorreoDeEsta")}
-                </button>
-              </div>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+          <div className="vidrio vidrio-glow glow-r p-4">
+            <div className="v-cont flex flex-col gap-1">
+              <div className="flex items-center gap-2"><AlertTriangle className="h-4 w-4 text-destructive" /><span className="text-xs font-semibold text-muted-foreground">{t("admin.tardanzas.kpi.total")}</span></div>
+              <div className="font-display text-3xl font-bold tabular-nums text-destructive">{total}</div>
             </div>
-          ))}
+          </div>
+          <div className="vidrio vidrio-glow glow-a p-4">
+            <div className="v-cont flex flex-col gap-1">
+              <div className="flex items-center gap-2"><Clock className="h-4 w-4 text-warning" /><span className="text-xs font-semibold text-muted-foreground">{t("admin.tardanzas.kpi.minutos")}</span></div>
+              <div className="font-display text-3xl font-bold tabular-nums text-warning">{minutosTotal}m</div>
+            </div>
+          </div>
+          <div className="vidrio vidrio-glow glow-g p-4">
+            <div className="v-cont flex flex-col gap-1">
+              <div className="flex items-center gap-2"><Mail className="h-4 w-4 text-success" /><span className="text-xs font-semibold text-muted-foreground">{t("admin.tardanzas.kpi.correos")}</span></div>
+              <div className="font-display text-3xl font-bold tabular-nums text-success">{correosOk}</div>
+            </div>
+          </div>
         </div>
-      )}
 
-      <p className="rounded-panel border border-border/40 bg-card/20 px-3 py-2 text-[11px] text-muted-foreground">
-        {t("admin.tardanzas.nota")}
-      </p>
+        {q.isLoading ? (
+          <div className="flex items-center gap-2 py-10 text-muted-foreground"><Loader2 className="h-5 w-5 animate-spin" />{t("admin.tardanzas.cargando")}</div>
+        ) : total === 0 ? (
+          <div className="vidrio p-8 text-center">
+            <p className="text-sm font-semibold text-success">✓ {t("admin.tardanzas.ninguna")}</p>
+            <p className="mt-1 text-xs text-muted-foreground">{t("admin.tardanzas.ningunaDetalle")}</p>
+          </div>
+        ) : (
+          <div className="flex flex-col gap-2">
+            {q.data?.map((f) => (
+              <div key={f.id} className="vidrio vidrio-glow glow-r p-3.5">
+                <div className="v-cont flex flex-wrap items-center gap-3">
+                  <UserAvatar name={f.nombre} src={f.avatar_url} seed={f.avatar_seed} size="sm" />
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate text-sm font-semibold">{f.nombre}</div>
+                    <div className="text-[11px] text-muted-foreground tabular-nums">
+                      {f.turno_nombre && <span className="mr-2 rounded-full border border-border/50 bg-card/40 px-1.5 py-0.5 text-[10px]">{f.turno_nombre}</span>}
+                      {t("admin.tardanzas.esperaba", { h: f.horario_asignado.slice(0, 5) })} ·
+                      {t("admin.tardanzas.entroA", { h: hhmm(f.entro_at) })}
+                    </div>
+                  </div>
+                  <div className="flex flex-col items-end gap-0.5">
+                    <span className="font-display text-xl font-bold tabular-nums text-destructive">+{f.tarde_min}m</span>
+                    <span className={`inline-flex items-center gap-1 text-[10px] font-medium ${f.correo_enviado ? "text-success" : "text-muted-foreground"}`}>
+                      {f.correo_enviado ? <><Send className="h-3 w-3" />{t("admin.tardanzas.correoEnviado", { n: f.correo_a?.length ?? 0 })}</> : <>{t("admin.tardanzas.correoNoEnviado")}</>}
+                    </span>
+                  </div>
+                  <button type="button" onClick={() => setPreview({
+                    nombre: f.nombre, rol: f.turno_nombre ?? null,
+                    horario: f.horario_asignado.slice(0, 5), entro: hhmm(f.entro_at),
+                    tardeMin: f.tarde_min, esPrueba: false,
+                  })} className="rounded-lg border border-border/60 bg-card/40 px-2 py-1 text-[11px] font-medium text-muted-foreground transition hover:bg-foreground/5 hover:text-foreground">
+                    <Eye className="inline h-3 w-3 mr-1" />{t("admin.tardanzas.verCorreoDeEsta")}
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
 
-      {/* Modal de preview del correo (igualito al que se envía). */}
-      <Dialog open={!!preview} onOpenChange={(o) => { if (!o) setPreview(null); }}>
-        <DialogContent className="max-w-2xl p-0 overflow-hidden">
-          <DialogTitle className="p-4 border-b border-border/40">{t("admin.tardanzas.previewTitulo")}</DialogTitle>
-          {preview && (
-            <iframe title="email preview" srcDoc={correoTardanzaHTML(preview)} className="w-full border-0" style={{ height: "min(70vh, 720px)", background: "#eef1f6" }} />
-          )}
-        </DialogContent>
-      </Dialog>
-    </div>
+        <p className="rounded-panel border border-border/40 bg-card/20 px-3 py-2 text-[11px] text-muted-foreground">
+          {t("admin.tardanzas.nota")}
+        </p>
+
+        {/* Modal de preview del correo (igualito al que se envía). */}
+        <Dialog open={!!preview} onOpenChange={(o) => { if (!o) setPreview(null); }}>
+          <DialogContent className="max-w-2xl p-0 overflow-hidden">
+            <DialogTitle className="p-4 border-b border-border/40">{t("admin.tardanzas.previewTitulo")}</DialogTitle>
+            {preview && (
+              <iframe title="email preview" srcDoc={correoTardanzaHTML(preview)} className="w-full border-0" style={{ height: "min(70vh, 720px)", background: "#eef1f6" }} />
+            )}
+          </DialogContent>
+        </Dialog>
+      </div>
+    </Page>
   );
 }

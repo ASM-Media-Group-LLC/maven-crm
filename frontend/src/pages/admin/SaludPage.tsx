@@ -6,6 +6,7 @@ import { Activity, AlertCircle, CheckCircle2, CloudOff, Clock, Loader2, Mail, Se
 import { supabase } from "@/integrations/supabase/client";
 import { useLanguage } from "@/hooks/useLanguage";
 import { useToast } from "@/hooks/use-toast";
+import { Page } from "@/components/ui/page";
 import { PageHeader } from "@/components/ui/page-header";
 import { Button } from "@/components/ui/button";
 // SALUD del sistema (Alvaro, 06/11). "Un dashboard entero bien hecho que corrobore
@@ -98,57 +99,59 @@ export default function SaludPage() {
   const argosOk = ult5min(s.argos_ia?.ultima_captura_juzgada) ? true : s.argos_ia?.ultima_captura_juzgada ? null : false;
 
   return (
-    <div className="flex-1 min-h-0 overflow-y-auto p-4 pb-24 md:p-6 space-y-4">
-      <PageHeader icon={<Activity className="h-5 w-5" />} title={t("admin.salud.titulo")} subtitle={t("admin.salud.sub")} />
+    <Page>
+      <div className="space-y-4">
+        <PageHeader icon={<Activity className="h-5 w-5" />} title={t("admin.salud.titulo")} subtitle={t("admin.salud.sub")} />
 
-      <FilaSalud
-        icono={CloudOff}
-        titulo={t("admin.salud.nas")}
-        estadoOk={nasOk}
-        loading={q.isLoading}
-        detalle={s.nas?.caido ? `Caído desde ${hace(s.nas.desde, language) ?? "—"}, ${s.nas.pendientes} aportes esperando` : "El NAS responde y los aportes aterrizan al toque."}
-      />
+        <FilaSalud
+          icono={CloudOff}
+          titulo={t("admin.salud.nas")}
+          estadoOk={nasOk}
+          loading={q.isLoading}
+          detalle={s.nas?.caido ? `Caído desde ${hace(s.nas.desde, language) ?? "—"}, ${s.nas.pendientes} aportes esperando` : "El NAS responde y los aportes aterrizan al toque."}
+        />
 
-      <FilaSalud
-        icono={Clock}
-        titulo={t("admin.salud.cronTardanzas")}
-        estadoOk={cronTardOk}
-        loading={q.isLoading}
-        detalle={<>
-          {s.cron_tardanzas?.ultima_corrida && <span>{t("admin.salud.ultCorrida", { t: hace(s.cron_tardanzas.ultima_corrida, language) ?? "—" })}</span>}
-          {s.tardanzas_hoy && <> · {t("admin.salud.tardanzasHoy", { n: s.tardanzas_hoy.total, ok: s.tardanzas_hoy.con_correo })}</>}
-        </>}
-      />
+        <FilaSalud
+          icono={Clock}
+          titulo={t("admin.salud.cronTardanzas")}
+          estadoOk={cronTardOk}
+          loading={q.isLoading}
+          detalle={<>
+            {s.cron_tardanzas?.ultima_corrida && <span>{t("admin.salud.ultCorrida", { t: hace(s.cron_tardanzas.ultima_corrida, language) ?? "—" })}</span>}
+            {s.tardanzas_hoy && <> · {t("admin.salud.tardanzasHoy", { n: s.tardanzas_hoy.total, ok: s.tardanzas_hoy.con_correo })}</>}
+          </>}
+        />
 
-      <FilaSalud
-        icono={Server}
-        titulo={t("admin.salud.cronNas")}
-        estadoOk={cronNasOk}
-        loading={q.isLoading}
-        detalle={s.cron_nas?.ultima_corrida ? t("admin.salud.ultCorrida", { t: hace(s.cron_nas.ultima_corrida, language) ?? "—" }) : "—"}
-      />
+        <FilaSalud
+          icono={Server}
+          titulo={t("admin.salud.cronNas")}
+          estadoOk={cronNasOk}
+          loading={q.isLoading}
+          detalle={s.cron_nas?.ultima_corrida ? t("admin.salud.ultCorrida", { t: hace(s.cron_nas.ultima_corrida, language) ?? "—" }) : "—"}
+        />
 
-      <FilaSalud
-        icono={Mail}
-        titulo={t("admin.salud.correo")}
-        estadoOk={s.tardanzas_hoy?.ultimo_correo ? true : null}
-        loading={q.isLoading}
-        detalle={s.tardanzas_hoy?.ultimo_correo ? t("admin.salud.ultCorreo", { t: hace(s.tardanzas_hoy.ultimo_correo, language) ?? "—" }) : t("admin.salud.sinCorreoHoy")}
-        accion={<Button size="sm" className="rounded-control" onClick={() => void probarCorreo()} disabled={probando}>
-          {probando ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Send className="mr-1.5 h-4 w-4" />}{t("admin.salud.probar")}
-        </Button>}
-      />
+        <FilaSalud
+          icono={Mail}
+          titulo={t("admin.salud.correo")}
+          estadoOk={s.tardanzas_hoy?.ultimo_correo ? true : null}
+          loading={q.isLoading}
+          detalle={s.tardanzas_hoy?.ultimo_correo ? t("admin.salud.ultCorreo", { t: hace(s.tardanzas_hoy.ultimo_correo, language) ?? "—" }) : t("admin.salud.sinCorreoHoy")}
+          accion={<Button size="sm" className="rounded-control" onClick={() => void probarCorreo()} disabled={probando}>
+            {probando ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Send className="mr-1.5 h-4 w-4" />}{t("admin.salud.probar")}
+          </Button>}
+        />
 
-      <FilaSalud
-        icono={Activity}
-        titulo={t("admin.salud.argos")}
-        estadoOk={argosOk}
-        loading={q.isLoading}
-        detalle={<>
-          {s.argos_ia?.ultima_captura_juzgada && <span>{t("admin.salud.ultCorrida", { t: hace(s.argos_ia.ultima_captura_juzgada, language) ?? "—" })}</span>}
-          {s.argos_ia && <> · {t("admin.salud.juzgadasHoy", { n: s.argos_ia.juzgadas_hoy })}</>}
-        </>}
-      />
-    </div>
+        <FilaSalud
+          icono={Activity}
+          titulo={t("admin.salud.argos")}
+          estadoOk={argosOk}
+          loading={q.isLoading}
+          detalle={<>
+            {s.argos_ia?.ultima_captura_juzgada && <span>{t("admin.salud.ultCorrida", { t: hace(s.argos_ia.ultima_captura_juzgada, language) ?? "—" })}</span>}
+            {s.argos_ia && <> · {t("admin.salud.juzgadasHoy", { n: s.argos_ia.juzgadas_hoy })}</>}
+          </>}
+        />
+      </div>
+    </Page>
   );
 }

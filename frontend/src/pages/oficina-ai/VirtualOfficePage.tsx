@@ -5,6 +5,8 @@ import { useLanguage } from "@/hooks/useLanguage";
 import { TarjetaKpi } from "@/components/ui/TarjetaKpi";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { Page } from "@/components/ui/page";
+import { PageHeader } from "@/components/ui/page-header";
 import type { TranslationKey } from "@/lib/i18n";
 
 // VIRTUAL OFFICE (Alvaro, 05/11, v2 con muñequitos en escena isométrica).
@@ -178,7 +180,7 @@ function Puesto({ a, x, y, onClick }: { a: AgenteDemo; x: number; y: number; onC
       </div>
       <div className="absolute" style={{ left: 56, top: 34, width: 8, height: 2, background: "#000" }} />
       <button type="button" onClick={onClick}
-        className="absolute transition-transform hover:scale-110 hover:z-20"
+        className="absolute transition hover:z-20 hover:brightness-125 hover:drop-shadow-[0_0_8px_hsl(var(--primary)/0.6)]"
         style={{ left: 36, top: 2, width: 48, height: 44, zIndex: 10, cursor: "pointer", background: "transparent", border: "none", padding: 0 }}
         aria-label={a.nombre}>
         <Munequito seed={a.seed} estado={a.estado} />
@@ -221,184 +223,183 @@ export default function VirtualOfficePage() {
   const puestos = piso.agentes.slice(0, COLS * FILAS);
 
   return (
-    <div className="flex-1 min-h-0 overflow-y-auto p-4 pb-24 md:p-6 space-y-5">
-      <div className="flex flex-wrap items-center gap-3">
-        <button onClick={() => navigate(-1)} className="flex h-9 w-9 items-center justify-center rounded-control border border-border/60 bg-card/40 text-muted-foreground transition hover:text-foreground">
-          <ArrowLeft className="h-4 w-4" />
-        </button>
-        <div className="flex items-center gap-3">
-          <span className="flex h-11 w-11 items-center justify-center rounded-panel bg-primary/10 text-primary">
-            <Building2 className="h-6 w-6" />
-          </span>
-          <div>
-            <h1 className="font-display text-2xl font-bold leading-tight">{t("dashboard.virtualOffice.titulo")}</h1>
-            <p className="text-sm text-muted-foreground">{t("dashboard.virtualOffice.sub")}</p>
-          </div>
+    <Page>
+      <div className="space-y-5">
+        <div className="flex items-start gap-3">
+          <button onClick={() => navigate(-1)} aria-label={t("common.back")} className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-control border border-border/60 bg-card/40 text-muted-foreground transition hover:text-foreground">
+            <ArrowLeft className="h-4 w-4" />
+          </button>
+          <PageHeader
+            className="min-w-0 flex-1"
+            icon={<Building2 />}
+            title={t("dashboard.virtualOffice.titulo")}
+            subtitle={t("dashboard.virtualOffice.sub")}
+            actions={<>
+              <Button variant="outline" size="sm" className="rounded-control" onClick={fullscreen}>
+                <Maximize2 className="mr-1.5 h-4 w-4" />{t("dashboard.virtualOffice.pantallaCompleta")}
+              </Button>
+              <Button size="sm" className="rounded-control" disabled title={t("dashboard.virtualOffice.demo")}>
+                <Bot className="mr-1.5 h-4 w-4" />{t("dashboard.virtualOffice.conectar")}
+              </Button>
+            </>}
+          />
         </div>
-        <div className="ml-auto flex gap-2">
-          <Button variant="outline" size="sm" className="rounded-control" onClick={fullscreen}>
-            <Maximize2 className="mr-1.5 h-4 w-4" />{t("dashboard.virtualOffice.pantallaCompleta")}
-          </Button>
-          <Button size="sm" className="rounded-control" disabled title={t("dashboard.virtualOffice.demo")}>
-            <Bot className="mr-1.5 h-4 w-4" />{t("dashboard.virtualOffice.conectar")}
-          </Button>
+
+        <div className="flex items-start gap-2.5 rounded-panel border border-warning/30 bg-warning/5 px-4 py-3 text-sm">
+          <Info className="h-4 w-4 shrink-0 text-warning mt-0.5" />
+          <span className="text-foreground/80">{t("dashboard.virtualOffice.demo")}</span>
         </div>
-      </div>
 
-      <div className="flex items-start gap-2.5 rounded-panel border border-warning/30 bg-warning/5 px-4 py-3 text-sm">
-        <Info className="h-4 w-4 shrink-0 text-warning mt-0.5" />
-        <span className="text-foreground/80">{t("dashboard.virtualOffice.demo")}</span>
-      </div>
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+          <TarjetaKpi indice={0} icono={Bot} etiqueta="Total" valor={resumen.total} detalle={t("dashboard.virtualOffice.agentes", { n: resumen.total })} />
+          <TarjetaKpi indice={1} icono={CheckCircle2} tono="success" etiqueta={t("dashboard.virtualOffice.trabajando")} valor={resumen.trabajando} detalle="En ejecución ahora" />
+          <TarjetaKpi indice={2} icono={Loader2} tono="warning" etiqueta={t("dashboard.virtualOffice.esperando")} valor={resumen.esperando} detalle="Esperan próxima tarea" />
+          <TarjetaKpi indice={3} icono={Info} tono="danger" etiqueta={t("dashboard.virtualOffice.error")} valor={resumen.error} detalle={resumen.error === 0 ? "Todo en orden" : "Requieren atención"} />
+        </div>
 
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <TarjetaKpi indice={0} icono={Bot} etiqueta="Total" valor={resumen.total} detalle={t("dashboard.virtualOffice.agentes", { n: resumen.total })} />
-        <TarjetaKpi indice={1} icono={CheckCircle2} tono="success" etiqueta={t("dashboard.virtualOffice.trabajando")} valor={resumen.trabajando} detalle="En ejecución ahora" />
-        <TarjetaKpi indice={2} icono={Loader2} tono="warning" etiqueta={t("dashboard.virtualOffice.esperando")} valor={resumen.esperando} detalle="Esperan próxima tarea" />
-        <TarjetaKpi indice={3} icono={Info} tono="danger" etiqueta={t("dashboard.virtualOffice.error")} valor={resumen.error} detalle={resumen.error === 0 ? "Todo en orden" : "Requieren atención"} />
-      </div>
+        <div className="grid gap-4 lg:grid-cols-[220px_1fr]">
+          <aside className="vidrio p-2 space-y-1">
+            <div className="px-3 py-2 text-xs font-semibold text-muted-foreground">Pisos</div>
+            {DEMO.map((p) => {
+              const activo = p.slug === pisoSel;
+              const problemas = p.agentes.filter((a) => a.estado === "error").length;
+              const trabajando = p.agentes.filter((a) => a.estado === "trabajando").length;
+              return (
+                <button key={p.slug} onClick={() => setPisoSel(p.slug)}
+                  className={`flex w-full items-center gap-3 rounded-panel border px-3 py-2.5 text-left transition ${
+                    activo ? "border-primary/40 bg-primary/10" : "border-transparent hover:bg-foreground/5"
+                  }`}>
+                  <span className={`font-display text-xl font-bold tabular-nums w-7 text-center ${activo ? "text-primary" : "text-muted-foreground"}`}>{p.numero}</span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-sm font-semibold capitalize">{p.slug === "operaciones" ? "Operaciones" : p.slug}</span>
+                    <span className="block text-[10px] text-muted-foreground">{trabajando}/{p.agentes.length} activos</span>
+                  </span>
+                  <span className={`h-2 w-2 rounded-full ${problemas > 0 ? "bg-destructive animate-pulse" : "bg-success"}`} />
+                </button>
+              );
+            })}
+          </aside>
 
-      <div className="grid gap-4 lg:grid-cols-[220px_1fr]">
-        <aside className="vidrio p-2 space-y-1">
-          <div className="px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Pisos</div>
-          {DEMO.map((p) => {
-            const activo = p.slug === pisoSel;
-            const problemas = p.agentes.filter((a) => a.estado === "error").length;
-            const trabajando = p.agentes.filter((a) => a.estado === "trabajando").length;
-            return (
-              <button key={p.slug} onClick={() => setPisoSel(p.slug)}
-                className={`flex w-full items-center gap-3 rounded-panel border px-3 py-2.5 text-left transition ${
-                  activo ? "border-primary/40 bg-primary/10" : "border-transparent hover:bg-foreground/5"
-                }`}>
-                <span className={`font-display text-xl font-bold tabular-nums w-7 text-center ${activo ? "text-primary" : "text-muted-foreground"}`}>{p.numero}</span>
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate text-sm font-semibold capitalize">{p.slug === "operaciones" ? "Operaciones" : p.slug}</span>
-                  <span className="block text-[10px] text-muted-foreground">{trabajando}/{p.agentes.length} activos</span>
-                </span>
-                <span className={`h-2 w-2 rounded-full ${problemas > 0 ? "bg-destructive animate-pulse" : "bg-success"}`} />
-              </button>
-            );
-          })}
-        </aside>
-
-        <section className="vidrio p-4 overflow-hidden" style={{ minHeight: 560 }}>
-          <div className="v-cont flex flex-col gap-3">
-            <div className="flex items-center justify-between gap-3">
-              <h2 className="flex items-center gap-2 text-sm font-semibold">
-                <span className="flex h-7 w-7 items-center justify-center rounded-panel bg-primary/10 text-primary">
-                  <Building2 className="h-4 w-4" />
-                </span>
-                {t("dashboard.virtualOffice.piso", { n: piso.numero })} · <span className="capitalize">{piso.slug === "operaciones" ? "Operaciones" : piso.slug}</span>
-                <span className="text-xs font-normal text-muted-foreground">· {t("dashboard.virtualOffice.agentes", { n: piso.agentes.length })}</span>
-              </h2>
-            </div>
-
-            <div className="relative flex-1 rounded-panel overflow-hidden" style={{
-              background: "radial-gradient(ellipse at top,#1b2140 0%,#0b0d16 60%,#070912 100%)",
-              minHeight: 480,
-            }}>
-              <div className="absolute inset-0 opacity-30" style={{
-                backgroundImage: "repeating-linear-gradient(90deg, transparent 0 40px, rgba(109,94,252,.15) 40px 44px, transparent 44px 88px, rgba(73,227,166,.1) 88px 92px)",
-                maskImage: "linear-gradient(180deg, rgba(0,0,0,0.6) 0%, transparent 60%)",
-                WebkitMaskImage: "linear-gradient(180deg, rgba(0,0,0,0.6) 0%, transparent 60%)",
-              }} />
-              <div className="absolute inset-0 flex items-center justify-center">
-                <div className="relative" style={{
-                  width: COLS * TILE,
-                  height: FILAS * TILE,
-                  transform: "perspective(900px) rotateX(18deg)",
-                  transformStyle: "preserve-3d",
-                }}>
-                  {Array.from({ length: COLS * FILAS }, (_, i) => {
-                    const r = Math.floor(i / COLS), c = i % COLS;
-                    const a = puestos[i];
-                    if (!a) return null;
-                    return (
-                      <Puesto key={a.id} a={a} x={c * TILE} y={r * TILE} onClick={() => setAbierto(a)} />
-                    );
-                  })}
-                </div>
+          <section className="vidrio p-4 overflow-hidden" style={{ minHeight: 560 }}>
+            <div className="v-cont flex flex-col gap-3">
+              <div className="flex items-center justify-between gap-3">
+                <h2 className="flex items-center gap-2 text-sm font-semibold">
+                  <span className="flex h-7 w-7 items-center justify-center rounded-panel bg-primary/10 text-primary">
+                    <Building2 className="h-4 w-4" />
+                  </span>
+                  {t("dashboard.virtualOffice.piso", { n: piso.numero })} · <span className="capitalize">{piso.slug === "operaciones" ? "Operaciones" : piso.slug}</span>
+                  <span className="text-xs font-normal text-muted-foreground">· {t("dashboard.virtualOffice.agentes", { n: piso.agentes.length })}</span>
+                </h2>
               </div>
-              {piso.agentes.length > COLS * FILAS && (
-                <div className="absolute bottom-3 right-3 rounded-control bg-card/80 border border-border/50 px-2.5 py-1 text-[11px] text-muted-foreground backdrop-blur">
-                  +{piso.agentes.length - COLS * FILAS} más en este piso
+
+              <div className="relative flex-1 rounded-panel overflow-hidden" style={{
+                background: "radial-gradient(ellipse at top,#1b2140 0%,#0b0d16 60%,#070912 100%)",
+                minHeight: 480,
+              }}>
+                <div className="absolute inset-0 opacity-30" style={{
+                  backgroundImage: "repeating-linear-gradient(90deg, transparent 0 40px, rgba(109,94,252,.15) 40px 44px, transparent 44px 88px, rgba(73,227,166,.1) 88px 92px)",
+                  maskImage: "linear-gradient(180deg, rgba(0,0,0,0.6) 0%, transparent 60%)",
+                  WebkitMaskImage: "linear-gradient(180deg, rgba(0,0,0,0.6) 0%, transparent 60%)",
+                }} />
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <div className="relative" style={{
+                    width: COLS * TILE,
+                    height: FILAS * TILE,
+                    transform: "perspective(900px) rotateX(18deg)",
+                    transformStyle: "preserve-3d",
+                  }}>
+                    {Array.from({ length: COLS * FILAS }, (_, i) => {
+                      const r = Math.floor(i / COLS), c = i % COLS;
+                      const a = puestos[i];
+                      if (!a) return null;
+                      return (
+                        <Puesto key={a.id} a={a} x={c * TILE} y={r * TILE} onClick={() => setAbierto(a)} />
+                      );
+                    })}
+                  </div>
                 </div>
-              )}
+                {piso.agentes.length > COLS * FILAS && (
+                  <div className="absolute bottom-3 right-3 rounded-control bg-card/80 border border-border/50 px-2.5 py-1 text-[11px] text-muted-foreground backdrop-blur">
+                    +{piso.agentes.length - COLS * FILAS} más en este piso
+                  </div>
+                )}
+              </div>
             </div>
-          </div>
-        </section>
+          </section>
+        </div>
+
+        <Dialog open={!!abierto} onOpenChange={(o) => { if (!o) setAbierto(null); }}>
+          <DialogContent className="max-w-md">
+            {abierto && (() => {
+              const ui = EST_UI[abierto.estado];
+              return (
+                <>
+                  <DialogTitle className="flex items-center gap-3">
+                    <span className={`relative flex h-14 w-14 shrink-0 items-center justify-center rounded-panel bg-card text-base font-bold ring-2 ${ui.anillo} overflow-hidden`}>
+                      <Munequito seed={abierto.seed} estado={abierto.estado} />
+                      <span className={`absolute -bottom-1 -right-1 h-3 w-3 rounded-full ring-2 ring-background ${ui.punto}`} />
+                    </span>
+                    <span className="min-w-0">
+                      <span className="block truncate text-base">{abierto.nombre}</span>
+                      <span className={`block text-xs font-medium ${ui.texto}`}>{t(ui.lbl)}</span>
+                    </span>
+                  </DialogTitle>
+                  <p className="text-xs text-muted-foreground">{abierto.depto} · {abierto.rol}</p>
+
+                  <div className="mt-2 space-y-4">
+                    <div>
+                      <p className="mb-1.5 text-xs font-semibold text-muted-foreground">{t("dashboard.virtualOffice.tareaActual")}</p>
+                      <div className="rounded-panel border border-primary/20 bg-primary/5 px-3 py-2.5 text-sm">
+                        {abierto.tarea ?? t("dashboard.virtualOffice.sinTarea")}
+                      </div>
+                    </div>
+                    <div>
+                      <p className="mb-1.5 text-xs font-semibold text-muted-foreground">{t("dashboard.virtualOffice.hoy")}</p>
+                      <div className="flex gap-2">
+                        <div className="min-w-0 flex-1 rounded-panel border border-border/40 bg-card/30 p-2.5 text-center">
+                          <div className="font-display text-xl font-bold tabular-nums text-success">{abierto.hechas}</div>
+                          <div className="text-[10px] text-muted-foreground">{t("dashboard.virtualOffice.hechas")}</div>
+                        </div>
+                        <div className="min-w-0 flex-1 rounded-panel border border-border/40 bg-card/30 p-2.5 text-center">
+                          <div className="font-display text-xl font-bold tabular-nums text-destructive">{abierto.errores}</div>
+                          <div className="text-[10px] text-muted-foreground">{t("dashboard.virtualOffice.errores")}</div>
+                        </div>
+                        <div className="min-w-0 flex-1 rounded-panel border border-border/40 bg-card/30 p-2.5 text-center">
+                          <div className="font-display text-xl font-bold tabular-nums text-primary">{abierto.exito}%</div>
+                          <div className="text-[10px] text-muted-foreground">{t("dashboard.virtualOffice.exito")}</div>
+                        </div>
+                      </div>
+                    </div>
+                    <div>
+                      <p className="mb-1.5 text-xs font-semibold text-muted-foreground">{t("dashboard.virtualOffice.ultimasEjec")}</p>
+                      <div className="space-y-1">
+                        {Array.from({ length: 5 }, (_, i) => {
+                          const ok = !(abierto.estado === "error" && i < 2);
+                          return (
+                            <div key={i} className="flex items-center gap-2 rounded-panel border border-border/40 bg-card/20 px-2.5 py-1.5 text-xs">
+                              <span className={`h-1.5 w-1.5 rounded-full ${ok ? "bg-success" : "bg-destructive"}`} />
+                              <span className="min-w-0 flex-1 truncate">{ok ? `Tarea completada` : `Error — token expirado`}</span>
+                              <span className="shrink-0 tabular-nums text-muted-foreground">#{4820 - i}</span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                    <Button className="w-full rounded-control" disabled title={t("dashboard.virtualOffice.demo")}>
+                      <ExternalLink className="mr-1.5 h-4 w-4" />{t("dashboard.virtualOffice.abrirPaperclip")}
+                    </Button>
+                  </div>
+                </>
+              );
+            })()}
+          </DialogContent>
+        </Dialog>
+
+        <style>{`
+          @keyframes flotar { 0%,100%{ transform: translateY(0) } 50%{ transform: translateY(-4px) } }
+          @keyframes parpadea { 0%,100%{ opacity: 1 } 50%{ opacity: .45 } }
+        `}</style>
       </div>
-
-      <Dialog open={!!abierto} onOpenChange={(o) => { if (!o) setAbierto(null); }}>
-        <DialogContent className="max-w-md">
-          {abierto && (() => {
-            const ui = EST_UI[abierto.estado];
-            return (
-              <>
-                <DialogTitle className="flex items-center gap-3">
-                  <span className={`relative flex h-14 w-14 shrink-0 items-center justify-center rounded-panel bg-card text-base font-bold ring-2 ${ui.anillo} overflow-hidden`}>
-                    <Munequito seed={abierto.seed} estado={abierto.estado} />
-                    <span className={`absolute -bottom-1 -right-1 h-3 w-3 rounded-full ring-2 ring-background ${ui.punto}`} />
-                  </span>
-                  <span className="min-w-0">
-                    <span className="block truncate text-base">{abierto.nombre}</span>
-                    <span className={`block text-xs font-medium ${ui.texto}`}>{t(ui.lbl)}</span>
-                  </span>
-                </DialogTitle>
-                <p className="text-xs text-muted-foreground">{abierto.depto} · {abierto.rol}</p>
-
-                <div className="mt-2 space-y-4">
-                  <div>
-                    <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{t("dashboard.virtualOffice.tareaActual")}</p>
-                    <div className="rounded-panel border border-primary/20 bg-primary/5 px-3 py-2.5 text-sm">
-                      {abierto.tarea ?? t("dashboard.virtualOffice.sinTarea")}
-                    </div>
-                  </div>
-                  <div>
-                    <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{t("dashboard.virtualOffice.hoy")}</p>
-                    <div className="grid grid-cols-3 gap-2">
-                      <div className="rounded-panel border border-border/40 bg-card/30 p-2.5 text-center">
-                        <div className="font-display text-xl font-bold tabular-nums text-success">{abierto.hechas}</div>
-                        <div className="text-[10px] text-muted-foreground">{t("dashboard.virtualOffice.hechas")}</div>
-                      </div>
-                      <div className="rounded-panel border border-border/40 bg-card/30 p-2.5 text-center">
-                        <div className="font-display text-xl font-bold tabular-nums text-destructive">{abierto.errores}</div>
-                        <div className="text-[10px] text-muted-foreground">{t("dashboard.virtualOffice.errores")}</div>
-                      </div>
-                      <div className="rounded-panel border border-border/40 bg-card/30 p-2.5 text-center">
-                        <div className="font-display text-xl font-bold tabular-nums text-primary">{abierto.exito}%</div>
-                        <div className="text-[10px] text-muted-foreground">{t("dashboard.virtualOffice.exito")}</div>
-                      </div>
-                    </div>
-                  </div>
-                  <div>
-                    <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{t("dashboard.virtualOffice.ultimasEjec")}</p>
-                    <div className="space-y-1">
-                      {Array.from({ length: 5 }, (_, i) => {
-                        const ok = !(abierto.estado === "error" && i < 2);
-                        return (
-                          <div key={i} className="flex items-center gap-2 rounded-panel border border-border/40 bg-card/20 px-2.5 py-1.5 text-xs">
-                            <span className={`h-1.5 w-1.5 rounded-full ${ok ? "bg-success" : "bg-destructive"}`} />
-                            <span className="min-w-0 flex-1 truncate">{ok ? `Tarea completada` : `Error — token expirado`}</span>
-                            <span className="shrink-0 tabular-nums text-muted-foreground">#{4820 - i}</span>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                  <Button className="w-full rounded-control" disabled title={t("dashboard.virtualOffice.demo")}>
-                    <ExternalLink className="mr-1.5 h-4 w-4" />{t("dashboard.virtualOffice.abrirPaperclip")}
-                  </Button>
-                </div>
-              </>
-            );
-          })()}
-        </DialogContent>
-      </Dialog>
-
-      <style>{`
-        @keyframes flotar { 0%,100%{ transform: translateY(0) } 50%{ transform: translateY(-4px) } }
-        @keyframes parpadea { 0%,100%{ opacity: 1 } 50%{ opacity: .45 } }
-      `}</style>
-    </div>
+    </Page>
   );
 }

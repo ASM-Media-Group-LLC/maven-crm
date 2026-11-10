@@ -6,6 +6,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useLanguage } from "@/hooks/useLanguage";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
+import { Page } from "@/components/ui/page";
 import { PageHeader } from "@/components/ui/page-header";
 import HorariosPorPersona from "./HorariosPorPersona";
 
@@ -148,7 +149,7 @@ function TurnosDelRol({ role }: { role: string }) {
   return (
     <div className="mt-3 border-t border-border/40 pt-3">
       <div className="mb-2 flex items-center justify-between gap-2">
-        <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">{t("admin.horarios.turnosDelRol")}</span>
+        <span className="text-xs font-semibold text-muted-foreground">{t("admin.horarios.turnosDelRol")}</span>
         <Button size="sm" variant="outline" className="rounded-control h-7 px-2 text-[11px]" onClick={() => setAddMode((v) => !v)}>
           <Plus className="mr-1 h-3 w-3" />{t("admin.horarios.agregarTurno")}
         </Button>
@@ -203,7 +204,7 @@ export default function HorariosPage() {
   });
 
   return (
-    <div className="flex-1 min-h-0 overflow-y-auto p-4 pb-24 md:p-6">
+    <Page>
       <PageHeader icon={<Clock className="h-5 w-5" />} title={t("admin.horarios.titulo")} subtitle={t("admin.horarios.sub")}
         actions={
           <Button asChild variant="outline" size="sm" className="rounded-control">
@@ -238,6 +239,6 @@ export default function HorariosPage() {
       ) : (
         <HorariosPorPersona />
       )}
-    </div>
+    </Page>
   );
 }

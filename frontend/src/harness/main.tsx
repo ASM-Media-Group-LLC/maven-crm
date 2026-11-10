@@ -13,6 +13,9 @@ import type { AdminUser } from "@/pages/admin/useAdminUsers";
 import BancoNas from "./bancoNas";
 import BancoLinks from "./bancoLinks";
 import BancoTableros from "./bancoTableros";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import VirtualOfficePage from "@/pages/oficina-ai/VirtualOfficePage";
+import TardanzasPage from "@/pages/admin/TardanzasPage";
 import "@/index.css";
 
 // Gente real del roster (nombre, rol y avatar_seed salidos de prod) para que los
@@ -60,8 +63,23 @@ const noop = () => {};
 const ver = new URLSearchParams(window.location.search).get("ver");
 const verNas = ver === "nas" || ver === "nas-pagina" || ver === "links";
 const verTablero = ver === "mio" || ver === "rrhh";
+// /harness.html?ver=oficina-ai | tardanzas → pantallas del contrato de diseño (sin sesión).
+const verPantalla = ver === "oficina-ai" || ver === "tardanzas";
 
 createRoot(document.getElementById("root")!).render(
+  verPantalla ? (
+    <StrictMode>
+      <LanguageProvider>
+        <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+          <MemoryRouter>
+            <div className="flex h-dvh flex-col bg-background text-foreground">
+              {ver === "oficina-ai" ? <VirtualOfficePage /> : <TardanzasPage />}
+            </div>
+          </MemoryRouter>
+        </QueryClientProvider>
+      </LanguageProvider>
+    </StrictMode>
+  ) :
   verTablero ? (
     <StrictMode>
       <LanguageProvider><BancoTableros cual={ver as "mio" | "rrhh"} /></LanguageProvider>

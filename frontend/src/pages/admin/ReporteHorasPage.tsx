@@ -5,6 +5,7 @@ import autoTable from "jspdf-autotable";
 import { supabase } from "@/integrations/supabase/client";
 import { useLanguage } from "@/hooks/useLanguage";
 import { useToast } from "@/hooks/use-toast";
+import { Page } from "@/components/ui/page";
 import { PageHeader } from "@/components/ui/page-header";
 import { Button } from "@/components/ui/button";
 
@@ -205,32 +206,34 @@ export default function ReporteHorasPage() {
   for (let a = hoy.getFullYear(); a >= hoy.getFullYear() - 2; a--) anios.push(a);
 
   return (
-    <div className="flex-1 min-h-0 overflow-y-auto p-4 pb-24 md:p-6 space-y-5">
-      <PageHeader icon={<FileText className="h-5 w-5" />} title={t("admin.reporte.titulo")} subtitle={t("admin.reporte.sub")} />
+    <Page>
+      <div className="space-y-5">
+        <PageHeader icon={<FileText className="h-5 w-5" />} title={t("admin.reporte.titulo")} subtitle={t("admin.reporte.sub")} />
 
-      <div className="vidrio p-5">
-        <div className="v-cont flex flex-col gap-4">
-          <div className="flex flex-wrap items-end gap-3">
-            <div>
-              <label className="mb-1 block text-xs font-semibold text-muted-foreground">{t("admin.reporte.mes")}</label>
-              <select value={mes} onChange={(e) => setMes(Number(e.target.value))} className="rounded-control border border-border/60 bg-card/40 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/40">
-                {MESES_ES.map((m, i) => <option key={m} value={i + 1}>{m}</option>)}
-              </select>
+        <div className="vidrio p-5">
+          <div className="v-cont flex flex-col gap-4">
+            <div className="flex flex-wrap items-end gap-3">
+              <div>
+                <label className="mb-1 block text-xs font-semibold text-muted-foreground">{t("admin.reporte.mes")}</label>
+                <select value={mes} onChange={(e) => setMes(Number(e.target.value))} className="rounded-control border border-border/60 bg-card/40 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/40">
+                  {MESES_ES.map((m, i) => <option key={m} value={i + 1}>{m}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-semibold text-muted-foreground">{t("admin.reporte.anio")}</label>
+                <select value={anio} onChange={(e) => setAnio(Number(e.target.value))} className="rounded-control border border-border/60 bg-card/40 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/40">
+                  {anios.map((a) => <option key={a} value={a}>{a}</option>)}
+                </select>
+              </div>
+              <Button size="lg" className="rounded-control gap-2" onClick={() => void generar()} disabled={cargando}>
+                {cargando ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+                {t("admin.reporte.bajar")}
+              </Button>
             </div>
-            <div>
-              <label className="mb-1 block text-xs font-semibold text-muted-foreground">{t("admin.reporte.anio")}</label>
-              <select value={anio} onChange={(e) => setAnio(Number(e.target.value))} className="rounded-control border border-border/60 bg-card/40 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/40">
-                {anios.map((a) => <option key={a} value={a}>{a}</option>)}
-              </select>
-            </div>
-            <Button size="lg" className="rounded-control gap-2" onClick={() => void generar()} disabled={cargando}>
-              {cargando ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
-              {t("admin.reporte.bajar")}
-            </Button>
+            <p className="text-[12px] text-muted-foreground">{t("admin.reporte.ayuda")}</p>
           </div>
-          <p className="text-[12px] text-muted-foreground">{t("admin.reporte.ayuda")}</p>
         </div>
       </div>
-    </div>
+    </Page>
   );
 }

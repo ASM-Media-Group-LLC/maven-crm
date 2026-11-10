@@ -407,20 +407,20 @@ function AsistenciaDia({ horario, dia, userId, nombre, t }: {
       </p>
       <div className="grid gap-2.5 sm:grid-cols-3">
         <div className="rounded-panel border border-border/40 bg-card/30 p-2.5">
-          <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{t("hr.exp.asigHorario")}</div>
+          <div className="text-xs font-semibold text-muted-foreground">{t("hr.exp.asigHorario")}</div>
           <div className="mt-1 font-display text-sm font-bold tabular-nums">
             {horario.entrada && horario.salida ? rango12(horario.entrada, horario.salida) : t("hr.exp.sinHorarioAsignado")}
           </div>
         </div>
         <div className={`rounded-panel border p-2.5 ${diasTardes ? "border-destructive/40 bg-destructive/5" : "border-border/40 bg-card/30"}`}>
-          <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{t("hr.exp.entroHora")}</div>
+          <div className="text-xs font-semibold text-muted-foreground">{t("hr.exp.entroHora")}</div>
           <div className={`mt-1 font-display text-sm font-bold tabular-nums ${diasTardes ? "text-destructive" : ""}`}>
             {a12(entradaReal) ?? "—"}
             {difEntrada != null && difEntrada > 5 && <span className="ml-1.5 text-[10px] font-semibold text-destructive">+{difEntrada}m</span>}
           </div>
         </div>
         <div className={`rounded-panel border p-2.5 ${enSalaAhora ? "border-success/40 bg-success/5" : dioSalidaTemprano ? "border-warning/40 bg-warning/5" : "border-border/40 bg-card/30"}`}>
-          <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{t("hr.exp.salioHora")}</div>
+          <div className="text-xs font-semibold text-muted-foreground">{t("hr.exp.salioHora")}</div>
           {enSalaAhora ? (
             <div className="mt-1 flex items-center gap-1.5 font-display text-sm font-bold text-success">
               <span className="h-1.5 w-1.5 rounded-full bg-success" />{t("hr.exp.enSala")}
@@ -530,7 +530,7 @@ function PruebaTardanza({ userId, fecha, nombre, entroAt, horarioEntrada, entrad
         <div className="shrink-0">
           {urlFoto ? (
             <button type="button" onClick={() => setVerGrande(true)} className="group relative block h-28 w-40 overflow-hidden rounded-xl border border-border/50">
-              <img src={urlFoto} alt="" className="h-full w-full object-cover transition group-hover:scale-105" />
+              <img src={urlFoto} alt="" className="h-full w-full object-cover transition group-hover:brightness-110" />
               <span className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 to-transparent px-2 py-1 text-left text-[10px] font-semibold text-white tabular-nums">
                 {t("hr.exp.prueba.fotoEntrada", { hora: a12(hhmm(foto?.createdAt ?? null) ?? entradaReal) ?? "—" })}
               </span>
