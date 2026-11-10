@@ -76,7 +76,7 @@ describe("el bloque del Centro", () => {
       data: {
         medido_at: new Date().toISOString(), total: 48e12, libre: 13.94e12, usado: 34.06e12, util_restante: 11.54e12,
         discos: [{ total: 24e12, libre: 6.71e12 }, { total: 24e12, libre: 7.23e12 }],
-        ritmo_semana: 59.9e9, ritmo_fuente: "drive", semanas_para_llenarse: 192.7, fecha_llena: "2030-07-21",
+        ritmo_semana: 141e9, ritmo_fuente: "anual", semanas_para_llenarse: 82.1, fecha_llena: "2028-06-07",
         que_ocupa: [{ unidad: "KASH-CONTENT-VPS", bytes: 6.63e12, archivos: 127955 }, { unidad: null, bytes: 1.44e12, archivos: 80924 }],
         alertas: [],
       },
@@ -84,7 +84,7 @@ describe("el bloque del Centro", () => {
     render(<EspacioNasBloque />, { wrapper: envolver });
     expect(await screen.findByText("34,1 TB")).toBeInTheDocument();
     expect(screen.getByText("71 %")).toBeInTheDocument();
-    expect(screen.getByText(/dashboard.centro.nas.falta.anios/)).toHaveTextContent("3,7");
+    expect(screen.getByText(/dashboard.centro.nas.falta.meses/)).toHaveTextContent("19"); // 82 semanas al ritmo del último año
     expect(screen.getByText("KASH-CONTENT-VPS")).toBeInTheDocument();
     expect(screen.getByText("dashboard.centro.nas.miUnidad")).toBeInTheDocument();
   });
