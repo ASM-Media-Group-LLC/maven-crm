@@ -1,7 +1,8 @@
 import { useQuery } from "@tanstack/react-query";
 import { formatDistanceToNowStrict } from "date-fns";
 import { es as esLocale } from "date-fns/locale";
-import { AlertTriangle, HardDrive, Loader2, RefreshCw } from "lucide-react";
+import { Link } from "react-router-dom";
+import { AlertTriangle, ArrowRight, HardDrive, Loader2, RefreshCw } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useLanguage } from "@/hooks/useLanguage";
@@ -46,8 +47,12 @@ function BarraFina({ pct, tono = "ok" }: { pct: number; tono?: TonoNas }) {
   );
 }
 
-/** El contenedor: pide el resumen (solo dueño/admin) y se lo pasa a la vista. */
-export default function EspacioNasBloque() {
+/** Dónde vive el detalle completo (EspacioNasPage). */
+export const RUTA_ESPACIO_NAS = "/oficina/espacio-nas";
+
+/** El contenedor: pide el resumen (solo dueño/admin) y se lo pasa a la vista.
+ *  En el Centro lleva el enlace a la página completa; en la página, no. */
+export default function EspacioNasBloque({ conEnlace = true }: { conEnlace?: boolean }) {
   const { user } = useAuth();
   const { esDueno } = useEsDueno();
   const { isAdmin } = useUserRole();
@@ -67,13 +72,20 @@ export default function EspacioNasBloque() {
   });
 
   if (!puede) return null;
-  return <EspacioNasVista resumen={q.data} cargando={q.isLoading} fallo={q.isError} onReintentar={() => void q.refetch()} />;
+  return (
+    <EspacioNasVista
+      resumen={q.data} cargando={q.isLoading} fallo={q.isError} onReintentar={() => void q.refetch()}
+      enlaceDetalle={conEnlace ? RUTA_ESPACIO_NAS : undefined}
+    />
+  );
 }
 
 /** La vista: solo dibuja. Separada para mirarla con datos reales en el banco
  *  visual (/harness.html?ver=nas) sin iniciar sesión. */
-export function EspacioNasVista({ resumen: r, cargando, fallo, onReintentar }: {
+export function EspacioNasVista({ resumen: r, cargando, fallo, onReintentar, enlaceDetalle }: {
   resumen: ResumenNas | undefined; cargando: boolean; fallo: boolean; onReintentar: () => void;
+  /** Si viene, el encabezado lleva «Ver detalle» hacia la página completa. */
+  enlaceDetalle?: string;
 }) {
   const { t, language } = useLanguage();
   const pct = r && !r.sin_muestras ? pctUsado(r) : 0;
@@ -90,9 +102,16 @@ export function EspacioNasVista({ resumen: r, cargando, fallo, onReintentar }: {
           <span className="flex h-7 w-7 items-center justify-center rounded-panel bg-primary/10 text-primary"><HardDrive className="h-4 w-4" /></span>
           {t("dashboard.centro.nas.titulo")}
         </h2>
-        <span className="text-[11px] text-muted-foreground">
-          {r && !r.sin_muestras ? t("dashboard.centro.nas.medido", { hace: hace(r.medido_at, language) }) : t("dashboard.centro.nas.soloAdmins")}
-        </span>
+        <div className="flex items-center gap-3">
+          <span className="text-[11px] text-muted-foreground">
+            {r && !r.sin_muestras ? t("dashboard.centro.nas.medido", { hace: hace(r.medido_at, language) }) : t("dashboard.centro.nas.soloAdmins")}
+          </span>
+          {enlaceDetalle && (
+            <Link to={enlaceDetalle} className="inline-flex items-center gap-1 rounded-control border border-border px-2.5 py-1 text-xs font-medium hover:bg-muted">
+              {t("dashboard.centro.nas.verDetalle")}<ArrowRight className="h-3.5 w-3.5" />
+            </Link>
+          )}
+        </div>
       </div>
 
       {cargando ? (

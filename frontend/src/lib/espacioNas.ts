@@ -61,3 +61,54 @@ export function partesDeLoUsado(r: Pick<ResumenNas, "que_ocupa" | "usado">) {
   const usado = Math.max(1, r.usado);
   return r.que_ocupa.map((u) => ({ ...u, pct: (u.bytes / usado) * 100 }));
 }
+
+// ── Página completa (nas_historia / nas_entro_semana / nas_por_modelo / nas_que_liberar) ──
+
+export interface HistoriaNas {
+  /** TB acumulados por mes según la fecha de cada archivo (últimos 24 meses). */
+  meses: { mes: string; bytes: number; total: number }[];
+  /** Mediciones reales del disco (una por día). */
+  muestras: { dia: string; usado: number; total: number }[];
+}
+
+export interface EntroSemana {
+  total: { bytes: number; archivos: number };
+  por_dia: { dia: string; bytes: number; archivos: number }[];
+  /** Lo que subió el equipo (sin lo que llegó por los links de las modelos). */
+  por_persona: { nombre: string | null; bytes: number; archivos: number }[];
+  /** Lo que mandaron las modelos por su link. */
+  por_modelo: { nombre: string; padre: string | null; carpeta_id: string; bytes: number; archivos: number; pidio: string | null }[];
+}
+
+export interface PorModelo {
+  modelos: { nombre: string; carpetas: number; bytes: number; archivos: number }[];
+  cuantas: number;
+  /** Lo que está en carpetas con el nombre de una modelo. */
+  atribuido: number;
+  usado: number;
+}
+
+export interface QueLiberar {
+  copias: { grupos: number; copias_de_mas: number; bytes: number };
+  top: { nombre: string; size: number; copias: number; recupera: number; unidades: string[] }[];
+  papelera: { bytes: number; archivos: number };
+}
+
+/** «ene 25» / «Jan 25» para el eje de la gráfica. */
+export function mesCorto(mes: string, idioma: string): string {
+  const [a, m] = mes.split("-").map(Number);
+  if (!a || !m) return mes;
+  const nombre = new Date(Date.UTC(a, m - 1, 15)).toLocaleDateString(idioma === "es" ? "es-CO" : "en-US", { month: "short", timeZone: "UTC" });
+  return `${nombre.replace(".", "")} ${String(a).slice(2)}`;
+}
+
+/** Los puntos de la gráfica en TB (lo acumulado y lo que entró ese mes). */
+export function puntosDeHistoria(h: Pick<HistoriaNas, "meses">, idioma: string) {
+  return h.meses.map((m) => ({ mes: mesCorto(m.mes, idioma), tb: m.total / 1e12, entro: m.bytes / 1e12 }));
+}
+
+/** Nombre de la carpeta de la modelo con la de arriba cuando la del link es genérica
+ *  («YOISNIA › SCRIPT»): sin eso «SCRIPT» no dice de quién es. */
+export function nombreConPadre(nombre: string, padre: string | null | undefined): string {
+  return padre && !/^contenido\b/i.test(padre) ? `${padre} › ${nombre}` : nombre;
+}
