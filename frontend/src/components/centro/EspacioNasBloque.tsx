@@ -7,7 +7,6 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useLanguage } from "@/hooks/useLanguage";
 import { useEsDueno } from "@/hooks/useEsDueno";
-import { useUserRole } from "@/hooks/useUserRole";
 import {
   ALERTA_PCT, LLENO_PCT, cuantoFalta, partesDeLoUsado, pctUsado, tamanoNas, tonoDelNas,
   type ResumenNas, type TonoNas,
@@ -50,15 +49,13 @@ function BarraFina({ pct, tono = "ok" }: { pct: number; tono?: TonoNas }) {
 /** Dónde vive el detalle completo (EspacioNasPage). */
 export const RUTA_ESPACIO_NAS = "/oficina/espacio-nas";
 
-/** El contenedor: pide el resumen (solo dueño/admin) y se lo pasa a la vista.
- *  En el Centro lleva el enlace a la página completa; en la página, no. */
-/** El resumen del NAS (solo dueño/admin). Lo comparten el bloque de la página,
+/** El resumen del NAS (solo el dueño). Lo comparten el bloque de la página,
  *  la línea del Centro y la ficha: una sola lectura en caché. */
 export function useResumenNas() {
   const { user } = useAuth();
   const { esDueno } = useEsDueno();
-  const { isAdmin } = useUserRole();
-  const puede = esDueno === true || isAdmin;
+  // Solo el dueño (Alvaro, 10/11: «Salud y NAS solo tú»).
+  const puede = esDueno === true;
   const q = useQuery<ResumenNas>({
     queryKey: ["centro-espacio-nas"],
     enabled: !!user && puede,

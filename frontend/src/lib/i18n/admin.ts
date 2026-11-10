@@ -829,6 +829,7 @@ export const admin = {
   "admin.salud.mal": { es: "Problema", en: "Problem" },
   "admin.salud.ultCorrida": { es: "Última corrida: {t}", en: "Last run: {t}" },
   "admin.salud.ultCorreo": { es: "Último correo real: {t}", en: "Last real email: {t}" },
+  "admin.salud.sinCorreoHoy": { es: "Aún no se ha enviado ningún correo real hoy. Pruébalo aquí.", en: "No real email has been sent today yet. Try it here." },
   "admin.salud.juzgadasHoy": { es: "{n} pantallazos juzgados hoy", en: "{n} snapshots judged today" },
   "admin.salud.tardanzasHoy": { es: "{n} tardanzas hoy ({ok} con correo)", en: "{n} lateness today ({ok} with email)" },
   "admin.salud.probar": { es: "Probar ahora", en: "Test now" },

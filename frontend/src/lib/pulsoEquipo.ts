@@ -17,6 +17,23 @@ export function puedeVerPulso(nivel: string | null | undefined): boolean {
   return (RANK_NIVEL[nivel ?? ""] ?? 0) >= RANK_NIVEL.supervisor;
 }
 
+/** A QUIÉN ve cada uno en el Pulso (Alvaro, 10/11/2026 — «quién mira qué»):
+ *  · "jerarquia": dueño, admin y manager ven a todos los de rango inferior.
+ *  · "rrhh": RR. HH. ve a todo el personal menos admins y dueño (la RLS de
+ *    Argos ya lo permitía: es_rh y el objetivo no es admin/dueño).
+ *  · "equipo": el supervisor ve SOLO a los agentes de su equipo (lo decide la
+ *    base con mi_equipo_supervisado(); la pantalla no adivina el equipo).
+ *  · null: no ve el Pulso. */
+export type AlcancePulso = "jerarquia" | "rrhh" | "equipo";
+export function alcanceDelPulso(nivel: string | null | undefined, esRh: boolean): AlcancePulso | null {
+  const r = RANK_NIVEL[nivel ?? ""] ?? 0;
+  if (r >= RANK_NIVEL.admin) return "jerarquia";
+  if (esRh) return "rrhh";
+  if (r >= RANK_NIVEL.manager) return "jerarquia";
+  if (r === RANK_NIVEL.supervisor) return "equipo";
+  return null;
+}
+
 /** Los niveles que un viewer puede ver (todos los de rango estrictamente menor). */
 export function nivelesVisibles(nivel: string | null | undefined): string[] {
   const r = RANK_NIVEL[nivel ?? ""] ?? 0;

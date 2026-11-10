@@ -60,6 +60,8 @@ export interface NavCatalogEntry {
   submodule?: string;
   /** Rutas envueltas en AdminRoute (solo admins). */
   adminOnly?: boolean;
+  /** Solo el dueño de la empresa (tenant_owners), ni siquiera los admins. */
+  soloDueno?: boolean;
   /** Sección para agrupar en el ⌘K (espeja las secciones del sidebar). */
   section: NavSection;
   /** Sinónimos / términos extra de búsqueda. */
@@ -79,8 +81,8 @@ export const NAV_CATALOG: NavCatalogEntry[] = [
   { title: "Hojas de cálculo", i18nKey: "nav.office.sheets", url: "/oficina/hojas", icon: FileSpreadsheet, module: "Oficina", submodule: "Hojas de cálculo", section: "Oficina", keywords: ["hojas", "excel", "sheets", "calculo", "planilla", "oficina"] },
   { title: "Presentaciones", i18nKey: "nav.office.slides", url: "/oficina/presentaciones", icon: Presentation, module: "Oficina", submodule: "Presentaciones", section: "Oficina", keywords: ["presentaciones", "powerpoint", "slides", "diapositivas", "oficina"] },
   { title: "Drive", i18nKey: "nav.office.drive", url: "/oficina/drive", icon: HardDrive, module: "Oficina", submodule: "Drive", section: "Oficina", keywords: ["drive", "archivos", "carpetas", "nas", "google drive", "subir", "oficina"] },
-  // Espacio del NAS: solo dueño/admin (sin módulo: no es un permiso por rol).
-  { title: "Espacio del NAS", i18nKey: "nav.office.nas", url: "/oficina/espacio-nas", icon: Gauge, adminOnly: true, section: "Oficina", keywords: ["nas", "espacio", "discos", "almacenamiento", "lleno", "terabytes", "tb", "storage", "oficina"] },
+  // Espacio del NAS: solo el dueño (sin módulo: no es un permiso por rol).
+  { title: "Espacio del NAS", i18nKey: "nav.office.nas", url: "/oficina/espacio-nas", icon: Gauge, soloDueno: true, section: "Oficina", keywords: ["nas", "espacio", "discos", "almacenamiento", "lleno", "terabytes", "tb", "storage", "oficina"] },
   { title: "Contactos", i18nKey: "nav.contacts", url: "/contactos", icon: UserPlus, module: "Contactos", section: "Menú", keywords: ["directorio"] },
   { title: "Panel de control", i18nKey: "nav.controlPanel", url: "/panel-de-control", icon: Gauge, module: "Panel de control", section: "Menú", keywords: ["control", "kpis"] },
 
@@ -199,8 +201,10 @@ export function filterNavCatalog(
   canAccess: (module: string, submodule?: string) => boolean,
   isAdmin: boolean,
   entries: NavCatalogEntry[] = NAV_CATALOG,
+  esDueno = false,
 ): NavCatalogEntry[] {
   return entries.filter((e) => {
+    if (e.soloDueno && !esDueno) return false;
     if (e.adminOnly && !isAdmin) return false;
     if (e.module && !canAccess(e.module, e.submodule)) return false;
     return true;

@@ -50,8 +50,10 @@ const RANK: Record<EstadoVivo, number> = {
   pausa: 2, presente: 3, ausente: 4, trabajando: 5,
 };
 
-export function useRondinVivo() {
+/** `habilitado = false` no consulta nada (para quien no ve el Pulso). */
+export function useRondinVivo(habilitado = true) {
   const q = useQuery({
+    enabled: habilitado,
     queryKey: ["rondin-vivo"],
     staleTime: 10_000,
     refetchInterval: 15_000, // el rondín en vivo se refresca solo cada 15 s

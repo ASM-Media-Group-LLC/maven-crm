@@ -4,6 +4,7 @@ import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useEsDueno } from "@/hooks/useEsDueno";
+import { useLanguage } from "@/hooks/useLanguage";
 
 // Banner rojo en el home que pinta los incidentes abiertos de salud_incidentes
 // (Alvaro, 08/11 noche). Solo lo ve el dueño; se puede cerrar (local), pero si
@@ -22,6 +23,7 @@ const LABEL: Record<string, string> = {
 };
 
 export default function BannerSaludIncidentes() {
+  const { t } = useLanguage();
   const { user } = useAuth();
   const { esDueno } = useEsDueno();
   const [cerradoLocal, setCerradoLocal] = useState<Set<string>>(new Set());
@@ -57,7 +59,7 @@ export default function BannerSaludIncidentes() {
           <button type="button"
             onClick={() => setCerradoLocal((s) => new Set([...s, inc.id]))}
             className="rounded-full p-1 text-destructive/70 transition hover:bg-destructive/20"
-            aria-label="Cerrar">
+            aria-label={t("common.close")}>
             <X className="h-4 w-4" />
           </button>
         </div>

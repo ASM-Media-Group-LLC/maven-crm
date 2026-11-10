@@ -133,7 +133,7 @@ export default function SaludPage() {
         titulo={t("admin.salud.correo")}
         estadoOk={s.tardanzas_hoy?.ultimo_correo ? true : null}
         loading={q.isLoading}
-        detalle={s.tardanzas_hoy?.ultimo_correo ? t("admin.salud.ultCorreo", { t: hace(s.tardanzas_hoy.ultimo_correo, language) ?? "—" }) : "Aún no se ha enviado ningún correo real hoy. Probá acá."}
+        detalle={s.tardanzas_hoy?.ultimo_correo ? t("admin.salud.ultCorreo", { t: hace(s.tardanzas_hoy.ultimo_correo, language) ?? "—" }) : t("admin.salud.sinCorreoHoy")}
         accion={<Button size="sm" className="rounded-control" onClick={() => void probarCorreo()} disabled={probando}>
           {probando ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Send className="mr-1.5 h-4 w-4" />}{t("admin.salud.probar")}
         </Button>}

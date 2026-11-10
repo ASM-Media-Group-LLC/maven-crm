@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { CheckCircle2, AlertCircle, CloudOff, Loader2, X, RefreshCw } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
+import { useLanguage } from "@/hooks/useLanguage";
 
 // Checklist EN VIVO al tocar una caja de Salud (Alvaro, 09/11). Corre el edge
 // salud-diagnostico que hace pruebas reales y las devuelve una por una, para
@@ -18,6 +19,7 @@ const TITULOS: Record<string, string> = {
 };
 
 export function SaludDiagnosticoModal({ tipo, abierto, onCerrar }: { tipo: string | null; abierto: boolean; onCerrar: () => void; }) {
+  const { t } = useLanguage();
   const [pruebas, setPruebas] = useState<Prueba[]>([]);
   const [cargando, setCargando] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -52,14 +54,14 @@ export function SaludDiagnosticoModal({ tipo, abierto, onCerrar }: { tipo: strin
       <div className="w-full max-w-lg rounded-2xl border border-border/40 bg-card p-5 shadow-2xl" onClick={(e) => e.stopPropagation()}>
         <div className="mb-3 flex items-center justify-between gap-3">
           <h3 className="font-display text-base font-semibold">{titulo}</h3>
-          <button type="button" onClick={onCerrar} className="rounded-full p-1 text-muted-foreground hover:bg-foreground/5 hover:text-foreground" aria-label="Cerrar">
+          <button type="button" onClick={onCerrar} className="rounded-full p-1 text-muted-foreground hover:bg-foreground/5 hover:text-foreground" aria-label={t("common.close")}>
             <X className="h-4 w-4" />
           </button>
         </div>
 
         {cargando ? (
           <div className="flex items-center justify-center gap-2 py-8 text-sm text-muted-foreground">
-            <Loader2 className="h-5 w-5 animate-spin" /> Corriendo pruebas en vivo…
+            <Loader2 className="h-5 w-5 animate-spin" /> {t("dashboard.centro.salud.corriendoPruebas")}
           </div>
         ) : error ? (
           <div className="rounded-xl border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive">

@@ -28,6 +28,7 @@ import {
   CommandGroup, CommandItem,
 } from "@/components/ui/command";
 import { NAV_CATALOG, NAV_SECTIONS, NAV_SECTION_KEYS, filterNavCatalog } from "@/lib/navCatalog";
+import { useEsDueno } from "@/hooks/useEsDueno";
 
 const GlobalSearchCommand = ({ open, onOpenChange }: { open: boolean; onOpenChange: (v: boolean) => void }) => {
   const navigate = useNavigate();
@@ -35,6 +36,7 @@ const GlobalSearchCommand = ({ open, onOpenChange }: { open: boolean; onOpenChan
   const { t } = useLanguage();
   const { canAccess } = usePermissions();
   const { isAdmin } = useUserRole();
+  const { esDueno } = useEsDueno();
   const [query, setQuery] = useState("");
 
   useEffect(() => {
@@ -67,11 +69,11 @@ const GlobalSearchCommand = ({ open, onOpenChange }: { open: boolean; onOpenChan
   // Catálogo completo filtrado por rol, agrupado por sección (mismo orden que
   // el sidebar). Recalcula solo cuando cambian permisos.
   const pageSections = useMemo(() => {
-    const visible = filterNavCatalog(canAccess, isAdmin, NAV_CATALOG);
+    const visible = filterNavCatalog(canAccess, isAdmin, NAV_CATALOG, esDueno === true);
     return NAV_SECTIONS
       .map((section) => ({ section, items: visible.filter((e) => e.section === section) }))
       .filter((s) => s.items.length > 0);
-  }, [canAccess, isAdmin]);
+  }, [canAccess, isAdmin, esDueno]);
 
   const go = (url: string) => {
     onOpenChange(false);

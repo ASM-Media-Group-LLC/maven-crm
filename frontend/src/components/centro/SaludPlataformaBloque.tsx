@@ -9,7 +9,6 @@ import { useAuth } from "@/hooks/useAuth";
 import { useLanguage } from "@/hooks/useLanguage";
 import { useEsDueno } from "@/hooks/useEsDueno";
 import { useOnlinePresence } from "@/hooks/useOnlinePresence";
-import { useUserRole } from "@/hooks/useUserRole";
 import { UserAvatar } from "@/components/UserAvatar";
 
 // Salud de la plataforma — "todo trabaja bien" para el dueño (Alvaro, 08/11 noche).
@@ -97,7 +96,6 @@ export default function SaludPlataformaBloque() {
   const { t, language } = useLanguage();
   const { user } = useAuth();
   const { esDueno } = useEsDueno();
-  const { isAdmin } = useUserRole();
   const { onlineUsers } = useOnlinePresence();
   const verDetalleTecnico = esDueno === true; // solo Alvaro
 
@@ -107,7 +105,7 @@ export default function SaludPlataformaBloque() {
     queryKey: ["centro-salud"],
     staleTime: 30_000,
     refetchInterval: 60_000,
-    enabled: !!user && (esDueno === true || isAdmin),
+    enabled: !!user && esDueno === true,
     queryFn: async () => {
       const { data, error } = await sinTipar.rpc("salud_sistema", {});
       if (error) return null;
@@ -121,7 +119,7 @@ export default function SaludPlataformaBloque() {
     queryKey: ["centro-salud-nas-ping"],
     staleTime: 20_000,
     refetchInterval: 45_000,
-    enabled: !!user && (esDueno === true || isAdmin),
+    enabled: !!user && esDueno === true,
     queryFn: async () => {
       const { data, error } = await supabase.functions.invoke("salud-nas-ping", { body: {} });
       if (error) return { arriba: false, motivo: error.message };
@@ -155,7 +153,7 @@ export default function SaludPlataformaBloque() {
     queryKey: ["centro-salud-entradas", onlineUsers.size], // reevaluar al cambiar presencia
     staleTime: 60_000,
     refetchInterval: 120_000,
-    enabled: !!user && (esDueno === true || isAdmin),
+    enabled: !!user && esDueno === true,
     queryFn: async () => {
       const inicio = `${new Intl.DateTimeFormat("en-CA", { timeZone: "America/Bogota" }).format(new Date())}T00:00:00-05:00`;
       const { data, error } = await sinTipar.from("monitor_rondas").select("user_id", { count: "exact", head: false }).gte("last_at", inicio);
@@ -170,7 +168,7 @@ export default function SaludPlataformaBloque() {
     queryKey: ["centro-salud-desconectados", onlineUsers.size],
     staleTime: 30_000,
     refetchInterval: 60_000,
-    enabled: !!user && (esDueno === true || isAdmin),
+    enabled: !!user && esDueno === true,
     queryFn: async () => {
       const hace2h = new Date(Date.now() - 2 * 60 * 60_000).toISOString();
       const { data } = await sinTipar.from("monitor_rondas")
@@ -250,7 +248,9 @@ export default function SaludPlataformaBloque() {
 
   // Si no es dueño y tampoco admin, no mostrar nada (home ya filtra por nivel,
   // pero igual blindamos).
-  if (esDueno !== true && !isAdmin) return null;
+  // Solo el dueño (Alvaro, 10/11: «Salud y NAS solo tú»). Los admins conservan
+  // el resto del Centro, pero no el estado técnico de la plataforma.
+  if (esDueno !== true) return null;
 
   return (
     <section className="vidrio sube p-4" style={{ animationDelay: "0.1s" }}>

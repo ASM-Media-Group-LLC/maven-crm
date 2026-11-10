@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import {
   AlertTriangle, ArrowRight, CalendarClock, Clock, DollarSign, Gauge,
   Megaphone, MousePointerClick, Sparkles, Users, Timer } from "lucide-react";
-import DashboardContent from "@/components/dashboard/DashboardContent";
+import MiTablero from "@/pages/dashboard/MiTablero";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { UserAvatar } from "@/components/UserAvatar";
@@ -229,11 +229,11 @@ export default function ManagerDashboard({ forzado = false }: {
 
   const cargando = notasCargando || creadorasCargando;
 
-  // Un manager sin roster ni notas no tiene nada que mirar acá: 3 de los 5
-  // roles `manager` están así. Antes de mostrarle una pantalla vacía, le
-  // dejamos el tablero general.
+  // Un manager sin roster ni notas no tiene nada que mirar aquí. Antes de
+  // mostrarle una pantalla vacía, le dejamos «lo suyo» (horas, avisos, accesos):
+  // el tablero general con números del negocio ya no se muestra (Alvaro, 10/11).
   if (!forzado && !cargando && creadoras.length === 0 && notas.length === 0) {
-    return <DashboardContent />;
+    return <MiTablero />;
   }
 
   return (
