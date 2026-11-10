@@ -100,6 +100,13 @@ jobs:
         if: steps.cambios.outputs.correr == 'true'
         run: deno test --no-check supabase/functions/mail-fetch/reacciones.test.ts supabase/functions/_shared/smtp.test.ts
 
+      # Contenido de las modelos por link + medidor del NAS (Alvaro, 10/11): UN
+      # aviso por tanda (no 480), el chatter sabe a quién pedirle el material, y
+      # el aviso de lleno sale una sola vez por nivel (80 y 90 %).
+      - name: Guard — avisos de aportes y espacio del NAS
+        if: steps.cambios.outputs.correr == 'true'
+        run: deno test --allow-read supabase/functions/_shared/aporte-y-espacio.test.ts
+
       - name: Tipos — mail-fetch
         if: steps.cambios.outputs.correr == 'true'
         run: deno check supabase/functions/mail-fetch/index.ts supabase/functions/mail-fetch/programados.test.ts supabase/functions/mail-fetch/reacciones.test.ts

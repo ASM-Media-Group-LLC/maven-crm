@@ -68,6 +68,17 @@ function tocaAlgo(sql: string): boolean {
 // Migraciones que tocan objetos de este banco pero necesitan tablas que sus fixtures no traen.
 // Se prueban en su propio banco, con el motivo al lado.
 const NO_CARGAN_AQUI: Record<string, string> = {
+  "20261105170000_exonerar_camara_pantalla.sql":
+    "Argos: le suma exonera_camara_pantalla a profiles y a roles_config (excepción de cámara/pantalla por " +
+    "persona y por rol). Entra a esta cadena solo por el alter de profiles, pero necesita roles_config, que " +
+    "este fixture no trae; no toca nada del Messenger. Desde el 09/11 tumbaba este banco en todo PR con migración.",
+  "20261106000000_turnos_por_rol.sql":
+    "Argos: turnos por rol (rol_turnos) y el turno de cada persona (profiles.turno_id). Entra a esta cadena " +
+    "solo por el alter de profiles, pero lee roles_config, que este fixture no trae; no toca nada del Messenger.",
+  "20261105190000_horarios_por_rol.sql":
+    "Argos: horario y cupo de baño/comida por rol y por persona (columnas en roles_config y profiles). Entra " +
+    "a esta cadena solo por el alter de profiles, pero necesita roles_config, que este fixture no trae; no " +
+    "toca nada del Messenger.",
   "20261030120000_monitor_camara_ia.sql":
     "el monitor de cámara de Cowork; solo toca el Messenger porque su trigger inserta avisos en notifications, pero " +
     "crea sus propias tablas y el bucket de storage, y no aporta nada al Messenger. Se prueba en frontend/test/monitor.",
