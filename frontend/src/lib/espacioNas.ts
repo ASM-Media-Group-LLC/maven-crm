@@ -14,8 +14,9 @@ export interface ResumenNas {
   discos: { total: number; libre: number }[];
   /** Bytes por semana. */
   ritmo_semana: number | null;
-  /** «disco» = medido con muestras reales (≥ 7 días); «drive» = lo que entró al Drive en 28 días. */
-  ritmo_fuente: "disco" | "drive";
+  /** El más alto de los dos (conservador): «anual» = promedio del último año en el
+   *  Drive; «disco» = medido en el disco con ≥ 30 días de muestras. */
+  ritmo_fuente: "disco" | "anual";
   semanas_para_llenarse: number | null;
   fecha_llena: string | null;
   /** null en unidad = «Mi unidad» de cada persona. */
