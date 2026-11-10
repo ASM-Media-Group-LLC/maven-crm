@@ -1097,7 +1097,14 @@ export default function DrivePage() {
  *  archivo. */
 function PanelDeSubidas({ subidas, onCerrar }: { subidas: ReturnType<typeof useSubidasDrive>["subidas"]; onCerrar: () => void }) {
   const { t } = useLanguage();
-  const pendientes = subidas.filter((s) => s.estado === "subiendo").length;
+  // «Activa» = todavía en marcha, aunque esté reintentando o esperando el
+  // internet: no se cierra el panel ni se da por terminada mientras tanto.
+  const activa = (e: string) => e === "subiendo" || e === "reintentando" || e === "sin_internet";
+  const pendientes = subidas.filter((s) => activa(s.estado)).length;
+  const textoFallo = (c?: string) =>
+    c === "sin_red" ? t("drive.subida.falloRed")
+    : c === "nas_rechazo" ? t("drive.subida.falloNas")
+    : c || t("drive.subida.error");
   return (
     // Dónde va (abajo a la derecha, sin tapar los botones flotantes) lo decide
     // la página, junto con el de las descargas.
@@ -1115,14 +1122,16 @@ function PanelDeSubidas({ subidas, onCerrar }: { subidas: ReturnType<typeof useS
             <li key={s.clave} className="flex items-center gap-3 border-b border-border/40 px-4 py-2 last:border-b-0">
               <div className="min-w-0 flex-1">
                 <p className="truncate text-sm">{s.nombre}</p>
-                {s.estado === "subiendo" && (
+                {activa(s.estado) && (
                   <div className="mt-1 h-1 overflow-hidden rounded-full bg-muted">
                     <div className="h-full rounded-full bg-primary transition-[width]" style={{ width: `${pct}%` }} />
                   </div>
                 )}
-                {s.estado === "error" && <p className="truncate text-xs text-destructive">{t("drive.subida.error")}: {s.error}</p>}
+                {s.estado === "reintentando" && <p className="truncate text-xs text-muted-foreground">{t("drive.subida.reintentando")}</p>}
+                {s.estado === "sin_internet" && <p className="truncate text-xs text-muted-foreground">{t("drive.subida.sinInternet")}</p>}
+                {s.estado === "error" && <p className="truncate text-xs text-destructive">{textoFallo(s.error)}</p>}
               </div>
-              {s.estado === "subiendo" && <Loader2 className="h-4 w-4 shrink-0 animate-spin text-muted-foreground" />}
+              {activa(s.estado) && <Loader2 className="h-4 w-4 shrink-0 animate-spin text-muted-foreground" />}
               {s.estado === "lista" && <Check className="h-4 w-4 shrink-0 text-success" aria-label={t("drive.subida.lista")} />}
               {s.estado === "error" && <AlertTriangle className="h-4 w-4 shrink-0 text-destructive" />}
             </li>

@@ -77,14 +77,41 @@ describe("la subida, del navegador al NAS", () => {
     expect(invocaciones[invocaciones.length - 1]).toMatchObject({ action: "subir_confirmar", body: { id: "f2" } });
   });
 
-  it("⚠️ si el NAS no contesta, la subida queda en error y NO se confirma", async () => {
-    plan = { id: "f3", url: "https://nas/o?t=caido" };
-    class XhrCaido extends XhrFalso { send() { setTimeout(() => this.onerror?.(), 0); } }
-    vi.stubGlobal("XMLHttpRequest", XhrCaido);
+  it("⚠️ si el NAS RECHAZA el archivo (4xx), queda en error y NO se confirma ni reintenta", async () => {
+    plan = { id: "f3", url: "https://nas/o?t=rechazo" };
+    class XhrRechaza extends XhrFalso {
+      send() { setTimeout(() => { this.status = 413; this.responseText = JSON.stringify({ error: "muy grande" }); this.onload?.(); }, 0); }
+    }
+    vi.stubGlobal("XMLHttpRequest", XhrRechaza);
     const { result } = renderHook(() => useSubidasDrive(), { wrapper: envolver });
     await act(async () => { await result.current.subir([new File(["x"], "a.txt")], null); });
     expect(invocaciones.map((i) => i.action)).toEqual(["subir_iniciar"]);
-    expect(result.current.subidas[0]).toMatchObject({ estado: "error", error: "No se pudo llegar al NAS" });
+    expect(result.current.subidas[0]).toMatchObject({ estado: "error", error: "nas_rechazo" });
+    vi.stubGlobal("XMLHttpRequest", XhrFalso);
+  });
+
+  it("✅ si un envío se CORTA y luego vuelve, REINTENTA solo y la subida termina bien", async () => {
+    vi.useFakeTimers();
+    plan = { id: "f3", url: "https://nas/o?t=entero" };
+    let intentos = 0;
+    class XhrInestable extends XhrFalso {
+      send(cuerpo: Blob | null) {
+        intentos += 1;
+        if (intentos === 1) { setTimeout(() => this.onerror?.(), 0); return; } // el primer envío se corta
+        super.send(cuerpo); // al reintentar, pasa
+      }
+    }
+    vi.stubGlobal("XMLHttpRequest", XhrInestable);
+    const { result } = renderHook(() => useSubidasDrive(), { wrapper: envolver });
+    await act(async () => {
+      const p = result.current.subir([new File([new Uint8Array(10)], "a.txt")], null);
+      await vi.runAllTimersAsync(); // salta la espera del reintento
+      await p;
+    });
+    expect(intentos).toBe(2); // se cortó una vez, reintentó y la segunda pasó
+    expect(invocaciones.map((i) => i.action)).toEqual(["subir_iniciar", "subir_confirmar"]);
+    expect(result.current.subidas[0].estado).toBe("lista");
+    vi.useRealTimers();
     vi.stubGlobal("XMLHttpRequest", XhrFalso);
   });
 });
