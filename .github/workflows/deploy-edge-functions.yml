@@ -147,12 +147,13 @@ jobs:
           #   public-api/        → messenger-webhooks (el feed como la persona) y
           #                        manage-api-keys (vía _shared/webhook-salida.ts)
           #   parrilla-generate/ → parrilla-weekly
-          #   drive/             → portal-contenido (las miniaturas: drive/logica.ts)
+          #   drive/             → portal-contenido (las miniaturas: drive/logica.ts) y
+          #                        drive-aporte (la carpeta de la creadora: miniaturas, abrir, .zip)
           # (here-string y no `echo | grep -q`: con pipefail, un SIGPIPE del echo haría
           # que el if diera falso y la regla no se aplicara)
           if grep -q '^supabase/functions/public-api/' <<< "$CHANGED"; then FUNCS="$FUNCS messenger-webhooks manage-api-keys"; fi
           if grep -q '^supabase/functions/parrilla-generate/' <<< "$CHANGED"; then FUNCS="$FUNCS parrilla-weekly"; fi
-          if grep -q '^supabase/functions/drive/' <<< "$CHANGED"; then FUNCS="$FUNCS portal-contenido"; fi
+          if grep -q '^supabase/functions/drive/' <<< "$CHANGED"; then FUNCS="$FUNCS portal-contenido drive-aporte"; fi
           FUNCS="$(echo $FUNCS | tr ' ' '\n' | sort -u | { grep -v '^$' || true; } | tr '\n' ' ')"
           echo "Funciones cambiadas: [$FUNCS]"
           echo "deploy_all=false" >> "$GITHUB_OUTPUT"

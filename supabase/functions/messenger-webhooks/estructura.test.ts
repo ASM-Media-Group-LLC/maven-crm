@@ -180,11 +180,11 @@ Deno.test("imports cruzados: la tabla fija, y el deploy tiene la regla de cada u
   for (const d of Deno.readDirSync(new URL("supabase/functions/", RAIZ))) {
     if (d.isDirectory) recorrer(new URL(`supabase/functions/${d.name}/`, RAIZ), d.name);
   }
-  assertEquals([...pares].sort(), ["_shared → public-api", "messenger-webhooks → public-api", "parrilla-weekly → parrilla-generate", "portal-contenido → drive"].sort());
+  assertEquals([...pares].sort(), ["_shared → public-api", "messenger-webhooks → public-api", "parrilla-weekly → parrilla-generate", "portal-contenido → drive", "drive-aporte → drive"].sort());
   const yml = Deno.readTextFileSync(new URL(".github/workflows/deploy-edge-functions.yml", RAIZ));
   assert(/grep -q '\^supabase\/functions\/public-api\/' <<< "\$CHANGED"; then FUNCS="\$FUNCS messenger-webhooks manage-api-keys"/.test(yml), "public-api → messenger-webhooks y manage-api-keys (que la lleva por _shared/webhook-salida.ts)");
   assert(/grep -q '\^supabase\/functions\/parrilla-generate\/' <<< "\$CHANGED"; then FUNCS="\$FUNCS parrilla-weekly"/.test(yml));
-  assert(/grep -q '\^supabase\/functions\/drive\/' <<< "\$CHANGED"; then FUNCS="\$FUNCS portal-contenido"/.test(yml), "drive → portal-contenido (las miniaturas)");
+  assert(/grep -q '\^supabase\/functions\/drive\/' <<< "\$CHANGED"; then FUNCS="\$FUNCS portal-contenido drive-aporte"/.test(yml), "drive → portal-contenido y drive-aporte (miniaturas, abrir, .zip)");
 });
 
 /** Todo lo que alcanza un archivo por imports relativos (transitivo). */
@@ -222,7 +222,7 @@ Deno.test("imports cruzados TRANSITIVOS (también por _shared): quién lleva pub
   }
   assertEquals(llevan["public-api"].sort(), ["manage-api-keys", "messenger-webhooks"], "las que el deploy redespliega cuando cambia public-api/");
   assertEquals(llevan["parrilla-generate"].sort(), ["parrilla-weekly"]);
-  assertEquals(llevan["drive"].sort(), ["portal-contenido"], "las que el deploy redespliega cuando cambia drive/");
+  assertEquals(llevan["drive"].sort(), ["drive-aporte", "portal-contenido"], "las que el deploy redespliega cuando cambia drive/");
 });
 
 Deno.test("el guard corre los tests del despachador y el banco PGlite", () => {
