@@ -141,16 +141,36 @@ export interface PorTipoNas {
 }
 
 export interface MasPesadosNas {
-  archivos: { id: string; nombre: string; size: number; carpeta_id: string | null; carpeta: string | null; unidad: string | null; dueno: string | null; creado: string; tipo: TipoNas }[];
+  archivos: { id: string; nombre: string; size: number; carpeta_id: string | null; carpeta: string | null; unidad: string | null; dueno: string | null; creado: string; tipo: TipoNas;
+    /** Dentro de una carpeta tirada: sigue ocupando disco, pero no se ve en el Drive. */
+    en_papelera?: boolean }[];
 }
 
 export interface FichaNas {
   archivos: number; carpetas: number; unidades: number; personas: number; links_modelos: number;
   desde: string | null;
+  /** Aportes de modelos que todavía no pasaron al NAS. */
+  aportes_esperando?: number;
   nas: { caido: boolean; desde: string | null; actualizado: string } | null;
 }
 
 /** Qué parte del nivel ocupa cada carpeta (para su barrita). */
 export function pctDelNivel(bytes: number, total: number): number {
   return total > 0 ? (bytes / total) * 100 : 0;
+}
+
+/** Lo que encuentra el buscador del explorador (nas_buscar). */
+export interface BuscarNas {
+  carpetas: { id: string; nombre: string; padre: string | null; bytes: number; archivos: number }[];
+  archivos: { id: string; nombre: string; size: number | null; carpeta_id: string | null; carpeta: string | null }[];
+}
+
+/** ¿Todo corriendo bien? Cada chequeo del Resumen: ok, revisar o mal. */
+export type EstadoChequeo = "ok" | "revisar" | "mal";
+
+/** La medición del disco se toma cada hora: más de 3 horas sin medir es raro. */
+export function estadoDeMedicion(medidoAt: string | null | undefined, ahora = Date.now()): EstadoChequeo {
+  if (!medidoAt) return "mal";
+  const horas = (ahora - Date.parse(medidoAt)) / 3_600_000;
+  return horas <= 3 ? "ok" : horas <= 24 ? "revisar" : "mal";
 }

@@ -74,23 +74,26 @@ export function useResumenNas() {
   return { puede, q };
 }
 
-export default function EspacioNasBloque({ conEnlace = true }: { conEnlace?: boolean }) {
+export default function EspacioNasBloque({ conEnlace = true, compacto = false }: { conEnlace?: boolean; compacto?: boolean }) {
   const { puede, q } = useResumenNas();
   if (!puede) return null;
   return (
     <EspacioNasVista
       resumen={q.data} cargando={q.isLoading} fallo={q.isError} onReintentar={() => void q.refetch()}
-      enlaceDetalle={conEnlace ? RUTA_ESPACIO_NAS : undefined}
+      enlaceDetalle={conEnlace ? RUTA_ESPACIO_NAS : undefined} compacto={compacto}
     />
   );
 }
 
 /** La vista: solo dibuja. Separada para mirarla con datos reales en el banco
  *  visual (/harness.html?ver=nas) sin iniciar sesión. */
-export function EspacioNasVista({ resumen: r, cargando, fallo, onReintentar, enlaceDetalle }: {
+export function EspacioNasVista({ resumen: r, cargando, fallo, onReintentar, enlaceDetalle, compacto = false }: {
   resumen: ResumenNas | undefined; cargando: boolean; fallo: boolean; onReintentar: () => void;
   /** Si viene, el encabezado lleva «Ver detalle» hacia la página completa. */
   enlaceDetalle?: string;
+  /** Solo lo lleno y los tres números (Alvaro: "no algo tan extendido"); los
+   *  discos y «qué ocupa más» viven en las pestañas de adentro. */
+  compacto?: boolean;
 }) {
   const { t, language } = useLanguage();
   const pct = r && !r.sin_muestras ? pctUsado(r) : 0;
@@ -183,6 +186,8 @@ export function EspacioNasVista({ resumen: r, cargando, fallo, onReintentar, enl
             </div>
           </div>
 
+          {!compacto && (
+            <>
           {/* Cada disco por separado: el NAS los llena parejo, pero si uno se adelanta se ve acá. */}
           {r.discos.length > 1 && (
             <div className="grid gap-2.5 sm:grid-cols-2">
@@ -219,6 +224,9 @@ export function EspacioNasVista({ resumen: r, cargando, fallo, onReintentar, enl
               ))}
             </ul>
           </div>
+
+            </>
+          )}
 
           {r.alertas.length > 0 && (
             <p className="flex items-center gap-1.5 text-[11px] text-warning">

@@ -70,7 +70,8 @@ const dibujar = (o: Partial<Parameters<typeof EspacioNasPaginaVista>[0]>) => ren
 describe("la página", () => {
   it("con datos: las copias, la papelera, la modelo y quién pidió lo del link", () => {
     dibujar({});
-    expect(screen.getByText("6,8 TB")).toBeInTheDocument();
+    // «Liberar»: el total recuperable (copias + papelera) y cada tarjeta.
+    expect(screen.getAllByText("6,8 TB").length).toBeGreaterThanOrEqual(2);
     expect(screen.getByText("12,2 GB")).toBeInTheDocument();
     expect(screen.getByText("MartinaSmith")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "YOISNIA › SCRIPT" })).toHaveAttribute("href", "/oficina/drive?carpeta=c1");

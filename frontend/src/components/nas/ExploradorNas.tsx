@@ -1,7 +1,8 @@
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { ChevronRight, ExternalLink, FileIcon, Folder, FolderSearch, HardDrive } from "lucide-react";
+import { ChevronRight, ExternalLink, FileIcon, Folder, FolderSearch, HardDrive, Search, X } from "lucide-react";
 import { useLanguage } from "@/hooks/useLanguage";
-import { pctDelNivel, tamanoNas, type ExplorarNas } from "@/lib/espacioNas";
+import { pctDelNivel, tamanoNas, type BuscarNas, type ExplorarNas } from "@/lib/espacioNas";
 import { Seccion, useRpcNas, type EstadoDe } from "./comun";
 
 // EXPLORADOR DEL NAS (Alvaro, 10/11/2026): "ver todo lo que hay en el NAS". Cada
@@ -10,12 +11,108 @@ import { Seccion, useRpcNas, type EstadoDe } from "./comun";
 // una carpeta; la ruta de arriba lleva de vuelta. «Abrir en el Drive» lleva a
 // la carpeta real. No se mueve ni se borra nada desde acá.
 
-/** El contenedor: pide el nivel (null = raíz del Drive). */
+/** El contenedor: el buscador y el nivel (null = raíz del Drive). Con 2 letras
+ *  o más busca en todo el NAS ("alemia" → todas sus carpetas con su peso). */
 export default function ExploradorNas({ carpeta, onAbrir, on }: {
   carpeta: string | null; onAbrir: (id: string | null) => void; on: boolean;
 }) {
-  const q = useRpcNas<ExplorarNas>("nas_explorar", on, { _carpeta: carpeta });
-  return <ExploradorNasVista q={q} onAbrir={onAbrir} />;
+  const { t } = useLanguage();
+  const [texto, setTexto] = useState("");
+  const [buscado, setBuscado] = useState("");
+  // Espera a que se deje de escribir (no una búsqueda por letra).
+  useEffect(() => {
+    const id = setTimeout(() => setBuscado(texto.trim()), 350);
+    return () => clearTimeout(id);
+  }, [texto]);
+  const buscando = buscado.length >= 2;
+  const nivel = useRpcNas<ExplorarNas>("nas_explorar", on && !buscando, { _carpeta: carpeta });
+  const busqueda = useRpcNas<BuscarNas>("nas_buscar", on && buscando, { _texto: buscado });
+  const abrir = (id: string | null) => { setTexto(""); setBuscado(""); onAbrir(id); };
+
+  return (
+    <div className="flex flex-col gap-3">
+      <label className="vidrio flex items-center gap-2 px-3 py-2">
+        <Search className="h-4 w-4 shrink-0 text-muted-foreground" />
+        <input
+          value={texto} onChange={(e) => setTexto(e.target.value)}
+          placeholder={t("dashboard.centro.nas.buscar.placeholder")} aria-label={t("dashboard.centro.nas.buscar.placeholder")}
+          className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
+        />
+        {texto && (
+          <button type="button" onClick={() => setTexto("")} aria-label={t("dashboard.centro.nas.buscar.limpiar")} className="rounded-control p-1 text-muted-foreground hover:bg-muted">
+            <X className="h-3.5 w-3.5" />
+          </button>
+        )}
+      </label>
+      {buscando
+        ? <ResultadosBusquedaNas q={busqueda} texto={buscado} onAbrir={abrir} />
+        : <ExploradorNasVista q={nivel} onAbrir={abrir} />}
+    </div>
+  );
+}
+
+/** Lo que encontró el buscador: carpetas (con el peso de todo lo de adentro) y archivos. */
+export function ResultadosBusquedaNas({ q, texto, onAbrir }: { q: EstadoDe<BuscarNas>; texto: string; onAbrir: (id: string | null) => void }) {
+  const { t, language } = useLanguage();
+  const loc = language === "es" ? "es-CO" : "en-US";
+  const tam = (b: number) => tamanoNas(b, language);
+  return (
+    <Seccion icono={Search} titulo={t("dashboard.centro.nas.buscar.titulo", { texto })} q={q}>
+      {(r) => r.carpetas.length === 0 && r.archivos.length === 0 ? (
+        <p className="text-sm text-muted-foreground">{t("dashboard.centro.nas.buscar.nada")}</p>
+      ) : (
+        <div className="flex flex-col gap-4">
+          {r.carpetas.length > 0 && (
+            <div>
+              <h3 className="mb-1 text-xs font-semibold text-muted-foreground">{t("dashboard.centro.nas.buscar.carpetas", { n: r.carpetas.length })}</h3>
+              <ul className="flex flex-col divide-y divide-border/40">
+                {r.carpetas.map((c) => (
+                  <li key={c.id} className="flex items-center gap-2 py-1.5">
+                    <button type="button" onClick={() => onAbrir(c.id)}
+                      className="grid min-w-0 flex-1 grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-x-2 rounded-control px-1 py-1 text-left hover:bg-muted/60">
+                      <Folder className="h-4 w-4 text-primary/70" />
+                      <span className="min-w-0">
+                        <span className="block truncate text-sm">{c.nombre}</span>
+                        {c.padre && <span className="block truncate text-[11px] text-muted-foreground">{t("dashboard.centro.nas.buscar.en", { padre: c.padre })}</span>}
+                      </span>
+                      <span className="text-right text-xs tabular-nums text-muted-foreground">
+                        {tam(c.bytes)} · {t("dashboard.centro.nas.archivos", { n: c.archivos.toLocaleString(loc) })}
+                      </span>
+                    </button>
+                    <Link to={`/oficina/drive?carpeta=${c.id}`} aria-label={t("dashboard.centro.nas.explorador.abrirDrive")}
+                      className="shrink-0 rounded-control p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground">
+                      <ExternalLink className="h-3.5 w-3.5" />
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+          {r.archivos.length > 0 && (
+            <div>
+              <h3 className="mb-1 text-xs font-semibold text-muted-foreground">{t("dashboard.centro.nas.buscar.archivos", { n: r.archivos.length })}</h3>
+              <ul className="flex flex-col divide-y divide-border/30">
+                {r.archivos.map((a) => (
+                  <li key={a.id} className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2 py-1.5">
+                    <FileIcon className="h-3.5 w-3.5 text-muted-foreground" />
+                    <span className="min-w-0">
+                      <span className="block truncate text-sm" title={a.nombre}>{a.nombre}</span>
+                      {a.carpeta_id && (
+                        <Link to={`/oficina/drive?carpeta=${a.carpeta_id}`} className="block truncate text-[11px] text-muted-foreground hover:underline">
+                          {t("dashboard.centro.nas.buscar.en", { padre: a.carpeta ?? "—" })}
+                        </Link>
+                      )}
+                    </span>
+                    <span className="text-right text-xs tabular-nums text-muted-foreground">{tam(a.size ?? 0)}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+      )}
+    </Seccion>
+  );
 }
 
 /** La vista: solo dibuja el nivel que le pasan. */

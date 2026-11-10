@@ -20,8 +20,12 @@ import { EspacioNasLineaVista } from "@/components/centro/EspacioNasLinea";
 import { ExploradorNasVista } from "@/components/nas/ExploradorNas";
 import { MasPesadosNasVista, PorTipoNasVista } from "@/components/nas/QueHayNas";
 import { FichaNasVista } from "@/components/nas/FichaNas";
+import { ResultadosBusquedaNas } from "@/components/nas/ExploradorNas";
+import { LiberarNasVista } from "@/components/nas/LiberarNas";
+import { CopiaSeguridadNasVista } from "@/components/nas/CopiaSeguridadNas";
+import { chequeosDelNas, todoCorriendo } from "@/components/nas/ResumenNas";
 import type { EstadoDe } from "@/components/nas/comun";
-import type { ExplorarNas, FichaNas, MasPesadosNas, PorTipoNas, ResumenNas } from "@/lib/espacioNas";
+import type { BuscarNas, ExplorarNas, FichaNas, MasPesadosNas, PorTipoNas, QueLiberar, ResumenNas } from "@/lib/espacioNas";
 
 const listo = <T,>(data: T): EstadoDe<T> => ({ data, isLoading: false, isError: false, refetch: () => undefined });
 const fallo = <T,>(): EstadoDe<T> => ({ data: undefined, isLoading: false, isError: true, refetch: () => undefined });
@@ -101,5 +105,58 @@ describe("qué hay y la ficha", () => {
     expect(screen.getByText("dashboard.centro.nas.ficha.respaldoTitulo")).toBeInTheDocument();
     expect(screen.getByText("942.381")).toBeInTheDocument();
     expect(screen.getByText(/dashboard.centro.nas.ficha.arriba/)).toBeInTheDocument();
+  });
+});
+
+describe("segunda pasada (Alvaro, 10/11): buscador, todo corriendo, liberar y copia", () => {
+  it("el buscador muestra las carpetas con su peso y dónde están, y lleva adentro", () => {
+    const d: BuscarNas = {
+      carpetas: [{ id: "a1", nombre: "AlemiaRojas", padre: "ELITE", bytes: 58.94e9, archivos: 677 }],
+      archivos: [{ id: "f1", nombre: "alemia_set1.mp4", size: 2.1e9, carpeta_id: "a1", carpeta: "AlemiaRojas" }],
+    };
+    const abrir = vi.fn();
+    enRouter(<ResultadosBusquedaNas q={listo(d)} texto="alemia" onAbrir={abrir} />);
+    expect(screen.getByText(/58,9 GB/)).toBeInTheDocument();
+    fireEvent.click(screen.getByText("AlemiaRojas", { selector: "span.block" }));
+    expect(abrir).toHaveBeenCalledWith("a1");
+    expect(screen.getByText("alemia_set1.mp4")).toBeInTheDocument();
+  });
+
+  it("⚠️ el buscador dice cuando no encuentra nada (no queda en blanco)", () => {
+    enRouter(<ResultadosBusquedaNas q={listo<BuscarNas>({ carpetas: [], archivos: [] })} texto="zzz" onAbrir={() => {}} />);
+    expect(screen.getByText("dashboard.centro.nas.buscar.nada")).toBeInTheDocument();
+  });
+
+  it("«todo corriendo bien»: la falta de copia es un pendiente, no una falla; el NAS caído sí", () => {
+    const resumen = { total: 48e12, libre: 13.94e12, usado: 34.06e12, medido_at: new Date().toISOString() } as ResumenNas;
+    const ficha = { aportes_esperando: 0, nas: { caido: false, desde: null, actualizado: "x" } } as FichaNas;
+    const bien = chequeosDelNas(resumen, ficha)!;
+    expect(todoCorriendo(bien)).toBe(true);
+    const caido = chequeosDelNas(resumen, { ...ficha, aportes_esperando: 3, nas: { caido: true, desde: null, actualizado: "x" } })!;
+    expect(todoCorriendo(caido)).toBe(false);
+    expect(caido.find((c) => c.clave === "dashboard.centro.nas.chequeo.aportesEsperando")?.estado).toBe("mal");
+    expect(chequeosDelNas(undefined, ficha)).toBeNull();
+  });
+
+  it("liberar: el total arriba y las listas plegadas hasta que se piden", () => {
+    const d: QueLiberar = {
+      copias: { bytes: 6.8e12, grupos: 1, copias_de_mas: 89658 },
+      papelera: { bytes: 4.49e12, archivos: 160375 },
+      top: [{ nombre: "c6602.mp4", size: 47.8e9, copias: 2, recupera: 47.8e9, unidades: ["Contenido Shootings"] }],
+      carpetas_tiradas: [{ id: "t1", nombre: "Alicia Trece", padre: "KASH-CONTENT-VPS", tirada: "2026-10-05T15:00:00Z", por: "Monica Duque", bytes: 1.55e12, archivos: 4401 }],
+    };
+    enRouter(<LiberarNasVista q={listo(d)} />);
+    expect(screen.getByText("11,3 TB")).toBeInTheDocument();
+    expect(screen.queryByText("Alicia Trece")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: /dashboard.centro.nas.liberar.verPapelera/ }));
+    expect(screen.getByText("Alicia Trece")).toBeInTheDocument();
+  });
+
+  it("⚠️ la copia de seguridad avisa que hoy no hay y trae la recomendación", () => {
+    const ficha = listo<FichaNas>({ archivos: 1, carpetas: 1, unidades: 1, personas: 1, links_modelos: 1, desde: null, nas: null });
+    enRouter(<CopiaSeguridadNasVista resumen={{ ...RESUMEN, discos: [{ total: 24e12, libre: 6.7e12 }] } as ResumenNas} ficha={ficha} />);
+    expect(screen.getByText("dashboard.centro.nas.copia.hoyTitulo")).toBeInTheDocument();
+    expect(screen.getAllByText("dashboard.centro.nas.copia.recomendada")).toHaveLength(2);
+    expect(screen.getByText("dashboard.centro.nas.copia.recomendacionTexto")).toBeInTheDocument();
   });
 });

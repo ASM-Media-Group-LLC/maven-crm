@@ -58,7 +58,12 @@ export function MasPesadosNasVista({ q }: { q: EstadoDe<MasPesadosNas> }) {
               <li key={a.id} className="grid grid-cols-[1.5rem_minmax(0,1fr)_auto] items-start gap-x-2 py-2">
                 <span className="pt-0.5 text-right text-[11px] tabular-nums text-muted-foreground">{i + 1}</span>
                 <div className="min-w-0">
-                  <p className="flex items-center gap-1.5 truncate text-sm" title={a.nombre}><Icono className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />{a.nombre}</p>
+                  <p className="flex items-center gap-1.5 text-sm" title={a.nombre}>
+                    <Icono className="h-3.5 w-3.5 shrink-0 text-muted-foreground" /><span className="truncate">{a.nombre}</span>
+                    {a.en_papelera && (
+                      <span className="shrink-0 rounded-full border border-warning/40 px-1.5 text-[10px] text-warning">{t("dashboard.centro.nas.pesados.enPapelera")}</span>
+                    )}
+                  </p>
                   <p className="truncate text-[11px] text-muted-foreground">
                     {a.carpeta_id
                       ? <Link to={`/oficina/drive?carpeta=${a.carpeta_id}`} className="hover:underline">{[a.unidad, a.carpeta].filter(Boolean).join(" › ")}</Link>

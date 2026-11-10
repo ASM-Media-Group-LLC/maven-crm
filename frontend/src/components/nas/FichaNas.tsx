@@ -26,7 +26,11 @@ function Dato({ etiqueta, valor }: { etiqueta: string; valor: string }) {
   );
 }
 
-export function FichaNasVista({ q, resumen }: { q: EstadoDe<FichaNas>; resumen: ResumenNas | undefined }) {
+export function FichaNasVista({ q, resumen, sinAvisoRespaldo = false }: {
+  q: EstadoDe<FichaNas>; resumen: ResumenNas | undefined;
+  /** Dentro de la pestaña de copia de seguridad el aviso ya está arriba. */
+  sinAvisoRespaldo?: boolean;
+}) {
   const { t, language } = useLanguage();
   const loc = language === "es" ? "es-CO" : "en-US";
   const num = (n: number) => n.toLocaleString(loc);
@@ -37,13 +41,13 @@ export function FichaNasVista({ q, resumen }: { q: EstadoDe<FichaNas>; resumen: 
       {(f) => (
         <div className="flex flex-col gap-4">
           {/* Lo más importante primero: hoy no hay copia de seguridad. */}
-          <div className="flex gap-3 rounded-panel border border-warning/40 bg-warning/5 p-3">
+          {!sinAvisoRespaldo && <div className="flex gap-3 rounded-panel border border-warning/40 bg-warning/5 p-3">
             <ShieldAlert className="mt-0.5 h-5 w-5 shrink-0 text-warning" />
             <div className="text-sm">
               <p className="font-semibold">{t("dashboard.centro.nas.ficha.respaldoTitulo")}</p>
               <p className="mt-0.5 text-muted-foreground">{t("dashboard.centro.nas.ficha.respaldoTexto")}</p>
             </div>
-          </div>
+          </div>}
 
           <div className="flex items-center gap-2 text-sm">
             {f.nas?.caido
