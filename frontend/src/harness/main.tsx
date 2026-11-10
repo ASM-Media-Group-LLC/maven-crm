@@ -12,6 +12,7 @@ import UsersGrid from "@/pages/admin/UsersGrid";
 import type { AdminUser } from "@/pages/admin/useAdminUsers";
 import BancoNas from "./bancoNas";
 import BancoLinks from "./bancoLinks";
+import BancoTableros from "./bancoTableros";
 import "@/index.css";
 
 // Gente real del roster (nombre, rol y avatar_seed salidos de prod) para que los
@@ -58,8 +59,14 @@ const noop = () => {};
 // /harness.html?ver=nas → el medidor del NAS; ?ver=nas-pagina → su página completa.
 const ver = new URLSearchParams(window.location.search).get("ver");
 const verNas = ver === "nas" || ver === "nas-pagina" || ver === "links";
+const verTablero = ver === "mio" || ver === "rrhh";
 
 createRoot(document.getElementById("root")!).render(
+  verTablero ? (
+    <StrictMode>
+      <LanguageProvider><BancoTableros cual={ver as "mio" | "rrhh"} /></LanguageProvider>
+    </StrictMode>
+  ) :
   verNas ? (
     <StrictMode>
       <LanguageProvider>{ver === "links" ? <BancoLinks /> : <BancoNas pagina={ver === "nas-pagina"} />}</LanguageProvider>

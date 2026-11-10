@@ -23,6 +23,7 @@ import { TurnoBadge } from "@/pages/chatters/horarios/MiSemana";
 import SemanaViva from "./SemanaViva";
 import { useResumenChatter, useVentasPorModelo } from "./useChatterDashboard";
 import SelectorDeTablero from "@/pages/dashboard/SelectorDeTablero";
+import PulsoEquipoVivo from "@/components/centro/PulsoEquipoVivo";
 
 // DASHBOARD DEL CHATTER. Lo que una persona del equipo de chat quiere ver al
 // entrar: su turno de hoy y sus creadoras, cómo le fue en el rango elegido
@@ -125,6 +126,10 @@ export default function ChatterDashboard({ hoy = new Date() }: { hoy?: Date }) {
               value={resumen.mejorDia ? money(resumen.mejorDia.ventas) : "—"} hint={resumen.mejorDia ? format(fechaDe(resumen.mejorDia.dia), "EEE d", { locale: formatoUi.fechas }) : undefined} />
           </div>
         )}
+
+        {/* El chatter con nivel de supervisor (Breyner, Vanessa) ve además el
+            Pulso de SU equipo (Alvaro, 10/11). A los demás no se les dibuja. */}
+        <PulsoEquipoVivo conEquipo />
 
         {/* Fila 1: hoy (turno, creadoras, descanso) + ventas por día */}
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">

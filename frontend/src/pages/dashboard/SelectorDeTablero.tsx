@@ -1,5 +1,5 @@
 import { useSearchParams } from "react-router-dom";
-import { Activity, BarChart3, Check, ChevronDown, Megaphone, Target, User, Users } from "lucide-react";
+import { Activity, BarChart3, Check, ChevronDown, CircleUser, HeartHandshake, Megaphone, Target, User, Users } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useRoleTier } from "@/hooks/useRoleTier";
 import { cn } from "@/lib/utils";
@@ -16,7 +16,7 @@ import type { TranslationKey } from "@/lib/i18n";
 // sobrevive un refresh. Para quien no puede cambiar, el título es un h1 normal:
 // nadie ve un menú con opciones que no le corresponden.
 
-export type ClaveTablero = "centro" | "ventas" | "equipo" | "roster" | "pipeline" | "chatter";
+export type ClaveTablero = "centro" | "ventas" | "equipo" | "rrhh" | "roster" | "pipeline" | "chatter" | "mio";
 
 // `clave` viaja en la URL (?ver=) y es dato; titulo/depto/detalle son claves del diccionario.
 export const TABLEROS: Array<{
@@ -31,9 +31,11 @@ export const TABLEROS: Array<{
   { clave: "centro",   titulo: "dashboard.board.centro.title",   depto: "dashboard.board.centro.dept",   detalle: "dashboard.board.centro.detail",   icono: Activity },
   { clave: "ventas",   titulo: "dashboard.board.sales.title",    depto: "dashboard.board.sales.dept",    detalle: "dashboard.board.sales.detail",    icono: BarChart3 },
   { clave: "equipo",   titulo: "dashboard.board.team.title",     depto: "dashboard.board.team.dept",     detalle: "dashboard.board.team.detail",     icono: Users },
+  { clave: "rrhh",     titulo: "dashboard.board.rrhh.title",     depto: "dashboard.board.rrhh.dept",     detalle: "dashboard.board.rrhh.detail",     icono: HeartHandshake },
   { clave: "roster",   titulo: "dashboard.board.roster.title",   depto: "dashboard.board.roster.dept",   detalle: "dashboard.board.roster.detail",   icono: Megaphone, personal: true },
   { clave: "pipeline", titulo: "dashboard.board.pipeline.title", depto: "dashboard.board.pipeline.dept", detalle: "dashboard.board.pipeline.detail", icono: Target,    personal: true },
   { clave: "chatter",  titulo: "dashboard.board.chatter.title",  depto: "dashboard.board.chatter.dept",  detalle: "dashboard.board.chatter.detail",  icono: User,      personal: true },
+  { clave: "mio",      titulo: "dashboard.board.mio.title",      depto: "dashboard.board.mio.dept",      detalle: "dashboard.board.mio.detail",      icono: CircleUser, personal: true },
 ];
 
 export const tableroDe = (v: string | null): ClaveTablero | null =>

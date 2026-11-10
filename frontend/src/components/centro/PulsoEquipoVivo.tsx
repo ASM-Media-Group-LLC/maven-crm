@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { formatDistanceToNowStrict } from "date-fns";
 import { es as esLocale } from "date-fns/locale";
@@ -7,8 +7,9 @@ import { useLanguage } from "@/hooks/useLanguage";
 import { UserAvatar } from "@/components/UserAvatar";
 import { TarjetaKpi } from "@/components/ui/TarjetaKpi";
 import { usePulsoEquipo } from "@/hooks/usePulsoEquipo";
+import { useEsDueno } from "@/hooks/useEsDueno";
 import type { EstadoVivo } from "@/hooks/useRondinVivo";
-import type { PersonaPulso } from "@/lib/pulsoEquipo";
+import type { CajaEquipo, PersonaPulso } from "@/lib/pulsoEquipo";
 import type { TranslationKey } from "@/lib/i18n";
 
 // EL PULSO DEL EQUIPO EN VIVO (Centro de operaciones · Alvaro, 05/11). Solo para
@@ -53,11 +54,13 @@ function hace(iso: string | null, lang: string): string | null {
 }
 
 /** Una persona como fila: avatar, nombre, estado en vivo y "hace X". Clic → expediente. */
-function FilaPersona({ p, t, lang, onAbrir, problema }: { p: PersonaPulso; t: Tr; lang: string; onAbrir: () => void; problema?: boolean }) {
+function FilaPersona({ p, t, lang, onAbrir, problema }: { p: PersonaPulso; t: Tr; lang: string; onAbrir?: () => void; problema?: boolean }) {
   const ui = ESTADO_UI[p.estado];
   const desde = hace(p.desde, lang);
+  // Sin permiso al expediente (supervisores, admins): la fila se ve, no se abre.
+  const Raiz = onAbrir ? "button" : "div";
   return (
-    <button type="button" onClick={onAbrir}
+    <Raiz {...(onAbrir ? { type: "button" as const, onClick: onAbrir } : {})}
       className={`group flex items-center gap-2.5 rounded-panel border px-2.5 py-1.5 text-left transition ${
         problema ? "border-destructive/20 bg-destructive/5 hover:border-destructive/40 hover:bg-destructive/10"
                  : "border-border/40 bg-card/30 hover:border-primary/30 hover:bg-card/50"
@@ -72,18 +75,71 @@ function FilaPersona({ p, t, lang, onAbrir, problema }: { p: PersonaPulso; t: Tr
           {t(ESTADO_LBL[p.estado])}{desde && <span className="font-normal text-muted-foreground"> · {desde}</span>}
         </span>
       </span>
-      <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground/50 transition group-hover:translate-x-0.5 group-hover:text-foreground" />
-    </button>
+      {onAbrir && <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground/50 transition group-hover:translate-x-0.5 group-hover:text-foreground" />}
+    </Raiz>
   );
 }
 
-export default function PulsoEquipoVivo({ coworkConectados }: { coworkConectados?: number | null }) {
+/** Una caja por equipo: nombre, conectados, nota viva y su gente. */
+export function CajaDelEquipo({ caja, t, lang, abrir }: { caja: CajaEquipo; t: Tr; lang: string; abrir: ((id: string) => void) | null }) {
+  const [verFuera, setVerFuera] = useState(false);
+  const conectados = caja.miembros.filter((p) => p.conectado);
+  const fuera = caja.miembros.filter((p) => !p.conectado);
+  const tn = tonoBanda(caja.nota);
+  return (
+    <div className="vidrio min-w-0 p-4">
+      <div className="v-cont space-y-2.5">
+        <div className="flex items-center gap-2">
+          <h3 className="text-sm font-semibold">{caja.equipo}</h3>
+          <span className="text-[11px] text-muted-foreground tabular-nums">
+            {t("dashboard.pulso.conectadosCaja", { conectados: caja.conectados, total: caja.total })}
+          </span>
+          {caja.nota != null && <span className={`ml-auto font-display text-base font-semibold tabular-nums ${tn.texto}`}>{caja.nota}</span>}
+        </div>
+        {conectados.length === 0 ? (
+          <p className="text-xs text-muted-foreground">{t("dashboard.pulso.sinConectados")}</p>
+        ) : (
+          <div className="grid gap-1.5 sm:grid-cols-2">
+            {conectados.map((p) => (
+              <FilaPersona key={p.userId} p={p} t={t} lang={lang} problema={p.problema} onAbrir={abrir ? () => abrir(p.userId) : undefined} />
+            ))}
+          </div>
+        )}
+        {fuera.length > 0 && (
+          <div>
+            <button type="button" onClick={() => setVerFuera((v) => !v)} aria-expanded={verFuera}
+              className="text-[11px] font-medium text-muted-foreground underline-offset-2 hover:text-foreground hover:underline">
+              {t("dashboard.pulso.sinConectar", { n: fuera.length })}
+            </button>
+            {verFuera && (
+              <div className="mt-1.5 grid gap-1.5 sm:grid-cols-2">
+                {fuera.map((p) => (
+                  <FilaPersona key={p.userId} p={p} t={t} lang={lang} onAbrir={abrir ? () => abrir(p.userId) : undefined} />
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+export default function PulsoEquipoVivo({ coworkConectados, conEquipo = false }: {
+  /** Conectados en Cowork según LiveKit (solo el Centro lo trae). Sin él, la
+   *  primera tarjeta cuenta los conectados del propio Pulso. */
+  coworkConectados?: number | null;
+  /** Muestra además quién es quién, por equipo (tableros de supervisor y RR. HH.). */
+  conEquipo?: boolean;
+}) {
   const { t, language } = useLanguage();
   const navigate = useNavigate();
-  const { puedeVer, pulso, cargando, error, ultimaRonda } = usePulsoEquipo();
+  const { puedeVer, alcance, pulso, cargando, error, ultimaRonda, reintentar } = usePulsoEquipo();
+  const { esDueno } = useEsDueno();
 
   const ultima = useMemo(() => (ultimaRonda ? hace(ultimaRonda.toISOString(), language) : null), [ultimaRonda, language]);
-  const abrir = (id: string) => navigate(`/hr/expediente/${id}`);
+  // El expediente lo abren el dueño y RR. HH. (la ruta es soloDueno + tambienRh).
+  const abrir = esDueno === true || alcance === "rrhh" ? (id: string) => navigate(`/hr/expediente/${id}`) : null;
 
   if (!puedeVer) return null;
 
@@ -111,21 +167,38 @@ export default function PulsoEquipoVivo({ coworkConectados }: { coworkConectados
 
       {cargando && !pulso ? (
         <div className="vidrio p-6 flex items-center gap-2 text-muted-foreground"><Loader2 className="h-5 w-5 animate-spin" /></div>
-      ) : error || !pulso || pulso.total === 0 ? (
-        <div className="vidrio p-4"><p className="text-sm text-muted-foreground">{error ? "—" : t("dashboard.pulso.sinEquipo")}</p></div>
+      ) : error ? (
+        // Un fallo no es «sin equipo»: se dice y se deja reintentar.
+        <div role="alert" className="vidrio p-4 text-sm text-muted-foreground">
+          {t("dashboard.centro.fallo")}
+          <button type="button" onClick={reintentar} className="underline underline-offset-2 hover:text-foreground">{t("dashboard.centro.reintentar")}</button>
+        </div>
+      ) : !pulso || pulso.total === 0 ? (
+        <div className="vidrio p-4"><p className="text-sm text-muted-foreground">{t("dashboard.pulso.sinEquipo")}</p></div>
       ) : (
         <>
           {/* MISMAS TARJETAS KPI que el resto del dashboard: ícono + etiqueta +
               número grande + detalle. Todo con el lenguaje glassy compartido. */}
           <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-            <TarjetaKpi
-              indice={0}
-              icono={Users}
-              tono="success"
-              etiqueta={t("dashboard.pulso.enCowork")}
-              valor={coworkConectados == null ? "–" : coworkConectados}
-              detalle={t("dashboard.pulso.conApp", { n: pulso.conectados })}
-            />
+            {coworkConectados === undefined ? (
+              <TarjetaKpi
+                indice={0}
+                icono={Users}
+                tono="success"
+                etiqueta={t("dashboard.pulso.conectadosAhora")}
+                valor={pulso.conectados}
+                detalle={t("dashboard.pulso.deTotal", { total: pulso.total })}
+              />
+            ) : (
+              <TarjetaKpi
+                indice={0}
+                icono={Users}
+                tono="success"
+                etiqueta={t("dashboard.pulso.enCowork")}
+                valor={coworkConectados == null ? "–" : coworkConectados}
+                detalle={t("dashboard.pulso.conApp", { n: pulso.conectados })}
+              />
+            )}
             <TarjetaKpi
               indice={1}
               icono={Gauge}
@@ -164,7 +237,7 @@ export default function PulsoEquipoVivo({ coworkConectados }: { coworkConectados
                 </div>
                 <div className="grid gap-1.5 sm:grid-cols-2 lg:grid-cols-3">
                   {pulso.quienLaBaja.slice(0, 9).map((p) => (
-                    <FilaPersona key={p.userId} p={p} t={t} lang={language} problema onAbrir={() => abrir(p.userId)} />
+                    <FilaPersona key={p.userId} p={p} t={t} lang={language} problema onAbrir={abrir ? () => abrir(p.userId) : undefined} />
                   ))}
                 </div>
               </div>
@@ -174,6 +247,16 @@ export default function PulsoEquipoVivo({ coworkConectados }: { coworkConectados
           {/* Alvaro (08/11 noche): el botón "Ver el equipo completo" sobraba —
               el Pulso ya es el vistazo; para el detalle se entra por Argos
               desde el menú. Fuera. */}
+
+          {/* Quién es quién, por equipo (supervisor y RR. HH., 10/11): los
+              conectados a la vista; los que no están, plegados. */}
+          {conEquipo && (
+            <div className="grid items-start gap-3 lg:grid-cols-2">
+              {pulso.cajas.map((c) => (
+                <CajaDelEquipo key={c.equipo} caja={c} t={t} lang={language} abrir={abrir} />
+              ))}
+            </div>
+          )}
         </>
       )}
     </section>

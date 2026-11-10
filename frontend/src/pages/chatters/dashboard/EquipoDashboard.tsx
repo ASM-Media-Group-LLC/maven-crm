@@ -19,6 +19,7 @@ import { useDescansos, useNombres, useRoster } from "@/pages/chatters/horarios/u
 import { useEquipoTiempoCowork, sumarCoworkDelEquipo } from "@/hooks/useEquipoTiempoCowork";
 import { TURNOS, diaSemanaDe, isoDe, lunesDe, type Shift } from "@/pages/chatters/horarios/types";
 import FeedbackDialog from "./FeedbackDialog";
+import PulsoEquipoVivo from "@/components/centro/PulsoEquipoVivo";
 
 // DASHBOARD DEL SUPERVISOR DE CHATTERS — su casa al entrar a Maven.
 //
@@ -308,6 +309,10 @@ export default function EquipoDashboard() {
       </div>
 
       <div className="space-y-4 p-4 md:p-6">
+        {/* Pulso en vivo de SU equipo (Alvaro, 10/11: «cada supervisor solo su
+            equipo»). Para quien no es supervisor, no se dibuja. */}
+        <PulsoEquipoVivo conEquipo />
+
         {/* ── KPIs del rango ── */}
         {cargando ? (
           <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">

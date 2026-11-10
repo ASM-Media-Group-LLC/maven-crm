@@ -13,6 +13,9 @@ export interface TiempoCoworkDePersona {
   /** De `horas`, las que fueron meet grupal. */
   horasMeet: number;
   diasConReloj: number;
+  /** De `horas`, las que estuvo sin compartir pantalla / sin cámara (Argos). */
+  horasSinPantalla?: number;
+  horasSinCamara?: number;
 }
 
 /** user_id de Maven → su tiempo en el rango. */
@@ -34,13 +37,18 @@ export function useEquipoTiempoCowork(desde: string, hasta: string) {
       const { data, error } = await db.rpc("equipo_tiempo_cowork", { _desde: desde, _hasta: hasta });
       if (error) throw new Error(error.message);
       const mapa: TiempoCoworkPorPersona = new Map();
-      for (const r of (data ?? []) as Array<{ user_id: string; seg_activo: number | string; seg_meet?: number | string | null; seg_en_sala: number | string; dias_con_reloj: number }>) {
-        mapa.set(r.user_id, { horas: Number(r.seg_activo) / 3600, horasEnSala: Number(r.seg_en_sala) / 3600, horasMeet: Number(r.seg_meet ?? 0) / 3600, diasConReloj: Number(r.dias_con_reloj) });
+      for (const r of (data ?? []) as Array<{ user_id: string; seg_activo: number | string; seg_meet?: number | string | null; seg_en_sala: number | string; seg_sin_pantalla?: number | string | null; seg_sin_camara?: number | string | null; dias_con_reloj: number }>) {
+        mapa.set(r.user_id, {
+          horas: Number(r.seg_activo) / 3600, horasEnSala: Number(r.seg_en_sala) / 3600, horasMeet: Number(r.seg_meet ?? 0) / 3600,
+          diasConReloj: Number(r.dias_con_reloj),
+          horasSinPantalla: Number(r.seg_sin_pantalla ?? 0) / 3600, horasSinCamara: Number(r.seg_sin_camara ?? 0) / 3600,
+        });
       }
       return mapa;
     },
   });
-  return { porPersona: q.data ?? VACIO, cargando: q.isLoading };
+  // fallo ≠ «sin horas»: quien lo use lo dice y deja reintentar.
+  return { porPersona: q.data ?? VACIO, cargando: q.isLoading, fallo: q.isError, reintentar: () => void q.refetch() };
 }
 
 /** Suma del equipo: solo las personas que están en las filas del tablero, para

@@ -422,8 +422,8 @@ const App = () => (
                 <Route path="/oficina/calendario" element={<PermissionRoute module="Oficina" submodule="Calendario"><CalendarioPage /></PermissionRoute>} />
                 <Route path="/oficina/hojas" element={<PermissionRoute module="Oficina" submodule="Hojas de cálculo"><OficinaPage formato="xlsx" /></PermissionRoute>} />
                 <Route path="/oficina/presentaciones" element={<PermissionRoute module="Oficina" submodule="Presentaciones"><OficinaPage formato="pptx" /></PermissionRoute>} />
-                {/* Espacio del NAS (Alvaro, 10/11): solo dueño/admin; la página y sus RPC lo verifican. */}
-                <Route path="/oficina/espacio-nas" element={<PermissionRoute module="Oficina"><EspacioNasPage /></PermissionRoute>} />
+                {/* Espacio del NAS (Alvaro, 10/11): solo el dueño; la ruta y sus RPC lo verifican. */}
+                <Route path="/oficina/espacio-nas" element={<PermissionRoute module="Oficina" soloDueno><EspacioNasPage /></PermissionRoute>} />
                 <Route path="/oficina/drive" element={<PermissionRoute module="Oficina" submodule="Drive"><DrivePage /></PermissionRoute>} />
                 {/* Links de las modelos (10/11). NO bajo /oficina/drive/…: chocaría con /oficina/drive/:id. */}
                 <Route path="/oficina/links-de-subida" element={<PermissionRoute module="Oficina" submodule="Drive"><LinksDeSubidaPage /></PermissionRoute>} />

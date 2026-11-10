@@ -2,10 +2,13 @@ import { lazy, Suspense } from "react";
 import { useSearchParams } from "react-router-dom";
 import { Loader2 } from "lucide-react";
 import { tableroDe } from "@/pages/dashboard/SelectorDeTablero";
-import DashboardContent from "@/components/dashboard/DashboardContent";
+// Directo (no lazy): es el tablero de la mayoría que no tiene uno de su área, y
+// es liviano. Trae su <Page> con scroll propio.
+import MiTablero from "@/pages/dashboard/MiTablero";
 import { useUserRole } from "@/hooks/useUserRole";
 import { usePermissions } from "@/hooks/usePermissions";
 import { useRoleTier } from "@/hooks/useRoleTier";
+import { useEsRh } from "@/hooks/useEsRh";
 
 const ChatterDashboard = lazy(() => import("@/pages/chatters/dashboard/ChatterDashboard"));
 const EquipoDashboard = lazy(() => import("@/pages/chatters/dashboard/EquipoDashboard"));
@@ -13,6 +16,7 @@ const ManagerDashboard = lazy(() => import("@/pages/manager/ManagerDashboard"));
 const CloserDashboard = lazy(() => import("@/pages/closers/dashboard/CloserDashboard"));
 const DashboardVentas = lazy(() => import("@/pages/Dashboard2"));
 const CentroDeOperaciones = lazy(() => import("@/pages/centro/CentroDeOperaciones"));
+const TableroRRHH = lazy(() => import("@/pages/dashboard/TableroRRHH"));
 
 // Roles que ven el tablero del ADMIN aunque no sean admin. Es una decisión de
 // producto por rol, no una capacidad: Jhon pidió que "operation sales puede
@@ -44,9 +48,10 @@ const Dashboard = () => {
   const { isChatter, role, isLoading } = useUserRole();
   const { canAccess, isLoading: permisosCargando } = usePermissions();
   const { tier, isLoading: tierCargando } = useRoleTier();
+  const { esRh, cargando: rhCargando } = useEsRh();
   const [params] = useSearchParams();
 
-  if (isLoading || permisosCargando || tierCargando) return <Cargando />;
+  if (isLoading || permisosCargando || tierCargando || rhCargando) return <Cargando />;
 
   // El admin puede pasearse por el tablero de cualquier departamento desde el
   // desplegable del título (pedido de Jhon). Viaja en `?ver=` para que el link
@@ -57,8 +62,10 @@ const Dashboard = () => {
     return (
       <Suspense fallback={<Cargando />}>
         {elegido === "equipo" ? <EquipoDashboard />
+          : elegido === "rrhh" ? <TableroRRHH />
           : elegido === "roster" ? <ManagerDashboard forzado />
           : elegido === "pipeline" ? <CloserDashboard />
+          : elegido === "mio" ? <MiTablero />
           : <ChatterDashboard />}
       </Suspense>
     );
@@ -76,6 +83,14 @@ const Dashboard = () => {
   // en ?ver=ventas (el desplegable del título y el botón del final del Centro).
   if (tier === "admin" && elegido !== "ventas") {
     return <Suspense fallback={<Cargando />}><CentroDeOperaciones /></Suspense>;
+  }
+
+  // RR. HH. (Alvaro, 10/11 — «quién mira qué»): su tablero propio con la
+  // asistencia de hoy, las tardanzas, quién está conectado y el Pulso de Argos
+  // de la gente que manejan. Sin ventas ni creadoras (antes caían en el del
+  // manager de creadoras por tener el permiso de Creadores).
+  if (esRh === true) {
+    return <Suspense fallback={<Cargando />}><TableroRRHH /></Suspense>;
   }
 
   // Solo ADMIN (decisión de Jhon: "dejalo solo admin"). El permiso del menú lo
@@ -113,7 +128,10 @@ const Dashboard = () => {
     return <Suspense fallback={<Cargando />}><CloserDashboard /></Suspense>;
   }
 
-  return <DashboardContent />;
+  // El resto (Finanzas, PR, coordinadores, closers, Warming, Básico…): SOLO LO
+  // SUYO (Alvaro, 10/11): sus horas de Cowork, sus avisos y sus accesos. El
+  // tablero genérico mostraba números de toda la empresa y ya no se usa aquí.
+  return <MiTablero />;
 };
 
 export default Dashboard;

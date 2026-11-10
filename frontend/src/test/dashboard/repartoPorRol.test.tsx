@@ -7,11 +7,15 @@ import { MemoryRouter } from "react-router-dom";
 let rol = { isChatter: false, role: "employee", isLoading: false };
 let permisos = { canAccess: (_m: string, _s?: string) => false, isLoading: false };
 let tier = { tier: "member" as "member" | "supervisor" | "manager" | "admin", isLoading: false };
+let rh = { esRh: false as boolean | null, cargando: false, error: null };
 
 vi.mock("@/hooks/useUserRole", () => ({ useUserRole: () => rol }));
 vi.mock("@/hooks/usePermissions", () => ({ usePermissions: () => permisos }));
 vi.mock("@/hooks/useRoleTier", () => ({ useRoleTier: () => tier }));
-vi.mock("@/components/dashboard/DashboardContent", () => ({ default: () => <div>GENERICO</div> }));
+vi.mock("@/hooks/useEsRh", () => ({ useEsRh: () => rh }));
+// «Solo lo suyo» (10/11) reemplazó al genérico: quien no tiene tablero de su área cae aquí.
+vi.mock("@/pages/dashboard/MiTablero", () => ({ default: () => <div>MIO</div> }));
+vi.mock("@/pages/dashboard/TableroRRHH", () => ({ default: () => <div>RRHH</div> }));
 vi.mock("@/pages/chatters/dashboard/ChatterDashboard", () => ({ default: () => <div>CHATTER</div> }));
 vi.mock("@/pages/chatters/dashboard/EquipoDashboard", () => ({ default: () => <div>EQUIPO</div> }));
 vi.mock("@/pages/manager/ManagerDashboard", () => ({ default: () => <div>MANAGER</div> }));
@@ -34,6 +38,7 @@ beforeEach(() => {
   rol = { isChatter: false, role: "employee", isLoading: false };
   permisos = { canAccess: () => false, isLoading: false };
   tier = { tier: "member", isLoading: false };
+  rh = { esRh: false, cargando: false, error: null };
 });
 
 describe("/dashboard · reparto por rol", () => {
@@ -49,7 +54,7 @@ describe("/dashboard · reparto por rol", () => {
     permisos = { canAccess: conVentas, isLoading: false };
     tier = { tier: "manager", isLoading: false };
     pintar();
-    await waitFor(() => expect(screen.getByText("GENERICO")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText("MIO")).toBeInTheDocument());
     expect(screen.queryByText("VENTAS")).not.toBeInTheDocument();
   });
 
@@ -71,7 +76,7 @@ describe("/dashboard · reparto por rol", () => {
     permisos = { canAccess: conVentas, isLoading: false };
     tier = { tier: "supervisor", isLoading: false };
     pintar();
-    await waitFor(() => expect(screen.getByText("GENERICO")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText("MIO")).toBeInTheDocument());
     expect(screen.queryByText("VENTAS")).not.toBeInTheDocument();
   });
 
@@ -86,7 +91,7 @@ describe("/dashboard · reparto por rol", () => {
     permisos = { canAccess: conChatters, isLoading: false };
     tier = { tier: "member", isLoading: false };
     pintar();
-    await waitFor(() => expect(screen.getByText("GENERICO")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText("MIO")).toBeInTheDocument());
     expect(screen.queryByText("EQUIPO")).not.toBeInTheDocument();
   });
 
@@ -145,10 +150,43 @@ describe("/dashboard · reparto por rol", () => {
     permisos = { canAccess: conVentas, isLoading: true };
     tier = { tier: "admin", isLoading: false };
     const { container } = pintar();
-    expect(screen.queryByText("GENERICO")).not.toBeInTheDocument();
+    expect(screen.queryByText("MIO")).not.toBeInTheDocument();
     expect(screen.queryByText("VENTAS")).not.toBeInTheDocument();
     expect(screen.queryByText("CENTRO")).not.toBeInTheDocument();
     expect(container.querySelector(".animate-spin")).toBeTruthy();
+  });
+
+  // ── Quién mira qué (Alvaro, 10/11) ──
+  it("RR. HH. ve SU tablero, aunque tenga el permiso de Creadores (ya no el del manager)", async () => {
+    permisos = { canAccess: conCreadores, isLoading: false };
+    tier = { tier: "manager", isLoading: false };
+    rh = { esRh: true, cargando: false, error: null };
+    pintar();
+    await waitFor(() => expect(screen.getByText("RRHH")).toBeInTheDocument());
+    expect(screen.queryByText("MANAGER")).not.toBeInTheDocument();
+  });
+
+  it("mientras no se sabe si es de RR. HH., no dibuja ningún tablero", () => {
+    permisos = { canAccess: conCreadores, isLoading: false };
+    tier = { tier: "manager", isLoading: false };
+    rh = { esRh: null, cargando: true, error: null };
+    const { container } = pintar();
+    expect(screen.queryByText("MANAGER")).not.toBeInTheDocument();
+    expect(screen.queryByText("RRHH")).not.toBeInTheDocument();
+    expect(container.querySelector(".animate-spin")).toBeTruthy();
+  });
+
+  it("quien no tiene tablero de su área (Finanzas, PR, Warming…) ve solo lo suyo", async () => {
+    tier = { tier: "supervisor", isLoading: false };
+    permisos = { canAccess: conCreadores, isLoading: false };
+    pintar();
+    await waitFor(() => expect(screen.getByText("MIO")).toBeInTheDocument());
+  });
+
+  it("el admin puede revisar los tableros de RR. HH. y «Tu día» con ?ver=", async () => {
+    tier = { tier: "admin", isLoading: false };
+    pintar("/dashboard?ver=rrhh");
+    await waitFor(() => expect(screen.getByText("RRHH")).toBeInTheDocument());
   });
 
   // ── El desplegable del título (solo admin) ──

@@ -432,9 +432,9 @@ async function registrarEspacio(admin: Admin, raices: RaizDelNas[] | undefined):
       .upsert({ nivel, pct: Number(disco.pct.toFixed(2)) }, { onConflict: "nivel", ignoreDuplicates: true }).select("nivel");
     if (!gane?.length) continue;
 
+    // Solo al dueño (Alvaro, 10/11: «Salud y NAS solo tú»); los admins ya no.
     const { data: duenos } = await admin.from("tenant_owners").select("user_id");
-    const { data: admins } = await admin.from("user_roles").select("user_id").ilike("role", "admin");
-    const candidatos = [...new Set([...(duenos ?? []), ...(admins ?? [])].map((r: { user_id: string }) => r.user_id))];
+    const candidatos = [...new Set((duenos ?? []).map((r: { user_id: string }) => r.user_id))];
     const { data: vivos } = candidatos.length
       ? await admin.from("profiles").select("id").in("id", candidatos).is("deleted_at", null)
       : { data: [] };
