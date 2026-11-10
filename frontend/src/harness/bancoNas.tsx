@@ -32,7 +32,6 @@ export default function BancoNas() {
   return (
     <div className="mx-auto flex max-w-4xl flex-col gap-6 p-6">
       <EspacioNasVista resumen={RESUMEN_REAL} cargando={false} fallo={false} onReintentar={() => {}} />
-      <EspacioNasVista resumen={undefined} cargando={false} fallo onReintentar={() => {}} />
     </div>
   );
 }
