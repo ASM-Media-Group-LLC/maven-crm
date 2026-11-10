@@ -5,6 +5,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { describeFunctionError } from "@/hooks/useMailConnection";
 import { fetchAllRows } from "@/lib/supabasePaginate";
 import { recordarTamanos, tamanosRecordados } from "@/lib/drive/tamanosRecordados";
+import { subirPorPartes, SubidaCancelada, SubidaFallida } from "@/lib/drive/subidaPorPartes";
 
 // Drive de Oficina. Las FICHAS (nombre, carpeta, dueño) se leen directo de la
 // base con la RLS de drive_items; el CONTENIDO va y viene del NAS por la puerta de Dokploy (Tailscale)
@@ -640,7 +641,7 @@ export interface Subida {
   nombre: string;
   size: number;
   enviado: number;
-  estado: "subiendo" | "lista" | "error";
+  estado: "subiendo" | "reintentando" | "sin_internet" | "lista" | "error";
   error?: string;
 }
 
@@ -648,47 +649,41 @@ type Inicio =
   | { id: string; url: string }
   | { id: string; tamano_parte: number; partes: string[]; completar: string };
 
-/** PUT con progreso. fetch no avisa cuánto va subiendo; XMLHttpRequest sí. */
-function enviar(url: string, metodo: string, cuerpo: Blob | null, onProgreso: (n: number) => void): Promise<unknown> {
-  return new Promise((resolve, reject) => {
-    const xhr = new XMLHttpRequest();
-    xhr.open(metodo, url);
-    xhr.upload.onprogress = (e) => onProgreso(e.loaded);
-    xhr.onload = () => {
-      let j: unknown = null;
-      try { j = JSON.parse(xhr.responseText || "null"); } catch { /* sin cuerpo */ }
-      if (xhr.status >= 200 && xhr.status < 300) resolve(j);
-      else reject(new Error((j as { error?: string } | null)?.error ?? `El NAS contestó ${xhr.status}`));
-    };
-    // Sin respuesta del todo: la puerta o la mini no están. No es «el archivo
-    // es inválido»; es «el NAS no está».
-    xhr.onerror = () => reject(new Error("No se pudo llegar al NAS"));
-    xhr.send(cuerpo);
-  });
+/** Cómo va una subida que aguanta cortes: subiendo normal, reintentando tras un
+ *  corte de red, o esperando a que vuelva el internet. */
+export type EstadoSubida = "subiendo" | "reintentando" | "sin_internet";
+
+/** El código estable de un fallo de subida, para que la UI lo muestre traducido
+ *  (ver PanelDeSubidas). SubidaFallida trae el porqué; el resto es genérico. */
+export function codigoDeFallo(e: unknown): string {
+  if (e instanceof SubidaCancelada) return "cancelada";
+  if (e instanceof SubidaFallida) return e.codigo; // sin_red | nas_rechazo | sin_recibo
+  return (e as Error)?.message || "error";
 }
 
-/** Sube UN archivo: pide el permiso a la edge, manda el archivo directo al NAS
- *  (entero o por partes de 32 MB) y confirma con el recibo que firma el NAS.
- *  Las partes van de a una: el orden importa menos que no saturar la subida de
- *  la oficina. Devuelve el id de la ficha, que al volver ya está «listo». */
-async function subirArchivo(f: File, parentId: string | null, onProgreso: (enviado: number) => void): Promise<string> {
+/** Sube UN archivo al NAS AGUANTANDO CORTES: pide el permiso a la edge y manda
+ *  el archivo con el MISMO motor robusto del portal de creadoras
+ *  (subirPorPartes). Si la red se cae a mitad, reintenta con esperas crecientes
+ *  y, al volver, sigue desde la parte que faltaba — en vez de morir al primer
+ *  parpadeo, como hacía antes. Confirma con el recibo que firma el NAS y
+ *  devuelve el id de la ficha, que al volver ya está «listo». */
+async function subirArchivo(
+  f: File,
+  parentId: string | null,
+  onProgreso: (enviado: number) => void,
+  onEstado?: (e: EstadoSubida) => void,
+  signal?: AbortSignal,
+): Promise<string> {
   const ini = await llamar<Inicio>("subir_iniciar", {
     parent_id: parentId, nombre: f.name, mime: f.type || "application/octet-stream", size: f.size,
   });
-  let respuesta: { recibo?: string } | null;
-  if ("url" in ini) {
-    respuesta = await enviar(ini.url, "PUT", f, onProgreso) as { recibo?: string };
-  } else {
-    let base = 0;
-    for (let i = 0; i < ini.partes.length; i++) {
-      const pedazo = f.slice(i * ini.tamano_parte, (i + 1) * ini.tamano_parte);
-      await enviar(ini.partes[i], "PUT", pedazo, (e) => onProgreso(base + e));
-      base += pedazo.size;
-    }
-    respuesta = await enviar(ini.completar, "POST", null, () => {}) as { recibo?: string };
-  }
-  if (!respuesta?.recibo) throw new Error("El NAS no devolvió el recibo");
-  await llamar("subir_confirmar", { id: ini.id, recibo: respuesta.recibo });
+  const recibo = await subirPorPartes(f, ini, {
+    onProgreso,
+    signal,
+    onEstado: (e) =>
+      onEstado?.("reintento" in e ? "reintentando" : "sinInternet" in e ? "sin_internet" : "subiendo"),
+  });
+  await llamar("subir_confirmar", { id: ini.id, recibo });
   return ini.id;
 }
 
@@ -709,10 +704,14 @@ export function useSubidasDrive() {
       const f = archivos[n];
       const { clave } = nuevas[n];
       try {
-        await subirArchivo(f, parentId, (e) => cambiar(clave, { enviado: e }));
+        await subirArchivo(
+          f, parentId,
+          (e) => cambiar(clave, { enviado: e }),
+          (estado) => cambiar(clave, { estado }),
+        );
         cambiar(clave, { estado: "lista", enviado: f.size });
       } catch (e) {
-        cambiar(clave, { estado: "error", error: (e as Error).message });
+        cambiar(clave, { estado: "error", error: codigoDeFallo(e) });
       }
       invalidar();
     }
