@@ -65,6 +65,7 @@ const DocumentoPage = lazy(() => import("./pages/oficina/DocumentoPage"));
 const DrivePage = lazy(() => import("./pages/oficina/DrivePage"));
 const EspacioNasPage = lazy(() => import("./pages/oficina/EspacioNasPage"));
 const ArchivoDelDrivePage = lazy(() => import("./pages/oficina/ArchivoDelDrivePage"));
+const LinksDeSubidaPage = lazy(() => import("./pages/oficina/LinksDeSubidaPage"));
 // Correo (Zoho detrás). Ya está en UNIVERSAL_MODULES (usePermissions), o sea que
 // se ve por default como Messenger/Cowork/Meet; un admin puede apagárselo a un rol
 // desde Administración → Roles, donde ahora figura (MODULES_CONFIG en useRoles.ts).
@@ -424,6 +425,8 @@ const App = () => (
                 {/* Espacio del NAS (Alvaro, 10/11): solo dueño/admin; la página y sus RPC lo verifican. */}
                 <Route path="/oficina/espacio-nas" element={<PermissionRoute module="Oficina"><EspacioNasPage /></PermissionRoute>} />
                 <Route path="/oficina/drive" element={<PermissionRoute module="Oficina" submodule="Drive"><DrivePage /></PermissionRoute>} />
+                {/* Links de las modelos (10/11). NO bajo /oficina/drive/…: chocaría con /oficina/drive/:id. */}
+                <Route path="/oficina/links-de-subida" element={<PermissionRoute module="Oficina" submodule="Drive"><LinksDeSubidaPage /></PermissionRoute>} />
                 {/* Un archivo del Drive abierto en la Oficina (editado en su
                     lugar, como el modo de edición de Office de Google). Lo
                     abre «Abrir» desde Documentos, Hojas o Presentaciones: no

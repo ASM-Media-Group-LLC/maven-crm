@@ -1,12 +1,15 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { Link as LinkRouter, useSearchParams } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
 import {
   Building2, ChevronRight, Clock, Download, File, FileArchive, FileImage, FileSpreadsheet, FileText, FileVideo,
   Folder, FolderInput, FolderPlus, HardDrive, History, Info, Loader2, MoreVertical, Pencil, Plus, RotateCcw, Share2, Trash2,
-  Upload, Users, X, AlertTriangle, Check, Lock,
+  Upload, Users, X, AlertTriangle, Check, Lock, Link2,
 } from "lucide-react";
+import { BotonLinkParaLaModelo } from "@/components/oficina/LinkDeSubida";
+import { useRoleTier } from "@/hooks/useRoleTier";
+import { useEsDueno } from "@/hooks/useEsDueno";
 import { toast } from "sonner";
 import { Page } from "@/components/ui/page";
 import { PageHeader } from "@/components/ui/page-header";
@@ -171,6 +174,13 @@ export default function DrivePage() {
   // Como en Google Workspace: las unidades compartidas las crea un admin.
   const sePuedeCrearUnidad = isAdmin && vista === "unidades" && !carpeta;
   const enPapelera = vista === "papelera" && !carpeta;
+  // Los links de subida de las modelos (10/11): a la vista para quien puede
+  // crearlos (supervisor para arriba, o dueño). Si igual no puede, la RPC lo dice.
+  const { isSupervisorOrAbove } = useRoleTier();
+  const { esDueno } = useEsDueno();
+  const puedeLinks = isAdmin || isSupervisorOrAbove || esDueno === true;
+  const pasos = ruta.data ?? [];
+  const nombreCarpeta = carpeta && pasos.length ? pasos[pasos.length - 1].nombre : null;
 
   const ir = (v: VistaDrive, c: string | null = null) => {
     const p = new URLSearchParams();
@@ -700,8 +710,20 @@ export default function DrivePage() {
     <Page>
       <PageHeader
         title={t("drive.titulo")}
-        actions={sePuedeSubir || isAdmin ? (
+        actions={sePuedeSubir || isAdmin || puedeLinks ? (
           <>
+          {/* Dentro de una carpeta: el link para que la modelo suba ahí, sin cuenta. */}
+          {puedeLinks && carpeta && !enPapelera && (
+            <BotonLinkParaLaModelo carpetaId={carpeta} carpetaNombre={nombreCarpeta} />
+          )}
+          {puedeLinks && (
+            <Button variant="outline" asChild>
+              <LinkRouter to="/oficina/links-de-subida" aria-label={t("drive.links.botonLista")}>
+                <Link2 className="h-4 w-4 sm:mr-1.5" />
+                <span className="hidden sm:inline">{t("drive.links.botonLista")}</span>
+              </LinkRouter>
+            </Button>
+          )}
           {sePuedeCrearUnidad && (
             <Button onClick={() => setCreandoUnidad(true)}>
               <Plus className="mr-1.5 h-4 w-4" />
