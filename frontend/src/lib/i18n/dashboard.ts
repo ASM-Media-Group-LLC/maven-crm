@@ -153,6 +153,7 @@ export const dashboard = {
   "dashboard.centro.nas.pagina.entroMes": { es: "Entró ese mes", en: "Added that month" },
   "dashboard.centro.nas.pagina.semana": { es: "Qué entró esta semana", en: "What came in this week" },
   "dashboard.centro.nas.pagina.semanaTotal": { es: "{tam} en {n} archivos en los últimos 7 días", en: "{tam} in {n} files in the last 7 days" },
+  "dashboard.centro.nas.pagina.semanaNota": { es: "Ojo: esto es solo lo NUEVO de los últimos 7 días, no todo lo que hay en el NAS (el total está arriba, en «Espacio del NAS»). Cada lista muestra los 10 que más subieron.", en: "Note: this is only what's NEW in the last 7 days, not everything on the NAS (the total is above, in «NAS storage»). Each list shows the top 10 uploaders." },
   "dashboard.centro.nas.pagina.dePorLink": { es: "Lo que mandaron las modelos por su link", en: "What models sent through their link" },
   "dashboard.centro.nas.pagina.pidio": { es: "Lo pidió {nombre}", en: "Requested by {nombre}" },
   "dashboard.centro.nas.pagina.delEquipo": { es: "Lo que subió el equipo", en: "What the team uploaded" },

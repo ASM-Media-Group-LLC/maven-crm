@@ -188,7 +188,8 @@ export function EspacioNasPaginaVista({ resumen, historia, entro: semana, modelo
         }}
       </Seccion>
 
-      <Seccion icono={Upload} titulo={t("dashboard.centro.nas.pagina.semana")} q={semana}>
+      <Seccion icono={Upload} titulo={t("dashboard.centro.nas.pagina.semana")} q={semana}
+        nota={t("dashboard.centro.nas.pagina.semanaNota")}>
         {(s) => {
           const maxDia = Math.max(1, ...s.por_dia.map((d) => d.bytes));
           const maxModelo = Math.max(1, ...s.por_modelo.map((m) => m.bytes));
