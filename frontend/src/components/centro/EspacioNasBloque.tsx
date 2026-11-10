@@ -52,12 +52,13 @@ export const RUTA_ESPACIO_NAS = "/oficina/espacio-nas";
 
 /** El contenedor: pide el resumen (solo dueño/admin) y se lo pasa a la vista.
  *  En el Centro lleva el enlace a la página completa; en la página, no. */
-export default function EspacioNasBloque({ conEnlace = true }: { conEnlace?: boolean }) {
+/** El resumen del NAS (solo dueño/admin). Lo comparten el bloque de la página,
+ *  la línea del Centro y la ficha: una sola lectura en caché. */
+export function useResumenNas() {
   const { user } = useAuth();
   const { esDueno } = useEsDueno();
   const { isAdmin } = useUserRole();
   const puede = esDueno === true || isAdmin;
-
   const q = useQuery<ResumenNas>({
     queryKey: ["centro-espacio-nas"],
     enabled: !!user && puede,
@@ -70,7 +71,11 @@ export default function EspacioNasBloque({ conEnlace = true }: { conEnlace?: boo
       return data as ResumenNas;
     },
   });
+  return { puede, q };
+}
 
+export default function EspacioNasBloque({ conEnlace = true }: { conEnlace?: boolean }) {
+  const { puede, q } = useResumenNas();
   if (!puede) return null;
   return (
     <EspacioNasVista

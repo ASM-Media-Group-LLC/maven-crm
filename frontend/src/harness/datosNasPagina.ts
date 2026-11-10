@@ -59,7 +59,12 @@ export const MODELOS_REAL: PorModelo = {
 
 export const LIBERAR_REAL: QueLiberar = {
   copias: { bytes: 6806501617387, grupos: 73727, copias_de_mas: 89658 },
-  papelera: { bytes: 12225704871, archivos: 213 },
+  papelera: { bytes: 4485234183241, archivos: 160375 },
+  carpetas_tiradas: [
+    { id: "t1", nombre: "Alicia Trece", padre: "KASH-CONTENT-VPS", tirada: "2026-10-05T15:00:00Z", por: "Monica Duque", bytes: 1551000000000, archivos: 4401 },
+    { id: "t2", nombre: "LUSH 3.0", padre: "KASH", tirada: "2026-10-05T15:00:00Z", por: "Monica Duque", bytes: 1427000000000, archivos: 47655 },
+    { id: "t3", nombre: "DRIVE CONTENT GENERAL", padre: "KASH", tirada: "2026-10-05T15:00:00Z", por: "Monica Duque", bytes: 1252000000000, archivos: 95912 },
+  ],
   top: [
     { nombre: "c6602.mp4", size: 47815843039, copias: 2, recupera: 47815843039, unidades: ["Contenido Shootings"] },
     { nombre: "c6405.mp4", size: 40970667053, copias: 2, recupera: 40970667053, unidades: ["Contenido Shootings"] },

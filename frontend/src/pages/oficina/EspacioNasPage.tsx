@@ -1,90 +1,49 @@
 import type { ReactNode } from "react";
-import { Link } from "react-router-dom";
-import { useQuery, type UseQueryResult } from "@tanstack/react-query";
+import { Link, useSearchParams } from "react-router-dom";
 import { Area, AreaChart, CartesianGrid, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
-import { AlertTriangle, ArrowLeft, Copy, HardDrive, Loader2, RefreshCw, Trash2, TrendingUp, Upload, Users } from "lucide-react";
-import EspacioNasBloque from "@/components/centro/EspacioNasBloque";
+import { ArrowLeft, Copy, HardDrive, Trash2, TrendingUp, Upload, Users } from "lucide-react";
+import EspacioNasBloque, { useResumenNas } from "@/components/centro/EspacioNasBloque";
+import ExploradorNas from "@/components/nas/ExploradorNas";
+import { FichaNasVista } from "@/components/nas/FichaNas";
+import { MasPesadosNasVista, PorTipoNasVista } from "@/components/nas/QueHayNas";
+import { Fila, Seccion, useRpcNas, type EstadoDe } from "@/components/nas/comun";
 import { Button } from "@/components/ui/button";
 import { Page } from "@/components/ui/page";
 import { PageHeader } from "@/components/ui/page-header";
-import { supabase } from "@/integrations/supabase/client";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/hooks/useAuth";
-import { useEsDueno } from "@/hooks/useEsDueno";
 import { useLanguage } from "@/hooks/useLanguage";
-import { useUserRole } from "@/hooks/useUserRole";
 import {
   ALERTA_PCT, LLENO_PCT, nombreConPadre, puntosDeHistoria, tamanoNas,
-  type EntroSemana, type HistoriaNas, type PorModelo, type QueLiberar,
+  type EntroSemana, type FichaNas, type HistoriaNas, type MasPesadosNas, type PorModelo, type PorTipoNas, type QueLiberar,
 } from "@/lib/espacioNas";
 
-// PÁGINA COMPLETA DEL ESPACIO DEL NAS (Alvaro, 10/11/2026). Se llega desde el
-// bloque del Centro de operaciones («Ver detalle»). Solo dueño/admin (las RPC
-// también lo exigen). Cada sección carga sola: si una falla, lo dice y deja
-// reintentar sin tumbar las demás. Nada se borra desde acá.
+// EL ÁREA DEL NAS (Alvaro, 10/11/2026): "ver todo lo que hay en el NAS". Se
+// entra desde la línea del Centro de operaciones («Entrar al NAS») y desde el
+// menú (Oficina › Espacio del NAS). Solo dueño/admin (las RPC también lo
+// exigen). Cinco pestañas que cargan solo cuando se abren:
+//   Resumen     qué tan lleno está, cómo se ha ido llenando y qué entró esta semana
+//   Explorador  las carpetas con su peso, nivel por nivel
+//   Qué hay     por tipo de archivo, los 50 más pesados y qué ocupa cada modelo
+//   Liberar     posibles copias repetidas y la papelera
+//   Ficha       qué es el NAS, cómo llega el contenido, si tiene respaldo
+// Cada sección dice su propio fallo (con Reintentar) sin tumbar las demás.
+// Nada se borra desde acá.
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const sinTipar = supabase as unknown as { rpc: (f: string, a?: unknown) => Promise<{ data: any; error: { message: string } | null }> };
+export type { EstadoDe };
 
 /** Capacidad de los discos, para las líneas de aviso y tope de la gráfica. */
 const CAPACIDAD_TB = 48;
 
-function useRpc<T>(rpc: string, on: boolean): UseQueryResult<T> {
-  return useQuery<T>({
-    queryKey: ["espacio-nas", rpc],
-    enabled: on,
-    staleTime: 10 * 60_000,
-    retry: 1,
-    queryFn: async () => {
-      const { data, error } = await sinTipar.rpc(rpc);
-      if (error) throw new Error(error.message);
-      return data as T;
-    },
-  });
-}
-
-/** Lo que la vista necesita de cada consulta (así se puede dibujar con datos fijos). */
-export type EstadoDe<T> = Pick<UseQueryResult<T>, "data" | "isLoading" | "isError"> & { refetch: () => unknown };
-
-/** Una sección con su estado: cargando, falló (con reintentar) o el contenido. */
-function Seccion<T>({ icono: Icono, titulo, nota, q, children }: {
-  icono: typeof HardDrive; titulo: string; nota?: ReactNode; q: EstadoDe<T>; children: (d: T) => ReactNode;
-}) {
-  const { t } = useLanguage();
-  return (
-    <section className="vidrio sube p-4">
-      <h2 className="mb-1 flex items-center gap-2 text-sm font-semibold">
-        <span className="flex h-7 w-7 items-center justify-center rounded-panel bg-primary/10 text-primary"><Icono className="h-4 w-4" /></span>
-        {titulo}
-      </h2>
-      {nota && <div className="mb-3 max-w-3xl text-xs text-muted-foreground">{nota}</div>}
-      {q.isLoading ? (
-        <div className="flex items-center justify-center py-8"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
-      ) : q.isError || !q.data ? (
-        <div role="alert" className="flex flex-wrap items-center gap-3 rounded-panel border border-destructive/30 bg-destructive/5 p-3 text-sm">
-          <AlertTriangle className="h-4 w-4 shrink-0 text-destructive" />
-          <span className="min-w-0 flex-1">{t("dashboard.centro.nas.fallo")}</span>
-          <button type="button" onClick={() => void q.refetch()} className="inline-flex items-center gap-1.5 rounded-control border border-border px-2.5 py-1 text-xs font-medium hover:bg-muted">
-            <RefreshCw className="h-3.5 w-3.5" />{t("dashboard.centro.nas.reintentar")}
-          </button>
-        </div>
-      ) : children(q.data)}
-    </section>
-  );
-}
-
-/** Fila de lista con barrita apagada (mismo lenguaje que el bloque del Centro). */
-function Fila({ nombre, detalle, valor, pct }: { nombre: ReactNode; detalle?: ReactNode; valor: string; pct: number }) {
-  return (
-    <li className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1">
-      <span className="truncate text-sm">{nombre}</span>
-      <span className="text-right text-xs tabular-nums text-muted-foreground">{valor}</span>
-      <div className="col-span-2 h-1.5 overflow-hidden rounded-full bg-muted">
-        <div className="h-full rounded-full bg-primary/45" style={{ width: `${Math.min(100, Math.max(1, pct))}%` }} />
-      </div>
-      {detalle && <span className="col-span-2 -mt-0.5 text-[10px] text-muted-foreground tabular-nums">{detalle}</span>}
-    </li>
-  );
-}
+const VISTAS = ["resumen", "explorador", "quehay", "liberar", "ficha"] as const;
+type Vista = (typeof VISTAS)[number];
+const CLAVE_VISTA = {
+  resumen: "dashboard.centro.nas.vista.resumen",
+  explorador: "dashboard.centro.nas.vista.explorador",
+  quehay: "dashboard.centro.nas.vista.quehay",
+  liberar: "dashboard.centro.nas.vista.liberar",
+  ficha: "dashboard.centro.nas.vista.ficha",
+} as const;
 
 /** El encabezado estándar de Maven, con «Volver al inicio». */
 function Encabezado() {
@@ -106,31 +65,66 @@ function Encabezado() {
   );
 }
 
-/** El contenedor: solo dueño/admin; pide las cuatro lecturas en paralelo. */
+/** El contenedor: solo dueño/admin. La pestaña y la carpeta del explorador
+ *  viajan en la URL (?vista=…&carpeta=…), así un link lleva al mismo lugar. */
 export default function EspacioNasPage() {
   const { t } = useLanguage();
   const { user } = useAuth();
-  const { esDueno } = useEsDueno();
-  const { isAdmin } = useUserRole();
-  const puede = esDueno === true || isAdmin;
-  const habilitado = !!user && puede;
+  const { puede, q: resumenQ } = useResumenNas();
+  const [params, setParams] = useSearchParams();
+  const vista: Vista = (VISTAS as readonly string[]).includes(params.get("vista") ?? "") ? (params.get("vista") as Vista) : "resumen";
+  const carpeta = params.get("carpeta");
+  const on = (v: Vista) => !!user && puede && vista === v;
 
-  const historia = useRpc<HistoriaNas>("nas_historia", habilitado);
-  const semana = useRpc<EntroSemana>("nas_entro_semana", habilitado);
-  const modelos = useRpc<PorModelo>("nas_por_modelo", habilitado);
-  const liberar = useRpc<QueLiberar>("nas_que_liberar", habilitado);
+  const ir = (v: Vista, extra?: Record<string, string | null>) => {
+    const p = new URLSearchParams(params);
+    p.set("vista", v);
+    for (const [k, val] of Object.entries(extra ?? {})) { if (val) p.set(k, val); else p.delete(k); }
+    setParams(p, { replace: false });
+  };
+
+  const historia = useRpcNas<HistoriaNas>("nas_historia", on("resumen"));
+  const semana = useRpcNas<EntroSemana>("nas_entro_semana", on("resumen"));
+  const tipos = useRpcNas<PorTipoNas>("nas_por_tipo", on("quehay"));
+  const pesados = useRpcNas<MasPesadosNas>("nas_mas_pesados", on("quehay"));
+  const modelos = useRpcNas<PorModelo>("nas_por_modelo", on("quehay"));
+  const liberar = useRpcNas<QueLiberar>("nas_que_liberar", on("liberar"));
+  const ficha = useRpcNas<FichaNas>("nas_ficha", on("ficha"));
 
   // <Page> trae el scroll propio: el AppShell recorta lo que se pasa de la pantalla.
   return (
     <Page>
       <Encabezado />
-      {puede ? (
-        <EspacioNasPaginaVista
-          resumen={<EspacioNasBloque conEnlace={false} />}
-          historia={historia} entro={semana} modelos={modelos} liberar={liberar}
-        />
-      ) : (
+      {!puede ? (
         <p className="vidrio p-4 text-sm text-muted-foreground">{t("dashboard.centro.nas.pagina.soloAdmins")}</p>
+      ) : (
+        <Tabs value={vista} onValueChange={(v) => ir(v as Vista)} className="flex flex-col gap-4">
+          <div className="overflow-x-auto">
+            <TabsList>
+              {VISTAS.map((v) => <TabsTrigger key={v} value={v}>{t(CLAVE_VISTA[v])}</TabsTrigger>)}
+            </TabsList>
+          </div>
+          <TabsContent value="resumen" className="mt-0">
+            <EspacioNasPaginaVista vista="resumen" resumen={<EspacioNasBloque conEnlace={false} />}
+              historia={historia} entro={semana} modelos={modelos} liberar={liberar} />
+          </TabsContent>
+          <TabsContent value="explorador" className="mt-0">
+            <ExploradorNas carpeta={carpeta} on={on("explorador")} onAbrir={(id) => ir("explorador", { carpeta: id })} />
+          </TabsContent>
+          <TabsContent value="quehay" className="mt-0 flex flex-col gap-4">
+            <PorTipoNasVista q={tipos} />
+            <MasPesadosNasVista q={pesados} />
+            <EspacioNasPaginaVista vista="quehay" resumen={null}
+              historia={historia} entro={semana} modelos={modelos} liberar={liberar} />
+          </TabsContent>
+          <TabsContent value="liberar" className="mt-0">
+            <EspacioNasPaginaVista vista="liberar" resumen={null}
+              historia={historia} entro={semana} modelos={modelos} liberar={liberar} />
+          </TabsContent>
+          <TabsContent value="ficha" className="mt-0">
+            <FichaNasVista q={ficha} resumen={resumenQ.data} />
+          </TabsContent>
+        </Tabs>
       )}
     </Page>
   );
@@ -138,7 +132,9 @@ export default function EspacioNasPage() {
 
 /** La vista: solo dibuja el cuerpo (el marco y el encabezado los pone el contenedor).
  *  Se mira con datos reales en /harness.html?ver=nas-pagina. */
-export function EspacioNasPaginaVista({ resumen, historia, entro: semana, modelos, liberar }: {
+export function EspacioNasPaginaVista({ vista, resumen, historia, entro: semana, modelos, liberar }: {
+  /** Qué pestaña dibujar; sin ella dibuja todo (banco visual y pruebas). */
+  vista?: "resumen" | "quehay" | "liberar";
   resumen: ReactNode;
   historia: EstadoDe<HistoriaNas>; entro: EstadoDe<EntroSemana>; modelos: EstadoDe<PorModelo>; liberar: EstadoDe<QueLiberar>;
 }) {
@@ -147,11 +143,14 @@ export function EspacioNasPaginaVista({ resumen, historia, entro: semana, modelo
   const num = (n: number) => n.toLocaleString(loc);
   const tam = (b: number) => tamanoNas(b, language);
 
+  const ver = (v: "resumen" | "quehay" | "liberar") => !vista || vista === v;
+
   return (
     <div className="flex w-full flex-col gap-4">
       {/* Lo de siempre: qué tan lleno está, cuánto falta, qué unidad ocupa más. */}
-      {resumen}
+      {ver("resumen") && resumen}
 
+      {ver("resumen") && (
       <Seccion icono={TrendingUp} titulo={t("dashboard.centro.nas.pagina.historia")} q={historia}
         nota={t("dashboard.centro.nas.pagina.historiaNota")}>
         {(h) => {
@@ -187,7 +186,9 @@ export function EspacioNasPaginaVista({ resumen, historia, entro: semana, modelo
           );
         }}
       </Seccion>
+      )}
 
+      {ver("resumen") && (
       <Seccion icono={Upload} titulo={t("dashboard.centro.nas.pagina.semana")} q={semana}
         nota={t("dashboard.centro.nas.pagina.semanaNota")}>
         {(s) => {
@@ -237,7 +238,9 @@ export function EspacioNasPaginaVista({ resumen, historia, entro: semana, modelo
           );
         }}
       </Seccion>
+      )}
 
+      {ver("quehay") && (
       <Seccion icono={Users} titulo={t("dashboard.centro.nas.pagina.modelos")} q={modelos}
         nota={modelos.data ? t("dashboard.centro.nas.pagina.modelosNota", { atribuido: tam(modelos.data.atribuido), usado: tam(modelos.data.usado), n: num(modelos.data.cuantas) }) : undefined}>
         {(m) => {
@@ -253,7 +256,9 @@ export function EspacioNasPaginaVista({ resumen, historia, entro: semana, modelo
           );
         }}
       </Seccion>
+      )}
 
+      {ver("liberar") && (
       <Seccion icono={Copy} titulo={t("dashboard.centro.nas.pagina.liberar")} q={liberar}>
         {(l) => (
           <div className="flex flex-col gap-4">
@@ -269,6 +274,28 @@ export function EspacioNasPaginaVista({ resumen, historia, entro: semana, modelo
                 <div className="mt-0.5 text-[11px] text-muted-foreground">{t("dashboard.centro.nas.pagina.papeleraNota", { n: num(l.papelera.archivos) })}</div>
               </div>
             </div>
+            {(l.carpetas_tiradas ?? []).length > 0 && (
+              <div className="flex flex-col gap-2">
+                <h3 className="text-xs font-semibold text-muted-foreground">{t("dashboard.centro.nas.pagina.tiradasTitulo")}</h3>
+                <ul className="flex flex-col divide-y divide-border/40">
+                  {(l.carpetas_tiradas ?? []).map((c) => {
+                    const fecha = new Date(c.tirada).toLocaleDateString(loc, { day: "2-digit", month: "short", year: "numeric" });
+                    return (
+                      <li key={c.id} className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-3 gap-y-0.5 py-2">
+                        <span className="truncate text-sm" title={c.nombre}>{c.nombre}</span>
+                        <span className="text-right text-sm font-medium tabular-nums">{tam(c.bytes)}</span>
+                        <span className="col-span-2 truncate text-[11px] text-muted-foreground">
+                          {c.por
+                            ? t("dashboard.centro.nas.pagina.tiradaPor", { padre: c.padre ?? "—", fecha, quien: c.por })
+                            : t("dashboard.centro.nas.pagina.tirada", { padre: c.padre ?? "—", fecha })}
+                          {" · "}{t("dashboard.centro.nas.archivos", { n: num(c.archivos) })}
+                        </span>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+            )}
             {l.top.length > 0 && (
               <div className="flex flex-col gap-2">
                 <p className="text-xs text-muted-foreground">{t("dashboard.centro.nas.pagina.copiasAviso")}</p>
@@ -291,6 +318,7 @@ export function EspacioNasPaginaVista({ resumen, historia, entro: semana, modelo
           </div>
         )}
       </Seccion>
+      )}
     </div>
   );
 }

@@ -92,7 +92,10 @@ export interface PorModelo {
 export interface QueLiberar {
   copias: { grupos: number; copias_de_mas: number; bytes: number };
   top: { nombre: string; size: number; copias: number; recupera: number; unidades: string[] }[];
+  /** Lo tirado uno por uno + TODO lo que está debajo de una carpeta tirada. */
   papelera: { bytes: number; archivos: number };
+  /** Las carpetas tiradas más pesadas (siguen ocupando disco hasta vaciar la papelera). */
+  carpetas_tiradas?: { id: string; nombre: string; padre: string | null; tirada: string; por: string | null; bytes: number; archivos: number }[];
 }
 
 /** «ene 25» / «Jan 25» para el eje de la gráfica. */
@@ -112,4 +115,42 @@ export function puntosDeHistoria(h: Pick<HistoriaNas, "meses">, idioma: string) 
  *  («YOISNIA › SCRIPT»): sin eso «SCRIPT» no dice de quién es. */
 export function nombreConPadre(nombre: string, padre: string | null | undefined): string {
   return padre && !/^contenido\b/i.test(padre) ? `${padre} › ${nombre}` : nombre;
+}
+
+// ── Área del NAS (nas_explorar / nas_por_tipo / nas_mas_pesados / nas_ficha) ──
+
+export interface CarpetaNas { id: string; nombre: string; bytes: number; archivos: number; carpetas: number; ultimo: string | null }
+export interface ArchivoNas { id: string; nombre: string; size: number | null; mime: string | null; creado: string }
+
+export interface ExplorarNas {
+  /** null = la raíz del Drive. */
+  carpeta: { id: string; nombre: string } | null;
+  /** De la raíz hacia abajo, sin la raíz y CON la carpeta actual. */
+  ruta: { id: string; nombre: string }[];
+  /** Las carpetas de este nivel, de la más pesada a la menos. */
+  hijos: CarpetaNas[];
+  /** Los 100 archivos sueltos más pesados de este nivel. */
+  sueltos: ArchivoNas[];
+  sueltos_total: { bytes: number; archivos: number };
+  total: { bytes: number; archivos: number };
+}
+
+export type TipoNas = "video" | "foto" | "audio" | "documento" | "comprimido" | "otro";
+export interface PorTipoNas {
+  tipos: { tipo: TipoNas; bytes: number; archivos: number; extensiones: { ext: string; bytes: number; archivos: number }[] }[];
+}
+
+export interface MasPesadosNas {
+  archivos: { id: string; nombre: string; size: number; carpeta_id: string | null; carpeta: string | null; unidad: string | null; dueno: string | null; creado: string; tipo: TipoNas }[];
+}
+
+export interface FichaNas {
+  archivos: number; carpetas: number; unidades: number; personas: number; links_modelos: number;
+  desde: string | null;
+  nas: { caido: boolean; desde: string | null; actualizado: string } | null;
+}
+
+/** Qué parte del nivel ocupa cada carpeta (para su barrita). */
+export function pctDelNivel(bytes: number, total: number): number {
+  return total > 0 ? (bytes / total) * 100 : 0;
 }

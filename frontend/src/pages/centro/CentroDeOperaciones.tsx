@@ -5,7 +5,7 @@ import { ArrowRight, BarChart3, Building2, Clock, DoorOpen, Headset, MessageCirc
 import SelectorDeTablero from "@/pages/dashboard/SelectorDeTablero";
 import PulsoEquipoVivo from "@/components/centro/PulsoEquipoVivo";
 import SaludPlataformaBloque from "@/components/centro/SaludPlataformaBloque";
-import EspacioNasBloque from "@/components/centro/EspacioNasBloque";
+import EspacioNasLinea from "@/components/centro/EspacioNasLinea";
 import { TarjetaKpi } from "@/components/ui/TarjetaKpi";
 import { Button } from "@/components/ui/button";
 import { useCoworkSession, type AdminSessionRow } from "@/hooks/useCoworkSession";
@@ -166,9 +166,10 @@ export default function CentroDeOperaciones() {
           El propio bloque se oculta a quien no es admin/dueño. */}
       <SaludPlataformaBloque />
 
-      {/* Espacio del NAS (Alvaro, 10/11): qué tan lleno está, cuánto falta y qué
-          ocupa más. Solo admin/dueño; el bloque se oculta solo para los demás. */}
-      <EspacioNasBloque />
+      {/* Espacio del NAS, CERRADO (Alvaro, 10/11): una línea con lo justo y
+          «Entrar al NAS»; todo el detalle vive en /oficina/espacio-nas. Solo
+          admin/dueño; para los demás no se dibuja. */}
+      <EspacioNasLinea />
 
       {/* Tarjetas resumen: compactas (los conectados ya van arriba en el Pulso). */}
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">

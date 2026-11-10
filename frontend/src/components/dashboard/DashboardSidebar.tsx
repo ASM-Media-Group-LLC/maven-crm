@@ -26,6 +26,7 @@ import {
 import { useLanguage } from "@/hooks/useLanguage";
 import { usePermissions } from "@/hooks/usePermissions";
 import { useEsDueno } from "@/hooks/useEsDueno";
+import { useUserRole } from "@/hooks/useUserRole";
 import { useEsRh } from "@/hooks/useEsRh";
 import { CollapsibleSidebarGroup } from "@/components/dashboard/CollapsibleSidebarGroup";
 import WhatsAppIcon from "@/components/icons/WhatsAppIcon";
@@ -88,6 +89,7 @@ const DashboardSidebar = () => {
   const { canAccess, isLoading: permisosCargando, hayError: permisosFallaron, reintentar: reintentarPermisos } = usePermissions();
   // Argos (por ahora) solo lo ve el dueño de la empresa, aunque tenga el permiso.
   const { esDueno } = useEsDueno();
+  const { isAdmin: esAdminDelMenu } = useUserRole();
   const { esRh } = useEsRh();
   // Argos/Monitor IA lo ve el dueño y también HR (Andrea). La RLS filtra que HR
   // no vea a los admins; aquí solo se abre el acceso del menú.
@@ -374,7 +376,15 @@ const DashboardSidebar = () => {
     { title: t("nav.office.slides"), url: "/oficina/presentaciones", icon: Presentation, submodule: "Presentaciones" },
     { title: t("nav.office.drive"), url: "/oficina/drive", icon: HardDrive, submodule: "Drive" },
   ];
-  const oficinaItems = oficinaItemsAll.filter((i) => canAccess("Oficina", i.submodule));
+  // «Espacio del NAS» (Alvaro, 10/11): solo dueño/admin. Va FUERA de
+  // oficinaItemsAll a propósito: no es un submódulo que se reparta por rol (el
+  // catálogo de permisos de Oficina tiene exactamente sus cinco secciones).
+  const oficinaItems = [
+    ...oficinaItemsAll.filter((i) => canAccess("Oficina", i.submodule)),
+    ...(esDueno === true || esAdminDelMenu
+      ? [{ title: t("nav.office.nas"), url: "/oficina/espacio-nas", icon: Gauge, submodule: "" }]
+      : []),
+  ];
   const oficinaCollapsedItems: CI[] = oficinaItems.map((i) => ({ title: i.title, url: i.url }));
   // ⚠️ Por PREFIJO y no por igualdad: al abrir un documento la ruta es
   // /oficina/<uuid>, que no está en el menú, y el grupo se apagaba justo
