@@ -3,6 +3,8 @@ import react from "@vitejs/plugin-react-swc";
 import path from "path";
 import { VitePWA } from "vite-plugin-pwa";
 import { pluginMarcaDeBuild } from "./frontend/src/lib/marcaDeBuild";
+import { TARJETAS, conTarjeta } from "./frontend/src/lib/tarjetasDeLink";
+import fs from "node:fs";
 
 // https://vitejs.dev/config/
 //
@@ -16,6 +18,24 @@ import { pluginMarcaDeBuild } from "./frontend/src/lib/marcaDeBuild";
 // Vite is told `root: 'frontend'` so it picks up index.html from there,
 // and `build.outDir: '../dist'` so the build output still ends up at
 // the repo root for Dokploy / nginx to serve.
+// La tarjeta de WhatsApp de los links de reunión y de Cowork (src/lib/tarjetasDeLink.ts):
+// una copia de index.html por tarjeta, con sus <meta og:…>. nginx.conf entrega cada
+// copia en su ruta; la app que arranca es la misma.
+function pluginTarjetasDeLink() {
+  return {
+    name: "tarjetas-de-link",
+    apply: "build" as const,
+    writeBundle(options: { dir?: string }) {
+      const dir = options.dir;
+      if (!dir) return;
+      const base = fs.readFileSync(path.join(dir, "index.html"), "utf8");
+      for (const t of [TARJETAS.reunion, TARJETAS.cowork]) {
+        fs.writeFileSync(path.join(dir, t.archivo), conTarjeta(base, t));
+      }
+    },
+  };
+}
+
 export default defineConfig(({ mode }) => ({
   root: "frontend",
   publicDir: "public",
@@ -35,6 +55,7 @@ export default defineConfig(({ mode }) => ({
     // builds del mismo código dan los mismos chunks y el mismo sw.js (ver
     // lib/marcaDeBuild.ts). En `npm run dev` es la hora en que arrancó el servidor.
     pluginMarcaDeBuild(),
+    pluginTarjetasDeLink(),
     mode === "production" && VitePWA({
       registerType: "prompt",
       injectRegister: false,
