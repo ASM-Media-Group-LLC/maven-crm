@@ -10,8 +10,10 @@ import type { ReactNode } from "react";
 // "no hay links"), que se vea cada modelo y que se resalte la que nunca mandó.
 
 let respuesta: { data: unknown; error: { message: string } | null } = { data: null, error: null };
-const rpc = vi.fn(async () => respuesta);
-vi.mock("@/integrations/supabase/client", () => ({ supabase: { rpc: (...a: unknown[]) => rpc(...(a as [])) } }));
+// Desde el 10/11 la página también trae la lista de creadoras (otra RPC, con su
+// propio banco en linksDeCreadoras.test.tsx): aquí contesta vacía.
+const rpc = vi.fn(async (f: string) => (f === "drive_links_de_subida" ? respuesta : { data: [], error: null }));
+vi.mock("@/integrations/supabase/client", () => ({ supabase: { rpc: (...a: unknown[]) => rpc(...(a as [string])) } }));
 vi.mock("@/hooks/useLanguage", () => {
   const idioma = {
     language: "es",

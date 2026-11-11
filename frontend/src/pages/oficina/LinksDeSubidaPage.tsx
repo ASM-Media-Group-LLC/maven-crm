@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { tamano } from "@/lib/drive/formato";
 import { urlDeAportar, useCopiar } from "@/components/oficina/LinkDeSubida";
+import { LinksDeCreadoras } from "@/components/oficina/LinksDeCreadoras";
 
 // LINKS DE LAS MODELOS (Alvaro, 10/11/2026): "¿dónde vergas está el link donde
 // las modelos meten sus videos?". Todos los links de subida activos en un solo
@@ -81,7 +82,22 @@ export default function LinksDeSubidaPage() {
           </Button>
         )}
       />
-      <LinksDeSubidaVista links={q.data} cargando={q.isLoading} fallo={q.isError} onReintentar={() => void q.refetch()} />
+      <div className="flex flex-col gap-8">
+        <section className="flex flex-col gap-3">
+          <div>
+            <h2 className="text-base font-semibold">{t("drive.creadoras.titulo")}</h2>
+            <p className="text-xs text-muted-foreground">{t("drive.creadoras.desc")}</p>
+          </div>
+          <LinksDeCreadoras />
+        </section>
+        <section className="flex flex-col gap-3">
+          <div>
+            <h2 className="text-base font-semibold">{t("drive.links.otros")}</h2>
+            <p className="text-xs text-muted-foreground">{t("drive.links.otrosDesc")}</p>
+          </div>
+          <LinksDeSubidaVista links={q.data} cargando={q.isLoading} fallo={q.isError} onReintentar={() => void q.refetch()} />
+        </section>
+      </div>
     </Page>
   );
 }

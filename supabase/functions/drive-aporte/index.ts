@@ -1,17 +1,34 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
+import { ahoraMas, firmar, VENCE } from "../_shared/drive-firma.ts";
+import {
+  armarListaDelZip, conExtension, extensionParaMiniatura, extensionParaVerComoJpg, type FichaZip, LADO_VISTA,
+  nombreDelZip, TOPE_MINIATURAS, TOPE_ZIP_PERMISO, venceMiniatura,
+} from "../drive/logica.ts";
+import { esTipoParaCompartir, type Hijo, NOMBRE_DEL_EQUIPO, nombreDeLink, nombreDelDia, ordenarHijos, permisosDe } from "./logica.ts";
 
-// drive-aporte — subida PÚBLICA por link (Alvaro, 04/11). Alguien abre el link
-// SIN cuenta y sube archivos a una carpeta del Drive. Para no exponer una
-// escritura pública al bucket, esta edge valida el token del link y entrega una
-// URL FIRMADA de subida (una sola, para ese archivo); el navegador sube directo
-// a esa URL (sirve para videos grandes). Luego confirma y se registra el aporte.
-// Los archivos viven en el bucket privado drive-aportes; un proceso aparte los
-// migra al NAS (Alvaro aceptó la demora de unos días). verify_jwt = false.
+// drive-aporte — el link público de la carpeta del Drive (Alvaro, 04/11), que
+// desde el 10/11 es también LA CARPETA DE LA CREADORA, para dejar Dropbox.
+//
+// Quien abre /aportar/<token> no tiene cuenta: el token ES la llave, y esta
+// edge decide qué deja hacer según el tipo de link (logica.ts → permisosDe):
+//
+//   · subir (los de siempre) e invitado (para el fotógrafo): solo suben.
+//   · personal (el de la creadora): sube, ve y baja todo lo de su carpeta, ve
+//     «Del equipo» y saca/cierra links de invitado y de ver.
+//   · ver (una carpeta compartida por la creadora): solo ve y baja esa carpeta.
+//
+// Todo lo que se sube cae en la subcarpeta del día («2026-11-10»), creada sola.
+// Los archivos se suben primero a Supabase (bucket privado drive-aportes, con
+// TUS) y drive-aporte-nas los pasa al NAS. Para ver y bajar, esta edge firma el
+// permiso del NAS (igual que la edge drive) DESPUÉS de comprobar que lo pedido
+// está dentro de la carpeta del link. verify_jwt = false.
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const CRON_TOKEN = Deno.env.get("CRON_INTERNAL_TOKEN") ?? "";
+const NAS = (Deno.env.get("DRIVE_NAS_URL") ?? "").replace(/\/+$/, "");
+const SECRETO = Deno.env.get("DRIVE_SECRETO") ?? "";
 const BUCKET = "drive-aportes";
 
 const MIMES: Record<string, string> = {
@@ -30,6 +47,10 @@ const CORS = {
 const json = (body: unknown, status = 200): Response =>
   new Response(JSON.stringify(body), { status, headers: { ...CORS, "Content-Type": "application/json" } });
 
+class Rechazo extends Error {
+  constructor(message: string, public status = 400) { super(message); }
+}
+
 const admin = createClient(SUPABASE_URL, SERVICE_KEY, { auth: { persistSession: false } });
 
 // Clave segura para el storage: sin acentos ni caracteres raros (macOS mete un
@@ -41,10 +62,68 @@ function claveSegura(nombre: string): string {
   return base.replace(/\s+/g, "_");
 }
 
-async function linkActivo(token: string) {
-  const { data } = await admin.from("drive_upload_links")
-    .select("token, item_id, tenant_id, activo, created_by").eq("token", token).maybeSingle();
-  return data && data.activo ? data : null;
+interface Link {
+  token: string; item_id: string; tenant_id: string; activo: boolean; created_by: string | null;
+  tipo: string; creator_id: string | null; padre_token: string | null; nombre: string | null;
+}
+const COLUMNAS_LINK = "token, item_id, tenant_id, activo, created_by, tipo, creator_id, padre_token, nombre";
+
+/** El link, si sigue vivo. Uno sacado por la creadora muere con el de ella. */
+async function linkActivo(token: string): Promise<Link | null> {
+  const { data } = await admin.from("drive_upload_links").select(COLUMNAS_LINK).eq("token", token).maybeSingle();
+  const l = data as Link | null;
+  if (!l || !l.activo) return null;
+  if (l.padre_token) {
+    const { data: padre } = await admin.from("drive_upload_links").select("activo").eq("token", l.padre_token).maybeSingle();
+    if (!padre?.activo) return null;
+  }
+  return l;
+}
+
+async function dentroDe(item: string, raiz: string): Promise<boolean> {
+  if (item === raiz) return true;
+  const { data, error } = await admin.rpc("drive_dentro_de", { _item: item, _raiz: raiz });
+  if (error) throw new Rechazo(error.message, 500);
+  return data === true;
+}
+
+/** Una carpeta que el link puede mirar (la suya o una de adentro). */
+async function carpetaPermitida(link: Link, carpeta: unknown): Promise<{ id: string; nombre: string; parent_id: string | null }> {
+  const id = typeof carpeta === "string" && carpeta ? carpeta : link.item_id;
+  if (!(await dentroDe(id, link.item_id))) throw new Rechazo("No existe o no es de este link", 404);
+  const { data } = await admin.from("drive_items").select("id, nombre, parent_id, tipo, trashed_at").eq("id", id).maybeSingle();
+  if (!data || data.tipo !== "carpeta" || data.trashed_at) throw new Rechazo("No existe o no es de este link", 404);
+  return { id: data.id as string, nombre: data.nombre as string, parent_id: (data.parent_id as string | null) ?? null };
+}
+
+/** El camino desde la carpeta del link hasta «carpeta», para las migas. */
+async function ruta(link: Link, carpeta: { id: string; nombre: string; parent_id: string | null }) {
+  const camino = [{ id: carpeta.id, nombre: carpeta.nombre }];
+  let padre = carpeta.parent_id;
+  let actual = carpeta.id;
+  for (let i = 0; i < 30 && actual !== link.item_id && padre; i++) {
+    const { data } = await admin.from("drive_items").select("id, nombre, parent_id").eq("id", padre).maybeSingle();
+    if (!data) break;
+    camino.unshift({ id: data.id as string, nombre: data.nombre as string });
+    actual = data.id as string;
+    padre = (data.parent_id as string | null) ?? null;
+  }
+  return camino;
+}
+
+const permisoNas = async (datos: Record<string, unknown>, vence: number) =>
+  `${NAS}/o?t=${await firmar(SECRETO, { ...datos, e: ahoraMas(vence) } as never)}`;
+
+/** Quién es la creadora del link (para saludarla en la página). */
+async function nombreDeLaCreadora(link: Link): Promise<string | null> {
+  let creador = link.creator_id;
+  if (!creador) {
+    const { data } = await admin.from("drive_carpeta_creadora").select("creator_id").eq("item_id", link.item_id).limit(1).maybeSingle();
+    creador = (data?.creator_id as string | undefined) ?? null;
+  }
+  if (!creador) return null;
+  const { data: c } = await admin.from("creators").select("name, artistic_name").eq("id", creador).maybeSingle();
+  return ((c?.artistic_name as string | null) || (c?.name as string | null)) ?? null;
 }
 
 Deno.serve(async (req) => {
@@ -59,13 +138,28 @@ Deno.serve(async (req) => {
   if (!token) return json({ error: "sin token" }, 400);
 
   try {
-    // Info del link (para pintar la página de subida).
+    // Info del link (para pintar la página).
     if (action === "info") {
-      const { data: l } = await admin.from("drive_upload_links")
-        .select("activo, item_id, nombre").eq("token", token).maybeSingle();
-      if (!l) return json({ existe: false });
-      const { data: di } = await admin.from("drive_items").select("nombre").eq("id", l.item_id).maybeSingle();
-      return json({ existe: true, activo: l.activo === true, carpeta: di?.nombre ?? null, etiqueta: l.nombre ?? null });
+      const { data } = await admin.from("drive_upload_links").select(COLUMNAS_LINK).eq("token", token).maybeSingle();
+      const crudo = data as Link | null;
+      if (!crudo) return json({ existe: false });
+      const link = await linkActivo(token);
+      const { data: di } = await admin.from("drive_items").select("nombre").eq("id", crudo.item_id).maybeSingle();
+      if (!link) return json({ existe: true, activo: false, carpeta: di?.nombre ?? null, etiqueta: crudo.nombre ?? null });
+
+      const permisos = permisosDe(link.tipo);
+      // La de la creadora siempre tiene su «Del equipo» (el equipo le deja ahí).
+      let delEquipo: string | null = null;
+      if (link.tipo === "personal") {
+        const { data: id } = await admin.rpc("drive_carpeta_hija", { _padre: link.item_id, _nombre: NOMBRE_DEL_EQUIPO, _owner: link.created_by });
+        delEquipo = (id as string | null) ?? null;
+      }
+      void admin.from("drive_upload_links").update({ usado_at: new Date().toISOString() }).eq("token", token).then(() => {}, () => {});
+      return json({
+        existe: true, activo: true, tipo: link.tipo, permisos,
+        carpeta: di?.nombre ?? null, carpeta_id: permisos.ver ? link.item_id : null,
+        etiqueta: link.nombre ?? null, creadora: await nombreDeLaCreadora(link), del_equipo_id: delEquipo,
+      });
     }
 
     // Telemetría de fallas (ANTES del check de link para que también funcione si
@@ -86,36 +180,46 @@ Deno.serve(async (req) => {
 
     const link = await linkActivo(token);
     if (!link) return json({ error: "El link no es válido o ya fue cerrado." }, 403);
+    const permisos = permisosDe(link.tipo);
 
+    // ── Subir ──────────────────────────────────────────────────────────────
     // Pide una URL firmada para subir UN archivo.
     if (action === "iniciar") {
+      if (!permisos.subir) throw new Rechazo("Este link no deja subir.", 403);
       const nombre = claveSegura(String(body.nombre_archivo ?? "archivo"));
       const path = `${token}/${crypto.randomUUID()}-${nombre}`;
       const { data, error } = await admin.storage.from(BUCKET).createSignedUploadUrl(path);
       if (error || !data) return json({ error: error?.message ?? "no se pudo iniciar" }, 500);
-      // signedUrl para subir con PROGRESO real (XHR) desde el navegador.
       return json({ path: data.path, uploadToken: data.token, signedUrl: data.signedUrl });
     }
 
-    // Confirma que un archivo ya se subió: crea la ficha "procesando" YA (para que
-    // el equipo la vea en la carpeta al instante) y dispara la migración al NAS.
+    // Confirma que un archivo ya se subió: crea la ficha "procesando" YA, en la
+    // carpeta del día (para que el equipo la vea al instante) y dispara la
+    // migración al NAS.
     if (action === "confirmar") {
+      if (!permisos.subir) throw new Rechazo("Este link no deja subir.", 403);
       const path = String(body.path ?? "");
       if (!path.startsWith(token + "/")) return json({ error: "ruta inválida" }, 400);
       const nombre = String(body.nombre_archivo ?? "archivo").slice(0, 300);
       const size = typeof body.size === "number" ? body.size : null;
       const quien = (String(body.quien ?? "").trim() || null)?.slice(0, 120) ?? null;
 
-      // Ficha visible de una, como "procesando"; el cron la pasa a "listo".
+      const { data: dia, error: eDia } = await admin.rpc("drive_carpeta_hija", {
+        _padre: link.item_id, _nombre: nombreDelDia(), _owner: link.created_by,
+      });
+      if (eDia || !dia) return json({ error: eDia?.message ?? "no se pudo crear la carpeta del día" }, 500);
+
       const itemId = crypto.randomUUID();
       const up = crypto.randomUUID();
       const storageKey = `${link.tenant_id}/${itemId}`;
       const { error: eFicha } = await admin.from("drive_items").insert({
-        id: itemId, tenant_id: link.tenant_id, owner_id: link.created_by ?? null, parent_id: link.item_id,
+        id: itemId, tenant_id: link.tenant_id, owner_id: link.created_by ?? null, parent_id: dia as string,
         tipo: "archivo", nombre, mime: mimeDe(nombre), size, storage_key: storageKey, estado: "procesando",
       });
       if (eFicha) return json({ error: eFicha.message }, 500);
 
+      // item_id = la carpeta de la creadora (no la del día): con eso se arman
+      // los avisos («llegó contenido de MIMIMOUSE») y los totales por creadora.
       const { error } = await admin.from("drive_aportes").insert({
         token, item_id: link.item_id, tenant_id: link.tenant_id, nombre_archivo: nombre,
         storage_path: path, size, quien, nas_item_id: itemId, nas_up: up, nas_parte: 0,
@@ -136,8 +240,116 @@ Deno.serve(async (req) => {
       return json({ ok: true });
     }
 
+    // ── Ver y bajar ────────────────────────────────────────────────────────
+    if (["listar", "miniaturas", "abrir", "bajar_carpeta"].includes(action)) {
+      if (!permisos.ver) throw new Rechazo("Este link solo deja subir.", 403);
+      if (!NAS || SECRETO.length < 32) throw new Rechazo("El Drive no está configurado.", 503);
+    }
+
+    if (action === "listar") {
+      const carpeta = await carpetaPermitida(link, body.carpeta);
+      const { data, error } = await admin.rpc("drive_hijos_publicos", { _carpeta: carpeta.id });
+      if (error) throw new Rechazo(error.message, 500);
+      return json({ carpeta: { id: carpeta.id, nombre: carpeta.nombre }, ruta: await ruta(link, carpeta), hijos: ordenarHijos((data ?? []) as Hijo[]) });
+    }
+
+    if (action === "miniaturas") {
+      const carpeta = await carpetaPermitida(link, body.carpeta);
+      const ids = Array.isArray(body.ids) ? [...new Set(body.ids.filter((x): x is string => typeof x === "string"))].slice(0, TOPE_MINIATURAS) : [];
+      const urls: Record<string, string> = {};
+      if (ids.length) {
+        const { data, error } = await admin.from("drive_items")
+          .select("id, tipo, nombre, mime, storage_key, estado").in("id", ids).eq("parent_id", carpeta.id).is("trashed_at", null);
+        if (error) throw new Rechazo(error.message, 500);
+        const e = venceMiniatura();
+        for (const f of (data ?? []) as { id: string; tipo: string; nombre: string; mime: string | null; storage_key: string | null; estado: string }[]) {
+          if (f.tipo !== "archivo" || f.estado !== "listo" || !f.storage_key) continue;
+          const x = extensionParaMiniatura(f.nombre, f.mime);
+          if (x) urls[f.id] = `${NAS}/o?t=${await firmar(SECRETO, { op: "mini", k: f.storage_key, x, e } as never)}`;
+        }
+      }
+      return json({ urls });
+    }
+
+    if (action === "abrir") {
+      const { data: f } = await admin.from("drive_items")
+        .select("id, tipo, nombre, mime, storage_key, estado, parent_id, trashed_at").eq("id", String(body.id ?? "")).maybeSingle();
+      if (!f || f.tipo !== "archivo" || f.trashed_at || !f.parent_id || !(await dentroDe(f.parent_id as string, link.item_id))) {
+        throw new Rechazo("No existe o no es de este link", 404);
+      }
+      if (f.estado !== "listo" || !f.storage_key) throw new Rechazo("El archivo todavía se está procesando", 409);
+      const descargar = body.descargar === true;
+      // Una HEIC para mirar: el JPG que el NAS convierte. Para bajar, el original.
+      const comoJpg = descargar ? null : extensionParaVerComoJpg(f.nombre as string, f.mime as string | null);
+      const url = await permisoNas(
+        comoJpg
+          ? { op: "mini", k: f.storage_key, x: comoJpg, l: LADO_VISTA }
+          : { op: "get", k: f.storage_key, ct: (f.mime as string | null) ?? "application/octet-stream", n: conExtension(f.nombre as string, f.mime as string | null), dl: descargar },
+        VENCE.bajar,
+      );
+      return json({ url });
+    }
+
+    // Bajar TODO lo de una carpeta (un día, por ejemplo) en un .zip.
+    if (action === "bajar_carpeta") {
+      const carpeta = await carpetaPermitida(link, body.carpeta);
+      const { data, error } = await admin.from("drive_items")
+        .select("id, parent_id, tipo, nombre, mime, size, storage_key, estado, trashed_at")
+        .eq("parent_id", carpeta.id).eq("tipo", "archivo").is("trashed_at", null).limit(5000);
+      if (error) throw new Rechazo(error.message, 500);
+      const archivos = (data ?? []) as FichaZip[];
+      const { l, archivos: n, bytes } = armarListaDelZip(archivos, new Map());
+      const ficha: FichaZip = { id: carpeta.id, parent_id: null, tipo: "carpeta", nombre: carpeta.nombre, size: null, storage_key: null, estado: "listo", trashed_at: null };
+      const t = await firmar(SECRETO, { op: "zip", e: ahoraMas(6 * 3600), n: nombreDelZip([ficha]), l } as never);
+      if (t.length > TOPE_ZIP_PERMISO) throw new Rechazo("Son demasiados archivos para un solo .zip.", 413);
+      return json({ url: `${NAS}/zip`, t, archivos: n, bytes });
+    }
+
+    // ── Compartir (solo el link de la creadora) ────────────────────────────
+    if (["crear_link", "mis_links", "cerrar_link"].includes(action) && !permisos.compartir) {
+      throw new Rechazo("Este link no deja compartir.", 403);
+    }
+
+    // Un link para otro: «invitado» (solo sube a su carpeta) o «ver» (solo ve y
+    // baja UNA carpeta suya). Sus avisos le llegan a la misma persona del equipo.
+    if (action === "crear_link") {
+      const tipo = body.tipo;
+      if (!esTipoParaCompartir(tipo)) throw new Rechazo("Tipo de link inválido");
+      const carpeta = tipo === "ver" ? await carpetaPermitida(link, body.carpeta) : { id: link.item_id };
+      const { data, error } = await admin.from("drive_upload_links").insert({
+        item_id: carpeta.id, tenant_id: link.tenant_id, created_by: link.created_by, tipo,
+        creator_id: link.creator_id, padre_token: token, nombre: nombreDeLink(body.nombre),
+      }).select("token").single();
+      if (error || !data) throw new Rechazo(error?.message ?? "no se pudo crear el link", 500);
+      return json({ token: data.token });
+    }
+
+    if (action === "mis_links") {
+      const { data, error } = await admin.from("drive_upload_links")
+        .select("token, tipo, nombre, item_id, created_at, usado_at").eq("padre_token", token).eq("activo", true)
+        .order("created_at", { ascending: false }).limit(200);
+      if (error) throw new Rechazo(error.message, 500);
+      const filas = (data ?? []) as { token: string; tipo: string; nombre: string | null; item_id: string; created_at: string; usado_at: string | null }[];
+      const ids = [...new Set(filas.map((f) => f.item_id))];
+      const nombres = new Map<string, string>();
+      if (ids.length) {
+        const { data: items } = await admin.from("drive_items").select("id, nombre").in("id", ids);
+        for (const i of (items ?? []) as { id: string; nombre: string }[]) nombres.set(i.id, i.nombre);
+      }
+      return json({ links: filas.map((f) => ({ ...f, carpeta: nombres.get(f.item_id) ?? null })) });
+    }
+
+    if (action === "cerrar_link") {
+      const { error } = await admin.from("drive_upload_links")
+        .update({ activo: false }).eq("token", String(body.hijo ?? "")).eq("padre_token", token);
+      if (error) throw new Rechazo(error.message, 500);
+      return json({ ok: true });
+    }
+
     return json({ error: "acción desconocida" }, 400);
   } catch (e) {
-    return json({ error: String((e as Error)?.message ?? e) }, 500);
+    if (e instanceof Rechazo) return json({ error: e.message }, e.status);
+    const status = typeof (e as { status?: unknown })?.status === "number" ? (e as { status: number }).status : 500;
+    return json({ error: String((e as Error)?.message ?? e) }, status);
   }
 });
