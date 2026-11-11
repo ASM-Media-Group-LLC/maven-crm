@@ -99,6 +99,10 @@ const NO_CARGAN_AQUI: Record<string, string> = {
     "Cowork: el arreglo de «fuera de Cowork» (solo si entró para su turno). Entra a esta cadena solo porque su " +
     "vigía inserta avisos en notifications, pero usa las tablas del reloj de Cowork y es_admin_o_dueno, que este " +
     "fixture no trae; no toca nada del Messenger.",
+  "20261111080000_salud_de_llamada.sql":
+    "Llamadas: por qué se cae la llamada (llamada_salud, diagnóstico y aviso a la persona y su supervisor). " +
+    "Entra a esta cadena solo porque su vigía inserta avisos en notifications, pero usa es_admin_o_dueno, " +
+    "equipo_de y pg_cron, que este fixture no trae; no toca nada del Messenger.",
   "20261111050000_fuera_de_cowork_reglas_alvaro.sql":
     "Cowork: las reglas de «fuera de Cowork» de Alvaro (a todos; llamada de Maven y últimos 10 min no cuentan). " +
     "Entra a esta cadena solo porque su vigía inserta avisos en notifications, pero usa las tablas del reloj de " +

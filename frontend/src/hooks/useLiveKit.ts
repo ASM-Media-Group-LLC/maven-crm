@@ -36,6 +36,16 @@ import {
 import type { ImagenDeFondo } from "@/lib/fondoDeLlamada";
 import { NoiseSuppresionTrackProcessor, supportsNoiseSuppression, loadNCPreference, saveNCPreference } from "@/lib/noise-suppression-processor";
 import { marcarConexionEnCurso, marcarLlamadaActiva, quitarLlamadaActiva } from "@/lib/llamadaActiva";
+import {
+  armarMuestra, borrarLlamadaEnCurso, leerReporte, marcarLlamadaEnCurso, medirRetraso, recargaConLlamada,
+  type LecturaDePista, type MuestraDeLlamada,
+} from "@/lib/saludDeLlamada";
+
+// La recarga a mitad de llamada se revisa UNA vez por página (al primer connect,
+// cuando ya hay sesión para anotarla). Ver saludDeLlamada.ts.
+let recargaRevisada = false;
+// Una muestra por minuto mientras dura la llamada (saludDeLlamada.ts).
+const MUESTRA_CADA_MS = 60_000;
 
 export type ConnectionQualityLevel = "excellent" | "good" | "poor" | "lost" | "unknown";
 
@@ -483,18 +493,68 @@ export function useLiveKit() {
   // El tipo angosto es porque la tabla es más nueva que los tipos generados
   // de Supabase (mismo idioma que ClienteQueEscribe en admin-user-actions).
   type InsertaCorte = (tabla: "llamada_cortes") => {
-    insert: (fila: { sala: string | null; fase: string; motivo: string | null }) =>
+    insert: (fila: { sala: string | null; fase: string; motivo: string | null; contexto: Record<string, unknown> | null }) =>
       PromiseLike<{ error: { message: string } | null }>;
   };
-  const anotarCorte = useCallback((fase: string, sala?: string | null, razon?: DisconnectReason | number | null) => {
+  // La última muestra de salud (saludDeLlamada.ts) viaja con cada corte: así el
+  // corte dice si en ese momento el computador no daba, el internet no subía o
+  // la pestaña estaba dormida.
+  const ultimaMuestraRef = useRef<MuestraDeLlamada | null>(null);
+  const pararMuestreoRef = useRef<(() => void) | null>(null);
+  const anotarCorte = useCallback((fase: string, sala?: string | null, razon?: DisconnectReason | number | null, extra?: Record<string, unknown>) => {
     try {
       const motivo = razon == null
         ? null
         : ((DisconnectReason as unknown as Record<number, string>)[razon as number] ?? String(razon));
+      const contexto = { ...(ultimaMuestraRef.current ?? {}), vis_ahora: document.visibilityState, en_linea: navigator.onLine, ...(extra ?? {}) };
       void (supabase.from as unknown as InsertaCorte)("llamada_cortes")
-        .insert({ sala: sala ?? null, fase, motivo })
+        .insert({ sala: sala ?? null, fase, motivo, contexto })
         .then(({ error }) => { if (error) console.warn("[llamada_cortes]", error.message); });
     } catch { /* sin telemetría, pero con llamada */ }
+  }, []);
+
+  type InsertaSalud = (tabla: "llamada_salud") => {
+    insert: (fila: { sala: string; datos: MuestraDeLlamada }) => PromiseLike<{ error: { message: string } | null }>;
+  };
+  // Si el componente se desmonta sin colgar, el reloj de muestras no queda vivo.
+  useEffect(() => () => { pararMuestreoRef.current?.(); }, []);
+
+  /** Mide la llamada una vez por minuto (y una a los 15 s de entrar). */
+  const iniciarMuestreo = useCallback((room: Room) => {
+    pararMuestreoRef.current?.();
+    const retraso = medirRetraso();
+    const leer = async (fuente: Track.Source): Promise<LecturaDePista | null> => {
+      const pista = room.localParticipant.getTrackPublication(fuente)?.track;
+      if (!pista) return null;
+      const reporte = await pista.getRTCStatsReport().catch(() => undefined);
+      return reporte ? leerReporte(reporte.values() as Iterable<Record<string, unknown>>) : null;
+    };
+    const tomar = async () => {
+      try {
+        if (roomRef.current !== room || room.state !== ConnectionState.Connected) return;
+        const [cam, pant, mic] = await Promise.all([
+          leer(Track.Source.Camera), leer(Track.Source.ScreenShare), leer(Track.Source.Microphone),
+        ]);
+        const muestra = armarMuestra({
+          vis: document.visibilityState,
+          calidad: mapConnectionQuality(room.localParticipant.connectionQuality),
+          cam, pant, mic, lag_ms: retraso.leer(),
+        });
+        ultimaMuestraRef.current = muestra;
+        marcarLlamadaEnCurso(room.name); // la marca de «sigue viva» se renueva
+        void (supabase.from as unknown as InsertaSalud)("llamada_salud")
+          .insert({ sala: room.name, datos: muestra })
+          .then(({ error }) => { if (error) console.warn("[llamada_salud]", error.message); });
+      } catch { /* medir jamás rompe la llamada */ }
+    };
+    const primera = window.setTimeout(() => { void tomar(); }, 15_000);
+    const cada = window.setInterval(() => { void tomar(); }, MUESTRA_CADA_MS);
+    pararMuestreoRef.current = () => {
+      window.clearTimeout(primera);
+      window.clearInterval(cada);
+      retraso.parar();
+      pararMuestreoRef.current = null;
+    };
   }, []);
   // Nos sacaron porque esta misma cuenta entró desde otra pestaña o equipo.
   // Va aparte de `error` a propósito: no se rompió nada, y sobre todo NO se
@@ -1178,6 +1238,14 @@ export function useLiveKit() {
     // mínimo de versión de pwa.ts) la cortaría igual. Se suelta en el finally; si
     // conectó, la sala ya quedó marcada con marcarLlamadaActiva.
     const soltarConexionEnCurso = marcarConexionEnCurso(roomName);
+    // ¿La llamada anterior murió con la página (recarga o pestaña descartada)?
+    if (!recargaRevisada) {
+      recargaRevisada = true;
+      const previa = recargaConLlamada();
+      if (previa && previa.hace_s <= 180) {
+        anotarCorte("recarga", previa.sala, null, { nav: previa.nav, descartada: previa.descartada, hace_s: previa.hace_s });
+      }
+    }
 
     let livekitUrlForError: string | undefined;
 
@@ -1556,6 +1624,8 @@ export function useLiveKit() {
         setParticipants([]);
         setActiveSpeaker(null);
         anotarCorte(fueUnaCaida(razon) ? "caida" : "salida", room.name, razon);
+        pararMuestreoRef.current?.();
+        if (!fueUnaCaida(razon)) borrarLlamadaEnCurso();
         // La caída de verdad no se queda esperando un clic: se vuelve solo.
         if (fueUnaCaida(razon)) programarReentradaRef.current(razon);
       });
@@ -1565,6 +1635,8 @@ export function useLiveKit() {
       if (!vigente()) { void room.disconnect(true); return; }
       // Que la página NO se recargue sola por un deploy mientras esto dure.
       marcarLlamadaActiva(roomName);
+      marcarLlamadaEnCurso(roomName);
+      iniciarMuestreo(room);
       if (reentradasRef.current > 0) anotarCorte("reentrada_ok", roomName);
       reentradasRef.current = 0;
       room.once(RoomEvent.Disconnected, () => quitarLlamadaActiva(roomName));
@@ -1670,7 +1742,7 @@ export function useLiveKit() {
       // Tampoco libera el cerrojo del intento que lo reemplazó.
       if (vigente()) connectingRef.current = false;
     }
-  }, [refreshParticipants, debouncedRefresh, clearSyncInterval, clearBackgroundReapplyTimer, cleanupAudioResumeListeners, hasActiveCameraPublication, enableCameraWithRecovery, disposeBackgroundProcessor, applyConfiguredBackgroundIfNeeded, applyBackgroundBeforeLocalVideoVisible, scheduleBackgroundApply, scheduleDeferredBackgroundReapply, kickAudioPlayback, vigilarMicro, anotarCorte]);
+  }, [refreshParticipants, debouncedRefresh, clearSyncInterval, clearBackgroundReapplyTimer, cleanupAudioResumeListeners, hasActiveCameraPublication, enableCameraWithRecovery, disposeBackgroundProcessor, applyConfiguredBackgroundIfNeeded, applyBackgroundBeforeLocalVideoVisible, scheduleBackgroundApply, scheduleDeferredBackgroundReapply, kickAudioPlayback, vigilarMicro, anotarCorte, iniciarMuestreo]);
 
   // Debajo de connect porque lo usa; por ref para que el handler de
   // Disconnected (que nace dentro de cada connect) vea siempre la versión
@@ -1704,6 +1776,8 @@ export function useLiveKit() {
     }
     ultimaConexionRef.current = null;
     reentradasRef.current = 0;
+    pararMuestreoRef.current?.();
+    borrarLlamadaEnCurso();
     clearSyncInterval();
     clearBackgroundReapplyTimer();
     cleanupAudioResumeListeners();
