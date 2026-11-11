@@ -58,6 +58,25 @@ Deno.test("scopesDeLaRuta: otra ruta con un método que no tiene → 405 con los
   for (const m of ["PUT", "HEAD", "OPTIONS", "get", "TRACE"]) assert(!esMetodo(m), m);
 });
 
+Deno.test("scopesDeLaRuta: /equipo — leer el equipo, las horas y las notas (GET) y mandarlo (POST /sync)", () => {
+  const casos: [string, string[], Accion, boolean][] = [
+    ["GET", [], "equipo_ver", false],
+    ["POST", ["sync"], "equipo_sync", true],
+    ["GET", ["horas"], "equipo_horas", false],
+    ["GET", ["notas"], "equipo_notas", false],
+  ];
+  for (const [metodo, ruta, accion, escritura] of casos) {
+    assert(esMetodo(metodo));
+    assertEquals(scopesDeLaRuta("equipo", metodo, ruta), { ok: true, accion, lectura: true, escritura }, `${metodo} /equipo/${ruta.join("/")}`);
+  }
+  assertEquals(scopesDeLaRuta("equipo", "POST", []), { ok: false, estado: 405, permitidos: ["GET"] });
+  assertEquals(scopesDeLaRuta("equipo", "GET", ["sync"]), { ok: false, estado: 405, permitidos: ["POST"] });
+  assertEquals(scopesDeLaRuta("equipo", "DELETE", ["horas"]), { ok: false, estado: 405, permitidos: ["GET"] });
+  for (const ruta of [["otra"], ["horas", "x"], [""], ["sync", "x"]]) {
+    assertEquals(scopesDeLaRuta("equipo", "GET", ruta), { ok: false, estado: 404 }, `/equipo/${ruta.join("/")}`);
+  }
+});
+
 // ─── El cuerpo ───────────────────────────────────────────────────────────────
 
 Deno.test("cuerpo: JSON inválido, o que no es un objeto, no pasa", () => {

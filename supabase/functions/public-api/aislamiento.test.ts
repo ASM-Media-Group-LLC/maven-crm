@@ -138,10 +138,12 @@ Deno.test("hoy ningún recurso de DATOS dice estar aislado (y con 2 agencias se 
   //    chat_conversations / chat_participants / chat_messages. Como la base todavía
   //    no impide conversaciones con gente de otra agencia, declara
   //    pendienteConVariasAgencias: con dos o más agencias se apaga (test de abajo).
-  //  * equipo — 11/11/2026. POST /equipo/sync (Backstage manda el equipo), con la sesión
-  //    de la persona de la llave y por dos RPC DEFINER que cruzan todo con la agencia de
-  //    la llave (api_equipo_llave: scope equipo:write, persona vigente y admin o dueña de
-  //    ESA agencia). Declara pendienteConVariasAgencias: con dos o más se apaga.
+  //  * equipo — 11/11/2026. /equipo (la plataforma de la agencia manda el equipo y sus
+  //    roles, y lee cómo quedó, las horas y las notas), con la sesión de la persona de la
+  //    llave y SOLO por RPC DEFINER que cruzan todo con la agencia de la llave
+  //    (api_equipo_llave: scope equipo:write, persona vigente y admin o dueña de ESA
+  //    agencia). Sirve con dos o más agencias (decisión de Alvaro, 11/11): lo respalda el
+  //    banco supabase/tests/agencias_conectadas.ts, con dos agencias, RPC por RPC.
   const PROMOVIDOS_CON_VERIFICACION: string[] = ["equipo", "me", "messenger"];
 
   const promovidos = Object.entries(AISLAMIENTO_POR_RECURSO)
@@ -475,12 +477,24 @@ Deno.test("equipo-logica.ts es PURO: no importa nada ni toca la base", () => {
   }
 });
 
-Deno.test("equipo: con DOS agencias se apaga; su scope es equipo:write y se escribe solo por POST /equipo/sync", () => {
+Deno.test("equipo: se sirve con una y con DOS agencias (la base aísla, y su banco lo prueba); scope equipo:write", () => {
   assert(decidir("equipo", 1).ok, "con una agencia no se sirve");
-  const v = decidir("equipo", 2);
-  assert(!v.ok && v.estado === 403, "con 2 agencias se sirvió /equipo");
+  assert(decidir("equipo", 2).ok, "con dos agencias no se sirve");
+  // Sin conteo de agencias sigue sirviendo: no depende de él (la pared es la base). Pero
+  // tiene que seguir siendo como_usuario: nunca con service_role.
+  assert(esComoUsuario("equipo"), "equipo dejó de ser como_usuario");
+  assertEquals(AISLAMIENTO_POR_RECURSO.equipo, { tipo: "como_usuario" });
   assertEquals(SCOPE_REQUERIDO.equipo, { lectura: "equipo:write", escritura: "equipo:write" });
   assert(isValidScope("equipo:write"), "equipo:write no está en el catálogo");
+  // Y el banco que lo respalda existe, prueba con dos agencias cada RPC del equipo y corre
+  // en el guard de cada PR.
+  const banco = Deno.readTextFileSync(new URL("../../tests/agencias_conectadas.ts", import.meta.url));
+  for (const rpc of FUENTES_POR_RECURSO.equipo) {
+    assert(banco.includes(rpc), `el banco de dos agencias no prueba ${rpc}`);
+  }
+  assert(/const T2 = /.test(banco), "el banco no tiene la segunda agencia");
+  const guard = Deno.readTextFileSync(new URL("../../../.github/workflows/guard-edge-functions.yml", import.meta.url));
+  assert(guard.includes("supabase/tests/agencias_conectadas.ts"), "el guard no corre el banco de dos agencias");
 });
 
 Deno.test("messenger-formato.ts es PURO: no importa nada ni toca la base", () => {
@@ -525,7 +539,7 @@ Deno.test("lo como_usuario escribe SOLO por estas RPC, una en cada handler, por 
   const PERMITIDAS = [
     "current_tenant_id", "get_last_messages", "messenger_unread_counts", "api_mi_llave", "messenger_directorio", "api_escritura_habilitada",
     "api_messenger_enviar", "api_messenger_abrir_directo", "api_messenger_editar", "api_messenger_borrar",
-    "api_equipo_estado", "api_equipo_aplicar",
+    "api_equipo_estado", "api_equipo_aplicar", "api_equipo_roles", "api_equipo_pendientes", "api_equipo_horas", "api_equipo_notas",
   ];
   assertEquals([...new Set(rpcs)].filter((r) => !PERMITIDAS.includes(r)), [], "una función de base no autorizada");
   assert(!/\.(from|rpc)\(\s*[^"\s]/.test(RECURSOS_USUARIO), "from()/rpc() con un nombre que no es literal");
@@ -543,7 +557,9 @@ Deno.test("lo como_usuario escribe SOLO por estas RPC, una en cada handler, por 
     api_messenger_enviar: "enviar", api_messenger_abrir_directo: "abrirChat",
     api_messenger_editar: "editar", api_messenger_borrar: "borrar", messenger_directorio: "personasDelDirectorio",
     api_escritura_habilitada: "personasDelDirectorio",
-    api_equipo_estado: "sincronizarEquipo", api_equipo_aplicar: "sincronizarEquipo",
+    api_equipo_estado: "estadoDelEquipo", api_equipo_aplicar: "sincronizarEquipo",
+    api_equipo_roles: "sincronizarEquipo", api_equipo_pendientes: "sincronizarEquipo",
+    api_equipo_horas: "horasDelEquipo", api_equipo_notas: "notasDelEquipo",
   };
   for (const [rpc, handler] of Object.entries(DUENO)) {
     const llamadas = RECURSOS_USUARIO.match(new RegExp(`\\.rpc\\(\\s*"${rpc}"`, "g")) ?? [];

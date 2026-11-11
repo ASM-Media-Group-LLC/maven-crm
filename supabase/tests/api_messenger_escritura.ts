@@ -110,6 +110,12 @@ const NO_CARGAN_AQUI: Record<string, string> = {
   "20261111180000_costos_consumo_de_maven.sql":
     "Costos: cada servicio vale lo que consume Maven (no la factura completa) y dice si se revisó. Depende de " +
     "costos_servicios y costos_cobros; no toca el Messenger.",
+  "20261111190000_agencias_conectadas.sql":
+    "Agencias conectadas: la plataforma de cada agencia manda sus roles (roles_config.origen), los pendientes, " +
+    "lee horas y notas, y recibe avisos por webhook (triggers en user_roles, profiles y tenant_members). Entra a " +
+    "esta cadena por esos triggers y por api_keys, pero usa roles_config, role_permissions, el reloj de Cowork, " +
+    "Vault y pg_cron, que este fixture no trae; no toca nada del Messenger. Se prueba en su propio banco, " +
+    "agencias_conectadas.ts.",
   "20261111200000_rrhh_copia_de_avisos.sql":
     "RR. HH. recibe copia de los avisos de vigilancia (se salió de Cowork) y se le prende el push. Entra a esta " +
     "cadena solo porque su vigía inserta avisos en notifications, pero usa las tablas del reloj de Cowork y " +
