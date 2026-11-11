@@ -93,3 +93,41 @@ export function nombreDeLink(n: unknown): string | null {
   const s = typeof n === "string" ? n.replace(/\s+/g, " ").trim().slice(0, 80) : "";
   return s || null;
 }
+
+// ── La caja negra de cada subida (Alvaro, 11/11/2026) ─────────────────────
+// La página de la modelo manda cómo va cada intento: subiendo, en pausa, listo
+// o falló. Se guarda en drive_aportar_intentos y, si se traba 15 min o falla,
+// el cron vigilar_subidas_trabadas le avisa a quien creó el link.
+export const ESTADOS_DE_INTENTO = ["subiendo", "pausado", "ok", "fallo"] as const;
+export type EstadoDeIntento = typeof ESTADOS_DE_INTENTO[number];
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const entero = (v: unknown, min: number, max: number): number | null =>
+  typeof v === "number" && Number.isFinite(v) ? Math.min(max, Math.max(min, Math.round(v))) : null;
+
+/** La fila de la caja negra a partir de lo que mandó el navegador, o null si
+ *  no sirve (sin id de intento válido o con un estado desconocido). No incluye
+ *  `iniciado_at` ni `avisado_at`: esos los pone la base y no se pisan. */
+export function filaDeBitacora(body: Record<string, unknown>, token: string, userAgent: string, ahoraISO: string): Record<string, unknown> | null {
+  const id = String(body.intento ?? "");
+  if (!UUID.test(id)) return null;
+  const estado = String(body.estado ?? "") as EstadoDeIntento;
+  if (!ESTADOS_DE_INTENTO.includes(estado)) return null;
+  const terminado = estado === "ok" || estado === "fallo";
+  return {
+    id,
+    token,
+    nombre_archivo: String(body.nombre_archivo ?? "archivo").slice(0, 300),
+    size_bytes: entero(body.size_bytes, 0, Number.MAX_SAFE_INTEGER),
+    estado,
+    pct: entero(body.pct, 0, 100) ?? 0,
+    bytes_subidos: entero(body.bytes_subidos, 0, Number.MAX_SAFE_INTEGER) ?? 0,
+    kbps: entero(body.kbps, 0, 10_000_000),
+    pausas: entero(body.pausas, 0, 100_000) ?? 0,
+    reintentos: entero(body.reintentos, 0, 100_000) ?? 0,
+    mensaje: body.mensaje === undefined || body.mensaje === null ? null : String(body.mensaje).slice(0, 500),
+    user_agent: userAgent.slice(0, 300),
+    actualizado_at: ahoraISO,
+    terminado_at: terminado ? ahoraISO : null,
+  };
+}

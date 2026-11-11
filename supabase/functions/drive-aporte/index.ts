@@ -5,7 +5,7 @@ import {
   armarListaDelZip, conExtension, extensionParaMiniatura, extensionParaVerComoJpg, type FichaZip, LADO_VISTA,
   nombreDelZip, TOPE_MINIATURAS, TOPE_ZIP_PERMISO, venceMiniatura,
 } from "../drive/logica.ts";
-import { esTipoParaCompartir, type Hijo, NOMBRE_DEL_EQUIPO, nombreDeLink, nombreDelDia, ordenarHijos, permisosDe, tipoEfectivo } from "./logica.ts";
+import { esTipoParaCompartir, filaDeBitacora, type Hijo, NOMBRE_DEL_EQUIPO, nombreDeLink, nombreDelDia, ordenarHijos, permisosDe, tipoEfectivo } from "./logica.ts";
 
 // drive-aporte — el link público de la carpeta del Drive (Alvaro, 04/11), que
 // desde el 10/11 es también LA CARPETA DE LA CREADORA, para dejar Dropbox.
@@ -184,6 +184,16 @@ Deno.serve(async (req) => {
       return json({ ok: true });
     }
 
+    // La caja negra de cada subida (también ANTES del check de link: si el link
+    // se cerró a mitad de una subida, igual queda el rastro). El aviso a quien
+    // creó el link lo da el cron vigilar_subidas_trabadas.
+    if (action === "bitacora") {
+      const fila = filaDeBitacora(body, token, req.headers.get("user-agent") ?? "", new Date().toISOString());
+      if (!fila) return json({ error: "intento inválido" }, 400);
+      await admin.from("drive_aportar_intentos").upsert(fila, { onConflict: "id" }).then(() => {}, () => {});
+      return json({ ok: true });
+    }
+
     const link = await linkActivo(token);
     if (!link) return json({ error: "El link no es válido o ya fue cerrado." }, 403);
     const permisos = permisosDe(link.tipo);
@@ -209,6 +219,19 @@ Deno.serve(async (req) => {
       const nombre = String(body.nombre_archivo ?? "archivo").slice(0, 300);
       const size = typeof body.size === "number" ? body.size : null;
       const quien = (String(body.quien ?? "").trim() || null)?.slice(0, 120) ?? null;
+
+      // Ya confirmado (la respuesta anterior se perdió y la página reintenta):
+      // no se duplica la ficha.
+      const { data: yaEsta } = await admin.from("drive_aportes").select("id").eq("storage_path", path).limit(1).maybeSingle();
+      if (yaEsta) return json({ ok: true, repetido: true });
+
+      // El archivo tiene que estar de verdad en el depósito. Antes se confirmaba
+      // cualquier ruta: si la subida se había retomado en otra, quedaba una
+      // ficha "procesando" para siempre y el video no aparecía (11/11/2026).
+      const { data: firmada } = await admin.storage.from(BUCKET).createSignedUrl(path, 60);
+      if (!firmada?.signedUrl) {
+        return json({ error: "El archivo no terminó de llegar. Vuelve a elegirlo: sigue desde donde quedó." }, 409);
+      }
 
       const { data: dia, error: eDia } = await admin.rpc("drive_carpeta_hija", {
         _padre: link.item_id, _nombre: nombreDelDia(), _owner: link.created_by,

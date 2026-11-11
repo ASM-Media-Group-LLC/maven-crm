@@ -502,6 +502,13 @@ export const oficina = {
   "drive.aportar.subiendo": { es: "Subiendo…", en: "Uploading…" },
   "drive.aportar.ok": { es: "Subido", en: "Uploaded" },
   "drive.aportar.fallo": { es: "Falló — reintenta", en: "Failed — retry" },
+  "drive.aportar.noBloquees": {
+    es: "No bloquees el teléfono ni cambies de app hasta que termine. Si se pausa, vuelve a esta pantalla: sigue sola desde donde iba.",
+    en: "Don't lock your phone or switch apps until it finishes. If it pauses, come back to this screen: it picks up where it left off.",
+  },
+  "drive.aportar.faltan": { es: "{sub} de {tot} · faltan ~{min} min", en: "{sub} of {tot} · ~{min} min left" },
+  "drive.aportar.calculando": { es: "{sub} de {tot} · calculando cuánto falta…", en: "{sub} of {tot} · working out time left…" },
+  "drive.aportar.enPausa": { es: "En pausa: esperando conexión. Sigue sola, no cierres esta página.", en: "Paused: waiting for a connection. It resumes on its own, keep this page open." },
   "drive.aportar.listoN": { es: "¡Listo! Ya subiste {n}.", en: "Done! You uploaded {n}." },
   "drive.aportar.exitoTitulo": { es: "✓ Subido correctamente", en: "✓ Uploaded successfully" },
   "drive.aportar.exitoDetalle": { es: "{n} archivo(s) ya están en el Drive del equipo.", en: "{n} file(s) are now in the team's Drive." },
