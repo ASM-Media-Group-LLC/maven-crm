@@ -27,6 +27,7 @@ vi.mock("@/lib/coworkLatido", () => ({
   // El reloj propio, detenido porque la cámara está apagada.
   leerReloj: () => ({ estado: "sin_camara", segundosHoy: 3 * 3600 + 42 * 60, en: AHORA }),
   suscribirReloj: () => () => {},
+  alQuedarSinSala: () => () => {},
 }));
 let principal: boolean | null = true;
 vi.mock("@/hooks/usePestanaPrincipal", () => ({

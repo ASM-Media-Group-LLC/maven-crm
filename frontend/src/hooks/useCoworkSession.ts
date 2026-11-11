@@ -282,7 +282,13 @@ export function useCoworkSession(sessionId: string | null) {
       }
     } finally {
       pasoRef.current = "";
-      if (!silent && vigente()) setLoading(false);
+      // La corrida que TERMINA última apaga la ruedita, sea silenciosa o no.
+      // EL BUG (Isabel, 11/11/2026): al unirse a la sala, el refetch normal
+      // prendía la ruedita y, 1,2 s después, el realtime de su propia
+      // asignación lanzaba una relectura silenciosa. La normal dejaba de ser
+      // "vigente" y no la apagaba; la silenciosa nunca la toca. Ruedita para
+      // siempre, aunque los datos ya estaban cargados.
+      if (vigente()) setLoading(false);
       initialLoadDone.current = true;
     }
   }, [sessionId]);

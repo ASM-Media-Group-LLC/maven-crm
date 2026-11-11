@@ -29,6 +29,22 @@ export function suscribirReloj(cb: (r: RelojCowork | null) => void): () => void 
   return () => { oyentes.delete(cb); };
 }
 
+// ── El servidor dice «sin sala» ────────────────────────────────────────────
+const oyentesSinSala = new Set<() => void>();
+
+/** Avisa cuando un latido vuelve con «sin sala» (la sala se perdió afuera de
+ *  esta pestaña). Devuelve cómo dejar de escuchar. */
+export function alQuedarSinSala(cb: () => void): () => void {
+  oyentesSinSala.add(cb);
+  return () => { oyentesSinSala.delete(cb); };
+}
+
+function avisarSinSala(): void {
+  for (const cb of oyentesSinSala) {
+    try { cb(); } catch { /* un oyente roto no frena a los demás */ }
+  }
+}
+
 function fijarReloj(r: RelojCowork | null): void {
   reloj = r;
   for (const cb of oyentes) {
@@ -118,7 +134,13 @@ async function enviar(v: Vivo): Promise<void> {
       body: JSON.stringify({ action: "latido", sessionId: v.sessionId, equipo: equipoDeEstaPestana(), ...v.estado }),
     });
     if (res.ok && vivo === v) {
-      const r = relojDeRespuesta(await res.json().catch(() => null), Date.now());
+      const cuerpo = await res.json().catch(() => null);
+      // El servidor dice que ya no tiene sala, pero esta pestaña sigue latiendo
+      // como si la tuviera: la pantalla quedó vieja. Pasa al recargar: la
+      // pestaña VIEJA avisa «me fui» al cerrarse y ese aviso llega DESPUÉS de
+      // que la nueva ya entró (Isabel, 11/11/2026). Quien escuche relee.
+      if ((cuerpo as { motivo?: unknown } | null)?.motivo === "sin sala") avisarSinSala();
+      const r = relojDeRespuesta(cuerpo, Date.now());
       if (r) fijarReloj(r);
     }
   } catch {

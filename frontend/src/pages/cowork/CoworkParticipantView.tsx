@@ -10,7 +10,7 @@ import { usePersistentCall, CallOutlet } from "@/components/PersistentCallProvid
 import type { useCoworkSession } from "@/hooks/useCoworkSession";
 import { supabase, SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY } from "@/integrations/supabase/client";
 import { useCoworkMediaPresence, salirDePresencia } from "@/hooks/useCoworkMediaPresence";
-import { iniciarLatido, actualizarLatido, detenerLatido, suscribirReloj, leerReloj } from "@/lib/coworkLatido";
+import { iniciarLatido, actualizarLatido, detenerLatido, suscribirReloj, leerReloj, alQuedarSinSala } from "@/lib/coworkLatido";
 import type { ConexionSala } from "@/lib/coworkTiempoRegla";
 import RelojCowork from "./RelojCowork";
 import { usePestanaPrincipal } from "@/hooks/usePestanaPrincipal";
@@ -168,6 +168,13 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps -- los refs se leen al iniciar; después se actualizan con actualizarLatido
   }, [cowork.session?.id, myAssignment?.room_id, pestanaPrincipal]);
+
+  // Si el servidor dice que esta persona ya no tiene sala, se relee (en
+  // silencio): sin asignación, la página la vuelve a unir por el link o le
+  // muestra cómo volver. Antes la pantalla seguía mostrando la sala y la
+  // persona quedaba afuera sin saberlo.
+  const refetchCowork = cowork.refetch;
+  useEffect(() => alQuedarSinSala(() => { void refetchCowork(true); }), [refetchCowork]);
 
 
   useEffect(() => {
