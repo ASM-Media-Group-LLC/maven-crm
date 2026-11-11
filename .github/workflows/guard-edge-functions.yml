@@ -246,6 +246,7 @@ jobs:
           supabase/functions/messenger-webhooks/datos.test.ts
           supabase/functions/messenger-webhooks/token.test.ts
           supabase/functions/messenger-webhooks/carreras.test.ts
+          supabase/functions/messenger-webhooks/equipo.test.ts
 
       # El banco contra la migración real (PGlite): las reglas de la base y lo que
       # escriben manage-api-keys y el despachador, con los triggers de verdad. Solo en
@@ -397,6 +398,15 @@ jobs:
         if: steps.cambios.outputs.correr == 'true'
         run: deno run -A --node-modules-dir=none --no-lock supabase/tests/equipo_backstage.ts
 
+      # Agencias conectadas (migración 20261111190000), con DOS agencias: los roles que
+      # manda la plataforma (sin permisos, nunca de admin), los pendientes, horas y notas
+      # solo de la agencia de la key, y los webhooks del equipo (encolar solo para la
+      # agencia de la persona, la ventana, reclamar y anotar). Es lo que respalda que
+      # /equipo sirva con dos o más agencias (public-api/aislamiento.test.ts lo exige). ~3 s.
+      - name: Banco — agencias conectadas (PGlite)
+        if: steps.cambios.outputs.correr == 'true'
+        run: deno run -A --node-modules-dir=none --no-lock supabase/tests/agencias_conectadas.ts
+
       # portal-creadoras (la agencia da y quita el acceso): solo alguien del equipo que
       # ve a la creadora y tiene «Invitar al portal»; nunca ata el correo de alguien del
       # equipo; la misma cuenta en dos agencias; quitar bloquea sin borrar; los correos,
@@ -492,3 +502,4 @@ jobs:
           supabase/functions/public-api/peticion.test.ts
           supabase/functions/public-api/recursos-como-usuario.test.ts
           supabase/functions/public-api/escritura-formato.test.ts
+          supabase/functions/public-api/equipo-logica.test.ts
