@@ -91,7 +91,7 @@ describe("conexiones", () => {
 });
 
 // ── El tablero con los números reales del 11/11/2026 ──────────────────────
-import { esperadoEnMes, mesEnCurso, serieDelAno, sumarMeses, tablero, type Cobro } from "@/lib/costos";
+import { desgloseDelMes, esperadoEnMes, mesEnCurso, serieDelAno, sumarMeses, tablero, type Cobro } from "@/lib/costos";
 
 describe("tablero: este mes, el año y la proyección", () => {
   const sv = (p: Partial<ServicioCosto>): ServicioCosto => s({ fuente: "factura", ...p });
@@ -151,5 +151,31 @@ describe("tablero: este mes, el año y la proyección", () => {
     expect(serie[10].proyectado.servidores).toBe(148.85);
     expect(serie[11].proyectado.correos).toBe(49.99);
     expect(sumarMeses("2026-11", 2)).toBe("2027-01");
+  });
+});
+
+describe("el desglose de un mes", () => {
+  const sv = (p: Partial<ServicioCosto>): ServicioCosto => s({ fuente: "factura", ...p });
+  const servicios = [
+    sv({ id: "claude", categoria: "ia", monto_usd: 200, dia_cobro: 17 }),
+    sv({ id: "resend", categoria: "correos", monto_usd: 20, dia_cobro: 8 }),
+  ];
+  const cobros: Cobro[] = [
+    { servicio_id: "claude", fecha: "2026-10-17", monto_usd: 200, fuente: "factura", nota: "Plan Ultra" },
+    { servicio_id: "resend", fecha: "2026-10-08", monto_usd: 20, fuente: "factura", nota: null },
+    { servicio_id: "resend", fecha: "2026-11-08", monto_usd: 20, fuente: "factura", nota: null },
+  ];
+  it("un mes pasado: lo cobrado, con sus cobros", () => {
+    const d = desgloseDelMes(servicios, cobros, "2026-11-11", "2026-10");
+    expect(d.map((l) => [l.servicio.id, l.real, l.proyectado])).toEqual([["claude", 200, 0], ["resend", 20, 0]]);
+    expect(d[0].cobros[0].nota).toBe("Plan Ultra");
+  });
+  it("este mes: lo cobrado y lo que falta", () => {
+    const d = desgloseDelMes(servicios, cobros, "2026-11-11", "2026-11");
+    expect(d.map((l) => [l.servicio.id, l.real, l.proyectado])).toEqual([["claude", 0, 200], ["resend", 20, 0]]);
+  });
+  it("un mes que viene: todo proyectado", () => {
+    const d = desgloseDelMes(servicios, cobros, "2026-11-11", "2026-12");
+    expect(d.map((l) => [l.servicio.id, l.real, l.proyectado])).toEqual([["claude", 0, 200], ["resend", 0, 20]]);
   });
 });
