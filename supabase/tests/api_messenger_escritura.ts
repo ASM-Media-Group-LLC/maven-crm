@@ -88,6 +88,9 @@ const NO_CARGAN_AQUI: Record<string, string> = {
     "Cowork: el arreglo de «fuera de Cowork» (solo si entró para su turno). Entra a esta cadena solo porque su " +
     "vigía inserta avisos en notifications, pero usa las tablas del reloj de Cowork y es_admin_o_dueno, que este " +
     "fixture no trae; no toca nada del Messenger.",
+  "20261111100000_purga_y_candado_de_llamadas.sql":
+    "Papelera: el candado calls_agencia deja pasar a NULL quién llama y a quién (la purga de cuentas) y se quita un " +
+    "cron muerto. Usa pg_cron, que este fixture no trae; el candado no cambia nada del Messenger.",
   "20261111090000_fuera_de_cowork_sin_pisarse.sql":
     "Cowork: un episodio de «fuera de Cowork» no se pisa con el anterior (mismo vigía, solo cambia desde). " +
     "Entra a esta cadena solo porque su vigía inserta avisos en notifications, pero usa las tablas del reloj de " +
