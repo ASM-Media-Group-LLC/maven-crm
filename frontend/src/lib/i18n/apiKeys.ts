@@ -70,7 +70,7 @@ export const apiKeys = {
   "apiKeys.fresh.copyKey": { es: "Copiar la key", en: "Copy the key" },
   "apiKeys.fresh.done": { es: "Listo, ya la copié", en: "Done, I've copied it" },
   "apiKeys.copied": { es: "Copiado", en: "Copied" },
-  "apiKeys.copyFailed": { es: "No se pudo copiar — hazlo manualmente", en: "Couldn't copy — copy it manually" },
+  "apiKeys.copyFailed": { es: "Este navegador no dejó copiar: haz clic en el texto y usa ⌘C (o Ctrl+C)", en: "This browser blocked copying: click the text and press ⌘C (or Ctrl+C)" },
 
   // Crear / editar
   "apiKeys.form.editTitle": { es: "Editar API key", en: "Edit API key" },

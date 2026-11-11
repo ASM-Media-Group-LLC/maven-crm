@@ -544,7 +544,9 @@ const AdminApiKeys = () => {
               </DialogHeader>
               <div className="space-y-3">
                 <div className="rounded-md border border-primary/40 bg-primary/5 p-3">
-                  <code className="block break-all font-mono text-sm text-foreground">{freshKey}</code>
+                  {/* Un clic la selecciona entera: si el portapapeles está bloqueado,
+                      queda lista para ⌘C / Ctrl+C. */}
+                  <code className="block cursor-text select-all break-all font-mono text-sm text-foreground">{freshKey}</code>
                 </div>
                 <div className="flex justify-end"><CopyButton text={freshKey} label={t("apiKeys.fresh.copyKey")} /></div>
               </div>
