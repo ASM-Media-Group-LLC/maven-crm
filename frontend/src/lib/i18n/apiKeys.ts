@@ -279,6 +279,11 @@ export const apiKeys = {
     es: "Empleados de la agencia: nombre, rol (chatter, closer, manager, coordinador…) y fecha de alta.",
     en: "Agency employees: name, role (chatter, closer, manager, coordinator…) and start date.",
   },
+  "apiKeys.scope.team.label": { es: "⚠️ Backstage manda el equipo", en: "⚠️ Backstage manages the team" },
+  "apiKeys.scope.team.desc": {
+    es: "Para Backstage: POST /equipo/sync con la lista completa del equipo (correo, rol, equipo, a quién reporta, nivel, horario y si sigue activo). Maven cambia rol, nivel, horario, equipo y jefe, y manda a la papelera a quien venga inactivo; nunca crea cuentas, nunca toca a admins ni dueños y nunca sube a nadie a admin. Mientras el dueño no prenda «aplicar», todo es ensayo: solo contesta qué cambiaría. Solo sirve si quien crea la key es admin o dueño.",
+    en: "For Backstage: it POSTs the full team list to the team sync endpoint (email, role, team, who they report to, level, schedule and whether they are still active). Maven updates role, level, schedule, team and manager, and moves whoever comes in as inactive to the trash; it never creates accounts, never touches admins or owners and never promotes anyone to admin. Until the owner turns on \"apply\", everything is a dry run: it only answers what it would change. It only works if the person who creates the key is an admin or owner.",
+  },
   "apiKeys.scope.hubstaff.label": { es: "Horas de Hubstaff (diario)", en: "Hubstaff hours (daily)" },
   "apiKeys.scope.hubstaff.desc": {
     es: "Horas trabajadas por día según Hubstaff: tiempo trackeado (horas), actividad general y proyecto, por empleado. Filtros por fecha y empleado.",

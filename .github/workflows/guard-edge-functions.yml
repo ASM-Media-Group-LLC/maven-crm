@@ -389,6 +389,14 @@ jobs:
         if: steps.cambios.outputs.correr == 'true'
         run: deno run -A --node-modules-dir=none --no-lock supabase/tests/portal_creadoras.ts
 
+      # Backstage manda el equipo (POST /equipo/sync, migración 20261111060000), con DOS
+      # agencias: la puerta (key con equipo:write de un admin o dueño), el ensayo que no
+      # cambia nada, el interruptor que solo prende el dueño, nadie de otra agencia, nadie
+      # sube a admin, el freno de bajas y la papelera como «Eliminar». ~3 s.
+      - name: Banco — el equipo que manda Backstage (PGlite)
+        if: steps.cambios.outputs.correr == 'true'
+        run: deno run -A --node-modules-dir=none --no-lock supabase/tests/equipo_backstage.ts
+
       # portal-creadoras (la agencia da y quita el acceso): solo alguien del equipo que
       # ve a la creadora y tiene «Invitar al portal»; nunca ata el correo de alguien del
       # equipo; la misma cuenta en dos agencias; quitar bloquea sin borrar; los correos,

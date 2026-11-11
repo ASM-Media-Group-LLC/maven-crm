@@ -364,6 +364,13 @@ export const MENSAJES = {
     es: "No se sabe si la escritura se hizo: puede haberse hecho. Reintenta el mismo pedido (en los POST, con la misma Idempotency-Key).",
     en: "It is unknown whether the write went through: it may have. Retry the same request (for POST, with the same Idempotency-Key).",
   },
+
+  // --- El equipo que manda Backstage (POST /equipo/sync, 11/11) ---
+  equipo_rutas: { es: "Usa POST /equipo/sync", en: "Use POST /equipo/sync" },
+  equipo_personas_invalidas: {
+    es: "personas tiene que ser una lista de 1 a 1000 personas",
+    en: "personas must be a list of 1 to 1000 people",
+  },
 } as const satisfies Record<string, Entrada>;
 
 export type Clave = keyof typeof MENSAJES;
