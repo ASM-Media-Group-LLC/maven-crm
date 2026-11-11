@@ -1,5 +1,5 @@
 import { assertEquals } from "jsr:@std/assert@1";
-import { esTipoParaCompartir, type Hijo, nombreDeLink, nombreDelDia, ordenarHijos, permisosDe } from "./logica.ts";
+import { esTipoParaCompartir, type Hijo, nombreDeLink, nombreDelDia, ordenarHijos, permisosDe, tipoEfectivo } from "./logica.ts";
 
 Deno.test("cada link deja lo suyo: los viejos y los de invitado solo suben, nunca ven", () => {
   assertEquals(permisosDe("personal"), { subir: true, ver: true, compartir: true });
@@ -49,4 +49,14 @@ Deno.test("el nombre de un link para otro queda corto y limpio", () => {
   assertEquals(nombreDeLink(""), null);
   assertEquals(nombreDeLink(42), null);
   assertEquals(nombreDeLink("x".repeat(200))?.length, 80);
+});
+
+Deno.test("el link viejo de una creadora abre su Drive; uno viejo a otra carpeta sigue solo para subir", () => {
+  assertEquals(tipoEfectivo("subir", true), "personal");
+  assertEquals(permisosDe(tipoEfectivo("subir", true)), { subir: true, ver: true, compartir: true });
+  assertEquals(tipoEfectivo("subir", false), "subir");
+  assertEquals(permisosDe(tipoEfectivo("subir", false)).ver, false);
+  // Los de invitado o de ver nunca se agrandan, aunque apunten a su carpeta.
+  assertEquals(tipoEfectivo("invitado", true), "invitado");
+  assertEquals(tipoEfectivo("ver", true), "ver");
 });

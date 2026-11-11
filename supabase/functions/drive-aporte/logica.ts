@@ -28,6 +28,15 @@ export function permisosDe(tipo: string | null | undefined): Permisos {
   }
 }
 
+/** Con qué tipo trabaja de verdad un link. Los links viejos de «solo subir»
+ *  que apuntan JUSTO a la carpeta de una creadora abren su Drive completo
+ *  (Alvaro, 11/11/2026: «convertir los links viejos», así no hay que mandarles
+ *  uno nuevo). Un link viejo a otra carpeta (una subcarpeta, una de otra
+ *  agencia) sigue solo para subir: ese lo pueden tener terceros. */
+export function tipoEfectivo(tipo: string, esCarpetaDeCreadora: boolean): string {
+  return tipo === "subir" && esCarpetaDeCreadora ? "personal" : tipo;
+}
+
 /** Los únicos links que la creadora puede sacar desde su página. */
 export function esTipoParaCompartir(tipo: unknown): tipo is "invitado" | "ver" {
   return tipo === "invitado" || tipo === "ver";

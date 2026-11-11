@@ -5,7 +5,7 @@ import {
   armarListaDelZip, conExtension, extensionParaMiniatura, extensionParaVerComoJpg, type FichaZip, LADO_VISTA,
   nombreDelZip, TOPE_MINIATURAS, TOPE_ZIP_PERMISO, venceMiniatura,
 } from "../drive/logica.ts";
-import { esTipoParaCompartir, type Hijo, NOMBRE_DEL_EQUIPO, nombreDeLink, nombreDelDia, ordenarHijos, permisosDe } from "./logica.ts";
+import { esTipoParaCompartir, type Hijo, NOMBRE_DEL_EQUIPO, nombreDeLink, nombreDelDia, ordenarHijos, permisosDe, tipoEfectivo } from "./logica.ts";
 
 // drive-aporte — el link público de la carpeta del Drive (Alvaro, 04/11), que
 // desde el 10/11 es también LA CARPETA DE LA CREADORA, para dejar Dropbox.
@@ -76,6 +76,12 @@ async function linkActivo(token: string): Promise<Link | null> {
   if (l.padre_token) {
     const { data: padre } = await admin.from("drive_upload_links").select("activo").eq("token", l.padre_token).maybeSingle();
     if (!padre?.activo) return null;
+  }
+  // El link viejo de una creadora abre su Drive completo (logica.ts → tipoEfectivo).
+  if (l.tipo === "subir") {
+    const { data: suya } = await admin.from("drive_carpeta_creadora").select("creator_id").eq("item_id", l.item_id).limit(1).maybeSingle();
+    const tipo = tipoEfectivo(l.tipo, !!suya);
+    if (tipo !== l.tipo) return { ...l, tipo, creator_id: l.creator_id ?? (suya?.creator_id as string | null) ?? null };
   }
   return l;
 }
