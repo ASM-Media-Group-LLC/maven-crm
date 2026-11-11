@@ -4,6 +4,7 @@ import { getTranslation, type Language } from "./lib/i18n";
 import { BUILD_PROPIO, crearVigiaDelMinimo } from "./lib/versionDelBundle";
 import { almacenDeLaPestana, forzarActualizacion, leerUiBuildMinimo } from "./lib/minimoDelBundle";
 import { hayLlamadaActiva } from "./lib/llamadaActiva";
+import { registrarSw } from "./lib/registroDelSw";
 
 /** El aviso "Nueva versión disponible" como toast del design system (el mismo
  *  vidrio de todos los avisos), con `id` fijo para no duplicarse en el chequeo
@@ -96,39 +97,34 @@ export async function initPWA() {
   }
 
   try {
-    // Static-string dynamic import: Vite resolves this at build time and
-    // emits a real chunk for the SW registration. Using a literal string
-    // is required — computed/obfuscated specifiers leave the literal
-    // "virtual:pwa-register" in the bundle, which the browser then tries
-    // to fetch as a URL and rejects with a CORS/scheme error.
-    // @ts-expect-error - virtual module resolved by vite-plugin-pwa
-    const { registerSW } = await import("virtual:pwa-register");
+    // Registro propio (lib/registroDelSw.ts) en vez de «virtual:pwa-register»:
+    // el del plugin recargaba TODAS las pestañas al salir una versión nueva, con
+    // llamada o sin ella, y cada deploy tumbaba llamadas de Cowork (11/11/2026).
     let registro: ServiceWorkerRegistration | undefined;
-    const updateSW = registerSW({
+    const lang: Language = localStorage.getItem("app-language") === "en" ? "en" : "es";
+    const avisar = () => mostrarAvisoDeActualizacion(
+      getTranslation("pwa.actualizar.titulo", lang),
+      getTranslation("pwa.actualizar.boton", lang),
+      // updateSW(true) manda skipWaiting al SW en espera y recarga cuando toma
+      // control. El window.location.reload() pelado NO alcanzaba: el SW nuevo
+      // quedaba "waiting", la página recargaba y seguía sirviendo el bundle VIEJO
+      // → el equipo quedaba clavado en versiones de días atrás aunque clickeara
+      // "Recargar" (así Fabiana no veía el aviso "Ya registrado hoy" de Promolog).
+      () => { updateSW(true).catch(() => window.location.reload()); },
+    );
+    const updateSW = registrarSw({
       // Las pestañas de Maven viven abiertas por DÍAS (SPA, sin navegaciones) y el
       // navegador solo chequea el SW al navegar → el banner de update no aparecía
       // nunca en pestañas longevas. Chequeo explícito cada hora.
-      onRegisteredSW(_swUrl: string, r: ServiceWorkerRegistration | undefined) {
+      alRegistrar(r) {
         registro = r;
         if (r) setInterval(() => { r.update().catch(() => {}); }, 60 * 60 * 1000);
       },
-      onNeedRefresh() {
-        const lang: Language = localStorage.getItem("app-language") === "en" ? "en" : "es";
-        // updateSW(true) manda skipWaiting al SW en espera y recarga cuando toma
-        // control. El window.location.reload() pelado NO alcanzaba: el SW nuevo
-        // quedaba "waiting", la página recargaba y seguía sirviendo el bundle VIEJO
-        // → el equipo quedaba clavado en versiones de días atrás aunque clickeara
-        // "Recargar" (así Fabiana no veía el aviso "Ya registrado hoy" de Promolog).
-        const recargar = () => {
-          updateSW(true).catch(() => window.location.reload());
-        };
-        mostrarAvisoDeActualizacion(
-          getTranslation("pwa.actualizar.titulo", lang),
-          getTranslation("pwa.actualizar.boton", lang),
-          recargar,
-        );
-      },
-      onOfflineReady() {},
+      alNecesitarRecarga: avisar,
+      enLlamada: hayLlamadaActiva,
+      // Con llamada no se recarga: queda el aviso para recargar al colgar.
+      alQuedarPendiente: avisar,
+      recargar: () => window.location.reload(),
     });
 
     // EL MÍNIMO: si app_flags 'ui_build_minimo' dice que este build es viejo, se
