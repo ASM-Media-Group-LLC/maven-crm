@@ -311,3 +311,36 @@ export function serieDelAno(servicios: ServicioCosto[], cobros: Cobro[], hoy: st
   }
   return serie;
 }
+
+// ── El desglose de un mes (al tocar una barra de la gráfica) ───────────────
+
+export interface LineaMes { servicio: ServicioCosto; real: number; proyectado: number; cobros: Cobro[] }
+
+function sumaDe(cs: Cobro[]): number {
+  return dos(cs.reduce((a, c) => a + (num(c.monto_usd) ?? 0), 0));
+}
+
+/** Qué se cobró (o se va a cobrar) en un mes, servicio por servicio. */
+export function desgloseDelMes(servicios: ServicioCosto[], cobros: Cobro[], hoy: string, mes: string): LineaMes[] {
+  const mesHoy = mesDe(hoy);
+  const enCurso = mes === mesHoy ? mesEnCurso(servicios, cobros, hoy) : null;
+  const pasado = mes.localeCompare(mesHoy) < 0;
+  const lineas: LineaMes[] = [];
+  for (const s of servicios) {
+    if (!s.activo || !s.es_maven) continue;
+    const cs = cobros.filter((c) => c.servicio_id === s.id && mesDe(c.fecha) === mes);
+    let real = 0;
+    let proyectado = 0;
+    if (pasado) {
+      real = sumaDe(cs);
+    } else if (enCurso) {
+      const t = enCurso.get(s.id);
+      real = t?.gastado ?? 0;
+      proyectado = dos(Math.max(0, (t?.proyectado ?? 0) - real));
+    } else {
+      proyectado = dos(esperadoEnMes(s, mes));
+    }
+    if (real > 0 || proyectado > 0) lineas.push({ servicio: s, real, proyectado, cobros: cs });
+  }
+  return lineas.sort((a, b) => b.real + b.proyectado - (a.real + a.proyectado));
+}

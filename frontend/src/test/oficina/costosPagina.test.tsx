@@ -2,7 +2,7 @@
 // prueba dibuja el total, los servicios, lo que viene, dónde ahorrar, y en
 // Conexiones las pruebas en vivo y lo de adentro. Un fallo se dice como fallo.
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
@@ -79,6 +79,14 @@ describe("Costos", () => {
     expect(screen.getByText("Pasar a Flash-Lite")).toBeTruthy();
     // Lo que no es Maven va aparte.
     expect(screen.getByText(/oficina\.costos\.fueraLinea.*USD 185/)).toBeTruthy();
+  });
+
+  it("al tocar un servicio se abre su ficha con sus cobros y el enlace a su factura", async () => {
+    pintar("/oficina/costos");
+    const fila = (await screen.findAllByText("IA de Google")).map((e) => e.closest("button")).find(Boolean)!;
+    fireEvent.click(fila);
+    expect(await screen.findByText(/oficina\.costos\.fichaCobros/)).toBeTruthy();
+    expect(screen.getByText(/oficina\.costos\.fichaPanel/).closest("a")?.getAttribute("href")).toBe("https://aistudio.google.com/spend");
   });
 
   it("si no se puede leer, lo dice y deja reintentar", async () => {
