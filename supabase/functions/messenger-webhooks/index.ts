@@ -1,8 +1,11 @@
-// messenger-webhooks — el despachador de los timbres del Messenger.
+// messenger-webhooks — el despachador de los timbres del Messenger y de los avisos del
+// equipo.
 //
-// Lo despierta SOLO el cron messenger-webhooks-tick (cada 15 s, y únicamente cuando
-// api_webhooks_hay_trabajo() da true) con X-Cron-Token. No tiene camino de usuario
-// ni de navegador. La lógica está en ./despachador.ts.
+// Lo despiertan SOLO dos cron, con X-Cron-Token: messenger-webhooks-tick (cada 15 s, y
+// únicamente cuando api_webhooks_hay_trabajo() da true) para los timbres del Messenger
+// (./despachador.ts), y equipo-webhooks-tick (cada 30 s, solo si
+// equipo_webhooks_hay_trabajo() da true) con ?tarea=equipo para los avisos del equipo
+// (./equipo.ts). No tiene camino de usuario ni de navegador.
 //
 // Contesta 202 EN EL ACTO y trabaja en segundo plano (EdgeRuntime.waitUntil). pg_net
 // tiene UN solo worker, que también lleva los push del Messenger y unos 35 crons: si
@@ -23,6 +26,8 @@ import { kekConfigurada } from "../_shared/webhook-salida.ts";
 import { comoUsuarioConfigurado } from "../public-api/como-usuario.ts";
 import { crearDatosDespacho } from "./datos.ts";
 import { despachar, lineaDeLog, PLAZO_DESPUES_MS, PRESUPUESTO_MS } from "./despachador.ts";
+import { despacharEquipo } from "./equipo.ts";
+import { crearDatosEquipo } from "./equipo-datos.ts";
 import { fetchConPlazo, leerFeedComoPersona } from "./feed.ts";
 import { tokenValido } from "./token.ts";
 
@@ -38,12 +43,6 @@ Deno.serve(async (req) => {
   if (!(await tokenValido(req.headers.get("X-Cron-Token"), esperado))) return json({ error: "Unauthorized" }, 401);
   // El cuerpo no se usa (el cron manda {}): no se lee.
   await req.body?.cancel().catch(() => {});
-  // Sin los secretos no se hace nada (y sin tocar la base). Se anota: si no, un secreto
-  // que falta dejaría a los integradores sin timbres sin ningún rastro en los logs.
-  if (!comoUsuarioConfigurado() || !kekConfigurada()) {
-    console.log(lineaDeLog(null, "sin_configurar"));
-    return json({ error: "sin_configurar" }, 503);
-  }
 
   const fin = Date.now() + PRESUPUESTO_MS;
   const cliente = (restanteMs: () => number) =>
@@ -51,6 +50,31 @@ Deno.serve(async (req) => {
       global: { fetch: fetchConPlazo(restanteMs) },
       auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
     });
+  const edge = (globalThis as ConSegundoPlano).EdgeRuntime;
+
+  // Los avisos del equipo (cron equipo-webhooks-tick, migración 20261111190000): otra
+  // tarea, con sus propias tablas. No usa la sesión como persona ni la KEK (el secreto
+  // está en Vault), así que no depende de esos dos secretos. Ver ./equipo.ts.
+  if (new URL(req.url).searchParams.get("tarea") === "equipo") {
+    const tarea = despacharEquipo({
+      datos: crearDatosEquipo({ antes: cliente(() => fin - Date.now() - 1_000), despues: cliente(() => PLAZO_DESPUES_MS) }),
+      fin,
+    }).catch(() => null);
+    if (edge?.waitUntil) {
+      edge.waitUntil(tarea);
+      return json({ ok: true }, 202);
+    }
+    const informeEquipo = await tarea;
+    return informeEquipo ? json(informeEquipo.cuerpo, informeEquipo.estado) : json({ ok: false }, 500);
+  }
+
+  // Sin los secretos no se hace nada (y sin tocar la base). Se anota: si no, un secreto
+  // que falta dejaría a los integradores sin timbres sin ningún rastro en los logs.
+  if (!comoUsuarioConfigurado() || !kekConfigurada()) {
+    console.log(lineaDeLog(null, "sin_configurar"));
+    return json({ error: "sin_configurar" }, 503);
+  }
+
   const corrida = despachar({
     datos: crearDatosDespacho({
       antes: cliente(() => fin - Date.now() - 1_000),
@@ -65,7 +89,6 @@ Deno.serve(async (req) => {
     return null;
   });
 
-  const edge = (globalThis as ConSegundoPlano).EdgeRuntime;
   if (edge?.waitUntil) {
     edge.waitUntil(corrida);
     return json({ ok: true }, 202);

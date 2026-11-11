@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Plus, Loader2 } from "lucide-react";
 import { useRoles, type RoleConfig } from "./useRoles";
@@ -15,9 +15,11 @@ interface RolesContentProps {
   view: "list" | "grid";
   createOpen: boolean;
   onCreateOpenChange: (open: boolean) => void;
+  /** Nombre de un rol cuyos permisos se abren solos al cargar (una vez). */
+  abrirPermisosDe?: string | null;
 }
 
-const RolesContent = ({ search = "", view, createOpen, onCreateOpenChange }: RolesContentProps) => {
+const RolesContent = ({ search = "", view, createOpen, onCreateOpenChange, abrirPermisosDe = null }: RolesContentProps) => {
   const {
     roles,
     isLoading,
@@ -49,6 +51,18 @@ const RolesContent = ({ search = "", view, createOpen, onCreateOpenChange }: Rol
       setManageUsersRoleId(null);
     }
   }, [roles, manageUsersRoleId]);
+
+  // Los permisos de un rol pedido por la URL se abren UNA vez, cuando llegan los roles.
+  // Primero el nombre exacto; si no, sin mayúsculas.
+  const permisosAbiertos = useRef(false);
+  useEffect(() => {
+    if (!abrirPermisosDe || permisosAbiertos.current || isLoading) return;
+    const pedido = abrirPermisosDe.trim().toLowerCase();
+    const rol = roles.find((r) => r.name === abrirPermisosDe) ?? roles.find((r) => r.name.toLowerCase() === pedido);
+    if (!rol) return;
+    permisosAbiertos.current = true;
+    setPermRole(rol);
+  }, [abrirPermisosDe, roles, isLoading]);
 
   const filteredRoles = search.trim()
     ? roles.filter((r) => r.name.toLowerCase().includes(search.toLowerCase()))

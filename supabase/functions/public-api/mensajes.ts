@@ -365,11 +365,22 @@ export const MENSAJES = {
     en: "It is unknown whether the write went through: it may have. Retry the same request (for POST, with the same Idempotency-Key).",
   },
 
-  // --- El equipo que manda Backstage (POST /equipo/sync, 11/11) ---
-  equipo_rutas: { es: "Usa POST /equipo/sync", en: "Use POST /equipo/sync" },
+  // --- El equipo de la plataforma conectada (/equipo, 11/11) ---
+  equipo_rutas: {
+    es: "Usa GET /equipo, POST /equipo/sync, GET /equipo/horas o GET /equipo/notas",
+    en: "Use GET /equipo, POST /equipo/sync, GET /equipo/horas or GET /equipo/notas",
+  },
   equipo_personas_invalidas: {
     es: "personas tiene que ser una lista de 1 a 1000 personas",
     en: "personas must be a list of 1 to 1000 people",
+  },
+  equipo_roles_invalidos: {
+    es: "roles tiene que ser una lista de hasta 50 roles (nombres, o objetos con nombre)",
+    en: "roles must be a list of at most 50 roles (names, or objects with a nombre field)",
+  },
+  equipo_rango_invalido: {
+    es: "desde y hasta van como AAAA-MM-DD, con desde <= hasta y hasta 93 días; no se aceptan otros parámetros",
+    en: "desde and hasta must be YYYY-MM-DD, with desde <= hasta and at most 93 days; no other parameters are accepted",
   },
 } as const satisfies Record<string, Entrada>;
 

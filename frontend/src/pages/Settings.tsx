@@ -21,7 +21,8 @@ import {
   MessageCircle,
   CheckCircle2,
   AlertCircle,
-  Gauge } from "lucide-react";
+  Gauge,
+  PlugZap } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
@@ -34,6 +35,7 @@ import AdminUsuarios from "@/pages/admin/AdminUsuarios";
 import AuditoriaRoles from "@/pages/admin/AuditoriaRoles";
 import AdminReportes from "@/pages/admin/AdminReportes";
 import AdminApiKeys from "@/pages/admin/AdminApiKeys";
+import ConexionEquipo from "@/pages/admin/ConexionEquipo";
 import DesignSystem from "@/pages/DesignSystem";
 import Docs from "@/pages/Docs";
 import Roadmap from "@/pages/Roadmap";
@@ -61,6 +63,7 @@ const SUB_TO_TAB: Record<string, TabKey> = {
   auditoria: "admin",
   reportes: "admin",
   "api-keys": "admin",
+  "conexion-equipo": "admin",
   "design-system": "resources",
   docs: "resources",
   roadmap: "resources",
@@ -553,6 +556,16 @@ const AdminTab = ({ canAccess, isAdmin }: { canAccess: ReturnType<typeof usePerm
             description={t("settings.apiKeysDesc")}
           />
         )}
+        {/* Agencias conectadas (11/11/2026): la plataforma de RR. HH. de la agencia
+            manda el equipo. Misma puerta que API keys: la llave sale de ahí. */}
+        {isAdmin && (
+          <Row
+            to="/settings?sub=conexion-equipo"
+            icon={PlugZap}
+            title={t("conexionEquipo.fila.titulo")}
+            description={t("conexionEquipo.fila.desc")}
+          />
+        )}
         {/* Panel de control vivía como entrada suelta del menú lateral; es una
             pantalla de administración y aquí tiene su lugar (Jhon, 09/09/2026). */}
         {(canAccess("Panel de control") || isAdmin) && (
@@ -781,7 +794,9 @@ const SettingsRightPane = ({
     usuarios:        { title: t("settings.users"),        render: () => <AdminUsuarios /> },
     auditoria:       { title: t("settings.audit"),        render: () => <AuditoriaRoles /> },
     reportes:        { title: t("settings.reportsShort"), render: () => <AdminReportes /> },
-    "api-keys":      { title: "API keys",       render: () => <AdminApiKeys /> },
+    // ?crear=<scope>: el alta abre sola con ese permiso (lo usa Conectar tu plataforma).
+    "api-keys":      { title: "API keys",       render: () => <AdminApiKeys crearCon={searchParams.get("crear")} /> },
+    "conexion-equipo": { title: t("conexionEquipo.titulo"), render: () => <ConexionEquipo /> },
     "design-system": { title: "Design System",  render: () => <DesignSystem /> },
     docs:            { title: "Docs",           render: () => <Docs /> },
     roadmap:         { title: "Roadmap",        render: () => <Roadmap /> },
@@ -798,6 +813,8 @@ const SettingsRightPane = ({
     // API keys: gate ESTRICTO a admin (no basta canAccess Administración). El
     // edge tambien exige role='admin', esto solo evita mostrar la pantalla.
     "api-keys": isAdmin,
+    // La misma puerta que API keys: la llave y el alta de cuentas son de admin.
+    "conexion-equipo": isAdmin,
     "design-system": true,
     docs: true,
     roadmap: true,

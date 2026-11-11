@@ -43,6 +43,7 @@ vi.mock("@/pages/admin/AdminUsuarios", () => ({ default: () => <div>SUBPAGINA_US
 vi.mock("@/pages/admin/AuditoriaRoles", () => ({ default: () => <div>SUBPAGINA_AUDITORIA</div> }));
 vi.mock("@/pages/admin/AdminReportes", () => ({ default: () => <div>SUBPAGINA_REPORTES</div> }));
 vi.mock("@/pages/admin/AdminApiKeys", () => ({ default: () => <div>SUBPAGINA_APIKEYS</div> }));
+vi.mock("@/pages/admin/ConexionEquipo", () => ({ default: () => <div>SUBPAGINA_CONEXION_EQUIPO</div> }));
 
 import Settings from "@/pages/Settings";
 
@@ -65,6 +66,11 @@ describe("Settings — entrar/refrescar sobre una sub-página", () => {
   it("cada ?sub= monta la suya", async () => {
     montar("/settings?sub=api-keys");
     expect(await screen.findByText("SUBPAGINA_APIKEYS")).toBeTruthy();
+  });
+
+  it("?sub=conexion-equipo monta Conectar tu plataforma", async () => {
+    montar("/settings?sub=conexion-equipo");
+    expect(await screen.findByText("SUBPAGINA_CONEXION_EQUIPO")).toBeTruthy();
   });
 
   it("sin ?sub= no monta ninguna sub-página", () => {
