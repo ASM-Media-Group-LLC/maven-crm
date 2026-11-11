@@ -67,15 +67,19 @@ describe("Costos", () => {
 
   it("muestra lo gastado en el mes, el año, los 12 meses, en qué se va y dónde ahorrar", async () => {
     pintar("/oficina/costos");
-    expect(await screen.findByText(/^oficina\.costos\.kpiMes \{/)).toBeTruthy();
-    expect(screen.getByText(/^oficina\.costos\.kpiAno \{/)).toBeTruthy();
+    expect(await screen.findByText(/^oficina\.costos\.cifraMes \{/)).toBeTruthy();
+    expect(screen.getByText(/^oficina\.costos\.cifraAno \{/)).toBeTruthy();
+    // El total al mes, lo primero.
+    expect(screen.getByText("oficina.costos.teCuesta")).toBeTruthy();
+    // La tabla separa el mes y el año en columnas.
+    expect(screen.getAllByText(/^oficina\.costos\.colPagadoMes/).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/^oficina\.costos\.colPagadoAno/).length).toBeGreaterThan(0);
     expect(screen.getByText("oficina.costos.kpi12")).toBeTruthy();
     // Lo gastado este mes: el cobro de Google de hoy.
     expect(screen.getAllByText("USD 17").length).toBeGreaterThan(0);
     // En qué se va: Google y Zoho (sin dato), y lo que falta se dice.
     expect(screen.getAllByText("IA de Google").length).toBeGreaterThan(0);
-    expect(screen.getByText("oficina.costos.sinDato")).toBeTruthy();
-    expect(screen.getByText(/oficina\.costos\.faltanCorto.*Correos del equipo/)).toBeTruthy();
+    expect(screen.getAllByText(/oficina\.costos\.faltaFactura/).length).toBeGreaterThan(0);
     expect(screen.getByText("Pasar a Flash-Lite")).toBeTruthy();
     // Lo que no es Maven va aparte.
     expect(screen.getByText(/oficina\.costos\.fueraLinea.*USD 185/)).toBeTruthy();
