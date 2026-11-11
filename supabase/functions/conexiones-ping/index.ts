@@ -4,10 +4,17 @@
 // lectura y gratis: listar modelos, dominios, la suscripción, etc. Lo que vive
 // en la base (crons, correo del equipo, Backstage, llamadas, subidas) lo da la
 // RPC conexiones_estado(). La página: /oficina/costos (pestaña Conexiones).
+//
+// Con { accion: "zoho_casillas" } (pestaña Costos › ficha de Zoho › «Ver en
+// vivo»): las licencias de Zoho y cada casilla cruzada con Maven (en uso, sin
+// uso, de gente que salió, sin cuenta en Maven). Solo correos y estados: nunca
+// tokens ni contraseñas. Solo lee; no cambia nada en Zoho.
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.4";
-import { licenciasDeZoho, zohoConfigured } from "../_shared/zoho.ts";
-import { type Chequeo, httpDeWs, miles, sinConfigurar, veredicto } from "./logica.ts";
+import { licenciasDeZoho, listAccounts, zohoConfigured } from "../_shared/zoho.ts";
+import {
+  type Chequeo, type CuentaDeMaven, clasificarCasillas, httpDeWs, miles, sinConfigurar, veredicto,
+} from "./logica.ts";
 
 const env = (k: string) => Deno.env.get(k) ?? "";
 const SUPABASE_URL = env("SUPABASE_URL");
@@ -115,6 +122,33 @@ async function anthropic(): Promise<Chequeo> {
   }), "Llave viva.");
 }
 
+/** Las casillas de Zoho cruzadas con Maven (ficha de Zoho › «Ver en vivo»).
+ *  Lo de Maven sale de costos_casillas_de_maven() (solo service_role): si la
+ *  cuenta está viva y cuándo entró por última vez (inicio de sesión, sesión
+ *  renovada o correo usado). Un fallo se dice como fallo, nunca como «vacío». */
+async function zohoCasillas(c: Record<string, string>): Promise<Response> {
+  if (!zohoConfigured()) return json({ ok: false, error: "Zoho no está configurado en Supabase." }, 200, c);
+  const [lic, cuentas, maven] = await Promise.all([
+    licenciasDeZoho().catch((e) => ({ ok: false as const, error: String(e), data: undefined })),
+    listAccounts().catch((e) => ({ ok: false as const, error: String(e), data: undefined })),
+    admin.rpc("costos_casillas_de_maven"),
+  ]);
+  if (!cuentas.ok) return json({ ok: false, error: `Zoho no dio la lista de casillas: ${String(cuentas.error ?? "").slice(0, 140)}` }, 200, c);
+  if (maven.error) return json({ ok: false, error: `Maven no dio sus casillas: ${maven.error.message}` }, 200, c);
+  const zoho = (cuentas.data ?? []).map((a) => ({ email: a.primaryEmailAddress ?? "", nombre: a.displayName ?? null }));
+  const deMaven: CuentaDeMaven[] = ((maven.data ?? []) as { email: string; viva: boolean; ultima: string | null }[])
+    .map((r) => ({ email: r.email, viva: r.viva, ultimaActividad: r.ultima }));
+  const { casillas, resumen } = clasificarCasillas(zoho, deMaven, Date.now());
+  return json({
+    ok: true,
+    en: new Date().toISOString(),
+    licencias: lic.ok && lic.data ? lic.data : null,
+    licencias_error: lic.ok ? null : String(lic.error ?? "").slice(0, 140),
+    resumen,
+    casillas,
+  }, 200, c);
+}
+
 Deno.serve(async (req) => {
   const c = cors(req);
   if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: c });
@@ -127,6 +161,10 @@ Deno.serve(async (req) => {
   if (!u?.user) return json({ ok: false, error: "sin-sesion" }, 401, c);
   const { data: dueno } = await admin.rpc("es_dueno", { _user_id: u.user.id });
   if (dueno !== true) return json({ ok: false, error: "solo-dueno" }, 403, c);
+
+  let cuerpo: { accion?: unknown } = {};
+  try { cuerpo = await req.json(); } catch { /* sin cuerpo: los chequeos de siempre */ }
+  if (cuerpo?.accion === "zoho_casillas") return await zohoCasillas(c);
 
   const chequeos = await Promise.all([app(), livekit(), nas(), google(), resend(), zoho(), elevenlabs(), whatsapp(), telegram(), openrouter(), anthropic()]);
   return json({ ok: true, en: new Date().toISOString(), chequeos }, 200, c);
