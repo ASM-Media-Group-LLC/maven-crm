@@ -113,6 +113,10 @@ const NO_CARGAN_AQUI: Record<string, string> = {
   "20261111220000_costos_cuentas_atadas.sql":
     "Costos: las cuentas atadas a cada servicio (costos_cuentas, solo el dueño). Se siembra leyendo mail_credentials, " +
     "profiles, auth y buzones_por_borrar, que este fixture no trae completos; no toca el Messenger.",
+  "20261111200000_rrhh_copia_de_avisos.sql":
+    "RR. HH. recibe copia de los avisos de vigilancia (se salió de Cowork) y se le prende el push. Entra a esta " +
+    "cadena solo porque su vigía inserta avisos en notifications, pero usa las tablas del reloj de Cowork y " +
+    "es_admin_o_dueno, que este fixture no trae; no toca nada del Messenger.",
   "20261111110000_aviso_blu_caido.sql":
     "Blu: aviso a los dueños si el puente con Blu se cae y los ingresos se quedan atrás. Inserta en notifications, " +
     "pero usa blu_bridge_state, creator_daily_earnings y pg_cron, que este fixture no trae; no toca nada del Messenger.",
