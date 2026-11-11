@@ -23,6 +23,7 @@ import type { TranslationKey } from "@/lib/i18n";
 import { ConFormato, CopyButton, Persona } from "./apiKeysPiezas";
 import type { Cara } from "./carasDePersonas";
 import { UserAvatar } from "@/components/UserAvatar";
+import { admiteWebhook, avisaEquipo, avisaMensajes } from "@/lib/conexionEquipo/webhook";
 
 // El webhook del Messenger de una API key (a lo sumo uno por key): la celda de la
 // tabla y el diálogo de registrar / estado / entregas. El contrato es el de
@@ -60,6 +61,8 @@ export type LlaveConWebhook = {
   webhook?: WebhookResumen | null;
 };
 
+/** El permiso del webhook del Messenger. Qué permisos admiten webhook (también el del
+ *  equipo, equipo:write) lo dice admiteWebhook, en lib/conexionEquipo/webhook.ts. */
 export const SCOPE_WEBHOOK = "messenger:read";
 
 // Motivos que reanudar no arregla: la key ya no sirve (revocada, vencida o sin el
@@ -117,6 +120,12 @@ export function textoDelMotivo(motivo: string | null, t: T): string {
   return motivo && MOTIVOS[motivo] ? t(MOTIVOS[motivo]) : t("apiKeys.webhook.reason.other");
 }
 
+/** Qué le cuenta el alta del webhook: lo del Messenger o, en una llave solo del
+ *  equipo, los avisos del equipo. */
+export function introDelAlta(scopes: readonly string[], t: T): string {
+  return avisaEquipo(scopes) && !avisaMensajes(scopes) ? t("conexionEquipo.webhook.intro") : t("apiKeys.webhook.registerIntro");
+}
+
 /** Cómo está DE VERDAD, que no siempre es el status de la fila:
  *  - Con la key revocada, vencida o sin Messenger, o la persona fuera, el servidor
  *    rechaza probar y reanudar aunque la fila siga pending/active/paused (ningún
@@ -134,7 +143,7 @@ export function estadoEfectivo(w: WebhookResumen, k: LlaveConWebhook): Efectivo 
   const motivoKey =
     k.status === "revoked" ? "key_revoked"
     : k.status === "expired" ? "key_expired"
-    : !k.scopes.includes(SCOPE_WEBHOOK) ? "scope_removed"
+    : !admiteWebhook(k.scopes) ? "scope_removed"
     : k.acts_as?.active === false ? "person_inactive"
     : null;
   if (motivoKey) return { estado: "disabled", motivo: motivoKey, porLaKey: true, fallando: false, demorado: false };
@@ -169,7 +178,7 @@ export function chipDe(ef: Efectivo): Chip {
  *  poder verlo y borrarlo). */
 export function queMostrar(k: LlaveConWebhook, youId: string | null | undefined, desconocido: boolean) {
   if (k.webhook) return "webhook" as const;
-  if (!k.scopes.includes(SCOPE_WEBHOOK)) return "nada" as const;
+  if (!admiteWebhook(k.scopes)) return "nada" as const;
   if (desconocido || k.webhook === undefined) return "desconocido" as const;
   const esDueno = !!youId && k.acts_as?.id === youId;
   return k.status === "active" && esDueno ? ("registrar" as const) : ("sin" as const);
@@ -495,7 +504,7 @@ export function DialogoWebhook({ abierto, llave, youId, desconocido = false, lis
       <>
         <DialogHeader>
           <DialogTitle>{t("apiKeys.webhook.registerTitle", { name: llave.name })}</DialogTitle>
-          <DialogDescription><ConFormato texto={t("apiKeys.webhook.registerIntro")} /></DialogDescription>
+          <DialogDescription><ConFormato texto={introDelAlta(llave.scopes, t)} /></DialogDescription>
         </DialogHeader>
         {tarjetaPersona}
         {(
@@ -507,14 +516,17 @@ export function DialogoWebhook({ abierto, llave, youId, desconocido = false, lis
                 onChange={(e) => setUrl(e.target.value)} />
               <p className="text-xs text-muted-foreground"><ConFormato texto={t("apiKeys.webhook.urlHint")} /></p>
             </div>
-            <label className="flex cursor-pointer items-start gap-2.5 text-sm">
-              <input type="checkbox" className="mt-0.5 h-4 w-4 accent-primary" checked={sinPropios} disabled={crear.isPending}
-                onChange={(e) => setSinPropios(e.target.checked)} />
-              <span>
-                <span className="font-medium">{t("apiKeys.webhook.excludeOwn")}</span>
-                <span className="block text-xs text-muted-foreground">{t("apiKeys.webhook.excludeOwnHint")}</span>
-              </span>
-            </label>
+            {/* «No avisar lo que yo mando» es de los mensajes: una llave solo del equipo no lo muestra. */}
+            {avisaMensajes(llave.scopes) && (
+              <label className="flex cursor-pointer items-start gap-2.5 text-sm">
+                <input type="checkbox" className="mt-0.5 h-4 w-4 accent-primary" checked={sinPropios} disabled={crear.isPending}
+                  onChange={(e) => setSinPropios(e.target.checked)} />
+                <span>
+                  <span className="font-medium">{t("apiKeys.webhook.excludeOwn")}</span>
+                  <span className="block text-xs text-muted-foreground">{t("apiKeys.webhook.excludeOwnHint")}</span>
+                </span>
+              </label>
+            )}
           </div>
         )}
         <DialogFooter className="gap-2 sm:gap-0">

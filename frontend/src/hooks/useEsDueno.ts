@@ -35,3 +35,35 @@ export function useEsDueno(): { esDueno: boolean | null; cargando: boolean; erro
     error: (q.error as Error | null) ?? null,
   };
 }
+
+/** ¿Es el dueño de ESTA agencia? Igual que useEsDueno, pero atado a una agencia: la
+ *  fila de tenant_owners tiene que ser de `tenantId` (la agencia de la pantalla, por
+ *  ejemplo la de integracion_equipo, que la RLS ya filtra por current_tenant_id()).
+ *  Ser dueño de otra agencia no cuenta. Sin `tenantId` todavía, espera (null). */
+export function useEsDuenoDeLaAgencia(tenantId: string | null | undefined): {
+  esDueno: boolean | null; cargando: boolean; error: Error | null; reintentar: () => void;
+} {
+  const { user } = useAuth();
+  const q = useQuery({
+    enabled: !!user?.id && !!tenantId,
+    queryKey: ["es-dueno", user?.id ?? null, tenantId ?? null],
+    staleTime: 5 * 60_000,
+    queryFn: async (): Promise<boolean> => {
+      const { data, error } = await sinTipar
+        .from("tenant_owners")
+        .select("user_id")
+        .eq("user_id", user!.id)
+        .eq("tenant_id", tenantId!)
+        .limit(1)
+        .maybeSingle();
+      if (error) throw new Error(error.message);
+      return !!data;
+    },
+  });
+  return {
+    esDueno: q.isSuccess ? q.data : null,
+    cargando: !user?.id || !tenantId || q.isLoading,
+    error: (q.error as Error | null) ?? null,
+    reintentar: () => { void q.refetch().then(() => {}, () => {}); },
+  };
+}

@@ -1,8 +1,8 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Search, LayoutGrid, List, Shield, UserCog, Users, User, Plus, ArrowLeft, Clock } from "lucide-react";
-import { useLocation, useNavigate, Link } from "react-router-dom";
+import { useLocation, useNavigate, useSearchParams, Link } from "react-router-dom";
 import StatChip from "@/components/StatChip";
 import { useAdminUsers, type AdminUser } from "./useAdminUsers";
 import UsersTable from "./UsersTable";
@@ -41,9 +41,13 @@ const AdminUsuarios = () => {
   // menú" arriba, así que el botón propio quedaba duplicado — dos flechas de
   // volver apiladas diciendo casi lo mismo.
   const embebidaEnSettings = useLocation().pathname === "/settings";
-  const { canAccess } = usePermissions();
+  const { canAccess, isLoading: permisosCargando } = usePermissions();
   const { users, isLoading, refetch, changeRole, isChangingRole, stats } = useAdminUsers();
-  const [search, setSearch] = useState("");
+  // ?pestana=roles&permisos=<rol>: se entra a Roles con los permisos de ese rol abiertos
+  // (lo usa Conectar tu plataforma con los roles nuevos que llegan sin permisos).
+  const [params] = useSearchParams();
+  const permisosDe = params.get("pestana") === "roles" ? params.get("permisos") : null;
+  const [search, setSearch] = useState(() => permisosDe ?? "");
   const [view, setView] = useState<"list" | "grid">("list");
   // Las tarjetas de arriba eran decorativas. Ahora filtran: clic en "Admins" deja
   // sólo los admins, clic de nuevo (o en "Total") limpia.
@@ -54,7 +58,9 @@ const AdminUsuarios = () => {
   // fuerzan y se esconde el selector — elegir "lista" ahí solo empeora todo.
   const isMobile = useIsMobile();
   const vistaEfectiva = isMobile ? "grid" : view;
-  const [activeTab, setActiveTab] = useState<"usuarios" | "roles" | "papelera">("usuarios");
+  const [activeTab, setActiveTab] = useState<"usuarios" | "roles" | "papelera">(
+    () => (params.get("pestana") === "roles" ? "roles" : "usuarios"),
+  );
   const [selectedUser, setSelectedUser] = useState<AdminUser | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
@@ -151,6 +157,11 @@ const AdminUsuarios = () => {
   const papelera = usePapelera(activeTab === "papelera");
 
   const canManageRoles = canAccess("Administración", "Roles");
+  // Entrar por URL a Roles sin el permiso de Roles: de vuelta a Usuarios (cuando los
+  // permisos ya cargaron; mientras cargan, canAccess da false para todos).
+  useEffect(() => {
+    if (!permisosCargando && activeTab === "roles" && !canManageRoles) setActiveTab("usuarios");
+  }, [permisosCargando, activeTab, canManageRoles]);
   const tabs = [
     { key: "usuarios" as const, label: t("admin.usersLabel") },
     ...(canManageRoles ? [{ key: "roles" as const, label: "Roles" }] : []),
@@ -387,7 +398,8 @@ const AdminUsuarios = () => {
                   />
                 </>
               ) : (
-                <RolesContent search={search} view={view} createOpen={createRoleOpen} onCreateOpenChange={setCreateRoleOpen} />
+                <RolesContent search={search} view={view} createOpen={createRoleOpen} onCreateOpenChange={setCreateRoleOpen}
+                  abrirPermisosDe={permisosDe} />
               )}
 
               <AddUserModal
