@@ -89,3 +89,67 @@ describe("conexiones", () => {
     expect(hacePasMasDe(null, 1, ahora)).toBe(true);
   });
 });
+
+// ── El tablero con los números reales del 11/11/2026 ──────────────────────
+import { esperadoEnMes, mesEnCurso, serieDelAno, sumarMeses, tablero, type Cobro } from "@/lib/costos";
+
+describe("tablero: este mes, el año y la proyección", () => {
+  const sv = (p: Partial<ServicioCosto>): ServicioCosto => s({ fuente: "factura", ...p });
+  const servicios = [
+    sv({ id: "claude", categoria: "ia", monto_usd: 200, dia_cobro: 17 }),
+    sv({ id: "google", categoria: "ia", monto_usd: 48, ciclo: "uso", proximo_cobro: "2027-01-01", proximo_monto_usd: 95 }),
+    sv({ id: "eleven", categoria: "ia", monto_usd: 26.62, dia_cobro: 7 }),
+    sv({ id: "supa", categoria: "servidores", monto_usd: 148, dia_cobro: 14 }),
+    sv({ id: "contabo", categoria: "servidores", monto_usd: 26.85, dia_cobro: 15 }),
+    sv({ id: "zoho", categoria: "correos", monto_usd: null, fuente: "falta" }),
+    sv({ id: "resend", categoria: "correos", monto_usd: 20, dia_cobro: 8 }),
+    sv({ id: "godaddy", categoria: "correos", monto_usd: 29.99, ciclo: "anual", proximo_cobro: "2026-12-19", dia_cobro: 19 }),
+    sv({ id: "otros", categoria: "otras", monto_usd: 185, es_maven: false, dia_cobro: 14 }),
+  ];
+  const c = (servicio_id: string, fecha: string, monto_usd: number): Cobro => ({ servicio_id, fecha, monto_usd, fuente: "factura", nota: null });
+  const cobros: Cobro[] = [
+    c("claude", "2026-10-17", 200), c("claude", "2026-11-06", 25), c("claude", "2026-11-06", 20), c("claude", "2026-11-07", 10),
+    c("resend", "2026-10-08", 20), c("resend", "2026-11-08", 20),
+    c("google", "2026-10-31", 1.03), c("google", "2026-11-11", 17.44),
+    c("eleven", "2026-11-07", 26.62),
+    c("supa", "2026-10-13", 48.59), c("supa", "2026-11-14", 122),
+    c("contabo", "2026-10-15", 26.85),
+    c("otros", "2026-11-01", 999),
+  ];
+  const hoy = "2026-11-11";
+
+  it("este mes: lo cobrado hasta hoy, y el cierre suma lo fijo que falta y el uso al ritmo del mes", () => {
+    const m = mesEnCurso(servicios, cobros, hoy);
+    // El uso extra de Claude (6–7 nov) no tapa su cobro fijo del 17.
+    expect(m.get("claude")).toEqual({ gastado: 55, proyectado: 255 });
+    // Supabase del 14 ya está anunciado: cuenta en el cierre, no en lo gastado.
+    expect(m.get("supa")).toEqual({ gastado: 0, proyectado: 122 });
+    expect(m.get("contabo")).toEqual({ gastado: 0, proyectado: 26.85 });
+    expect(m.get("google")?.proyectado).toBe(47.56);
+    expect(m.has("otros")).toBe(false);
+  });
+
+  it("los cuatro números de arriba", () => {
+    const t = tablero(servicios, cobros, hoy);
+    expect(t.gastadoMes).toBe(119.06);
+    expect(t.cierreMes).toBe(498.03);
+    expect(t.gastadoAno).toBe(119.06 + 200 + 20 + 1.03 + 48.59 + 26.85);
+    // Diciembre: todo lo fijo + Google a USD 48 + el dominio.
+    expect(servicios.reduce((a, x) => a + esperadoEnMes(x, "2026-12"), 0)).toBeCloseTo(499.46, 2);
+    expect(t.cierreAno).toBeCloseTo(296.47 + 498.03 + 499.46, 2);
+    // Desde enero Google sube a 95: once meses de 516,47 + diciembre.
+    expect(t.proximos12).toBeCloseTo(499.46 + 11 * 516.47, 2);
+    expect(t.porServicio[0].servicio.id).toBe("claude");
+  });
+
+  it("la serie del año: lo pasado real, este mes partido, lo que viene proyectado", () => {
+    const serie = serieDelAno(servicios, cobros, hoy);
+    expect(serie).toHaveLength(12);
+    expect(serie[9].real.ia).toBe(201.03);
+    expect(serie[9].proyectado.ia).toBe(0);
+    expect(serie[10].real.ia).toBe(119.06 - 20);
+    expect(serie[10].proyectado.servidores).toBe(148.85);
+    expect(serie[11].proyectado.correos).toBe(49.99);
+    expect(sumarMeses("2026-11", 2)).toBe("2027-01");
+  });
+});

@@ -30,13 +30,18 @@ const PING = { ok: true, en: "2026-11-11T19:00:00Z", chequeos: [
   { id: "anthropic", estado: "mal", ms: 90, detalle: "Error 401: la llave no sirve" },
 ] };
 
+const HOY = new Date().toLocaleDateString("sv-SE", { timeZone: "America/Bogota" });
+const COBROS = [{ servicio_id: "google_ia", fecha: HOY, monto_usd: "17.44", fuente: "factura", nota: null }];
 let fallaCostos = false;
 const tabla = (t: string) => ({
   select: () => {
-    const r = fallaCostos ? { data: null, error: { message: "x" } } : { data: t === "costos_servicios" ? SERVICIOS : [], error: null };
+    const r = fallaCostos ? { data: null, error: { message: "x" } }
+      : { data: t === "costos_servicios" ? SERVICIOS : t === "costos_cobros" ? COBROS : [], error: null };
     return { order: () => Promise.resolve(r), then: (f: (v: unknown) => unknown) => Promise.resolve(r).then(f) };
   },
 });
+vi.stubGlobal("ResizeObserver", class { observe() {} unobserve() {} disconnect() {} });
+vi.mock("next-themes", () => ({ useTheme: () => ({ resolvedTheme: "dark" }) }));
 vi.mock("@/integrations/supabase/client", () => ({
   supabase: {
     from: (t: string) => tabla(t),
@@ -60,16 +65,20 @@ const pintar = (ruta: string) => render(
 describe("Costos", () => {
   beforeEach(() => { fallaCostos = false; });
 
-  it("muestra el total de Maven, lo que falta, lo que viene y dónde ahorrar", async () => {
+  it("muestra lo gastado en el mes, el año, los 12 meses, en qué se va y dónde ahorrar", async () => {
     pintar("/oficina/costos");
-    expect((await screen.findAllByText("IA de Google")).length).toBe(3);
-    expect(screen.getAllByText("USD 48").length).toBeGreaterThan(0);
-    expect(screen.getByText(/oficina\.costos\.totalFaltan/)).toBeTruthy();
-    expect(screen.getByText(/oficina\.costos\.faltanFacturas.*Zoho/)).toBeTruthy();
-    expect(screen.getByText("Google duplica")).toBeTruthy();
+    expect(await screen.findByText(/^oficina\.costos\.kpiMes \{/)).toBeTruthy();
+    expect(screen.getByText(/^oficina\.costos\.kpiAno \{/)).toBeTruthy();
+    expect(screen.getByText("oficina.costos.kpi12")).toBeTruthy();
+    // Lo gastado este mes: el cobro de Google de hoy.
+    expect(screen.getAllByText("USD 17").length).toBeGreaterThan(0);
+    // En qué se va: Google y Zoho (sin dato), y lo que falta se dice.
+    expect(screen.getAllByText("IA de Google").length).toBeGreaterThan(0);
+    expect(screen.getByText("oficina.costos.sinDato")).toBeTruthy();
+    expect(screen.getByText(/oficina\.costos\.faltanCorto.*Correos del equipo/)).toBeTruthy();
     expect(screen.getByText("Pasar a Flash-Lite")).toBeTruthy();
-    // Lo que no es Maven va aparte, no suma al total.
-    expect(screen.getByText(/oficina\.costos\.fuera.*USD 185/)).toBeTruthy();
+    // Lo que no es Maven va aparte.
+    expect(screen.getByText(/oficina\.costos\.fueraLinea.*USD 185/)).toBeTruthy();
   });
 
   it("si no se puede leer, lo dice y deja reintentar", async () => {
