@@ -1,46 +1,67 @@
 // Lo puro de Conectar tu plataforma: leer los envíos, las palabras de cada rechazo,
-// partir el nombre para el alta, el adaptador del webhook y las instrucciones.
+// partir el nombre para el alta, los avisos del equipo, los errores de las RPC y las
+// instrucciones.
 import { describe, it, expect } from "vitest";
 import translations, { getTranslation, type TranslationKey } from "@/lib/i18n";
 import {
   conteosDe, haceCuanto, inicial, leerResumen, leerSync, partirNombre, textoDelCampo, textoDelMotivo, valorLegible,
 } from "@/lib/conexionEquipo/resumen";
 import {
-  EVENTOS_EQUIPO, admiteWebhook, avisaMensajes, eventosDeLaLlave, llaveDelEquipo,
+  EVENTOS_EQUIPO, accionesDe, eventosParaCrear, llaveDelEquipo, normalizarUrl, semaforoDe, textoDeLaEntrega,
+  textoDelDetenido, type EntregaEquipo, type WebhookEquipo,
 } from "@/lib/conexionEquipo/webhook";
-import { armarInstrucciones, EJEMPLO_SYNC } from "@/lib/conexionEquipo/instrucciones";
-import { estadoEfectivo, introDelAlta, queMostrar } from "@/pages/admin/ApiKeyWebhook";
+import { CODIGOS_DE_ERROR, codigoDelError, textoDelErrorRpc } from "@/lib/conexionEquipo/errores";
+import { armarInstrucciones, EJEMPLO_RESPUESTA, EJEMPLO_SYNC } from "@/lib/conexionEquipo/instrucciones";
 
 const tEs = (k: TranslationKey, p?: Record<string, string | number>) => getTranslation(k, "es", p);
 const tEn = (k: TranslationKey, p?: Record<string, string | number>) => getTranslation(k, "en", p);
 
 // Las fuentes de los códigos: la edge (equipo-logica.ts) y la base (las migraciones
-// del equipo). Rutas literales desde la raíz del repo, como en sinEspanolNuevo.
+// del equipo y la de agencias conectadas). Rutas literales desde la raíz del repo,
+// como en sinEspanolNuevo.
 const edge = (import.meta as unknown as {
   glob: (p: string, o: Record<string, unknown>) => Record<string, string>;
 }).glob("/supabase/functions/public-api/equipo-logica.ts", { query: "?raw", import: "default", eager: true });
 const migraciones = (import.meta as unknown as {
   glob: (p: string, o: Record<string, unknown>) => Record<string, string>;
 }).glob("/supabase/migrations/*equipo*.sql", { query: "?raw", import: "default", eager: true });
+const agencias = (import.meta as unknown as {
+  glob: (p: string, o: Record<string, unknown>) => Record<string, string>;
+}).glob("/supabase/migrations/20261111190000_agencias_conectadas.sql", { query: "?raw", import: "default", eager: true });
+const sqlDelEquipo = () => [...Object.values(migraciones), ...Object.values(agencias)];
 
 function motivosDeLaEdge(): string[] {
   const src = Object.values(edge)[0] ?? "";
   const union = src.match(/export type MotivoDeRechazo =([\s\S]*?);/)?.[1] ?? "";
   return [...union.matchAll(/"([a-z_]+)"/g)].map((m) => m[1]);
 }
+/** Los motivos que la base pone en un rechazo (aplicar, roles) o en un ignorado
+ *  (pendientes). Solo esos: el `motivo` de los avisos (alta, papelera…) es un dato. */
 function motivosDeLaBase(): string[] {
   const todos = new Set<string>();
-  for (const sql of Object.values(migraciones)) {
+  for (const sql of sqlDelEquipo()) {
     for (const m of sql.matchAll(/_motivo\s*:=\s*'([a-z_]+)'/g)) todos.add(m[1]);
-    for (const m of sql.matchAll(/'motivo',\s*'([a-z_]+)'/g)) todos.add(m[1]);
+    for (const m of sql.matchAll(/(?:_rechazados|_ignoradas)\s*:=[^;]*?'motivo',\s*'([a-z_]+)'/g)) todos.add(m[1]);
   }
   return [...todos];
 }
+/** Los códigos con que empiezan los errores de las RPC que usa la app. */
+function erroresDeLasRpc(): string[] {
+  const sql = Object.values(agencias)[0] ?? "";
+  return [...new Set([...sql.matchAll(/message\s*=\s*'([a-z_]+):/g)].map((m) => m[1]))];
+}
+const ENTREGA: EntregaEquipo = {
+  id: "e", evento: "webhook.test", state: "pending", drop_reason: null, attempts: 0, next_attempt_at: null,
+  last_attempt_at: null, last_status_code: null, last_error: null, latency_ms: null, uncertain: false,
+  created_at: "2026-11-11T00:00:00Z", delivered_at: null,
+};
 
 describe("cada motivo de rechazo tiene su frase", () => {
   it("se encontraron los códigos (un glob vacío pasaría todo)", () => {
     expect(motivosDeLaEdge().length).toBeGreaterThan(10);
     expect(motivosDeLaBase().length).toBeGreaterThan(10);
+    // Los de los roles y los pendientes (20261111190000) también.
+    expect(motivosDeLaBase()).toEqual(expect.arrayContaining(["nombre_muy_largo", "nombre_invalido", "rol_inactivo", "ya_tiene_cuenta"]));
   });
 
   it("los de la edge y los de la base se leen en palabras, en los dos idiomas", () => {
@@ -119,37 +140,59 @@ describe("partir el nombre para create_user", () => {
   });
 });
 
-describe("el webhook del equipo, sobre el sistema de webhooks que ya existe", () => {
-  const base = { id: "k", name: "k", status: "active" as const, created_at: "2026-11-01T00:00:00Z", acts_as: { id: "yo", name: null, active: true } };
-
-  it("una llave con equipo:write admite webhook y recibe los tres eventos", () => {
-    expect(admiteWebhook(["equipo:write"])).toBe(true);
-    expect(admiteWebhook(["creators:read"])).toBe(false);
-    expect(eventosDeLaLlave(["equipo:write"])).toEqual([...EVENTOS_EQUIPO]);
-    expect(eventosDeLaLlave(["messenger:read", "equipo:write"])).toEqual(["messages.created", ...EVENTOS_EQUIPO]);
-    expect(avisaMensajes(["equipo:write"])).toBe(false);
+describe("los avisos del equipo (RPC propias, no los webhooks del Messenger)", () => {
+  const base = { id: "k", name: "k", status: "active" as const, created_at: "2026-11-01T00:00:00Z" };
+  const aviso = (extra: Partial<WebhookEquipo> = {}): WebhookEquipo => ({
+    id: "w", api_key_id: "k", url_host: "x.com", eventos: [...EVENTOS_EQUIPO], status: "active", disabled_reason: null,
+    disabled_at: null, secret_last4: "abcd", consecutive_failures: 0, failing_since: null, last_attempt_at: null,
+    last_success_at: null, last_status_code: null, last_error: null, created_by: null, created_at: "2026-11-11T00:00:00Z",
+    pendientes: 0, ...extra,
   });
 
-  it("la tabla de API keys ofrece registrar el webhook en la llave del equipo", () => {
-    expect(queMostrar({ ...base, scopes: ["equipo:write"], webhook: null }, "yo", false)).toBe("registrar");
-    expect(queMostrar({ ...base, scopes: ["creators:read"], webhook: null }, "yo", false)).toBe("nada");
-    // Un webhook en una llave del equipo NO se ve como «sin el permiso de Messenger».
-    const w = { status: "active", consecutive_failures: 0, last_attempt_at: null, failing_since: null, last_error: null, disabled_reason: null };
-    expect(estadoEfectivo(w as never, { ...base, scopes: ["equipo:write"] }).motivo).toBeNull();
+  it("la URL va como new URL(x).href y solo https", () => {
+    expect(normalizarUrl("  https://Hooks.Example.com ")).toBe("https://hooks.example.com/");
+    expect(normalizarUrl("https://hooks.example.com:443/maven?x=1")).toBe("https://hooks.example.com/maven?x=1");
+    expect(normalizarUrl("http://hooks.example.com")).toBeNull();
+    expect(normalizarUrl("no es una url")).toBeNull();
   });
 
-  it("el alta cuenta lo que recibe cada llave", () => {
-    expect(introDelAlta(["equipo:write"], tEs)).toMatch(/equipo\.persona_entro/);
-    expect(introDelAlta(["messenger:read"], tEs)).toBe(tEs("apiKeys.webhook.registerIntro"));
+  it("los tres eventos van como null (lo que la base toma por defecto); menos, como lista", () => {
+    expect(eventosParaCrear([...EVENTOS_EQUIPO])).toBeNull();
+    expect(eventosParaCrear(["equipo.rol_cambio", "otro"])).toEqual(["equipo.rol_cambio"]);
   });
 
-  it("la llave del equipo: la activa (con webhook primero); si no hay, la última que hubo", () => {
+  it("cómo está y qué se puede hacer", () => {
+    expect(semaforoDe(aviso()).tono).toBe("bien");
+    expect(semaforoDe(aviso({ consecutive_failures: 3 })).tono).toBe("ojo");
+    expect(semaforoDe(aviso({ status: "paused" })).tono).toBe("apagado");
+    expect(accionesDe(aviso())).toMatchObject({ probar: true, pausar: true, reanudar: false });
+    expect(accionesDe(aviso({ status: "paused" }))).toMatchObject({ probar: false, pausar: false, reanudar: true });
+    // Con la llave revocada, reanudar no lo arregla: hay que crear otra llave.
+    expect(accionesDe(aviso({ status: "disabled", disabled_reason: "key_revoked" })).reanudar).toBe(false);
+    expect(accionesDe(aviso({ status: "disabled", disabled_reason: "receiver_failing" })).reanudar).toBe(true);
+    expect(textoDelDetenido("receiver_gone", tEs)).toMatch(/410/);
+    expect(textoDeLaEntrega({ ...ENTREGA, state: "delivered", last_status_code: 204 }, tEs).texto).toMatch(/204/);
+    expect(textoDeLaEntrega({ ...ENTREGA, state: "dropped", drop_reason: "endpoint_paused" }, tEs).tono).toBe("mal");
+  });
+
+  it("cada error de las RPC de la app se dice en una frase, en los dos idiomas", () => {
+    expect(erroresDeLasRpc().length).toBeGreaterThan(10);
+    const sinFrase = erroresDeLasRpc().filter((c) => !CODIGOS_DE_ERROR.includes(c));
+    expect(sinFrase, "Agrega el código en lib/conexionEquipo/errores.ts y su frase").toEqual([]);
+    expect(textoDelErrorRpc(new Error("url_invalida: la url no sirve"), tEs)).toMatch(/https/);
+    expect(textoDelErrorRpc(new Error("ya_resuelta: ese pendiente ya está aprobada"), tEn)).toMatch(/already/);
+    // Uno que no se conoce, con su mensaje tal cual.
+    expect(textoDelErrorRpc(new Error("otra_cosa: detalle"), tEs)).toBe("otra_cosa: detalle");
+    expect(codigoDelError(new Error("sin_permiso: solo el dueño"))).toBe("sin_permiso");
+  });
+
+  it("la llave del equipo: la activa (con aviso primero); si no hay, la última que hubo", () => {
     const k = (id: string, extra: Record<string, unknown>) => ({ ...base, id, scopes: ["equipo:write"], ...extra });
     const vieja = k("vieja", { created_at: "2026-10-01T00:00:00Z" });
     const nueva = k("nueva", { created_at: "2026-11-05T00:00:00Z" });
-    const conWebhook = k("con", { created_at: "2026-10-15T00:00:00Z", webhook: { id: "w" } });
+    const conAviso = k("con", { created_at: "2026-10-15T00:00:00Z" });
     expect(llaveDelEquipo([vieja, nueva]).llave?.id).toBe("nueva");
-    expect(llaveDelEquipo([vieja, nueva, conWebhook]).llave?.id).toBe("con");
+    expect(llaveDelEquipo([vieja, nueva, conAviso], new Set(["con"])).llave?.id).toBe("con");
     const revocada = k("rev", { status: "revoked" });
     expect(llaveDelEquipo([revocada])).toEqual({ llave: revocada, activa: false });
     expect(llaveDelEquipo([{ ...base, scopes: ["creators:read"] }])).toEqual({ llave: null, activa: false });
@@ -179,5 +222,24 @@ describe("las instrucciones que se copian", () => {
     }
     expect(armarInstrucciones(tEs, "b")).toMatch(/nunca por chat/);
     expect(armarInstrucciones(tEn, "b")).toMatch(/never over chat/);
+  });
+
+  it("los roles van primero en el cuerpo y la respuesta trae `roles` y `pendientes`", () => {
+    expect(Object.keys(JSON.parse(EJEMPLO_SYNC)).indexOf("roles")).toBeLessThan(Object.keys(JSON.parse(EJEMPLO_SYNC)).indexOf("personas"));
+    const r = JSON.parse(EJEMPLO_RESPUESTA);
+    expect(r.object).toBe("equipo_sync");
+    expect(Object.keys(r.roles).sort()).toEqual(["creados", "ensayo", "rechazados", "ya_estaban"]);
+    expect(Object.keys(r.pendientes).sort()).toEqual(["actualizadas", "ensayo", "ignoradas", "registradas"]);
+    for (const t of [tEs, tEn]) {
+      const texto = armarInstrucciones(t, "b");
+      expect(texto).toContain("\"pendientes\": {");
+      // En ensayo, quien tiene un rol por crear sale en roles_desconocidos.
+      expect(texto).toContain("`roles_desconocidos`");
+      // Horas y notas: 7 días por defecto, hasta 93, y los campos de cada día.
+      expect(texto).toMatch(/7/);
+      expect(texto).toMatch(/93/);
+      for (const campo of ["minutos_trabajados", "llego_tarde", "desglose", "crudo"]) expect(texto).toContain(campo);
+      expect(texto).toContain("webhook.test");
+    }
   });
 });

@@ -28,8 +28,8 @@ avisos los manda `supabase/functions/messenger-webhooks/equipo.ts`. Los bancos c
 
 ## 1. La llave
 
-1. En Maven: **Ajustes → API keys → Nueva key**, con el permiso `equipo:write` (hoy se llama
-   «⚠️ Backstage manda el equipo» en la pantalla). La tiene que crear un **admin o el dueño** de
+1. En Maven: **Ajustes → API keys → Nueva key**, con el permiso `equipo:write` («⚠️ Tu plataforma
+   manda el equipo» en la pantalla; Ajustes → Conectar tu plataforma la abre ya marcada). La tiene que crear un **admin o el dueño** de
    la agencia: la key actúa como quien la crea, es de SU agencia, y la base exige que esa persona
    siga siendo admin o dueña.
 2. Recomendado: IPs fijas del servidor de la plataforma y un vencimiento.
@@ -262,7 +262,7 @@ Maven avisa a la plataforma cuando, en su agencia:
 
 ### Registrar la URL (en Maven)
 
-El dueño o un admin, desde Ajustes → API keys, sobre la key de la plataforma (con `equipo:write`):
+El dueño o un admin, desde Ajustes → Conectar tu plataforma → Avisos, sobre la key de la plataforma (con `equipo:write`):
 URL `https://` (puerto 443, un nombre de dominio, nada de red interna ni de Maven) y los eventos que
 quiere. Maven muestra el **secreto de firma una sola vez** (`whsec_…`); se guarda en la plataforma.
 Hay un botón «Enviar prueba» (`webhook.test`) y se puede pausar, reanudar o borrar.

@@ -3,7 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { adminInvoke } from "@/lib/adminInvoke";
 import { useLanguage } from "@/hooks/useLanguage";
 import { leerSync, partirNombre, type FilaSync, type Sync } from "@/lib/conexionEquipo/resumen";
-import type { LlaveConWebhook } from "../ApiKeyWebhook";
+import type { EntregaEquipo, WebhookCreado, WebhookEquipo } from "@/lib/conexionEquipo/webhook";
 import type { NuevoUsuario } from "../AddUserModal";
 
 // Lo que lee y escribe Ajustes → Conectar tu plataforma. Todo pasa por la RLS de la
@@ -23,8 +23,9 @@ export const CLAVE = {
   syncs: ["conexion-equipo", "syncs"] as const,
   pendientes: ["conexion-equipo", "pendientes"] as const,
   roles: ["conexion-equipo", "roles-sin-permisos"] as const,
-  // La misma lista que Ajustes → API keys: una sola caché, así el diálogo del webhook
-  // (que escribe en ["api-keys"]) se ve igual en las dos pantallas.
+  webhooks: ["conexion-equipo", "webhooks"] as const,
+  entregas: (id: string) => ["conexion-equipo", "webhook-entregas", id] as const,
+  // La misma lista que Ajustes → API keys: una sola caché para las dos pantallas.
   llaves: ["api-keys"] as const,
 };
 
@@ -52,8 +53,12 @@ export type Pendiente = {
   estado: string;
 };
 export type RolSinPermisos = { nombre: string; creado_at: string | null };
-export type LlaveApi = LlaveConWebhook & { created_at: string };
-export type ListaLlaves = { keys: LlaveApi[]; you?: { id: string; name: string | null }; webhooks_unknown?: boolean };
+/** Lo que se usa de cada key de manage-api-keys (list). */
+export type LlaveApi = {
+  id: string; name: string; scopes: string[]; status: "active" | "revoked" | "expired"; created_at: string;
+  acts_as?: { id: string; name: string | null; active: boolean | null } | null;
+};
+export type ListaLlaves = { keys: LlaveApi[]; you?: { id: string; name: string | null } };
 
 /** La fila de la agencia. null = la agencia todavía no la tiene (nace con el primer
  *  envío): no es un error, pero tampoco se puede cambiar el modo todavía. */
@@ -117,7 +122,7 @@ export function useRolesSinPermisos() {
 }
 
 /** Las API keys de la agencia (manage-api-keys, solo admins): de ahí sale si la
- *  plataforma está conectada y el webhook de su llave. */
+ *  plataforma está conectada y en qué llave se registra el aviso. */
 export function useLlaves() {
   const { language } = useLanguage();
   return useQuery({
@@ -159,9 +164,64 @@ export async function crearCuenta(p: Pendiente, errorSinId: string): Promise<Alt
   };
 }
 
-export async function resolverPendiente(id: string, accion: "aprobar" | "descartar", userId?: string): Promise<void> {
-  const { error } = await sinTipar.rpc("equipo_pendiente_resolver", {
+/** Lo que contesta equipo_pendiente_resolver. Aprobar dos veces la misma fila con la
+ *  misma cuenta no es un error: devuelve lo mismo. */
+export type Resuelto = { id: string; estado: string; user_id: string | null; equipo: string | null; reporta_a: string | null };
+
+/** Los errores traen el código al principio («ya_resuelta: …»): ver textoDelErrorRpc. */
+export async function resolverPendiente(id: string, accion: "aprobar" | "descartar", userId?: string): Promise<Resuelto | null> {
+  const { data, error } = await sinTipar.rpc("equipo_pendiente_resolver", {
     _id: id, _accion: accion, ...(accion === "aprobar" ? { _user_id: userId } : {}),
   });
   if (error) throw new Error(error.message);
+  return (data as Resuelto | null) ?? null;
+}
+
+// ── Los avisos del equipo (webhook): RPC propias, ver lib/conexionEquipo/webhook.ts ──
+
+export function useWebhooksEquipo() {
+  return useQuery({
+    queryKey: CLAVE.webhooks,
+    queryFn: async (): Promise<WebhookEquipo[]> => {
+      const { data, error } = await sinTipar.rpc("equipo_webhooks");
+      if (error) throw new Error(error.message);
+      if (!Array.isArray(data)) throw new Error("equipo_webhooks");
+      return data as WebhookEquipo[];
+    },
+  });
+}
+
+export function useEntregas(id: string | null, abierto: boolean) {
+  return useQuery({
+    queryKey: CLAVE.entregas(id ?? ""),
+    enabled: abierto && !!id,
+    // Mientras se mira, se relee: una prueba sale en menos de 30 s.
+    staleTime: 0,
+    refetchInterval: abierto ? 10_000 : false,
+    queryFn: async (): Promise<EntregaEquipo[]> => {
+      const { data, error } = await sinTipar.rpc("equipo_webhook_entregas", { _id: id, _limite: 20 });
+      if (error) throw new Error(error.message);
+      if (!Array.isArray(data)) throw new Error("equipo_webhook_entregas");
+      return data as EntregaEquipo[];
+    },
+  });
+}
+
+/** Registra el aviso. Devuelve el secreto UNA vez: quien llama lo guarda solo en memoria. */
+export async function crearWebhook(apiKeyId: string, url: string, eventos: string[] | null): Promise<WebhookCreado> {
+  const { data, error } = await sinTipar.rpc("equipo_webhook_crear", { _api_key_id: apiKeyId, _url: url, _eventos: eventos });
+  if (error) throw new Error(error.message);
+  if (!data || typeof (data as { secreto?: unknown }).secreto !== "string") throw new Error("equipo_webhook_crear");
+  return data as WebhookCreado;
+}
+
+export async function cambiarWebhook(id: string, accion: "pausar" | "reanudar" | "borrar"): Promise<void> {
+  const { error } = await sinTipar.rpc("equipo_webhook_cambiar", { _id: id, _accion: accion });
+  if (error) throw new Error(error.message);
+}
+
+export async function probarWebhook(id: string): Promise<string | null> {
+  const { data, error } = await sinTipar.rpc("equipo_webhook_probar", { _id: id });
+  if (error) throw new Error(error.message);
+  return (data as { entrega_id?: string } | null)?.entrega_id ?? null;
 }

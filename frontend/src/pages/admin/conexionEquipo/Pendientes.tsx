@@ -4,6 +4,7 @@ import { Check, Loader2, UserPlus, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useFormato } from "@/hooks/useFormato";
 import { useLanguage } from "@/hooks/useLanguage";
+import { textoDelErrorRpc } from "@/lib/conexionEquipo/errores";
 import { Bloque, Cargando, Chip, Fallo, Letra, Nota } from "./piezas";
 import { CLAVE, crearCuenta, resolverPendiente, usePendientes, type Alta, type Pendiente } from "./datos";
 
@@ -18,7 +19,6 @@ import { CLAVE, crearCuenta, resolverPendiente, usePendientes, type Alta, type P
 type EstadoFila = { ocupado?: "aprobar" | "descartar"; error?: string; creadaSinMarcar?: boolean };
 type Hecho = { id: string; tono: "bien" | "ojo" | "info"; texto: string; extra?: string };
 
-const mensajeDe = (e: unknown) => (e instanceof Error && e.message ? e.message : String(e));
 
 export function Pendientes() {
   const { t } = useLanguage();
@@ -49,14 +49,18 @@ export function Pendientes() {
         alta = await crearCuenta(p, t("conexionEquipo.pend.sinId"));
         creadas.current.set(p.id, alta);
       } catch (e) {
-        fijar(p.id, { error: t("conexionEquipo.pend.noSeCreo", { nombre, error: mensajeDe(e) }) });
+        // create_user contesta en palabras (adminInvoke ya trae su mensaje).
+        fijar(p.id, { error: t("conexionEquipo.pend.noSeCreo", { nombre, error: e instanceof Error && e.message ? e.message : String(e) }) });
         return;
       }
     }
+    let resuelto;
     try {
-      await resolverPendiente(p.id, "aprobar", alta.user_id);
-    } catch {
-      fijar(p.id, { error: t("conexionEquipo.pend.creadaSinMarcar", { nombre }), creadaSinMarcar: true });
+      // Aprobar otra vez la misma fila con la misma cuenta no es un error: Reintentar
+      // solo vuelve a marcarla.
+      resuelto = await resolverPendiente(p.id, "aprobar", alta.user_id);
+    } catch (e) {
+      fijar(p.id, { error: t("conexionEquipo.pend.creadaSinMarcar", { nombre, motivo: textoDelErrorRpc(e, t) }), creadaSinMarcar: true });
       return;
     }
     creadas.current.delete(p.id);
@@ -66,7 +70,8 @@ export function Pendientes() {
       texto: llego
         ? t("conexionEquipo.pend.aprobada", { nombre, correo: alta.email_sent_to ?? p.correo })
         : t("conexionEquipo.pend.aprobadaSinCorreo", { nombre }),
-      extra: t("conexionEquipo.pend.equipoDespues"),
+      // La base ya le puso el equipo y el jefe que mandó la plataforma.
+      extra: resuelto?.equipo || resuelto?.reporta_a ? t("conexionEquipo.pend.equipoPuesto") : undefined,
     });
     void qc.invalidateQueries({ queryKey: ["admin-users"] }).then(() => {}, () => {});
   };
@@ -77,7 +82,9 @@ export function Pendientes() {
     try {
       await resolverPendiente(p.id, "descartar");
     } catch (e) {
-      fijar(p.id, { error: t("conexionEquipo.pend.noSeDescarto", { nombre, error: mensajeDe(e) }) });
+      fijar(p.id, { error: t("conexionEquipo.pend.noSeDescarto", { nombre, error: textoDelErrorRpc(e, t) }) });
+      // Si otra persona ya la resolvió, la lista se relee.
+      void qc.invalidateQueries({ queryKey: CLAVE.pendientes }).then(() => {}, () => {});
       return;
     }
     terminar(p, { tono: "info", texto: t("conexionEquipo.pend.descartada", { nombre }) });

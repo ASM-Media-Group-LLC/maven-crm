@@ -19,7 +19,7 @@ import { SCOPE_EQUIPO, llaveDelEquipo } from "@/lib/conexionEquipo/webhook";
 import { API_BASE } from "./AdminApiKeys";
 import { ConFormato, CopyButton } from "./apiKeysPiezas";
 import { Bloque, Fallo, Nota } from "./conexionEquipo/piezas";
-import { CLAVE, cambiarModo, useIntegracion, useLlaves, type Integracion } from "./conexionEquipo/datos";
+import { CLAVE, cambiarModo, useIntegracion, useLlaves, useWebhooksEquipo, type Integracion } from "./conexionEquipo/datos";
 import { UltimaSync } from "./conexionEquipo/UltimaSync";
 import { RolesSinPermisos } from "./conexionEquipo/RolesSinPermisos";
 import { Pendientes } from "./conexionEquipo/Pendientes";
@@ -286,7 +286,9 @@ const ConexionEquipo = () => {
   const { t } = useLanguage();
   const integracion = useIntegracion();
   const llaves = useLlaves();
-  const { llave, activa } = llaveDelEquipo(llaves.data?.keys ?? []);
+  // La misma llave que elige Avisos: si hay varias, la que ya tiene aviso.
+  const webhooks = useWebhooksEquipo();
+  const { llave, activa } = llaveDelEquipo(llaves.data?.keys ?? [], new Set((webhooks.data ?? []).map((w) => w.api_key_id)));
   const estadoLlave: EstadoLlave = {
     cargando: llaves.isLoading,
     // Sin la lista no se sabe: nunca se concluye «sin conectar» por un fallo.

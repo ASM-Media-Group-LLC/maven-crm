@@ -21,7 +21,7 @@ const CLAVE_TEMPORAL = "CLAVE-TEMPORAL-NO-MOSTRAR-9431";
 type Res = { data: unknown; error: { message: string } | null };
 const db = vi.hoisted(() => ({
   tablas: {} as Record<string, Res>,
-  rpcs: {} as Record<string, Res | (() => Res)>,
+  rpcs: {} as Record<string, Res | ((args: unknown) => Res)>,
   alActualizar: { data: [{ aplicar: true }], error: null } as Res,
   consultas: [] as { tabla: string; filtros: [string, unknown][] }[],
   actualizaciones: [] as { tabla: string; valores: unknown; filtros: [string, unknown][] }[],
@@ -61,7 +61,7 @@ vi.mock("@/integrations/supabase/client", () => {
       rpc: (fn: string, args?: unknown) => {
         db.rpcLlamadas.push({ fn, args });
         const r = db.rpcs[fn];
-        return Promise.resolve(typeof r === "function" ? r() : r ?? { data: [], error: null });
+        return Promise.resolve(typeof r === "function" ? r(args) : r ?? { data: [], error: null });
       },
       auth: { getSession: () => Promise.resolve({ data: { session: { access_token: "x" } } }) },
     },
@@ -139,14 +139,21 @@ const PENDIENTE = {
 };
 
 function escenario({ keys = [] as unknown[], integ = integracion() as unknown, syncs = [] as unknown[], pendientes = [] as unknown[],
-  roles = [] as unknown[], dueno = true } = {}) {
+  roles = [] as unknown[], dueno = true, webhooks = [] as unknown[] } = {}) {
   db.tablas = {
     integracion_equipo: { data: integ, error: null },
     integracion_equipo_syncs: { data: syncs, error: null },
     integracion_equipo_pendientes: { data: pendientes, error: null },
     tenant_owners: { data: dueno ? { user_id: YO } : null, error: null },
   };
-  db.rpcs = { equipo_roles_sin_permisos: { data: roles, error: null }, equipo_pendiente_resolver: { data: null, error: null } };
+  db.rpcs = {
+    equipo_roles_sin_permisos: { data: roles, error: null },
+    equipo_pendiente_resolver: { data: { id: "p1", estado: "aprobada", user_id: "nuevo-1", equipo: null, reporta_a: null }, error: null },
+    equipo_webhooks: { data: webhooks, error: null },
+    equipo_webhook_entregas: { data: [], error: null },
+    equipo_webhook_cambiar: { data: {}, error: null },
+    equipo_webhook_probar: { data: { entrega_id: "e1" }, error: null },
+  };
   db.servidor = (fn, body) => {
     if (fn === "manage-api-keys" && body.action === "list") return Promise.resolve(lista(keys));
     if (fn === "admin-user-actions" && body.action === "create_user") {
@@ -159,8 +166,10 @@ function escenario({ keys = [] as unknown[], integ = integracion() as unknown, s
   };
 }
 
+let qcActual: QueryClient;
 function pintar() {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  qcActual = qc;
   return render(
     <QueryClientProvider client={qc}>
       <MemoryRouter initialEntries={["/settings?sub=conexion-equipo"]}><ConexionEquipo /></MemoryRouter>
@@ -461,5 +470,162 @@ describe("roles nuevos sin permisos", () => {
     escenario();
     pintar();
     expect(await within(seccion("conexionEquipo.roles.titulo")).findByText("conexionEquipo.roles.ninguno")).toBeTruthy();
+  });
+});
+
+// ── Avisos (webhook del equipo: RPC propias) ────────────────────────────────
+
+const SECRETO = "whsec_c2VjcmV0by1kZS1wcnVlYmEtZXF1aXBv";
+const AVISO = {
+  id: "w1", api_key_id: "k-equipo", url_host: "hooks.example.com",
+  eventos: ["equipo.persona_entro", "equipo.persona_salio", "equipo.rol_cambio"], status: "active",
+  disabled_reason: null, disabled_at: null, secret_last4: "pozo", consecutive_failures: 0, failing_since: null,
+  last_attempt_at: null, last_success_at: null, last_status_code: null, last_error: null, created_by: YO,
+  created_at: "2026-11-11T12:00:00Z", pendientes: 0,
+};
+const rpcDe = (fn: string) => db.rpcLlamadas.filter((l) => l.fn === fn);
+
+describe("avisos a tu plataforma", () => {
+  it("registra la dirección con equipo_webhook_crear y muestra el secreto UNA vez", async () => {
+    escenario({ keys: [llave()] });
+    // Como la base: después de crear, la lista ya lo trae (sin el secreto).
+    let creado = false;
+    db.rpcs.equipo_webhook_crear = () => { creado = true; return { data: { ...AVISO, secreto: SECRETO }, error: null }; };
+    db.rpcs.equipo_webhooks = () => ({ data: creado ? [AVISO] : [], error: null });
+    pintar();
+    const avisos = seccion("conexionEquipo.avisos.titulo");
+    const url = await within(avisos).findByLabelText("conexionEquipo.wh.alta.url");
+    fireEvent.change(url, { target: { value: "  https://Hooks.Example.com " } });
+    fireEvent.click(within(avisos).getByRole("button", { name: /conexionEquipo\.wh\.alta\.boton/ }));
+
+    expect(await within(avisos).findByText(SECRETO)).toBeTruthy();
+    // La URL como new URL(x).href; los tres eventos van como null (la base pone los tres).
+    expect(rpcDe("equipo_webhook_crear")[0].args).toEqual({ _api_key_id: "k-equipo", _url: "https://hooks.example.com/", _eventos: null });
+    // El secreto no queda en ninguna caché de react-query.
+    expect(JSON.stringify(qcActual.getQueryCache().getAll().map((q) => q.state.data))).not.toContain(SECRETO);
+    expect(JSON.stringify(qcActual.getMutationCache().getAll().map((m) => m.state.data))).not.toContain(SECRETO);
+    // Ya registrado: se ve la tarjeta, no el alta.
+    expect(within(avisos).getByText("whsec_…pozo")).toBeTruthy();
+    expect(within(avisos).queryByLabelText("conexionEquipo.wh.alta.url")).toBeNull();
+
+    fireEvent.click(within(avisos).getByRole("button", { name: "conexionEquipo.wh.secreto.listo" }));
+    expect(within(avisos).queryByText(SECRETO)).toBeNull();
+  });
+
+  it("con menos eventos los manda como lista; sin https no deja registrar", async () => {
+    escenario({ keys: [llave()] });
+    db.rpcs.equipo_webhook_crear = () => ({ data: { ...AVISO, secreto: SECRETO }, error: null });
+    pintar();
+    const avisos = seccion("conexionEquipo.avisos.titulo");
+    const url = await within(avisos).findByLabelText("conexionEquipo.wh.alta.url");
+    const registrar = within(avisos).getByRole("button", { name: /conexionEquipo\.wh\.alta\.boton/ });
+    fireEvent.change(url, { target: { value: "http://hooks.example.com" } });
+    expect(registrar).toBeDisabled();
+    expect(within(avisos).getByText("conexionEquipo.wh.alta.urlMala")).toBeTruthy();
+    fireEvent.change(url, { target: { value: "https://hooks.example.com/maven" } });
+    fireEvent.click(within(avisos).getByRole("checkbox", { name: /equipo\.persona_salio/ }));
+    fireEvent.click(registrar);
+    await waitFor(() => expect(rpcDe("equipo_webhook_crear")).toHaveLength(1));
+    expect(rpcDe("equipo_webhook_crear")[0].args).toMatchObject({ _eventos: ["equipo.persona_entro", "equipo.rol_cambio"] });
+  });
+
+  it("un error de la base se dice en una frase", async () => {
+    escenario({ keys: [llave()] });
+    db.rpcs.equipo_webhook_crear = () => ({ data: null, error: { message: "url_invalida: host prohibido" } });
+    pintar();
+    const avisos = seccion("conexionEquipo.avisos.titulo");
+    fireEvent.change(await within(avisos).findByLabelText("conexionEquipo.wh.alta.url"), { target: { value: "https://10.0.0.1" } });
+    fireEvent.click(within(avisos).getByRole("button", { name: /conexionEquipo\.wh\.alta\.boton/ }));
+    expect(await within(avisos).findByText("conexionEquipo.err.url_invalida")).toBeTruthy();
+  });
+
+  it("pausar y borrar piden confirmación en la página; reanudar va directo", async () => {
+    const confirmar = vi.spyOn(window, "confirm");
+    escenario({ keys: [llave()], webhooks: [AVISO] });
+    pintar();
+    const avisos = seccion("conexionEquipo.avisos.titulo");
+    fireEvent.click(await within(avisos).findByRole("button", { name: /conexionEquipo\.wh\.pausar/ }));
+    expect(within(avisos).getByRole("alertdialog")).toBeTruthy();
+    expect(rpcDe("equipo_webhook_cambiar")).toHaveLength(0);
+    fireEvent.click(within(avisos).getByRole("button", { name: /conexionEquipo\.wh\.confirmar\.pausar\.si/ }));
+    await waitFor(() => expect(rpcDe("equipo_webhook_cambiar")).toHaveLength(1));
+    expect(rpcDe("equipo_webhook_cambiar")[0].args).toEqual({ _id: "w1", _accion: "pausar" });
+
+    fireEvent.click(within(avisos).getByRole("button", { name: /conexionEquipo\.wh\.borrar/ }));
+    expect(rpcDe("equipo_webhook_cambiar")).toHaveLength(1);
+    fireEvent.click(within(avisos).getByRole("button", { name: /conexionEquipo\.wh\.confirmar\.borrar\.si/ }));
+    await waitFor(() => expect(rpcDe("equipo_webhook_cambiar")).toHaveLength(2));
+    expect(rpcDe("equipo_webhook_cambiar")[1].args).toEqual({ _id: "w1", _accion: "borrar" });
+    expect(confirmar).not.toHaveBeenCalled();
+    confirmar.mockRestore();
+  });
+
+  it("un aviso en pausa se reanuda sin confirmar", async () => {
+    escenario({ keys: [llave()], webhooks: [{ ...AVISO, status: "paused" }] });
+    pintar();
+    const avisos = seccion("conexionEquipo.avisos.titulo");
+    fireEvent.click(await within(avisos).findByRole("button", { name: /conexionEquipo\.wh\.reanudar/ }));
+    await waitFor(() => expect(rpcDe("equipo_webhook_cambiar")).toHaveLength(1));
+    expect(rpcDe("equipo_webhook_cambiar")[0].args).toEqual({ _id: "w1", _accion: "reanudar" });
+  });
+
+  it("enviar prueba: una cada 12 s, y abre las entregas", async () => {
+    escenario({ keys: [llave()], webhooks: [AVISO] });
+    pintar();
+    const avisos = seccion("conexionEquipo.avisos.titulo");
+    fireEvent.click(await within(avisos).findByRole("button", { name: /conexionEquipo\.wh\.probar/ }));
+    await waitFor(() => expect(rpcDe("equipo_webhook_probar")).toHaveLength(1));
+    expect(rpcDe("equipo_webhook_probar")[0].args).toEqual({ _id: "w1" });
+    // El botón espera: no sale otra prueba enseguida.
+    const espera = await within(avisos).findByRole("button", { name: /conexionEquipo\.wh\.probarEspera/ });
+    expect(espera).toBeDisabled();
+    await waitFor(() => expect(rpcDe("equipo_webhook_entregas").length).toBeGreaterThan(0));
+    expect(rpcDe("equipo_webhook_entregas")[0].args).toMatchObject({ _id: "w1" });
+  });
+
+  it("si no se puede leer la lista de avisos, no ofrece registrar otro", async () => {
+    escenario({ keys: [llave()] });
+    db.rpcs.equipo_webhooks = { data: null, error: { message: "sin_permiso: solo el dueño o un admin" } };
+    pintar();
+    const avisos = seccion("conexionEquipo.avisos.titulo");
+    expect(await within(avisos).findByText("conexionEquipo.fallo")).toBeTruthy();
+    expect(within(avisos).queryByLabelText("conexionEquipo.wh.alta.url")).toBeNull();
+  });
+
+  it("un aviso detenido dice por qué", async () => {
+    escenario({ keys: [llave()], webhooks: [{ ...AVISO, status: "disabled", disabled_reason: "receiver_failing", disabled_at: "2026-11-11T12:00:00Z" }] });
+    pintar();
+    const avisos = seccion("conexionEquipo.avisos.titulo");
+    expect(await within(avisos).findByText("conexionEquipo.wh.detenido.receiver_failing")).toBeTruthy();
+    expect(within(avisos).getByRole("button", { name: /conexionEquipo\.wh\.probar/ })).toBeDisabled();
+  });
+});
+
+describe("pendientes: lo que contesta la base", () => {
+  it("si la base ya puso equipo y jefe al aprobar, lo dice", async () => {
+    escenario({ keys: [llave()], pendientes: [PENDIENTE] });
+    db.rpcs.equipo_pendiente_resolver = { data: { id: "p1", estado: "aprobada", user_id: "nuevo-1", equipo: "Turno A", reporta_a: "j1" }, error: null };
+    pintar();
+    const pend = seccion("conexionEquipo.pend.titulo");
+    fireEvent.click(await within(pend).findByRole("button", { name: /conexionEquipo\.pend\.aprobar/ }));
+    expect(await within(pend).findByText("conexionEquipo.pend.equipoPuesto")).toBeTruthy();
+  });
+
+  it("un error de la base al descartar se dice en una frase", async () => {
+    escenario({ keys: [llave()], pendientes: [PENDIENTE] });
+    db.rpcs.equipo_pendiente_resolver = { data: null, error: { message: "ya_resuelta: ese pendiente ya está aprobada" } };
+    pintar();
+    const pend = seccion("conexionEquipo.pend.titulo");
+    fireEvent.click(await within(pend).findByRole("button", { name: /conexionEquipo\.pend\.descartar/ }));
+    expect(await within(pend).findByText(/conexionEquipo\.pend\.noSeDescarto.*conexionEquipo\.err\.ya_resuelta/)).toBeTruthy();
+  });
+
+  it("si marcar la aprobada falla, dice por qué", async () => {
+    escenario({ keys: [llave()], pendientes: [PENDIENTE] });
+    db.rpcs.equipo_pendiente_resolver = { data: null, error: { message: "cuenta_no_coincide: la cuenta no es de esta agencia" } };
+    pintar();
+    const pend = seccion("conexionEquipo.pend.titulo");
+    fireEvent.click(await within(pend).findByRole("button", { name: /conexionEquipo\.pend\.aprobar/ }));
+    expect(await within(pend).findByText(/conexionEquipo\.pend\.creadaSinMarcar.*conexionEquipo\.err\.cuenta_no_coincide/)).toBeTruthy();
   });
 });
