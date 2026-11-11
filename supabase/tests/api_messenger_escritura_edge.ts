@@ -80,6 +80,9 @@ const NO_CARGAN_AQUI: Record<string, string> = {
   "20261111130000_sin_blu.sql":
     "Blu: se apagan los cron que buscaban a Blu (Alvaro cortó la conexión). Usa pg_cron, que este fixture no " +
     "trae; no toca nada del Messenger.",
+  "20261111140000_caja_negra_de_subidas.sql":
+    "Drive: caja negra de las subidas de las modelos (drive_aportar_intentos) y aviso a quien creó el link si " +
+    "una subida se traba. Usa pg_cron e inserta notificaciones; no toca nada del Messenger.",
   "20261111110000_aviso_blu_caido.sql":
     "Blu: aviso a los dueños si el puente con Blu se cae y los ingresos se quedan atrás. Inserta en notifications, " +
     "pero usa blu_bridge_state, creator_daily_earnings y pg_cron, que este fixture no trae; no toca nada del Messenger.",

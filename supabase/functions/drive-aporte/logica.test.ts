@@ -1,5 +1,5 @@
 import { assertEquals } from "jsr:@std/assert@1";
-import { esTipoParaCompartir, type Hijo, nombreDeLink, nombreDelDia, ordenarHijos, permisosDe, tipoEfectivo } from "./logica.ts";
+import { esTipoParaCompartir, filaDeBitacora, type Hijo, nombreDeLink, nombreDelDia, ordenarHijos, permisosDe, tipoEfectivo } from "./logica.ts";
 
 Deno.test("cada link deja lo suyo: los viejos y los de invitado solo suben, nunca ven", () => {
   assertEquals(permisosDe("personal"), { subir: true, ver: true, compartir: true });
@@ -59,4 +59,20 @@ Deno.test("el link viejo de una creadora abre su Drive; uno viejo a otra carpeta
   // Los de invitado o de ver nunca se agrandan, aunque apunten a su carpeta.
   assertEquals(tipoEfectivo("invitado", true), "invitado");
   assertEquals(tipoEfectivo("ver", true), "ver");
+});
+
+Deno.test("caja negra: arma la fila de cada intento y descarta lo que no sirve", () => {
+  const id = "0530ed9b-c009-4d3d-b7e2-77eefb5a2a40";
+  const f = filaDeBitacora({ intento: id, estado: "pausado", nombre_archivo: "IMG_9154.mov", size_bytes: 649127517, pct: 41.6, bytes_subidos: 270000000, kbps: 812.4, pausas: 2, reintentos: 1 }, "tok", "iPhone", "2026-11-11T18:00:00Z")!;
+  assertEquals(f.id, id);
+  assertEquals(f.estado, "pausado");
+  assertEquals(f.pct, 42);
+  assertEquals(f.kbps, 812);
+  assertEquals(f.terminado_at, null);
+  assertEquals("iniciado_at" in f, false);
+  assertEquals("avisado_at" in f, false);
+  assertEquals(filaDeBitacora({ intento: id, estado: "ok" }, "tok", "", "T")!.terminado_at, "T");
+  assertEquals(filaDeBitacora({ intento: id, estado: "fallo", pct: 300 }, "tok", "", "T")!.pct, 100);
+  assertEquals(filaDeBitacora({ intento: "no-es-uuid", estado: "ok" }, "tok", "", "T"), null);
+  assertEquals(filaDeBitacora({ intento: id, estado: "borrar" }, "tok", "", "T"), null);
 });

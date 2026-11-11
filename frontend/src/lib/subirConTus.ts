@@ -1,5 +1,6 @@
 import * as tus from "tus-js-client";
 import { SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY } from "@/integrations/supabase/client";
+import { rutaDeUrlTus, sePuedeRetomar } from "@/lib/aportar/subidaLarga";
 
 // Sube un File a Supabase Storage con TUS (chunks resumibles de 6 MB).
 // Por qué TUS (Alvaro, 06/11): un video de 10 min son 100-300 MB; un PUT único
@@ -22,6 +23,19 @@ export interface SubirConTusArgs {
   path: string;
   file: File;
   onPct: (p: number) => void;
+  /** Bytes subidos y total, para la velocidad y el "faltan ~N min". */
+  onBytes?: (subidos: number, total: number) => void;
+  /** Solo se retoma una subida guardada cuya ruta empiece así (el token del
+   *  link). Sin esto se retoma cualquiera del mismo archivo y bucket. */
+  prefijoReanudable?: string;
+}
+
+export interface ResultadoTus {
+  /** Dónde quedó DE VERDAD el archivo. Si se retomó una subida anterior, es la
+   *  ruta de ESA subida, no la que se pidió ahora (11/11/2026: el aporte se
+   *  registraba con la ruta nueva y vacía, y el video quedaba en la vieja). */
+  path: string;
+  retomada: boolean;
 }
 
 // Chunks de 2 MB: en redes colombianas flakys un chunk de 6 MB completo era muy
@@ -36,9 +50,10 @@ const CHUNK_SIZE = 2 * 1024 * 1024;
 // así que no se repiten bytes ya subidos.
 const RETRY_DELAYS = [0, 3_000, 10_000, 30_000, 60_000, 120_000, 300_000];
 
-export function subirConTus({ bucket, path, file, onPct }: SubirConTusArgs): Promise<void> {
+export function subirConTus({ bucket, path, file, onPct, onBytes, prefijoReanudable }: SubirConTusArgs): Promise<ResultadoTus> {
   const endpoint = `${SUPABASE_URL}/storage/v1/upload/resumable`;
   return new Promise((resolve, reject) => {
+    let retomadaDe: string | null = null;
     const upload = new tus.Upload(file, {
       endpoint,
       retryDelays: RETRY_DELAYS,
@@ -61,13 +76,23 @@ export function subirConTus({ bucket, path, file, onPct }: SubirConTusArgs): Pro
       onError: (err) => reject(err),
       onProgress: (bytesUploaded, bytesTotal) => {
         onPct(bytesTotal > 0 ? Math.round((bytesUploaded / bytesTotal) * 100) : 0);
+        onBytes?.(bytesUploaded, bytesTotal);
       },
-      onSuccess: () => resolve(),
+      onSuccess: () => {
+        // La URL de TUS dice dónde quedó el objeto (si la subida vieja venció,
+        // tus-js-client abre una nueva con la ruta pedida AHORA).
+        const real = rutaDeUrlTus(upload.url, bucket) ?? retomadaDe ?? path;
+        resolve({ path: real, retomada: real !== path });
+      },
     });
     // Si ya había un upload previo del MISMO archivo (fingerprint por nombre +
     // tamaño + lastModified), reanuda desde donde quedó en vez de empezar de 0.
     upload.findPreviousUploads().then((prev) => {
-      if (prev.length > 0) upload.resumeFromPreviousUpload(prev[0]);
+      const previa = prev.find((p) => sePuedeRetomar(p.metadata, bucket, prefijoReanudable ?? ""));
+      if (previa) {
+        retomadaDe = previa.metadata.objectName ?? null;
+        upload.resumeFromPreviousUpload(previa);
+      }
       upload.start();
     }).catch(() => upload.start());
   });
