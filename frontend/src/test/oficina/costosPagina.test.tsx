@@ -11,7 +11,7 @@ const SERVICIOS = [
   { id: "google_ia", nombre: "IA de Google", categoria: "ia", proveedor: "Google AI Studio", es_maven: true, monto_usd: "48.00", ciclo: "mensual", fuente: "factura",
     detalle: "USD 17,44 cobrados", proximo_cobro: EN_20_DIAS, proximo_monto_usd: "95.00", proximo_detalle: "Google duplica", ahorro_usd: "70.00", ahorro_detalle: "Pasar a Flash-Lite", orden: 10, activo: true, revisado_at: "" },
   { id: "zoho", nombre: "Correos del equipo", categoria: "correos", proveedor: "Zoho", es_maven: true, monto_usd: null, ciclo: "mensual", fuente: "falta",
-    detalle: "59 casillas", proximo_cobro: null, proximo_monto_usd: null, proximo_detalle: null, ahorro_usd: null, ahorro_detalle: null, orden: 70, activo: true, revisado_at: "" },
+    detalle: "59 casillas", revisado: "No lo puedo ver: inicia sesión en Zoho", proximo_cobro: null, proximo_monto_usd: null, proximo_detalle: null, ahorro_usd: null, ahorro_detalle: null, orden: 70, activo: true, revisado_at: "" },
   { id: "supabase_otros", nombre: "Supabase: otros 20 proyectos", categoria: "otras", proveedor: "Supabase", es_maven: false, monto_usd: "185.00", ciclo: "mensual", fuente: "factura",
     detalle: "No son Maven", proximo_cobro: null, proximo_monto_usd: null, proximo_detalle: null, ahorro_usd: "18.54", ahorro_detalle: "Apagar BLU", orden: 200, activo: true, revisado_at: "" },
 ];
@@ -79,7 +79,7 @@ describe("Costos", () => {
     expect(screen.getAllByText("USD 17").length).toBeGreaterThan(0);
     // En qué se va: Google y Zoho (sin dato), y lo que falta se dice.
     expect(screen.getAllByText("IA de Google").length).toBeGreaterThan(0);
-    expect(screen.getAllByText(/oficina\.costos\.faltaFactura/).length).toBeGreaterThan(0);
+    expect(screen.getAllByText("No lo puedo ver: inicia sesión en Zoho").length).toBeGreaterThan(0);
     expect(screen.getByText("Pasar a Flash-Lite")).toBeTruthy();
     // Lo que no es Maven va aparte.
     expect(screen.getByText(/oficina\.costos\.fueraLinea.*USD 185/)).toBeTruthy();

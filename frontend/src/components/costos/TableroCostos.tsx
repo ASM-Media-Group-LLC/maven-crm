@@ -1,7 +1,7 @@
 import { useState, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
-import { AlertTriangle, ChevronRight, ExternalLink, Loader2, RefreshCw } from "lucide-react";
+import { AlertTriangle, CheckCircle2, ChevronRight, ExternalLink, Loader2, RefreshCw } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { useLanguage } from "@/hooks/useLanguage";
@@ -182,10 +182,9 @@ function TablaServicios({ tb, nombreMes, ano, onAbrir }: { tb: Tablero; nombreMe
             <span className="col-span-2 min-w-0 md:col-span-1">
               <span className="block truncate text-sm font-medium">{s.nombre}</span>
               <span className="block text-xs text-muted-foreground">
-                {s.proveedor}
-                {falta && <span className="text-warning"> · {t("oficina.costos.faltaFactura")}</span>}
-                {!falta && s.fuente === "estimado" && <span> · {t("oficina.costos.fuente.estimado").toLowerCase()}</span>}
+                {s.proveedor}{s.como_se_calcula ? ` · ${s.como_se_calcula}` : ""}
               </span>
+              <Revisado servicio={s} />
             </span>
             {valores.map((v, i) => (
               <span key={cabeza[i]} className="flex flex-col md:items-end">
@@ -385,6 +384,18 @@ export default function TableroCostos() {
   );
 }
 
+/** «Lo revisé» (con dónde) o «no lo puedo ver, déjame entrar», en una línea. */
+function Revisado({ servicio: s }: { servicio: ServicioCosto }) {
+  const noLoVeo = s.fuente === "falta";
+  if (!s.revisado) return null;
+  return (
+    <span className={`mt-0.5 flex items-start gap-1 text-[11px] ${noLoVeo ? "text-warning" : "text-muted-foreground/80"}`}>
+      {noLoVeo ? <AlertTriangle className="mt-px h-3 w-3 shrink-0" /> : <CheckCircle2 className="mt-px h-3 w-3 shrink-0 text-success" />}
+      <span className="min-w-0">{s.revisado}</span>
+    </span>
+  );
+}
+
 /** ¿La fecha (YYYY-MM-DD) es después de hoy? */
 function esFutura(fecha: string, hoy: string): boolean {
   return fecha.localeCompare(hoy) > 0;
@@ -405,7 +416,8 @@ function FichaServicio({ ficha, cobros, hoy, idioma, nombreMes }: {
     <div className="flex flex-col gap-5">
       <SheetHeader className="text-left">
         <SheetTitle className="text-base">{s.nombre}</SheetTitle>
-        <SheetDescription>{s.proveedor}{falta ? ` · ${t("oficina.costos.faltaFactura")}` : ""}</SheetDescription>
+        <SheetDescription>{s.proveedor}</SheetDescription>
+        <Revisado servicio={s} />
       </SheetHeader>
 
       <div className="grid grid-cols-2 gap-px overflow-hidden rounded-panel border border-border/50 bg-border/50">
@@ -422,6 +434,11 @@ function FichaServicio({ ficha, cobros, hoy, idioma, nombreMes }: {
         ))}
       </div>
 
+      {s.como_se_calcula && (
+        <div className="rounded-panel bg-muted/40 px-3 py-2 text-xs">
+          <span className="text-muted-foreground">{t("oficina.costos.comoSeCalcula")} </span>{s.como_se_calcula}
+        </div>
+      )}
       {s.detalle && <p className="text-sm text-muted-foreground">{s.detalle}</p>}
       {s.proximo_detalle && <p className="text-sm text-warning">{s.proximo_detalle}</p>}
 

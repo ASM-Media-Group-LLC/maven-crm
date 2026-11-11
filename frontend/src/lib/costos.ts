@@ -9,6 +9,10 @@ export type Fuente = "factura" | "estimado" | "falta";
 export interface ServicioCosto {
   id: string;
   dia_cobro?: number | null;
+  /** Cómo se saca lo que gasta Maven (p. ej. «servidor de Maven por hora + 1/22 del plan»). */
+  como_se_calcula?: string | null;
+  /** Si se revisó (y dónde) o si no se puede ver sin que el dueño inicie sesión. */
+  revisado?: string | null;
   nombre: string;
   categoria: Categoria;
   proveedor: string;

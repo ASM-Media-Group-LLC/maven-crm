@@ -91,6 +91,9 @@ const NO_CARGAN_AQUI: Record<string, string> = {
     "Depende de costos_servicios y es_dueno; no toca nada del Messenger.",
   "20261111170000_costos_sin_claude.sql":
     "Costos: se apaga Claude de la cuenta (decisión de Alvaro). Depende de costos_servicios; no toca el Messenger.",
+  "20261111180000_costos_consumo_de_maven.sql":
+    "Costos: cada servicio vale lo que consume Maven (no la factura completa) y dice si se revisó. Depende de " +
+    "costos_servicios y costos_cobros; no toca el Messenger.",
   "20261111110000_aviso_blu_caido.sql":
     "Blu: aviso a los dueños si el puente con Blu se cae y los ingresos se quedan atrás. Inserta en notifications, " +
     "pero usa blu_bridge_state, creator_daily_earnings y pg_cron, que este fixture no trae; no toca nada del Messenger.",
