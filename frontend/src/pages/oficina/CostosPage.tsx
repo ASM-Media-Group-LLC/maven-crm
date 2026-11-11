@@ -139,37 +139,32 @@ function VistaCostos() {
       )}
 
       <Bloque icono={Wallet} titulo={t("oficina.costos.porServicio")} nota={t("oficina.costos.porServicioNota")}>
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[620px] text-sm">
-            <thead>
-              <tr className="border-b border-border/50 text-left text-[11px] uppercase tracking-wide text-muted-foreground">
-                <th className="py-2 pr-3 font-medium">{t("oficina.costos.col.servicio")}</th>
-                <th className="py-2 pr-3 font-medium">{t("oficina.costos.col.alMes")}</th>
-                <th className="py-2 pr-3 font-medium">{t("oficina.costos.col.dato")}</th>
-                <th className="py-2 font-medium">{t("oficina.costos.col.detalle")}</th>
-              </tr>
-            </thead>
-            {CATEGORIAS.map((cat) => {
-              const filas = servicios.filter((s) => s.activo && s.es_maven && s.categoria === cat);
-              if (!filas.length) return null;
-              return (
-                <tbody key={cat}>
-                  <tr><td colSpan={4} className="pt-3 pb-1 text-xs font-semibold text-primary">{t(CLAVE_CATEGORIA[cat])}</td></tr>
+        <div className="flex flex-col gap-4">
+          {CATEGORIAS.map((cat) => {
+            const filas = servicios.filter((s) => s.activo && s.es_maven && s.categoria === cat);
+            if (!filas.length) return null;
+            return (
+              <div key={cat} className="flex flex-col gap-2">
+                <h3 className="text-xs font-semibold text-primary">{t(CLAVE_CATEGORIA[cat])}</h3>
+                <ul className="flex flex-col gap-2">
                   {filas.map((s) => {
                     const m = mensual(s);
                     return (
-                      <tr key={s.id} className="border-b border-border/30 align-top">
-                        <td className="py-2 pr-3"><div className="font-medium">{s.nombre}</div><div className="text-[11px] text-muted-foreground">{s.proveedor}</div></td>
-                        <td className="py-2 pr-3 tabular-nums">{m === null ? "—" : usd(m)}{s.ciclo === "anual" && s.monto_usd !== null && <div className="text-[11px] text-muted-foreground">{t("oficina.costos.alAno", { m: usd(Number(s.monto_usd)) })}</div>}</td>
-                        <td className="py-2 pr-3"><Pastilla fuente={s.fuente} /></td>
-                        <td className="py-2 text-xs text-muted-foreground">{s.detalle}</td>
-                      </tr>
+                      <li key={s.id} className="grid gap-1 rounded-control border border-border/40 p-2.5 md:grid-cols-[minmax(0,14rem)_7rem_5rem_minmax(0,1fr)] md:items-start md:gap-3">
+                        <div className="min-w-0"><div className="text-sm font-medium">{s.nombre}</div><div className="text-[11px] text-muted-foreground">{s.proveedor}</div></div>
+                        <div className="text-sm tabular-nums">
+                          {m === null ? "—" : usd(m)}
+                          {s.ciclo === "anual" && s.monto_usd !== null && <div className="text-[11px] text-muted-foreground">{t("oficina.costos.alAno", { m: usd(Number(s.monto_usd)) })}</div>}
+                        </div>
+                        <div><Pastilla fuente={s.fuente} /></div>
+                        <p className="min-w-0 text-xs text-muted-foreground">{s.detalle}</p>
+                      </li>
                     );
                   })}
-                </tbody>
-              );
-            })}
-          </table>
+                </ul>
+              </div>
+            );
+          })}
         </div>
       </Bloque>
 
