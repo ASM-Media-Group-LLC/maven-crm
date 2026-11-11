@@ -105,6 +105,10 @@ const FIXTURE_HASTA = "20260929180000";
 // el motivo. Si SÍ cambia el Messenger, lo que hay que hacer es sumar al fixture
 // lo que le falta.
 const NO_TOCAN_EL_MESSENGER: Record<string, string> = {
+  "20261111010000_donde_esta_cada_uno.sql":
+    "Cowork: «fuera de Cowork» y el tablero «Dónde está cada uno» (cowork_fuera y funciones de turno). Entra a " +
+    "esta cadena solo porque su vigía inserta avisos en notifications, pero usa es_admin_o_dueno, roles_config y " +
+    "las tablas del reloj de Cowork, que este fixture no trae; no toca nada del Messenger. Se prueba en frontend/test/hr.",
   "20261105170000_exonerar_camara_pantalla.sql":
     "Argos: le suma exonera_camara_pantalla (columna opcional) a profiles y a roles_config. Nombra profiles por el " +
     "alter, pero no cambia nada que use el Messenger; necesita roles_config, que este fixture no trae. Desde el 09/11 " +
