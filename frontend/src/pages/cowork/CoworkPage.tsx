@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { useCoworkSession, type AdminSessionRow, type SesionFinalizada, type CoworkSessionRow } from "@/hooks/useCoworkSession";
 import { useUserRole } from "@/hooks/useUserRole";
@@ -241,24 +241,24 @@ export default function CoworkPage() {
   // Vigilante de la ruedita (lib/coworkAtascado.ts): si la carga o la entrada a
   // la sala no terminan en 20 s, se anota el paso trabado y se recarga una vez;
   // si vuelve a pasar enseguida, queda el botón «Reintentar».
+  // El reloj vive en <RuedaVigilada>, que se monta CON la ruedita: cuenta el
+  // tiempo que la ruedita lleva de verdad en pantalla, sin reiniciarse por
+  // cambios de estado de adentro (antes era un efecto que se reiniciaba cada
+  // vez que cambiaba `autoJoining`, y con Isabel nunca llegó a saltar).
   const [atascado, setAtascado] = useState(false);
-  const cargando = !!sessionId && (cowork.loading || autoJoining);
-  useEffect(() => {
-    if (!cargando) return;
-    const inicio = Date.now();
-    const timer = window.setTimeout(() => {
-      const paso = autoJoining ? "unirse" : (cowork.pasoDeCarga() || "cargar");
-      anotarAtasco(paso, Math.round((Date.now() - inicio) / 1000));
-      if (queHacerConElAtasco({ ultimaRecarga: ultimaRecargaPorAtasco(), ahora: Date.now() }) === "recargar") {
-        marcarRecargaPorAtasco();
-        window.location.reload();
-      } else {
-        setAtascado(true);
-      }
-    }, ATASCO_MS);
-    return () => window.clearTimeout(timer);
+  const autoJoiningRef = useRef(autoJoining);
+  autoJoiningRef.current = autoJoining;
+  const alAtascarse = useCallback((segundos: number) => {
+    const paso = autoJoiningRef.current ? "unirse" : (cowork.pasoDeCarga() || "cargar");
+    anotarAtasco(paso, segundos);
+    if (queHacerConElAtasco({ ultimaRecarga: ultimaRecargaPorAtasco(), ahora: Date.now() }) === "recargar") {
+      marcarRecargaPorAtasco();
+      window.location.reload();
+    } else {
+      setAtascado(true);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cargando, autoJoining]);
+  }, []);
   // El atasco anterior (si lo hubo) se anota para saber la causa. Fuego y olvido.
   useEffect(() => {
     const previo = tomarAtascoPrevio();
@@ -673,11 +673,7 @@ export default function CoworkPage() {
   }
 
   if (cowork.loading || autoJoining) {
-    return (
-      <div className="flex items-center justify-center flex-1 min-h-0">
-        <div className="h-10 w-10 rounded-full border-[3px] border-primary/30 border-t-primary animate-spin" />
-      </div>
-    );
+    return <RuedaVigilada alAtascarse={alAtascarse} />;
   }
 
   // Session ended → auto-redirect to main Maven dashboard
@@ -711,6 +707,21 @@ export default function CoworkPage() {
 // Shown briefly while we redirect participants out of an ended Cowork session
 // back to the main Maven dashboard.
 /** dd/mm HH:MM en hora local, para las listas y la pantalla de finalizada. */
+/** La ruedita de carga de Cowork, con su vigilante. El reloj arranca cuando la
+ *  ruedita aparece y se apaga cuando desaparece: mide lo que la persona ve. */
+function RuedaVigilada({ alAtascarse }: { alAtascarse: (segundos: number) => void }) {
+  useEffect(() => {
+    const inicio = Date.now();
+    const timer = window.setTimeout(() => alAtascarse(Math.round((Date.now() - inicio) / 1000)), ATASCO_MS);
+    return () => window.clearTimeout(timer);
+  }, [alAtascarse]);
+  return (
+    <div className="flex items-center justify-center flex-1 min-h-0">
+      <div className="h-10 w-10 rounded-full border-[3px] border-primary/30 border-t-primary animate-spin" />
+    </div>
+  );
+}
+
 function fechaCorta(iso: string | null | undefined, formato: Formato): string {
   if (!iso) return "";
   const d = new Date(iso);
