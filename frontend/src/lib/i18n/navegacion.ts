@@ -84,6 +84,7 @@ export const navegacion = {
   "nav.office.calendar": { es: "Calendario", en: "Calendar" },
   "nav.office.drive": { es: "Drive", en: "Drive" },
   "nav.office.nas": { es: "Espacio del NAS", en: "NAS storage" },
+  "nav.office.costos": { es: "Costos y conexiones", en: "Costs and connections" },
   "nav.messenger": { es: "Messenger", en: "Messenger" },
   "nav.cowork": { es: "Cowork", en: "Cowork" },
   "nav.argos": { es: "Argos", en: "Argos" },

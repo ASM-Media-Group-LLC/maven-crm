@@ -290,6 +290,9 @@ verify_jwt = false  # solo cron; escala al supervisor/HR/dueño si la persona ig
 [functions.salud-diagnostico]
 verify_jwt = true  # usuario logueado (dueño/admin); corre pruebas EN VIVO de una caja de Salud
 
+[functions.conexiones-ping]
+verify_jwt = true  # solo el dueño; prueba en vivo cada servicio externo (pestaña Conexiones de /oficina/costos)
+
 [functions.detectar-tardanzas]
 verify_jwt = true  # cron (X-Cron-Token) o service_role; detecta tardanzas y manda correo
 

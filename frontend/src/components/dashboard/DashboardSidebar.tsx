@@ -380,7 +380,11 @@ const DashboardSidebar = () => {
   const oficinaItems = [
     ...oficinaItemsAll.filter((i) => canAccess("Oficina", i.submodule)),
     ...(esDueno === true
-      ? [{ title: t("nav.office.nas"), url: "/oficina/espacio-nas", icon: Gauge, submodule: "" }]
+      ? [
+          { title: t("nav.office.nas"), url: "/oficina/espacio-nas", icon: Gauge, submodule: "" },
+          // «Costos y conexiones» (Alvaro, 11/11): solo el dueño, igual que el NAS.
+          { title: t("nav.office.costos"), url: "/oficina/costos", icon: Wallet, submodule: "" },
+        ]
       : []),
   ];
   const oficinaCollapsedItems: CI[] = oficinaItems.map((i) => ({ title: i.title, url: i.url }));

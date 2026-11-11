@@ -64,6 +64,7 @@ const CalendarioPage = lazy(() => import("./pages/calendario/CalendarioPage"));
 const DocumentoPage = lazy(() => import("./pages/oficina/DocumentoPage"));
 const DrivePage = lazy(() => import("./pages/oficina/DrivePage"));
 const EspacioNasPage = lazy(() => import("./pages/oficina/EspacioNasPage"));
+const CostosPage = lazy(() => import("./pages/oficina/CostosPage"));
 const ArchivoDelDrivePage = lazy(() => import("./pages/oficina/ArchivoDelDrivePage"));
 const LinksDeSubidaPage = lazy(() => import("./pages/oficina/LinksDeSubidaPage"));
 // Correo (Zoho detrás). Ya está en UNIVERSAL_MODULES (usePermissions), o sea que
@@ -424,6 +425,7 @@ const App = () => (
                 <Route path="/oficina/presentaciones" element={<PermissionRoute module="Oficina" submodule="Presentaciones"><OficinaPage formato="pptx" /></PermissionRoute>} />
                 {/* Espacio del NAS (Alvaro, 10/11): solo el dueño; la ruta y sus RPC lo verifican. */}
                 <Route path="/oficina/espacio-nas" element={<PermissionRoute module="Oficina" soloDueno><EspacioNasPage /></PermissionRoute>} />
+                <Route path="/oficina/costos" element={<PermissionRoute module="Oficina" soloDueno><CostosPage /></PermissionRoute>} />
                 <Route path="/oficina/drive" element={<PermissionRoute module="Oficina" submodule="Drive"><DrivePage /></PermissionRoute>} />
                 {/* Links de las modelos (10/11). NO bajo /oficina/drive/…: chocaría con /oficina/drive/:id. */}
                 <Route path="/oficina/links-de-subida" element={<PermissionRoute module="Oficina" submodule="Drive"><LinksDeSubidaPage /></PermissionRoute>} />
