@@ -95,6 +95,8 @@ const NO_CARGAN_AQUI: Record<string, string> = {
   "20261111160000_costos_cobros.sql":
     "Costos: cada cobro de 2026 (costos_cobros) y el día de cobro de cada servicio, para el tablero del dueño. " +
     "Depende de costos_servicios y es_dueno; no toca nada del Messenger.",
+  "20261111170000_costos_sin_claude.sql":
+    "Costos: se apaga Claude de la cuenta (decisión de Alvaro). Depende de costos_servicios; no toca el Messenger.",
   "20261111110000_aviso_blu_caido.sql":
     "Blu: aviso a los dueños si el puente con Blu se cae y los ingresos se quedan atrás. Inserta en notifications, " +
     "pero usa blu_bridge_state, creator_daily_earnings y pg_cron, que este fixture no trae; no toca nada del Messenger.",
