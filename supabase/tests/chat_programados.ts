@@ -100,7 +100,7 @@ const NO_CARGAN_AQUI: Record<string, string> = {
   "20261111180000_costos_consumo_de_maven.sql":
     "Costos: cada servicio vale lo que consume Maven (no la factura completa) y dice si se revisó. Depende de " +
     "costos_servicios y costos_cobros; no toca el Messenger.",
-  "20261111210000_costos_cuentas_atadas.sql":
+  "20261111220000_costos_cuentas_atadas.sql":
     "Costos: las cuentas atadas a cada servicio (costos_cuentas, solo el dueño). Se siembra leyendo mail_credentials, " +
     "profiles, auth y buzones_por_borrar, que este fixture no trae completos; no toca el Messenger.",
   "20261111110000_aviso_blu_caido.sql":
