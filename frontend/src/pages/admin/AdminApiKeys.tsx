@@ -92,6 +92,7 @@ const TEXTOS_SCOPE: Record<string, { label: TranslationKey; desc: TranslationKey
   "contacts:read": { label: "apiKeys.scope.contacts.label", desc: "apiKeys.scope.contacts.desc" },
   "contacts:phone": { label: "apiKeys.scope.phone.label", desc: "apiKeys.scope.phone.desc" },
   "employees:read": { label: "apiKeys.scope.employees.label", desc: "apiKeys.scope.employees.desc" },
+  "equipo:write": { label: "apiKeys.scope.team.label", desc: "apiKeys.scope.team.desc" },
   "hubstaff:read": { label: "apiKeys.scope.hubstaff.label", desc: "apiKeys.scope.hubstaff.desc" },
   "cowork:read": { label: "apiKeys.scope.cowork.label", desc: "apiKeys.scope.cowork.desc" },
   "sales:read": { label: "apiKeys.scope.sales.label", desc: "apiKeys.scope.sales.desc" },

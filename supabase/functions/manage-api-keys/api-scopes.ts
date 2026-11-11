@@ -64,6 +64,13 @@ export const SCOPE_CATALOG_COMPLETO: ScopeDef[] = [
       "Empleados de la agencia: nombre, rol (chatter, closer, manager, coordinador…) y fecha de alta.",
   },
   {
+    key: "equipo:write",
+    group: "Empleados",
+    label: "⚠️ Backstage manda el equipo",
+    description:
+      "Para Backstage: POST /equipo/sync con la lista completa del equipo (correo, rol, equipo, a quién reporta, nivel, horario y si sigue activo). Maven cambia rol, nivel, horario, equipo y jefe, y manda a la papelera a quien venga inactivo; nunca crea cuentas, nunca toca a admins ni dueños y nunca sube a nadie a admin. Mientras el dueño no prenda «aplicar», todo es ensayo: solo contesta qué cambiaría. Solo sirve si quien crea la key es admin o dueño.",
+  },
+  {
     key: "hubstaff:read",
     group: "Empleados",
     label: "Horas de Hubstaff (diario)",

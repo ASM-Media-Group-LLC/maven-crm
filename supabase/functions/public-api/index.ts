@@ -19,6 +19,8 @@
 //   GET /public-api/messenger/conversations/:id          messenger:read (una conversación y sus miembros)
 //   GET /public-api/messenger/conversations/:id/messages messenger:read (historia, con cursor)
 //   GET /public-api/messenger/feed                       messenger:read (lo nuevo en todas, con cursor)
+//   POST /public-api/equipo/sync                         equipo:write   (Backstage manda el equipo; ver
+//                                                        ./equipo-logica.ts y docs/backstage-equipo.md)
 //
 // Escribir en el Messenger (messenger:write, que va siempre con messenger:read):
 //   GET    /public-api/messenger/people                                  a quién se le puede escribir
@@ -341,6 +343,8 @@ Deno.serve(async (req) => {
         { method: "POST", path: "/messenger/conversations/{id}/messages", scope: "messenger:write" },
         { method: "PATCH", path: "/messenger/conversations/{id}/messages/{message_id}", scope: "messenger:write" },
         { method: "DELETE", path: "/messenger/conversations/{id}/messages/{message_id}", scope: "messenger:write" },
+        // Backstage manda el equipo (ensayo hasta que el dueño prenda «aplicar»).
+        { method: "POST", path: "/equipo/sync", scope: "equipo:write" },
         { path: "/creators", scope: "creators:read" },
         { path: "/creators/{id}", scope: "creators:read" },
         { path: "/contacts", scope: "contacts:read" },
