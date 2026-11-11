@@ -9,8 +9,11 @@ import { createClient } from "jsr:@supabase/supabase-js@2";
 // cara incompleta) ya lo detecta gratis el navegador (useFaceWatch) y no pasa
 // por acá.
 //
-// No necesita llave nueva: usa OPENROUTER_API_KEY (la misma stack de visión que
-// ya lee las imágenes de WhatsApp) con openai/gpt-4o-mini por defecto.
+// Usa GEMINI_API_KEY (la misma llave pagada que ya usa Argos) con Gemini
+// Flash-Lite (Alvaro, 11/11/2026: la más barata, ~USD 0,0005 por foto; antes
+// era OpenRouter con una llave que venció y fallaba ~12.700 veces al día). El
+// navegador solo llama cuando las señales gratis ven algo raro (useMonitorCamara
+// / useArgosEscaleraClip), así que el gasto esperado es de unos USD 20 al mes.
 //
 // Si hay falta, registra la fila en monitor_eventos (service_role, salta RLS) y
 // guarda la captura en el bucket privado monitor-capturas. Nunca monitorea
@@ -20,8 +23,8 @@ import { createClient } from "jsr:@supabase/supabase-js@2";
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
-const OPENROUTER_API_KEY = Deno.env.get("OPENROUTER_API_KEY") ?? "";
-const LLM_MODEL = Deno.env.get("MONITOR_LLM_MODEL") ?? "openai/gpt-4o-mini";
+const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY") ?? "";
+const LLM_MODEL = Deno.env.get("MONITOR_GEMINI_MODEL") ?? "gemini-3.1-flash-lite";
 const LLM_TIMEOUT_MS = 25_000;
 const MAX_IMAGE_BYTES = 6 * 1024 * 1024;
 
@@ -71,40 +74,36 @@ function faltaDe(v: Veredicto): { tipo: string; detalle: string } | null {
 }
 
 async function callVision(dataUri: string): Promise<{ v: Veredicto } | { error: string }> {
-  if (!OPENROUTER_API_KEY) return { error: "no-key" };
+  if (!GEMINI_API_KEY) return { error: "no-key" };
+  const coma = dataUri.indexOf(",");
+  const mime = dataUri.slice(5, dataUri.indexOf(";")) || "image/jpeg";
+  const b64 = dataUri.slice(coma + 1);
   const reqBody = {
-    model: LLM_MODEL,
-    messages: [{
-      role: "user",
-      content: [
-        { type: "text", text: VISION_PROMPT },
-        { type: "image_url", image_url: { url: dataUri } },
-      ],
-    }],
-    response_format: { type: "json_object" },
-    temperature: 0.1,
-    max_tokens: 400,
+    contents: [{ parts: [{ text: VISION_PROMPT }, { inline_data: { mime_type: mime, data: b64 } }] }],
+    generationConfig: {
+      temperature: 0.1,
+      maxOutputTokens: 400,
+      responseMimeType: "application/json",
+      // Sin «pensar» antes de responder: más barato y no se come el tope (igual que Argos).
+      thinkingConfig: { thinkingBudget: 0 },
+    },
   };
   const ac = new AbortController();
   const t = setTimeout(() => ac.abort(), LLM_TIMEOUT_MS);
   try {
-    const resp = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(LLM_MODEL)}:generateContent?key=${GEMINI_API_KEY}`;
+    const resp = await fetch(url, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${OPENROUTER_API_KEY}`,
-        "HTTP-Referer": "https://maven.asmtech.me",
-        "X-Title": "Maven Cowork Monitor",
-      },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(reqBody),
       signal: ac.signal,
     });
     clearTimeout(t);
-    if (!resp.ok) return { error: `openrouter ${resp.status}: ${(await resp.text().catch(() => "")).slice(0, 200)}` };
-    const data = await resp.json() as { choices?: Array<{ message?: { content?: string } }> };
-    const text = data.choices?.[0]?.message?.content ?? "";
+    if (!resp.ok) return { error: `gemini ${resp.status}: ${(await resp.text().catch(() => "")).slice(0, 200)}` };
+    const data = await resp.json() as { candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }> };
+    const text = data.candidates?.[0]?.content?.parts?.map((x) => x.text ?? "").join("") ?? "";
     if (!text) return { error: "empty_response" };
-    const p = JSON.parse(text);
+    const p = JSON.parse(text.replace(/^```(?:json)?\s*|\s*```$/g, ""));
     return {
       v: {
         presente: p.presente === true,

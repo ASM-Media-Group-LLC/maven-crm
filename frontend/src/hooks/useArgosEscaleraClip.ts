@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useMonitorEstado } from "@/hooks/useMonitorEstado";
 import type { FaceWatch } from "@/hooks/useFaceWatch";
+import { debePreguntarIA } from "@/lib/ojoDeIA";
 
 // Argos — ESCALERA de muestreo + grabación al distraerse (Alvaro, 08/11/2026).
 //
@@ -175,6 +176,10 @@ export function useArgosEscaleraClip({ trackCamara, trackPantalla, faceWatch, ac
       const cam = trackCamRef.current;
       if (!cam || cam.readyState !== "live") return;
       if (faceRef.current.state !== "ok") return; // sin cara no gastamos IA
+      // Solo si algo se ve raro (lib/ojoDeIA.ts): falta reciente, cambio de la
+      // cara hace poco, o la revisión de rutina cada 10 min.
+      if (!debePreguntarIA({ apretado: nivel !== "normal", caraCambio: faceRef.current.since, ultimaIA, ahora: Date.now() })) return;
+      ultimaIA = Date.now();
       enVuelo = true;
       let distraida = false;
       let motivo = "distraida";
@@ -209,6 +214,7 @@ export function useArgosEscaleraClip({ trackCamara, trackPantalla, faceWatch, ac
       }
     };
 
+    let ultimaIA = 0;
     const agendar = (ms: number) => {
       timerFoto = window.setTimeout(async () => {
         await paso();

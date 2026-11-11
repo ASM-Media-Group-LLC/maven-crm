@@ -7,6 +7,7 @@ import { useMonitorEstado } from "@/hooks/useMonitorEstado";
 import type { FaceWatch, FaceState } from "@/hooks/useFaceWatch";
 import { TIPO_POR_CARA } from "@/lib/monitorFaltas";
 import { anotarPantallazo, tomarLosDeAfuera } from "@/lib/monitorLocal";
+import { debePreguntarIA } from "@/lib/ojoDeIA";
 
 // Monitor de cámara de RRHH (Álvaro, 30/10). Corre en el navegador de la propia
 // persona, DENTRO de la llamada de Cowork (al lado de useFaceNudge), para que
@@ -226,18 +227,23 @@ export function useMonitorCamara({ track, trackPantalla = null, camaraRealOn, fa
   // en Cowork y ya se encarga de llamar a monitor-vision con su propio ritmo
   // adaptativo (1 min → 30 s → 20 s → graba). No duplicamos las llamadas acá.
   const escaleraCorriendo = !!trackPantalla;
+  const ultimaIARef = useRef(0);
   useEffect(() => {
     if (!activoIA || escaleraCorriendo) return;
     const disparar = async () => {
       if (enVueloRef.current) return;
       if (!camRef.current) return; // cámara apagada: ya lo marca lo gratis
       if (faceRef.current.state !== "ok") return; // sin cara/oscuro: no gastar IA
+      // Solo si algo se ve raro (lib/ojoDeIA.ts): cambio de la cara hace poco o
+      // la revisión de rutina cada 10 min.
+      if (!debePreguntarIA({ apretado: false, caraCambio: faceRef.current.since, ultimaIA: ultimaIARef.current, ahora: Date.now() })) return;
       const t = trackRef.current;
       if (!t || t.readyState !== "live") return;
       enVueloRef.current = true;
       try {
         const b64 = await capturarJPEG(t);
         if (!b64) return;
+        ultimaIARef.current = Date.now();
         await supabase.functions.invoke("monitor-vision", {
           body: { imagen_base64: b64, mime: "image/jpeg", room_nombre: roomRef.current },
         });
