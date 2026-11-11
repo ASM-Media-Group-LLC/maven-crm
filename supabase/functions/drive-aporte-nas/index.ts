@@ -32,7 +32,10 @@ const NAS = (Deno.env.get("DRIVE_NAS_URL") ?? "").replace(/\/+$/, "");
 const SECRETO = Deno.env.get("DRIVE_SECRETO") ?? "";
 const RESEND = Deno.env.get("RESEND_API_KEY") ?? "";
 const AVISO_A = Deno.env.get("DRIVE_NAS_AVISO_EMAIL") ?? "rusin24@gmail.com";
-const AVISO_FROM = Deno.env.get("DRIVE_NAS_AVISO_FROM") ?? "Maven <noreply@mail.maven-ai.me>";
+// Mismo remitente que el resto de los correos (NOTIFICATION_FROM_EMAIL), para que
+// cambiar de cuenta de Resend sea cambiar una sola variable.
+const REMITENTE = Deno.env.get("NOTIFICATION_FROM_EMAIL") || "noreply@mail.maven-ai.me";
+const AVISO_FROM = Deno.env.get("DRIVE_NAS_AVISO_FROM") ?? (REMITENTE.includes("<") ? REMITENTE : `Maven <${REMITENTE}>`);
 const APP_URL = (Deno.env.get("APP_URL") ?? "https://app.maven-ai.me").replace(/\/+$/, "");
 
 const BUCKET = "drive-aportes";
