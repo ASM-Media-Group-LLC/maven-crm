@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { ArrowRight, BarChart3, Building2, Clock, DoorOpen, Headset, MessageCircle, Timer, Users } from "lucide-react";
 import SelectorDeTablero from "@/pages/dashboard/SelectorDeTablero";
 import PulsoEquipoVivo from "@/components/centro/PulsoEquipoVivo";
+import QuienEstaBajando from "@/components/vigilancia/QuienEstaBajando";
 import SaludPlataformaBloque from "@/components/centro/SaludPlataformaBloque";
 import EspacioNasLinea from "@/components/centro/EspacioNasLinea";
 import { TarjetaKpi } from "@/components/ui/TarjetaKpi";
@@ -129,6 +130,10 @@ export default function CentroDeOperaciones() {
     // flex-1 min-h-0 overflow-y-auto: el scroll propio de la página. El <main>
     // del AppShell es overflow-hidden (cada página pone su scroll), si no, recorta.
     <div className="flex-1 min-h-0 overflow-y-auto p-4 pb-24 md:p-6 space-y-5">
+      {/* Teléfono: lo PRIMERO que se ve al abrir Maven es quién está bajando la
+          nota ahora (Alvaro, 11/11). En la computadora va arriba del Pulso. */}
+      <QuienEstaBajando lugar="arriba" />
+
       {/* Cabecera */}
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>

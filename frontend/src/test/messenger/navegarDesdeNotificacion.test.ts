@@ -3,7 +3,7 @@
 // cualquier script del origen: solo se aceptan rutas internas de Maven.
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { renderHook } from "@testing-library/react";
-import { rutaSegura, useNavegarDesdeNotificacion, TIPO_ABRIR_URL } from "@/hooks/useNavegarDesdeNotificacion";
+import { rutaSegura, rutaPendienteVigente, useNavegarDesdeNotificacion, TIPO_ABRIR_URL, VIGENCIA_AVISO_PENDIENTE_MS } from "@/hooks/useNavegarDesdeNotificacion";
 
 const navigateMock = vi.fn();
 vi.mock("react-router-dom", async (orig) => ({
@@ -64,5 +64,20 @@ describe("useNavegarDesdeNotificacion", () => {
     unmount();
     swFalso.dispatchEvent(new MessageEvent("message", { data: { type: TIPO_ABRIR_URL, url: "/inbox?c=2" } }));
     expect(navigateMock).toHaveBeenCalledTimes(1);
+  });
+});
+
+// La ruta que el SW deja anotada al tocar un aviso (iPhone: si iOS pierde el
+// mensaje o abre la app en el inicio, la app la lee al despertar).
+describe("rutaPendienteVigente", () => {
+  const ahora = Date.parse("2026-11-11T21:00:00Z");
+  it("acepta la ruta reciente y segura, con su ?query", () => {
+    expect(rutaPendienteVigente({ url: "/hr/en-vivo/u1?alerta=a1", at: ahora - 5_000 }, ahora)).toBe("/hr/en-vivo/u1?alerta=a1");
+  });
+  it("descarta la vieja, la que no es ruta interna y la que no trae hora", () => {
+    expect(rutaPendienteVigente({ url: "/hr/en-vivo/u1", at: ahora - VIGENCIA_AVISO_PENDIENTE_MS - 1 }, ahora)).toBeNull();
+    expect(rutaPendienteVigente({ url: "https://otro.example/x", at: ahora }, ahora)).toBeNull();
+    expect(rutaPendienteVigente({ url: "/hr/en-vivo/u1" }, ahora)).toBeNull();
+    expect(rutaPendienteVigente(null, ahora)).toBeNull();
   });
 });

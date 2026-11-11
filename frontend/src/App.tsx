@@ -13,6 +13,7 @@ import { LanguageProvider } from "@/hooks/useLanguage";
 import { OnlinePresenceProvider } from "@/hooks/useOnlinePresence";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import PermissionRoute from "@/components/PermissionRoute";
+import RutaDeVigilancia from "@/components/vigilancia/RutaDeVigilancia";
 import CreadorRosterRoute from "@/components/CreadorRosterRoute";
 import AdminRoute from "./components/AdminRoute";
 import AppShell from "@/components/dashboard/AppShell";
@@ -176,6 +177,7 @@ const HROffboardingNew = lazy(() => import("./pages/hr/HROffboardingNew"));
 const HRMonitoring = lazy(() => import("./pages/hr/HRMonitoring"));
 const HRMonitorIA = lazy(() => import("./pages/hr/HRMonitorIA"));
 const HRExpediente = lazy(() => import("./pages/hr/HRExpediente"));
+const EnVivoPersona = lazy(() => import("./pages/hr/EnVivoPersona"));
 const ArgosComparativo = lazy(() => import("./pages/hr/ArgosComparativo"));
 const ArgosAjustes = lazy(() => import("./pages/hr/ArgosAjustes"));
 const HRDirectoryLookup = lazy(() => import("./pages/hr/HRDirectoryLookup"));
@@ -473,6 +475,9 @@ const App = () => (
                 {/* Argos (por ahora) solo para el dueño de la empresa: soloDueno. */}
                 <Route path="/hr/monitor-ia" element={<PermissionRoute module="HR" submodule="Monitor IA" soloDueno tambienRh><HRLayout><HRMonitorIA /></HRLayout></PermissionRoute>} />
                 <Route path="/hr/expediente/:userId" element={<PermissionRoute module="HR" submodule="Monitor IA" soloDueno tambienRh><HRLayout><HRExpediente /></HRLayout></PermissionRoute>} />
+                {/* La vista en vivo de una persona (Alvaro, 11/11): a donde llevan los avisos
+                    de Argos y de «se salió de Cowork». Dueño, RR. HH. y supervisores (su equipo). */}
+                <Route path="/hr/en-vivo/:userId" element={<RutaDeVigilancia><EnVivoPersona /></RutaDeVigilancia>} />
                 <Route path="/hr/argos-comparativo" element={<PermissionRoute module="HR" submodule="Monitor IA" soloDueno><HRLayout><ArgosComparativo /></HRLayout></PermissionRoute>} />
                 <Route path="/hr/argos-ajustes" element={<PermissionRoute module="HR" submodule="Monitor IA" soloDueno><HRLayout><ArgosAjustes /></HRLayout></PermissionRoute>} />
                 <Route path="/hr/organizacion/directorio" element={<PermissionRoute module="HR" submodule="Directorio"><HRLayout><HRDirectoryLookup /></HRLayout></PermissionRoute>} />

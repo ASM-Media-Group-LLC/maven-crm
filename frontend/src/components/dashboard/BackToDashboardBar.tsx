@@ -18,7 +18,7 @@ const BackToDashboardBar = () => {
   // al Dashboard" no tiene sentido ahí — venía de estado de navegación pegado y
   // sacaba al usuario de su lugar. El Messenger y Argos (/hr/monitor-ia, con su
   // propio ojo en el riel) son primarios: para volver a RR.HH. está el sidebar.
-  const ES_PRIMARIO = ["/messenger", "/hr/monitor-ia", "/hr/expediente"];
+  const ES_PRIMARIO = ["/messenger", "/hr/monitor-ia", "/hr/expediente", "/hr/en-vivo"];
   if (ES_PRIMARIO.some((r) => pathname === r || pathname.startsWith(r + "/"))) return null;
 
   if (!s?.fromDashboard && !s?.fromHR) return null;

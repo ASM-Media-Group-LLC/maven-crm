@@ -98,6 +98,11 @@ const NO_CARGAN_AQUI: Record<string, string> = {
     "RR. HH. recibe copia de los avisos de vigilancia (se salió de Cowork) y se le prende el push. Entra a esta " +
     "cadena solo porque su vigía inserta avisos en notifications, pero usa las tablas del reloj de Cowork y " +
     "es_admin_o_dueno, que este fixture no trae; no toca nada del Messenger.",
+  "20261111210000_monitoreo_en_vivo.sql":
+    "Monitoreo en vivo: los avisos de «se salió de Cowork» abren la vista en vivo, «Revisado ✓» y «Avisarle» por " +
+    "RPC, y supervisores/RR. HH. ven las fotos de su gente. Entra a esta cadena solo porque su vigía inserta avisos " +
+    "en notifications, pero usa las tablas del reloj de Cowork, Argos y es_admin_o_dueno, que este fixture no trae; " +
+    "no toca nada del Messenger.",
   "20261111110000_aviso_blu_caido.sql":
     "Blu: aviso a los dueños si el puente con Blu se cae y los ingresos se quedan atrás. Inserta en notifications, " +
     "pero usa blu_bridge_state, creator_daily_earnings y pg_cron, que este fixture no trae; no toca nada del Messenger.",

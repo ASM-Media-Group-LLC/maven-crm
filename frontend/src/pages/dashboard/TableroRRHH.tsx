@@ -6,6 +6,7 @@ import { Page } from "@/components/ui/page";
 import { Button } from "@/components/ui/button";
 import { UserAvatar } from "@/components/UserAvatar";
 import PulsoEquipoVivo from "@/components/centro/PulsoEquipoVivo";
+import QuienEstaBajando from "@/components/vigilancia/QuienEstaBajando";
 import SelectorDeTablero from "@/pages/dashboard/SelectorDeTablero";
 import { supabase } from "@/integrations/supabase/client";
 import { useLanguage } from "@/hooks/useLanguage";
@@ -40,11 +41,13 @@ function Fallo({ onReintentar }: { onReintentar: () => void }) {
   );
 }
 
-export function TableroRRHHVista({ fecha, datos, pulso }: {
+export function TableroRRHHVista({ fecha, datos, pulso, arriba }: {
   fecha: string;
   datos: EstadoLectura<DatosRRHH>;
   /** El Pulso en vivo (en la app real, <PulsoEquipoVivo conEquipo />). */
   pulso: ReactNode;
+  /** Lo primero de la página en el teléfono: «Quién está bajando ahora». */
+  arriba?: ReactNode;
 }) {
   const { t, language } = useLanguage();
   const hora = (iso: string | null) => (iso
@@ -56,6 +59,7 @@ export function TableroRRHHVista({ fecha, datos, pulso }: {
   return (
     <Page>
       <div className="flex flex-col gap-5">
+        {arriba}
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div>
             <SelectorDeTablero actual="rrhh" />
@@ -198,6 +202,7 @@ export default function TableroRRHH() {
         reintentar: () => { tiempo.reintentar(); void datosQ.refetch(); },
       }}
       pulso={<PulsoEquipoVivo conEquipo />}
+      arriba={<QuienEstaBajando lugar="arriba" />}
     />
   );
 }

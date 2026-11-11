@@ -1,12 +1,41 @@
 import { conEtiqueta } from "@/lib/etiquetaTraducida";
 import { Bell, CheckSquare, Users, Calendar, Briefcase, DollarSign, FileText, UserCheck, ShieldAlert, MessageSquare, ClipboardList, AlertTriangle, Clock, HelpCircle, type LucideIcon, AtSign } from "lucide-react";
 
+// ─── Avisos de vigilancia de antes del 11/11 ──────────────────────
+// Hasta el 11/11 el aviso de Argos llevaba al expediente con fotos
+// (/hr/expediente/<persona>) y el de «se salió de Cowork» a la pestaña «Dónde
+// está» de Argos. Ahora los dos abren la VISTA EN VIVO de esa persona; las filas
+// viejas de la campana se reescriben al tocarlas para que lleven al mismo lugar.
+// Solo los avisos AL DUEÑO/RR. HH.: el de la persona («comparte tu pantalla»,
+// reference_type argos_alerta pero link /cowork) no se toca.
+const UUID = "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}";
+const EXPEDIENTE_VIEJO = new RegExp(`^/hr/expediente/(${UUID})$`, "i");
+const ES_UUID = new RegExp(`^${UUID}$`, "i");
+
+export function enlaceVivoDeAvisoViejo(
+  referenceType: string | null,
+  referenceId: string | null,
+  deepLinkUrl: string | null,
+): string | null {
+  if (!referenceId || !ES_UUID.test(referenceId) || !deepLinkUrl) return null;
+  if (referenceType === "argos_alerta") {
+    const m = EXPEDIENTE_VIEJO.exec(deepLinkUrl);
+    return m ? `/hr/en-vivo/${m[1]}?alerta=${referenceId}` : null;
+  }
+  if (referenceType === "profile" && deepLinkUrl === "/hr/monitor-ia?t=donde") {
+    return `/hr/en-vivo/${referenceId}`;
+  }
+  return null;
+}
+
 // ─── Deep link resolver ────────────────────────────────────────────
 export function resolveDeepLink(
   referenceType: string | null,
   referenceId: string | null,
   deepLinkUrl: string | null,
 ): string {
+  const vivo = enlaceVivoDeAvisoViejo(referenceType, referenceId, deepLinkUrl);
+  if (vivo) return vivo;
   // Prefer explicit deep_link_url if stored
   if (deepLinkUrl) return deepLinkUrl;
   if (!referenceType || !referenceId) return "/dashboard";

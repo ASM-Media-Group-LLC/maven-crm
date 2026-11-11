@@ -4,7 +4,7 @@
 // bajando. Las cajas van por equipo. Función pura y determinista (el guard la ata
 // sin tocar la red); el hook usePulsoEquipo la alimenta con datos reales.
 
-import type { EstadoVivo } from "@/hooks/useRondinVivo";
+import { ESTADOS_PROBLEMA as PROBLEMAS, PUNTOS_VIVOS, esProblema as esProblemaVivo, type EstadoVivo, type MotivoVivo } from "@/lib/motivosVivos";
 
 // Jerarquía por profiles.nivel. Un rango ve a TODOS los de rango INFERIOR (no a
 // sus pares): dueño ve a todos, admin de admin para abajo, etc.
@@ -40,18 +40,14 @@ export function nivelesVisibles(nivel: string | null | undefined): string[] {
   return Object.entries(RANK_NIVEL).filter(([, v]) => v < r).map(([k]) => k);
 }
 
-// Puntos vivos por estado (la "nota" de ese instante). ausente = offline: no
-// cuenta para la nota viva (no está trabajando ahora, aparece en gris en su caja).
-const PUNTOS: Record<EstadoVivo, number | null> = {
-  trabajando: 100, presente: 70, pausa: 55,
-  camara_apagada: 30, distraido: 30, no_mira: 30,
-  celular: 15, se_fue: 15,
-  ausente: null,
-};
-// Estados que son "cometiendo error ahora" (bajan y aparecen en "quién la baja").
-export const ESTADOS_PROBLEMA: EstadoVivo[] = ["celular", "distraido", "no_mira", "camara_apagada", "se_fue"];
+// Puntos vivos por estado (la "nota" de ese instante) y qué estados son
+// "cometiendo error ahora": viven en lib/motivosVivos.ts (11/11), junto con las
+// fuentes que los alimentan (alertas de Argos, fuera de Cowork, el rondín).
+// ausente = offline: no cuenta para la nota viva (aparece en gris en su caja).
+const PUNTOS = PUNTOS_VIVOS;
+export const ESTADOS_PROBLEMA: EstadoVivo[] = PROBLEMAS;
 export function esProblema(e: EstadoVivo): boolean {
-  return ESTADOS_PROBLEMA.includes(e);
+  return esProblemaVivo(e);
 }
 
 export interface PersonaPulso {
@@ -65,6 +61,8 @@ export interface PersonaPulso {
   desde: string | null;
   conectado: boolean;
   problema: boolean;
+  /** Por qué (de peor a menos mal): alertas de Argos, fuera de Cowork, faltas. */
+  motivos: MotivoVivo[];
 }
 
 export interface CajaEquipo {
@@ -105,7 +103,7 @@ function promedio(nums: number[]): number | null {
  *  y el rondín no lo vio. Así "conectado" cuadra con la tarjeta de arriba. */
 export function construirPulso(
   roster: Array<{ userId: string; nombre: string; avatarUrl: string | null; avatarSeed: string | null; equipo: string }>,
-  estadoPor: Map<string, { estado: EstadoVivo; desde: string | null }>,
+  estadoPor: Map<string, { estado: EstadoVivo; desde: string | null; motivos?: MotivoVivo[] }>,
   online: Set<string>,
 ): Pulso {
   const personas: PersonaPulso[] = roster.map((r) => {
@@ -120,6 +118,7 @@ export function construirPulso(
       desde: ev?.desde ?? null,
       conectado: estado !== "ausente",
       problema: esProblema(estado),
+      motivos: ev?.motivos ?? [],
     };
   });
 
@@ -158,7 +157,9 @@ export function construirPulso(
 
   const quienLaBaja = personas
     .filter((p) => p.problema)
-    .sort((a, b) => (PUNTOS[a.estado] ?? 0) - (PUNTOS[b.estado] ?? 0) || a.nombre.localeCompare(b.nombre, "es"));
+    .sort((a, b) => (PUNTOS[a.estado] ?? 0) - (PUNTOS[b.estado] ?? 0)
+      || (a.desde && b.desde ? Date.parse(a.desde) - Date.parse(b.desde) : 0)
+      || a.nombre.localeCompare(b.nombre, "es"));
 
   return {
     notaViva: promedio(puntosConectados),

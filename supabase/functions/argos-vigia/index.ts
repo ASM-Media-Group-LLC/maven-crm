@@ -17,6 +17,7 @@ import { createClient } from "jsr:@supabase/supabase-js@2";
 // Al ABRIRSE una alerta se avisa (notifications → push automático) a los DUEÑOS
 // de la empresa (tenant_owners): «avisar siempre», pero una sola vez por alerta,
 // no cada 2 min. Solo entra por cron (X-Cron-Token). Huella en argos_diag.
+// El aviso abre /hr/en-vivo/<persona>?alerta=<id> (la vista en vivo, 11/11).
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -274,7 +275,11 @@ Deno.serve(async (req: Request) => {
       priority: d.gravedad >= 3 ? "high" : "medium",
       status: "new",
       visibility_scope: "personal",
-      deep_link_url: `/hr/expediente/${d.user_id}`,
+      // Tocar el aviso abre la VISTA EN VIVO de la persona con ESTA alerta arriba
+      // (Alvaro, 11/11): qué vio Argos, desde cuándo, y su pantalla y cámara ahora
+      // — no el expediente con fotos. Si la alerta ya cerró, ahí mismo sale el
+      // video de esos minutos.
+      deep_link_url: `/hr/en-vivo/${d.user_id}?alerta=${fila.id}`,
       required_permission_module: "HR",
       required_permission_submodule: "Monitor IA",
     }));

@@ -117,9 +117,111 @@ describe("el service worker abre la pestaña que ya está en esa sección", () =
 
   it("primero busca una ventana YA en esa sección; recién si no hay, usa otra", () => {
     const i = sw.indexOf("p === pathname");
-    const j = sw.indexOf("if (list.length) return enfocarYNavegar(list[0], url)");
+    const j = sw.indexOf("if (list.length) return enfocarYNavegar(list[0], ruta)");
     expect(i).toBeGreaterThan(0);
     expect(j).toBeGreaterThan(i);
+  });
+});
+
+// TOCAR UNA ALERTA EN EL IPHONE ABRE EXACTAMENTE SU URL (Alvaro, 11/11/2026).
+//
+// Los avisos de Argos y de «se salió de Cowork» llevan a la vista en vivo:
+// /hr/en-vivo/<persona>?alerta=<id>. Aquí se CORRE el sw-push.js de verdad (con
+// un `self` de mentira) y se toca el aviso: con Maven cerrado se abre esa url
+// exacta; con Maven abierto, la ventana navega a esa ruta exacta, con su ?query.
+// Una url absoluta de Maven (la manda el vigilante del equipo) se recorta a la
+// ruta: antes la app la descartaba y tocar el aviso no llevaba a ningún lado.
+describe("tocar una alerta abre EXACTAMENTE su url (iPhone, app instalada)", () => {
+  const ORIGEN = "https://app.maven-ai.me";
+  type Manejador = (e: unknown) => void;
+
+  function cargarSw(urlsDeVentanas: string[]) {
+    const manejadores: Record<string, Manejador> = {};
+    const openWindow = vi.fn().mockResolvedValue(undefined);
+    const mensajes: Array<{ ventana: string; data: unknown }> = [];
+    const ventanas = urlsDeVentanas.map((url) => {
+      const v = {
+        url,
+        visibilityState: "hidden",
+        focus: vi.fn(async () => v),
+        postMessage: vi.fn((data: unknown) => { mensajes.push({ ventana: url, data }); }),
+      };
+      return v;
+    });
+    const anotado: Record<string, string> = {};
+    const caches = {
+      open: vi.fn(async () => ({
+        put: vi.fn(async (k: string, r: { texto: string }) => { anotado[k] = r.texto; }),
+      })),
+    };
+    class RespuestaFalsa { texto: string; constructor(cuerpo: string) { this.texto = cuerpo; } }
+    const self = {
+      addEventListener: (tipo: string, m: Manejador) => { manejadores[tipo] = m; },
+      location: { origin: ORIGEN },
+      clients: { matchAll: vi.fn(async () => ventanas), openWindow },
+      registration: {},
+      navigator: {},
+      caches,
+    };
+    new Function("self", "Response", "fetch", sw)(self, RespuestaFalsa, vi.fn());
+    const tocar = async (data: Record<string, unknown>) => {
+      let espera: Promise<unknown> = Promise.resolve();
+      manejadores.notificationclick({ notification: { close: vi.fn(), data }, waitUntil: (p: Promise<unknown>) => { espera = p; } });
+      await espera;
+    };
+    return { tocar, openWindow, mensajes, ventanas, anotado };
+  }
+
+  const ALERTA = "/hr/en-vivo/0473bcfa-6755-486f-8b07-bfdd1dd51bc8?alerta=11111111-2222-4333-8444-555555555555";
+
+  it("con Maven cerrado, abre la url completa con su ?alerta=", async () => {
+    const sw = cargarSw([]);
+    await sw.tocar({ kind: "argos_alerta", url: ALERTA });
+    expect(sw.openWindow).toHaveBeenCalledWith(`${ORIGEN}${ALERTA}`);
+  });
+
+  it("con Maven abierto en otra sección, esa ventana navega a la ruta EXACTA", async () => {
+    const sw = cargarSw([`${ORIGEN}/dashboard`]);
+    await sw.tocar({ kind: "argos_alerta", url: ALERTA });
+    expect(sw.ventanas[0].focus).toHaveBeenCalled();
+    expect(sw.mensajes).toEqual([{ ventana: `${ORIGEN}/dashboard`, data: { type: "abrir-url", url: ALERTA } }]);
+    expect(sw.openWindow).not.toHaveBeenCalled();
+  });
+
+  it("si ya hay una ventana en esa vista, usa esa (y le cambia la alerta)", async () => {
+    const sw = cargarSw([`${ORIGEN}/messenger`, `${ORIGEN}/hr/en-vivo/0473bcfa-6755-486f-8b07-bfdd1dd51bc8?alerta=vieja`]);
+    await sw.tocar({ kind: "argos_alerta", url: ALERTA });
+    expect(sw.mensajes).toHaveLength(1);
+    expect(sw.mensajes[0].ventana).toContain("/hr/en-vivo/");
+    expect(sw.mensajes[0].data).toEqual({ type: "abrir-url", url: ALERTA });
+  });
+
+  it("«se salió de Cowork» abre su vista con ?fuera=", async () => {
+    const url = "/hr/en-vivo/0473bcfa-6755-486f-8b07-bfdd1dd51bc8?fuera=99999999-2222-4333-8444-555555555555";
+    const sw = cargarSw([`${ORIGEN}/cowork`]);
+    await sw.tocar({ kind: "cowork_fuera", url });
+    expect(sw.mensajes[0].data).toEqual({ type: "abrir-url", url });
+  });
+
+  it("una url ABSOLUTA de Maven se recorta a la ruta (si no, la app la descartaba)", async () => {
+    const sw = cargarSw([`${ORIGEN}/dashboard`]);
+    await sw.tocar({ kind: "equipo_video_grabado", url: `${ORIGEN}/hr/en-vivo/abc?clip=1#x` });
+    expect(sw.mensajes[0].data).toEqual({ type: "abrir-url", url: "/hr/en-vivo/abc?clip=1#x" });
+  });
+
+  it("una url de OTRO sitio se abre aparte y no toca las ventanas de Maven", async () => {
+    const sw = cargarSw([`${ORIGEN}/dashboard`]);
+    await sw.tocar({ kind: "otro", url: "https://otro.example/algo" });
+    expect(sw.mensajes).toEqual([]);
+    expect(sw.openWindow).toHaveBeenCalledWith("https://otro.example/algo");
+  });
+
+  it("deja la ruta anotada para la app (iOS a veces pierde el mensaje o abre en el inicio)", async () => {
+    const sw = cargarSw([`${ORIGEN}/dashboard`]);
+    await sw.tocar({ kind: "argos_alerta", url: ALERTA });
+    const nota = JSON.parse(sw.anotado["/__aviso-pendiente"] ?? "null") as { url: string; at: number } | null;
+    expect(nota?.url).toBe(ALERTA);
+    expect(typeof nota?.at).toBe("number");
   });
 });
 

@@ -1006,6 +1006,10 @@ export const hr = {
   "hr.rondin.estado.no_mira": { es: "No mira la pantalla", en: "Not looking at screen" },
   "hr.rondin.estado.camara_apagada": { es: "Cámara apagada", en: "Camera off" },
   "hr.rondin.estado.se_fue": { es: "Fuera del puesto", en: "Away from desk" },
+  "hr.rondin.estado.fuera_cowork": { es: "Se salió de Cowork", en: "Left Cowork" },
+  "hr.rondin.estado.fuera_de_lugar": { es: "En algo que no es trabajo", en: "Doing something off-task" },
+  "hr.rondin.estado.sin_pantalla": { es: "No comparte pantalla", en: "Not sharing screen" },
+  "hr.rondin.estado.pausa_de_mas": { es: "Pausa pasada de tiempo", en: "Break over time" },
   "hr.rondin.estado.ausente": { es: "Desconectado", en: "Disconnected" },
   // ── Pantallazos en vivo (galería tipo Hubstaff, Argos) ──
   "hr.pantallazos.title": { es: "Pantallazos en vivo", en: "Live screenshots" },

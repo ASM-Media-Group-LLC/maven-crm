@@ -187,6 +187,47 @@ function enfocarYNavegar(client, url) {
   });
 }
 
+// La ruta INTERNA de un aviso: "/hr/en-vivo/<persona>?alerta=<id>" tal cual,
+// con su ?query y su #hash. Algunos avisos llegan con la url ABSOLUTA de Maven
+// ("https://app.maven-ai.me/hr/…", el vigilante del equipo): antes esa url no
+// casaba con ninguna ventana y la app la descartaba (solo acepta rutas que
+// empiezan con "/"), así que tocar el aviso en el iPhone con Maven abierto
+// detrás no llevaba a ningún lado. Ahora se recorta a la ruta. Una url de OTRO
+// sitio devuelve null y se abre aparte, sin pasar por la app.
+function rutaInterna(url) {
+  try {
+    var u = new URL(url || "/", self.location.origin);
+    if (u.origin !== self.location.origin) return null;
+    return u.pathname + u.search + u.hash;
+  } catch (e) {
+    return null;
+  }
+}
+
+// EL AVISO PENDIENTE (iPhone, app instalada). El postMessage a una ventana que
+// iOS tenía congelada a veces no llega (iOS la recarga al volver y el mensaje se
+// pierde), y abrir la app en frío a veces cae en el inicio y no en la url. Por
+// eso, además, se deja la ruta anotada un momento: la app, al despertar, la lee
+// (useNavegarDesdeNotificacion), la borra y navega ahí si todavía no está.
+var CACHE_AVISO = "maven-aviso-pendiente";
+var CLAVE_AVISO = "/__aviso-pendiente";
+function anotarPendiente(ruta) {
+  if (!ruta || !self.caches) return Promise.resolve();
+  return self.caches
+    .open(CACHE_AVISO)
+    .then(function (c) {
+      return c.put(
+        CLAVE_AVISO,
+        new Response(JSON.stringify({ url: ruta, at: Date.now() }), {
+          headers: { "Content-Type": "application/json" },
+        })
+      );
+    })
+    .catch(function () {
+      /* sin caché: queda el postMessage y el openWindow */
+    });
+}
+
 self.addEventListener("notificationclick", function (event) {
   event.notification.close();
   var d = event.notification.data || {};
@@ -194,30 +235,43 @@ self.addEventListener("notificationclick", function (event) {
   // --- Aviso (mensaje, llamado, asignación) ---
   if (d.kind) {
     var url = d.url || "/";
-    var pathname = url.split("?")[0];
+    var ruta = rutaInterna(url);
+    var pathname = (ruta || "/").split("?")[0].split("#")[0];
     if (self.navigator && self.navigator.clearAppBadge) {
       self.navigator.clearAppBadge().catch(function () {});
     }
+    // La nota va PRIMERO: así, cuando la ventana recibe el mensaje y la borra,
+    // ya está escrita (si se escribiera después, quedaría colgada y la app
+    // volvería a saltar a esa vista la próxima vez que se abra).
     event.waitUntil(
-      self.clients
-        .matchAll({ type: "window", includeUncontrolled: true })
-        .then(function (list) {
-          // Primero una ventana que ya esté en esa sección; si no, cualquier
-          // ventana de Maven (navega por dentro, sin recargar); si no hay, abrir.
-          for (var i = 0; i < list.length; i++) {
-            var p = "";
-            try {
-              p = new URL(list[i].url).pathname;
-            } catch (e) {
-              p = "";
-            }
-            if (p === pathname || p.indexOf(pathname + "/") === 0) {
-              return enfocarYNavegar(list[i], url);
-            }
-          }
-          if (list.length) return enfocarYNavegar(list[0], url);
-          if (self.clients.openWindow) return self.clients.openWindow(url);
+      anotarPendiente(ruta)
+        .then(function () {
+          return self.clients.matchAll({ type: "window", includeUncontrolled: true });
         })
+        .then(function (list) {
+        list = list || [];
+        // Fuera de Maven: se abre tal cual, sin tocar las ventanas de la app.
+        if (!ruta) {
+          if (self.clients.openWindow) return self.clients.openWindow(url);
+          return;
+        }
+        // Primero una ventana que ya esté en esa sección; si no, cualquier
+        // ventana de Maven (navega por dentro, sin recargar); si no hay, abrir
+        // EXACTAMENTE esa ruta (absoluta, con su ?query).
+        for (var i = 0; i < list.length; i++) {
+          var p = "";
+          try {
+            p = new URL(list[i].url).pathname;
+          } catch (e) {
+            p = "";
+          }
+          if (p === pathname || p.indexOf(pathname + "/") === 0) {
+            return enfocarYNavegar(list[i], ruta);
+          }
+        }
+        if (list.length) return enfocarYNavegar(list[0], ruta);
+        if (self.clients.openWindow) return self.clients.openWindow(self.location.origin + ruta);
+      })
     );
     return;
   }

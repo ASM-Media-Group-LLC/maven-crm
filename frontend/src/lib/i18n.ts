@@ -34,6 +34,7 @@ import { paginas } from "./i18n/paginas";
 import { ventas } from "./i18n/ventas";
 import { portal } from "./i18n/portal";
 import { centroOps } from "./i18n/centroOps";
+import { vigilancia } from "./i18n/vigilancia";
 
 export type Language = "es" | "en";
 
@@ -92,6 +93,7 @@ const translations = {
   ...ventas,
   ...portal,
   ...centroOps,
+  ...vigilancia,
 } as const;
 
 export type TranslationKey = keyof typeof translations;

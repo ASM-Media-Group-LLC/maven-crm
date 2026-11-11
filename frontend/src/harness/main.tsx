@@ -13,6 +13,7 @@ import type { AdminUser } from "@/pages/admin/useAdminUsers";
 import BancoNas from "./bancoNas";
 import BancoLinks from "./bancoLinks";
 import BancoTableros from "./bancoTableros";
+import BancoVigilancia from "./bancoVigilancia";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import VirtualOfficePage from "@/pages/oficina-ai/VirtualOfficePage";
 import TardanzasPage from "@/pages/admin/TardanzasPage";
@@ -65,8 +66,22 @@ const verNas = ver === "nas" || ver === "nas-pagina" || ver === "links";
 const verTablero = ver === "mio" || ver === "rrhh";
 // /harness.html?ver=oficina-ai | tardanzas → pantallas del contrato de diseño (sin sesión).
 const verPantalla = ver === "oficina-ai" || ver === "tardanzas";
+// /harness.html?ver=quien-baja | en-vivo | en-vivo-video → monitoreo en vivo (11/11).
+// &tema=claro → tema claro; &skin=esmeralda → primario oscuro.
+const verVigilancia = ver === "quien-baja" || ver === "en-vivo" || ver === "en-vivo-video";
+{
+  const q = new URLSearchParams(window.location.search);
+  if (q.get("tema") === "claro") document.documentElement.classList.remove("dark");
+  const skin = q.get("skin");
+  if (skin) document.documentElement.setAttribute("data-skin", skin);
+}
 
 createRoot(document.getElementById("root")!).render(
+  verVigilancia ? (
+    <StrictMode>
+      <LanguageProvider><BancoVigilancia cual={ver as "quien-baja" | "en-vivo" | "en-vivo-video"} /></LanguageProvider>
+    </StrictMode>
+  ) :
   verPantalla ? (
     <StrictMode>
       <LanguageProvider>

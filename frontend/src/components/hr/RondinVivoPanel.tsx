@@ -1,4 +1,4 @@
-import { Radar, Loader2, Video, User, Coffee, Smartphone, Eye, EyeOff, VideoOff, UserX, Moon, AlertTriangle } from "lucide-react";
+import { Radar, Loader2, Video, User, Coffee, Smartphone, Eye, EyeOff, VideoOff, UserX, Moon, AlertTriangle, LogOut, Ban, MonitorOff, TimerOff } from "lucide-react";
 import { useLanguage } from "@/hooks/useLanguage";
 import { UserAvatar } from "@/components/UserAvatar";
 import { useRondinVivo, type EstadoVivo, type PersonaRondin } from "@/hooks/useRondinVivo";
@@ -19,6 +19,10 @@ const EST: Record<EstadoVivo, { icon: typeof Video; tone: "success" | "primary" 
   no_mira: { icon: EyeOff, tone: "destructive", status: "busy" },
   camara_apagada: { icon: VideoOff, tone: "destructive", status: "busy" },
   se_fue: { icon: UserX, tone: "destructive", status: "busy" },
+  fuera_cowork: { icon: LogOut, tone: "destructive", status: "busy" },
+  fuera_de_lugar: { icon: Ban, tone: "destructive", status: "busy" },
+  sin_pantalla: { icon: MonitorOff, tone: "destructive", status: "busy" },
+  pausa_de_mas: { icon: TimerOff, tone: "warning", status: "away" },
   ausente: { icon: Moon, tone: "muted", status: "away" },
 };
 const TONO: Record<string, string> = {
