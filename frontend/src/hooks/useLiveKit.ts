@@ -12,6 +12,7 @@ import {
   ConnectionQuality,
   RoomOptions,
   TrackEvent,
+  VideoQuality,
 } from "livekit-client";
 import type { ScreenShareCaptureOptions, TrackPublishOptions } from "livekit-client";
 import { esOtraPestana } from "@/lib/sesionDuplicada";
@@ -40,6 +41,7 @@ import {
   armarMuestra, borrarLlamadaEnCurso, leerReporte, marcarLlamadaEnCurso, medirRetraso, recargaConLlamada,
   type LecturaDePista, type MuestraDeLlamada,
 } from "@/lib/saludDeLlamada";
+import { AHORRO_INICIAL, PANTALLA_AHORRO, siguienteAhorro, type EstadoAhorro } from "@/lib/modoAhorro";
 
 // La recarga a mitad de llamada se revisa UNA vez por página (al primer connect,
 // cuando ya hay sesión para anotarla). Ver saludDeLlamada.ts.
@@ -514,7 +516,7 @@ export function useLiveKit() {
   }, []);
 
   type InsertaSalud = (tabla: "llamada_salud") => {
-    insert: (fila: { sala: string; datos: MuestraDeLlamada }) => PromiseLike<{ error: { message: string } | null }>;
+    insert: (fila: { sala: string; datos: MuestraDeLlamada & { ahorro: boolean } }) => PromiseLike<{ error: { message: string } | null }>;
   };
   // Si el componente se desmonta sin colgar, el reloj de muestras no queda vivo.
   useEffect(() => () => { pararMuestreoRef.current?.(); }, []);
@@ -523,6 +525,40 @@ export function useLiveKit() {
   const iniciarMuestreo = useCallback((room: Room) => {
     pararMuestreoRef.current?.();
     const retraso = medirRetraso();
+    // Modo ahorro (lib/modoAhorro.ts): con la subida lenta, cámara en calidad
+    // media y pantalla a 5 cuadros por segundo, solo para esta persona.
+    let ahorro: EstadoAhorro = AHORRO_INICIAL;
+    let ahorroAvisado = false;
+    const originales = new Map<RTCRtpSender, Array<{ maxFramerate?: number; maxBitrate?: number }>>();
+    const aplicarAhorro = async (activo: boolean) => {
+      try {
+        const cam = room.localParticipant.getTrackPublication(Track.Source.Camera)?.track as
+          { setPublishingQuality?: (q: VideoQuality) => void } | undefined;
+        cam?.setPublishingQuality?.(activo ? VideoQuality.MEDIUM : VideoQuality.HIGH);
+        const sender = room.localParticipant.getTrackPublication(Track.Source.ScreenShare)?.track?.sender;
+        if (!sender) return;
+        const params = sender.getParameters();
+        if (!params.encodings?.length) return;
+        if (activo) {
+          if (!originales.has(sender)) {
+            originales.set(sender, params.encodings.map((e) => ({ maxFramerate: e.maxFramerate, maxBitrate: e.maxBitrate })));
+          }
+          for (const e of params.encodings) {
+            e.maxFramerate = Math.min(e.maxFramerate ?? 30, PANTALLA_AHORRO.maxFramerate);
+            e.maxBitrate = Math.min(e.maxBitrate ?? PANTALLA_AHORRO.maxBitrate, PANTALLA_AHORRO.maxBitrate);
+          }
+        } else {
+          const antes = originales.get(sender);
+          if (!antes) return;
+          params.encodings.forEach((e, i) => {
+            if (antes[i]?.maxFramerate === undefined) delete e.maxFramerate; else e.maxFramerate = antes[i].maxFramerate;
+            if (antes[i]?.maxBitrate === undefined) delete e.maxBitrate; else e.maxBitrate = antes[i].maxBitrate;
+          });
+          originales.delete(sender);
+        }
+        await sender.setParameters(params);
+      } catch { /* ajustar la calidad jamás rompe la llamada */ }
+    };
     const leer = async (fuente: Track.Source): Promise<LecturaDePista | null> => {
       const pista = room.localParticipant.getTrackPublication(fuente)?.track;
       if (!pista) return null;
@@ -542,8 +578,17 @@ export function useLiveKit() {
         });
         ultimaMuestraRef.current = muestra;
         marcarLlamadaEnCurso(room.name); // la marca de «sigue viva» se renueva
+        const estabaEnAhorro = ahorro.activo;
+        ahorro = siguienteAhorro(ahorro, muestra);
+        // Prendido se vuelve a aplicar cada minuto: LiveKit puede reponer capas.
+        if (ahorro.activo) void aplicarAhorro(true);
+        else if (estabaEnAhorro) void aplicarAhorro(false);
+        if (ahorro.activo && !estabaEnAhorro && !ahorroAvisado) {
+          ahorroAvisado = true;
+          toast(traducir("shared.call.ahorroTitulo"), { description: traducir("shared.call.ahorroDesc"), duration: 10_000 });
+        }
         void (supabase.from as unknown as InsertaSalud)("llamada_salud")
-          .insert({ sala: room.name, datos: muestra })
+          .insert({ sala: room.name, datos: { ...muestra, ahorro: ahorro.activo } })
           .then(({ error }) => { if (error) console.warn("[llamada_salud]", error.message); });
       } catch { /* medir jamás rompe la llamada */ }
     };

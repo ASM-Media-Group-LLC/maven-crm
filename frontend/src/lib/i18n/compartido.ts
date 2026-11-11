@@ -119,6 +119,8 @@ export const compartido = {
     en: "Phones don't support it. Do it from a computer.",
   },
   "shared.call.screenShareFailed": { es: "No se pudo compartir la pantalla", en: "Couldn't share your screen" },
+  "shared.call.ahorroTitulo": { es: "Tu internet de subida está lento", en: "Your upload speed is low" },
+  "shared.call.ahorroDesc": { es: "Bajamos un poco la calidad de tu cámara y tu pantalla para que no se te caiga la llamada.", en: "We lowered your camera and screen quality a bit so your call doesn't drop." },
   "shared.call.pantallaCompletaTitulo": { es: "Comparte la PANTALLA COMPLETA", en: "Share your ENTIRE SCREEN" },
   "shared.call.pantallaCompletaDesc": { es: "En Cowork no sirve una pestaña ni una ventana. Vuelve a tocar «Compartir pantalla» y elige «Pantalla completa». Mientras tanto cuentas como «sin pantalla».", en: "In Cowork a tab or a window isn't enough. Tap «Share screen» again and choose «Entire screen». Until then you count as «no screen»." },
   "shared.call.you": { es: "Tú", en: "You" },
