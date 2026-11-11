@@ -16,6 +16,7 @@ import { Switch } from "@/components/ui/switch";
 import { Page } from "@/components/ui/page";
 import { PageHeader } from "@/components/ui/page-header";
 import { useMonitorConfig } from "@/hooks/useMonitorConfig";
+import { DondeEstaPanel } from "@/components/hr/DondeEstaPanel";
 import { ConectadosAhoraPanel } from "@/components/hr/ConectadosAhoraPanel";
 import { PantallazosVivoPanel } from "@/components/hr/PantallazosVivoPanel";
 import { ContextoEmpresaPanel } from "@/components/hr/ContextoEmpresaPanel";
@@ -139,16 +140,16 @@ export default function HRMonitorIA() {
   // La pestaña vive en la URL (?t=…) para volver DONDE ESTABAS al entrar a un
   // perfil y pulsar atrás. Mapeamos los nombres viejos (panel/equipo/envivo/
   // historial) a los nuevos para no romper links guardados.
-  type TabArgos = "ahora" | "dia" | "ajustes";
+  type TabArgos = "donde" | "ahora" | "dia" | "ajustes";
   const [searchParams, setSearchParams] = useSearchParams();
   const VIEJO_A_NUEVO: Record<string, TabArgos> = {
-    ahora: "ahora", dia: "dia", ajustes: "ajustes",
+    donde: "donde", ahora: "ahora", dia: "dia", ajustes: "ajustes",
     equipo: "ahora", envivo: "ahora", panel: "dia", historial: "dia", resumen: "dia", atencion: "ahora",
   };
   const tabURL = searchParams.get("t");
-  // Al entrar a Argos se cae en "El día" (ahí están los días para ir hacia
-  // atrás), no en "En vivo" (Alvaro, 08/11).
-  const tab: TabArgos = (tabURL && VIEJO_A_NUEVO[tabURL]) || "dia";
+  // Al entrar a Argos se cae en «Dónde está» (Alvaro, 10/11: «necesito saber
+  // dónde está el empleado en todo momento»); antes era «El día» (08/11).
+  const tab: TabArgos = (tabURL && VIEJO_A_NUEVO[tabURL]) || "donde";
   const setTab = (k: TabArgos) => setSearchParams((prev) => { const n = new URLSearchParams(prev); n.set("t", k); return n; }, { replace: true });
 
   const monitorOff = config ? !config.activo : false;
@@ -181,6 +182,7 @@ export default function HRMonitorIA() {
       {/* Pestañas de Argos (3) */}
       {(() => {
         const tabs: Array<{ k: TabArgos; label: string }> = [
+          { k: "donde", label: t("hr.monia.tab.donde") },
           { k: "dia", label: t("hr.monia.tab.dia") },
           { k: "ahora", label: t("hr.monia.tab.ahora") },
           ...(isAdmin ? [{ k: "ajustes" as TabArgos, label: t("hr.monia.tab.ajustes") }] : []),
@@ -200,6 +202,13 @@ export default function HRMonitorIA() {
           </div>
         );
       })()}
+
+      {/* DÓNDE ESTÁ — cada empleado ahora: en Cowork o fuera, qué tiene en pantalla. */}
+      {tab === "donde" && (
+        <div className="mt-5">
+          <DondeEstaPanel />
+        </div>
+      )}
 
       {/* AHORA — el piso en vivo: tablero de caras con semáforo + muralla de pantallazos. */}
       {tab === "ahora" && (

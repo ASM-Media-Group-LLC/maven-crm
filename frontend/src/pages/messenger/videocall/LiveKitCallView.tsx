@@ -24,6 +24,7 @@ import { toast } from "sonner";
 import { useFaceWatch, faceStateLabel, type FaceWatch } from "@/hooks/useFaceWatch";
 import { useFaceNudge, useScreenShareNudge } from "@/hooks/useFaceNudge";
 import { useMonitorCamara } from "@/hooks/useMonitorCamara";
+import { useUltimoPantallazo } from "@/lib/monitorLocal";
 import { useArgosEscaleraClip } from "@/hooks/useArgosEscaleraClip";
 import { latirEnLlamada, salirDeLlamada, LATIDO_LLAMADA_MS } from "@/lib/llamadaEnMaven";
 import { useRegistrarLlamados } from "@/hooks/useRegistrarLlamados";
@@ -626,6 +627,16 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
   // ventanita flotante). Registra las faltas gratis (cámara apagada/tapada, se
   // fue, cara incompleta) y cada ~2 min pasa un frame por la IA (celular/
   // distraído). Solo en una sala de Cowork viva; el propio hook excluye admins.
+  // En la sala de Cowork se exige la PANTALLA COMPLETA (Alvaro, 10/11): si
+  // elige una pestaña o una ventana, useLiveKit se la rechaza y se la pide de nuevo.
+  useEffect(() => { lk.setExigirPantallaCompleta(!!supervisorEncuadre); }, [lk.setExigirPantallaCompleta, supervisorEncuadre]);
+  const ultimoPantallazo = useUltimoPantallazo();
+  const [ahoraMonitor, setAhoraMonitor] = useState(() => Date.now());
+  useEffect(() => {
+    if (!supervisorEncuadre) return;
+    const id = window.setInterval(() => setAhoraMonitor(Date.now()), 30_000);
+    return () => window.clearInterval(id);
+  }, [supervisorEncuadre]);
   useMonitorCamara({
     track: localCameraTrack,
     trackPantalla: localScreenTrack,
@@ -892,6 +903,19 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
           <button type="button" onClick={() => setVolvioDeCaida(false)} className="underline underline-offset-2 opacity-80 hover:opacity-100">
             {t("messenger.callView.entendido")}
           </button>
+        </div>
+      )}
+      {/* «Monitoreo activo · pantallazo hace X»: se ve también en la ventanita
+          flotante y en la ventana del sistema, para que la persona sepa que el
+          monitoreo sigue aunque esté en otra app (Alvaro, 10/11). */}
+      {supervisorEncuadre && conSalaViva && ultimoPantallazo && ahoraMonitor - ultimoPantallazo < 5 * 60_000 && (
+        <div role="status" className="shrink-0 flex items-center justify-center gap-1.5 py-1 px-3 text-[11px] text-muted-foreground">
+          <span className="h-1.5 w-1.5 rounded-full bg-success" aria-hidden />
+          {t("messenger.callView.monitoreoActivo", {
+            hace: ahoraMonitor - ultimoPantallazo < 60_000
+              ? t("messenger.callView.monitoreoAhora")
+              : t("messenger.callView.monitoreoMin", { n: Math.floor((ahoraMonitor - ultimoPantallazo) / 60_000) }),
+          })}
         </div>
       )}
       {pantallaPendiente && (

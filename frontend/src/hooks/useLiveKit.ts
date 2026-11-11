@@ -13,7 +13,7 @@ import {
   RoomOptions,
   TrackEvent,
 } from "livekit-client";
-import type { TrackPublishOptions } from "livekit-client";
+import type { ScreenShareCaptureOptions, TrackPublishOptions } from "livekit-client";
 import { esOtraPestana } from "@/lib/sesionDuplicada";
 import { fueUnaCaida } from "@/lib/conexionSala";
 import {
@@ -25,7 +25,7 @@ import { toast } from "sonner";
 // Los avisos de la llamada van por traducir(): se arman en eventos de LiveKit y
 // callbacks, no en el JSX, y los lee la persona en su propio idioma.
 import { traducir } from "@/lib/i18n";
-import { puedeCompartirPantalla, motivoDeFalloAlCompartir } from "@/lib/compartirPantalla";
+import { esPantallaCompleta, puedeCompartirPantalla, motivoDeFalloAlCompartir } from "@/lib/compartirPantalla";
 import { supabase } from "@/integrations/supabase/client";
 import { avisarSalidaDeLlamada, mostrarAvisoDeSala, ID_AVISO_ME_SILENCIARON } from "@/lib/avisosDeLlamada";
 import type { BackgroundEffect } from "@/lib/fondoDeLlamada";
@@ -2112,6 +2112,11 @@ export function useLiveKit() {
   // ── Screen share (using ref to avoid stale closure) ───────────
   const isScreenSharingRef = useRef(isScreenSharing);
   isScreenSharingRef.current = isScreenSharing;
+  // En Cowork se exige la PANTALLA COMPLETA (Alvaro, 10/11): una pestaña o una
+  // ventana no muestran adónde se fue la persona. Lo prende LiveKitCallView
+  // solo en la sala de Cowork; en una llamada común se comparte lo que quieras.
+  const exigirPantallaCompletaRef = useRef(false);
+  const setExigirPantallaCompleta = useCallback((v: boolean) => { exigirPantallaCompletaRef.current = v; }, []);
 
   const toggleScreenShare = useCallback(async () => {
     const room = roomRef.current;
@@ -2134,7 +2139,28 @@ export function useLiveKit() {
         });
         return;
       }
-      await room.localParticipant.setScreenShareEnabled(newState, { audio: newState }, PUBLICACION_DE_PANTALLA);
+      const exigir = newState && exigirPantallaCompletaRef.current;
+      // Con la exigencia, el diálogo de Chrome abre en «Pantalla completa» y no
+      // ofrece esta pestaña ni cambiar de pestaña a mitad de camino.
+      const captura: ScreenShareCaptureOptions = exigir
+        ? { audio: true, video: { displaySurface: "monitor" }, selfBrowserSurface: "exclude", surfaceSwitching: "exclude" }
+        : { audio: newState };
+      await room.localParticipant.setScreenShareEnabled(newState, captura, PUBLICACION_DE_PANTALLA);
+      if (exigir) {
+        const superficie = room.localParticipant.getTrackPublication(Track.Source.ScreenShare)?.track?.mediaStreamTrack?.getSettings?.().displaySurface;
+        if (!esPantallaCompleta(superficie)) {
+          // Eligió una pestaña o una ventana: no sirve. Se corta y se le pide de
+          // nuevo; mientras tanto el reloj lo cuenta como «sin pantalla».
+          await room.localParticipant.setScreenShareEnabled(false);
+          setIsScreenSharing(false);
+          debouncedRefresh();
+          toast.error(traducir("shared.call.pantallaCompletaTitulo"), {
+            description: traducir("shared.call.pantallaCompletaDesc"),
+            duration: 12_000,
+          });
+          return;
+        }
+      }
       setIsScreenSharing(newState);
       debouncedRefresh();
     } catch (err) {
@@ -2483,6 +2509,7 @@ export function useLiveKit() {
     toggleMic,
     toggleCam,
     toggleScreenShare,
+    setExigirPantallaCompleta,
     toggleHand,
     sendReaction,
     sendChatMessage,
