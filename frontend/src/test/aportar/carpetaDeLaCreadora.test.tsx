@@ -31,7 +31,7 @@ vi.mock("@/hooks/useLanguage", () => {
 });
 
 import PaginaAportar from "@/pages/aportar/PaginaAportar";
-import { nuevosDesde, queDiaEs } from "@/lib/aportar/api";
+import { hoyEnColombia, nuevosDesde, queDiaEs } from "@/lib/aportar/api";
 
 const abrir = () => render(
   <MemoryRouter initialEntries={["/aportar/tok123"]}>
@@ -76,7 +76,8 @@ describe("la página según el link", () => {
     respuestas["listar:equipo"] = { carpeta: { id: "equipo", nombre: "Del equipo" }, ruta: [], hijos: [hijo("guion.pdf", "archivo"), hijo("editado.mp4", "archivo")] };
     respuestas["listar:raiz"] = {
       carpeta: { id: "raiz", nombre: "MIMIMOUSE" }, ruta: [{ id: "raiz", nombre: "MIMIMOUSE" }],
-      hijos: [hijo("Del equipo", "carpeta", { del_equipo: true }), hijo("2026-11-10", "carpeta")],
+      // La carpeta del día de HOY (no una fecha fija: el banco corre cualquier día).
+      hijos: [hijo("Del equipo", "carpeta", { del_equipo: true }), hijo(hoyEnColombia(), "carpeta")],
     };
     abrir();
     expect(await screen.findByText(/drive.carpeta.hola.*Mimimouse/)).toBeInTheDocument();

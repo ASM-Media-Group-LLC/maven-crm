@@ -19,6 +19,7 @@ const ETIQUETA: Record<string, TranslationKey> = {
   activo: "hr.donde.estado.activo",
   pausa: "hr.donde.estado.pausa",
   meet: "hr.donde.estado.meet",
+  en_llamada: "hr.donde.estado.enLlamada",
   sin_pantalla: "hr.donde.estado.sinPantalla",
   sin_camara: "hr.donde.estado.sinCamara",
   fuera_de_camara: "hr.donde.estado.fueraDeCamara",

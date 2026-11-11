@@ -55,3 +55,20 @@ export function estaEnLlamadaDeMaven(ahora: number = Date.now()): boolean {
     return false;
   }
 }
+
+// Y en el SERVIDOR (Alvaro, 11/11: «estar en otra llamada de Maven no cuenta
+// como salirse de Cowork»). El latido de localStorage solo lo ve el mismo
+// navegador; el vigía «fuera de Cowork» corre en la base, así que la llamada
+// también deja un latido allá (llamada_maven_latido) cada 30 s. Los registros
+// de llamadas no sirven para esto: la mayoría nunca marca su fin.
+export const LATIDO_SERVIDOR_MS = 30_000;
+
+type Rpc = { rpc: (f: string, a?: Record<string, unknown>) => PromiseLike<unknown> };
+
+export function latirLlamadaEnServidor(cliente: Rpc, sala: string): void {
+  try { void Promise.resolve(cliente.rpc("latir_llamada_maven", { _sala: sala })).catch(() => {}); } catch { /* sin red: el próximo latido */ }
+}
+
+export function salirLlamadaEnServidor(cliente: Rpc): void {
+  try { void Promise.resolve(cliente.rpc("salir_llamada_maven")).catch(() => {}); } catch { /* caduca solo a los 90 s */ }
+}

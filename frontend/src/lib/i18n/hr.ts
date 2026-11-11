@@ -1059,6 +1059,7 @@ export const hr = {
   "hr.donde.estado.activo": { es: "En Cowork", en: "In Cowork" },
   "hr.donde.estado.pausa": { es: "En pausa", en: "On break" },
   "hr.donde.estado.meet": { es: "En reunión", en: "In a meeting" },
+  "hr.donde.estado.enLlamada": { es: "En llamada de Maven", en: "In a Maven call" },
   "hr.donde.estado.sinPantalla": { es: "Sin pantalla", en: "No screen" },
   "hr.donde.estado.sinCamara": { es: "Sin cámara", en: "No camera" },
   "hr.donde.estado.fueraDeCamara": { es: "No se ve en cámara", en: "Not on camera" },

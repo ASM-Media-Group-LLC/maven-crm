@@ -64,6 +64,11 @@ describe("el monitor se nota también fuera de Maven", () => {
     expect(tomarLosDeAfuera()).toBe(0);
   });
 
+  it("una llamada de Maven que no es Cowork late también en el servidor (no cuenta como salirse)", () => {
+    expect(llamada).toContain("latirLlamadaEnServidor(supabase, roomName)");
+    expect(llamada).toContain("salirLlamadaEnServidor(supabase)");
+  });
+
   it("cada pantallazo guardado se anota y al volver a Maven se avisa", () => {
     expect(monitor).toContain("if (guardoAlgo) anotarPantallazo();");
     expect(monitor).toContain('document.addEventListener("visibilitychange", alVolver)');

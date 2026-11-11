@@ -74,6 +74,14 @@ const FIXTURE_HASTA = "20260929180000";
 // Migraciones que tocan objetos de este banco pero necesitan tablas que sus fixtures no traen.
 // Se prueban en su propio banco, con el motivo al lado.
 const NO_CARGAN_AQUI: Record<string, string> = {
+  "20261111030000_fuera_de_cowork_solo_su_turno.sql":
+    "Cowork: el arreglo de «fuera de Cowork» (solo si entró para su turno). Entra a esta cadena solo porque su " +
+    "vigía inserta avisos en notifications, pero usa las tablas del reloj de Cowork y es_admin_o_dueno, que este " +
+    "fixture no trae; no toca nada del Messenger.",
+  "20261111050000_fuera_de_cowork_reglas_alvaro.sql":
+    "Cowork: las reglas de «fuera de Cowork» de Alvaro (a todos; llamada de Maven y últimos 10 min no cuentan). " +
+    "Entra a esta cadena solo porque su vigía inserta avisos en notifications, pero usa las tablas del reloj de " +
+    "Cowork y es_admin_o_dueno, que este fixture no trae; no toca nada del Messenger.",
   "20261111010000_donde_esta_cada_uno.sql":
     "Cowork: «fuera de Cowork» y el tablero «Dónde está cada uno» (cowork_fuera y funciones de turno). Entra a " +
     "esta cadena solo porque su vigía inserta avisos en notifications, pero usa es_admin_o_dueno, roles_config y " +
