@@ -109,6 +109,9 @@ export const cowork = {
   "cowork.ended.wasEnded": { es: "La sesión fue finalizada", en: "The session was ended" },
 
   // ── Lobby ──────────────────────────────────────────────────────────────────
+  "cowork.atasco.titulo": { es: "Cowork no terminó de cargar", en: "Cowork didn't finish loading" },
+  "cowork.atasco.desc": { es: "Algo se trabó al entrar a la sala. Reintentar suele arreglarlo.", en: "Something got stuck while joining the room. Retrying usually fixes it." },
+  "cowork.atasco.reintentar": { es: "Reintentar", en: "Retry" },
   "cowork.lobby.defaultName": { es: "Sesión Cowork", en: "Cowork session" },
   "cowork.lobby.joinAsParticipant": { es: "Unirse como participante", en: "Join as participant" },
   "cowork.lobby.joinError": { es: "Error al unirse", en: "Couldn't join" },

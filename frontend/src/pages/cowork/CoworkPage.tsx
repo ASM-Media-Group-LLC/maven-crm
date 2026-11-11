@@ -31,6 +31,7 @@ import { traducir } from "@/lib/i18n";
 import { tituloBonito } from "@/lib/tituloBonito";
 import { UserAvatar } from "@/components/UserAvatar";
 import { cn } from "@/lib/utils";
+import { ATASCO_MS, anotarAtasco, marcarRecargaPorAtasco, queHacerConElAtasco, tomarAtascoPrevio, ultimaRecargaPorAtasco } from "@/lib/coworkAtascado";
 
 export default function CoworkPage() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -236,6 +237,40 @@ export default function CoworkPage() {
       setJoiningByCode(false);
     }
   };
+
+  // Vigilante de la ruedita (lib/coworkAtascado.ts): si la carga o la entrada a
+  // la sala no terminan en 20 s, se anota el paso trabado y se recarga una vez;
+  // si vuelve a pasar enseguida, queda el botón «Reintentar».
+  const [atascado, setAtascado] = useState(false);
+  const cargando = !!sessionId && (cowork.loading || autoJoining);
+  useEffect(() => {
+    if (!cargando) return;
+    const inicio = Date.now();
+    const timer = window.setTimeout(() => {
+      const paso = autoJoining ? "unirse" : (cowork.pasoDeCarga() || "cargar");
+      anotarAtasco(paso, Math.round((Date.now() - inicio) / 1000));
+      if (queHacerConElAtasco({ ultimaRecarga: ultimaRecargaPorAtasco(), ahora: Date.now() }) === "recargar") {
+        marcarRecargaPorAtasco();
+        window.location.reload();
+      } else {
+        setAtascado(true);
+      }
+    }, ATASCO_MS);
+    return () => window.clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cargando, autoJoining]);
+  // El atasco anterior (si lo hubo) se anota para saber la causa. Fuego y olvido.
+  useEffect(() => {
+    const previo = tomarAtascoPrevio();
+    if (!previo) return;
+    type InsertaCorte = (tabla: "llamada_cortes") => {
+      insert: (fila: { sala: string | null; fase: string; motivo: string | null; contexto: Record<string, unknown> }) => PromiseLike<unknown>;
+    };
+    void (supabase.from as unknown as InsertaCorte)("llamada_cortes").insert({
+      sala: sessionId ?? null, fase: "cowork_atascado", motivo: previo.paso,
+      contexto: { segundos: previo.segundos, hace_s: Math.round((Date.now() - previo.t) / 1000), vis: document.visibilityState },
+    });
+  }, [sessionId]);
 
   // Auto-join from invite URL params
   useEffect(() => {
@@ -624,6 +659,16 @@ export default function CoworkPage() {
         cowork={cowork}
         onExit={() => setSearchParams({})}
       />
+    );
+  }
+
+  if (atascado) {
+    return (
+      <div className="flex flex-col items-center justify-center flex-1 min-h-0 gap-3 text-center px-4">
+        <p className="text-base font-semibold">{t("cowork.atasco.titulo")}</p>
+        <p className="text-sm text-muted-foreground max-w-sm">{t("cowork.atasco.desc")}</p>
+        <Button onClick={() => window.location.reload()}>{t("cowork.atasco.reintentar")}</Button>
+      </div>
     );
   }
 

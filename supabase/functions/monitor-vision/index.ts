@@ -53,6 +53,9 @@ Devuelve JSON estricto con esta forma exacta:
 
 REGLAS:
 - Ante la duda, marca lo MENOS acusatorio (usando_celular=false, distraido=false). Solo true si es evidente.
+- Mirar hacia abajo, a un lado o a otro monitor NO es estar distraído: la gente trabaja con teclado y varias pantallas.
+- "distraido" = true SOLO si se ve claramente: dormido, de espaldas, hablando con otra persona, comiendo o fuera de su puesto.
+- "usando_celular" = true SOLO si se ve el teléfono en la mano o frente a la cara.
 - "detalle" en español neutro, máximo una frase.
 - OUTPUT: solo JSON. Sin markdown, sin explicaciones.`;
 
@@ -69,7 +72,9 @@ function faltaDe(v: Veredicto): { tipo: string; detalle: string } | null {
   if (!v.presente) return null; // "se fue" lo cubre el detector gratis del navegador
   if (v.usando_celular) return { tipo: "celular", detalle: v.detalle || "parece estar en el celular" };
   if (v.distraido) return { tipo: "distraido", detalle: v.detalle || "se ve distraído" };
-  if (!v.mirando_pantalla) return { tipo: "no_mira", detalle: v.detalle || "no mira la pantalla" };
+  // «No mira la pantalla» YA NO es falta (11/11/2026): con Flash-Lite salían
+  // 57 faltas en 15 minutos, casi todas de gente mirando su segundo monitor o
+  // el teclado. Solo cuentan el celular y la distracción evidente.
   return null;
 }
 

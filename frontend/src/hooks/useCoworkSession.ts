@@ -192,6 +192,7 @@ export function useCoworkSession(sessionId: string | null) {
   const isHost = myMembership?.role === "host";
 
   // Fetch all data (silent = true skips loading state for realtime refetches)
+  const pasoRef = useRef("");
   const fetchData = useCallback(async (silent = false) => {
     if (!sessionId) return;
     // Esta corrida; si una más nueva empieza, esta deja de escribir estado.
@@ -199,6 +200,8 @@ export function useCoworkSession(sessionId: string | null) {
     const vigente = () => seq === fetchSeqRef.current;
     if (!silent) setLoading(true);
     try {
+      // En qué paso va la carga: si se traba, lib/coworkAtascado.ts lo anota.
+      pasoRef.current = "usuario";
       const { data: { user } } = await supabase.auth.getUser();
       if (!user || !vigente()) return;
 
@@ -208,14 +211,17 @@ export function useCoworkSession(sessionId: string | null) {
       // antes, en cada reconexión (p.ej. tras un reinicio de la base), una
       // consulta fallida vaciaba la sesión/membresías y sacaba al host o al
       // chatter a la pantalla de "Unirse" en medio del turno (el parpadeo).
+      pasoRef.current = "sesion";
       const { data: sess, error: eSess } = await supabase.from("cowork_sessions").select("*").eq("id", sessionId).single();
       if (!vigente()) return;
       if (!eSess && sess) setSession(sess);
 
+      pasoRef.current = "salas";
       const { data: rms, error: eRms } = await supabase.from("cowork_rooms").select("*").eq("session_id", sessionId).order("sort_order");
       if (!vigente()) return;
       if (!eRms && rms) setRooms(rms as CoworkRoom[]);
 
+      pasoRef.current = "miembros";
       const { data: mems, error: eMems } = await supabase.from("cowork_memberships").select("*").eq("session_id", sessionId);
       if (!vigente()) return;
       const memsOk = !eMems && mems ? (mems as CoworkMembership[]) : null;
@@ -224,6 +230,7 @@ export function useCoworkSession(sessionId: string | null) {
         setMyMembership(memsOk.find(m => m.user_id === user.id) || null);
       }
 
+      pasoRef.current = "asignaciones";
       const { data: assigns, error: eAss } = await supabase.from("cowork_room_assignments").select("*").eq("session_id", sessionId).eq("is_active", true);
       if (!vigente()) return;
       if (!eAss && assigns) {
@@ -232,6 +239,7 @@ export function useCoworkSession(sessionId: string | null) {
         setMyAssignment(arr.find(a => a.user_id === user.id && a.is_active) || null);
       }
 
+      pasoRef.current = "pedidos";
       const { data: hReqs, error: eH } = await supabase.from("cowork_host_requests").select("*").eq("session_id", sessionId).neq("status", "resolved").order("created_at", { ascending: false });
       if (!vigente()) return;
       if (!eH && hReqs) setHostRequests(hReqs as HostRequest[]);
@@ -246,6 +254,7 @@ export function useCoworkSession(sessionId: string | null) {
       // migración, hasta entonces se consulta sin tipar la tabla.
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const sinTipar = supabase as unknown as { from: (tabla: string) => any };
+      pasoRef.current = "meets";
       const { data: ms, error: eMs } = await sinTipar.from("cowork_meets")
         .select("*, participantes:cowork_meet_participants(*)")
         .eq("session_id", sessionId).is("ended_at", null).order("started_at", { ascending: false });
@@ -257,6 +266,7 @@ export function useCoworkSession(sessionId: string | null) {
 
       const userIds = memsOk?.map(m => m.user_id) ?? [];
       if (userIds.length) {
+        pasoRef.current = "perfiles";
         const { data: profs, error: eP } = await supabase.from("profiles").select("id, full_name, avatar_url, avatar_seed").in("id", userIds);
         if (!vigente()) return;
         if (!eP && profs) {
@@ -271,6 +281,7 @@ export function useCoworkSession(sessionId: string | null) {
         }
       }
     } finally {
+      pasoRef.current = "";
       if (!silent && vigente()) setLoading(false);
       initialLoadDone.current = true;
     }
@@ -557,5 +568,7 @@ export function useCoworkSession(sessionId: string | null) {
     crearMeetGrupal, terminarMeetGrupal, salirDeMeetGrupal, joinMeetGrupal,
     requestScreenShare, approveScreenShare, claimScreenShareToken, joinOneOnOne, endSession, getHostCode, leaveRoom, setBreak, getPausaAbierta, refetch: fetchData,
     listMyActiveSessions, listMyEndedSessions, leaveSessionById, endSessionById, adminListSessions, incognitoPing, incognitoLeave,
+    /** En qué paso va la carga ("" si no está cargando). Para lib/coworkAtascado.ts. */
+    pasoDeCarga: () => pasoRef.current,
   };
 }
