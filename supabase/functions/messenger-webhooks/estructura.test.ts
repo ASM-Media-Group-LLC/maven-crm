@@ -10,7 +10,7 @@ const leer = (f: string) => Deno.readTextFileSync(aqui(f));
 const codigo = (f: string) =>
   leer(f).replace(/\/\*[\s\S]*?\*\//g, "").split("\n").filter((l) => !/^\s*\/\//.test(l)).map((l) => l.replace(/\s\/\/.*$/, "")).join("\n");
 const RAIZ = new URL("../../../", import.meta.url);
-const NO_TEST = ["index.ts", "despachador.ts", "datos.ts", "feed.ts", "token.ts"];
+const NO_TEST = ["index.ts", "despachador.ts", "datos.ts", "feed.ts", "token.ts", "equipo.ts", "equipo-datos.ts"];
 
 Deno.test("datos.ts: con service_role solo lo del webhook (nunca chat_* ni profiles)", () => {
   const c = codigo("datos.ts");
@@ -68,7 +68,7 @@ Deno.test("feed.ts: el feed del API por su única entrada, como la persona (no u
 });
 
 Deno.test("ningún archivo del despachador arma un cliente, salvo index.ts (y con service_role solo para datos)", () => {
-  for (const f of ["despachador.ts", "datos.ts", "feed.ts", "token.ts"]) assert(!/createClient|SERVICE_ROLE/.test(codigo(f)), f);
+  for (const f of ["despachador.ts", "datos.ts", "feed.ts", "token.ts", "equipo.ts", "equipo-datos.ts"]) assert(!/createClient|SERVICE_ROLE/.test(codigo(f)), f);
   const idx = codigo("index.ts");
   assertEquals([...idx.matchAll(/createClient\(/g)].length, 1);
   assert(idx.includes("leerFeed: leerFeedComoPersona"), "el feed se lee como la persona, no con el cliente de index");
@@ -76,7 +76,7 @@ Deno.test("ningún archivo del despachador arma un cliente, salvo index.ts (y co
 
 Deno.test("logs: solo la plantilla (lineaDeLog), y nunca el mensaje ni el detalle de un error", () => {
   const usos = NO_TEST.flatMap((f) => [...codigo(f).matchAll(/console\.\w+\(([^;\n]*)/g)].map((m) => `${f}: ${m[1]}`));
-  assertEquals(usos.sort(), ["despachador.ts: l))", 'index.ts: lineaDeLog(null, "error", { clase: "interno" }))', 'index.ts: lineaDeLog(null, "sin_configurar"))'].sort());
+  assertEquals(usos.sort(), ["despachador.ts: l))", "equipo.ts: l))", 'index.ts: lineaDeLog(null, "error", { clase: "interno" }))', 'index.ts: lineaDeLog(null, "sin_configurar"))'].sort());
   for (const f of NO_TEST) {
     const c = codigo(f);
     assert(!/\.message\b|\.details\b|\.hint\b|\.detalle\b(?!\))/.test(c.replace(/r\.detalle\)/g, "")), `${f} usa message/details/hint`);
@@ -93,7 +93,7 @@ const CONSULTA = /(?<!\b(?:Array|Uint8Array))\.\s*(from|rpc|schema)\s*\(|\[\s*["
 const TEXTOS = /"(?:[^"\\\n]|\\.)*"|'(?:[^'\\\n]|\\.)*'|`(?:[^`\\]|\\.)*`/g;
 
 Deno.test("solo datos.ts toca la base, siempre con un nombre literal y sin embebidos de otra tabla", () => {
-  for (const f of ["index.ts", "despachador.ts", "feed.ts", "token.ts"]) {
+  for (const f of ["index.ts", "despachador.ts", "feed.ts", "token.ts", "equipo.ts"]) {
     assertEquals([...codigo(f).matchAll(CONSULTA)].length, 0, `${f} consulta la base directo`);
   }
   const c = codigo("datos.ts");
@@ -110,6 +110,8 @@ Deno.test("imports: la tabla fija de los cinco archivos, con cualquier comilla, 
       "../public-api/como-usuario.ts: comoUsuarioConfigurado",
       "./datos.ts: crearDatosDespacho",
       "./despachador.ts: PLAZO_DESPUES_MS,PRESUPUESTO_MS,despachar,lineaDeLog",
+      "./equipo.ts: despacharEquipo",
+      "./equipo-datos.ts: crearDatosEquipo",
       "./feed.ts: fetchConPlazo,leerFeedComoPersona",
       "./token.ts: tokenValido",
     ],
@@ -119,6 +121,8 @@ Deno.test("imports: la tabla fija de los cinco archivos, con cualquier comilla, 
     ],
     "datos.ts": [],
     "token.ts": [],
+    "equipo.ts": [],
+    "equipo-datos.ts": [],
     "feed.ts": [
       "../public-api/como-usuario.ts: clienteComoUsuario",
       "../public-api/recursos-como-usuario.ts: DETALLE_TOPE_CONVERSACIONES,servirComoUsuario",
@@ -134,6 +138,27 @@ Deno.test("imports: la tabla fija de los cinco archivos, con cualquier comilla, 
       .filter((x) => !x.endsWith(": "));
     const mirar = f === "index.ts" ? reales : reales.filter((x) => x.startsWith("../public-api/"));
     assertEquals(mirar.sort(), [...permitido[f]].sort(), f);
+  }
+});
+
+Deno.test("equipo: equipo-datos.ts solo llama a las dos RPC del despachador del equipo; equipo.ts no toca la base", () => {
+  const c = codigo("equipo-datos.ts");
+  assertEquals([...c.matchAll(/\.from\(/g)].length, 0, "equipo-datos.ts lee o escribe una tabla directo");
+  const rpcs = [...c.matchAll(/\.rpc\("([a-z_]+)"/g)].map((m) => m[1]).sort();
+  assertEquals(rpcs, ["equipo_webhooks_anotar", "equipo_webhooks_reclamar"]);
+  assertEquals([...c.matchAll(CONSULTA)].length, rpcs.length, "equipo-datos.ts: una consulta sin nombre literal");
+  // La tarea del equipo entra solo con ?tarea=equipo, después del token y ANTES de la
+  // verificación de los secretos del Messenger (no los usa): la del Messenger no cambia.
+  const idx = codigo("index.ts");
+  const tarea = idx.indexOf('searchParams.get("tarea") === "equipo"');
+  assert(tarea > idx.indexOf("tokenValido(") && tarea < idx.indexOf("comoUsuarioConfigurado()"),
+    "la tarea del equipo no va después del token y antes de los secretos");
+  // Firma y envío: los de _shared/webhook-salida.ts, nunca un fetch propio.
+  const e = codigo("equipo.ts");
+  assert(/encabezadosFirmados\(/.test(e) && /enviarWebhook/.test(e) && !/\bfetch\s*\(/.test(e), "equipo.ts no firma o no manda con webhook-salida");
+  for (const f of ["equipo.ts", "equipo-datos.ts"]) {
+    const imports = [...codigo(f).matchAll(/from\s*"([^"]+)"/g)].map((m) => m[1]).sort();
+    assertEquals(imports, f === "equipo.ts" ? ["../_shared/webhook-salida.ts"] : ["./equipo.ts"], `${f}: imports`);
   }
 });
 
