@@ -921,7 +921,7 @@ export const servirMessenger: Handler = (yo, ctx) => {
 // Aquí se compara con lo que Maven tiene (api_equipo_estado, con la sesión de la
 // persona de la llave) y se le pide a la base que aplique cada cambio, o que solo diga
 // qué haría mientras el interruptor de la agencia esté en ensayo (api_equipo_aplicar).
-// La base vuelve a validar todo: la pared es ella (migración 20261111060000). Lo puro
+// La base vuelve a validar todo: la pared es ella (migración 20261111100000). Lo puro
 // (leer el cuerpo, comparar, armar la respuesta) vive en ./equipo-logica.ts.
 
 /** El 400 de un cuerpo que no sirve para nada (lo de UNA persona va en `rechazados`). */

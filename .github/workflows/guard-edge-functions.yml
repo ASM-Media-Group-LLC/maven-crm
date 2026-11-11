@@ -389,7 +389,7 @@ jobs:
         if: steps.cambios.outputs.correr == 'true'
         run: deno run -A --node-modules-dir=none --no-lock supabase/tests/portal_creadoras.ts
 
-      # Backstage manda el equipo (POST /equipo/sync, migración 20261111060000), con DOS
+      # Backstage manda el equipo (POST /equipo/sync, migración 20261111100000), con DOS
       # agencias: la puerta (key con equipo:write de un admin o dueño), el ensayo que no
       # cambia nada, el interruptor que solo prende el dueño, nadie de otra agencia, nadie
       # sube a admin, el freno de bajas y la papelera como «Eliminar». ~3 s.

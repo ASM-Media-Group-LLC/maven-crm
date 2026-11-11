@@ -1,4 +1,4 @@
-// Backstage manda el equipo (migración 20261111060000_backstage_equipo), probada contra
+// Backstage manda el equipo (migración 20261111100000_backstage_equipo), probada contra
 // un Postgres de verdad (PGlite). El fixture va aquí mismo: solo las tablas y funciones
 // de prod que la migración usa, con sus columnas y sus cuerpos copiados de prod
 // (11/11/2026), y DOS agencias, porque con una sola un fallo de aislamiento no se ve.
@@ -22,7 +22,7 @@
 import { PGlite } from "npm:@electric-sql/pglite@0.3";
 
 const leer = (rel: string) => Deno.readTextFileSync(new URL(rel, import.meta.url));
-const N = "20261111060000_backstage_equipo.sql";
+const N = "20261111100000_backstage_equipo.sql";
 const M = leer(`../migrations/${N}`);
 
 const ok: string[] = [], mal: string[] = [];

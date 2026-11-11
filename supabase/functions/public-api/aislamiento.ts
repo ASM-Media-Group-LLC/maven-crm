@@ -187,7 +187,7 @@ export const FUENTES_POR_RECURSO: Record<string, string[]> = {
     "api_messenger_editar",
     "api_messenger_borrar",
   ],
-  // Las dos RPC DEFINER del equipo (migración 20261111060000): validan la key del claim
+  // Las dos RPC DEFINER del equipo (migración 20261111100000): validan la key del claim
   // `mvk`, el scope equipo:write y que la persona sea admin o dueña de su agencia.
   equipo: ["api_equipo_estado", "api_equipo_aplicar"],
   sales: ["creator_daily_earnings"],

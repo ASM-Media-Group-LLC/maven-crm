@@ -105,7 +105,7 @@ const FIXTURE_HASTA = "20260929180000";
 // el motivo. Si SÍ cambia el Messenger, lo que hay que hacer es sumar al fixture
 // lo que le falta.
 const NO_TOCAN_EL_MESSENGER: Record<string, string> = {
-  "20261111060000_backstage_equipo.sql":
+  "20261111100000_backstage_equipo.sql":
     "Backstage manda el equipo (POST /equipo/sync): el interruptor, la bitácora y las RPC api_equipo_*. Entra a " +
     "esta cadena solo porque cambia rol, nivel, horario y la papelera de profiles/user_roles y lee api_keys, pero " +
     "usa es_admin_o_dueno, roles_config, tenant_owners y cuenta_eventos, que este fixture no trae; no toca nada del " +
