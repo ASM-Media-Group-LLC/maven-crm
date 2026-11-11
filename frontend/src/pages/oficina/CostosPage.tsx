@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import {
-  AlertTriangle, ArrowLeft, CalendarClock, CheckCircle2, CircleDashed, Loader2, PiggyBank, PlugZap, RefreshCw, Wallet, XCircle,
+  AlertTriangle, ArrowLeft, CheckCircle2, CircleDashed, Loader2, PlugZap, RefreshCw, Wallet, XCircle,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -11,10 +11,8 @@ import { PageHeader } from "@/components/ui/page-header";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useLanguage } from "@/hooks/useLanguage";
 import type { TranslationKey } from "@/lib/i18n";
-import {
-  CATEGORIAS, dondeAhorrar, hacePasMasDe, loQueViene, mensual, peor, resumenCostos, semaforoDeChequeo, usd,
-  type ChequeoVivo, type MesCosto, type Semaforo, type ServicioCosto,
-} from "@/lib/costos";
+import { hacePasMasDe, peor, semaforoDeChequeo, type ChequeoVivo, type Semaforo } from "@/lib/costos";
+import TableroCostos from "@/components/costos/TableroCostos";
 
 // COSTOS Y CONEXIONES (Alvaro, 11/11/2026). Solo el dueño (la ruta usa
 // soloDueno y la base también lo exige: RLS de costos_* y conexiones_estado()).
@@ -30,14 +28,6 @@ const sinTipar = supabase as unknown as { from: (t: string) => any; rpc: (f: str
 const VISTAS = ["costos", "conexiones"] as const;
 type Vista = (typeof VISTAS)[number];
 
-const hoyEnColombia = () => new Date().toLocaleDateString("sv-SE", { timeZone: "America/Bogota" });
-
-const CLAVE_CATEGORIA: Record<string, TranslationKey> = {
-  ia: "oficina.costos.cat.ia", servidores: "oficina.costos.cat.servidores", correos: "oficina.costos.cat.correos", otras: "oficina.costos.cat.otras",
-};
-const CLAVE_FUENTE: Record<string, TranslationKey> = {
-  factura: "oficina.costos.fuente.factura", estimado: "oficina.costos.fuente.estimado", falta: "oficina.costos.fuente.falta",
-};
 const CLAVE_CONEXION: Record<string, TranslationKey> = {
   app: "oficina.conexiones.app", livekit: "oficina.conexiones.livekit", nas: "oficina.conexiones.nas",
   google_ia: "oficina.conexiones.google", resend: "oficina.conexiones.resend", zoho: "oficina.conexiones.zoho",
@@ -72,147 +62,6 @@ function Fallo({ onReintentar }: { onReintentar: () => void }) {
 }
 
 const Cargando = () => <div className="flex items-center justify-center py-8"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>;
-
-function Cifra({ valor, etiqueta, nota, tono }: { valor: string; etiqueta: string; nota?: string; tono?: "alerta" | "bien" }) {
-  return (
-    <div className={`vidrio flex flex-col gap-1 p-4 ${tono === "alerta" ? "border-warning/40" : ""}`}>
-      <span className={`font-display text-2xl font-bold tabular-nums ${tono === "alerta" ? "text-warning" : tono === "bien" ? "text-success" : ""}`}>{valor}</span>
-      <span className="text-xs text-muted-foreground">{etiqueta}</span>
-      {nota && <span className="text-[11px] text-muted-foreground/80">{nota}</span>}
-    </div>
-  );
-}
-
-function Pastilla({ fuente }: { fuente: string }) {
-  const { t } = useLanguage();
-  const tono = fuente === "factura" ? "border-success/40 text-success" : fuente === "estimado" ? "border-warning/40 text-warning" : "border-destructive/40 text-destructive";
-  return <span className={`inline-block whitespace-nowrap rounded-full border px-2 py-0.5 text-[10px] font-medium ${tono}`}>{t(CLAVE_FUENTE[fuente] ?? "oficina.costos.fuente.falta")}</span>;
-}
-
-function useCostos() {
-  return useQuery({
-    queryKey: ["costos"],
-    staleTime: 5 * 60_000,
-    retry: 1,
-    queryFn: async () => {
-      const [s, m] = await Promise.all([
-        sinTipar.from("costos_servicios").select("*").order("orden"),
-        sinTipar.from("costos_mensuales").select("mes, servicio_id, monto_usd"),
-      ]);
-      if (s.error) throw new Error(s.error.message);
-      if (m.error) throw new Error(m.error.message);
-      return { servicios: (s.data ?? []) as ServicioCosto[], meses: (m.data ?? []) as MesCosto[] };
-    },
-  });
-}
-
-function VistaCostos() {
-  const { t } = useLanguage();
-  const q = useCostos();
-  if (q.isLoading) return <Cargando />;
-  if (q.isError || !q.data) return <Fallo onReintentar={() => void q.refetch()} />;
-  const hoy = hoyEnColombia();
-  const { servicios, meses } = q.data;
-  const r = resumenCostos(servicios, meses, hoy);
-  const viene = loQueViene(servicios, hoy);
-  const ahorrar = dondeAhorrar(servicios);
-  const faltantes = servicios.filter((s) => s.activo && s.es_maven && s.monto_usd === null);
-  const fuera = servicios.filter((s) => s.activo && !s.es_maven);
-
-  return (
-    <div className="flex flex-col gap-4">
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <Cifra valor={usd(r.total)} etiqueta={t("oficina.costos.total")}
-          nota={r.faltan ? t("oficina.costos.totalFaltan", { n: r.faltan }) : undefined} />
-        <Cifra valor={r.mesPasado === null ? "—" : usd(r.mesPasado)} etiqueta={t("oficina.costos.mesPasado")}
-          nota={r.cambioPct === null ? t("oficina.costos.sinMesPasado") : t("oficina.costos.cambio", { p: r.cambioPct > 0 ? `+${r.cambioPct}` : String(r.cambioPct) })}
-          tono={r.cambioPct !== null && r.cambioPct > 20 ? "alerta" : undefined} />
-        <Cifra valor={usd(r.proximo)} etiqueta={t("oficina.costos.proximo")} tono={r.proximo > r.total ? "alerta" : undefined} />
-        <Cifra valor={usd(r.ahorro)} etiqueta={t("oficina.costos.ahorro")} tono="bien" />
-      </div>
-
-      {faltantes.length > 0 && (
-        <div role="status" className="flex items-start gap-3 rounded-panel border border-warning/40 bg-warning/10 p-3 text-sm">
-          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-warning" />
-          <span className="min-w-0">{t("oficina.costos.faltanFacturas", { lista: faltantes.map((s) => s.proveedor).join(", ") })}</span>
-        </div>
-      )}
-
-      <Bloque icono={Wallet} titulo={t("oficina.costos.porServicio")} nota={t("oficina.costos.porServicioNota")}>
-        <div className="flex flex-col gap-4">
-          {CATEGORIAS.map((cat) => {
-            const filas = servicios.filter((s) => s.activo && s.es_maven && s.categoria === cat);
-            if (!filas.length) return null;
-            return (
-              <div key={cat} className="flex flex-col gap-2">
-                <h3 className="text-xs font-semibold text-primary">{t(CLAVE_CATEGORIA[cat])}</h3>
-                <ul className="flex flex-col gap-2">
-                  {filas.map((s) => {
-                    const m = mensual(s);
-                    return (
-                      <li key={s.id} className="grid gap-1 rounded-control border border-border/40 p-2.5 md:grid-cols-[minmax(0,14rem)_7rem_5rem_minmax(0,1fr)] md:items-start md:gap-3">
-                        <div className="min-w-0"><div className="text-sm font-medium">{s.nombre}</div><div className="text-[11px] text-muted-foreground">{s.proveedor}</div></div>
-                        <div className="text-sm tabular-nums">
-                          {m === null ? "—" : usd(m)}
-                          {s.ciclo === "anual" && s.monto_usd !== null && <div className="text-[11px] text-muted-foreground">{t("oficina.costos.alAno", { m: usd(Number(s.monto_usd)) })}</div>}
-                        </div>
-                        <div><Pastilla fuente={s.fuente} /></div>
-                        <p className="min-w-0 text-xs text-muted-foreground">{s.detalle}</p>
-                      </li>
-                    );
-                  })}
-                </ul>
-              </div>
-            );
-          })}
-        </div>
-      </Bloque>
-
-      <div className="grid gap-4 lg:grid-cols-2">
-        <Bloque icono={CalendarClock} titulo={t("oficina.costos.viene")} nota={t("oficina.costos.vieneNota")}>
-          {viene.length === 0 ? <p className="text-sm text-muted-foreground">{t("oficina.costos.nadaViene")}</p> : (
-            <ul className="flex flex-col gap-2">
-              {viene.map((v) => (
-                <li key={v.servicio.id} className="flex items-start gap-3 rounded-control border border-border/40 p-2.5">
-                  <span className="w-20 shrink-0 text-xs font-semibold tabular-nums">{v.fecha}</span>
-                  <div className="min-w-0 flex-1">
-                    <div className="text-sm font-medium">{v.servicio.nombre}{v.monto !== null && <span className={`ml-2 tabular-nums ${v.cambia ? "text-warning" : "text-muted-foreground"}`}>{usd(v.monto)}{v.cambia ? t("oficina.costos.alMesCorto") : ""}</span>}</div>
-                    {v.servicio.proximo_detalle && <p className="text-xs text-muted-foreground">{v.servicio.proximo_detalle}</p>}
-                  </div>
-                </li>
-              ))}
-            </ul>
-          )}
-        </Bloque>
-
-        <Bloque icono={PiggyBank} titulo={t("oficina.costos.ahorrar")} nota={t("oficina.costos.ahorrarNota")}>
-          {ahorrar.length === 0 ? <p className="text-sm text-muted-foreground">{t("oficina.costos.nadaAhorrar")}</p> : (
-            <ul className="flex flex-col gap-2">
-              {ahorrar.map((s) => (
-                <li key={s.id} className="flex items-start gap-3 rounded-control border border-border/40 p-2.5">
-                  <span className="w-24 shrink-0 text-sm font-semibold tabular-nums text-success">{usd(Number(s.ahorro_usd))}{t("oficina.costos.alMesCorto")}</span>
-                  <div className="min-w-0 flex-1"><div className="text-sm font-medium">{s.nombre}</div><p className="text-xs text-muted-foreground">{s.ahorro_detalle}</p></div>
-                </li>
-              ))}
-            </ul>
-          )}
-        </Bloque>
-      </div>
-
-      {fuera.length > 0 && (
-        <Bloque icono={Wallet} titulo={t("oficina.costos.fuera", { m: usd(r.fuera) })} nota={t("oficina.costos.fueraNota")}>
-          <ul className="flex flex-col gap-2">
-            {fuera.map((s) => (
-              <li key={s.id} className="text-sm"><span className="font-medium">{s.nombre}</span> · <span className="tabular-nums">{usd(mensual(s) ?? 0)}</span><p className="text-xs text-muted-foreground">{s.detalle}</p></li>
-            ))}
-          </ul>
-        </Bloque>
-      )}
-
-      <p className="text-[11px] text-muted-foreground">{t("oficina.costos.pie")}</p>
-    </div>
-  );
-}
 
 // ── Conexiones ─────────────────────────────────────────────────────────────
 
@@ -382,7 +231,7 @@ export default function CostosPage() {
           <TabsTrigger value="costos">{t("oficina.costos.tab.costos")}</TabsTrigger>
           <TabsTrigger value="conexiones">{t("oficina.costos.tab.conexiones")}</TabsTrigger>
         </TabsList>
-        <TabsContent value="costos" className="mt-0">{vista === "costos" && <VistaCostos />}</TabsContent>
+        <TabsContent value="costos" className="mt-0">{vista === "costos" && <TableroCostos />}</TabsContent>
         <TabsContent value="conexiones" className="mt-0">{vista === "conexiones" && <VistaConexiones />}</TabsContent>
       </Tabs>
     </Page>

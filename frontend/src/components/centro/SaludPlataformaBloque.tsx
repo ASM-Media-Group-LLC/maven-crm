@@ -2,7 +2,9 @@ import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { formatDistanceToNowStrict } from "date-fns";
 import { es as esLocale } from "date-fns/locale";
-import { Activity, AlertCircle, CheckCircle2, CloudOff, Database, Mail, Users, UserMinus, HardDrive, Loader2 } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { Activity, AlertCircle, ArrowRight, CheckCircle2, CloudOff, Database, Mail, Users, UserMinus, HardDrive, Loader2, Wallet } from "lucide-react";
+import { mensual, usd, type ServicioCosto } from "@/lib/costos";
 import { SaludDiagnosticoModal } from "./SaludDiagnosticoModal";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -250,6 +252,23 @@ export default function SaludPlataformaBloque() {
   // pero igual blindamos).
   // Solo el dueño (Alvaro, 10/11: «Salud y NAS solo tú»). Los admins conservan
   // el resto del Centro, pero no el estado técnico de la plataforma.
+  // Gastos de la plataforma (Alvaro, 11/11): el total del mes, a la vista en el
+  // inicio; el detalle y las conexiones viven en /oficina/costos.
+  const navegar = useNavigate();
+  const gastos = useQuery({
+    queryKey: ["costos-inicio"],
+    enabled: esDueno === true,
+    staleTime: 10 * 60_000,
+    queryFn: async () => {
+      const { data, error } = await (supabase as unknown as { from: (t: string) => { select: (c: string) => Promise<{ data: unknown; error: { message: string } | null }> } })
+        .from("costos_servicios").select("monto_usd, ciclo, es_maven, activo");
+      if (error) throw new Error(error.message);
+      const filas = ((data ?? []) as Pick<ServicioCosto, "monto_usd" | "ciclo" | "es_maven" | "activo">[]).filter((f) => f.activo && f.es_maven);
+      const total = filas.reduce((a, f) => a + (mensual(f) ?? 0), 0);
+      return { total: Math.round(total * 100) / 100, faltan: filas.filter((f) => mensual(f) === null).length };
+    },
+  });
+
   if (esDueno !== true) return null;
 
   return (
@@ -273,9 +292,32 @@ export default function SaludPlataformaBloque() {
 
       {/* Bloque técnico (solo dueño): crons + nombres de proveedores. */}
       {verDetalleTecnico && (
-        <div className="mt-2.5 grid gap-2.5 sm:grid-cols-2">
+        <div className="mt-2.5 grid gap-2.5 sm:grid-cols-2 lg:grid-cols-3">
           <Chequeo icono={Database} titulo={t("dashboard.centro.salud.crons")} estado={cronEstado} detalle={cronDetalle} loading={cargando} />
-          <Chequeo icono={Activity} titulo={t("dashboard.centro.salud.infra")} estado="ok" detalle={t("dashboard.centro.salud.infraDet")} />
+          <Chequeo icono={Activity} titulo={t("dashboard.centro.salud.infra")} estado="ok" detalle={t("dashboard.centro.salud.infraVer")}
+            onClick={() => navegar("/oficina/costos?vista=conexiones")} />
+          <button type="button" onClick={() => navegar("/oficina/costos")}
+            className="vidrio vidrio-glow glow-b w-full cursor-pointer p-3 text-left transition hover:brightness-110">
+            <div className="v-cont flex items-start gap-3">
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-panel bg-primary/10 text-primary"><Wallet className="h-4.5 w-4.5" /></span>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2">
+                  <span className="truncate text-sm font-semibold">{t("dashboard.centro.salud.gastos")}</span>
+                  <ArrowRight className="h-3.5 w-3.5 text-muted-foreground" />
+                </div>
+                {gastos.isLoading ? <Loader2 className="mt-1 h-3.5 w-3.5 animate-spin text-muted-foreground" />
+                  : gastos.isError || !gastos.data ? <p className="mt-0.5 text-[11px] text-destructive">{t("dashboard.centro.salud.gastosFallo")}</p>
+                  : (
+                    <>
+                      <div className="font-display text-lg font-bold tabular-nums leading-tight">{t("dashboard.centro.salud.gastosTotal", { m: usd(gastos.data.total) })}</div>
+                      <p className="text-[11px] text-muted-foreground">
+                        {gastos.data.faltan ? t("dashboard.centro.salud.gastosFaltan", { n: gastos.data.faltan }) : t("dashboard.centro.salud.gastosVer")}
+                      </p>
+                    </>
+                  )}
+              </div>
+            </div>
+          </button>
         </div>
       )}
 
