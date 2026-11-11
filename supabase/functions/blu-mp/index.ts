@@ -82,6 +82,17 @@ function bluQuery(
   });
 }
 
+/** ¿El JWT ya venció? Lee solo su parte pública (exp). Si no se puede leer, no se da por vencido. */
+function jwtVencido(t: string): boolean {
+  try {
+    const cuerpo = t.split(".")[1];
+    const j = JSON.parse(atob(cuerpo.replace(/-/g, "+").replace(/_/g, "/").padEnd(Math.ceil(cuerpo.length / 4) * 4, "=")));
+    return typeof j.exp === "number" && j.exp * 1000 < Date.now();
+  } catch {
+    return false;
+  }
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: cors(req) });
 
@@ -131,7 +142,11 @@ Deno.serve(async (req) => {
   const semilla = limpiar(agency === "massive"
     ? Deno.env.get("BLU_JWT_MASSIVE")
     : Deno.env.get("BLU_JWT"));
-  const token = limpiar(sess?.token as string | undefined) ?? semilla;
+  // La sesión guardada manda mientras no esté vencida. Vencida, se usa la
+  // semilla: si no, renovar BLU_JWT no servía de nada porque la fila vieja de
+  // blu_session seguía ganando (mismo arreglo que ya tiene infra/blu-bridge).
+  const guardado = limpiar(sess?.token as string | undefined);
+  const token = guardado && !jwtVencido(guardado) ? guardado : (semilla ?? guardado);
   if (!token) {
     return json(req, {
       error: `sin sesión de BLU para "${agency}". Falta el secreto ${agency === "massive" ? "BLU_JWT_MASSIVE" : "BLU_JWT"}.`,
