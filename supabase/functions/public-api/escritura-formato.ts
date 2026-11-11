@@ -27,7 +27,8 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 export type Accion =
   | "me"
   | "bandeja" | "conversacion" | "mensajes" | "feed" | "personas"
-  | "abrir" | "enviar" | "editar" | "borrar";
+  | "abrir" | "enviar" | "editar" | "borrar"
+  | "equipo_sync";
 
 /** Las rutas del Messenger: el camino (null = un id) y qué hace cada método. */
 const RUTAS_MESSENGER: readonly { camino: readonly (string | null)[]; metodos: Partial<Record<Metodo, Accion>> }[] = [
@@ -39,10 +40,15 @@ const RUTAS_MESSENGER: readonly { camino: readonly (string | null)[]; metodos: P
   { camino: ["people"], metodos: { GET: "personas" } },
 ];
 
+/** Las rutas del equipo que manda Backstage (/equipo/*): solo POST /equipo/sync. */
+const RUTAS_EQUIPO: readonly { camino: readonly (string | null)[]; metodos: Partial<Record<Metodo, Accion>> }[] = [
+  { camino: ["sync"], metodos: { POST: "equipo_sync" } },
+];
+
 /** Lo que pide messenger:write además de messenger:read: escribir y el directorio
  *  (que solo sirve para abrir chats: una key de solo lectura no recibe la lista
  *  entera ni puede deducir, comparándola en el tiempo, a quién bloquearon). */
-const ACCIONES_DE_ESCRITURA: ReadonlySet<Accion> = new Set(["abrir", "enviar", "editar", "borrar", "personas"]);
+const ACCIONES_DE_ESCRITURA: ReadonlySet<Accion> = new Set(["abrir", "enviar", "editar", "borrar", "personas", "equipo_sync"]);
 
 export type RutaResuelta =
   | { ok: true; accion: Accion; lectura: boolean; escritura: boolean }
@@ -52,13 +58,15 @@ export type RutaResuelta =
 /** Qué hace (método, ruta) en un recurso como_usuario y qué scopes pide: `lectura`
  *  (el scope de lectura del recurso) y `escritura` (además, el de escritura). Una
  *  ruta que existe con otro método da 405 con los métodos que sí acepta; una que no
- *  existe, 404. /me solo se lee. Sin tocar la base: corre antes que nada. */
+ *  existe, 404. /me solo se lee; /equipo solo se escribe (POST /equipo/sync). Sin
+ *  tocar la base: corre antes que nada. */
 export function scopesDeLaRuta(recurso: string, metodo: Metodo, ruta: readonly string[]): RutaResuelta {
   if (recurso === "me") {
     return metodo === "GET" ? { ok: true, accion: "me", lectura: false, escritura: false } : { ok: false, estado: 405, permitidos: ["GET"] };
   }
-  if (recurso !== "messenger") return { ok: false, estado: 404 };
-  const r = RUTAS_MESSENGER.find((x) =>
+  if (recurso !== "messenger" && recurso !== "equipo") return { ok: false, estado: 404 };
+  const rutas = recurso === "equipo" ? RUTAS_EQUIPO : RUTAS_MESSENGER;
+  const r = rutas.find((x) =>
     x.camino.length === ruta.length && x.camino.every((parte, i) => parte === null ? ruta[i] !== "" : parte === ruta[i])
   );
   if (!r) return { ok: false, estado: 404 };

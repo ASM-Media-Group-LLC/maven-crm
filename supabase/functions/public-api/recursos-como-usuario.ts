@@ -61,6 +61,14 @@ import {
   textoGuardable,
 } from "./escritura-formato.ts";
 import { type ClaveSinVars, type Idioma, msg } from "./mensajes.ts";
+import {
+  armarRespuesta,
+  calcularCambios,
+  leerEstado,
+  leerResultadoDeLaBase,
+  leerSync,
+  type ProblemaDelEquipo,
+} from "./equipo-logica.ts";
 
 export type Contexto = {
   /** De qué agencia es la llave (api_keys.tenant_id). */
@@ -902,12 +910,65 @@ export const servirMessenger: Handler = (yo, ctx) => {
     case "editar": return editar(yo, ctx);
     case "borrar": return borrar(yo, ctx);
     case "me": return Promise.resolve(falla("la ruta de /me llegó al Messenger"));
+    case "equipo_sync": return Promise.resolve(falla("la ruta de /equipo llegó al Messenger"));
   }
+};
+
+// ─── El equipo que manda Backstage (POST /equipo/sync) ────────────────────────
+//
+// Backstage manda la lista COMPLETA del equipo (decisión de Alvaro, 11/11/2026:
+// Backstage manda sobre las personas, el rol, el equipo y a quién reporta cada una).
+// Aquí se compara con lo que Maven tiene (api_equipo_estado, con la sesión de la
+// persona de la llave) y se le pide a la base que aplique cada cambio, o que solo diga
+// qué haría mientras el interruptor de la agencia esté en ensayo (api_equipo_aplicar).
+// La base vuelve a validar todo: la pared es ella (migración 20261111100000). Lo puro
+// (leer el cuerpo, comparar, armar la respuesta) vive en ./equipo-logica.ts.
+
+/** El 400 de un cuerpo que no sirve para nada (lo de UNA persona va en `rechazados`). */
+function problemaDelEquipo(idioma: Idioma, p: ProblemaDelEquipo): Resultado {
+  switch (p.tipo) {
+    case "sin_cuerpo":
+      return { ok: false, estado: 400, error: "invalid_json", mensaje: msg(idioma, "cuerpo_no_es_objeto") };
+    case "campo_desconocido":
+      return { ok: false, estado: 400, error: "unknown_field", mensaje: msg(idioma, "campo_desconocido", { campos: p.campos.join(", ") }) };
+    case "campo_invalido":
+      return { ok: false, estado: 400, error: "invalid_field", mensaje: msg(idioma, "campo_invalido", { campo: p.campo }) };
+    case "personas_invalidas":
+      return { ok: false, estado: 400, error: "invalid_field", mensaje: msg(idioma, "equipo_personas_invalidas") };
+  }
+}
+
+/** POST /equipo/sync — la lista del equipo según Backstage. Sin Idempotency-Key: el
+ *  envío es la foto completa, así que repetirlo da lo mismo. */
+async function sincronizarEquipo(yo: SupabaseClient, ctx: Contexto): Promise<Resultado> {
+  const leido = leerSync(ctx.cuerpo);
+  if (!leido.ok) return problemaDelEquipo(ctx.idioma, leido.problema);
+  const estado = await llamar(yo.rpc("api_equipo_estado", {}));
+  if (estado.error) return resultadoDeError(ctx.idioma, clasificarErrorDeEscritura(estado.error));
+  const maven = leerEstado(estado.data);
+  if (!maven) return falla("api_equipo_estado devolvió otra forma");
+  const { resumen, paraLaBase } = calcularCambios(maven, leido.pedido);
+  const r = await llamar(yo.rpc("api_equipo_aplicar", { _cambios: paraLaBase, _resumen: resumen, _ensayo: leido.pedido.ensayo }));
+  if (r.error) return resultadoDeError(ctx.idioma, clasificarErrorDeEscritura(r.error));
+  const base = leerResultadoDeLaBase(r.data);
+  if (!base) return falla("api_equipo_aplicar devolvió otra forma");
+  return { ok: true, estado: 200, cuerpo: armarRespuesta(resumen, base) };
+}
+
+/** /equipo/* — hoy solo POST /equipo/sync. */
+export const servirEquipo: Handler = (yo, ctx) => {
+  const ruta = scopesDeLaRuta("equipo", ctx.metodo, ctx.ruta);
+  if (!ruta.ok && ruta.estado === 405) return Promise.resolve(metodoNoPermitido(ctx.idioma, ruta.permitidos));
+  if (!ruta.ok || ruta.accion !== "equipo_sync") {
+    return Promise.resolve({ ok: false, estado: 404, error: "not_found", mensaje: msg(ctx.idioma, "equipo_rutas") });
+  }
+  return sincronizarEquipo(yo, ctx);
 };
 
 export const RECURSOS_COMO_USUARIO: Record<string, Handler> = {
   me: servirMe,
   messenger: servirMessenger,
+  equipo: servirEquipo,
 };
 
 /** Los scopes de cada recurso: el de leer (null = ninguno) y el de escribir (null =
@@ -920,6 +981,9 @@ export type ScopesDelRecurso = { lectura: string | null; escritura: string | nul
 export const SCOPE_REQUERIDO: Record<string, ScopesDelRecurso> = {
   me: { lectura: null, escritura: null },
   messenger: { lectura: "messenger:read", escritura: "messenger:write" },
+  // Un solo scope para todo /equipo: no tiene lectura aparte (equipo:write ya ve, en
+  // la respuesta, a las personas que compara).
+  equipo: { lectura: "equipo:write", escritura: "equipo:write" },
 };
 
 /** Arma la entrada: verifica método, scopes y sesión, y recién ahí despacha.

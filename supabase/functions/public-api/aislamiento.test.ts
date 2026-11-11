@@ -46,6 +46,7 @@ const PUBLIC_API = leer("./index.ts");
 const RECURSOS_USUARIO = leer("./recursos-como-usuario.ts");
 const FORMATO_MESSENGER = leer("./messenger-formato.ts");
 const FORMATO_ESCRITURA = leer("./escritura-formato.ts");
+const EQUIPO_LOGICA = leer("./equipo-logica.ts");
 const COMO_USUARIO = leer("./como-usuario.ts");
 const PETICION = leer("./peticion.ts");
 const MENSAJES_TS = leer("./mensajes.ts");
@@ -137,7 +138,11 @@ Deno.test("hoy ningún recurso de DATOS dice estar aislado (y con 2 agencias se 
   //    chat_conversations / chat_participants / chat_messages. Como la base todavía
   //    no impide conversaciones con gente de otra agencia, declara
   //    pendienteConVariasAgencias: con dos o más agencias se apaga (test de abajo).
-  const PROMOVIDOS_CON_VERIFICACION: string[] = ["me", "messenger"];
+  //  * equipo — 11/11/2026. POST /equipo/sync (Backstage manda el equipo), con la sesión
+  //    de la persona de la llave y por dos RPC DEFINER que cruzan todo con la agencia de
+  //    la llave (api_equipo_llave: scope equipo:write, persona vigente y admin o dueña de
+  //    ESA agencia). Declara pendienteConVariasAgencias: con dos o más se apaga.
+  const PROMOVIDOS_CON_VERIFICACION: string[] = ["equipo", "me", "messenger"];
 
   const promovidos = Object.entries(AISLAMIENTO_POR_RECURSO)
     .filter(([, m]) => m.tipo !== "sin_agencia")
@@ -353,7 +358,7 @@ Deno.test("como_usuario: los handlers nunca ven service_role", () => {
   // Las únicas excepciones: las piezas PURAS del Messenger y los textos, que los tests
   // de abajo obligan a no importar nada ni tocar la base.
   const importsDeValores = (RECURSOS_USUARIO.match(/^\s*import\s+(?!type\b)[^;]*/gm) ?? [])
-    .filter((i) => !/from\s+"\.\/(messenger-formato|escritura-formato|mensajes)\.ts"\s*$/.test(i.trim()));
+    .filter((i) => !/from\s+"\.\/(messenger-formato|escritura-formato|equipo-logica|mensajes)\.ts"\s*$/.test(i.trim()));
   assertEquals(importsDeValores, [], "recursos-como-usuario.ts importa valores, no solo tipos");
   const reexports = RECURSOS_USUARIO.match(/^\s*export\s*(\*|\{)[^;]*\bfrom\b/gm) ?? [];
   assertEquals(reexports, [], "recursos-como-usuario.ts reexporta de otro archivo");
@@ -458,6 +463,26 @@ Deno.test("escritura-formato.ts es PURO: no importa nada ni toca la base", () =>
   }
 });
 
+Deno.test("equipo-logica.ts es PURO: no importa nada ni toca la base", () => {
+  // recursos-como-usuario.ts importa valores de aquí: si esto importara algo, por aquí
+  // entraría un cliente con service_role. ("admin" sí aparece: es el nivel y el rol.)
+  for (const prohibido of [
+    /^\s*import\b/m, /\bimport\s*\(/, /^\s*export\s*(\*|\{)[^;]*\bfrom\b/m, /\brequire\s*\(/,
+    /SupabaseClient/, /createClient/, /\bDeno\./, /\bfetch\s*\(/, /service_?role/i,
+    /\.from\(\s*["'`]/, /\.rpc\(/, /\badmin\s*\./, /\byo\b/, /\bglobalThis\b/, /\beval\s*\(/, /\bFunction\s*\(/,
+  ]) {
+    assert(!prohibido.test(EQUIPO_LOGICA), `equipo-logica.ts usa ${prohibido}`);
+  }
+});
+
+Deno.test("equipo: con DOS agencias se apaga; su scope es equipo:write y se escribe solo por POST /equipo/sync", () => {
+  assert(decidir("equipo", 1).ok, "con una agencia no se sirve");
+  const v = decidir("equipo", 2);
+  assert(!v.ok && v.estado === 403, "con 2 agencias se sirvió /equipo");
+  assertEquals(SCOPE_REQUERIDO.equipo, { lectura: "equipo:write", escritura: "equipo:write" });
+  assert(isValidScope("equipo:write"), "equipo:write no está en el catálogo");
+});
+
 Deno.test("messenger-formato.ts es PURO: no importa nada ni toca la base", () => {
   for (const prohibido of [
     /^\s*import\b/m, /\bimport\s*\(/, /SupabaseClient/, /createClient/, /Deno\.env/, /\bfetch\s*\(/,
@@ -500,6 +525,7 @@ Deno.test("lo como_usuario escribe SOLO por estas RPC, una en cada handler, por 
   const PERMITIDAS = [
     "current_tenant_id", "get_last_messages", "messenger_unread_counts", "api_mi_llave", "messenger_directorio", "api_escritura_habilitada",
     "api_messenger_enviar", "api_messenger_abrir_directo", "api_messenger_editar", "api_messenger_borrar",
+    "api_equipo_estado", "api_equipo_aplicar",
   ];
   assertEquals([...new Set(rpcs)].filter((r) => !PERMITIDAS.includes(r)), [], "una función de base no autorizada");
   assert(!/\.(from|rpc)\(\s*[^"\s]/.test(RECURSOS_USUARIO), "from()/rpc() con un nombre que no es literal");
@@ -517,6 +543,7 @@ Deno.test("lo como_usuario escribe SOLO por estas RPC, una en cada handler, por 
     api_messenger_enviar: "enviar", api_messenger_abrir_directo: "abrirChat",
     api_messenger_editar: "editar", api_messenger_borrar: "borrar", messenger_directorio: "personasDelDirectorio",
     api_escritura_habilitada: "personasDelDirectorio",
+    api_equipo_estado: "sincronizarEquipo", api_equipo_aplicar: "sincronizarEquipo",
   };
   for (const [rpc, handler] of Object.entries(DUENO)) {
     const llamadas = RECURSOS_USUARIO.match(new RegExp(`\\.rpc\\(\\s*"${rpc}"`, "g")) ?? [];
@@ -528,8 +555,8 @@ Deno.test("lo como_usuario escribe SOLO por estas RPC, una en cada handler, por 
     assertEquals((RECURSOS_USUARIO.match(new RegExp(`"${rpc}"`, "g")) ?? []).length, 1, `${rpc} aparece fuera de ${handler}`);
   }
   // Las de escritura no aparecen en ningún otro archivo de public-api.
-  for (const [archivo, src] of [["index.ts", PUBLIC_API], ["escritura-formato.ts", FORMATO_ESCRITURA], ["messenger-formato.ts", FORMATO_MESSENGER]]) {
-    assert(!/"api_messenger_|"api_idem_/.test(src), `${archivo} nombra una RPC de escritura`);
+  for (const [archivo, src] of [["index.ts", PUBLIC_API], ["escritura-formato.ts", FORMATO_ESCRITURA], ["messenger-formato.ts", FORMATO_MESSENGER], ["equipo-logica.ts", EQUIPO_LOGICA]]) {
+    assert(!/"api_messenger_|"api_idem_|"api_equipo_/.test(src), `${archivo} nombra una RPC de escritura`);
   }
 });
 

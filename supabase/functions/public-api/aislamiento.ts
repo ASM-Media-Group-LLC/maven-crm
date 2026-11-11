@@ -28,8 +28,8 @@
 //                    Con UNA agencia todas son de ella y se sirven igual que siempre.
 //                    Con dos o más, el recurso se APAGA en vez de entregar datos ajenos.
 //
-// ⚠️ HOY TODOS LOS RECURSOS DE DATOS SON `sin_agencia`, Y ES A PROPÓSITO (el único
-// que no, /me, devuelve a la persona misma y corre `como_usuario`). Tener una columna
+// ⚠️ HOY TODOS LOS RECURSOS DE DATOS SON `sin_agencia`, Y ES A PROPÓSITO (los que no,
+// /me, /messenger y /equipo, corren `como_usuario` con la sesión de la persona). Tener una columna
 // no alcanza: tiene que decir la verdad. La revisión del 24/09 lo mostró con /sales:
 // creator_daily_earnings SÍ tiene tenant_id, pero con un DEFAULT fijo (el id de la
 // primera agencia) que ningún importador sobrescribe, y sus índices únicos son para
@@ -89,6 +89,16 @@ export const AISLAMIENTO_POR_RECURSO: MapaDeAislamiento = congelar({
     tipo: "como_usuario",
     pendienteConVariasAgencias: "tenant_members todavía no dice la verdad (handle_new_user mete a toda " +
       "cuenta nueva en la agencia original); la base también apaga la escritura por API con 2 o más agencias",
+  },
+  // El equipo que manda Backstage (POST /equipo/sync, 11/11/2026), con la sesión de la
+  // persona de la llave. La base cruza TODO con la agencia de la llave (api_keys.tenant_id
+  // contra tenant_members): api_equipo_estado solo ve a las personas de esa agencia y
+  // api_equipo_aplicar no toca a nadie de otra. Igual se apaga con dos o más agencias
+  // (segundo cerrojo) hasta probar esa separación con la segunda agencia de verdad.
+  equipo: {
+    tipo: "como_usuario",
+    pendienteConVariasAgencias: "probar con la segunda agencia real que tenant_members y user_roles.tenant_id " +
+      "de cada persona dicen la verdad antes de que Backstage escriba el equipo de más de una",
   },
   sales: {
     tipo: "sin_agencia",
@@ -177,6 +187,9 @@ export const FUENTES_POR_RECURSO: Record<string, string[]> = {
     "api_messenger_editar",
     "api_messenger_borrar",
   ],
+  // Las dos RPC DEFINER del equipo (migración 20261111100000): validan la key del claim
+  // `mvk`, el scope equipo:write y que la persona sea admin o dueña de su agencia.
+  equipo: ["api_equipo_estado", "api_equipo_aplicar"],
   sales: ["creator_daily_earnings"],
   employees: ["profiles", "user_roles", "rol_turnos"],
   creators: ["creators", "creator_of_accounts"],

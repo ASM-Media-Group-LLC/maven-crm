@@ -305,6 +305,9 @@ const ANTES: Record<Clave, [Record<string, string | number> | undefined, string]
   escritura_apagada: [undefined, "La escritura del Messenger por API está apagada en este momento"],
   escritura_en_pausa: [undefined, "La escritura del Messenger por API está en pausa porque la base está bajo carga. Reintenta más tarde."],
   resultado_incierto: [undefined, "No se sabe si la escritura se hizo: puede haberse hecho. Reintenta el mismo pedido (en los POST, con la misma Idempotency-Key)."],
+  // El equipo que manda Backstage (11/11): el texto con el que nacen.
+  equipo_rutas: [undefined, "Usa POST /equipo/sync"],
+  equipo_personas_invalidas: [undefined, "personas tiene que ser una lista de 1 a 1000 personas"],
 };
 
 Deno.test("en español, cada texto es byte a byte el de antes", () => {
