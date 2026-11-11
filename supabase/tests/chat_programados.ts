@@ -74,7 +74,7 @@ const FIXTURE_HASTA = "20260929180000";
 // Migraciones que tocan objetos de este banco pero necesitan tablas que sus fixtures no traen.
 // Se prueban en su propio banco, con el motivo al lado.
 const NO_CARGAN_AQUI: Record<string, string> = {
-  "20261111100000_backstage_equipo.sql":
+  "20261111120000_backstage_equipo.sql":
     "Backstage manda el equipo (POST /equipo/sync): el interruptor, la bitácora y las RPC api_equipo_*. Entra a " +
     "esta cadena solo porque cambia rol, nivel, horario y la papelera de profiles/user_roles y lee api_keys, pero " +
     "usa es_admin_o_dueno, roles_config, tenant_owners y cuenta_eventos, que este fixture no trae; no toca nada del " +
