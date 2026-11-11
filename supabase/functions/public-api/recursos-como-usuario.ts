@@ -62,12 +62,21 @@ import {
 } from "./escritura-formato.ts";
 import { type ClaveSinVars, type Idioma, msg } from "./mensajes.ts";
 import {
+  armarEquipo,
   armarRespuesta,
   calcularCambios,
+  type EstadoDeMaven,
+  hoyEnBogota,
   leerEstado,
+  leerRango,
+  leerReporte,
   leerResultadoDeLaBase,
+  leerResultadoDePendientes,
+  leerResultadoDeRoles,
   leerSync,
   type ProblemaDelEquipo,
+  type ResultadoDePendientes,
+  type ResultadoDeRoles,
 } from "./equipo-logica.ts";
 
 export type Contexto = {
@@ -910,19 +919,25 @@ export const servirMessenger: Handler = (yo, ctx) => {
     case "editar": return editar(yo, ctx);
     case "borrar": return borrar(yo, ctx);
     case "me": return Promise.resolve(falla("la ruta de /me llegó al Messenger"));
-    case "equipo_sync": return Promise.resolve(falla("la ruta de /equipo llegó al Messenger"));
+    case "equipo_sync":
+    case "equipo_ver":
+    case "equipo_horas":
+    case "equipo_notas":
+      return Promise.resolve(falla("una ruta de /equipo llegó al Messenger"));
   }
 };
 
-// ─── El equipo que manda Backstage (POST /equipo/sync) ────────────────────────
+// ─── El equipo de la plataforma conectada (/equipo/*) ─────────────────────────
 //
-// Backstage manda la lista COMPLETA del equipo (decisión de Alvaro, 11/11/2026:
-// Backstage manda sobre las personas, el rol, el equipo y a quién reporta cada una).
-// Aquí se compara con lo que Maven tiene (api_equipo_estado, con la sesión de la
-// persona de la llave) y se le pide a la base que aplique cada cambio, o que solo diga
-// qué haría mientras el interruptor de la agencia esté en ensayo (api_equipo_aplicar).
-// La base vuelve a validar todo: la pared es ella (migración 20261111100000). Lo puro
-// (leer el cuerpo, comparar, armar la respuesta) vive en ./equipo-logica.ts.
+// La plataforma de RR. HH. de la agencia (Backstage u otra) manda la lista COMPLETA del
+// equipo y sus roles (decisiones de Alvaro, 11/11/2026: la plataforma manda sobre las
+// personas, los roles, el equipo y a quién reporta cada una). Aquí se compara con lo
+// que Maven tiene (api_equipo_estado, con la sesión de la persona de la llave) y se le
+// pide a la base que aplique cada cambio, o que solo diga qué haría mientras el
+// interruptor de la agencia esté en ensayo (api_equipo_aplicar). Y se lee de vuelta lo
+// que Maven tiene: el equipo, las horas de Cowork y la nota de Argos. La base vuelve a
+// validar todo y cruza todo con la agencia de la llave: la pared es ella (migraciones
+// 20261111120000 y 20261111190000). Lo puro vive en ./equipo-logica.ts.
 
 /** El 400 de un cuerpo que no sirve para nada (lo de UNA persona va en `rechazados`). */
 function problemaDelEquipo(idioma: Idioma, p: ProblemaDelEquipo): Resultado {
@@ -935,34 +950,111 @@ function problemaDelEquipo(idioma: Idioma, p: ProblemaDelEquipo): Resultado {
       return { ok: false, estado: 400, error: "invalid_field", mensaje: msg(idioma, "campo_invalido", { campo: p.campo }) };
     case "personas_invalidas":
       return { ok: false, estado: 400, error: "invalid_field", mensaje: msg(idioma, "equipo_personas_invalidas") };
+    case "roles_invalidos":
+      return { ok: false, estado: 400, error: "invalid_field", mensaje: msg(idioma, "equipo_roles_invalidos") };
   }
 }
 
-/** POST /equipo/sync — la lista del equipo según Backstage. Sin Idempotency-Key: el
- *  envío es la foto completa, así que repetirlo da lo mismo. */
+/** El estado leído, o la respuesta de error ya armada. */
+type EstadoLeido = { ok: true; estado: EstadoDeMaven } | { ok: false; r: Resultado };
+
+/** Lo que Maven tiene hoy del equipo de la agencia de la llave (api_equipo_estado). Una
+ *  forma rota es un fallo NUESTRO (503), nunca «no hay nadie». */
+async function estadoDelEquipo(yo: SupabaseClient, idioma: Idioma): Promise<EstadoLeido> {
+  const estado = await llamar(yo.rpc("api_equipo_estado", {}));
+  if (estado.error) return { ok: false, r: resultadoDeError(idioma, clasificarErrorDeEscritura(estado.error)) };
+  const maven = leerEstado(estado.data);
+  if (!maven) return { ok: false, r: falla("api_equipo_estado devolvió otra forma") };
+  return { ok: true, estado: maven };
+}
+
+/** POST /equipo/sync — la lista del equipo (y, si vienen, los roles) según la
+ *  plataforma. Sin Idempotency-Key: el envío es la foto completa, así que repetirlo da
+ *  lo mismo. Los roles van PRIMERO: así las personas con un rol que la plataforma
+ *  acaba de mandar se resuelven en el mismo envío. Fuera de ensayo, quien no tiene
+ *  cuenta queda pendiente (lo aprueba o lo descarta el dueño en Maven). */
 async function sincronizarEquipo(yo: SupabaseClient, ctx: Contexto): Promise<Resultado> {
   const leido = leerSync(ctx.cuerpo);
   if (!leido.ok) return problemaDelEquipo(ctx.idioma, leido.problema);
-  const estado = await llamar(yo.rpc("api_equipo_estado", {}));
-  if (estado.error) return resultadoDeError(ctx.idioma, clasificarErrorDeEscritura(estado.error));
-  const maven = leerEstado(estado.data);
-  if (!maven) return falla("api_equipo_estado devolvió otra forma");
-  const { resumen, paraLaBase } = calcularCambios(maven, leido.pedido);
+
+  let roles: ResultadoDeRoles | null = null;
+  if (leido.pedido.roles !== null) {
+    const r = await llamar(yo.rpc("api_equipo_roles", { _roles: leido.pedido.roles, _ensayo: leido.pedido.ensayo }));
+    if (r.error) return resultadoDeError(ctx.idioma, clasificarErrorDeEscritura(r.error));
+    roles = leerResultadoDeRoles(r.data);
+    if (!roles) return falla("api_equipo_roles devolvió otra forma");
+  }
+
+  const e = await estadoDelEquipo(yo, ctx.idioma);
+  if (!e.ok) return e.r;
+  const { resumen, paraLaBase } = calcularCambios(e.estado, leido.pedido);
   const r = await llamar(yo.rpc("api_equipo_aplicar", { _cambios: paraLaBase, _resumen: resumen, _ensayo: leido.pedido.ensayo }));
   if (r.error) return resultadoDeError(ctx.idioma, clasificarErrorDeEscritura(r.error));
   const base = leerResultadoDeLaBase(r.data);
   if (!base) return falla("api_equipo_aplicar devolvió otra forma");
-  return { ok: true, estado: 200, cuerpo: armarRespuesta(resumen, base) };
+
+  let pendientes: ResultadoDePendientes | null = null;
+  if (!base.ensayo && resumen.pendientes_de_crear.length > 0) {
+    const p = await llamar(yo.rpc("api_equipo_pendientes", { _lista: resumen.pendientes_de_crear }));
+    if (p.error) return resultadoDeError(ctx.idioma, clasificarErrorDeEscritura(p.error));
+    pendientes = leerResultadoDePendientes(p.data);
+    if (!pendientes) return falla("api_equipo_pendientes devolvió otra forma");
+  }
+  return { ok: true, estado: 200, cuerpo: { ...armarRespuesta(resumen, base), roles, pendientes } };
 }
 
-/** /equipo/* — hoy solo POST /equipo/sync. */
+/** GET /equipo — el equipo como quedó: los roles (con su origen y si ya ven algo en
+ *  Maven) y las personas, con el jefe por su correo. */
+async function verEquipo(yo: SupabaseClient, ctx: Contexto): Promise<Resultado> {
+  if (Object.keys(ctx.consulta).length > 0) {
+    return { ok: false, estado: 400, error: "unknown_field", mensaje: msg(ctx.idioma, "campo_desconocido", { campos: Object.keys(ctx.consulta).sort().join(", ") }) };
+  }
+  const e = await estadoDelEquipo(yo, ctx.idioma);
+  if (!e.ok) return e.r;
+  return { ok: true, estado: 200, cuerpo: armarEquipo(ctx.agenciaDeLaLlave, e.estado) };
+}
+
+/** El rango de /equipo/horas y /equipo/notas, o el 400. */
+function rangoDelPedido(ctx: Contexto): { ok: true; desde: string; hasta: string } | { ok: false; r: Resultado } {
+  const rango = leerRango(ctx.consulta, hoyEnBogota(Date.now()));
+  if (!rango.ok) return { ok: false, r: { ok: false, estado: 400, error: "invalid_range", mensaje: msg(ctx.idioma, "equipo_rango_invalido") } };
+  return rango;
+}
+
+/** GET /equipo/horas?desde&hasta — horas y asistencia de Cowork por persona y día. */
+async function horasDelEquipo(yo: SupabaseClient, ctx: Contexto): Promise<Resultado> {
+  const rango = rangoDelPedido(ctx);
+  if (!rango.ok) return rango.r;
+  const r = await llamar(yo.rpc("api_equipo_horas", { _desde: rango.desde, _hasta: rango.hasta }));
+  if (r.error) return resultadoDeError(ctx.idioma, clasificarErrorDeEscritura(r.error));
+  const reporte = leerReporte(r.data);
+  if (!reporte) return falla("api_equipo_horas devolvió otra forma");
+  return { ok: true, estado: 200, cuerpo: reporte };
+}
+
+/** GET /equipo/notas?desde&hasta — la nota de Argos (0–100) con su desglose. */
+async function notasDelEquipo(yo: SupabaseClient, ctx: Contexto): Promise<Resultado> {
+  const rango = rangoDelPedido(ctx);
+  if (!rango.ok) return rango.r;
+  const r = await llamar(yo.rpc("api_equipo_notas", { _desde: rango.desde, _hasta: rango.hasta }));
+  if (r.error) return resultadoDeError(ctx.idioma, clasificarErrorDeEscritura(r.error));
+  const reporte = leerReporte(r.data);
+  if (!reporte) return falla("api_equipo_notas devolvió otra forma");
+  return { ok: true, estado: 200, cuerpo: reporte };
+}
+
+/** /equipo/* — GET /equipo, POST /equipo/sync, GET /equipo/horas y GET /equipo/notas. */
 export const servirEquipo: Handler = (yo, ctx) => {
   const ruta = scopesDeLaRuta("equipo", ctx.metodo, ctx.ruta);
   if (!ruta.ok && ruta.estado === 405) return Promise.resolve(metodoNoPermitido(ctx.idioma, ruta.permitidos));
-  if (!ruta.ok || ruta.accion !== "equipo_sync") {
-    return Promise.resolve({ ok: false, estado: 404, error: "not_found", mensaje: msg(ctx.idioma, "equipo_rutas") });
+  if (!ruta.ok) return Promise.resolve({ ok: false, estado: 404, error: "not_found", mensaje: msg(ctx.idioma, "equipo_rutas") });
+  switch (ruta.accion) {
+    case "equipo_sync": return sincronizarEquipo(yo, ctx);
+    case "equipo_ver": return verEquipo(yo, ctx);
+    case "equipo_horas": return horasDelEquipo(yo, ctx);
+    case "equipo_notas": return notasDelEquipo(yo, ctx);
+    default: return Promise.resolve({ ok: false, estado: 404, error: "not_found", mensaje: msg(ctx.idioma, "equipo_rutas") });
   }
-  return sincronizarEquipo(yo, ctx);
 };
 
 export const RECURSOS_COMO_USUARIO: Record<string, Handler> = {
@@ -981,8 +1073,8 @@ export type ScopesDelRecurso = { lectura: string | null; escritura: string | nul
 export const SCOPE_REQUERIDO: Record<string, ScopesDelRecurso> = {
   me: { lectura: null, escritura: null },
   messenger: { lectura: "messenger:read", escritura: "messenger:write" },
-  // Un solo scope para todo /equipo: no tiene lectura aparte (equipo:write ya ve, en
-  // la respuesta, a las personas que compara).
+  // Un solo scope para todo /equipo: la plataforma que manda el equipo es la que lee
+  // cómo quedó, las horas y las notas (equipo:write como lectura y como escritura).
   equipo: { lectura: "equipo:write", escritura: "equipo:write" },
 };
 

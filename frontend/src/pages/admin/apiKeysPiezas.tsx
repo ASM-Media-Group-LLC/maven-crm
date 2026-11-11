@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { useLanguage } from "@/hooks/useLanguage";
 import { UserAvatar } from "@/components/UserAvatar";
 import type { Cara } from "./carasDePersonas";
+import { copiarTexto } from "@/lib/copiarTexto";
 
 // Piezas de Ajustes → API keys que usan la tabla de keys y el webhook.
 
@@ -36,11 +37,12 @@ export function CopyButton({ text, label, size = "sm" as "sm" | "default" }: { t
     <Button
       type="button" variant="outline" size={size} className="gap-1.5"
       onClick={async () => {
-        try {
-          await navigator.clipboard.writeText(text);
+        if (await copiarTexto(text)) {
           setDone(true); toast.success(t("apiKeys.copied"));
           setTimeout(() => setDone(false), 2000);
-        } catch { toast.error(t("apiKeys.copyFailed")); }
+        } else {
+          toast.error(t("apiKeys.copyFailed"));
+        }
       }}
     >
       {done ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}

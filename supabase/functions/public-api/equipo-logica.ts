@@ -1,7 +1,9 @@
-// Piezas PURAS del equipo que manda Backstage (POST /public-api/equipo/sync): leer el
-// cuerpo y comparar la lista de Backstage con lo que Maven tiene, para decir qué
-// cambiaría. Sin base, sin red y sin imports: el test lo verifica, igual que con
-// escritura-formato.ts, porque recursos-como-usuario.ts importa valores de aquí.
+// Piezas PURAS del equipo que manda la plataforma de la agencia (Backstage u otra;
+// POST /public-api/equipo/sync): leer el cuerpo y comparar la lista de la plataforma
+// con lo que Maven tiene, para decir qué cambiaría; y armar lo que Maven devuelve
+// (GET /equipo, /equipo/horas, /equipo/notas). Sin base, sin red y sin imports: el test
+// lo verifica, igual que con escritura-formato.ts, porque recursos-como-usuario.ts
+// importa valores de aquí.
 //
 // LAS REGLAS (decisión de Alvaro, 11/11/2026: Backstage manda sobre las personas, el
 // rol, el equipo y a quién reporta cada una):
@@ -25,6 +27,12 @@ export type Json = string | number | boolean | null | Json[] | { [clave: string]
 
 /** Tope de personas por envío. El cuerpo ya topa en 64 KB (unas 250 personas). */
 export const TOPE_PERSONAS = 1000;
+/** Tope de roles por envío (la base vuelve a exigirlo: api_equipo_roles). */
+export const TOPE_ROLES = 50;
+/** El rango más largo de /equipo/horas y /equipo/notas, en días (la base también). */
+export const RANGO_MAX_DIAS = 93;
+/** Sin desde/hasta: los últimos 7 días, hoy incluido. */
+export const RANGO_POR_DEFECTO_DIAS = 7;
 /** Los niveles que Backstage puede poner. admin y dueño solo se ponen a mano en Maven. */
 export const NIVELES_PERMITIDOS = ["manager", "supervisor", "agente"] as const;
 const NIVELES_DE_ADMIN = new Set(["admin", "dueno", "owner"]);
@@ -76,6 +84,9 @@ export type PersonaDeBackstage = {
 export type PedidoDeSync = {
   personas: PersonaDeBackstage[];
   ensayo: boolean;
+  /** La lista de roles de la plataforma, tal cual vino (la valida la base:
+   *  api_equipo_roles). null si no vino. */
+  roles: Json[] | null;
   recibidas: number;
   /** Correos que vinieron más de una vez: no se tocan, pero cuentan como «vinieron». */
   repetidos: string[];
@@ -86,9 +97,10 @@ export type ProblemaDelEquipo =
   | { tipo: "sin_cuerpo" }
   | { tipo: "campo_desconocido"; campos: string[] }
   | { tipo: "campo_invalido"; campo: "ensayo" }
-  | { tipo: "personas_invalidas" };
+  | { tipo: "personas_invalidas" }
+  | { tipo: "roles_invalidos" };
 
-const CAMPOS_DEL_CUERPO = ["personas", "ensayo"];
+const CAMPOS_DEL_CUERPO = ["personas", "ensayo", "roles"];
 const CAMPOS_DE_PERSONA = ["correo", "nombre", "rol", "equipo", "reporta_a", "nivel", "activo", "hora_entrada", "hora_salida"];
 const CORREO = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const HORA = /^([01]?[0-9]|2[0-3]):([0-5][0-9])(?::([0-5][0-9]))?$/;
@@ -135,6 +147,12 @@ export function leerSync(cuerpo: unknown): { ok: true; pedido: PedidoDeSync } | 
   if (!Array.isArray(lista) || lista.length === 0 || lista.length > TOPE_PERSONAS) {
     return { ok: false, problema: { tipo: "personas_invalidas" } };
   }
+  // roles: una lista de nombres (o de { nombre }), hasta 50. Lo de cada rol lo decide la
+  // base (y lo que no sirve vuelve en roles.rechazados); aquí solo la forma de la lista.
+  const roles = cuerpo.roles ?? null;
+  if (roles !== null && (!Array.isArray(roles) || roles.length > TOPE_ROLES)) {
+    return { ok: false, problema: { tipo: "roles_invalidos" } };
+  }
 
   const rechazados: Rechazado[] = [];
   const leidas: PersonaDeBackstage[] = [];
@@ -150,7 +168,10 @@ export function leerSync(cuerpo: unknown): { ok: true; pedido: PedidoDeSync } | 
   for (const c of repetidos) rechazados.push({ indice: null, correo: c, campo: "correo", motivo: "correo_repetido" });
   const personas = leidas.filter((p) => veces.get(p.correo) === 1);
 
-  return { ok: true, pedido: { personas, ensayo, recibidas: lista.length, repetidos, rechazados } };
+  return {
+    ok: true,
+    pedido: { personas, ensayo, roles: roles === null ? null : roles as Json[], recibidas: lista.length, repetidos, rechazados },
+  };
 }
 
 function leerPersona(item: unknown, indice: number, rechazados: Rechazado[]): PersonaDeBackstage | null {
@@ -229,7 +250,14 @@ function leerPersona(item: unknown, indice: number, rechazados: Rechazado[]): Pe
 
 // ─── Lo que Maven tiene hoy (api_equipo_estado) ──────────────────────────────
 
-export type RolDeMaven = { nombre: string; es_admin: boolean };
+export type RolDeMaven = {
+  nombre: string;
+  es_admin: boolean;
+  /** null = hecho en Maven; "plataforma" = lo creó la plataforma. */
+  origen?: string | null;
+  /** Si ya tiene al menos un permiso en Maven (un rol nuevo nace sin ninguno). */
+  con_permisos?: boolean;
+};
 
 export type PersonaDeMaven = {
   id: string;
@@ -264,7 +292,13 @@ export function leerEstado(v: unknown): EstadoDeMaven | null {
   const roles: RolDeMaven[] = [];
   for (const r of v.roles) {
     if (!esObjeto(r) || typeof r.nombre !== "string" || typeof r.es_admin !== "boolean") return null;
-    roles.push({ nombre: r.nombre, es_admin: r.es_admin });
+    // origen y con_permisos llegaron después (20261111190000): si faltan, no se inventan.
+    if (r.origen !== undefined && !textoONulo(r.origen)) return null;
+    if (r.con_permisos !== undefined && typeof r.con_permisos !== "boolean") return null;
+    const rol: RolDeMaven = { nombre: r.nombre, es_admin: r.es_admin };
+    if (r.origen !== undefined) rol.origen = r.origen as string | null;
+    if (r.con_permisos !== undefined) rol.con_permisos = r.con_permisos as boolean;
+    roles.push(rol);
   }
   const personas: PersonaDeMaven[] = [];
   for (const p of v.personas) {
@@ -322,7 +356,15 @@ export type CambioParaLaBase = { user_id: string; campo: Campo; valor: string | 
 export type Resumen = {
   recibidas: number;
   cambios: Cambio[];
-  pendientes_de_crear: { correo: string; nombre: string | null; rol: string | null; equipo: string | null }[];
+  pendientes_de_crear: {
+    correo: string;
+    nombre: string | null;
+    rol: string | null;
+    nivel: string | null;
+    equipo: string | null;
+    /** El correo del jefe, como lo mandó la plataforma. */
+    reporta_a: string | null;
+  }[];
   roles_desconocidos: { rol: string; correos: string[] }[];
   protegidos: { user_id: string; correo: string; nombre: string | null; motivo: "admin_o_dueno" }[];
   no_vienen_en_backstage: { user_id: string; correo: string | null; nombre: string | null; rol: string | null }[];
@@ -358,7 +400,12 @@ export function calcularCambios(estado: EstadoDeMaven, pedido: PedidoDeSync): { 
     const m = maven.get(b.correo);
     if (!m) {
       // Una persona inactiva que Maven no tiene: no hay nada que hacer.
-      if (b.activo) pendientes.push({ correo: b.correo, nombre: b.nombre, rol: b.rol ?? null, equipo: b.equipo ?? null });
+      if (b.activo) {
+        pendientes.push({
+          correo: b.correo, nombre: b.nombre, rol: b.rol ?? null, nivel: b.nivel ?? null,
+          equipo: b.equipo ?? null, reporta_a: b.reporta_a ?? null,
+        });
+      }
       continue;
     }
     if (m.protegido) {
@@ -526,4 +573,141 @@ export function armarRespuesta(resumen: Resumen, base: ResultadoDeLaBase) {
     rechazados: [...resumen.rechazados, ...deLaBase],
     freno_de_bajas: resumen.freno_de_bajas,
   };
+}
+
+// ─── Lo que contestan api_equipo_roles y api_equipo_pendientes ───────────────
+
+export type ResultadoDeRoles = {
+  ensayo: boolean;
+  creados: string[];
+  ya_estaban: string[];
+  rechazados: { nombre: string; motivo: string }[];
+};
+
+const listaDeTextos = (v: unknown): v is string[] => Array.isArray(v) && v.every((x) => typeof x === "string");
+
+/** null si la base devolvió otra forma (un contrato roto: 503). */
+export function leerResultadoDeRoles(v: unknown): ResultadoDeRoles | null {
+  if (!esObjeto(v) || typeof v.ensayo !== "boolean" || !listaDeTextos(v.creados) || !listaDeTextos(v.ya_estaban)) return null;
+  if (!Array.isArray(v.rechazados)) return null;
+  const rechazados: ResultadoDeRoles["rechazados"] = [];
+  for (const r of v.rechazados) {
+    if (!esObjeto(r) || typeof r.nombre !== "string" || typeof r.motivo !== "string") return null;
+    rechazados.push({ nombre: r.nombre, motivo: r.motivo });
+  }
+  return { ensayo: v.ensayo, creados: v.creados, ya_estaban: v.ya_estaban, rechazados };
+}
+
+export type ResultadoDePendientes = {
+  ensayo: boolean;
+  registradas: number;
+  actualizadas: number;
+  ignoradas: { correo: string | null; motivo: string }[];
+};
+
+/** null si la base devolvió otra forma (un contrato roto: 503). */
+export function leerResultadoDePendientes(v: unknown): ResultadoDePendientes | null {
+  if (!esObjeto(v) || typeof v.ensayo !== "boolean" || typeof v.registradas !== "number" || typeof v.actualizadas !== "number") return null;
+  if (!Array.isArray(v.ignoradas)) return null;
+  const ignoradas: ResultadoDePendientes["ignoradas"] = [];
+  for (const i of v.ignoradas) {
+    if (!esObjeto(i) || !textoONulo(i.correo ?? null) || typeof i.motivo !== "string") return null;
+    ignoradas.push({ correo: (i.correo as string | null) ?? null, motivo: i.motivo });
+  }
+  return { ensayo: v.ensayo, registradas: v.registradas, actualizadas: v.actualizadas, ignoradas };
+}
+
+// ─── GET /equipo: el equipo como quedó ───────────────────────────────────────
+
+/** Lo que Maven devuelve del equipo: los roles (con su origen y si ya ven algo) y las
+ *  personas, con el jefe por su correo y activo = no está en la papelera. */
+export function armarEquipo(agencia: string, estado: EstadoDeMaven) {
+  const correoDeId = new Map(estado.personas.map((p) => [p.id, p.correo]));
+  return {
+    agencia,
+    aplicar: estado.aplicar,
+    roles: [...estado.roles]
+      .sort((a, b) => cmp(a.nombre, b.nombre))
+      .map((r) => ({ nombre: r.nombre, es_admin: r.es_admin, origen: r.origen ?? null, con_permisos: r.con_permisos ?? null })),
+    personas: estado.personas
+      .filter((p): p is PersonaDeMaven & { correo: string } => p.correo !== null)
+      .map((p) => ({
+        correo: p.correo,
+        nombre: p.nombre,
+        rol: p.rol,
+        nivel: p.nivel,
+        equipo: p.equipo,
+        reporta_a: p.reporta_a === null ? null : correoDeId.get(p.reporta_a) ?? null,
+        hora_entrada: p.hora_entrada,
+        hora_salida: p.hora_salida,
+        activo: !p.en_papelera,
+      }))
+      .sort(porCorreo),
+  };
+}
+
+// ─── GET /equipo/horas y /equipo/notas: el rango y la respuesta ──────────────
+
+const FECHA = /^(\d{4})-(\d{2})-(\d{2})$/;
+const DIA_MS = 86_400_000;
+
+/** "2026-11-10" → ms de esa medianoche UTC; null si no es una fecha de verdad. */
+function fechaAMs(s: string): number | null {
+  const m = s.match(FECHA);
+  if (!m) return null;
+  const ms = Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+  return new Date(ms).toISOString().slice(0, 10) === s ? ms : null;
+}
+const msAFecha = (ms: number) => new Date(ms).toISOString().slice(0, 10);
+
+/** Hoy en Bogotá (UTC−5 todo el año, sin horario de verano). */
+export function hoyEnBogota(ahoraMs: number): string {
+  return msAFecha(ahoraMs - 5 * 3_600_000);
+}
+
+/** desde y hasta de la URL (AAAA-MM-DD). Sin ninguno: los últimos 7 días hasta hoy; con
+ *  uno solo, el otro se completa a 7 días. Hasta 93 días, con desde <= hasta. Otro
+ *  parámetro en la URL es un error (no se ignora: alguien creería que filtró). */
+export function leerRango(consulta: Record<string, string>, hoy: string):
+  { ok: true; desde: string; hasta: string } | { ok: false } {
+  if (Object.keys(consulta).some((k) => k !== "desde" && k !== "hasta")) return { ok: false };
+  const d = consulta.desde, h = consulta.hasta;
+  const desdeMs = d === undefined ? null : fechaAMs(d);
+  const hastaMs = h === undefined ? null : fechaAMs(h);
+  if ((d !== undefined && desdeMs === null) || (h !== undefined && hastaMs === null)) return { ok: false };
+  const atras = (RANGO_POR_DEFECTO_DIAS - 1) * DIA_MS;
+  let fin: number, ini: number;
+  if (hastaMs !== null) {
+    fin = hastaMs;
+    ini = desdeMs ?? fin - atras;
+  } else if (desdeMs !== null) {
+    ini = desdeMs;
+    fin = ini + atras;
+  } else {
+    const hoyMs = fechaAMs(hoy);
+    if (hoyMs === null) return { ok: false };
+    fin = hoyMs;
+    ini = fin - atras;
+  }
+  if (ini > fin || (fin - ini) / DIA_MS + 1 > RANGO_MAX_DIAS) return { ok: false };
+  return { ok: true, desde: msAFecha(ini), hasta: msAFecha(fin) };
+}
+
+export type Reporte = {
+  desde: string;
+  hasta: string;
+  personas: { correo: string; nombre: string | null; dias: { [clave: string]: Json }[] }[];
+};
+
+/** Lo que devuelven api_equipo_horas y api_equipo_notas; null si llegó con otra forma
+ *  (un contrato roto: 503, nunca «no hay nadie»). */
+export function leerReporte(v: unknown): Reporte | null {
+  if (!esObjeto(v) || typeof v.desde !== "string" || typeof v.hasta !== "string" || !Array.isArray(v.personas)) return null;
+  const personas: Reporte["personas"] = [];
+  for (const p of v.personas) {
+    if (!esObjeto(p) || typeof p.correo !== "string" || !textoONulo(p.nombre ?? null) || !Array.isArray(p.dias)) return null;
+    if (!p.dias.every((d) => esObjeto(d) && typeof d.fecha === "string")) return null;
+    personas.push({ correo: p.correo, nombre: (p.nombre as string | null) ?? null, dias: p.dias as { [clave: string]: Json }[] });
+  }
+  return { desde: v.desde, hasta: v.hasta, personas };
 }

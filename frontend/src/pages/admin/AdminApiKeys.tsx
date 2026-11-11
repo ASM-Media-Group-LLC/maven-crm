@@ -121,7 +121,8 @@ const TEXTOS_GRUPO: Record<string, TranslationKey> = {
   Messenger: "apiKeys.group.Messenger",
 };
 
-const API_BASE =
+// También la usa Conectar tu plataforma (las instrucciones que se copian).
+export const API_BASE =
   `${import.meta.env.VITE_SUPABASE_URL ?? "https://lsagslbkliprespbyhts.supabase.co"}/functions/v1/public-api`;
 
 // Mandar un mensaje: los dos encabezados que exige un POST de escritura. La
@@ -144,7 +145,9 @@ function fmt(d: string | null, locale: string): string {
   return new Date(d).toLocaleDateString(locale, { day: "2-digit", month: "short", year: "numeric" });
 }
 
-const AdminApiKeys = () => {
+/** `crearCon`: un scope con el que se abre el alta ya marcado (Conectar tu plataforma
+ *  manda aquí con ?crear=equipo:write). Se abre UNA vez, cuando llega el catálogo. */
+const AdminApiKeys = ({ crearCon = null }: { crearCon?: string | null } = {}) => {
   const qc = useQueryClient();
   const f = useFormato();
   const { t, language } = useLanguage();
@@ -358,6 +361,17 @@ const AdminApiKeys = () => {
   const canSubmit = name.trim() && scopes.length > 0 && !submitting &&
     (ipMode === "none" || parseIps().length > 0) && reglasMessengerOk && reglasEscrituraOk;
 
+  // Llegar con ?crear=<scope>: el alta se abre sola con ese permiso marcado, una sola
+  // vez y solo si el servidor ofrece ese scope y queda cupo (como el botón «Crear»).
+  const crearConAbierto = useRef(false);
+  useEffect(() => {
+    if (!crearCon || crearConAbierto.current || !data || atLimit) return;
+    if (!catalog.some((s) => s.key === crearCon) || esScopeMessenger(crearCon)) return;
+    crearConAbierto.current = true;
+    resetForm(); setScopes([crearCon]); setEditing(null); setModalMode("create");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [crearCon, data, atLimit, catalog]);
+
   return (
     <div className="space-y-5 p-6 lg:p-8">
       {/* Header */}
@@ -544,7 +558,9 @@ const AdminApiKeys = () => {
               </DialogHeader>
               <div className="space-y-3">
                 <div className="rounded-md border border-primary/40 bg-primary/5 p-3">
-                  <code className="block break-all font-mono text-sm text-foreground">{freshKey}</code>
+                  {/* Un clic la selecciona entera: si el portapapeles está bloqueado,
+                      queda lista para ⌘C / Ctrl+C. */}
+                  <code className="block cursor-text select-all break-all font-mono text-sm text-foreground">{freshKey}</code>
                 </div>
                 <div className="flex justify-end"><CopyButton text={freshKey} label={t("apiKeys.fresh.copyKey")} /></div>
               </div>

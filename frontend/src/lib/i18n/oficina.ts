@@ -856,7 +856,7 @@ export const oficina = {
   "oficina.conexiones.correoEquipo": { es: "Correo del equipo dentro de Maven", en: "Team email inside Maven" },
   "oficina.conexiones.correoDetalle": { es: "{n} conectadas · {e} con error · {s} sin sincronizar hace 30 min", en: "{n} connected · {e} with errors · {s} not synced in 30 min" },
   "oficina.conexiones.backstage": { es: "Backstage", en: "Backstage" },
-  "oficina.conexiones.backstageSinLlave": { es: "Falta crear la llave «Backstage manda el equipo».", en: "The \"Backstage manages the team\" key hasn't been created yet." },
+  "oficina.conexiones.backstageSinLlave": { es: "Falta crear la llave «Tu plataforma manda el equipo».", en: "The \"Your platform manages the team\" key hasn't been created yet." },
   "oficina.conexiones.backstageUltimo": { es: "Último envío: {f}", en: "Last sync: {f}" },
   "oficina.conexiones.backstageNunca": { es: "Todavía no ha mandado nada.", en: "Nothing sent yet." },
   "oficina.conexiones.llamadas": { es: "Llamadas (la última hora)", en: "Calls (last hour)" },

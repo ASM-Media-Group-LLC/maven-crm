@@ -14,6 +14,7 @@ import BancoNas from "./bancoNas";
 import BancoLinks from "./bancoLinks";
 import BancoTableros from "./bancoTableros";
 import BancoVigilancia from "./bancoVigilancia";
+import BancoConexionEquipo from "./bancoConexionEquipo";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import VirtualOfficePage from "@/pages/oficina-ai/VirtualOfficePage";
 import TardanzasPage from "@/pages/admin/TardanzasPage";
@@ -80,6 +81,16 @@ createRoot(document.getElementById("root")!).render(
   verVigilancia ? (
     <StrictMode>
       <LanguageProvider><BancoVigilancia cual={ver as "quien-baja" | "en-vivo" | "en-vivo-video"} /></LanguageProvider>
+// /harness.html?ver=conexion[&estado=vacio|aplicando][&tema=claro][&skin=dorado] → Conectar tu plataforma.
+const verConexion = ver === "conexion";
+const params = new URLSearchParams(window.location.search);
+if (params.get("tema") === "claro") document.documentElement.classList.remove("dark");
+if (params.get("skin")) document.documentElement.setAttribute("data-skin", params.get("skin")!);
+
+createRoot(document.getElementById("root")!).render(
+  verConexion ? (
+    <StrictMode>
+      <LanguageProvider><BancoConexionEquipo estado={params.get("estado") ?? "ensayo"} abrir={params.get("abrir") === "1"} /></LanguageProvider>
     </StrictMode>
   ) :
   verPantalla ? (

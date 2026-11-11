@@ -28,7 +28,7 @@ export type Accion =
   | "me"
   | "bandeja" | "conversacion" | "mensajes" | "feed" | "personas"
   | "abrir" | "enviar" | "editar" | "borrar"
-  | "equipo_sync";
+  | "equipo_sync" | "equipo_ver" | "equipo_horas" | "equipo_notas";
 
 /** Las rutas del Messenger: el camino (null = un id) y qué hace cada método. */
 const RUTAS_MESSENGER: readonly { camino: readonly (string | null)[]; metodos: Partial<Record<Metodo, Accion>> }[] = [
@@ -40,9 +40,13 @@ const RUTAS_MESSENGER: readonly { camino: readonly (string | null)[]; metodos: P
   { camino: ["people"], metodos: { GET: "personas" } },
 ];
 
-/** Las rutas del equipo que manda Backstage (/equipo/*): solo POST /equipo/sync. */
+/** Las rutas del equipo de la plataforma conectada (/equipo/*): mandar el equipo
+ *  (POST /equipo/sync) y leer cómo quedó, las horas y las notas (GET). */
 const RUTAS_EQUIPO: readonly { camino: readonly (string | null)[]; metodos: Partial<Record<Metodo, Accion>> }[] = [
+  { camino: [], metodos: { GET: "equipo_ver" } },
   { camino: ["sync"], metodos: { POST: "equipo_sync" } },
+  { camino: ["horas"], metodos: { GET: "equipo_horas" } },
+  { camino: ["notas"], metodos: { GET: "equipo_notas" } },
 ];
 
 /** Lo que pide messenger:write además de messenger:read: escribir y el directorio
@@ -58,8 +62,9 @@ export type RutaResuelta =
 /** Qué hace (método, ruta) en un recurso como_usuario y qué scopes pide: `lectura`
  *  (el scope de lectura del recurso) y `escritura` (además, el de escritura). Una
  *  ruta que existe con otro método da 405 con los métodos que sí acepta; una que no
- *  existe, 404. /me solo se lee; /equipo solo se escribe (POST /equipo/sync). Sin
- *  tocar la base: corre antes que nada. */
+ *  existe, 404. /me solo se lee; en /equipo se escribe solo POST /equipo/sync (las
+ *  lecturas piden el mismo scope, equipo:write, como lectura). Sin tocar la base:
+ *  corre antes que nada. */
 export function scopesDeLaRuta(recurso: string, metodo: Metodo, ruta: readonly string[]): RutaResuelta {
   if (recurso === "me") {
     return metodo === "GET" ? { ok: true, accion: "me", lectura: false, escritura: false } : { ok: false, estado: 405, permitidos: ["GET"] };

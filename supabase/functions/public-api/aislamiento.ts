@@ -90,16 +90,17 @@ export const AISLAMIENTO_POR_RECURSO: MapaDeAislamiento = congelar({
     pendienteConVariasAgencias: "tenant_members todavía no dice la verdad (handle_new_user mete a toda " +
       "cuenta nueva en la agencia original); la base también apaga la escritura por API con 2 o más agencias",
   },
-  // El equipo que manda Backstage (POST /equipo/sync, 11/11/2026), con la sesión de la
-  // persona de la llave. La base cruza TODO con la agencia de la llave (api_keys.tenant_id
-  // contra tenant_members): api_equipo_estado solo ve a las personas de esa agencia y
-  // api_equipo_aplicar no toca a nadie de otra. Igual se apaga con dos o más agencias
-  // (segundo cerrojo) hasta probar esa separación con la segunda agencia de verdad.
-  equipo: {
-    tipo: "como_usuario",
-    pendienteConVariasAgencias: "probar con la segunda agencia real que tenant_members y user_roles.tenant_id " +
-      "de cada persona dicen la verdad antes de que Backstage escriba el equipo de más de una",
-  },
+  // El equipo de la plataforma conectada de cada agencia (/equipo, 11/11/2026), con la
+  // sesión de la persona de la llave y SOLO por RPC DEFINER que cruzan TODO con la agencia
+  // de la llave (api_equipo_llave: scope equipo:write, persona vigente y admin o dueña de
+  // ESA agencia; las personas por tenant_members, que tiene UNA fila por persona
+  // —tenant_members_una_agencia— y desde 20261001210000 la pone quien crea la cuenta).
+  // Sirve con dos o más agencias A PROPÓSITO (decisión de Alvaro: la próxima agencia
+  // conecta su plataforma sola): el banco supabase/tests/agencias_conectadas.ts prueba con
+  // DOS agencias que cada key ve y cambia solo lo suyo en cada RPC (estado, aplicar,
+  // roles, pendientes, horas, notas) y que los avisos por webhook se encolan solo para
+  // la agencia de la persona.
+  equipo: { tipo: "como_usuario" },
   sales: {
     tipo: "sin_agencia",
     pendiente: "creator_daily_earnings.tenant_id tiene DEFAULT fijo y los importadores BLU " +
@@ -187,9 +188,13 @@ export const FUENTES_POR_RECURSO: Record<string, string[]> = {
     "api_messenger_editar",
     "api_messenger_borrar",
   ],
-  // Las dos RPC DEFINER del equipo (migración 20261111100000): validan la key del claim
-  // `mvk`, el scope equipo:write y que la persona sea admin o dueña de su agencia.
-  equipo: ["api_equipo_estado", "api_equipo_aplicar"],
+  // Las RPC DEFINER del equipo (migraciones 20261111120000 y 20261111190000): validan la
+  // key del claim `mvk`, el scope equipo:write y que la persona sea admin o dueña de su
+  // agencia, y cruzan todo con ESA agencia.
+  equipo: [
+    "api_equipo_estado", "api_equipo_aplicar", "api_equipo_roles", "api_equipo_pendientes",
+    "api_equipo_horas", "api_equipo_notas",
+  ],
   sales: ["creator_daily_earnings"],
   employees: ["profiles", "user_roles", "rol_turnos"],
   creators: ["creators", "creator_of_accounts"],

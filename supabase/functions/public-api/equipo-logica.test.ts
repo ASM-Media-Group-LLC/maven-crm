@@ -12,11 +12,17 @@
 import { assert, assertEquals } from "jsr:@std/assert";
 import type { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 import {
+  armarEquipo,
   armarRespuesta,
   calcularCambios,
   type EstadoDeMaven,
+  hoyEnBogota,
   leerEstado,
+  leerRango,
+  leerReporte,
   leerResultadoDeLaBase,
+  leerResultadoDePendientes,
+  leerResultadoDeRoles,
   leerSync,
   normalizarCorreo,
   normalizarHora,
@@ -204,7 +210,7 @@ Deno.test("calcular: quien no está en Maven no se crea; un rol que Maven no tie
     { correo: "eva@kash.test", rol: "closer" },
   ]));
   assertEquals(paraLaBase, []);
-  assertEquals(resumen.pendientes_de_crear, [{ correo: "nueva@kash.test", nombre: "Nueva", rol: "Chatter", equipo: "Chatters A" }],
+  assertEquals(resumen.pendientes_de_crear, [{ correo: "nueva@kash.test", nombre: "Nueva", rol: "Chatter", nivel: null, equipo: "Chatters A", reporta_a: null }],
     "una inactiva que Maven no tiene no es pendiente");
   // «Closer» y «closer» son el mismo rol que falta.
   assertEquals(resumen.roles_desconocidos, [{ rol: "Closer", correos: ["ana@kash.test", "eva@kash.test"] }]);
@@ -392,4 +398,201 @@ Deno.test("handler: la base dice que no (key sin permiso, persona no admin) → 
   const r2 = await servirComoUsuario("equipo", roto.cliente, CTX);
   assert(!r2.ok && r2.estado === 503, "una forma rota no es «no hay nadie»");
   assertEquals(roto.llamadas.map((l) => l.nombre), ["current_tenant_id", "api_equipo_estado"]);
+});
+
+// ─── Agencias conectadas: roles, pendientes y lo que Maven devuelve ──────────
+
+Deno.test("leerSync: roles es opcional; si viene, una lista de hasta 50 (lo de cada rol lo decide la base)", () => {
+  const sin = leerSync({ personas: [{ correo: "a@b.co" }] });
+  assert(sin.ok && sin.pedido.roles === null, "sin roles: null");
+  const con = leerSync({ personas: [{ correo: "a@b.co" }], roles: ["Closer", { nombre: "Chatter" }, 7] });
+  assert(con.ok);
+  assertEquals(con.pedido.roles, ["Closer", { nombre: "Chatter" }, 7], "tal cual: la base rechaza lo que no sirve, con su motivo");
+  const nulo = leerSync({ personas: [{ correo: "a@b.co" }], roles: null });
+  assert(nulo.ok && nulo.pedido.roles === null);
+  for (const roles of ["Closer", { nombre: "x" }, 3, Array(51).fill("R")]) {
+    assertEquals(leerSync({ personas: [{ correo: "a@b.co" }], roles }), { ok: false, problema: { tipo: "roles_invalidos" } });
+  }
+});
+
+Deno.test("calcular: el pendiente lleva todo lo de la plataforma (nivel y el correo del jefe)", () => {
+  const { resumen } = calcularCambios(ESTADO, pedido([
+    { correo: "nueva@kash.test", nombre: "Nueva", rol: "Closer", nivel: "Supervisor", equipo: "A", reporta_a: "Beto@Kash.test" },
+  ]));
+  assertEquals(resumen.pendientes_de_crear, [
+    { correo: "nueva@kash.test", nombre: "Nueva", rol: "Closer", nivel: "supervisor", equipo: "A", reporta_a: "beto@kash.test" },
+  ]);
+});
+
+Deno.test("leerEstado: origen y con_permisos de cada rol (y una forma rota es null)", () => {
+  const e = leerEstado({ ...ESTADO_DE_LA_BASE, roles: [{ nombre: "Closer", es_admin: false, origen: "plataforma", con_permisos: false }] });
+  assertEquals(e?.roles, [{ nombre: "Closer", es_admin: false, origen: "plataforma", con_permisos: false }]);
+  const viejo = leerEstado({ ...ESTADO_DE_LA_BASE, roles: [{ nombre: "Closer", es_admin: false }] });
+  assertEquals(viejo?.roles, [{ nombre: "Closer", es_admin: false }], "sin los campos nuevos (antes de la migración) no se inventan");
+  assertEquals(leerEstado({ ...ESTADO_DE_LA_BASE, roles: [{ nombre: "X", es_admin: false, origen: 7 }] }), null);
+  assertEquals(leerEstado({ ...ESTADO_DE_LA_BASE, roles: [{ nombre: "X", es_admin: false, con_permisos: "si" }] }), null);
+});
+
+Deno.test("armarEquipo: roles con su origen, personas con el jefe por correo y activo = fuera de la papelera", () => {
+  const estado: EstadoDeMaven = {
+    ...ESTADO,
+    roles: [{ nombre: "Closer", es_admin: false, origen: "plataforma", con_permisos: false }, { nombre: "admin", es_admin: true }],
+    personas: [
+      persona(2, "ana@kash.test", { reporta_a: ID(3), equipo: "A", hora_entrada: "09:00:00" }),
+      persona(3, "beto@kash.test", { rol: "Chatter Supervisor", nivel: "supervisor" }),
+      persona(5, "dario@kash.test", { en_papelera: true, reporta_a: ID(99) }),
+    ],
+  };
+  const r = armarEquipo("agencia-1", estado);
+  assertEquals(Object.keys(r).sort(), ["agencia", "aplicar", "personas", "roles"]);
+  assertEquals(r.agencia, "agencia-1");
+  assertEquals(r.roles, [
+    { nombre: "Closer", es_admin: false, origen: "plataforma", con_permisos: false },
+    { nombre: "admin", es_admin: true, origen: null, con_permisos: null },
+  ]);
+  assertEquals(r.personas[0], {
+    correo: "ana@kash.test", nombre: "ana", rol: "Chatter", nivel: "agente", equipo: "A", reporta_a: "beto@kash.test",
+    hora_entrada: "09:00:00", hora_salida: null, activo: true,
+  });
+  assertEquals(r.personas.map((p) => [p.correo, p.activo, p.reporta_a]), [
+    ["ana@kash.test", true, "beto@kash.test"], ["beto@kash.test", true, null], ["dario@kash.test", false, null],
+  ], "un jefe que no está en la agencia no se muestra como un id");
+});
+
+Deno.test("leerRango: AAAA-MM-DD, por defecto los últimos 7 días, hasta 93, y nada más en la URL", () => {
+  assertEquals(hoyEnBogota(Date.UTC(2026, 10, 11, 3, 0)), "2026-11-10", "a las 22:00 de Bogotá todavía es el 10");
+  assertEquals(hoyEnBogota(Date.UTC(2026, 10, 11, 6, 0)), "2026-11-11");
+  const H = "2026-11-11";
+  assertEquals(leerRango({}, H), { ok: true, desde: "2026-11-05", hasta: "2026-11-11" });
+  assertEquals(leerRango({ hasta: "2026-03-01" }, H), { ok: true, desde: "2026-02-23", hasta: "2026-03-01" });
+  assertEquals(leerRango({ desde: "2026-02-27" }, H), { ok: true, desde: "2026-02-27", hasta: "2026-03-05" });
+  assertEquals(leerRango({ desde: "2026-01-01", hasta: "2026-04-03" }, H), { ok: true, desde: "2026-01-01", hasta: "2026-04-03" }, "93 días justos");
+  const malos: Record<string, string>[] = [
+    { desde: "2026-01-01", hasta: "2026-04-04" }, { desde: "2026-11-12", hasta: "2026-11-11" }, { desde: "2026-02-30" },
+    { hasta: "11/11/2026" }, { desde: "" }, { desde: "2026-11-01", from: "2026-11-01" },
+  ];
+  for (const c of malos) assertEquals(leerRango(c, H), { ok: false }, JSON.stringify(c));
+});
+
+Deno.test("leerReporte y los resultados de roles y pendientes: una forma rota es null (503), nunca «vacío»", () => {
+  assertEquals(leerReporte({ desde: "a", hasta: "b", personas: [] }), { desde: "a", hasta: "b", personas: [] });
+  assertEquals(
+    leerReporte({ desde: "a", hasta: "b", personas: [{ correo: "x@y.z", nombre: null, dias: [{ fecha: "2026-11-10", nota: 50 }] }] })?.personas[0].dias,
+    [{ fecha: "2026-11-10", nota: 50 }],
+  );
+  for (const v of [null, [], { desde: "a", hasta: "b" }, { desde: "a", hasta: "b", personas: [{ correo: 1, dias: [] }] },
+    { desde: "a", hasta: "b", personas: [{ correo: "x@y.z", dias: [{ nota: 1 }] }] }]) {
+    assertEquals(leerReporte(v), null, JSON.stringify(v));
+  }
+  assertEquals(
+    leerResultadoDeRoles({ ensayo: true, creados: ["A"], ya_estaban: [], rechazados: [{ nombre: "admin", motivo: "rol_de_admin" }] }),
+    { ensayo: true, creados: ["A"], ya_estaban: [], rechazados: [{ nombre: "admin", motivo: "rol_de_admin" }] },
+  );
+  assertEquals(leerResultadoDeRoles({ ensayo: true, creados: [1], ya_estaban: [], rechazados: [] }), null);
+  assertEquals(
+    leerResultadoDePendientes({ ensayo: false, registradas: 1, actualizadas: 0, ignoradas: [{ correo: null, motivo: "correo_invalido" }] })?.registradas,
+    1,
+  );
+  assertEquals(leerResultadoDePendientes({ ensayo: false, registradas: "1", actualizadas: 0, ignoradas: [] }), null);
+});
+
+const BASE_OK = { ensayo: false, aplicar: true, sync_id: "s1", aplicados: [], rechazados: [] };
+const ROLES_OK = { ensayo: false, creados: ["Closer"], ya_estaban: ["Finanzas"], rechazados: [{ nombre: "Admin", motivo: "rol_de_admin" }] };
+const PEND_OK = { ensayo: false, registradas: 1, actualizadas: 0, ignoradas: [] };
+
+Deno.test("handler sync: los roles van PRIMERO; fuera de ensayo, quien no tiene cuenta queda pendiente", async () => {
+  const { cliente, llamadas } = clienteFalso({
+    api_equipo_roles: ok(ROLES_OK),
+    api_equipo_estado: ok({ ...ESTADO_DE_LA_BASE, aplicar: true }),
+    api_equipo_aplicar: ok(BASE_OK),
+    api_equipo_pendientes: ok(PEND_OK),
+  });
+  const r = await servirComoUsuario("equipo", cliente, {
+    ...CTX,
+    cuerpo: {
+      roles: ["Closer", "Finanzas", "Admin"],
+      personas: [{ correo: "nueva@kash.test", nombre: "Nueva", rol: "Closer", nivel: "agente", reporta_a: "beto@kash.test" }],
+    },
+  });
+  assert(r.ok, JSON.stringify(r));
+  assertEquals(llamadas.map((l) => l.nombre), ["current_tenant_id", "api_equipo_roles", "api_equipo_estado", "api_equipo_aplicar", "api_equipo_pendientes"]);
+  assertEquals(llamadas[1].args, { _roles: ["Closer", "Finanzas", "Admin"], _ensayo: false });
+  assertEquals(llamadas[4].args._lista, [
+    { correo: "nueva@kash.test", nombre: "Nueva", rol: "Closer", nivel: "agente", equipo: null, reporta_a: "beto@kash.test" },
+  ]);
+  const c = r.cuerpo as Record<string, any>;
+  assertEquals(c.roles, ROLES_OK);
+  assertEquals(c.pendientes, PEND_OK);
+  assertEquals(c.pendientes_de_crear.map((p: any) => p.correo), ["nueva@kash.test"]);
+});
+
+Deno.test("handler sync: en ensayo no se anotan pendientes; sin roles no se llama a api_equipo_roles", async () => {
+  const { cliente, llamadas } = clienteFalso({
+    api_equipo_estado: ok(ESTADO_DE_LA_BASE),
+    api_equipo_aplicar: ok({ ...BASE_OK, ensayo: true, aplicar: false }),
+  });
+  const r = await servirComoUsuario("equipo", cliente, { ...CTX, cuerpo: { personas: [{ correo: "nueva@kash.test" }] } });
+  assert(r.ok, JSON.stringify(r));
+  assertEquals(llamadas.map((l) => l.nombre), ["current_tenant_id", "api_equipo_estado", "api_equipo_aplicar"]);
+  const c = r.cuerpo as Record<string, any>;
+  assertEquals([c.roles, c.pendientes], [null, null]);
+  assertEquals(c.pendientes_de_crear.length, 1, "igual dice quién quedaría pendiente");
+});
+
+Deno.test("handler sync: roles que no son una lista → 400 sin tocar la base; la base dice que no → su error", async () => {
+  const { cliente, llamadas } = clienteFalso({});
+  const r = await servirComoUsuario("equipo", cliente, { ...CTX, cuerpo: { roles: "Closer", personas: [{ correo: "a@b.co" }] } });
+  assert(!r.ok && r.estado === 400 && "error" in r && r.error === "invalid_field");
+  assertEquals(llamadas.map((l) => l.nombre), ["current_tenant_id"]);
+  const prohibido = clienteFalso({
+    api_equipo_roles: { data: null, error: { code: "MV403", message: "api_equipo_sin_permiso", details: '{"error": "forbidden"}' } },
+  });
+  const r2 = await servirComoUsuario("equipo", prohibido.cliente, { ...CTX, cuerpo: { roles: ["X"], personas: [{ correo: "a@b.co" }] } });
+  assert(!r2.ok && r2.estado === 403);
+  assertEquals(prohibido.llamadas.map((l) => l.nombre), ["current_tenant_id", "api_equipo_roles"], "sin roles no se sigue");
+  const roto = clienteFalso({ api_equipo_roles: ok({ creados: "x" }) });
+  const r3 = await servirComoUsuario("equipo", roto.cliente, { ...CTX, cuerpo: { roles: ["X"], personas: [{ correo: "a@b.co" }] } });
+  assert(!r3.ok && r3.estado === 503);
+});
+
+const GET: Contexto = { ...CTX, metodo: "GET", cuerpo: null, ruta: [] };
+
+Deno.test("GET /equipo: el equipo como quedó, con la sesión de la llave", async () => {
+  const { cliente, llamadas } = clienteFalso({ api_equipo_estado: ok(ESTADO_DE_LA_BASE) });
+  const r = await servirComoUsuario("equipo", cliente, GET);
+  assert(r.ok, JSON.stringify(r));
+  assertEquals(llamadas.map((l) => l.nombre), ["current_tenant_id", "api_equipo_estado"]);
+  const c = r.cuerpo as Record<string, any>;
+  assertEquals(c.agencia, AGENCIA);
+  assertEquals(c.personas.map((p: any) => p.correo), ESTADO.personas.map((p) => p.correo).sort());
+  assertEquals(c.personas.find((p: any) => p.correo === "dario@kash.test").activo, false);
+  const conParams = await servirComoUsuario("equipo", clienteFalso({}).cliente, { ...GET, consulta: { limit: "5" } });
+  assert(!conParams.ok && conParams.estado === 400, "un parámetro que no existe es un 400, no se ignora");
+  const post = await servirComoUsuario("equipo", clienteFalso({}).cliente, { ...CTX, ruta: [] });
+  assert(!post.ok && post.estado === 405 && "permitidos" in post && post.permitidos.join() === "GET");
+  const sin = await servirComoUsuario("equipo", clienteFalso({}).cliente, { ...GET, scopes: ["employees:read"] });
+  assert(!sin.ok && sin.estado === 403, "GET también pide equipo:write");
+});
+
+Deno.test("GET /equipo/horas y /equipo/notas: el rango va a la base; un rango malo es 400 sin tocarla", async () => {
+  const REPORTE = {
+    desde: "2026-11-01", hasta: "2026-11-10",
+    personas: [{ correo: "ana@kash.test", nombre: "Ana", dias: [{ fecha: "2026-11-10", minutos_trabajados: 240 }] }],
+  };
+  for (const [ruta, rpc] of [["horas", "api_equipo_horas"], ["notas", "api_equipo_notas"]] as const) {
+    const { cliente, llamadas } = clienteFalso({ [rpc]: ok(REPORTE) });
+    const r = await servirComoUsuario("equipo", cliente, { ...GET, ruta: [ruta], consulta: { desde: "2026-11-01", hasta: "2026-11-10" } });
+    assert(r.ok, JSON.stringify(r));
+    assertEquals(r.cuerpo, REPORTE);
+    assertEquals(llamadas[1], { nombre: rpc, args: { _desde: "2026-11-01", _hasta: "2026-11-10" } });
+    const malo = clienteFalso({});
+    const r2 = await servirComoUsuario("equipo", malo.cliente, { ...GET, ruta: [ruta], consulta: { desde: "2026-01-01", hasta: "2026-06-01" } });
+    assert(!r2.ok && r2.estado === 400 && "error" in r2 && r2.error === "invalid_range", `${ruta}: más de 93 días`);
+    assertEquals(malo.llamadas.map((l) => l.nombre), ["current_tenant_id"]);
+    const roto = clienteFalso({ [rpc]: ok({ personas: "x" }) });
+    const r3 = await servirComoUsuario("equipo", roto.cliente, { ...GET, ruta: [ruta] });
+    assert(!r3.ok && r3.estado === 503, `${ruta}: una forma rota es 503`);
+    const post = await servirComoUsuario("equipo", clienteFalso({}).cliente, { ...CTX, ruta: [ruta] });
+    assert(!post.ok && post.estado === 405);
+  }
 });
