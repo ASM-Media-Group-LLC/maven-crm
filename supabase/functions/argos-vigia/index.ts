@@ -129,6 +129,12 @@ Deno.serve(async (req: Request) => {
   const abiertas = (abiertasRes.data ?? []) as Abierta[];
   const duenos = (duenosRes.data ?? []) as Array<{ tenant_id: string; user_id: string }>;
   const esDueno = new Set(duenos.map((d) => d.user_id));
+  // RR. HH. recibe copia de cada alerta, igual que el dueño (Alvaro, 11/11/2026).
+  // Si la lista no carga, se avisa igual al dueño y queda anotado: una copia que
+  // falta no frena la alerta.
+  const rrhhRes = await admin.rpc("equipo_rrhh");
+  if (rrhhRes.error) await diag("rrhh_error", { error: rrhhRes.error.message });
+  const rrhh = (rrhhRes.data ?? []) as Array<{ tenant_id: string; user_id: string }>;
 
   // Salas de las pausas abiertas (límites por sala) — solo si hay pausas.
   const sesionIds = [...new Set(pausas.map((p) => p.session_id).filter(Boolean))] as string[];
@@ -252,7 +258,9 @@ Deno.serve(async (req: Request) => {
     if (error || !fila) { errores.push(`abrir: ${error?.message ?? "sin-fila"}`); continue; }
     abiertasN++;
 
-    const destinatarios = duenos.filter((o) => !tenantId || o.tenant_id === tenantId).map((o) => o.user_id);
+    const destinatarios = [...duenos, ...rrhh]
+      .filter((o) => (!tenantId || o.tenant_id === tenantId) && o.user_id !== d.user_id)
+      .map((o) => o.user_id);
     if (destinatarios.length === 0) continue;
     const nombre = nombreDe.get(d.user_id) ?? "Alguien";
     const filas = [...new Set(destinatarios)].map((uid) => ({
