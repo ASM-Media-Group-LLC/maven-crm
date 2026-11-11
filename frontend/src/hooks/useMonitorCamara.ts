@@ -6,6 +6,7 @@ import { useLanguage } from "@/hooks/useLanguage";
 import { useMonitorEstado } from "@/hooks/useMonitorEstado";
 import type { FaceWatch, FaceState } from "@/hooks/useFaceWatch";
 import { TIPO_POR_CARA } from "@/lib/monitorFaltas";
+import { anotarPantallazo, tomarLosDeAfuera } from "@/lib/monitorLocal";
 
 // Monitor de cámara de RRHH (Álvaro, 30/10). Corre en el navegador de la propia
 // persona, DENTRO de la llamada de Cowork (al lado de useFaceNudge), para que
@@ -280,6 +281,10 @@ export function useMonitorCamara({ track, trackPantalla = null, camaraRealOn, fa
       } finally {
         guardandoRef.current = false;
       }
+      // La llamada muestra «monitoreo activo · hace X» (también en la ventanita
+      // flotante y en la ventana del sistema) y, si estaba en otra app, al
+      // volver se le cuenta cuántos se tomaron (lib/monitorLocal).
+      if (guardoAlgo) anotarPantallazo();
       // Transparencia: la persona ve que se le tomó un pantallazo (una vez, aunque
       // corran dos capturadores a la vez).
       if (guardoAlgo && !cancelado && avisarCapturaRef.current !== false && Date.now() - ultimoAvisoCaptura > 30_000) {
@@ -295,6 +300,20 @@ export function useMonitorCamara({ track, trackPantalla = null, camaraRealOn, fa
       }, ms);
     };
     agendar(8000);
-    return () => { cancelado = true; if (timer) window.clearTimeout(timer); };
+    // «Cuando me voy a otro lado ya no me toma pantallazos» (Alvaro, 10/11): sí
+    // los toma; el aviso solo se ve dentro de Maven. Al volver, se le dice cuántos.
+    const alVolver = () => {
+      if (document.visibilityState !== "visible") return;
+      const n = tomarLosDeAfuera();
+      if (n > 0 && avisarCapturaRef.current !== false) {
+        try { toast(t("hr.monitor.pantallazosAfuera", { n }), { duration: 6000 }); } catch { /* sin toast no pasa nada */ }
+      }
+    };
+    document.addEventListener("visibilitychange", alVolver);
+    return () => {
+      cancelado = true;
+      if (timer) window.clearTimeout(timer);
+      document.removeEventListener("visibilitychange", alVolver);
+    };
   }, [activoFree, user, t]);
 }

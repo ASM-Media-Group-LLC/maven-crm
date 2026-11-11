@@ -74,6 +74,10 @@ const FIXTURE_HASTA = "20260929180000";
 // Migraciones que tocan objetos de este banco pero necesitan tablas que sus fixtures no traen.
 // Se prueban en su propio banco, con el motivo al lado.
 const NO_CARGAN_AQUI: Record<string, string> = {
+  "20261111010000_donde_esta_cada_uno.sql":
+    "Cowork: «fuera de Cowork» y el tablero «Dónde está cada uno» (cowork_fuera y funciones de turno). Entra a " +
+    "esta cadena solo porque su vigía inserta avisos en notifications, pero usa es_admin_o_dueno, roles_config y " +
+    "las tablas del reloj de Cowork, que este fixture no trae; no toca nada del Messenger. Se prueba en frontend/test/hr.",
   "20261105170000_exonerar_camara_pantalla.sql":
     "Argos: le suma exonera_camara_pantalla a profiles y a roles_config (excepción de cámara/pantalla por " +
     "persona y por rol). Entra a esta cadena solo por el alter de profiles, pero necesita roles_config, que " +

@@ -58,3 +58,13 @@ export function motivoDeFalloAlCompartir(err: unknown): string | null {
   if (nombre === "NotFoundError") return traducir("shared.screenShare.notFound");
   return (err as Error | null)?.message || traducir("shared.screenShare.failed");
 }
+
+/** ¿Lo que se comparte es la PANTALLA COMPLETA? (Alvaro, 10/11: «se obliga la
+ *  pantalla completa, como Hubstaff pero con navegador»). En Cowork una pestaña
+ *  o una ventana no sirve: al irse a OnlyFans o a otra app, el pantallazo
+ *  seguiría mostrando Maven. Chrome y Edge dicen qué se eligió en
+ *  `getSettings().displaySurface` («monitor», «window» o «browser»); si el
+ *  navegador no lo dice (Safari), no hay cómo saberlo y se acepta. */
+export function esPantallaCompleta(superficie: string | null | undefined): boolean {
+  return superficie == null || superficie === "monitor";
+}

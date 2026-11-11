@@ -100,6 +100,7 @@ const defaultLkState = {
   toggleMic: vi.fn(),
   toggleCam: vi.fn(),
   toggleScreenShare: vi.fn(),
+  setExigirPantallaCompleta: vi.fn(),
   toggleHand: vi.fn(),
   sendChatMessage: vi.fn(),
   sendReaction: vi.fn(),
