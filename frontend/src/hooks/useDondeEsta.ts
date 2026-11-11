@@ -9,7 +9,7 @@ import { supabase } from "@/integrations/supabase/client";
 // admins y RR. HH. ven a todos; un supervisor, a su equipo.
 
 export type EstadoDondeEsta =
-  | "activo" | "pausa" | "meet" | "sin_pantalla" | "sin_camara" | "fuera_de_camara"
+  | "activo" | "pausa" | "meet" | "en_llamada" | "sin_pantalla" | "sin_camara" | "fuera_de_camara"
   | "sin_conexion" | "sin_conexion_larga" | "fuera_de_cowork" | "no_ha_entrado" | "fuera_de_turno";
 
 export interface FilaDondeEsta {
@@ -35,14 +35,14 @@ export interface FilaDondeEsta {
 /** Qué tan urgente es cada estado: arriba lo que hay que mirar ya. */
 export const ORDEN_ESTADO: Record<string, number> = {
   fuera_de_cowork: 0, no_ha_entrado: 1, sin_pantalla: 2, sin_conexion_larga: 3, sin_conexion: 4,
-  sin_camara: 5, fuera_de_camara: 6, pausa: 7, meet: 8, activo: 9, fuera_de_turno: 10,
+  sin_camara: 5, fuera_de_camara: 6, pausa: 7, meet: 8, en_llamada: 8, activo: 9, fuera_de_turno: 10,
 };
 
 export type Tono = "rojo" | "naranja" | "neutro" | "verde" | "gris";
 export function tonoDe(estado: string): Tono {
   if (estado === "fuera_de_cowork" || estado === "no_ha_entrado") return "rojo";
   if (["sin_pantalla", "sin_camara", "fuera_de_camara", "sin_conexion", "sin_conexion_larga"].includes(estado)) return "naranja";
-  if (estado === "pausa" || estado === "meet") return "neutro";
+  if (estado === "pausa" || estado === "meet" || estado === "en_llamada") return "neutro";
   if (estado === "activo") return "verde";
   return "gris";
 }

@@ -25,8 +25,9 @@ import { useFaceWatch, faceStateLabel, type FaceWatch } from "@/hooks/useFaceWat
 import { useFaceNudge, useScreenShareNudge } from "@/hooks/useFaceNudge";
 import { useMonitorCamara } from "@/hooks/useMonitorCamara";
 import { useUltimoPantallazo } from "@/lib/monitorLocal";
+import { supabase } from "@/integrations/supabase/client";
 import { useArgosEscaleraClip } from "@/hooks/useArgosEscaleraClip";
-import { latirEnLlamada, salirDeLlamada, LATIDO_LLAMADA_MS } from "@/lib/llamadaEnMaven";
+import { latirEnLlamada, salirDeLlamada, LATIDO_LLAMADA_MS, LATIDO_SERVIDOR_MS, latirLlamadaEnServidor, salirLlamadaEnServidor } from "@/lib/llamadaEnMaven";
 import { useRegistrarLlamados } from "@/hooks/useRegistrarLlamados";
 import { esBlur, alternarBlur, leerFondoGuardado, guardarFondo, type BackgroundEffect } from "@/lib/fondoDeLlamada";
 import { useLanguage } from "@/hooks/useLanguage";
@@ -669,8 +670,12 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
     if (supervisorEncuadre) return;
     latirEnLlamada();
     const id = window.setInterval(() => latirEnLlamada(), LATIDO_LLAMADA_MS);
-    return () => { window.clearInterval(id); salirDeLlamada(); };
-  }, [supervisorEncuadre]);
+    // También en el servidor: el vigía «fuera de Cowork» no cuenta como salida
+    // estar en otra llamada de Maven (Alvaro, 11/11).
+    latirLlamadaEnServidor(supabase, roomName);
+    const idServidor = window.setInterval(() => latirLlamadaEnServidor(supabase, roomName), LATIDO_SERVIDOR_MS);
+    return () => { window.clearInterval(id); window.clearInterval(idServidor); salirDeLlamada(); salirLlamadaEnServidor(supabase); };
+  }, [supervisorEncuadre, roomName]);
   // En Cowork la pantalla compartida es la mitad del trabajo: sin ella se ve la
   // cara pero no QUÉ está haciendo la persona.
   useScreenShareNudge(localScreenShare, !!supervisorEncuadre && conSalaViva);
