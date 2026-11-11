@@ -70,17 +70,6 @@ const verPantalla = ver === "oficina-ai" || ver === "tardanzas";
 // /harness.html?ver=quien-baja | en-vivo | en-vivo-video → monitoreo en vivo (11/11).
 // &tema=claro → tema claro; &skin=esmeralda → primario oscuro.
 const verVigilancia = ver === "quien-baja" || ver === "en-vivo" || ver === "en-vivo-video";
-{
-  const q = new URLSearchParams(window.location.search);
-  if (q.get("tema") === "claro") document.documentElement.classList.remove("dark");
-  const skin = q.get("skin");
-  if (skin) document.documentElement.setAttribute("data-skin", skin);
-}
-
-createRoot(document.getElementById("root")!).render(
-  verVigilancia ? (
-    <StrictMode>
-      <LanguageProvider><BancoVigilancia cual={ver as "quien-baja" | "en-vivo" | "en-vivo-video"} /></LanguageProvider>
 // /harness.html?ver=conexion[&estado=vacio|aplicando][&tema=claro][&skin=dorado] → Conectar tu plataforma.
 const verConexion = ver === "conexion";
 const params = new URLSearchParams(window.location.search);
@@ -88,6 +77,11 @@ if (params.get("tema") === "claro") document.documentElement.classList.remove("d
 if (params.get("skin")) document.documentElement.setAttribute("data-skin", params.get("skin")!);
 
 createRoot(document.getElementById("root")!).render(
+  verVigilancia ? (
+    <StrictMode>
+      <LanguageProvider><BancoVigilancia cual={ver as "quien-baja" | "en-vivo" | "en-vivo-video"} /></LanguageProvider>
+    </StrictMode>
+  ) :
   verConexion ? (
     <StrictMode>
       <LanguageProvider><BancoConexionEquipo estado={params.get("estado") ?? "ensayo"} abrir={params.get("abrir") === "1"} /></LanguageProvider>
