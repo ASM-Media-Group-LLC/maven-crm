@@ -3,6 +3,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { usePermissions } from "@/hooks/usePermissions";
 import { useEsDueno } from "@/hooks/useEsDueno";
 import { useEsRh } from "@/hooks/useEsRh";
+import { useVeArgos } from "@/hooks/useVeArgos";
 import { Loader2, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -14,18 +15,24 @@ interface PermissionRouteProps {
   /** Con `soloDueno`, también deja entrar a HR (rol HHRR). Para Argos/expediente:
    *  Andrea (HR) ve todo MENOS los admins (la RLS filtra por nivel del observado). */
   tambienRh?: boolean;
+  /** Argos (Alvaro, 12/11/2026): la puerta la decide la base con ve_argos()
+   *  —dueño, admin, RR. HH. o supervisor— SIN pasar por el permiso del módulo
+   *  (los supervisores no tienen el de HR). Qué ve cada uno lo filtra la RLS. */
+  argos?: boolean;
   children: React.ReactNode;
 }
 
-const PermissionRoute = ({ module, submodule, soloDueno = false, tambienRh = false, children }: PermissionRouteProps) => {
+const PermissionRoute = ({ module, submodule, soloDueno = false, tambienRh = false, argos = false, children }: PermissionRouteProps) => {
   const location = useLocation();
   const { user, loading: authLoading } = useAuth();
   const { canAccess, isLoading: permsLoading, hayError, reintentar } = usePermissions();
   const { esDueno, cargando: duenoCargando, error: duenoError } = useEsDueno();
   const { esRh, cargando: rhCargando, error: rhError } = useEsRh();
+  const { veArgos, cargando: argosCargando, error: argosError } = useVeArgos();
 
   // Con soloDueno esperamos a saber si es dueño (y, si aplica, si es HR).
-  const esperaGate = soloDueno && !!user && (duenoCargando || (tambienRh && rhCargando));
+  const esperaGate = (soloDueno && !!user && (duenoCargando || (tambienRh && rhCargando)))
+    || (argos && !!user && argosCargando);
   if (authLoading || permsLoading || esperaGate) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
@@ -51,7 +58,8 @@ const PermissionRoute = ({ module, submodule, soloDueno = false, tambienRh = fal
   const permitidoGate = esDueno === true || (tambienRh && esRh === true);
   const duenoIndef = esDueno == null || duenoError != null;
   const rhIndef = tambienRh && (esRh == null || rhError != null);
-  const gateIndeterminado = soloDueno && !permitidoGate && (duenoIndef || rhIndef);
+  const gateIndeterminado = (soloDueno && !permitidoGate && (duenoIndef || rhIndef))
+    || (argos && (veArgos == null || argosError != null));
 
   if (hayError || gateIndeterminado) {
     return (
@@ -66,6 +74,11 @@ const PermissionRoute = ({ module, submodule, soloDueno = false, tambienRh = fal
         </Button>
       </div>
     );
+  }
+
+  // Argos: manda ve_argos (no el permiso del módulo).
+  if (argos) {
+    return veArgos === true ? <>{children}</> : <Navigate to="/dashboard" replace />;
   }
 
   if (!canAccess(module, submodule)) {

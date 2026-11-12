@@ -26,7 +26,7 @@ import {
 import { useLanguage } from "@/hooks/useLanguage";
 import { usePermissions } from "@/hooks/usePermissions";
 import { useEsDueno } from "@/hooks/useEsDueno";
-import { useEsRh } from "@/hooks/useEsRh";
+import { useVeArgos } from "@/hooks/useVeArgos";
 import { CollapsibleSidebarGroup } from "@/components/dashboard/CollapsibleSidebarGroup";
 import WhatsAppIcon from "@/components/icons/WhatsAppIcon";
 import TelegramIcon from "@/components/icons/TelegramIcon";
@@ -86,12 +86,13 @@ const DashboardSidebar = () => {
   const navigate = useNavigate();
   const { t } = useLanguage();
   const { canAccess, isLoading: permisosCargando, hayError: permisosFallaron, reintentar: reintentarPermisos } = usePermissions();
-  // Argos (por ahora) solo lo ve el dueño de la empresa, aunque tenga el permiso.
+  // Argos lo ven el dueño, los admins, RR. HH. y los supervisores (Alvaro,
+  // 12/11/2026). Lo decide la base (ve_argos); a quién ve cada uno lo filtra la
+  // RLS. El supervisor no tiene el permiso del módulo HR: por eso el botón NO
+  // pasa por canAccess, solo por veArgos.
   const { esDueno } = useEsDueno();
-  const { esRh } = useEsRh();
-  // Argos/Monitor IA lo ve el dueño y también HR (Andrea). La RLS filtra que HR
-  // no vea a los admins; aquí solo se abre el acceso del menú.
-  const veArgos = esDueno === true || esRh === true;
+  const { veArgos: veArgosDb } = useVeArgos();
+  const veArgos = veArgosDb === true;
 
   const unreadChatCount = useUnreadChatCount();
   const { promologCount, leadgenCount, closersCount, waInboxCount, tgInboxCount, coworkRequestsCount, correoUnreadCount } = useSidebarBadges();
@@ -548,9 +549,8 @@ const DashboardSidebar = () => {
         </CollapsibleSidebarGroup>
 
         {/* Argos: su PROPIO botón en el riel (Alvaro), no dentro del flyout de
-            Menú. Monitor del equipo en vivo; por ahora solo lo ve el DUEÑO de la
-            empresa (gate HR/Monitor IA + tenant_owners). */}
-        {canAccess("HR", "Monitor IA") && veArgos && (
+            Menú. Lo ven dueño, admins, RR. HH. y supervisores (ve_argos). */}
+        {veArgos && (
           <SidebarMenu>
             <SidebarMenuItem>
               <SidebarMenuButton asChild tooltip={t("nav.argos")}>
