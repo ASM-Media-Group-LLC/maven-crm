@@ -7,6 +7,9 @@ import { a12 } from "@/lib/horaBogota";
 import { urlCaptura, urlsDeNas } from "@/hooks/useMonitorEventos";
 import type { CapturaDia, DiaExpediente } from "@/hooks/useExpedienteEmpleado";
 import type { TranslationKey } from "@/lib/i18n";
+import { TarjetaArgosClasica } from "@/components/hr/TarjetaArgosClasica";
+import { disenoPulidoPrendido } from "@/lib/disenoDePrueba";
+import { useEsDueno } from "@/hooks/useEsDueno";
 
 // Argos como MANAGER del día, estilo FICHA CON EVIDENCIA (Alvaro, 09/11, v2).
 // Antes era un párrafo rojo que DECÍA lo que encontró pero no dejaba verlo. Ahora
@@ -81,7 +84,7 @@ function camaraDe(pantalla: CapturaDia, camaras: CapturaDia[], usadas: Set<strin
 
 const MAX_EVIDENCIAS = 6;
 
-export function TarjetaArgos({ nombre, dia, horario }: {
+export function TarjetaArgosPulida({ nombre, dia, horario }: {
   nombre: string;
   dia: DiaExpediente;
   horario: { entrada: string | null; salida: string | null };
@@ -308,4 +311,13 @@ export function TarjetaArgos({ nombre, dia, horario }: {
       )}
     </section>
   );
+}
+
+
+/** La tarjeta del Expediente. El diseño pulido sale solo para el dueño que lo
+ *  prendió con su link (`?diseno=pulido`); todos los demás ven el de siempre. */
+export function TarjetaArgos(props: Parameters<typeof TarjetaArgosPulida>[0]) {
+  const { esDueno } = useEsDueno();
+  if (esDueno === true && disenoPulidoPrendido()) return <TarjetaArgosPulida {...props} />;
+  return <TarjetaArgosClasica {...props} />;
 }
