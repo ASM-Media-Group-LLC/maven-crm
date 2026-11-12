@@ -836,6 +836,8 @@ export default function HRExpediente() {
 
   const nombre = expediente?.nombre || t("hr.noName");
   const c = dia.nota.banda ? TONO[dia.nota.banda] : null;
+  // Diseño pulido (solo dueño con su link): casillas neutras, números en blanco.
+  const pulido = useDisenoPulido();
 
   // % DE ATENCIÓN DEL DÍA (estilo Hubstaff): de los pantallazos que la IA ya
   // juzgó este día, qué porción estaba en lo suyo. Sin juzgados → "—" (no 0).
@@ -881,11 +883,16 @@ export default function HRExpediente() {
             {expediente && <UserAvatar name={nombre} src={expediente.avatarUrl} seed={expediente.avatarSeed} size="md" />}
             <div className="min-w-0 flex-1">
               <h2 className="truncate font-display text-base font-bold leading-tight tracking-tight">{nombre}</h2>
-              {dia.nota.banda && (
+              {dia.nota.banda && (pulido ? (
+                <span className="mt-1 inline-flex items-center gap-1.5 text-xs text-muted-foreground">
+                  <span className={`h-1.5 w-1.5 rounded-full ${PUNTO_BANDA[dia.nota.banda] ?? "bg-muted-foreground"}`} aria-hidden />
+                  <span className="tabular-nums"><span className="font-semibold text-foreground">{dia.nota.valor}</span> / 100</span>
+                </span>
+              ) : (
                 <span className={`mt-0.5 inline-flex items-center rounded-control px-1.5 py-0.5 text-[11px] font-semibold ${c?.chip}`}>
                   {dia.nota.valor} / 100
                 </span>
-              )}
+              ))}
             </div>
             {/* Navegación de día */}
             <div className="flex items-center gap-1.5">
@@ -931,7 +938,27 @@ export default function HRExpediente() {
             </div>
           )}
 
-          {/* Stats del día */}
+          {/* Stats del día. Pulido: casillas neutras (filo fino, radio 10), la cifra
+              en blanco y la etiqueta arriba en gris; lo flojo, solo un puntito. */}
+          {pulido ? (
+          <div className="mt-4 grid grid-cols-3 gap-2 sm:grid-cols-5">
+            {[
+              { k: "hr.exp.nota" as const, v: dia.nota.valor != null ? String(dia.nota.valor) : "—", punto: null },
+              { k: "hr.exp.atencion" as const, v: atencion ? `${atencion.pct}%` : "—", punto: atencion == null ? null : atencion.pct < 60 ? "bg-destructive" : atencion.pct < 80 ? "bg-warning" : null, title: atencion ? t("hr.exp.atencionDetalle", { ok: atencion.ok, n: atencion.n }) : undefined },
+              { k: "hr.exp.horas" as const, v: `${dia.horas.toFixed(1)}h`, punto: null },
+              { k: "hr.exp.faltas" as const, v: String(dia.faltas.length), punto: null },
+              { k: "hr.exp.pausas" as const, v: `${Math.round(dia.minutosPausaDeMas)}m`, punto: null },
+            ].map((x) => (
+              <div key={x.k} title={"title" in x ? x.title : undefined} className="rounded-[10px] border border-border/60 bg-card/30 px-3 py-2.5">
+                <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+                  {x.punto && <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${x.punto}`} aria-hidden />}
+                  <span className="truncate">{t(x.k)}</span>
+                </div>
+                <div className="mt-1 font-display text-xl font-semibold tabular-nums leading-tight text-foreground">{x.v}</div>
+              </div>
+            ))}
+          </div>
+          ) : (
           <div className="mt-4 grid grid-cols-3 gap-2 sm:grid-cols-5">
             <div className={`rounded-panel border p-2.5 text-center ${c ? c.bg : "border-border/40 bg-card/40"}`}>
               <div className={`font-display text-lg font-bold tabular-nums ${c?.tx ?? ""}`}>{dia.nota.valor ?? "—"}</div>
@@ -955,6 +982,7 @@ export default function HRExpediente() {
               <div className="text-[10px] text-muted-foreground">{t("hr.exp.pausas")}</div>
             </div>
           </div>
+          )}
         </div>
       </section>
 
@@ -1032,6 +1060,9 @@ export default function HRExpediente() {
 }
 
 /** El día que pide el link (`?dia=AAAA-MM-DD`), si es válido y no es futuro; si no, hoy. */
+/** Puntito de la nota en el diseño pulido (el mismo del titular de Argos). */
+const PUNTO_BANDA: Record<string, string> = { bien: "bg-success", ojo: "bg-warning", mal: "bg-destructive" };
+
 function diaDelLink(search: string, hoy: string): string {
   const pedido = new URLSearchParams(search).get("dia");
   if (pedido && /^\d{4}-\d{2}-\d{2}$/.test(pedido) && pedido <= hoy) return pedido;
