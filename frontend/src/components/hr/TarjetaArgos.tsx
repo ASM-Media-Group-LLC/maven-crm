@@ -13,6 +13,7 @@ import type { TranslationKey } from "@/lib/i18n";
 import { TarjetaArgosClasica } from "@/components/hr/TarjetaArgosClasica";
 import { disenoPulidoPrendido } from "@/lib/disenoDePrueba";
 import { useEsDueno } from "@/hooks/useEsDueno";
+import { FotoConZoom } from "@/components/hr/FotoConZoom";
 
 // Argos como MANAGER del día, estilo FICHA CON EVIDENCIA (Alvaro, 09/11, v2).
 // Antes era un párrafo rojo que DECÍA lo que encontró pero no dejaba verlo. Ahora
@@ -224,6 +225,8 @@ export function TarjetaArgosPulida({ nombre, dia, horario }: {
   };
 
   const [visor, setVisor] = useState<Evidencia | null>(null);
+  const [visorZoom, setVisorZoom] = useState(false);
+  useEffect(() => { setVisorZoom(false); }, [visor]);
   useEffect(() => {
     if (!visor) return;
     const h = (e: KeyboardEvent) => { if (e.key === "Escape") setVisor(null); };
@@ -280,6 +283,10 @@ export function TarjetaArgosPulida({ nombre, dia, horario }: {
                         <img src={up} alt={hora} loading="lazy" onError={() => reFirmar(e.pantalla)} className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.03]" />
                       ) : <div className="flex h-full w-full items-center justify-center"><Loader2 className="h-4 w-4 animate-spin text-muted-foreground" /></div>
                       ) : <div className="flex h-full w-full flex-col items-center justify-center gap-1 text-muted-foreground"><ScreenShareOff className="h-5 w-5 opacity-60" /><span className="text-[10px]">{t("hr.exp.sinPantalla")}</span></div>}
+                      {/* Sombreo suave sobre el pantallazo (Alvaro, 12/11: «se mira mucha
+                          información»): se ve, pero no grita. Al pasar el mouse se aclara.
+                          Adentro, en el visor, la foto va limpia y con zoom. */}
+                      <div className="pointer-events-none absolute inset-0 bg-black/35 transition-opacity duration-300 group-hover:opacity-30" aria-hidden />
                       {/* Arriba: la hora (izquierda) y la cámara (derecha). */}
                       <span className="absolute left-2 top-2 rounded-full bg-black/50 px-2 py-0.5 text-[10px] font-medium tabular-nums text-white/95 ring-1 ring-white/10 backdrop-blur-md">{hora}</span>
                       <div className="absolute right-2 top-2 h-9 w-14 overflow-hidden rounded-[6px] border border-white/40 shadow-md sm:h-10 sm:w-16">
@@ -289,7 +296,7 @@ export function TarjetaArgosPulida({ nombre, dia, horario }: {
                       {/* Abajo, ENCIMA de la foto: el ícono de la app (con su puntito de
                           estado, como el de las personas), la app y qué hacía. Si estaba
                           fuera de lugar, eso es lo que se lee. */}
-                      <div className="absolute inset-x-0 bottom-0 flex items-center gap-2.5 border-t border-white/10 bg-black/70 px-3 py-2.5 backdrop-blur-md [text-shadow:0_1px_2px_rgba(0,0,0,0.95),0_0_14px_rgba(0,0,0,0.7)]">
+                      <div className="absolute inset-x-0 bottom-0 flex items-center gap-2.5 border-t border-white/10 bg-black/50 px-3 py-2.5 backdrop-blur-md [text-shadow:0_1px_2px_rgba(0,0,0,0.95),0_0_14px_rgba(0,0,0,0.7)]">
                         <span className="relative flex h-8 w-8 shrink-0 items-center justify-center rounded-[9px] bg-white/[0.14] text-white ring-1 ring-white/20 shadow-[0_2px_10px_rgba(0,0,0,0.6)] backdrop-blur-md">
                           {Icono ? <Icono className="h-4 w-4" /> : <span className="font-display text-sm font-bold leading-none">{ap.letra}</span>}
                           <span className={`absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full ring-2 ring-black/80 ${e.fueraDeLugar ? "bg-destructive" : "bg-success"}`} aria-hidden />
@@ -330,13 +337,14 @@ export function TarjetaArgosPulida({ nombre, dia, horario }: {
       {/* Visor: la prueba en grande al tocar una miniatura. */}
       {visor && (
         <Dialog open onOpenChange={(o) => { if (!o) setVisor(null); }}>
-          <DialogContent className="max-w-3xl bg-none from-transparent p-2 sm:p-3">
+          <DialogContent className="max-w-5xl bg-none from-transparent p-2 sm:p-3">
             <DialogTitle className="sr-only">{t("hr.exp.mgr.titulo")}</DialogTitle>
             <div className="flex flex-col gap-2.5">
               <div className={`relative overflow-hidden rounded-[12px] border bg-black ${visor.fueraDeLugar ? "border-destructive/70" : "border-border/50"}`}>
                 <div className="relative aspect-[16/10] w-full">
-                  {visor.pantalla && miniPantalla(visor) ? <img src={miniPantalla(visor)} alt="" className="h-full w-full object-contain" />
+                  {visor.pantalla && miniPantalla(visor) ? <FotoConZoom src={miniPantalla(visor)!} onZoom={setVisorZoom} />
                     : <div className="flex h-full w-full flex-col items-center justify-center gap-2 text-muted-foreground"><ScreenShareOff className="h-9 w-9 opacity-60" /><span className="text-xs font-semibold">{t("hr.exp.sinPantalla")}</span></div>}
+                  {!visorZoom && (<>
                   <div className="absolute bottom-2.5 right-2.5 w-[32%] max-w-[220px] overflow-hidden rounded-[8px] border border-white/50 shadow-xl">
                     <div className="relative aspect-[4/3] bg-black">
                       {visor.camara && miniCamara(visor) ? <img src={miniCamara(visor)} alt="" className="h-full w-full object-cover" />
@@ -349,13 +357,29 @@ export function TarjetaArgosPulida({ nombre, dia, horario }: {
                       <span className="h-1.5 w-1.5 rounded-full bg-destructive" aria-hidden />{t("hr.exp.fueraDeLugar")}
                     </span>
                   )}
+                  </>)}
                 </div>
               </div>
-              {visor.veredicto && (
-                <div className="flex items-start gap-2 rounded-[12px] border border-border/50 bg-card/50 px-3 py-2.5 text-sm text-foreground/85">
-                  <Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" /><span>{visor.veredicto}</span>
-                </div>
-              )}
+              {visor.veredicto && (() => {
+                const { app, que } = separar(visor.veredicto);
+                const ap = appDe(app ?? que);
+                const I = ap.icono;
+                return (
+                  <div className="flex items-start gap-3 rounded-[12px] border border-border/50 bg-card/50 px-3 py-2.5">
+                    <span className="relative mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-[9px] border border-border/60 bg-foreground/[0.05] text-foreground">
+                      {I ? <I className="h-4 w-4" /> : <span className="font-display text-sm font-bold leading-none">{ap.letra}</span>}
+                      <span className={`absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full ring-2 ring-background ${visor.fueraDeLugar ? "bg-destructive" : "bg-success"}`} aria-hidden />
+                    </span>
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold text-foreground">
+                        {ap.nombre}
+                        <span className="font-normal text-muted-foreground"> · {t(visor.fueraDeLugar ? "hr.exp.fueraDeLugar" : "hr.exp.mgr.trabajando")}</span>
+                      </p>
+                      <p className="mt-0.5 text-sm leading-snug text-foreground/75">{que ?? visor.veredicto}</p>
+                    </div>
+                  </div>
+                );
+              })()}
               <button type="button" onClick={() => setVisor(null)} className="flex items-center justify-center gap-1.5 rounded-[12px] border border-border/50 bg-card/50 py-2 text-sm font-medium text-muted-foreground transition hover:text-foreground">
                 <X className="h-4 w-4" />{t("hr.exp.clips.cerrar")}
               </button>
