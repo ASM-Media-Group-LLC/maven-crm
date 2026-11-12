@@ -29,3 +29,53 @@ export const httpDeWs = (url: string) => url.replace(/^wss:/, "https:").replace(
 
 /** «138 de 302.761» con separador de miles a la colombiana. */
 export const miles = (n: number) => Math.round(n).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+
+// ── Casillas de Zoho en vivo (Alvaro, 11/11/2026: «cuántas cuentas había
+// atadas para poder bajar costos») ─────────────────────────────────────────
+// Cruza la lista REAL de casillas de Zoho con lo que Maven sabe de cada una.
+// Devuelve correos y estados; nunca tokens ni contraseñas.
+
+export type EstadoCasilla = "en_uso" | "sin_uso" | "de_alguien_que_salio" | "sin_cuenta_en_maven";
+export interface CasillaDeZoho { email: string; nombre?: string | null }
+/** Lo que Maven sabe de una dirección: si la cuenta está viva o en la papelera
+ *  y cuándo entró por última vez a Maven (inicio de sesión o correo usado). */
+export interface CuentaDeMaven { email: string; viva: boolean; ultimaActividad?: string | null }
+export interface CasillaClasificada { email: string; nombre: string | null; estado: EstadoCasilla; ultimaActividad: string | null }
+
+/** Clasifica cada casilla de Zoho. «Sin uso» = cuenta viva que no entra a
+ *  Maven hace más de `diasSinUso` días (o nunca). Una dirección que Maven no
+ *  conoce es «sin cuenta en Maven» (funcional, del administrador u olvidada). */
+export function clasificarCasillas(
+  zoho: readonly CasillaDeZoho[],
+  maven: readonly CuentaDeMaven[],
+  ahora: number,
+  diasSinUso = 21,
+): { casillas: CasillaClasificada[]; resumen: Record<EstadoCasilla, number> & { total: number } } {
+  const porEmail = new Map<string, CuentaDeMaven>();
+  for (const c of maven) {
+    const k = c.email.trim().toLowerCase();
+    const previa = porEmail.get(k);
+    // Si la misma dirección aparece dos veces, manda la cuenta viva.
+    if (!previa || (!previa.viva && c.viva)) porEmail.set(k, c);
+  }
+  const tope = ahora - diasSinUso * 86_400_000;
+  const resumen = { en_uso: 0, sin_uso: 0, de_alguien_que_salio: 0, sin_cuenta_en_maven: 0, total: 0 };
+  const vistas = new Set<string>();
+  const casillas: CasillaClasificada[] = [];
+  for (const z of zoho) {
+    const email = (z.email ?? "").trim().toLowerCase();
+    if (!email || vistas.has(email)) continue;
+    vistas.add(email);
+    const m = porEmail.get(email);
+    const ultima = m?.ultimaActividad ?? null;
+    const estado: EstadoCasilla = !m ? "sin_cuenta_en_maven"
+      : !m.viva ? "de_alguien_que_salio"
+      : ultima && Date.parse(ultima) >= tope ? "en_uso" : "sin_uso";
+    resumen[estado]++;
+    resumen.total++;
+    casillas.push({ email, nombre: z.nombre ?? null, estado, ultimaActividad: ultima });
+  }
+  const rango: Record<EstadoCasilla, number> = { de_alguien_que_salio: 0, sin_uso: 1, sin_cuenta_en_maven: 2, en_uso: 3 };
+  casillas.sort((a, b) => rango[a.estado] - rango[b.estado] || a.email.localeCompare(b.email));
+  return { casillas, resumen };
+}

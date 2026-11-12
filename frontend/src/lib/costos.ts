@@ -348,3 +348,135 @@ export function desgloseDelMes(servicios: ServicioCosto[], cobros: Cobro[], hoy:
   }
   return lineas.sort((a, b) => b.real + b.proyectado - (a.real + a.proyectado));
 }
+
+// ── Cuentas atadas (Alvaro, 11/11: «no me dijiste cuántas cuentas había atadas
+// para poder bajar costos»). Cada servicio con sus casillas, proyectos, llaves,
+// servidores y puestos (tabla costos_cuentas), cuáles se usan y cuánto baja la
+// cuenta si se suelta lo que no. ─────────────────────────────────────────────
+
+export type TipoCuenta = "buzon" | "proyecto" | "llave" | "servidor" | "puesto";
+export type EstadoCuenta = "en_uso" | "sin_uso" | "de_alguien_que_salio" | "no_se_puede_ver";
+/** En el orden en que se muestran: primero lo que se puede soltar. */
+export const ESTADOS_CUENTA: readonly EstadoCuenta[] = ["de_alguien_que_salio", "sin_uso", "no_se_puede_ver", "en_uso"];
+
+export interface CuentaAtada {
+  id: string;
+  servicio_id: string;
+  tipo: TipoCuenta;
+  nombre: string;
+  detalle: string | null;
+  estado: EstadoCuenta;
+  /** Un renglón puede agrupar varias iguales («52 casillas de gente activa»). */
+  cantidad: number;
+  /** Lo que baja al mes si se suelta; null = no se ve el precio. */
+  ahorro_usd_mes: number | null;
+  fuente: "verificado" | "estimado" | "falta";
+  revisado: string | null;
+  orden: number;
+}
+
+/** Lo que se puede soltar: lo que no se usa y lo de gente que ya salió. */
+export const esLiberable = (c: Pick<CuentaAtada, "estado">) => c.estado === "sin_uso" || c.estado === "de_alguien_que_salio";
+
+export type ConteoCuentas = Record<EstadoCuenta, number> & {
+  total: number;
+  /** sin uso + de gente que salió */
+  liberables: number;
+  /** Suma de lo que se ahorra al mes (solo lo que tiene precio). */
+  ahorro: number;
+  /** ¿Algún renglón trae precio? Si no, el ahorro no se sabe (no es 0). */
+  conPrecio: boolean;
+};
+
+const cuantas = (c: Pick<CuentaAtada, "cantidad">) => Math.max(1, Math.round(num(c.cantidad) ?? 1));
+
+/** Cuántas hay en cada estado (cuenta la `cantidad` de cada renglón). */
+export function contarCuentas(cuentas: readonly CuentaAtada[]): ConteoCuentas {
+  const r: ConteoCuentas = { en_uso: 0, sin_uso: 0, de_alguien_que_salio: 0, no_se_puede_ver: 0, total: 0, liberables: 0, ahorro: 0, conPrecio: false };
+  for (const c of cuentas) {
+    const n = cuantas(c);
+    r[c.estado] += n;
+    r.total += n;
+    if (esLiberable(c)) r.liberables += n;
+    const a = num(c.ahorro_usd_mes);
+    if (a !== null) { r.conPrecio = true; r.ahorro += a; }
+  }
+  r.ahorro = dos(r.ahorro);
+  return r;
+}
+
+/** Primero lo que se puede soltar (el ahorro más grande arriba), después lo que
+ *  no se puede ver y al final lo que está en uso. */
+export function ordenarCuentas(cuentas: readonly CuentaAtada[]): CuentaAtada[] {
+  const rango = (c: CuentaAtada) => (esLiberable(c) ? 0 : c.estado === "no_se_puede_ver" ? 1 : 2);
+  return [...cuentas].sort((a, b) =>
+    rango(a) - rango(b)
+    || (num(b.ahorro_usd_mes) ?? 0) - (num(a.ahorro_usd_mes) ?? 0)
+    || (num(a.orden) ?? 0) - (num(b.orden) ?? 0)
+    || a.nombre.localeCompare(b.nombre));
+}
+
+export interface Candidato {
+  servicio: ServicioCosto;
+  /** Las cuentas de ese servicio (vacío si el ahorro es del servicio entero). */
+  conteo: ConteoCuentas | null;
+  /** Lo que baja al mes; null = hay cosas para soltar pero no se ve el precio. */
+  ahorro: number | null;
+}
+
+/** «Dónde puedes bajar costos»: por servicio (sea o no Maven), lo que se puede
+ *  soltar y cuánto baja al mes, el ahorro más grande primero. Si un servicio
+ *  tiene cuentas con ahorro, mandan las cuentas (el ahorro del servicio no se
+ *  suma encima, para no contar dos veces lo mismo). */
+export function dondeBajarCostos(servicios: readonly ServicioCosto[], cuentas: readonly CuentaAtada[]): {
+  candidatos: Candidato[];
+  total: number;
+  sinPrecio: number;
+} {
+  const porServicio = new Map<string, CuentaAtada[]>();
+  for (const c of cuentas) {
+    const l = porServicio.get(c.servicio_id);
+    if (l) l.push(c); else porServicio.set(c.servicio_id, [c]);
+  }
+  const candidatos: Candidato[] = [];
+  for (const s of servicios) {
+    if (!s.activo) continue;
+    const propias = porServicio.get(s.id) ?? [];
+    const conteo = propias.length ? contarCuentas(propias) : null;
+    const delServicio = num(s.ahorro_usd);
+    if (conteo && (conteo.liberables > 0 || conteo.ahorro > 0)) {
+      candidatos.push({ servicio: s, conteo, ahorro: conteo.ahorro > 0 ? conteo.ahorro : null });
+    } else if (delServicio !== null && delServicio > 0 && s.ahorro_detalle) {
+      candidatos.push({ servicio: s, conteo, ahorro: dos(delServicio) });
+    }
+  }
+  candidatos.sort((a, b) =>
+    (b.ahorro ?? -1) - (a.ahorro ?? -1)
+    || (b.conteo?.liberables ?? 0) - (a.conteo?.liberables ?? 0)
+    || a.servicio.orden - b.servicio.orden);
+  return {
+    candidatos,
+    total: dos(candidatos.reduce((a, c) => a + (c.ahorro ?? 0), 0)),
+    sinPrecio: candidatos.filter((c) => c.ahorro === null).length,
+  };
+}
+
+// ── Zoho en vivo (edge conexiones-ping, accion zoho_casillas) ─────────────
+
+export type EstadoCasillaZoho = "en_uso" | "sin_uso" | "de_alguien_que_salio" | "sin_cuenta_en_maven";
+export interface ZohoEnVivo {
+  en: string;
+  licencias: { compradas: number; usadas: number } | null;
+  licencias_error: string | null;
+  resumen: Record<EstadoCasillaZoho, number> & { total: number };
+  casillas: { email: string; nombre: string | null; estado: EstadoCasillaZoho; ultimaActividad: string | null }[];
+}
+
+/** Licencias que sobran hoy en Zoho y las que sobrarían si se sueltan las
+ *  casillas de gente que salió y las sin uso. null = Zoho no dijo las licencias. */
+export function licenciasQueSobran(z: Pick<ZohoEnVivo, "licencias" | "resumen">): { libresHoy: number; libresDespues: number } | null {
+  if (!z.licencias) return null;
+  const libresHoy = Math.max(0, z.licencias.compradas - z.licencias.usadas);
+  const soltables = z.resumen.de_alguien_que_salio + z.resumen.sin_uso;
+  return { libresHoy, libresDespues: libresHoy + soltables };
+}
