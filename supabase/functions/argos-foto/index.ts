@@ -6,7 +6,9 @@ import { createClient } from "jsr:@supabase/supabase-js@2";
 // El buzón de Supabase se firma con createSignedUrl; las fotos mudadas al NAS
 // (en_nas=true) se sirven por aquí: firma un permiso de BAJADA (op "get") y
 // devuelve la URL de la puerta del NAS, que el navegador carga como <img src>.
-// Solo el DUEÑO (es_dueno). Recibe una lista y devuelve un mapa { ruta: url }.
+// Dueño y admins: todas. RR. HH. y supervisores (Alvaro, 12/11/2026): solo las
+// fotos de quien pueden vigilar (puede_vigilar_a, la misma regla de la RLS; la
+// ruta es <ns>/<user_id>/<id>). Recibe una lista y devuelve un mapa { ruta: url }.
 //
 // Firma incrustada (igual a _shared/drive-firma.ts). También entra por cron
 // (X-Cron-Token) para autoprueba. Namespace fijo de Argos para no firmar
@@ -53,6 +55,7 @@ async function firmar(datos: Record<string, unknown>): Promise<string> {
 }
 const ahoraMas = (segundos: number) => Math.floor(Date.now() / 1000) + segundos;
 
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const esRutaArgos = (k: unknown): k is string => typeof k === "string" && k.startsWith(`${ARGOS_NS}/`) && k.length < 200;
 async function urlGet(nasPath: string): Promise<string> {
   return `${NAS}/o?t=${await firmar({ op: "get", k: nasPath, e: ahoraMas(VENCE_BAJAR) })}`;
@@ -81,8 +84,21 @@ Deno.serve(async (req: Request) => {
     const { data: { user } } = await userClient.auth.getUser();
     if (!user) return json({ ok: false, error: "no-auth" }, 401);
     const admin = createClient(SUPABASE_URL, SERVICE_KEY, { auth: { persistSession: false, autoRefreshToken: false } });
-    const { data: puede } = await admin.rpc("es_dueno", { _user_id: user.id });
-    if (puede !== true) return json({ ok: false, error: "forbidden" }, 403);
+    const { data: todo } = await admin.rpc("es_admin_o_dueno", { _uid: user.id });
+    if (todo !== true) {
+      // Solo lo de las personas que puede vigilar (a quien no puede vigilar a
+      // nadie, puede_vigilar_a le dice que no a todo y el mapa sale vacío).
+      const pedidas = Array.isArray(body.nas_paths) ? body.nas_paths.filter(esRutaArgos).slice(0, MAX) : [];
+      const personas = [...new Set(pedidas.map((r) => r.split("/")[1]).filter((u): u is string => !!u && UUID.test(u)))];
+      const permitidas = new Set<string>();
+      for (const uid of personas) {
+        const { data: puede } = await admin.rpc("puede_vigilar_a", { _viewer: user.id, _target: uid });
+        if (puede === true) permitidas.add(uid);
+      }
+      const urls: Record<string, string> = {};
+      for (const r of pedidas) if (permitidas.has(r.split("/")[1])) urls[r] = await urlGet(r);
+      return json({ ok: true, urls });
+    }
   }
 
   const rutas = Array.isArray(body.nas_paths) ? body.nas_paths.filter(esRutaArgos).slice(0, MAX) : [];
