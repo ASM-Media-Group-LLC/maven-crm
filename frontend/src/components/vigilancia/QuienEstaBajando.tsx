@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type CSSProperties } from "react";
 import { useNavigate } from "react-router-dom";
 import { CheckCircle2, ChevronRight, RefreshCw, TrendingDown } from "lucide-react";
 import { useLanguage } from "@/hooks/useLanguage";
@@ -7,7 +7,7 @@ import { useQuienBaja, type FilaQuienBaja } from "@/hooks/useQuienBaja";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { minutosDesde } from "@/lib/motivosVivos";
-import { LetraAvatar, NotaViva, textoDuracion, type Tr, ETIQUETA_ESTADO } from "./piezas";
+import { LetraAvatar, NotaViva, textoDuracion, tonoDePersona, type Tr, ETIQUETA_ESTADO } from "./piezas";
 import { fraseCorta } from "@/components/hr/TarjetaArgos";
 import { useDisenoPulido } from "@/hooks/useDisenoPulido";
 import type { FilaQuienBaja as Fila } from "@/hooks/useQuienBaja";
@@ -108,7 +108,9 @@ function FilaBajandoPulida({ f, t, onAbrir }: { f: FilaQuienBaja; t: Tr; onAbrir
       title={detalle ?? undefined}
       className="group flex w-full min-w-0 items-center gap-3.5 rounded-[12px] border border-border/60 bg-card/30 p-2.5 text-left transition-colors hover:border-foreground/25 hover:bg-card/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
     >
-      <span className="relative h-[68px] w-[108px] shrink-0 overflow-hidden rounded-[8px] border border-border/60 bg-foreground/[0.04]">
+      <span
+        style={f.miniatura ? undefined : ({ "--av-h": tonoDePersona(f.nombre) } as CSSProperties)}
+        className={cn("relative h-[68px] w-[108px] shrink-0 overflow-hidden rounded-[8px] border border-border/60 bg-foreground/[0.04]", !f.miniatura && "avatar-fondo")}>
         {f.miniatura ? (
           <>
             <img src={f.miniatura.url} alt="" loading="lazy" decoding="async" className="h-full w-full object-cover" />

@@ -118,17 +118,7 @@ export function TarjetaDeApariencia({ conDensidad = true }: { conDensidad?: bool
     if (guardado.kind === "custom") { applySkin(skin); applyCustomHue(guardado.hue); }
     else { applyCustomHue(null); applySkin(guardado.id); }
   };
-  // Blanco es todo blanco: al elegirlo el tema pasa a Claro; si se descarta,
-  // vuelve el tema que había.
-  const temaPrevio = useRef<string | null>(null);
   const elegir = (sel: Sel) => {
-    if (sel.kind === "preset" && sel.id === "blanco" && theme !== "light") {
-      temaPrevio.current = theme ?? "dark";
-      setTheme("light");
-    } else if (temaPrevio.current && !(sel.kind === "preset" && sel.id === "blanco")) {
-      setTheme(temaPrevio.current);
-      temaPrevio.current = null;
-    }
     previsualizar(sel);
     setPendiente(mismo(sel, guardado) ? null : sel);
   };
@@ -141,23 +131,14 @@ export function TarjetaDeApariencia({ conDensidad = true }: { conDensidad?: bool
       setPrefs({ customHue: pendiente.hue });
       avisarme(t("settings.skinApplied"), t("settings.skinCustom"));
     }
-    temaPrevio.current = null;
     setPendiente(null);
   };
-  const descartar = () => {
-    restaurarGuardado();
-    if (temaPrevio.current) { setTheme(temaPrevio.current); temaPrevio.current = null; }
-    setPendiente(null);
-  };
+  const descartar = () => { restaurarGuardado(); setPendiente(null); };
 
   // Si el usuario sale de Ajustes con una vista previa sin guardar, el color
   // debe volver al guardado (no dejar aplicado algo que no eligió de verdad).
   const salidaRef = useRef<() => void>(() => {});
-  salidaRef.current = () => {
-    if (!pendiente) return;
-    restaurarGuardado();
-    if (temaPrevio.current) setTheme(temaPrevio.current);
-  };
+  salidaRef.current = () => { if (pendiente) restaurarGuardado(); };
   useEffect(() => () => salidaRef.current(), []);
 
   const customEnVista = vista.kind === "custom";
@@ -228,7 +209,7 @@ export function TarjetaDeApariencia({ conDensidad = true }: { conDensidad?: bool
                 key={s.id}
                 label={s.label}
                 active={vista.kind === "preset" && vista.id === s.id}
-                background={s.muestra ?? `linear-gradient(135deg, ${s.primary}, ${s.accent})`}
+                background={`linear-gradient(135deg, ${s.primary}, ${s.accent})`}
                 onClick={() => elegir({ kind: "preset", id: s.id })}
               />
             ))}
@@ -247,7 +228,7 @@ export function TarjetaDeApariencia({ conDensidad = true }: { conDensidad?: bool
                 key={s.id}
                 label={s.label}
                 active={vista.kind === "preset" && vista.id === s.id}
-                background={s.muestra ?? `linear-gradient(135deg, ${s.primary}, ${s.accent})`}
+                background={`linear-gradient(135deg, ${s.primary}, ${s.accent})`}
                 onClick={() => elegir({ kind: "preset", id: s.id })}
               />
             ))}
@@ -321,6 +302,14 @@ export function TarjetaDeApariencia({ conDensidad = true }: { conDensidad?: bool
             description={t("settings.oledDesc")}
             checked={prefs.oled === true}
             onCheckedChange={(v) => setPrefs({ oled: v })}
+          />
+          {/* Blanco puro (Alvaro, 12/11): el espejo de Negro puro, en claro.
+              Prenderlo pasa el tema a Claro (si no, no se vería). */}
+          <ToggleRow
+            label={t("settings.blancoLabel")}
+            description={t("settings.blancoDesc")}
+            checked={prefs.blanco === true}
+            onCheckedChange={(v) => { setPrefs({ blanco: v }); if (v && theme !== "light") setTheme("light"); }}
           />
           <ToggleRow
             label={t("settings.contrastLabel")}

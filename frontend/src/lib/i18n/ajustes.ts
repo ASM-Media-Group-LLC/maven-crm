@@ -43,6 +43,8 @@ export const ajustes = {
   "settings.skinCustomDesc": { es: "Elige cualquier tono: la intensidad se ajusta sola para que el texto siga legible.", en: "Pick any hue: intensity adjusts itself so text stays readable." },
   "settings.oledLabel": { es: "Negro puro (OLED)", en: "True black (OLED)" },
   "settings.oledDesc": { es: "En tema oscuro usa fondo negro absoluto: en pantallas OLED los píxeles negros se apagan y la batería dura más.", en: "Uses an absolute black background in dark theme: on OLED screens black pixels turn off and the battery lasts longer." },
+  "settings.blancoLabel": { es: "Blanco puro", en: "Pure white" },
+  "settings.blancoDesc": { es: "En tema claro, todo blanco: fondos y tarjetas blancas, sin el fondo de colores. Funciona con cualquier color de arriba.", en: "In light theme, everything white: white backgrounds and cards, no colored backdrop. Works with any color above." },
   "settings.densityLabel": { es: "Densidad compacta", en: "Compact density" },
   "settings.densityDesc": { es: "Menos espacio entre filas: más leads y conversaciones por pantalla.", en: "Tighter rows: more leads and conversations per screen." },
   "settings.contrastLabel": { es: "Alto contraste", en: "High contrast" },
