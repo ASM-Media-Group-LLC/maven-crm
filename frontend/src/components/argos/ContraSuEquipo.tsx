@@ -16,16 +16,16 @@ export function ContraSuEquipo({ jornada: j, equipo, nombreEquipo, t }: {
   const prom = promedioDelEquipo(equipo);
   const min = (s: number) => textoMin(s / 60, t);
   return (
-    <section className="vidrio sube mt-4 p-4 lg:p-5">
-      <div className="v-cont">
-        <p className="mb-3 flex items-center gap-1.5 text-xs font-semibold text-muted-foreground">
-          <Users className="h-3.5 w-3.5" />{t("argos.equipo.titulo")}
+    <section className="mt-5 p-5 sm:p-6 rounded-control border border-border bg-card">
+      <div>
+        <p className="mb-4 flex flex-wrap items-center gap-2 text-sm font-semibold text-foreground/90">
+          <Users className="h-4 w-4 text-muted-foreground" />{t("argos.equipo.titulo")}
           {prom && <span className="font-normal">· {t("argos.equipo.sub", { e: nombreEquipo ?? "—", n: prom.personas })}</span>}
         </p>
         {!prom ? (
           <p className="text-sm text-muted-foreground">{t("argos.equipo.solo", { e: nombreEquipo ?? "—" })}</p>
         ) : (
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
             <Cuadrito valor={pct(j.pctBien)} etiqueta={t("argos.equipo.trabajoBien")} detalle={t("argos.equipo.suEquipo", { v: pct(prom.pctBien) })} />
             <Cuadrito valor={min(j.conectadoSeg)} etiqueta={t("argos.cifra.conectado")} detalle={t("argos.equipo.suEquipo", { v: min(prom.conectadoSeg) })} />
             <Cuadrito valor={min(j.seg.sin_pantalla)} etiqueta={t("argos.cifra.sinPantalla")} detalle={t("argos.equipo.suEquipo", { v: min(prom.seg.sin_pantalla) })} />

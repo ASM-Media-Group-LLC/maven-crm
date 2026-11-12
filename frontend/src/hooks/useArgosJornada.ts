@@ -1,9 +1,8 @@
-import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { urlsDeNas } from "@/hooks/useMonitorEventos";
 import {
-  calcularJornada, semanaDe, sumarDias, type Jornada, type JornadaCruda,
+  calcularJornada, type Jornada, type JornadaCruda,
 } from "@/lib/argosJornada";
 import { armarMomentos, type ClipArgos, type FotoArgos, type Momento } from "@/lib/argosMomentos";
 
@@ -122,23 +121,4 @@ export function useEvidenciaDia(uid: string | null, jornada: Jornada | null) {
     },
   });
   return { evidencia: q.data ?? null, cargando: q.isLoading, error: (q.error as Error | null) ?? null, reintentar: () => { void q.refetch(); } };
-}
-
-/** La semana de lunes a domingo de una persona. */
-export function useArgosSemana(uid: string | null, lunes: string, habilitado: boolean) {
-  const q = useQuery({
-    enabled: habilitado && !!uid,
-    queryKey: ["argos-semana", uid, lunes],
-    staleTime: 60_000,
-    retry: 1,
-    queryFn: async (): Promise<{ dias: Jornada[]; nombre: string }> => {
-      const cruda = await leerCruda(uid!, lunes, sumarDias(lunes, 6), false);
-      const ahora = Date.parse(cruda.ahora) || Date.now();
-      const p = cruda.personas.find((x) => x.objetivo);
-      if (!p) throw new Error("argos_jornada_cruda: sin persona");
-      return { dias: semanaDe(p, lunes, cruda.limites, ahora), nombre: p.nombre ?? "" };
-    },
-  });
-  const dias = useMemo(() => q.data?.dias ?? null, [q.data]);
-  return { dias, cargando: q.isLoading, error: (q.error as Error | null) ?? null, reintentar: () => { void q.refetch(); } };
 }

@@ -55,12 +55,12 @@ export function VisorEvidencia({ fotos, indice, onIndice, onCerrar, t, lang }: {
   const { app, que } = separarPantalla(f.veredicto);
   return (
     <Dialog open onOpenChange={(o) => { if (!o) onCerrar(); }}>
-      <DialogContent className="max-h-[94dvh] max-w-6xl overflow-y-auto rounded-panel bg-none from-transparent p-3 sm:p-4">
+      <DialogContent className="max-h-[94dvh] max-w-6xl overflow-y-auto rounded-control bg-none from-transparent p-3 sm:p-4">
         <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_17rem]">
           {/* La pantalla, entera */}
           <div onClick={f.pantallaUrl ? alternarZoom : undefined} onPointerMove={recorrer}
             style={{ touchAction: zoom === 1 ? "auto" : "none" }}
-            className={`relative aspect-[16/10] w-full overflow-hidden rounded-panel border border-border/50 bg-black ${f.pantallaUrl ? (zoom === 1 ? "cursor-zoom-in" : "cursor-zoom-out") : ""}`}>
+            className={`relative aspect-[16/10] w-full overflow-hidden rounded-control border border-border/50 bg-black ${f.pantallaUrl ? (zoom === 1 ? "cursor-zoom-in" : "cursor-zoom-out") : ""}`}>
             {f.tienePantalla ? (
               f.pantallaUrl ? <img src={f.pantallaUrl} alt="" draggable={false} className="h-full w-full select-none object-contain transition-transform duration-150"
                 style={{ transform: `scale(${zoom})`, transformOrigin: `${origen.x}% ${origen.y}%` }} />
@@ -73,7 +73,7 @@ export function VisorEvidencia({ fotos, indice, onIndice, onCerrar, t, lang }: {
                 {zoom === 1 ? t("argos.visor.acercar") : t("argos.visor.alejar")}
               </span>
             )}
-            {f.fueraDeLugar && <span className="pointer-events-none absolute left-0 top-0 rounded-br-control bg-destructive px-2.5 py-1 text-xs font-bold text-destructive-foreground">{t("argos.foto.flojo")}</span>}
+            {f.fueraDeLugar && <span className="pointer-events-none absolute left-2 top-2 rounded-control bg-black/70 px-2 py-1 text-xs font-semibold text-white">{t("argos.foto.flojo")}</span>}
           </div>
 
           {/* Al lado: la hora, la app, lo que dijo Argos y la cámara de ese momento */}
@@ -82,16 +82,16 @@ export function VisorEvidencia({ fotos, indice, onIndice, onCerrar, t, lang }: {
               <DialogTitle className="font-display text-2xl font-bold tabular-nums leading-none">{hora(f.at, lang)}</DialogTitle>
               <DialogDescription className="mt-1 text-xs tabular-nums text-muted-foreground">{t("argos.visor.deN", { i: indice + 1, n: fotos.length })}</DialogDescription>
             </div>
-            <div className="rounded-panel border border-border/50 bg-card/50 p-3">
+            <div className="rounded-control border border-border/50 bg-card/50 p-3">
               {app && <p className="text-sm font-semibold">{app}</p>}
               <p className="mt-0.5 text-sm leading-snug text-foreground/80">{que ?? t("argos.visor.sinJuzgar")}</p>
-              <p className={`mt-2 text-xs font-semibold ${f.fueraDeLugar ? "text-destructive" : f.veredicto ? "text-success" : "text-muted-foreground"}`}>
+              <p className={`mt-2 text-xs font-semibold ${f.fueraDeLugar ? "text-destructive" : "text-muted-foreground"}`}>
                 {f.fueraDeLugar ? t("argos.visor.flojo") : f.veredicto ? t("argos.visor.enLoSuyo") : t("argos.visor.sinJuzgar")}
               </p>
             </div>
             <div>
               <p className="mb-1 text-[11px] font-medium text-muted-foreground">{t("argos.visor.camara")}</p>
-              <div className="relative aspect-[4/3] w-full max-w-[17rem] overflow-hidden rounded-panel border border-border/50 bg-black">
+              <div className="relative aspect-[4/3] w-full max-w-[17rem] overflow-hidden rounded-control border border-border/50 bg-black">
                 {f.tieneCamara && f.camaraUrl ? <img src={f.camaraUrl} alt="" className="h-full w-full object-cover" />
                   : <div className="flex h-full flex-col items-center justify-center gap-1.5 text-destructive"><CameraOff className="h-5 w-5" /><span className="text-[11px] font-semibold">{t("argos.visor.camaraApagada")}</span></div>}
               </div>

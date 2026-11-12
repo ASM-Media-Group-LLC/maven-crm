@@ -1,22 +1,35 @@
 import { describe, it, expect, vi } from "vitest";
-import { render, screen, within } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter } from "react-router-dom";
 import type { ReactNode } from "react";
 
-// GUARDA de «Dónde está cada uno» (Alvaro, 10/11/2026: «necesito saber dónde
-// está el empleado en todo momento»). Lo urgente va arriba (fuera de Cowork en
-// su turno, no ha entrado), cada fila dice qué tenía en pantalla y cuántas veces
-// se salió hoy, y un fallo se dice como fallo (no como «todos bien»).
+// GUARDA de «Equipo hoy» (antes «Dónde está cada uno»; Alvaro, 10/11 y 11/11/2026:
+// «necesito saber dónde está el empleado en todo momento», «me pierdo»). La lógica
+// de cada fila (orden, app de la pantalla, color) sigue igual; el tablero ahora va
+// por departamento y dice quién va mal y por qué. Un fallo se dice como fallo (no
+// como «todos bien»).
 
 let respuesta: { data: unknown; error: { message: string } | null } = { data: [], error: null };
-vi.mock("@/integrations/supabase/client", () => ({ supabase: { rpc: vi.fn(async () => respuesta) } }));
+const vacio = { data: [], error: null };
+const cadena = () => {
+  const c: Record<string, unknown> = {};
+  for (const k of ["select", "is", "in", "eq", "order", "limit", "gte", "lt"]) c[k] = () => c;
+  c.then = (ok: (v: unknown) => unknown) => Promise.resolve(vacio).then(ok);
+  return c;
+};
+vi.mock("@/integrations/supabase/client", () => ({
+  supabase: {
+    rpc: vi.fn(async (f: string) => (f === "donde_esta_cada_uno" ? respuesta : vacio)),
+    from: vi.fn(() => cadena()),
+  },
+}));
 vi.mock("@/hooks/useLanguage", () => {
   const idioma = { language: "es", t: (k: string, p?: Record<string, string | number>) => (p ? `${k} ${JSON.stringify(p)}` : k) };
   return { useLanguage: () => idioma, useLanguageSiHay: () => idioma };
 });
 
-import { DondeEstaPanel, pasaFiltro } from "@/components/hr/DondeEstaPanel";
+import { EquipoHoyPanel } from "@/components/argos/EquipoHoy";
 import { type FilaDondeEsta, ordenarFilas, separarPantalla, tonoDe } from "@/hooks/useDondeEsta";
 
 const fila = (nombre: string, estado: string, extra: Partial<FilaDondeEsta> = {}): FilaDondeEsta => ({
@@ -44,38 +57,33 @@ describe("la lógica", () => {
     expect(separarPantalla(null)).toEqual({ app: null, que: null });
   });
 
-  it("los filtros agrupan por color", () => {
+  it("los colores siguen agrupando igual", () => {
     expect(tonoDe("fuera_de_cowork")).toBe("rojo");
     expect(tonoDe("sin_pantalla")).toBe("naranja");
-    expect(pasaFiltro({ estado: "pausa" }, "enCowork")).toBe(true);
     // Otra llamada de Maven no es «fuera de Cowork» (Alvaro, 11/11).
     expect(tonoDe("en_llamada")).toBe("neutro");
-    expect(pasaFiltro({ estado: "en_llamada" }, "enCowork")).toBe(true);
-    expect(pasaFiltro({ estado: "fuera_de_turno" }, "gris")).toBe(true);
-    expect(pasaFiltro({ estado: "activo" }, "rojo")).toBe(false);
   });
 });
 
-describe("el tablero", () => {
-  it("muestra primero a quien se salió, con cuántas veces hoy, y qué tenía en pantalla", async () => {
+describe("Equipo hoy", () => {
+  it("cada departamento dice quién va mal y por qué (no solo un número)", async () => {
     respuesta = { error: null, data: [
       fila("Ana", "activo", { pantalla_at: new Date().toISOString(), pantalla_que: "Infloww · Respondiendo fans" }),
       fila("Karem", "fuera_de_cowork", { fuera_hoy_veces: 2, fuera_hoy_min: 14 }),
+      fila("Luis", "fuera_de_turno", { en_turno: false }),
     ] };
-    render(<DondeEstaPanel />, { wrapper: envolver });
-    const filas = await screen.findAllByRole("listitem");
-    expect(filas[0]).toHaveTextContent("Karem");
-    expect(within(filas[0]).getByText("hr.donde.estado.fueraDeCowork")).toBeInTheDocument();
-    expect(within(filas[0]).getByText(/hr.donde.fueraHoy.*"n":2.*"m":14/)).toBeInTheDocument();
-    expect(within(filas[1]).getByText("Infloww")).toBeInTheDocument();
-    expect(within(filas[0]).getByRole("link")).toHaveAttribute("href", "/hr/expediente/u-Karem");
+    render(<EquipoHoyPanel />, { wrapper: envolver });
+    expect(await screen.findByText("Chatters")).toBeInTheDocument();
+    // La línea del departamento nombra a quien va mal con su porqué.
+    expect(screen.getByText(/Karem \(argos\.motivo\.fueraCowork/)).toBeInTheDocument();
+    expect(screen.getByText("argos.equipo.regla")).toBeInTheDocument();
   });
 
   it("⚠️ si no carga lo DICE y ofrece reintentar", async () => {
     respuesta = { data: null, error: { message: "boom" } };
-    render(<DondeEstaPanel />, { wrapper: envolver });
+    render(<EquipoHoyPanel />, { wrapper: envolver });
     const alerta = await screen.findByRole("alert", {}, { timeout: 4000 });
-    expect(alerta).toHaveTextContent("hr.donde.fallo");
-    expect(screen.queryByText("hr.donde.vacio")).not.toBeInTheDocument();
+    expect(alerta).toHaveTextContent("argos.equipo.fallo");
+    expect(screen.queryByText("argos.equipo.nadieEnTurno")).not.toBeInTheDocument();
   });
 });

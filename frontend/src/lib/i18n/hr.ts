@@ -1051,7 +1051,7 @@ export const hr = {
   // Pestañas nuevas (Alvaro, 08/11): de 5 pestañas a 3 — Ahora (conectados +
   // pantallazos), El día (resumen + historial) y Ajustes.
   "hr.monia.tab.ahora": { es: "En vivo", en: "Live" },
-  "hr.monia.tab.donde": { es: "Dónde está", en: "Where everyone is" },
+  "hr.monia.tab.donde": { es: "Equipo hoy", en: "Team today" },
   "hr.donde.titulo": { es: "Dónde está cada uno", en: "Where everyone is" },
   "hr.donde.sub": { es: "Cada empleado ahora: si está en Cowork, qué tiene en pantalla según la última captura y cuántas veces se salió hoy. Se actualiza solo.", en: "Every employee right now: whether they're in Cowork, what's on their screen per the last capture and how many times they left today. Updates on its own." },
   "hr.donde.buscar": { es: "Buscar empleado", en: "Search employee" },

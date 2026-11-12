@@ -3,7 +3,7 @@ import { Clock, ImageIcon, Loader2, RefreshCw } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ESTADOS, enRango, type Jornada, type Tramo } from "@/lib/argosJornada";
 import type { Momento } from "@/lib/argosMomentos";
-import { NOMBRE_ESTADO, Punto, RELLENO, hora, horaRedonda, textoMin, type Tr } from "./piezas";
+import { CUADRO, NOMBRE_ESTADO, Punto, RELLENO, TARJETA, hora, horaRedonda, textoMin, type Tr } from "./piezas";
 
 // EL TURNO MINUTO A MINUTO (Alvaro, 11/11/2026: «desde el clock in contabilizamos
 // cada minuto»). Una barra de la hora de ENTRADA de su horario a la de SALIDA,
@@ -36,10 +36,10 @@ export function BarraDelTurno({ jornada: j, cargando, error, onReintentar, momen
   const momentoElegido = elegido ? momentos.find((m) => enRango(m.at, elegido.desde, elegido.hasta)) ?? null : null;
 
   return (
-    <section className="vidrio sube mt-4 p-4 lg:p-5">
-      <div className="v-cont">
-        <div className="mb-3 flex flex-wrap items-center gap-x-3 gap-y-1">
-          <p className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground"><Clock className="h-3.5 w-3.5" />{t("argos.barra.titulo")}</p>
+    <section className={cn("mt-5 p-5 sm:p-6", TARJETA)}>
+      <div>
+        <div className="mb-4 flex flex-wrap items-center gap-x-3 gap-y-1">
+          <p className="flex items-center gap-1.5 text-sm font-semibold text-foreground/90"><Clock className="h-4 w-4 text-muted-foreground" />{t("argos.barra.titulo")}</p>
           {j && (
             <span className="ml-auto text-[11px] tabular-nums text-muted-foreground">
               {j.conHorario ? t("argos.barra.horario", { a: hora(j.inicio, lang), b: hora(j.fin, lang) }) : t("argos.barra.sinHorario")}
@@ -59,7 +59,7 @@ export function BarraDelTurno({ jornada: j, cargando, error, onReintentar, momen
           <div className="flex justify-center py-6"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
         ) : (
           <>
-            <div className="relative h-7 w-full overflow-hidden rounded-control bg-foreground/[0.05]" role="group" aria-label={t("argos.barra.aria")}>
+            <div className="relative h-8 w-full overflow-hidden rounded-control bg-foreground/[0.05]" role="group" aria-label={t("argos.barra.aria")}>
               {j.tramos.map((tr) => {
                 const izq = porcentaje(j, tr.desde);
                 const ancho = porcentaje(j, tr.hasta) - izq;
@@ -85,7 +85,7 @@ export function BarraDelTurno({ jornada: j, cargando, error, onReintentar, momen
             </div>
 
             {elegido && (
-              <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1.5 rounded-panel border border-border/50 bg-card/40 px-3 py-2 text-sm">
+              <div className={cn("mt-3 flex flex-wrap items-center gap-x-3 gap-y-1.5 px-4 py-3 text-sm", CUADRO)}>
                 <span className="flex items-center gap-2 font-medium"><Punto estado={elegido.estado} />{t(NOMBRE_ESTADO[elegido.estado])}</span>
                 <span className="tabular-nums text-muted-foreground">{hora(elegido.desde, lang)} – {hora(elegido.hasta, lang)}</span>
                 <span className="font-semibold tabular-nums">{textoMin((elegido.hasta - elegido.desde) / 60_000, t)}</span>
@@ -100,12 +100,12 @@ export function BarraDelTurno({ jornada: j, cargando, error, onReintentar, momen
               </div>
             )}
 
-            <div className="mt-3 grid grid-cols-1 gap-x-6 gap-y-1 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="mt-5 grid grid-cols-1 gap-x-8 gap-y-2 sm:grid-cols-2">
               {ESTADOS.filter((e) => e === "bien" || j.seg[e] > 0).map((e) => (
-                <div key={e} className="flex items-baseline gap-2 text-[12px]">
+                <div key={e} className="flex items-baseline gap-2.5 text-sm">
                   <Punto estado={e} className="self-center" />
                   <span className="min-w-0 flex-1 truncate text-foreground/80">{t(NOMBRE_ESTADO[e])}</span>
-                  <span className="font-semibold tabular-nums">{textoMin(j.seg[e] / 60, t)}</span>
+                  <span className={cn("font-semibold tabular-nums", e !== "bien" && e !== "pausa" && e !== "pendiente" && "text-destructive")}>{textoMin(j.seg[e] / 60, t)}</span>
                 </div>
               ))}
             </div>

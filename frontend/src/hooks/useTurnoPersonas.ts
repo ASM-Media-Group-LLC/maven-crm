@@ -33,6 +33,14 @@ export interface PersonaTurno {
   /** Turno al que la persona está ASIGNADA por su horario (no por cuándo estuvo
    *  activa). "madrugada" 0-8, "am" 8-16, "pm" 16-24; null si no tiene horario. */
   turnoAsignado: "madrugada" | "am" | "pm" | null;
+  /** Segundos crudos del día (para decir el porqué en minutos, Alvaro 11/11). */
+  segActivo: number;
+  segSinPantalla: number;
+  segSinCamara: number;
+  segFueraCamara: number;
+  /** Pantallazos que juzgó Argos y cuántos estaban en lo suyo. */
+  juzgadas: number;
+  juzgadasOk: number;
 }
 
 /** Turno asignado a partir de la hora de entrada (HH:MM). */
@@ -178,6 +186,12 @@ export function useTurnoPersonas(dia: string, hDesde: number, hHasta: number, ha
           salioHHMM: h ? a12(hhmmBogota(h.ultimo)) : null,
           tardeMin,
           turnoAsignado: turnoDeEntrada(horPers.entrada),
+          segActivo: Number(f.seg_activo) || 0,
+          segSinPantalla: Number(f.seg_sin_pantalla) || 0,
+          segSinCamara: Number(f.seg_sin_camara) || 0,
+          segFueraCamara: Number(f.seg_fuera_camara) || 0,
+          juzgadas: juz,
+          juzgadasOk: juzOk,
         };
       });
 
