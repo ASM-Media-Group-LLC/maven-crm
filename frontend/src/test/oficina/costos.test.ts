@@ -179,3 +179,83 @@ describe("el desglose de un mes", () => {
     expect(d.map((l) => [l.servicio.id, l.real, l.proyectado])).toEqual([["claude", 0, 200], ["resend", 0, 20]]);
   });
 });
+
+// ── Cuentas atadas (Alvaro, 11/11: «no me dijiste cuántas cuentas había atadas») ──
+import {
+  contarCuentas, dondeBajarCostos, esLiberable, licenciasQueSobran, ordenarCuentas, type CuentaAtada,
+} from "@/lib/costos";
+
+describe("cuentas atadas y dónde bajar costos", () => {
+  let n = 0;
+  const cu = (p: Partial<CuentaAtada>): CuentaAtada => ({
+    id: `c${++n}`, servicio_id: "zoho", tipo: "buzon", nombre: `cuenta ${n}`, detalle: null, estado: "en_uso",
+    cantidad: 1, ahorro_usd_mes: null, fuente: "verificado", revisado: null, orden: 100, ...p,
+  });
+  // Lo que se verificó el 11/11/2026, en chico.
+  const servicios = [
+    s({ id: "zoho", nombre: "Zoho", monto_usd: null, fuente: "falta", orden: 70, ahorro_detalle: "Libera casillas" }),
+    s({ id: "supabase_otros", nombre: "Supabase: otros", es_maven: false, monto_usd: 185, orden: 200, ahorro_usd: 78.48, ahorro_detalle: "Pausa 8" }),
+    s({ id: "google_ia", nombre: "Google", monto_usd: 48, orden: 10, ahorro_usd: 70, ahorro_detalle: "Flash-Lite" }),
+    s({ id: "elevenlabs", nombre: "ElevenLabs", monto_usd: 0.03, orden: 20 }),
+    s({ id: "resend", nombre: "Resend", monto_usd: 0.54, orden: 60 }),
+    s({ id: "viejo", nombre: "Apagado", activo: false, orden: 1 }),
+  ];
+  const cuentas: CuentaAtada[] = [
+    cu({ servicio_id: "zoho", nombre: "52 casillas de gente activa", cantidad: 52 }),
+    ...Array.from({ length: 13 }, () => cu({ servicio_id: "zoho", estado: "de_alguien_que_salio" })),
+    ...Array.from({ length: 3 }, () => cu({ servicio_id: "zoho", estado: "sin_uso" })),
+    cu({ servicio_id: "zoho", tipo: "puesto", estado: "no_se_puede_ver", fuente: "falta" }),
+    ...Array.from({ length: 8 }, () => cu({ servicio_id: "supabase_otros", tipo: "proyecto", estado: "sin_uso", ahorro_usd_mes: "9.81" as unknown as number })),
+    ...Array.from({ length: 13 }, () => cu({ servicio_id: "supabase_otros", tipo: "proyecto" })),
+    cu({ servicio_id: "google_ia", tipo: "llave" }),
+    cu({ servicio_id: "elevenlabs", tipo: "puesto", ahorro_usd_mes: 19.36 }),
+    ...Array.from({ length: 4 }, () => cu({ servicio_id: "elevenlabs", tipo: "llave", estado: "sin_uso" })),
+    cu({ servicio_id: "viejo", tipo: "llave", estado: "sin_uso", ahorro_usd_mes: 500 }),
+  ];
+
+  it("cuenta por estado, con la cantidad de cada renglón", () => {
+    const k = contarCuentas(cuentas.filter((c) => c.servicio_id === "zoho"));
+    expect(k).toMatchObject({ en_uso: 52, de_alguien_que_salio: 13, sin_uso: 3, no_se_puede_ver: 1, total: 69, liberables: 16 });
+    // Sin precio no es «ahorro 0»: no se sabe.
+    expect(k.conPrecio).toBe(false);
+    expect(k.ahorro).toBe(0);
+    // PostgREST manda numeric como texto.
+    expect(contarCuentas(cuentas.filter((c) => c.servicio_id === "supabase_otros")).ahorro).toBe(78.48);
+    expect(esLiberable({ estado: "no_se_puede_ver" })).toBe(false);
+  });
+
+  it("primero lo que se puede soltar, el ahorro más grande arriba; lo que se usa al final", () => {
+    const orden = ordenarCuentas([
+      cu({ nombre: "activa", estado: "en_uso" }),
+      cu({ nombre: "no se ve", estado: "no_se_puede_ver" }),
+      cu({ nombre: "salió", estado: "de_alguien_que_salio", orden: 10 }),
+      cu({ nombre: "parado", estado: "sin_uso", ahorro_usd_mes: 9.81, orden: 50 }),
+    ]);
+    expect(orden.map((c) => c.nombre)).toEqual(["parado", "salió", "no se ve", "activa"]);
+  });
+
+  it("dónde bajar: las cuentas mandan sobre el ahorro del servicio y nada se cuenta dos veces", () => {
+    const r = dondeBajarCostos(servicios, cuentas);
+    expect(r.candidatos.map((c) => [c.servicio.id, c.ahorro])).toEqual([
+      ["supabase_otros", 78.48], // de sus 8 proyectos parados, no el 78,48 del servicio sumado encima
+      ["google_ia", 70],         // sin cuentas para soltar: manda el ahorro del servicio
+      ["elevenlabs", 19.36],     // el plan; las 4 llaves sin uso no tienen precio
+      ["zoho", null],            // 16 casillas para soltar, pero el precio no se ve
+    ]);
+    expect(r.total).toBe(167.84);
+    expect(r.sinPrecio).toBe(1);
+    expect(r.candidatos.find((c) => c.servicio.id === "zoho")?.conteo?.liberables).toBe(16);
+    // Lo apagado no cuenta, aunque tenga cuentas con ahorro.
+    expect(r.candidatos.some((c) => c.servicio.id === "viejo")).toBe(false);
+  });
+
+  it("sin cuentas ni ahorros no hay candidatos (y no se inventa nada)", () => {
+    expect(dondeBajarCostos([s({ id: "x" })], [])).toEqual({ candidatos: [], total: 0, sinPrecio: 0 });
+  });
+
+  it("Zoho en vivo: cuántas licencias sobran hoy y si se sueltan las de gente que salió", () => {
+    const resumen = { en_uso: 52, sin_uso: 3, de_alguien_que_salio: 13, sin_cuenta_en_maven: 1, total: 69 };
+    expect(licenciasQueSobran({ licencias: { compradas: 70, usadas: 69 }, resumen })).toEqual({ libresHoy: 1, libresDespues: 17 });
+    expect(licenciasQueSobran({ licencias: null, resumen })).toBeNull();
+  });
+});

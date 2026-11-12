@@ -7,8 +7,10 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "
 import { useLanguage } from "@/hooks/useLanguage";
 import {
   CATEGORIAS, desgloseDelMes, dondeAhorrar, mensual, num, serieDelAno, tablero, usd,
-  type BarraMes, type Cobro, type ServicioCosto, type Tablero,
+  type BarraMes, type Cobro, type CuentaAtada, type ServicioCosto, type Tablero,
 } from "@/lib/costos";
+import type { UseQueryResult } from "@tanstack/react-query";
+import { BloqueBajarCostos, SeccionCuentas, usarCuentas } from "./CuentasAtadas";
 
 // COSTOS DE MAVEN — DISEÑO «A · UNA CIFRA» (Alvaro, 11/11/2026, lo eligió entre
 // tres propuestas: https://claude.ai/artifact/RG42FisWLPeXbpmiVoiZEm).
@@ -19,6 +21,8 @@ import {
 // mes, lo pagado en el año y el precio al mes («no me lo disfraces»). Cada
 // servicio abre su ficha; cada mes de la gráfica, su desglose; y los ahorros se
 // marcan para ver cómo baja la cuenta. Lógica con tests en lib/costos.ts.
+// Debajo del total, «Dónde puedes bajar costos», y en cada ficha sus cuentas
+// atadas (casillas, proyectos, llaves, servidores): ver CuentasAtadas.tsx.
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const sinTipar = supabase as unknown as { from: (t: string) => any };
@@ -215,6 +219,7 @@ function TablaServicios({ tb, nombreMes, ano, onAbrir }: { tb: Tablero; nombreMe
 export default function TableroCostos() {
   const { t, language } = useLanguage();
   const q = usarCostos();
+  const cuentas = usarCuentas();
   const [mesElegido, setMesElegido] = useState<string | null>(null);
   const [abierto, setAbierto] = useState<string | null>(null);
   const [marcados, setMarcados] = useState<Set<string>>(new Set());
@@ -250,7 +255,7 @@ export default function TableroCostos() {
   const totalSel = desglose.reduce((a, l) => a + l.real + l.proyectado, 0);
   const pagadoSel = desglose.reduce((a, l) => a + l.real, 0);
   const proximos = proximosCobros(tb.porServicio.map((p) => p.servicio), cobros, hoy);
-  const ficha = abierto ? tb.porServicio.find((p) => p.servicio.id === abierto) ?? null : null;
+  const ficha = abierto ? fichaDe(abierto, tb, servicios) : null;
   const alternar = (id: string) => setMarcados((prev) => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n; });
 
   let mesAnterior = "";
@@ -280,6 +285,9 @@ export default function TableroCostos() {
           <Cifra valor={redondo(tb.proximos12)} etiqueta={t("oficina.costos.kpi12")} detalle={t("oficina.costos.promedio", { m: redondo(tb.promedioProximo) })} />
         </div>
       </section>
+
+      {/* «No me dijiste cuántas cuentas había atadas para poder bajar costos.» */}
+      <BloqueBajarCostos servicios={servicios} cuentas={cuentas} onAbrir={setAbierto} />
 
       <Tarjeta titulo={t("oficina.costos.graficaTitulo", { a: ano })}
         derecha={<span className="text-xs text-muted-foreground">{t("oficina.costos.graficaLeyenda")}</span>}>
@@ -377,7 +385,7 @@ export default function TableroCostos() {
 
       <Sheet open={!!ficha} onOpenChange={(o) => { if (!o) setAbierto(null); }}>
         <SheetContent side="right" className="w-full overflow-y-auto sm:max-w-md">
-          {ficha && <FichaServicio ficha={ficha} cobros={cobros.filter((c) => c.servicio_id === ficha.servicio.id)} hoy={hoy} idioma={language} nombreMes={nombreMes} />}
+          {ficha && <FichaServicio ficha={ficha} cobros={cobros.filter((c) => c.servicio_id === ficha.servicio.id)} hoy={hoy} idioma={language} nombreMes={nombreMes} cuentas={cuentas} />}
         </SheetContent>
       </Sheet>
     </div>
@@ -401,9 +409,19 @@ function esFutura(fecha: string, hoy: string): boolean {
   return fecha.localeCompare(hoy) > 0;
 }
 
-/** La ficha de un servicio: lo pagado este mes y en el año, el precio, cada cobro y cómo ahorrar. */
-function FichaServicio({ ficha, cobros, hoy, idioma, nombreMes }: {
+/** La ficha que se abre: la de un servicio de Maven (con lo que gastó) o, si
+ *  no es Maven (los otros proyectos de Supabase), solo su precio y sus cuentas. */
+function fichaDe(id: string, tb: Tablero, servicios: ServicioCosto[]): Tablero["porServicio"][number] | null {
+  const deMaven = tb.porServicio.find((p) => p.servicio.id === id);
+  if (deMaven) return deMaven;
+  const s = servicios.find((x) => x.id === id && x.activo);
+  return s ? { servicio: s, mes: { gastado: 0, proyectado: 0 }, alMes: mensual(s) ?? 0, ano: 0 } : null;
+}
+
+/** La ficha de un servicio: lo pagado este mes y en el año, el precio, cada cobro, sus cuentas atadas y cómo ahorrar. */
+function FichaServicio({ ficha, cobros, hoy, idioma, nombreMes, cuentas }: {
   ficha: Tablero["porServicio"][number]; cobros: Cobro[]; hoy: string; idioma: string; nombreMes: string;
+  cuentas: UseQueryResult<CuentaAtada[]>;
 }) {
   const { t } = useLanguage();
   const { servicio: s, mes, alMes, ano } = ficha;
@@ -412,6 +430,10 @@ function FichaServicio({ ficha, cobros, hoy, idioma, nombreMes }: {
   const fecha = (f: string) => new Date(`${f}T12:00:00Z`).toLocaleDateString(idioma, { day: "numeric", month: "short", year: "numeric" });
   const panel = PANEL[s.id];
   const falta = s.monto_usd === null;
+  // Lo que no es Maven no tiene «gastado por Maven»: se muestra solo su precio.
+  const sinGasto = falta || !s.es_maven;
+  // Si sus cuentas ya dicen cuánto se ahorra, el ahorro del servicio no se repite.
+  const ahorroEnCuentas = (cuentas.data ?? []).some((c) => c.servicio_id === s.id && (num(c.ahorro_usd_mes) ?? 0) > 0);
   return (
     <div className="flex flex-col gap-5">
       <SheetHeader className="text-left">
@@ -422,9 +444,9 @@ function FichaServicio({ ficha, cobros, hoy, idioma, nombreMes }: {
 
       <div className="grid grid-cols-2 gap-px overflow-hidden rounded-panel border border-border/50 bg-border/50">
         {[
-          [t("oficina.costos.colPagadoMes", { mes: nombreMes }), falta ? "—" : exacto(mes.gastado)],
-          [t("oficina.costos.colFaltaMes", { mes: nombreMes }), falta ? "—" : exacto(Math.max(0, mes.proyectado - mes.gastado))],
-          [t("oficina.costos.colPagadoAno", { a: hoy.slice(0, 4) }), falta ? "—" : exacto(ano)],
+          [t("oficina.costos.colPagadoMes", { mes: nombreMes }), sinGasto ? "—" : exacto(mes.gastado)],
+          [t("oficina.costos.colFaltaMes", { mes: nombreMes }), sinGasto ? "—" : exacto(Math.max(0, mes.proyectado - mes.gastado))],
+          [t("oficina.costos.colPagadoAno", { a: hoy.slice(0, 4) }), sinGasto ? "—" : exacto(ano)],
           [t("oficina.costos.colPrecio"), falta ? "—" : exacto(alMes)],
         ].map(([k, v]) => (
           <div key={k} className="bg-card p-3">
@@ -442,7 +464,7 @@ function FichaServicio({ ficha, cobros, hoy, idioma, nombreMes }: {
       {s.detalle && <p className="text-sm text-muted-foreground">{s.detalle}</p>}
       {s.proximo_detalle && <p className="text-sm text-warning">{s.proximo_detalle}</p>}
 
-      {(anunciados.length > 0 || (s.dia_cobro && !falta)) && (
+      {s.es_maven && (anunciados.length > 0 || (s.dia_cobro && !falta)) && (
         <div className="flex flex-col gap-1.5">
           <h3 className="text-xs font-semibold text-muted-foreground">{t("oficina.costos.fichaProximo")}</h3>
           {anunciados.map((c) => (
@@ -457,22 +479,26 @@ function FichaServicio({ ficha, cobros, hoy, idioma, nombreMes }: {
         </div>
       )}
 
-      <div className="flex flex-col gap-1.5">
-        <h3 className="text-xs font-semibold text-muted-foreground">{t("oficina.costos.fichaCobros", { n: pasados.length })}</h3>
-        {pasados.length === 0 ? <p className="text-xs text-muted-foreground">{t("oficina.costos.fichaSinCobros")}</p> : (
-          <ul className="flex flex-col divide-y divide-border/40 rounded-panel border border-border/50">
-            {pasados.map((c, i) => (
-              <li key={`${c.fecha}-${i}`} className="grid grid-cols-[6.5rem_minmax(0,1fr)_auto] items-center gap-3 px-3 py-2">
-                <span className="text-xs tabular-nums text-muted-foreground">{fecha(c.fecha)}</span>
-                <span className="min-w-0 truncate text-xs">{c.nota ?? ""}{c.fuente === "estimado" ? ` · ${t("oficina.costos.fuente.estimado").toLowerCase()}` : ""}</span>
-                <span className="text-sm font-semibold tabular-nums">{exacto(Number(c.monto_usd))}</span>
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
+      {s.es_maven && (
+        <div className="flex flex-col gap-1.5">
+          <h3 className="text-xs font-semibold text-muted-foreground">{t("oficina.costos.fichaCobros", { n: pasados.length })}</h3>
+          {pasados.length === 0 ? <p className="text-xs text-muted-foreground">{t("oficina.costos.fichaSinCobros")}</p> : (
+            <ul className="flex flex-col divide-y divide-border/40 rounded-panel border border-border/50">
+              {pasados.map((c, i) => (
+                <li key={`${c.fecha}-${i}`} className="grid grid-cols-[6.5rem_minmax(0,1fr)_auto] items-center gap-3 px-3 py-2">
+                  <span className="text-xs tabular-nums text-muted-foreground">{fecha(c.fecha)}</span>
+                  <span className="min-w-0 truncate text-xs">{c.nota ?? ""}{c.fuente === "estimado" ? ` · ${t("oficina.costos.fuente.estimado").toLowerCase()}` : ""}</span>
+                  <span className="text-sm font-semibold tabular-nums">{exacto(Number(c.monto_usd))}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
 
-      {s.ahorro_detalle && Number(s.ahorro_usd) > 0 && (
+      <SeccionCuentas servicioId={s.id} cuentas={cuentas} />
+
+      {s.ahorro_detalle && Number(s.ahorro_usd) > 0 && !ahorroEnCuentas && (
         <div className="rounded-panel border border-success/30 bg-success/5 p-3">
           <div className="font-display text-base font-semibold tabular-nums text-success">{t("oficina.costos.fichaAhorro", { m: redondo(Number(s.ahorro_usd)) })}</div>
           <p className="text-xs text-muted-foreground">{s.ahorro_detalle}</p>
