@@ -760,8 +760,9 @@ export default function HRExpediente() {
   // panel de Argos, trae su URL en el state (volverA) y la usa; si no, al monitor.
   const volverA = (location.state as { volverA?: string } | null)?.volverA ?? "/hr/monitor-ia";
   const hoyStr = useMemo(() => new Date().toLocaleDateString("en-CA", { timeZone: "America/Bogota" }), []);
-  // Se abre en HOY. El día elegido manda; el mes sale de él (para cargar y para el calendario).
-  const [diaSel, setDiaSel] = useState<string>(hoyStr);
+  // Se abre en HOY, o en el día que traiga el link (?dia=AAAA-MM-DD, nunca futuro).
+  // El día elegido manda; el mes sale de él (para cargar y para el calendario).
+  const [diaSel, setDiaSel] = useState<string>(() => diaDelLink(location.search, hoyStr));
   const [verCalendario, setVerCalendario] = useState(false);
   const [verDesglose, setVerDesglose] = useState(false);
   const anio = Number(diaSel.slice(0, 4));
@@ -976,4 +977,11 @@ export default function HRExpediente() {
       </section>
     </Page>
   );
+}
+
+/** El día que pide el link (`?dia=AAAA-MM-DD`), si es válido y no es futuro; si no, hoy. */
+function diaDelLink(search: string, hoy: string): string {
+  const pedido = new URLSearchParams(search).get("dia");
+  if (pedido && /^\d{4}-\d{2}-\d{2}$/.test(pedido) && pedido <= hoy) return pedido;
+  return hoy;
 }
