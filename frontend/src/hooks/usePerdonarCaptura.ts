@@ -28,8 +28,6 @@ export function usePerdonarCaptura() {
       qc.invalidateQueries({ queryKey: ["expediente"] });
       qc.invalidateQueries({ queryKey: ["argos-turno-personas"] });
       qc.invalidateQueries({ queryKey: ["resumen-dia"] });
-      qc.invalidateQueries({ queryKey: ["argos-dia"] });
-      qc.invalidateQueries({ queryKey: ["argos-evidencia"] });
     },
   });
 }

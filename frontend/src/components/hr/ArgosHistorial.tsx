@@ -3,31 +3,22 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceArea } from "recharts";
 import { Clock, Loader2, AlertTriangle, ChevronLeft, ChevronRight, Sunrise, Sun, Moon, Eye } from "lucide-react";
 import { useLanguage } from "@/hooks/useLanguage";
-import { LetraAvatar } from "@/components/vigilancia/piezas";
+import { UserAvatar } from "@/components/UserAvatar";
 import { useHorasDia, type HoraDia } from "@/hooks/useHorasDia";
-import { turnoDeEntrada, useTurnoPersonas, type PersonaTurno } from "@/hooks/useTurnoPersonas";
-import { useDondeEsta } from "@/hooks/useDondeEsta";
-import { armarDeptosDelDia, type MiembroRoster } from "@/lib/argosEquipo";
-import { DetalleDepto, TarjetasDeDeptos } from "@/components/argos/Departamentos";
+import { useTurnoPersonas, type PersonaTurno } from "@/hooks/useTurnoPersonas";
 import type { TranslationKey } from "@/lib/i18n";
 
 // HISTORIAL del día (Alvaro, 04/11): el día partido en 3 turnos (hora Colombia).
 // ARRIBA la gráfica hora por hora (pantalla/cámara/atención del equipo) con el
 // fondo dividido en franjas AM/PM/Madrugada; ABAJO 3 cajas, una por turno, con el
 // resumen. Así el dueño ve el panorama: cómo estuvo la mañana, la tarde, la noche.
-//
-// 11/11 (Alvaro: «los cuadritos casi no se logran ver» y «las ⚠ parecen
-// emojis»): las mismas tarjetas, con más contraste, radios chicos parejos y la
-// misma altura; las fallas van en texto simple, sin el triángulo.
 
 type Tr = (k: TranslationKey, v?: Record<string, string | number>) => string;
 
 // Tonos APAGADOS, no neón (Alvaro 09/11: "los colores muy encendidos me hacen
 // mierda"). Se bajó la saturación del azul (cámara) y el morado (atención) para
 // que el número se insinúe, no grite. Pantalla sigue el primario de la skin.
-// Diseño serio (Alvaro, 11/11): las tres líneas en tinta, distinguidas por el trazo.
-const COLOR = { pantalla: "hsl(var(--foreground) / 0.85)", camara: "hsl(var(--foreground) / 0.55)", atencion: "hsl(var(--foreground) / 0.35)" } as const;
-const TRAZO = { pantalla: undefined, camara: "6 4", atencion: "2 4" } as const;
+const COLOR = { pantalla: "hsl(var(--primary))", camara: "hsl(205 42% 62%)", atencion: "hsl(256 30% 66%)" } as const;
 
 // Turnos (hora Colombia): Madrugada 0-8, AM 8-16, PM 16-24. Se muestran en el
 // orden que pidió Alvaro: AM, PM, Madrugada.
@@ -81,21 +72,26 @@ function fallasDe(p: PersonaTurno, t: Tr): string[] {
 // nota; clic → su expediente (y sus pantallazos de ese día). Peor → mejor.
 // Nota como TILE de color TENUE (Alvaro 08/11: "vida con glow, tono apagado, no
 // neón"). El color se insinúa, no grita.
+const NOTA_TILE: Record<string, string> = {
+  bien: "bg-success/10 text-success/90", ojo: "bg-warning/10 text-warning/90", mal: "bg-destructive/10 text-destructive/90",
+};
 function PersonaFilaTurno({ p, t, onClick }: { p: PersonaTurno; t: Tr; onClick: () => void }) {
   const f = (c: string) => p.nota.factores.find((x) => x.clave === c)?.sub ?? null;
   const txt = (v: number | null) => (v == null ? "—" : `${Math.round(v)}%`);
   const fallas = fallasDe(p, t);
-  const notaTile = p.nota.valor != null && p.nota.valor < 60 ? "text-destructive" : "text-foreground";
+  const notaTile = p.nota.banda ? NOTA_TILE[p.nota.banda] : "bg-muted/40 text-muted-foreground";
   return (
-    <button type="button" onClick={onClick} title={t("hr.hist.verExpediente")} className="group flex w-full items-center gap-4 rounded-control border border-border bg-background px-4 py-3 text-left transition hover:border-foreground/40">
-      <LetraAvatar nombre={p.nombre || t("hr.noName")} tamano="md" />
+    <button type="button" onClick={onClick} title={t("hr.hist.verExpediente")} className="group flex w-full items-center gap-3 rounded-xl border border-border/40 bg-card/20 px-3 py-2 text-left transition hover:border-primary/30 hover:bg-card/40">
+      <UserAvatar name={p.nombre || t("hr.noName")} src={p.avatarUrl} seed={p.avatarSeed} size="sm" />
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
           <span className="truncate text-sm font-medium">{p.nombre || t("hr.noName")}</span>
-          {/* Las fallas en texto simple (sin ⚠ ni pastillas). */}
-          {fallas.length > 0 && <span className="text-xs font-medium text-destructive">{fallas.join(" · ")}</span>}
+          {/* Pastillas SUAVES (apagadas): se notan sin chillar. */}
+          {fallas.map((fl) => (
+            <span key={fl} className="inline-flex items-center gap-1 rounded-full bg-foreground/5 px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground"><AlertTriangle className="h-2.5 w-2.5 text-warning/70" />{fl}</span>
+          ))}
         </div>
-        <div className="mt-0.5 flex flex-wrap gap-x-2.5 text-[11px] text-foreground/70">
+        <div className="mt-0.5 flex flex-wrap gap-x-2.5 text-[11px] text-muted-foreground">
           <span>{t("hr.resumen.pantalla")} <span className="tabular-nums">{txt(f("pantalla"))}</span></span>
           <span>{t("hr.resumen.camara")} <span className="tabular-nums">{txt(f("camara"))}</span></span>
           <span>{t("hr.resumen.atencion")} <span className="tabular-nums">{txt(f("atencion"))}</span></span>
@@ -107,14 +103,14 @@ function PersonaFilaTurno({ p, t, onClick }: { p: PersonaTurno; t: Tr; onClick: 
             {p.entroHHMM && (
               <span className="tabular-nums">
                 · entró {p.entroHHMM}
-                {p.tardeMin != null && p.tardeMin > 0 && <span className="ml-1 text-destructive">(+{p.tardeMin}m)</span>}
+                {p.tardeMin != null && p.tardeMin > 0 && <span className="ml-1 text-warning/80">(+{p.tardeMin}m)</span>}
               </span>
             )}
             {p.salioHHMM && <span className="tabular-nums">· salió {p.salioHHMM}</span>}
           </div>
         )}
       </div>
-      <span className={`shrink-0 font-display text-xl font-semibold tabular-nums ${notaTile}`}>{p.nota.valor ?? "—"}</span>
+      <span className={`shrink-0 rounded-lg px-2 py-1 font-display text-sm font-bold tabular-nums ${notaTile}`}>{p.nota.valor ?? "—"}</span>
       <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground/60 transition group-hover:translate-x-0.5 group-hover:text-foreground" />
     </button>
   );
@@ -127,7 +123,7 @@ function TurnoDetalle({ turno, dia, resumen, t, onVolver, onPersona }: {
   turno: Turno; dia: string; resumen: { pantalla: number | null; camara: number | null; atencion: number | null; personas: number };
   t: Tr; onVolver: () => void; onPersona: (id: string) => void;
 }) {
-  const { personas: todas, cargando, error } = useTurnoPersonas(dia, turno.from, turno.to, true);
+  const { personas: todas, cargando } = useTurnoPersonas(dia, turno.from, turno.to, true);
   // Solo la gente ASIGNADA a este turno por su horario (Alvaro, 08/11): Eric es
   // de madrugada y seguía conectado a las 8 → NO aparece en AM. Los que no tienen
   // horario asignado van a un apartado "Sin turno asignado", no se mezclan.
@@ -142,7 +138,7 @@ function TurnoDetalle({ turno, dia, resumen, t, onVolver, onPersona }: {
       <div className="flex flex-wrap items-center gap-3">
         <button type="button" onClick={onVolver} className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-xs text-muted-foreground transition hover:bg-foreground/5 hover:text-foreground"><ChevronLeft className="h-4 w-4" />{t("hr.hist.volver")}</button>
         <div className="flex items-center gap-2">
-          <span className="flex h-7 w-7 items-center justify-center rounded-full" style={{ background: "hsl(var(--foreground) / 0.06)", color: "hsl(var(--muted-foreground))" }}><Icono className="h-4 w-4" /></span>
+          <span className="flex h-7 w-7 items-center justify-center rounded-full" style={{ background: `${turno.color}1f`, color: turno.color }}><Icono className="h-4 w-4" /></span>
           <span className="font-display text-base font-bold">{t(turno.lbl)}</span>
           <span className="text-xs font-normal text-muted-foreground">{t("hr.hist.horario", { a: turno.from, b: turno.to })}</span>
         </div>
@@ -155,14 +151,14 @@ function TurnoDetalle({ turno, dia, resumen, t, onVolver, onPersona }: {
           { lbl: t("hr.resumen.camara"), v: resumen.camara, c: COLOR.camara },
           { lbl: t("hr.resumen.atencion"), v: resumen.atencion, c: COLOR.atencion },
         ].map((m) => (
-          <div key={m.lbl} className="flex min-h-[5.5rem] flex-col justify-center gap-1 rounded-control border border-border bg-background p-3 text-center">
-            <div className={`font-display text-2xl font-semibold tabular-nums ${m.v != null && m.v < 60 ? "text-destructive" : ""}`}>{m.v == null ? "—" : `${m.v}%`}</div>
-            <div className="text-[11px] font-medium text-foreground/75">{m.lbl}</div>
+          <div key={m.lbl} className="rounded-xl border border-border/40 bg-card/20 p-2.5 text-center">
+            <div className="font-display text-lg font-bold tabular-nums" style={{ color: m.c }}>{m.v == null ? "—" : `${m.v}%`}</div>
+            <div className="text-[10px] text-muted-foreground">{m.lbl}</div>
           </div>
         ))}
-        <div className={`flex min-h-[5.5rem] flex-col justify-center gap-1 rounded-control border p-3 text-center bg-background ${enProblema > 0 ? "border-destructive/60" : "border-border"}`}>
-          <div className={`font-display text-xl font-bold tabular-nums ${enProblema > 0 ? "text-destructive" : ""}`}>{enProblema}</div>
-          <div className="text-[11px] font-medium text-foreground/75">{t("hr.hist.enProblemaLbl")}</div>
+        <div className={`rounded-xl border p-2.5 text-center ${enProblema > 0 ? "border-destructive/40 bg-destructive/5" : "border-border/40 bg-card/20"}`}>
+          <div className={`font-display text-lg font-bold tabular-nums ${enProblema > 0 ? "text-destructive" : ""}`}>{enProblema}</div>
+          <div className="text-[10px] text-muted-foreground">{t("hr.hist.enProblemaLbl")}</div>
         </div>
       </div>
 
@@ -170,27 +166,25 @@ function TurnoDetalle({ turno, dia, resumen, t, onVolver, onPersona }: {
           → su expediente. El corte "Por departamento" queda como vista opcional
           (toggle), no un paso obligado que hacía dar vueltas. */}
       <div className="flex items-center justify-end">
-        <div className="inline-flex rounded-control border border-border/60 bg-card/30 p-0.5 text-xs">
+        <div className="inline-flex rounded-full border border-border/50 bg-card/20 p-0.5 text-xs">
           <button type="button" onClick={() => setVista("personas")}
-            className={`rounded-[6px] px-3 py-1 font-medium transition ${vista === "personas" ? "bg-foreground/[0.09] text-foreground" : "text-muted-foreground hover:text-foreground"}`}>
+            className={`rounded-full px-3 py-1 font-medium transition ${vista === "personas" ? "bg-primary/15 text-primary" : "text-muted-foreground hover:text-foreground"}`}>
             {t("hr.hist.vistaPersonas")}
           </button>
           <button type="button" onClick={() => setVista("deptos")}
-            className={`rounded-[6px] px-3 py-1 font-medium transition ${vista === "deptos" ? "bg-foreground/[0.09] text-foreground" : "text-muted-foreground hover:text-foreground"}`}>
+            className={`rounded-full px-3 py-1 font-medium transition ${vista === "deptos" ? "bg-primary/15 text-primary" : "text-muted-foreground hover:text-foreground"}`}>
             {t("hr.hist.vistaDeptos")}
           </button>
         </div>
       </div>
-      {/* Un fallo se dice como fallo, nunca como «nadie trabajó». */}
-      {error ? <p role="alert" className="py-6 text-center text-sm text-destructive">{t("argos.hist.fallo")}</p>
-        : vista === "personas"
+      {vista === "personas"
         ? <PersonasConFiltro personas={personas} cargando={cargando} t={t} onPersona={onPersona} />
-        : <DeptosDelTurno personas={personas} cargando={cargando} t={t} onPersona={onPersona} turnoKey={turno.key} horas={turno.to - turno.from} />}
+        : <DeptosDelTurno personas={personas} cargando={cargando} t={t} onPersona={onPersona} />}
 
       {/* Apartado aparte: quienes estuvieron activos en esta franja pero NO tienen
           turno asignado. No se mezclan con los del turno. */}
-      {!cargando && !error && sinTurno.length > 0 && (
-        <details className="rounded-control border border-border bg-background p-4">
+      {!cargando && sinTurno.length > 0 && (
+        <details className="rounded-2xl border border-dashed border-border/40 bg-card/10 p-3">
           <summary className="cursor-pointer select-none text-xs font-medium text-muted-foreground">
             {t("hr.hist.sinTurnoAsignado", { n: sinTurno.length })}
           </summary>
@@ -203,42 +197,92 @@ function TurnoDetalle({ turno, dia, resumen, t, onVolver, onPersona }: {
   );
 }
 
-// Los DEPARTAMENTOS de un turno (Alvaro 05/11; 11/11: «solo un 89 no me dice
-// nada»): cada tarjeta dice cuántos vinieron, cuántos fueron bien, cuántos mal y
-// quién no vino, y QUIÉN fue mal y por qué en minutos. Al tocarla, su gente:
-// primero quien fue mal, luego quien fue bien, luego quien no vino.
-/** La gente que DEBÍA estar (hoy en su horario): para decir quién no vino. */
-function useRoster(filtro: (entrada: string | null) => boolean): MiembroRoster[] {
-  const donde = useDondeEsta();
-  return useMemo(() => (donde.data ?? [])
-    .filter((f) => f.entrada && f.salida && filtro(f.entrada))
-    .map((f) => {
-      const [eh, em] = (f.entrada ?? "0:0").split(":").map(Number);
-      const [sh, sm] = (f.salida ?? "0:0").split(":").map(Number);
-      let min = sh * 60 + sm - (eh * 60 + em);
-      if (min <= 0) min += 24 * 60;
-      return { userId: f.user_id, nombre: f.nombre ?? "", equipo: f.equipo ?? "Otros", jornadaHoras: min / 60 };
-    }),
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  [donde.data]);
-}
-
-function DeptosDelTurno({ personas, cargando, t, onPersona, turnoKey, horas }: {
-  personas: PersonaTurno[]; cargando: boolean; t: Tr; onPersona: (id: string) => void; turnoKey: string; horas: number;
+// Cajas por departamento dentro de un turno + drill-in (Alvaro 05/11). Peor
+// departamento primero (más con problema). Clic → ves solo esa gente.
+function DeptosDelTurno({ personas, cargando, t, onPersona }: {
+  personas: PersonaTurno[]; cargando: boolean; t: Tr; onPersona: (id: string) => void;
 }) {
   const [deptoSel, setDeptoSel] = useState<string | null>(null);
-  const roster = useRoster((entrada) => turnoDeEntrada(entrada) === turnoKey);
-  const armado = useMemo(() => armarDeptosDelDia(personas, roster, horas), [personas, roster, horas]);
+  const deptos = useMemo(() => {
+    const m = new Map<string, PersonaTurno[]>();
+    for (const p of personas) (m.get(p.equipo) ?? m.set(p.equipo, []).get(p.equipo)!).push(p);
+    return [...m.entries()].map(([nombre, gente]) => ({
+      nombre,
+      gente,
+      total: gente.length,
+      conFallas: gente.filter((p) => tiposFallaDe(p).length > 0).length,
+      conTarde: gente.filter((p) => p.tardeMin != null && p.tardeMin > 0).length,
+      notaProm: (() => {
+        const con = gente.map((p) => p.nota.valor).filter((n): n is number => n != null);
+        return con.length ? Math.round(con.reduce((a, b) => a + b, 0) / con.length) : null;
+      })(),
+    })).sort((a, b) =>
+      // Primero los que tienen problema; luego por peor nota.
+      (b.conFallas > 0 ? 1 : 0) - (a.conFallas > 0 ? 1 : 0)
+      || (a.notaProm ?? 101) - (b.notaProm ?? 101)
+      || a.nombre.localeCompare(b.nombre, "es"),
+    );
+  }, [personas]);
 
   if (cargando) return <p className="py-8 text-center text-sm text-muted-foreground">{t("hr.hist.cargando")}</p>;
-  if (armado.deptos.length === 0) return <p className="py-8 text-center text-sm text-muted-foreground">{t("hr.hist.sinGente")}</p>;
-  const d = deptoSel ? armado.deptos.find((x) => x.nombre === deptoSel) ?? null : null;
-  if (d) return <DetalleDepto d={d} vivo={false} regla={t("argos.equipo.reglaDia")} onVolver={() => setDeptoSel(null)} onPersona={onPersona} t={t} />;
+  if (deptos.length === 0) return <p className="py-8 text-center text-sm text-muted-foreground">{t("hr.hist.sinGente")}</p>;
+
+  // Drill: gente del depto seleccionado (con los mismos filtros de tipo).
+  if (deptoSel) {
+    const d = deptos.find((x) => x.nombre === deptoSel);
+    if (!d) { setDeptoSel(null); return null; }
+    return (
+      <div className="space-y-3">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <button type="button" onClick={() => setDeptoSel(null)} className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-xs text-muted-foreground transition hover:bg-foreground/5 hover:text-foreground"><ChevronLeft className="h-4 w-4" />{t("hr.hist.volverDeptos")}</button>
+          <span className="flex items-center gap-2 text-sm">
+            <span className="font-semibold">{d.nombre}</span>
+            <span className="text-xs text-muted-foreground">· {t("hr.hist.deptoGente", { n: d.total })}{d.conFallas > 0 ? ` · ${t("hr.hist.deptoConFallas", { n: d.conFallas })}` : ""}</span>
+          </span>
+        </div>
+        <PersonasConFiltro personas={d.gente} cargando={false} t={t} onPersona={onPersona} />
+      </div>
+    );
+  }
 
   return (
     <div>
       <p className="mb-2 flex items-center gap-1.5 text-xs font-semibold text-muted-foreground"><Eye className="h-3.5 w-3.5" />{t("hr.hist.deptos")}</p>
-      <TarjetasDeDeptos deptos={armado.deptos} onAbrir={setDeptoSel} t={t} vivo={false} />
+      <div className="grid gap-2.5 sm:grid-cols-2 lg:grid-cols-3">
+        {deptos.map((d) => {
+          // Glassy con VIDA (Alvaro 08/11): resplandor sutil del vidrio según cómo
+          // va el depto (no un semáforo chillón) + nota como tile de color TENUE.
+          // El texto queda neutro; el color se insinúa, no grita.
+          const glow = d.conFallas > 0 ? "glow-a" : (d.notaProm ?? 100) < 80 ? "glow-a" : "glow-g";
+          const notaTile = d.notaProm == null ? "bg-muted/40 text-muted-foreground" :
+            d.notaProm >= 80 ? "bg-success/10 text-success/90" : d.notaProm >= 60 ? "bg-warning/10 text-warning/90" : "bg-destructive/10 text-destructive/90";
+          return (
+            <button key={d.nombre} type="button" onClick={() => setDeptoSel(d.nombre)}
+              className={`group vidrio vidrio-glow vidrio-lift ${glow} text-left`}>
+              <div className="v-cont flex items-center gap-3 px-3.5 py-2.5">
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-baseline gap-2">
+                    <span className="truncate text-sm font-semibold">{d.nombre}</span>
+                    <span className="text-[11px] text-muted-foreground tabular-nums">{t("hr.hist.deptoGente", { n: d.total })}</span>
+                  </div>
+                  <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] text-muted-foreground">
+                    {d.conFallas > 0 ? (
+                      <span className="inline-flex items-center gap-1"><AlertTriangle className="h-3 w-3 text-warning/70" />{t("hr.hist.deptoConFallas", { n: d.conFallas })}</span>
+                    ) : (
+                      <span>{t("hr.hist.deptoSinFallas")}</span>
+                    )}
+                    {d.conTarde > 0 && (
+                      <span className="inline-flex items-center gap-1">· <Clock className="h-3 w-3" />{t("hr.hist.deptoTarde", { n: d.conTarde })}</span>
+                    )}
+                  </div>
+                </div>
+                <span className={`shrink-0 rounded-lg px-2 py-1 font-display text-sm font-bold tabular-nums ${notaTile}`}>{d.notaProm ?? "—"}</span>
+                <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground/60 transition group-hover:translate-x-0.5 group-hover:text-foreground" />
+              </div>
+            </button>
+          );
+        })}
+      </div>
     </div>
   );
 }
@@ -277,9 +321,9 @@ function PersonasConFiltro({ personas, cargando, t, onPersona, agruparPorEquipo 
     <div>
       <div className="mb-3 flex flex-wrap items-center gap-2">
         {chips.map((c) => (
-          <button key={c.k} type="button" onClick={() => setFiltroTipo(c.k)} className={`inline-flex items-center gap-1.5 rounded-control border px-3 py-1 text-xs font-medium transition ${filtroTipo === c.k ? "border-foreground/60 bg-foreground/[0.06] text-foreground" : "border-border text-muted-foreground hover:bg-foreground/5"}`}>
+          <button key={c.k} type="button" onClick={() => setFiltroTipo(c.k)} className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition ${filtroTipo === c.k ? "border-primary/50 bg-primary/10 text-primary" : "border-border/50 text-muted-foreground hover:bg-foreground/5"}`}>
             {c.lbl}
-            {c.n != null && c.n > 0 && <span className={`text-[11px] font-semibold tabular-nums ${filtroTipo === c.k ? "" : "text-destructive"}`}>{c.n}</span>}
+            {c.n != null && c.n > 0 && <span className={`rounded-full px-1.5 py-0.5 text-[10px] tabular-nums ${filtroTipo === c.k ? "bg-primary/20" : "bg-warning/20 text-warning"}`}>{c.n}</span>}
           </button>
         ))}
       </div>
@@ -291,7 +335,7 @@ function PersonasConFiltro({ personas, cargando, t, onPersona, agruparPorEquipo 
         <div className="flex flex-col gap-4">
           {grupos.map(([eq, gente]) => (
             <div key={eq}>
-              <p className="mb-1.5 text-xs font-semibold text-muted-foreground">{eq} · {gente.length}</p>
+              <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground/80">{eq} · {gente.length}</p>
               <div className="flex flex-col gap-1.5">{gente.map(fila)}</div>
             </div>
           ))}
@@ -306,15 +350,15 @@ function PersonasConFiltro({ personas, cargando, t, onPersona, agruparPorEquipo 
             <div className="flex flex-col gap-4">
               {tarde.length > 0 && (
                 <div>
-                  <p className="mb-1.5 flex items-center gap-1.5 text-xs font-semibold text-muted-foreground">
-                    <Clock className="h-3 w-3" />{t("hr.hist.secTarde", { n: tarde.length })}
+                  <p className="mb-1.5 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                    <Clock className="h-3 w-3 text-warning/70" />{t("hr.hist.secTarde", { n: tarde.length })}
                   </p>
                   <div className="flex flex-col gap-1.5">{tarde.map(fila)}</div>
                 </div>
               )}
               {puntuales.length > 0 && (
                 <div>
-                  <p className="mb-1.5 flex items-center gap-1.5 text-xs font-semibold text-muted-foreground">
+                  <p className="mb-1.5 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground/70">
                     <Clock className="h-3 w-3" />{t("hr.hist.secATiempo", { n: puntuales.length })}
                   </p>
                   <div className="flex flex-col gap-1.5">{puntuales.map(fila)}</div>
@@ -328,28 +372,76 @@ function PersonasConFiltro({ personas, cargando, t, onPersona, agruparPorEquipo 
   );
 }
 
-// VISTA EQUIPOS (Alvaro, 05/11; 11/11): el día entero, una tarjeta por equipo con
-// cuántos vinieron, fueron bien, fueron mal y no vinieron, y quién fue mal y por
-// qué. Al tocarla, su gente en ese orden.
+// VISTA EQUIPOS (Alvaro, 05/11): cajas por equipo (Chatters, PR, Warming,
+// Editores, Finanzas…) con su promedio; clic en una caja = la gente de ese
+// equipo (con los mismos filtros por tipo de falla). Peor equipo primero.
 function EquiposVista({ dia, t, onPersona, equipoInicial }: { dia: string; t: Tr; onPersona: (id: string, eq?: string) => void; equipoInicial?: string | null }) {
-  const { personas, cargando, error } = useTurnoPersonas(dia, 0, 24, true);
+  const { personas, cargando } = useTurnoPersonas(dia, 0, 24, true);
   const [equipoSel, setEquipoSel] = useState<string | null>(equipoInicial ?? null);
-  const roster = useRoster(() => true);
-  const armado = useMemo(() => armarDeptosDelDia(personas, roster, 8), [personas, roster]);
+  const equipos = useMemo(() => {
+    const m = new Map<string, PersonaTurno[]>();
+    for (const p of personas) (m.get(p.equipo) ?? m.set(p.equipo, []).get(p.equipo)!).push(p);
+    const avg = (gente: PersonaTurno[], f: (p: PersonaTurno) => number | null) => {
+      const v = gente.map(f).filter((x): x is number => x != null);
+      return v.length ? Math.round(v.reduce((a, b) => a + b, 0) / v.length) : null;
+    };
+    return [...m.entries()].map(([eq, gente]) => {
+      const conNota = gente.filter((p) => p.nota.valor != null);
+      return {
+        eq, gente,
+        nota: conNota.length ? Math.round(conNota.reduce((a, p) => a + (p.nota.valor as number), 0) / conNota.length) : null,
+        pantalla: avg(gente, (p) => p.pantallaPct), camara: avg(gente, (p) => p.camaraPct), atencion: avg(gente, (p) => p.atencionPct),
+        conFallas: gente.filter((p) => tiposFallaDe(p).length > 0).length,
+      };
+    }).sort((a, b) => (a.nota ?? 101) - (b.nota ?? 101));
+  }, [personas]);
 
+  if (equipoSel) {
+    const gente = personas.filter((p) => p.equipo === equipoSel);
+    return (
+      <div className="space-y-4">
+        <div className="flex items-center gap-3">
+          <button type="button" onClick={() => setEquipoSel(null)} className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-xs text-muted-foreground transition hover:bg-foreground/5 hover:text-foreground"><ChevronLeft className="h-4 w-4" />{t("hr.hist.volverEquipos")}</button>
+          <span className="font-display text-base font-bold">{equipoSel}</span>
+          <span className="text-xs text-muted-foreground">· {gente.length}</span>
+        </div>
+        <PersonasConFiltro personas={gente} cargando={cargando} t={t} onPersona={(id) => onPersona(id, equipoSel ?? undefined)} />
+      </div>
+    );
+  }
   if (cargando) return <div className="flex justify-center py-10"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>;
-  if (error) return <p role="alert" className="py-8 text-center text-sm text-destructive">{t("argos.hist.fallo")}</p>;
-  if (armado.deptos.length === 0) return <p className="py-8 text-center text-sm text-muted-foreground">{t("hr.hist.sinGente")}</p>;
-  const d = equipoSel ? armado.deptos.find((x) => x.nombre === equipoSel) ?? null : null;
-  if (d) return <DetalleDepto d={d} vivo={false} regla={t("argos.equipo.reglaDia")} onVolver={() => setEquipoSel(null)} onPersona={(id) => onPersona(id, d.nombre)} t={t} />;
-  return <TarjetasDeDeptos deptos={armado.deptos} onAbrir={setEquipoSel} t={t} vivo={false} />;
+  if (equipos.length === 0) return <p className="py-8 text-center text-sm text-muted-foreground">{t("hr.hist.sinGente")}</p>;
+  return (
+    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+      {equipos.map((e) => {
+        const color = e.nota == null ? "text-muted-foreground" : e.nota < 60 ? "text-destructive" : e.nota < 80 ? "text-warning" : "text-success";
+        return (
+          <button key={e.eq} type="button" onClick={() => setEquipoSel(e.eq)} className="rounded-2xl border border-border/40 bg-card/20 p-3.5 text-left transition hover:border-primary/40 hover:bg-card/40">
+            <div className="mb-2 flex items-center gap-2">
+              <span className="min-w-0 flex-1 truncate text-sm font-semibold">{e.eq}</span>
+              <span className="shrink-0 text-[11px] text-muted-foreground">{e.gente.length}</span>
+              <span className={`shrink-0 font-display text-xl font-bold tabular-nums ${color}`}>{e.nota ?? "—"}</span>
+            </div>
+            <div className="space-y-1.5">
+              <Metrica label={t("hr.resumen.pantalla")} valor={e.pantalla} color={COLOR.pantalla} />
+              <Metrica label={t("hr.resumen.camara")} valor={e.camara} color={COLOR.camara} />
+              <Metrica label={t("hr.resumen.atencion")} valor={e.atencion} color={COLOR.atencion} />
+            </div>
+            <div className={`mt-2 flex items-center gap-1 border-t border-border/40 pt-2 text-[11px] ${e.conFallas > 0 ? "text-warning" : "text-muted-foreground"}`}>
+              {e.conFallas > 0 ? <><AlertTriangle className="h-3 w-3" />{t("hr.hist.equipoConFallas", { n: e.conFallas })}</> : t("hr.hist.equipoSinFallas")}
+            </div>
+          </button>
+        );
+      })}
+    </div>
+  );
 }
 
 function Metrica({ label, valor, color }: { label: string; valor: number | null; color: string }) {
   return (
     <div className="flex items-center justify-between text-xs">
-      <span className="flex items-center gap-1.5 text-foreground/75"><span className="h-2 w-2 shrink-0 rounded-full" style={{ background: color }} aria-hidden />{label}</span>
-      <span className={`font-semibold tabular-nums ${valor != null && valor < 60 ? "text-destructive" : ""}`}>{valor == null ? "—" : `${valor}%`}</span>
+      <span className="flex items-center gap-1.5 text-muted-foreground"><span className="h-2 w-2 shrink-0 rounded-full" style={{ background: color }} />{label}</span>
+      <span className="font-semibold tabular-nums">{valor == null ? "—" : `${valor}%`}</span>
     </div>
   );
 }
@@ -383,11 +475,11 @@ export function ArgosHistorial() {
   ];
 
   return (
-    <section className="rounded-control border border-border bg-card p-5 sm:p-6">
+    <section className="vidrio sube p-4 lg:p-5">
       <div className="v-cont space-y-5">
         {/* Cabecera + navegación de día */}
         <div className="flex flex-wrap items-center gap-3">
-          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-control border border-border text-muted-foreground"><Clock className="h-[18px] w-[18px]" /></span>
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-panel bg-primary/10 text-primary"><Clock className="h-[18px] w-[18px]" /></span>
           <div className="min-w-0 flex-1">
             <h2 className="font-display text-base font-bold leading-tight tracking-tight">{t("hr.hist.titulo")}</h2>
             <div className="mt-0.5 flex items-center gap-1">
@@ -397,9 +489,9 @@ export function ArgosHistorial() {
             </div>
           </div>
           {/* Toggle: ver por turno (gráfica + turnos) o por EQUIPO (cajas). */}
-          <div className="flex shrink-0 items-center gap-1 rounded-control border border-border/60 bg-card/30 p-1">
+          <div className="flex shrink-0 items-center gap-1 rounded-xl border border-border/50 bg-card/20 p-1">
             {([["turno", "hr.hist.porTurnoBtn"], ["equipos", "hr.hist.equiposBtn"]] as const).map(([v, k]) => (
-              <button key={v} type="button" onClick={() => { setVista(v); setTurnoSel(null); }} className={`rounded-[6px] px-3 py-1 text-xs font-medium transition ${vista === v ? "bg-foreground/[0.09] text-foreground" : "text-muted-foreground hover:text-foreground"}`}>
+              <button key={v} type="button" onClick={() => { setVista(v); setTurnoSel(null); }} className={`rounded-lg px-3 py-1 text-xs font-medium transition ${vista === v ? "bg-primary/15 text-primary" : "text-muted-foreground hover:text-foreground"}`}>
                 {t(k)}
               </button>
             ))}
@@ -418,7 +510,7 @@ export function ArgosHistorial() {
             onPersona={irAExpediente}
           />
         ) : error ? (
-          <div className="flex flex-col items-center gap-2 py-10 text-center text-muted-foreground"><AlertTriangle className="h-7 w-7 text-destructive/70" /><button type="button" onClick={() => void refrescar()} className="text-sm text-foreground underline-offset-2 hover:underline">{t("hr.pantallazos.reintentar")}</button></div>
+          <div className="flex flex-col items-center gap-2 py-10 text-center text-muted-foreground"><AlertTriangle className="h-7 w-7 text-destructive/70" /><button type="button" onClick={() => void refrescar()} className="text-sm text-primary hover:underline">{t("hr.pantallazos.reintentar")}</button></div>
         ) : cargando && horas.length === 0 ? (
           <div className="flex items-center justify-center py-12 text-muted-foreground"><Loader2 className="h-6 w-6 animate-spin" /></div>
         ) : horas.length === 0 ? (
@@ -429,7 +521,7 @@ export function ArgosHistorial() {
                 a "El día" es cómo va cada turno, no la gráfica. */}
             <div>
               <p className="mb-2 text-xs font-medium text-muted-foreground">{t("hr.hist.turnos")}</p>
-              <div className="grid auto-rows-fr gap-3 sm:grid-cols-3">
+              <div className="grid gap-3 sm:grid-cols-3">
                 {TURNOS.map((turno) => {
                   const r = resumenTurno(horas, turno.from, turno.to);
                   const Icono = turno.icon;
@@ -440,13 +532,13 @@ export function ArgosHistorial() {
                       onClick={() => setTurnoSel(turno)}
                       disabled={!r.hayDatos}
                       title={t("hr.hist.gente")}
-                      className="flex h-full flex-col rounded-control border border-border bg-background p-5 text-left transition hover:border-foreground/40 disabled:cursor-default disabled:opacity-70"
+                      className="rounded-2xl border border-border/40 bg-card/20 p-3.5 text-left transition hover:border-primary/40 hover:bg-card/40 disabled:cursor-default disabled:opacity-70 disabled:hover:border-border/40 disabled:hover:bg-card/20"
                     >
                       <div className="mb-2.5 flex items-center gap-2">
-                        <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full" style={{ background: "hsl(var(--foreground) / 0.06)", color: "hsl(var(--muted-foreground))" }}><Icono className="h-4 w-4" /></span>
+                        <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full" style={{ background: `${turno.color}1f`, color: turno.color }}><Icono className="h-4 w-4" /></span>
                         <div className="min-w-0 flex-1">
                           <div className="text-sm font-semibold leading-tight">{t(turno.lbl)}</div>
-                          <div className="text-[11px] text-foreground/70">{t("hr.hist.horario", { a: turno.from, b: turno.to })}</div>
+                          <div className="text-[10px] text-muted-foreground">{t("hr.hist.horario", { a: turno.from, b: turno.to })}</div>
                         </div>
                         {r.hayDatos && <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground/50" />}
                       </div>
@@ -455,7 +547,7 @@ export function ArgosHistorial() {
                           <Metrica label={t("hr.resumen.pantalla")} valor={r.pantalla} color={COLOR.pantalla} />
                           <Metrica label={t("hr.resumen.camara")} valor={r.camara} color={COLOR.camara} />
                           <Metrica label={t("hr.resumen.atencion")} valor={r.atencion} color={COLOR.atencion} />
-                          <div className="mt-1.5 border-t border-border/50 pt-1.5 text-xs text-foreground/70">{t("hr.hist.turnoPersonas", { n: r.personas })}</div>
+                          <div className="mt-1.5 border-t border-border/40 pt-1.5 text-[11px] text-muted-foreground">{t("hr.hist.turnoPersonas", { n: r.personas })}</div>
                         </div>
                       ) : (
                         <p className="py-2 text-[11px] text-muted-foreground">{t("hr.hist.turnoSinDatos")}</p>
@@ -467,25 +559,27 @@ export function ArgosHistorial() {
             </div>
 
             {/* GRÁFICA por hora — DESPUÉS de los turnos (la única del día). */}
-            <div className="rounded-control border border-border bg-background p-5">
+            <div className="rounded-2xl border border-border/40 bg-card/20 p-4">
               <div className="mb-3 flex flex-wrap items-center gap-2">
                 <span className="text-sm font-semibold">{t("hr.hist.porHora")}</span>
                 <div className="ml-auto flex flex-wrap items-center gap-3">
                   {series.map((s) => (
-                    <span key={s.key} className="inline-flex items-center gap-1.5 text-[11px] text-muted-foreground"><svg width="18" height="6" aria-hidden><line x1="0" y1="3" x2="18" y2="3" stroke={COLOR[s.key]} strokeWidth="2" strokeDasharray={TRAZO[s.key]} /></svg>{s.label}</span>
+                    <span key={s.key} className="inline-flex items-center gap-1.5 text-[11px] text-muted-foreground"><span className="h-2 w-2 shrink-0 rounded-full" style={{ background: COLOR[s.key] }} />{s.label}</span>
                   ))}
                 </div>
               </div>
               <div className="h-60 w-full">
                 <ResponsiveContainer width="100%" height="100%">
                   <LineChart data={data} margin={{ top: 6, right: 10, left: 0, bottom: 0 }}>
-                    <ReferenceArea x1={8} x2={16} fill="hsl(var(--foreground))" fillOpacity={0.03} />
+                    <ReferenceArea x1={0} x2={8} fill="hsl(255 70% 62%)" fillOpacity={0.06} />
+                    <ReferenceArea x1={8} x2={16} fill="hsl(38 92% 55%)" fillOpacity={0.06} />
+                    <ReferenceArea x1={16} x2={24} fill="hsl(199 89% 56%)" fillOpacity={0.06} />
                     <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
                     <XAxis dataKey="hourNum" type="number" domain={[0, 24]} ticks={[0, 4, 8, 12, 16, 20, 24]} tickFormatter={(h) => `${h}h`} tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} tickLine={false} axisLine={{ stroke: "hsl(var(--border))" }} />
                     <YAxis domain={[0, 100]} ticks={[0, 25, 50, 75, 100]} tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} tickLine={false} axisLine={false} unit="%" width={44} />
                     <Tooltip contentStyle={{ background: "hsl(var(--popover))", border: "1px solid hsl(var(--border))", borderRadius: 12, fontSize: 12, color: "hsl(var(--popover-foreground))" }} labelStyle={{ color: "hsl(var(--muted-foreground))" }} labelFormatter={(h) => `${h}:00`} formatter={(v: number | null, name) => [v == null ? "—" : `${v}%`, name]} />
                     {series.map((s) => (
-                      <Line key={s.key} type="monotone" dataKey={s.key} name={s.label} stroke={COLOR[s.key]} strokeWidth={2} strokeDasharray={TRAZO[s.key]} dot={{ r: 2, strokeWidth: 0, fill: COLOR[s.key] }} activeDot={{ r: 4 }} connectNulls isAnimationActive={false} />
+                      <Line key={s.key} type="monotone" dataKey={s.key} name={s.label} stroke={COLOR[s.key]} strokeWidth={2} dot={{ r: 2, strokeWidth: 0, fill: COLOR[s.key] }} activeDot={{ r: 4 }} connectNulls isAnimationActive={false} />
                     ))}
                   </LineChart>
                 </ResponsiveContainer>

@@ -10,12 +10,13 @@ import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { Page } from "@/components/ui/page";
 import { PageHeader } from "@/components/ui/page-header";
 import { useMonitorConfig } from "@/hooks/useMonitorConfig";
-import { EquipoHoyPanel } from "@/components/argos/EquipoHoy";
+import { DondeEstaPanel } from "@/components/hr/DondeEstaPanel";
 import { ConectadosAhoraPanel } from "@/components/hr/ConectadosAhoraPanel";
 import { PantallazosVivoPanel } from "@/components/hr/PantallazosVivoPanel";
 import { ContextoEmpresaPanel } from "@/components/hr/ContextoEmpresaPanel";
@@ -162,15 +163,18 @@ export default function HRMonitorIA() {
         actions={
           <>
             {vistaCompleta && (
-              <Button variant="outline" size="sm" className="rounded-control" onClick={exportarHoras} disabled={exportar.isPending}>
+              <Button variant="outline" size="sm" className="rounded-full" onClick={exportarHoras} disabled={exportar.isPending}>
                 {exportar.isPending ? <Loader2 className="h-4 w-4 animate-spin sm:mr-1.5" /> : <FileSpreadsheet className="h-4 w-4 sm:mr-1.5" />}
                 <span className="hidden sm:inline">{t("hr.monia.exportarHoras")}</span>
               </Button>
             )}
-            <span className="inline-flex items-center gap-1.5 px-1 text-xs font-medium text-muted-foreground">
-              <Eye className="h-3.5 w-3.5" />
+            <Badge
+              variant="outline"
+              className={`gap-1.5 px-3 py-1.5 text-xs font-medium ${monitorOff ? "border-warning/50 bg-warning/10 text-warning" : "border-success/50 bg-success/10 text-success"}`}
+            >
+              <Eye className="h-3 w-3" />
               {monitorOff ? t("hr.monia.apagado") : t("hr.monia.activo")}
-            </span>
+            </Badge>
           </>
         }
       />
@@ -184,13 +188,13 @@ export default function HRMonitorIA() {
           ...(isAdmin ? [{ k: "ajustes" as TabArgos, label: t("hr.monia.tab.ajustes") }] : []),
         ];
         return (
-          <div className="mt-5 flex gap-1 overflow-x-auto rounded-control border border-border bg-card p-1">
+          <div className="mt-4 flex gap-1 overflow-x-auto rounded-2xl border border-border/50 bg-background/40 p-1">
             {tabs.map((x) => (
               <button
                 key={x.k}
                 type="button"
                 onClick={() => setTab(x.k)}
-                className={`shrink-0 rounded-[6px] px-4 py-2 text-sm font-semibold transition ${tab === x.k ? "bg-foreground/[0.09] text-foreground" : "text-muted-foreground hover:text-foreground"}`}
+                className={`shrink-0 rounded-xl px-4 py-2 text-sm font-semibold transition ${tab === x.k ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
               >
                 {x.label}
               </button>
@@ -199,11 +203,10 @@ export default function HRMonitorIA() {
         );
       })()}
 
-      {/* EQUIPO HOY (antes «Dónde está», 11/11): el equipo ahora por departamento,
-          quién va bien, quién va mal y por qué; dónde está cada uno va adentro. */}
+      {/* DÓNDE ESTÁ — cada empleado ahora: en Cowork o fuera, qué tiene en pantalla. */}
       {tab === "donde" && (
         <div className="mt-5">
-          <EquipoHoyPanel />
+          <DondeEstaPanel />
         </div>
       )}
 
