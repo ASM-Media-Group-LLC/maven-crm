@@ -301,14 +301,15 @@ All colors MUST be HSL. Light mode in :root, dark mode in .dark.
      lo pone el skin que se tenga. */
   html[data-blanco]:not(.dark) {
     --background: 0 0% 100%;
-    --foreground: 240 10% 9%;
-    --texto: 240 6% 25%;
+    /* Un punto menos negro (Alvaro, 12/11: «la letra sigue muy fuerte»). */
+    --foreground: 240 8% 14%;
+    --texto: 240 5% 34%;
     --card: 0 0% 100%;
-    --card-foreground: 240 6% 25%;
+    --card-foreground: 240 5% 34%;
     --popover: 0 0% 100%;
     --secondary: 240 5% 96%;
     --muted: 240 5% 96%;
-    --muted-foreground: 240 4% 44%;
+    --muted-foreground: 240 4% 46%;
     --border: 240 6% 90%;
     --input: 240 6% 88%;
     --sidebar-background: 0 0% 100%;

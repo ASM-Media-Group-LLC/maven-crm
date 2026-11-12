@@ -91,6 +91,8 @@ const PUNTO_ESTADO: Partial<Record<Fila["estado"], string>> = {
  * pantalla con un sombreo suave y la hora en placa de vidrio, el nombre en
  * blanco, el motivo con UN puntito (sin texto rojo), cuánto lleva y lo que vio
  * Argos en corto, y la nota como cifra blanca. Sin rellenos ni brillos rojos.
+ * Tres niveles (Alvaro, 12/11: «todo parece importante»): el nombre fuerte, el
+ * motivo en gris normal y el tiempo más tenue.
  */
 function FilaBajandoPulida({ f, t, onAbrir }: { f: FilaQuienBaja; t: Tr; onAbrir: () => void }) {
   const ahora = Date.now();
@@ -129,11 +131,11 @@ function FilaBajandoPulida({ f, t, onAbrir }: { f: FilaQuienBaja; t: Tr; onAbrir
       </span>
       <span className="flex min-w-0 flex-1 flex-col gap-1">
         <span className="truncate text-[15px] font-semibold leading-tight text-foreground">{f.nombre || "—"}</span>
-        <span className="flex min-w-0 items-center gap-1.5 text-[13px] font-medium leading-tight text-foreground/90">
+        <span className="flex min-w-0 items-center gap-1.5 text-[13px] leading-tight text-muted-foreground">
           <span className={cn("h-1.5 w-1.5 shrink-0 rounded-full", PUNTO_ESTADO[f.estado] ?? "bg-destructive")} aria-hidden />
           <span className="truncate">{t(ETIQUETA_ESTADO[f.estado])}</span>
         </span>
-        <span className="truncate text-xs leading-tight text-muted-foreground tabular-nums">
+        <span className="truncate text-xs leading-tight text-muted-foreground/70 tabular-nums">
           {t("vigilancia.quien.lleva", { d: lleva })}
           {f.otros > 0 && ` · ${t("vigilancia.quien.otros", { n: f.otros })}`}
           {f.motivo?.revisadoAt && ` · ${t("vigilancia.quien.revisado")}`}
