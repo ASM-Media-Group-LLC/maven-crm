@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { format } from "date-fns";
 import { Bot, Monitor, CameraOff, ScreenShareOff, Loader2, Sparkles, X } from "lucide-react";
 import { useLanguage } from "@/hooks/useLanguage";
@@ -22,9 +22,9 @@ import { useEsDueno } from "@/hooks/useEsDueno";
 // cuadrícula de 3: el titular en blanco con un puntito de estado; las pastillas
 // en UN solo estilo neutro (vidrio sutil, filo fino, el número en negrita; lo malo
 // solo con un puntito); las fotos parejas (16:10, radio 12, filo de 1 px y sombra
-// suave), la hora en una placa oscura con desenfoque y, debajo, la app en blanco y
-// lo que hacía en gris (2 líneas). La foto fuera de lugar: solo un filo rojo fino y
-// una placa oscura «Fuera de lugar». Sin bloques ni textos rojos.
+// suave), la hora en una placa oscura con desenfoque y, debajo, qué hacía en corto
+// y un puntito con el estado (Trabajando / Fuera de lugar · la app). La foto fuera
+// de lugar: solo un filo rojo fino. Sin bloques ni textos rojos.
 
 type Tono = "verde" | "ambar" | "rojo" | "neutro";
 type Frase = { k: TranslationKey; p?: Record<string, string | number> };
@@ -68,6 +68,20 @@ function separar(veredicto: string | null): { app: string | null; que: string | 
   if (!v) return { app: null, que: null };
   const i = v.indexOf(" · ");
   return i < 0 ? { app: null, que: v } : { app: v.slice(0, i).trim() || null, que: v.slice(i + 3).trim() || null };
+}
+
+/** La frase de Argos, en corto (Alvaro, 12/11: «se embola»): sin el sujeto de
+ *  relleno y cortada en el primer «mientras», coma, «a través», «para» o «y»,
+ *  siempre que lo que quede todavía diga algo. La frase entera sale al tocar. */
+const SUJETO = /^(?:el|la)\s+(?:usuari[oa]|persona|agente|chatter)\s+|^usuari[oa]\s+/i;
+const CORTE = /\s+mientras\s+|,\s+|\s+a\s+trav[eé]s\s+|\s+para\s+|\s+y\s+/gi;
+export function fraseCorta(que: string | null): string | null {
+  let f = (que ?? "").trim().replace(SUJETO, "").replace(/[.\s]+$/, "");
+  if (!f) return null;
+  for (const m of f.matchAll(CORTE)) {
+    if ((m.index ?? 0) >= 18) { f = f.slice(0, m.index); break; }
+  }
+  return f.charAt(0).toUpperCase() + f.slice(1);
 }
 
 // Empareja cada pantalla con la cámara más cercana en el tiempo (≤ 90 s).
@@ -217,6 +231,7 @@ export function TarjetaArgosPulida({ nombre, dia, horario }: {
                 const up = miniPantalla(e), uc = miniCamara(e);
                 const hora = a12(format(new Date(e.createdAt), "HH:mm"));
                 const { app, que } = separar(e.veredicto);
+                const frase = fraseCorta(que);
                 return (
                   <button key={e.id} type="button" onClick={() => setVisor(e)}
                     className={`group flex h-full flex-col overflow-hidden rounded-[12px] border bg-card/50 text-left shadow-[0_1px_2px_rgba(0,0,0,0.10),0_10px_24px_-14px_rgba(0,0,0,0.45)] transition-colors ${e.fueraDeLugar ? "border-destructive/70" : "border-border/60 hover:border-foreground/25"}`}>
@@ -230,24 +245,16 @@ export function TarjetaArgosPulida({ nombre, dia, horario }: {
                           : <div className="flex h-full w-full items-center justify-center bg-black/70 text-white/80"><CameraOff className="h-3.5 w-3.5" /></div>}
                       </div>
                       <span className="absolute bottom-2 left-2 rounded-full bg-black/45 px-2 py-0.5 text-[10px] font-medium tabular-nums text-white/95 ring-1 ring-white/10 backdrop-blur-md">{hora}</span>
-                      {e.fueraDeLugar && (
-                        <span className="absolute left-2 top-2 inline-flex items-center gap-1.5 rounded-full bg-black/55 px-2 py-0.5 text-[10px] font-medium text-white ring-1 ring-white/15 backdrop-blur-md">
-                          <span className="h-1.5 w-1.5 rounded-full bg-destructive" aria-hidden />{t("hr.exp.fueraDeLugar")}
-                        </span>
-                      )}
                     </div>
-                    {(app || que) && (
-                      <div className="flex flex-1 flex-col gap-0.5 px-3 pb-3 pt-2.5">
-                        {app ? (
-                          <Fragment>
-                            <p className="truncate text-[13px] font-semibold leading-snug text-foreground">{app}</p>
-                            {que && <p className="line-clamp-2 text-xs leading-snug text-muted-foreground">{que}</p>}
-                          </Fragment>
-                        ) : (
-                          <p className="line-clamp-2 text-xs leading-snug text-muted-foreground">{que}</p>
-                        )}
-                      </div>
-                    )}
+                    {/* Qué hacía, en corto + el estado (Alvaro, 12/11). */}
+                    <div className="flex flex-1 flex-col gap-1.5 px-3 pb-3 pt-2.5">
+                      {(frase ?? app) && <p className="line-clamp-2 text-[13px] font-medium leading-snug text-foreground">{frase ?? app}</p>}
+                      <p className="flex min-w-0 items-center gap-1.5 text-[11px] leading-none text-muted-foreground">
+                        <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${e.fueraDeLugar ? "bg-destructive" : "bg-success"}`} aria-hidden />
+                        <span className={e.fueraDeLugar ? "font-medium text-foreground/90" : undefined}>{t(e.fueraDeLugar ? "hr.exp.fueraDeLugar" : "hr.exp.mgr.trabajando")}</span>
+                        {frase && app && <span className="truncate">· {app}</span>}
+                      </p>
+                    </div>
                   </button>
                 );
               })}
