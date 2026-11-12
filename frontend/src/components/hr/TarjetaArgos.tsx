@@ -286,7 +286,7 @@ export function TarjetaArgosPulida({ nombre, dia, horario }: {
                       {/* Sombreo suave sobre el pantallazo (Alvaro, 12/11: «se mira mucha
                           información»): se ve, pero no grita. Al pasar el mouse se aclara.
                           Adentro, en el visor, la foto va limpia y con zoom. */}
-                      <div className="pointer-events-none absolute inset-0 bg-black/35 transition-opacity duration-300 group-hover:opacity-30" aria-hidden />
+                      <div className="pointer-events-none absolute inset-0 bg-black/45 transition-opacity duration-300 group-hover:opacity-30" aria-hidden />
                       {/* Arriba: la hora (izquierda) y la cámara (derecha). */}
                       <span className="absolute left-2 top-2 rounded-full bg-black/50 px-2 py-0.5 text-[10px] font-medium tabular-nums text-white/95 ring-1 ring-white/10 backdrop-blur-md">{hora}</span>
                       <div className="absolute right-2 top-2 h-9 w-14 overflow-hidden rounded-[6px] border border-white/40 shadow-md sm:h-10 sm:w-16">
