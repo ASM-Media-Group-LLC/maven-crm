@@ -82,8 +82,8 @@ export function ClipsDelDia({ userId, fecha }: Params) {
   // expediente con "no hay nada hoy").
   if (q.isLoading) {
     return (
-      <section className="vidrio sube mt-5 p-4 lg:p-5">
-        <div className="v-cont flex items-center gap-2 text-xs text-muted-foreground">
+      <section className="mt-5 p-5 sm:p-6 rounded-control border border-border bg-card">
+        <div className="flex items-center gap-2 text-xs text-muted-foreground">
           <Loader2 className="h-4 w-4 animate-spin" /> {t("hr.exp.clips.cargando")}
         </div>
       </section>
@@ -92,16 +92,16 @@ export function ClipsDelDia({ userId, fecha }: Params) {
   if (clips.length === 0) return null;
 
   return (
-    <section className="vidrio sube mt-5 p-4 lg:p-5">
-      <div className="v-cont">
+    <section className="mt-5 p-5 sm:p-6 rounded-control border border-border bg-card">
+      <div>
         <p className="mb-3 flex items-center gap-1.5 text-xs font-semibold text-muted-foreground">
           <Video className="h-3.5 w-3.5" />{t("hr.exp.clips.titulo", { n: clips.length })}
         </p>
         <div className="grid gap-2">
           {clips.map((c) => (
             <button key={c.id} type="button" onClick={() => abrir(c)}
-              className="group flex items-center gap-3 rounded-xl border border-border/40 bg-card/20 px-3 py-2 text-left transition hover:border-primary/40 hover:bg-card/40">
-              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-panel bg-primary/10 text-primary">
+              className="group flex items-center gap-3 px-4 py-3 text-left transition rounded-control border border-border bg-background hover:border-foreground/40 hover:bg-card/40">
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-control border border-border text-foreground/80">
                 {cargandoId === c.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <PlayCircle className="h-5 w-5" />}
               </span>
               <div className="min-w-0 flex-1">

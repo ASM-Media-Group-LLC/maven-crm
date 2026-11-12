@@ -1,44 +1,179 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { format } from "date-fns";
-import { Bot, Monitor, AlertTriangle, CameraOff, ScreenShareOff, Loader2, Sparkles, X } from "lucide-react";
+import { Bot, Monitor, CameraOff, ScreenShareOff, Loader2, Images } from "lucide-react";
 import { useLanguage } from "@/hooks/useLanguage";
-import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
-import { a12 } from "@/lib/horaBogota";
 import { urlCaptura, urlsDeNas } from "@/hooks/useMonitorEventos";
 import type { CapturaDia, DiaExpediente } from "@/hooks/useExpedienteEmpleado";
 import type { TranslationKey } from "@/lib/i18n";
+import { bandaDelDia, type Jornada } from "@/lib/argosJornada";
+import { appDe, loBuenoYLoMalo, loPeor, tiempoPorApp, type CapturaJuzgada, type Hecho } from "@/lib/argosResumen";
+import type { ClipArgos } from "@/lib/argosMomentos";
+import { cn } from "@/lib/utils";
+import { TARJETA, hora as horaDe, horaRedonda, pct, textoMin, type Tr } from "@/components/argos/piezas";
+import { VisorEvidencia, type FotoEvidencia } from "@/components/argos/VisorEvidencia";
 
-// Argos como MANAGER del día, estilo FICHA CON EVIDENCIA (Alvaro, 09/11, v2).
-// Antes era un párrafo rojo que DECÍA lo que encontró pero no dejaba verlo. Ahora
-// es una ficha: veredicto corto arriba + las MINIATURAS de lo que Argos pilló, a
-// la vista. Lo fuera de lugar resaltado; si todo bien, una muestra de lo que hacía.
-// Cada foto se toca y se agranda (pantalla + cámara + lo que escribió Argos).
+// ARGOS, TU MANAGER DEL DÍA (Alvaro, 09/11 y 11/11/2026). Tres piezas:
+//   · FraseDelDia: UNA frase que dice cómo va y por qué, en minutos («Va mal hoy.
+//     Trabajó 1 h 29 min de 10 h. Por esto: …»).
+//   · TarjetaArgos: «Lo bueno» y «Lo malo», cada cosa con su hora; una línea de
+//     texto con los hechos («18 momentos mirados · 1 fuera de lugar (9:03) · entró
+//     7 min tarde») y «Dónde pasó el tiempo» en filas con una barra fina.
+//   · FotosDeArgos: las fotos por hora, grandes; debajo UNA línea gris
+//     («9:03 · Flojo · Instagram»); la floja se marca solo con su marco y la
+//     palabra. La descripción completa, la cámara y el zoom, en el visor.
+// Diseño serio (11/11): tarjetas planas, cifras en tinta neutra y rojo solo en lo
+// malo; sin pastillas ni colores de adorno.
 
-type Tono = "verde" | "ambar" | "rojo" | "neutro";
-type Frase = { k: TranslationKey; p?: Record<string, string | number> };
-interface Evidencia { id: string; createdAt: string; pantalla: CapturaDia | null; camara: CapturaDia | null; fueraDeLugar: boolean; veredicto: string | null; }
-
-const PUNTO: Record<Tono, string> = { verde: "bg-success", ambar: "bg-warning", rojo: "bg-destructive", neutro: "bg-muted-foreground" };
-const TITULAR: Record<Tono, string> = { verde: "text-success", ambar: "text-warning", rojo: "text-destructive", neutro: "text-foreground" };
-
-function sistemasDe(veredicto: string): string[] {
-  return veredicto.split("·")[0].trim().split("/").map((s) => s.trim()).filter((s) => s.length > 1);
-}
-function hhmm(iso: string | null | undefined): string | null {
-  if (!iso) return null;
-  try { return new Date(iso).toLocaleTimeString("es-CO", { timeZone: "America/Bogota", hour: "2-digit", minute: "2-digit", hour12: false }); }
-  catch { return null; }
-}
-function minDif(hAsig: string | null, hReal: string | null): number | null {
-  if (!hAsig || !hReal) return null;
-  const [ha, ma] = hAsig.split(":").map(Number);
-  const [hr, mr] = hReal.split(":").map(Number);
-  if (Number.isNaN(ha) || Number.isNaN(hr)) return null;
-  return (hr * 60 + mr) - (ha * 60 + ma);
-}
+const HORA_MS = 3_600_000;
 const claveFoto = (c: CapturaDia | null): string | null => (c ? (c.enNas ? c.nasPath : c.path) : null);
 
-// Empareja cada pantalla con la cámara más cercana en el tiempo (≤ 90 s).
+function juzgadasDe(dia: DiaExpediente): CapturaJuzgada[] {
+  return dia.capturas
+    .filter((c) => c.tipo === "pantalla" && c.veredicto != null)
+    .map((c) => ({ at: Date.parse(c.createdAt), veredicto: c.veredicto, flojo: c.fueraDeLugar === true && !c.perdonado }));
+}
+
+const FALLA: Partial<Record<string, TranslationKey>> = {
+  fuera_cowork: "argos.hecho.fueraCowork",
+  sin_camara: "argos.hecho.sinCamara",
+  sin_pantalla: "argos.hecho.sinPantalla",
+  fuera_de_camara: "argos.hecho.fueraDeCuadro",
+  pausa_de_mas: "argos.hecho.pausaDeMas",
+  distraido: "argos.hecho.distraido",
+};
+
+/** Qué pasó, en palabras simples (sin la hora). */
+function textoHecho(h: Hecho, t: Tr): string {
+  const m = textoMin(h.min ?? 0, t);
+  switch (h.clave) {
+    case "tarde": return t("argos.hecho.tarde", { m });
+    case "seFue": return t("argos.hecho.seFue", { m });
+    case "aTiempo": return t("argos.hecho.aTiempo");
+    case "bienTramo": return t("argos.hecho.bienTramo", { m });
+    case "pausaOk": return t("argos.hecho.pausaOk", { m });
+    case "flojo": return h.app ? t("argos.hecho.flojoEn", { app: h.app }) : t("argos.hecho.flojo");
+    case "falla":
+      if (h.estado === "distraido" && h.app) return t("argos.hecho.enApp", { m, app: h.app });
+      return t(FALLA[h.estado ?? ""] ?? "argos.hecho.distraido", { m });
+  }
+}
+
+/** «9:03 a. m.» o «10:37 a. m. – 1:18 p. m.». */
+function horaDeHecho(h: Hecho, lang: string): string {
+  return h.hasta && h.hasta - h.at >= 60_000 ? `${horaDe(h.at, lang)} – ${horaDe(h.hasta, lang)}` : horaDe(h.at, lang);
+}
+
+/** LA FRASE DEL DÍA: cómo va y por qué, en minutos. */
+export function FraseDelDia({ jornada: j, dia, esHoy }: { jornada: Jornada | null; dia: DiaExpediente; esHoy: boolean }) {
+  const { t, language } = useLanguage();
+  if (!j) return null;
+  if (j.sinSenal) return <p className="text-base leading-relaxed">{t("argos.frase.noEntro")}</p>;
+  const { malo } = loBuenoYLoMalo(j, juzgadasDe(dia));
+  const banda = bandaDelDia(j);
+  const lead = banda === "bueno" ? t(esHoy ? "argos.frase.bienHoy" : "argos.frase.bienDia")
+    : banda === "regular" ? t(esHoy ? "argos.frase.regularHoy" : "argos.frase.regularDia")
+    : t(esHoy ? "argos.frase.malHoy" : "argos.frase.malDia");
+  const total = textoMin((Math.min(j.fin, Date.now()) - j.inicio) / 60_000, t);
+  const peor = loPeor(malo);
+  const item = (h: Hecho) => {
+    const que = textoHecho(h, t);
+    if (h.clave === "tarde" || h.clave === "seFue") return `${que} (${horaDe(h.at, language)})`;
+    const hh = horaDe(h.at, language);
+    return t(hh.startsWith("1:") ? "argos.frase.aLa" : "argos.frase.aLas", { h: hh, que });
+  };
+  const lista = peor.map(item);
+  const unidos = lista.length > 1 ? `${lista.slice(0, -1).join(", ")} ${t("argos.frase.y")} ${lista[lista.length - 1]}` : lista[0];
+  return (
+    <p className="text-base leading-relaxed">
+      <span className={cn("font-semibold", banda === "flojo" && "text-destructive")}>{lead}</span>{" "}
+      {t("argos.frase.trabajo", { m: textoMin(j.conectadoSeg / 60, t), total })}{" "}
+      {lista.length > 0
+        ? <>{banda === "bueno" ? t("argos.frase.loUnico") : t("argos.frase.porEsto")} {unidos}.</>
+        : t("argos.frase.sinFallas")}
+    </p>
+  );
+}
+
+function Fila({ h, lang, t, malo }: { h: Hecho; lang: string; t: Tr; malo: boolean }) {
+  return (
+    <li className="grid grid-cols-1 gap-x-4 gap-y-0.5 border-b border-border py-2.5 text-sm last:border-b-0 sm:grid-cols-[11.5rem_minmax(0,1fr)]">
+      <span className="tabular-nums text-muted-foreground">{horaDeHecho(h, lang)}</span>
+      <span className={malo ? "text-destructive" : "text-foreground/90"}>{textoHecho(h, t)}</span>
+    </li>
+  );
+}
+
+/** «Lo bueno» y «Lo malo», los hechos en una línea y dónde pasó el tiempo. */
+export function TarjetaArgos({ dia, horario, jornada }: {
+  dia: DiaExpediente;
+  horario: { entrada: string | null; salida: string | null };
+  jornada?: Jornada | null;
+}) {
+  const { t, language } = useLanguage();
+  const juzgadas = useMemo(() => juzgadasDe(dia), [dia]);
+  const res = useMemo(() => (jornada ? loBuenoYLoMalo(jornada, juzgadas) : null), [jornada, juzgadas]);
+  const tiempo = useMemo(() => tiempoPorApp(juzgadas), [juzgadas]);
+  const maxMin = tiempo.reduce((a, x) => Math.max(a, x.min), 1);
+
+  // La línea de hechos, en texto simple.
+  const flojas = juzgadas.filter((c) => c.flojo);
+  const hechos: string[] = [];
+  if (juzgadas.length > 0) hechos.push(t("hr.exp.mgr.hecho.momentos", { n: juzgadas.length }));
+  if (flojas.length > 0) hechos.push(t("argos.hechos.fuera", { n: flojas.length, h: flojas.slice(0, 3).map((c) => horaDe(c.at, language)).join(", ") }));
+  const tarde = res?.malo.find((h) => h.clave === "tarde");
+  if (tarde) hechos.push(t("argos.hecho.tarde", { m: textoMin(tarde.min ?? 0, t) }));
+  const hoyB = new Date().toLocaleDateString("en-CA", { timeZone: "America/Bogota" });
+  const ultCap = dia.capturas.reduce((mx, c) => (c.createdAt > mx ? c.createdAt : mx), "");
+  if (dia.fecha === hoyB && !!ultCap && Date.now() - Date.parse(ultCap) < 5 * 60_000) hechos.push(t("hr.exp.mgr.hecho.enSala"));
+  void horario;
+
+  return (
+    <section className={cn("mt-5 p-5 sm:p-6", TARJETA)}>
+      <p className="mb-4 flex items-center gap-2 text-sm font-semibold text-foreground/90"><Bot className="h-4 w-4 text-muted-foreground" />{t("hr.exp.mgr.titulo")}</p>
+      {hechos.length > 0 && <p className="mb-5 text-sm text-muted-foreground">{hechos.join(" · ")}</p>}
+
+      {res && (
+        <div className="grid gap-6 lg:grid-cols-2">
+          <div>
+            <p className="mb-1 text-sm font-semibold">{t("argos.bloque.malo")}</p>
+            {res.malo.length === 0 ? <p className="py-2.5 text-sm text-muted-foreground">{t("argos.bloque.nadaMalo")}</p> : (
+              <ul>{res.malo.map((h) => <Fila key={`${h.clave}-${h.at}`} h={h} lang={language} t={t} malo />)}</ul>
+            )}
+            {res.masMalo > 0 && <p className="pt-2 text-xs text-muted-foreground">{t("argos.equipo.yMas", { n: res.masMalo })}</p>}
+          </div>
+          <div>
+            <p className="mb-1 text-sm font-semibold">{t("argos.bloque.bueno")}</p>
+            {res.bueno.length === 0 ? <p className="py-2.5 text-sm text-muted-foreground">{t("argos.bloque.nadaBueno")}</p> : (
+              <ul>{res.bueno.map((h) => <Fila key={`${h.clave}-${h.at}`} h={h} lang={language} t={t} malo={false} />)}</ul>
+            )}
+          </div>
+        </div>
+      )}
+
+      {tiempo.length > 0 && (
+        <div className="mt-6">
+          <p className="mb-2 flex items-center gap-2 text-sm font-semibold"><Monitor className="h-4 w-4 text-muted-foreground" />{t("hr.exp.mgr.dondeTitulo")}</p>
+          <ul className="flex flex-col gap-2.5">
+            {tiempo.map((x) => (
+              <li key={x.app} className="grid grid-cols-[minmax(0,1fr)_4.5rem] items-center gap-x-4 gap-y-1 text-sm sm:grid-cols-[14rem_minmax(0,1fr)_4.5rem]">
+                <span className="truncate">{x.app}</span>
+                <span className="col-span-2 row-start-2 block h-1 w-full bg-foreground/[0.08] sm:col-span-1 sm:row-start-auto">
+                  <span className="block h-full bg-foreground/60" style={{ width: `${Math.max(2, (x.min / maxMin) * 100)}%` }} />
+                </span>
+                <span className="row-start-1 text-right tabular-nums text-muted-foreground sm:row-start-auto">{t("argos.tiempo.aprox", { m: textoMin(x.min, t) })}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </section>
+  );
+}
+
+// ─── Las fotos de Argos, por hora ────────────────────────────────────────────
+
+interface Evidencia { id: string; createdAt: string; pantalla: CapturaDia | null; camara: CapturaDia | null; fueraDeLugar: boolean; veredicto: string | null }
+const MAX_EVIDENCIAS = 6;
+
 function camaraDe(pantalla: CapturaDia, camaras: CapturaDia[], usadas: Set<string>): CapturaDia | null {
   let best: CapturaDia | null = null, bestD = Infinity;
   for (const cam of camaras) {
@@ -50,76 +185,43 @@ function camaraDe(pantalla: CapturaDia, camaras: CapturaDia[], usadas: Set<strin
   return null;
 }
 
-const MAX_EVIDENCIAS = 6;
-
-export function TarjetaArgos({ nombre, dia, horario }: {
-  nombre: string;
-  dia: DiaExpediente;
-  horario: { entrada: string | null; salida: string | null };
-}) {
-  const { t } = useLanguage();
-
-  const r = useMemo(() => {
-    const nom = nombre.split(" ")[0] || nombre;
-    const banda = dia.nota.banda;
+export function FotosDeArgos({ dia, jornada, clips }: { dia: DiaExpediente; jornada?: Jornada | null; clips?: ClipArgos[] | null }) {
+  const { t, language } = useLanguage();
+  // La muestra: primero lo fuera de lugar, luego lo que hacía (lo más reciente).
+  const evid = useMemo(() => {
     const pantallas = dia.capturas.filter((c) => c.tipo === "pantalla").sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
-    const camaras = dia.capturas.filter((c) => c.tipo === "camara").sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
+    const camaras = dia.capturas.filter((c) => c.tipo === "camara");
     const juzgadas = pantallas.filter((c) => c.veredicto);
     const fuera = juzgadas.filter((c) => c.fueraDeLugar === true && !c.perdonado);
-
-    // Evidencia: primero lo fuera de lugar, luego una muestra de lo que hacía.
     const usadas = new Set<string>();
-    const tomar = (c: CapturaDia): Evidencia => ({
-      id: c.id, createdAt: c.createdAt, pantalla: c, camara: camaraDe(c, camaras, usadas),
-      fueraDeLugar: c.fueraDeLugar === true && !c.perdonado, veredicto: c.veredicto,
-    });
-    const evid: Evidencia[] = [...fuera.map(tomar)];
+    const tomar = (c: CapturaDia): Evidencia => ({ id: c.id, createdAt: c.createdAt, pantalla: c, camara: camaraDe(c, camaras, usadas), fueraDeLugar: c.fueraDeLugar === true && !c.perdonado, veredicto: c.veredicto });
+    const out: Evidencia[] = fuera.map(tomar);
     for (const c of juzgadas) {
-      if (evid.length >= MAX_EVIDENCIAS) break;
-      if (evid.some((e) => e.id === c.id)) continue;
-      evid.push(tomar(c));
+      if (out.length >= MAX_EVIDENCIAS) break;
+      if (!out.some((e) => e.id === c.id)) out.push(tomar(c));
     }
+    return out.sort((a, b) => (a.createdAt < b.createdAt ? -1 : 1));
+  }, [dia.capturas]);
 
-    const conteo = new Map<string, number>();
-    for (const c of juzgadas) for (const s of sistemasDe(c.veredicto!)) conteo.set(s, (conteo.get(s) ?? 0) + 1);
-    const sistemas = [...conteo.entries()].sort((a, b) => b[1] - a[1]).slice(0, 6);
+  const grupos = useMemo(() => {
+    const m = new Map<number, Evidencia[]>();
+    for (const e of evid) { const k = Math.floor(Date.parse(e.createdAt) / HORA_MS) * HORA_MS; m.set(k, [...(m.get(k) ?? []), e]); }
+    const enHora = (iso: string, k: number) => Math.floor(Date.parse(iso) / HORA_MS) * HORA_MS === k;
+    return [...m.entries()].map(([desde, items]) => ({
+      desde, items,
+      h: jornada?.horas.find((x) => Math.floor(x.desde / HORA_MS) * HORA_MS === desde) ?? null,
+      pantallazos: dia.capturas.filter((c) => c.tipo === "pantalla" && enHora(c.createdAt, desde)).length,
+      grabaciones: (clips ?? []).filter((c) => enHora(c.desde, desde)).length,
+    }));
+  }, [evid, jornada, dia.capturas, clips]);
 
-    const fCam = dia.nota.factores.find((f) => f.clave === "camara")?.sub ?? null;
-    const fPant = dia.nota.factores.find((f) => f.clave === "pantalla")?.sub ?? null;
-    const difEnt = minDif(horario.entrada, hhmm(dia.entroAt));
-    const difSal = minDif(horario.salida, hhmm(dia.salioAt));
-    // ¿Sigue EN SALA ahora? (hoy + última captura fresca). Si es así, NO "salió":
-    // el cálculo de salida puede confundir un break o un latido con una salida.
-    const hoyB = new Date().toLocaleDateString("en-CA", { timeZone: "America/Bogota" });
-    const ultCap = dia.capturas.reduce((mx, c) => (c.createdAt > mx ? c.createdAt : mx), "");
-    const enSala = dia.fecha === hoyB && !!ultCap && Date.now() - Date.parse(ultCap) < 5 * 60_000;
-
-    const titular: Frase = banda === "bien" ? { k: "hr.exp.mgr.bien", p: { n: nom } }
-      : banda === "ojo" ? { k: "hr.exp.mgr.ojo", p: { n: nom } }
-      : banda === "mal" ? { k: "hr.exp.mgr.mal", p: { n: nom } }
-      : { k: "hr.exp.mgr.sindatos", p: { n: nom } };
-    const tono: Tono = banda === "bien" ? "verde" : banda === "ojo" ? "ambar" : banda === "mal" ? "rojo" : "neutro";
-
-    // Hechos cortos (reemplazan el párrafo): cada uno con su color semántico.
-    const hechos: Array<{ k: TranslationKey; p?: Record<string, string | number>; tono: "neutro" | "rojo" | "ambar" }> = [];
-    if (juzgadas.length > 0) hechos.push({ k: "hr.exp.mgr.hecho.momentos", p: { n: juzgadas.length }, tono: "neutro" });
-    if (fuera.length > 0) hechos.push({ k: "hr.exp.mgr.hecho.fuera", p: { n: fuera.length }, tono: "rojo" });
-    if (enSala) hechos.push({ k: "hr.exp.mgr.hecho.enSala", tono: "neutro" });
-    else if (difSal != null && difSal < -5) hechos.push({ k: "hr.exp.mgr.hecho.salioAntes", p: { min: Math.abs(difSal) }, tono: "ambar" });
-    if (difEnt != null && difEnt > 5) hechos.push({ k: "hr.exp.mgr.hecho.entroTarde", p: { min: difEnt }, tono: "ambar" });
-    if (fPant != null && fPant < 50) hechos.push({ k: "hr.exp.mgr.hecho.pantalla", p: { pct: Math.round(fPant) }, tono: "ambar" });
-    if (fCam != null && fCam < 50) hechos.push({ k: "hr.exp.mgr.hecho.camara", p: { pct: Math.round(fCam) }, tono: "ambar" });
-
-    return { nom, tono, titular, hechos, sistemas, evid, hayFuera: fuera.length > 0, hayJuicio: juzgadas.length > 0 };
-  }, [nombre, dia, horario]);
-
-  // Firmar las URLs de las miniaturas de evidencia (buzón + NAS).
+  // Firmar las URLs (buzón + NAS); si una falla, se vuelve a firmar una vez.
   const [urls, setUrls] = useState<Record<string, string>>({});
   const refirmados = useRef<Set<string>>(new Set());
   useEffect(() => {
     let vivo = true;
     const nas = new Set<string>(), buzon = new Set<string>();
-    for (const e of r.evid) for (const c of [e.pantalla, e.camara]) {
+    for (const e of evid) for (const c of [e.pantalla, e.camara]) {
       const k = claveFoto(c); if (!k) continue;
       if (c!.enNas) nas.add(k); else buzon.add(k);
     }
@@ -131,134 +233,70 @@ export function TarjetaArgos({ nombre, dia, horario }: {
       if (vivo) setUrls({ ...nasUrls, ...Object.fromEntries(buzonPairs.filter(([, u]) => !!u) as [string, string][]) });
     })();
     return () => { vivo = false; };
-  }, [r.evid]);
+  }, [evid]);
   const reFirmar = async (c: CapturaDia | null) => {
     if (!c || c.enNas || refirmados.current.has(c.path)) return;
     refirmados.current.add(c.path);
     const u = await urlCaptura(c.path);
     if (u) setUrls((prev) => ({ ...prev, [c.path]: u }));
   };
+  const urlDe = (c: CapturaDia | null) => (c ? urls[claveFoto(c)!] : undefined);
+  const [visorIdx, setVisorIdx] = useState<number | null>(null);
 
-  const [visor, setVisor] = useState<Evidencia | null>(null);
-  useEffect(() => {
-    if (!visor) return;
-    const h = (e: KeyboardEvent) => { if (e.key === "Escape") setVisor(null); };
-    window.addEventListener("keydown", h);
-    return () => window.removeEventListener("keydown", h);
-  }, [visor]);
-
-  const miniPantalla = (e: Evidencia) => (e.pantalla ? urls[claveFoto(e.pantalla)!] : undefined);
-  const miniCamara = (e: Evidencia) => (e.camara ? urls[claveFoto(e.camara)!] : undefined);
-
+  if (evid.length === 0) return null;
   return (
-    <section className="vidrio sube mt-4 p-4 lg:p-5">
-      <div className="v-cont">
-        <div className="mb-3 flex items-center gap-2">
-          <span className="flex h-7 w-7 items-center justify-center rounded-full bg-primary/15 text-primary"><Bot className="h-4 w-4" /></span>
-          <p className="text-xs font-semibold text-muted-foreground">{t("hr.exp.mgr.titulo")}</p>
-        </div>
-
-        {/* Veredicto corto: titular + hechos en chips (sin párrafo ni caja de color). */}
-        <p className={`flex items-center gap-2 font-display text-base font-bold ${TITULAR[r.tono]}`}>
-          <span className={`h-2 w-2 shrink-0 rounded-full ${PUNTO[r.tono]}`} />
-          {t(r.titular.k, r.titular.p)}
-        </p>
-        {r.hechos.length > 0 && (
-          <div className="mt-2 flex flex-wrap gap-1.5">
-            {r.hechos.map((h, i) => (
-              <span key={i} className={`rounded-full border px-2.5 py-1 text-xs font-medium ${
-                h.tono === "rojo" ? "border-destructive/40 bg-destructive/5 text-destructive"
-                : h.tono === "ambar" ? "border-warning/40 bg-warning/5 text-warning"
-                : "border-border/50 bg-card/40 text-foreground/80"}`}>
-                {t(h.k, h.p)}
+    <section className={cn("mt-5 p-5 sm:p-6", TARJETA)}>
+      <p className="mb-5 flex items-center gap-2 text-sm font-semibold text-foreground/90">
+        <Images className="h-4 w-4 text-muted-foreground" />{evid.some((e) => e.fueraDeLugar) ? t("hr.exp.mgr.pruebaFuera") : t("hr.exp.mgr.pruebaMuestra")}
+      </p>
+      <div className="flex flex-col gap-8">
+        {grupos.map((g) => (
+          <div key={g.desde}>
+            <div className="mb-4 flex flex-wrap items-baseline gap-x-4 gap-y-1 border-b border-border pb-2.5">
+              <span className="text-sm font-semibold tabular-nums">{horaRedonda(g.desde, language)}</span>
+              {g.h && g.h.productiva !== null && (
+                <span className="text-sm tabular-nums">
+                  <span className={cn("font-semibold", (g.h.pctBien ?? 0) < 0.6 && "text-destructive")}>{pct(g.h.pctBien)}</span>
+                  <span className="text-muted-foreground"> · {g.h.productiva ? t("argos.hora.productiva") : t("argos.hora.noProductiva")}</span>
+                </span>
+              )}
+              <span className="ml-auto text-xs tabular-nums text-muted-foreground">
+                {g.pantallazos === 1 ? t("argos.tira.pantallazo1") : t("argos.tira.pantallazos", { n: g.pantallazos })}
+                {" · "}
+                {g.grabaciones === 1 ? t("argos.tira.grabacion1") : t("argos.tira.grabaciones", { n: g.grabaciones })}
               </span>
-            ))}
-          </div>
-        )}
-
-        {/* La evidencia a la vista: miniaturas de lo que Argos vio. */}
-        {r.evid.length > 0 && (
-          <div className="mt-3.5">
-            <p className="mb-2 flex items-center gap-1.5 text-[11px] font-semibold text-muted-foreground">
-              <Sparkles className="h-3 w-3 text-primary" />{r.hayFuera ? t("hr.exp.mgr.pruebaFuera") : t("hr.exp.mgr.pruebaMuestra")}
-            </p>
-            <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3">
-              {r.evid.map((e) => {
-                const up = miniPantalla(e), uc = miniCamara(e);
-                const hora = a12(format(new Date(e.createdAt), "HH:mm"));
+            </div>
+            <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
+              {g.items.map((e) => {
+                const up = urlDe(e.pantalla), uc = urlDe(e.camara);
+                const hora = horaDe(e.createdAt, language);
                 return (
-                  <button key={e.id} type="button" onClick={() => setVisor(e)}
-                    className={`group overflow-hidden rounded-xl border text-left transition ${e.fueraDeLugar ? "border-destructive/60 ring-1 ring-destructive/30" : "border-border/40 hover:border-primary/50"}`}>
-                    <div className="relative aspect-[16/10] w-full bg-muted/40">
-                      {e.pantalla ? (up ? (
-                        <img src={up} alt={hora} loading="lazy" onError={() => reFirmar(e.pantalla)} className="h-full w-full object-cover" />
-                      ) : <div className="flex h-full w-full items-center justify-center"><Loader2 className="h-4 w-4 animate-spin text-muted-foreground" /></div>
-                      ) : <div className="flex h-full w-full flex-col items-center justify-center gap-1 text-muted-foreground"><ScreenShareOff className="h-5 w-5 opacity-60" /><span className="text-[9px]">{t("hr.exp.sinPantalla")}</span></div>}
-                      <div className="absolute bottom-1 right-1 h-9 w-14 overflow-hidden rounded-md border-2 border-background/80 shadow">
-                        {e.camara ? (uc ? <img src={uc} alt="" loading="lazy" onError={() => reFirmar(e.camara)} className="h-full w-full object-cover" /> : <div className="flex h-full w-full items-center justify-center bg-muted/60"><Loader2 className="h-3 w-3 animate-spin text-muted-foreground" /></div>)
-                          : <div className="flex h-full w-full items-center justify-center bg-destructive/15 text-destructive"><CameraOff className="h-3.5 w-3.5" /></div>}
-                      </div>
-                      <span className="absolute bottom-1 left-1 rounded bg-black/55 px-1 py-0.5 text-[9px] font-semibold tabular-nums text-white backdrop-blur-sm">{hora}</span>
-                      {e.fueraDeLugar && <span className="absolute left-1 top-1 inline-flex items-center gap-0.5 rounded bg-destructive px-1 py-0.5 text-[9px] font-semibold text-white"><AlertTriangle className="h-2.5 w-2.5" />{t("hr.exp.fueraDeLugar")}</span>}
-                    </div>
-                    {e.veredicto && <p className={`px-2 py-1.5 text-[11px] leading-snug ${e.fueraDeLugar ? "text-destructive" : "text-muted-foreground"}`}>{e.veredicto}</p>}
+                  <button key={e.id} type="button" onClick={() => setVisorIdx(evid.indexOf(e))} className="group text-left">
+                    <span className={cn("relative block aspect-[16/10] w-full overflow-hidden rounded-control bg-black transition-colors", e.fueraDeLugar ? "border-2 border-destructive" : "border border-border group-hover:border-foreground/40")}>
+                      {e.pantalla ? (up ? <img src={up} alt={hora} loading="lazy" onError={() => reFirmar(e.pantalla)} className="h-full w-full object-contain" />
+                        : <span className="flex h-full w-full items-center justify-center"><Loader2 className="h-4 w-4 animate-spin text-muted-foreground" /></span>)
+                        : <span className="flex h-full w-full flex-col items-center justify-center gap-1 text-white/60"><ScreenShareOff className="h-6 w-6" /><span className="text-xs">{t("hr.exp.sinPantalla")}</span></span>}
+                      <span className="absolute bottom-2 right-2 h-14 w-20 overflow-hidden rounded-control border border-white/60">
+                        {e.camara ? (uc ? <img src={uc} alt="" loading="lazy" onError={() => reFirmar(e.camara)} className="h-full w-full object-cover" /> : <span className="flex h-full w-full items-center justify-center bg-muted"><Loader2 className="h-3 w-3 animate-spin text-muted-foreground" /></span>)
+                          : <span className="flex h-full w-full items-center justify-center bg-black/80 text-white/70"><CameraOff className="h-4 w-4" /></span>}
+                      </span>
+                    </span>
+                    <span className="mt-2 block truncate text-sm tabular-nums text-muted-foreground">
+                      {hora} · {e.fueraDeLugar ? t("argos.foto.flojo") : t("argos.foto.bien")} · {appDe(e.veredicto) ?? "—"}
+                    </span>
                   </button>
                 );
               })}
             </div>
           </div>
-        )}
-
-        {/* Dónde pasó el tiempo. */}
-        {r.sistemas.length > 0 && (
-          <div className="mt-3.5">
-            <p className="mb-1.5 flex items-center gap-1.5 text-[11px] font-semibold text-muted-foreground">
-              <Monitor className="h-3 w-3" />{t("hr.exp.mgr.dondeTitulo")}
-            </p>
-            <div className="flex flex-wrap gap-1.5">
-              {r.sistemas.map(([sistema, n]) => (
-                <span key={sistema} className="inline-flex items-center gap-1.5 rounded-full border border-border/50 bg-card/40 px-2.5 py-1 text-xs">
-                  <span className="max-w-[180px] truncate">{sistema}</span>
-                  <span className="rounded-full bg-primary/15 px-1.5 text-[10px] font-semibold tabular-nums text-primary">{n}</span>
-                </span>
-              ))}
-            </div>
-          </div>
-        )}
+        ))}
       </div>
-
-      {/* Visor: la prueba en grande al tocar una miniatura. */}
-      {visor && (
-        <Dialog open onOpenChange={(o) => { if (!o) setVisor(null); }}>
-          <DialogContent className="max-w-3xl bg-none from-transparent p-2 sm:p-3">
-            <DialogTitle className="sr-only">{t("hr.exp.mgr.titulo")}</DialogTitle>
-            <div className="flex flex-col gap-2.5">
-              <div className="relative overflow-hidden rounded-xl border border-border/50 bg-black">
-                <div className="relative aspect-[16/10] w-full">
-                  {visor.pantalla && miniPantalla(visor) ? <img src={miniPantalla(visor)} alt="" className="h-full w-full object-contain" />
-                    : <div className="flex h-full w-full flex-col items-center justify-center gap-2 text-muted-foreground"><ScreenShareOff className="h-9 w-9 opacity-60" /><span className="text-xs font-semibold">{t("hr.exp.sinPantalla")}</span></div>}
-                  <div className="absolute bottom-2.5 right-2.5 w-[32%] max-w-[220px] overflow-hidden rounded-lg border-2 border-white/80 shadow-xl">
-                    <div className="relative aspect-[4/3] bg-black">
-                      {visor.camara && miniCamara(visor) ? <img src={miniCamara(visor)} alt="" className="h-full w-full object-cover" />
-                        : <div className="flex h-full w-full flex-col items-center justify-center gap-1 text-destructive"><CameraOff className="h-5 w-5" /><span className="text-[9px] font-semibold">{t("hr.exp.camaraApagada")}</span></div>}
-                    </div>
-                  </div>
-                  <span className="absolute left-2.5 top-2.5 rounded-lg bg-black/60 px-2.5 py-1.5 text-xs font-semibold tabular-nums text-white backdrop-blur-sm">{a12(format(new Date(visor.createdAt), "HH:mm"))}</span>
-                  {visor.fueraDeLugar && <span className="absolute left-2.5 top-11 inline-flex items-center gap-1 rounded-lg bg-destructive px-2 py-1 text-[11px] font-semibold text-white"><AlertTriangle className="h-3 w-3" />{t("hr.exp.fueraDeLugar")}</span>}
-                </div>
-              </div>
-              {visor.veredicto && (
-                <div className={`flex items-start gap-2 rounded-lg border border-border/40 bg-card/40 px-3 py-2 text-sm ${visor.fueraDeLugar ? "text-destructive" : "text-muted-foreground"}`}>
-                  <Sparkles className="mt-0.5 h-4 w-4 shrink-0 opacity-70" /><span>{visor.veredicto}</span>
-                </div>
-              )}
-              <button type="button" onClick={() => setVisor(null)} className="flex items-center justify-center gap-1.5 rounded-lg border border-border/50 bg-card/40 py-2 text-sm font-medium text-muted-foreground transition hover:text-foreground">
-                <X className="h-4 w-4" />{t("hr.exp.clips.cerrar")}
-              </button>
-            </div>
-          </DialogContent>
-        </Dialog>
-      )}
+      <VisorEvidencia
+        fotos={evid.map((e): FotoEvidencia => ({
+          id: e.id, at: e.createdAt, pantallaUrl: urlDe(e.pantalla), camaraUrl: urlDe(e.camara),
+          tienePantalla: !!e.pantalla, tieneCamara: !!e.camara, veredicto: e.veredicto, fueraDeLugar: e.fueraDeLugar,
+        }))}
+        indice={visorIdx} onIndice={setVisorIdx} onCerrar={() => setVisorIdx(null)} t={t} lang={language} />
     </section>
   );
 }

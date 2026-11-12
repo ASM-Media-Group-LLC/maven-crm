@@ -103,6 +103,10 @@ const NO_CARGAN_AQUI: Record<string, string> = {
   "20261111220000_costos_cuentas_atadas.sql":
     "Costos: las cuentas atadas a cada servicio (costos_cuentas, solo el dueño). Se siembra leyendo mail_credentials, " +
     "profiles, auth y buzones_por_borrar, que este fixture no trae completos; no toca el Messenger.",
+  "20261111230000_argos_minuto_a_minuto.sql":
+    "Argos minuto a minuto: argos_jornada_cruda entrega lo crudo del turno (tramos del reloj de Cowork, pausas, " +
+    "salidas de Cowork, pantallazos fuera de lugar y alertas) a quien puede_vigilar_a deja. Solo lectura y una " +
+    "función nueva; usa las tablas del reloj de Cowork y de Argos, que este fixture no trae; no toca el Messenger.",
   "20261111190000_agencias_conectadas.sql":
     "Agencias conectadas: la plataforma de cada agencia manda sus roles (roles_config.origen), los pendientes, " +
     "lee horas y notas, y recibe avisos por webhook (triggers en user_roles, profiles y tenant_members). Entra a " +
