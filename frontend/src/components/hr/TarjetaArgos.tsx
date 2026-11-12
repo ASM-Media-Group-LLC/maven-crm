@@ -1,6 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { format } from "date-fns";
-import { Bot, Monitor, CameraOff, ScreenShareOff, Loader2, Sparkles, X } from "lucide-react";
+import {
+  Bot, Monitor, CameraOff, ScreenShareOff, Loader2, Sparkles, X,
+  Instagram, Youtube, Facebook, MessageCircle, MessagesSquare, Clapperboard, FolderOpen, Video, Images, Globe,
+} from "lucide-react";
 import { useLanguage } from "@/hooks/useLanguage";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { a12 } from "@/lib/horaBogota";
@@ -22,9 +25,10 @@ import { useEsDueno } from "@/hooks/useEsDueno";
 // cuadrícula de 3: el titular en blanco con un puntito de estado; las pastillas
 // en UN solo estilo neutro (vidrio sutil, filo fino, el número en negrita; lo malo
 // solo con un puntito); las fotos parejas (16:10, radio 12, filo de 1 px y sombra
-// suave), la hora en una placa oscura con desenfoque y, debajo, qué hacía en corto
-// y un puntito con el estado (Trabajando / Fuera de lugar · la app). La foto fuera
-// de lugar: solo un filo rojo fino. Sin bloques ni textos rojos.
+// suave). Lo que dice cada foto va ENCIMA de ella, sobre un degradado: el ícono de
+// la app con su puntito de estado, el nombre limpio de la app y, debajo, qué hacía
+// en corto (o «Fuera de lugar» si lo estaba). La hora y la cámara arriba. La foto
+// fuera de lugar: un filo rojo fino. Sin bloques ni textos rojos.
 
 type Tono = "verde" | "ambar" | "rojo" | "neutro";
 type Frase = { k: TranslationKey; p?: Record<string, string | number> };
@@ -82,6 +86,39 @@ export function fraseCorta(que: string | null): string | null {
     if ((m.index ?? 0) >= 18) { f = f.slice(0, m.index); break; }
   }
   return f.charAt(0).toUpperCase() + f.slice(1);
+}
+
+/** La app de la foto, limpia y con su ícono (Alvaro, 12/11: «se mira igual»).
+ *  Argos escribe la app a su manera («CRM Maven / OnlyFans CRM», «Instagram /
+ *  Navegador web»…): aquí se reduce a un nombre corto que se reconoce de un
+ *  vistazo. Lo específico va primero (Instagram gana a «Navegador web»). */
+type IconoApp = typeof Globe;
+const APPS: Array<{ re: RegExp; nombre: string; icono?: IconoApp; letra?: string }> = [
+  { re: /instagram/i, nombre: "Instagram", icono: Instagram },
+  { re: /youtube/i, nombre: "YouTube", icono: Youtube },
+  { re: /facebook/i, nombre: "Facebook", icono: Facebook },
+  { re: /tik\s?tok/i, nombre: "TikTok", letra: "T" },
+  { re: /whaticket|whatsapp/i, nombre: "WhatsApp", icono: MessageCircle },
+  { re: /capcut/i, nombre: "CapCut", icono: Clapperboard },
+  { re: /dropbox/i, nombre: "Dropbox", icono: FolderOpen },
+  { re: /gemini|chatgpt|venice|claude/i, nombre: "", icono: Sparkles },
+  { re: /backstage|kash/i, nombre: "Backstage", letra: "B" },
+  { re: /cowork/i, nombre: "Cowork", icono: Video },
+  { re: /messenger|mensajer[ií]a interna/i, nombre: "Messenger", icono: MessageCircle },
+  { re: /vault|b[óo]veda/i, nombre: "Media Vault", icono: Images },
+  { re: /onlyfans|infloww|blu\b|mensajer[ií]a/i, nombre: "OnlyFans", icono: MessagesSquare },
+  { re: /maven|crm/i, nombre: "Maven", letra: "M" },
+];
+export function appDe(app: string | null): { nombre: string; icono: IconoApp | null; letra: string } {
+  const a = (app ?? "").trim();
+  const crudo = a.split(/\s*[/(·]\s*/)[0].trim().slice(0, 24) || a.slice(0, 24);
+  for (const x of APPS) {
+    if (!x.re.test(a)) continue;
+    // Las IA: se deja el nombre que dio Argos («Gemini», «Venice AI»).
+    const nombre = x.nombre || (a.match(/google gemini|gemini|chatgpt|venice ai|venice|claude/i)?.[0] ?? crudo);
+    return { nombre, icono: x.icono ?? null, letra: x.letra ?? nombre.charAt(0).toUpperCase() };
+  }
+  return { nombre: crudo, icono: crudo ? null : Globe, letra: crudo.charAt(0).toUpperCase() };
 }
 
 // Empareja cada pantalla con la cámara más cercana en el tiempo (≤ 90 s).
@@ -224,36 +261,45 @@ export function TarjetaArgosPulida({ nombre, dia, horario }: {
         {r.evid.length > 0 && (
           <div className="mt-6">
             <p className="mb-3 flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
-              <Sparkles className="h-3.5 w-3.5" />{r.hayFuera ? t("hr.exp.mgr.pruebaFuera") : t("hr.exp.mgr.pruebaMuestra")}
+              <Sparkles className="h-3.5 w-3.5" />{t("hr.exp.mgr.loQueVio")}
             </p>
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4">
               {r.evid.map((e) => {
                 const up = miniPantalla(e), uc = miniCamara(e);
                 const hora = a12(format(new Date(e.createdAt), "HH:mm"));
                 const { app, que } = separar(e.veredicto);
+                const ap = appDe(app ?? que);
+                const Icono = ap.icono;
                 const frase = fraseCorta(que);
                 return (
                   <button key={e.id} type="button" onClick={() => setVisor(e)}
-                    className={`group flex h-full flex-col overflow-hidden rounded-[12px] border bg-card/50 text-left shadow-[0_1px_2px_rgba(0,0,0,0.10),0_10px_24px_-14px_rgba(0,0,0,0.45)] transition-colors ${e.fueraDeLugar ? "border-destructive/70" : "border-border/60 hover:border-foreground/25"}`}>
-                    <div className="relative aspect-[16/10] w-full shrink-0 bg-muted/40">
+                    className={`group relative block overflow-hidden rounded-[12px] border bg-card/50 text-left shadow-[0_1px_2px_rgba(0,0,0,0.10),0_10px_24px_-14px_rgba(0,0,0,0.45)] transition-colors ${e.fueraDeLugar ? "border-destructive/80" : "border-border/60 hover:border-foreground/25"}`}>
+                    <div className="relative aspect-[16/10] w-full overflow-hidden bg-muted/40">
                       {e.pantalla ? (up ? (
-                        <img src={up} alt={hora} loading="lazy" onError={() => reFirmar(e.pantalla)} className="h-full w-full object-cover" />
+                        <img src={up} alt={hora} loading="lazy" onError={() => reFirmar(e.pantalla)} className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.03]" />
                       ) : <div className="flex h-full w-full items-center justify-center"><Loader2 className="h-4 w-4 animate-spin text-muted-foreground" /></div>
                       ) : <div className="flex h-full w-full flex-col items-center justify-center gap-1 text-muted-foreground"><ScreenShareOff className="h-5 w-5 opacity-60" /><span className="text-[10px]">{t("hr.exp.sinPantalla")}</span></div>}
-                      <div className="absolute bottom-2 right-2 h-9 w-14 overflow-hidden rounded-[6px] border border-white/40 shadow-md sm:h-10 sm:w-16">
+                      {/* Arriba: la hora (izquierda) y la cámara (derecha). */}
+                      <span className="absolute left-2 top-2 rounded-full bg-black/50 px-2 py-0.5 text-[10px] font-medium tabular-nums text-white/95 ring-1 ring-white/10 backdrop-blur-md">{hora}</span>
+                      <div className="absolute right-2 top-2 h-9 w-14 overflow-hidden rounded-[6px] border border-white/40 shadow-md sm:h-10 sm:w-16">
                         {e.camara ? (uc ? <img src={uc} alt="" loading="lazy" onError={() => reFirmar(e.camara)} className="h-full w-full object-cover" /> : <div className="flex h-full w-full items-center justify-center bg-muted/60"><Loader2 className="h-3 w-3 animate-spin text-muted-foreground" /></div>)
                           : <div className="flex h-full w-full items-center justify-center bg-black/70 text-white/80"><CameraOff className="h-3.5 w-3.5" /></div>}
                       </div>
-                      <span className="absolute bottom-2 left-2 rounded-full bg-black/45 px-2 py-0.5 text-[10px] font-medium tabular-nums text-white/95 ring-1 ring-white/10 backdrop-blur-md">{hora}</span>
-                    </div>
-                    {/* Qué hacía, en corto + el estado (Alvaro, 12/11). */}
-                    <div className="flex flex-1 flex-col gap-1.5 px-3 pb-3 pt-2.5">
-                      {(frase ?? app) && <p className="line-clamp-2 text-[13px] font-medium leading-snug text-foreground">{frase ?? app}</p>}
-                      <p className="flex min-w-0 items-center gap-1.5 text-[11px] leading-none text-muted-foreground">
-                        <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${e.fueraDeLugar ? "bg-destructive" : "bg-success"}`} aria-hidden />
-                        <span className={e.fueraDeLugar ? "font-medium text-foreground/90" : undefined}>{t(e.fueraDeLugar ? "hr.exp.fueraDeLugar" : "hr.exp.mgr.trabajando")}</span>
-                        {frase && app && <span className="truncate">· {app}</span>}
-                      </p>
+                      {/* Abajo, ENCIMA de la foto: el ícono de la app (con su puntito de
+                          estado, como el de las personas), la app y qué hacía. Si estaba
+                          fuera de lugar, eso es lo que se lee. */}
+                      <div className="absolute inset-x-0 bottom-0 flex items-end gap-2.5 bg-gradient-to-t from-black/90 via-black/60 to-transparent px-3 pb-2.5 pt-12">
+                        <span className="relative flex h-8 w-8 shrink-0 items-center justify-center rounded-[9px] bg-white/[0.14] text-white ring-1 ring-white/20 backdrop-blur-md">
+                          {Icono ? <Icono className="h-4 w-4" /> : <span className="font-display text-sm font-bold leading-none">{ap.letra}</span>}
+                          <span className={`absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full ring-2 ring-black/80 ${e.fueraDeLugar ? "bg-destructive" : "bg-success"}`} aria-hidden />
+                        </span>
+                        <div className="min-w-0 flex-1 pb-px">
+                          <p className="truncate text-sm font-semibold leading-tight text-white">{ap.nombre || frase}</p>
+                          <p className={`mt-0.5 truncate text-[11px] leading-snug ${e.fueraDeLugar ? "font-semibold text-white" : "text-white/70"}`}>
+                            {e.fueraDeLugar ? t("hr.exp.fueraDeLugar") : (frase ?? t("hr.exp.mgr.trabajando"))}
+                          </p>
+                        </div>
+                      </div>
                     </div>
                   </button>
                 );
