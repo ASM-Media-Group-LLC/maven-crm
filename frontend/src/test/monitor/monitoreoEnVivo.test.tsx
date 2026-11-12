@@ -208,8 +208,16 @@ describe("3 · los avisos abren la vista en vivo", () => {
   });
 
   it("la migración está anotada en los cinco bancos que listan migraciones", () => {
-    for (const banco of ["api_messenger_escritura", "api_messenger_escritura_edge", "chat_mensajes_de_sistema", "chat_programados", "chat_agencia_y_huecos"]) {
-      const src = fuente(`/supabase/tests/${banco}.ts`);
+    // Rutas completas y literales: la guarda de CI deduce de aquí qué archivos lee el
+    // test (una ruta armada con ${…} la hace creer que lee TODOS los bancos).
+    for (const banco of [
+      "/supabase/tests/api_messenger_escritura.ts",
+      "/supabase/tests/api_messenger_escritura_edge.ts",
+      "/supabase/tests/chat_mensajes_de_sistema.ts",
+      "/supabase/tests/chat_programados.ts",
+      "/supabase/tests/chat_agencia_y_huecos.ts",
+    ]) {
+      const src = fuente(banco);
       const i = src.indexOf('"20261111200000_rrhh_copia_de_avisos.sql"');
       const j = src.indexOf('"20261111210000_monitoreo_en_vivo.sql"');
       expect(i, banco).toBeGreaterThan(0);
