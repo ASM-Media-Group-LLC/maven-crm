@@ -8,6 +8,8 @@ import { UserAvatar } from "@/components/UserAvatar";
 import { TarjetaKpi } from "@/components/ui/TarjetaKpi";
 import { usePulsoEquipo } from "@/hooks/usePulsoEquipo";
 import { useEsDueno } from "@/hooks/useEsDueno";
+import { useVigilancia } from "@/hooks/useVigilancia";
+import QuienEstaBajando from "@/components/vigilancia/QuienEstaBajando";
 import type { EstadoVivo } from "@/hooks/useRondinVivo";
 import type { CajaEquipo, PersonaPulso } from "@/lib/pulsoEquipo";
 import type { TranslationKey } from "@/lib/i18n";
@@ -29,6 +31,10 @@ const ESTADO_UI: Record<EstadoVivo, { punto: string; anillo: string; texto: stri
   no_mira:        { punto: "bg-destructive", anillo: "ring-destructive/50", texto: "text-destructive" },
   camara_apagada: { punto: "bg-destructive", anillo: "ring-destructive/50", texto: "text-destructive" },
   se_fue:         { punto: "bg-destructive", anillo: "ring-destructive/50", texto: "text-destructive" },
+  fuera_cowork:   { punto: "bg-destructive", anillo: "ring-destructive/50", texto: "text-destructive" },
+  fuera_de_lugar: { punto: "bg-destructive", anillo: "ring-destructive/50", texto: "text-destructive" },
+  sin_pantalla:   { punto: "bg-destructive", anillo: "ring-destructive/50", texto: "text-destructive" },
+  pausa_de_mas:   { punto: "bg-warning",     anillo: "ring-warning/40",     texto: "text-warning" },
   ausente:        { punto: "bg-muted-foreground/30", anillo: "ring-transparent", texto: "text-muted-foreground" },
 };
 const ESTADO_LBL: Record<EstadoVivo, TranslationKey> = {
@@ -36,6 +42,8 @@ const ESTADO_LBL: Record<EstadoVivo, TranslationKey> = {
   pausa: "dashboard.pulso.estado.pausa", celular: "dashboard.pulso.estado.celular",
   distraido: "dashboard.pulso.estado.distraido", no_mira: "dashboard.pulso.estado.no_mira",
   camara_apagada: "dashboard.pulso.estado.camara_apagada", se_fue: "dashboard.pulso.estado.se_fue",
+  fuera_cowork: "dashboard.pulso.estado.fuera_cowork", fuera_de_lugar: "dashboard.pulso.estado.fuera_de_lugar",
+  sin_pantalla: "dashboard.pulso.estado.sin_pantalla", pausa_de_mas: "dashboard.pulso.estado.pausa_de_mas",
   ausente: "dashboard.pulso.estado.ausente",
 };
 
@@ -136,6 +144,9 @@ export default function PulsoEquipoVivo({ coworkConectados, conEquipo = false }:
   const navigate = useNavigate();
   const { puedeVer, alcance, pulso, cargando, error, ultimaRonda, reintentar } = usePulsoEquipo();
   const { esDueno } = useEsDueno();
+  // Quien vigila (dueño, RR. HH., supervisor) ve «Quién está bajando ahora»: en
+  // la computadora arriba del Pulso; en el teléfono va primero en la página.
+  const { puede: vigila } = useVigilancia();
 
   const ultima = useMemo(() => (ultimaRonda ? hace(ultimaRonda.toISOString(), language) : null), [ultimaRonda, language]);
   // El expediente lo abren el dueño y RR. HH. (la ruta es soloDueno + tambienRh).
@@ -164,6 +175,10 @@ export default function PulsoEquipoVivo({ coworkConectados, conEquipo = false }:
           <ShieldAlert className="h-3.5 w-3.5" />{t("dashboard.pulso.soloVigilancia")}
         </span>
       </div>
+
+      {/* «Quién está bajando ahora» (11/11): computadora, arriba del Pulso. Se
+          dibuja solo fuera del teléfono (allá va lo primero de la página). */}
+      <QuienEstaBajando lugar="pulso" />
 
       {cargando && !pulso ? (
         <div className="vidrio p-6 flex items-center gap-2 text-muted-foreground"><Loader2 className="h-5 w-5 animate-spin" /></div>
@@ -227,8 +242,10 @@ export default function PulsoEquipoVivo({ coworkConectados, conEquipo = false }:
             />
           </div>
 
-          {/* "Quién la está bajando" como su propia sección glassy */}
-          {pulso.conProblema > 0 && (
+          {/* "Quién la está bajando" como su propia sección glassy. Para quien
+              vigila lo reemplaza «Quién está bajando ahora» (con miniatura y en
+              vivo); los demás (admin, manager) siguen viendo esta lista. */}
+          {pulso.conProblema > 0 && vigila !== true && (
             <div className="vidrio vidrio-glow glow-r p-4">
               <div className="v-cont space-y-2.5">
                 <div className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground">

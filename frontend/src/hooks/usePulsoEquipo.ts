@@ -101,7 +101,7 @@ export function usePulsoEquipo(): PulsoEquipo {
     },
   });
 
-  const estadoPor = new Map(rondin.personas.map((p) => [p.userId, { estado: p.estado, desde: p.desde }]));
+  const estadoPor = new Map(rondin.personas.map((p) => [p.userId, { estado: p.estado, desde: p.desde, motivos: p.motivos }]));
   const pulso = puedeVer && rosterQ.data ? construirPulso(rosterQ.data, estadoPor, onlineUsers) : null;
 
   return {
@@ -115,6 +115,6 @@ export function usePulsoEquipo(): PulsoEquipo {
     // Un fallo no es «sin equipo»: se dice y se deja reintentar.
     error: (nivelQ.error as Error | null) ?? rhError ?? (rosterQ.error as Error | null) ?? rondin.error ?? null,
     ultimaRonda: rondin.resumen.ultimaRonda,
-    reintentar: () => { void nivelQ.refetch(); void rosterQ.refetch(); },
+    reintentar: () => { void nivelQ.refetch(); void rosterQ.refetch(); rondin.reintentar(); },
   };
 }

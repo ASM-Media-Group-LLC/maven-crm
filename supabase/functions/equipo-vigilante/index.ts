@@ -10,6 +10,9 @@
 //   • pausa_de_mas        → cowork_breaks ended_at IS NULL con duración > cupo
 //                            + 10 min (comida default 30 → avisa a los 40 min)
 //
+// Lo que pasa AHORA (video, cámara, pausa) abre la vista en vivo de la persona
+// (/hr/en-vivo, 11/11); la tardanza sigue abriendo su expediente.
+//
 // Idempotente: unique (user_id, tipo) mientras no cerrada. Se cierra cuando el
 // motivo desaparece. SILENCIOSO con admins (no se les monitorea).
 
@@ -43,7 +46,8 @@ async function detectarVideos(): Promise<Nueva[]> {
     salidas.push({
       userId: c.user_id, tipo: "video_grabado",
       mensaje: `${nombre}: Argos grabó ${c.duracion_seg ? `${c.duracion_seg}s` : "un clip"} (${c.motivo ?? "distracción"})`,
-      url: `${APP_URL}/hr/expediente/${c.user_id}`,
+      // El push abre la vista en vivo con ESTE video arriba (Alvaro, 11/11).
+      url: `/hr/en-vivo/${c.user_id}?clip=${c.id}`,
       ref: { clip_id: c.id },
     });
   }
@@ -94,7 +98,7 @@ async function detectarCamaraApagada(): Promise<Nueva[]> {
     salidas.push({
       userId: s.user_id, tipo: "camara_apagada",
       mensaje: `${nombre} lleva ${min} min con la cámara apagada`,
-      url: `${APP_URL}/hr/expediente/${s.user_id}`,
+      url: `/hr/en-vivo/${s.user_id}`,
     });
   }
   return salidas;
@@ -124,7 +128,7 @@ async function detectarPausaDeMas(): Promise<Nueva[]> {
     salidas.push({
       userId: b.user_id, tipo: "pausa_de_mas",
       mensaje: `${nombre} lleva ${min} min en ${nombreKind} (cupo ${cupo})`,
-      url: `${APP_URL}/hr/expediente/${b.user_id}`,
+      url: `/hr/en-vivo/${b.user_id}`,
       ref: { kind: b.kind, min },
     });
   }

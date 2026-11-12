@@ -24,6 +24,7 @@ import SemanaViva from "./SemanaViva";
 import { useResumenChatter, useVentasPorModelo } from "./useChatterDashboard";
 import SelectorDeTablero from "@/pages/dashboard/SelectorDeTablero";
 import PulsoEquipoVivo from "@/components/centro/PulsoEquipoVivo";
+import QuienEstaBajando from "@/components/vigilancia/QuienEstaBajando";
 
 // DASHBOARD DEL CHATTER. Lo que una persona del equipo de chat quiere ver al
 // entrar: su turno de hoy y sus creadoras, cómo le fue en el rango elegido
@@ -105,6 +106,9 @@ export default function ChatterDashboard({ hoy = new Date() }: { hoy?: Date }) {
       </header>
 
       <main className="flex-1 space-y-6 overflow-auto p-6">
+        {/* Supervisor en el teléfono: primero, quién de su equipo está bajando
+            la nota ahora (11/11). Para un chatter no se dibuja. */}
+        <QuienEstaBajando lugar="arriba" className="-mx-2" />
         {/* KPIs: mismos stat-chips que el dashboard general */}
         {cargando ? <Skeleton className="h-16 w-full rounded-xl" /> : (
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 xl:grid-cols-8">

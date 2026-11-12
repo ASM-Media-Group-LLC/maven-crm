@@ -53,6 +53,13 @@ on:
       # Lo que los tests de frontend/src leen de afuera (con fs o import.meta.glob).
       - "supabase/functions/**"
       - "supabase/migrations/**"
+      # Los cinco bancos que listan migraciones (monitoreoEnVivo.test.tsx revisa que la
+      # migración del monitoreo esté anotada en ellos).
+      - "supabase/tests/api_messenger_escritura.ts"
+      - "supabase/tests/api_messenger_escritura_edge.ts"
+      - "supabase/tests/chat_mensajes_de_sistema.ts"
+      - "supabase/tests/chat_programados.ts"
+      - "supabase/tests/chat_agencia_y_huecos.ts"
       - "infra/nas-drive/**"
       - "nginx.conf"
 

@@ -5,7 +5,7 @@ import {
   caidaSePaga, equipoDeCuerpo, estadoDeTiempo, latidoDeCuerpo, latidoDeEquipoAfuera, noCobrabaAlCaerse, sinConexionPagadaMs,
   LATIDO_VENCIDO_MS, TOPE_SIN_CONEXION_MS, VENTANA_SIN_CONEXION_MS, type Exigencias, type TramoGuardado,
 } from "../_shared/cowork-tiempo.ts";
-import { agenciaDePersona, agenciaDeSesion, revisarPedido, topeDeLaTabla } from "./agencia.ts";
+import { agenciaDePersona, agenciaDeSesion, esUuid, revisarPedido, topeDeLaTabla } from "./agencia.ts";
 
 const corsHeaders = (req: Request) => corsFor(req, { "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version" });
 
@@ -864,6 +864,102 @@ serve(async (req) => {
         .update({ left_at: new Date().toISOString(), left_reason: "volvio" })
         .eq("meet_id", meetId).eq("user_id", userId).is("left_at", null);
       return json(req, { ok: true });
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // OBSERVAR A UNA PERSONA (vista en vivo de Argos · Alvaro, 11/11/2026)
+    // ═══════════════════════════════════════════════════════════════
+    // Al tocar un aviso de Argos o de «se salió de Cowork», el dueño, RR. HH. o
+    // su supervisor ven a ESA persona en vivo: su pantalla y su cámara. Es el
+    // mismo observador que el incógnito (hidden + solo suscribirse; el token no
+    // deja publicar nada), pero:
+    //   · la llave no es «ser admin» sino puede_vigilar (la base decide: dueño a
+    //     todos, RR. HH. a todos menos admins y dueño, supervisor solo su equipo);
+    //   · no hace falta saber la sesión ni la sala: se resuelven aquí desde la
+    //     asignación viva de la persona, y si tiene más de una se elige la sala
+    //     donde LiveKit la ve conectada AHORA;
+    //   · no crea membresía (no aparece en el tablero del anfitrión).
+    // El navegador se suscribe solo a las pistas de esa persona (autoSubscribe
+    // apagado). Si no está en Cowork, responde enCowork:false (la vista muestra
+    // el video de esos minutos).
+    if (action === "observarPersona") {
+      const target = body.targetUserId;
+      if (!esUuid(target)) return err(req, "targetUserId required");
+      // Con el cliente del USUARIO: puede_vigilar mira auth.uid().
+      const { data: puede, error: permErr } = await supabase.rpc("puede_vigilar", { _target: target });
+      if (permErr) return err(req, "No se pudo verificar el permiso", 503);
+      if (puede !== true) return err(req, "No puedes ver a esta persona", 403);
+
+      const { data: asigs, error: asigErr } = await admin.from("cowork_room_assignments")
+        .select("session_id, room_id, assigned_at").eq("user_id", target).eq("is_active", true)
+        .order("assigned_at", { ascending: false }).limit(5);
+      if (asigErr) return err(req, asigErr.message, 500);
+      if (!asigs?.length) return json(req, { enCowork: false });
+
+      const sesIds = [...new Set(asigs.map((a) => a.session_id as string))];
+      const salaIds = [...new Set(asigs.map((a) => a.room_id as string).filter(Boolean))];
+      const [{ data: sesiones }, { data: salas }] = await Promise.all([
+        admin.from("cowork_sessions").select("id, name, status").in("id", sesIds).eq("status", "active"),
+        salaIds.length
+          ? admin.from("cowork_rooms").select("id, name, livekit_room_name, session_id").in("id", salaIds)
+          : Promise.resolve({ data: [] as Array<{ id: string; name: string; livekit_room_name: string; session_id: string }> }),
+      ]);
+      const sesionPor = new Map((sesiones ?? []).map((s) => [s.id as string, s as { id: string; name: string }]));
+      const salaPor = new Map((salas ?? []).map((r) => [r.id as string, r as { id: string; name: string; livekit_room_name: string; session_id: string }]));
+      const candidatas: Array<{ sesion: { id: string; name: string }; sala: { id: string; name: string; livekit_room_name: string } }> = [];
+      for (const a of asigs) {
+        const sesion = sesionPor.get(a.session_id as string);
+        const sala = salaPor.get(a.room_id as string);
+        if (!sesion || !sala || sala.session_id !== sesion.id) continue;
+        // Agencia: una sesión de otra agencia es como si no existiera.
+        const agenciaSesion = await agenciaDeSesion(admin, sesion.id);
+        if (!miAgencia || agenciaSesion !== miAgencia) continue;
+        candidatas.push({ sesion, sala });
+      }
+      if (!candidatas.length) return json(req, { enCowork: false });
+
+      // ¿En cuál está conectada ahora? La verdad es LiveKit (ListParticipants).
+      // Si LiveKit no contesta, se elige la asignación más reciente.
+      const httpUrl = lkUrl.replace(/^wss:/, "https:").replace(/^ws:/, "http:");
+      let elegida = candidatas[0];
+      let presente: boolean | null = null;
+      for (const c of candidatas) {
+        try {
+          const tk = await createLKToken(lkKey, lkSecret, `cowork-vigia-lista-${userId.slice(0, 8)}`, userName, { roomAdmin: true, room: c.sala.livekit_room_name }, 60);
+          const resp = await fetch(`${httpUrl}/twirp/livekit.RoomService/ListParticipants`, {
+            method: "POST",
+            headers: { Authorization: `Bearer ${tk}`, "Content-Type": "application/json" },
+            body: JSON.stringify({ room: c.sala.livekit_room_name }),
+          });
+          if (!resp.ok) continue;
+          const j = await resp.json();
+          const esta = (j.participants || []).some((p: { identity?: string }) => p.identity === target);
+          presente = presente === true ? true : esta;
+          if (esta) { elegida = c; break; }
+        } catch (_e) {
+          // LiveKit caído: se queda la más reciente y presente=null («no se sabe»).
+        }
+      }
+
+      const tabRaw = typeof body.clientId === "string" ? body.clientId : "";
+      const tab = tabRaw.toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 12);
+      const identity = tab ? `${userId}__vigia__${tab}` : `${userId}__vigia`;
+      const token = await createLKToken(lkKey, lkSecret, identity, userName, {
+        roomJoin: true, room: elegida.sala.livekit_room_name, canPublish: false, canSubscribe: true, canPublishData: false, hidden: true,
+      }, 3600);
+      return json(req, {
+        enCowork: true,
+        presente,
+        token,
+        url: lkUrl,
+        room: elegida.sala.livekit_room_name,
+        roomId: elegida.sala.id,
+        roomName: elegida.sala.name,
+        sessionId: elegida.sesion.id,
+        sessionName: elegida.sesion.name,
+        // La identidad de la persona en la sala (join_room usa su id tal cual).
+        identidad: target,
+      });
     }
 
     if (action === "issueLiveKitToken") {
