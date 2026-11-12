@@ -1181,6 +1181,11 @@ export const hr = {
   "hr.exp.mgr.hecho.camara": { es: "cámara {pct}%", en: "camera {pct}%" },
   // Evidencia a la vista: miniaturas de lo que Argos vio.
   "hr.exp.mgr.pruebaFuera": { es: "Lo que pilló fuera de lugar — toca para ver", en: "What it caught off-task — tap to see" },
+  "hr.exp.zoom.acercar": { es: "Acercar", en: "Zoom in" },
+  "hr.exp.zoom.alejar": { es: "Alejar", en: "Zoom out" },
+  "hr.exp.zoom.volver": { es: "Ver completa", en: "Fit to screen" },
+  "hr.exp.zoom.original": { es: "Abrir la foto original", en: "Open the original photo" },
+  "hr.exp.zoom.ayuda": { es: "Toca o pellizca para acercar", en: "Tap or pinch to zoom" },
   "hr.exp.mgr.loQueVio": { es: "Lo que vio Argos — toca una foto para verla en grande", en: "What Argos saw — tap a photo to see it large" },
   "hr.exp.mgr.pruebaMuestra": { es: "Una muestra de lo que hacía — toca para ver", en: "A sample of what they were doing — tap to see" },
   "hr.exp.mgr.dondeTitulo": { es: "Dónde pasó el tiempo", en: "Where the time went" },
