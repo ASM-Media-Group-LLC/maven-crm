@@ -30,6 +30,7 @@ export type SkinId =
   | "diva"
   | "gris"
   | "negro"
+  | "blanco"
   | "unlimited"
   | "unlok";
 
@@ -47,6 +48,9 @@ export interface SkinDef {
   /** "linea" = skin de línea de negocio (Unlimited/Unlok): en el picker van
       después del separador "Líneas". Sin group = preset base. */
   group?: "linea";
+  /** Fondo del swatch cuando el gradiente primary→accent no lo representa
+      (Blanco: botones grafito, pero lo que se ve es todo blanco). */
+  muestra?: string;
 }
 
 const definirSkin = (def: Omit<SkinDef, "labelKey" | "label">, labelKey: TranslationKey): SkinDef =>
@@ -65,6 +69,8 @@ export const SKINS: SkinDef[] = [
   // Neutros (gris / negro): solo acento; la atmósfera NO se tiñe (ver applySkin).
   definirSkin({ id: "gris", primary: "hsl(220 8% 38%)", accent: "hsl(220 8% 48%)" }, "int.skin.gris"),
   definirSkin({ id: "negro", primary: "hsl(220 10% 20%)", accent: "hsl(220 9% 34%)" }, "int.skin.negro"),
+  // Blanco (Alvaro, 12/11): todo blanco en claro, botones grafito. Ajustes pone el tema en Claro.
+  definirSkin({ id: "blanco", primary: "hsl(220 12% 14%)", accent: "hsl(220 9% 30%)", muestra: "linear-gradient(135deg, #ffffff 0%, #ffffff 55%, #e4e5ea 100%)" }, "int.skin.blanco"),
   // Líneas de negocio — van después del separador "Líneas" del picker
   // (Kash ya tiene su preset propio arriba, "Rojo Kash").
   definirSkin({ id: "unlimited", primary: "hsl(150 56% 33%)", accent: "hsl(190 90% 45%)", group: "linea" }, "int.skin.unlimited"),
@@ -94,7 +100,7 @@ const hueDeSkin = (skin: SkinId): number => {
 // directo (bloques html[data-skin="gris"|"negro"] .fondo-glass en index.css),
 // no el hue. Acá solo se evita rotar los glows de las tarjetas (rot = 0) y se
 // deja --skin-h en el base, ya que para estos skins la atmósfera no lo usa.
-const SKINS_NEUTROS = new Set<SkinId>(["gris", "negro"]);
+const SKINS_NEUTROS = new Set<SkinId>(["gris", "negro", "blanco"]);
 
 export const applySkin = (skin: SkinId) => {
   if (skin === "maven") delete document.documentElement.dataset.skin;

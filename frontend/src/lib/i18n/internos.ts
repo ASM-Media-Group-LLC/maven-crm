@@ -56,6 +56,7 @@ export const internos = {
   "int.skin.diva": { es: "Diva", en: "Diva" },
   "int.skin.gris": { es: "Gris", en: "Gray" },
   "int.skin.negro": { es: "Negro", en: "Black" },
+  "int.skin.blanco": { es: "Blanco", en: "White" },
   "int.skin.unlimited": { es: "Unlimited", en: "Unlimited" },
   "int.skin.unlok": { es: "Unlok", en: "Unlok" },
 

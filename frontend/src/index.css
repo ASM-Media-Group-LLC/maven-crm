@@ -16,9 +16,14 @@ All colors MUST be HSL. Light mode in :root, dark mode in .dark.
   :root {
     --background: 240 20% 98%;
     --foreground: 240 20% 12%;
+    /* TEXTO CORRIENTE (Alvaro, 12/11: «blanco solo para lo clave»): tres niveles.
+       fuerte = --foreground (títulos, nombres, cifras: quien lo pide con
+       text-foreground o un h1–h3), corriente = --texto (todo lo demás, lo que
+       hereda del body y de las tarjetas), tenue = --muted-foreground. */
+    --texto: 240 10% 26%;
 
     --card: 0 0% 100%;
-    --card-foreground: 240 20% 12%;
+    --card-foreground: 240 10% 26%;
 
     --popover: 0 0% 100%;
     --popover-foreground: 240 20% 12%;
@@ -116,9 +121,11 @@ All colors MUST be HSL. Light mode in :root, dark mode in .dark.
        fotos/video (text-white). Decisión de Alvaro (19/10): "todo un poco más
        suave, dos niveles". */
     --foreground: 240 12% 89%;
+    /* Texto corriente un escalón bajo el fuerte (ver :root). */
+    --texto: 240 7% 76%;
 
     --card: 240 12% 7%;
-    --card-foreground: 240 12% 89%;
+    --card-foreground: 240 7% 76%;
 
     --popover: 240 12% 7%;
     --popover-foreground: 240 12% 89%;
@@ -288,6 +295,44 @@ All colors MUST be HSL. Light mode in :root, dark mode in .dark.
     --sidebar-ring: 220 10% 20%;
   }
 
+  /* BLANCO (Alvaro, 12/11/2026: «un modo de verdad blanco»): en claro, TODO
+     blanco — fondos y tarjetas blancas, filos finos, botones grafito. Al
+     elegirlo, Ajustes pasa el tema a Claro. Si después se pone Oscuro, queda
+     un oscuro monocromo (botones blancos), nunca grafito sobre negro. */
+  :root[data-skin="blanco"] {
+    --primary: 220 12% 14%;
+    --accent: 220 9% 30%;
+    --ring: 220 12% 14%;
+    --sidebar-primary: 220 12% 14%;
+    --sidebar-ring: 220 12% 14%;
+  }
+  html[data-skin="blanco"]:not(.dark) {
+    --background: 0 0% 100%;
+    --foreground: 240 10% 9%;
+    --texto: 240 6% 25%;
+    --card: 0 0% 100%;
+    --card-foreground: 240 6% 25%;
+    --popover: 0 0% 100%;
+    --secondary: 240 5% 96%;
+    --muted: 240 5% 96%;
+    --muted-foreground: 240 4% 44%;
+    --border: 240 6% 90%;
+    --input: 240 6% 88%;
+    --sidebar-background: 0 0% 100%;
+    --sidebar-accent: 240 5% 96%;
+    --sidebar-border: 240 6% 90%;
+  }
+  .dark[data-skin="blanco"] {
+    --primary: 0 0% 94%;
+    --primary-foreground: 240 14% 6%;
+    --accent: 0 0% 78%;
+    --accent-foreground: 240 14% 6%;
+    --ring: 0 0% 78%;
+    --sidebar-primary: 0 0% 94%;
+    --sidebar-primary-foreground: 240 14% 6%;
+    --sidebar-ring: 0 0% 78%;
+  }
+
   /* ---- Skins de LÍNEA de negocio (grupo "Líneas" del picker) ----
      Colores de marca de cada línea como preset de acento (Kash ya tiene su
      preset propio arriba, "Rojo Kash"). Misma regla A11y que los presets de
@@ -361,6 +406,8 @@ All colors MUST be HSL. Light mode in :root, dark mode in .dark.
      el modo también funcione en claro sin volver el texto invisible. */
   :root[data-contrast="high"]:not(.dark) {
     --foreground: 0 0% 0%;
+    --texto: 0 0% 0%;
+    --card-foreground: 0 0% 0%;
     --muted-foreground: 240 5% 30%;
     --border: 240 6% 62%;
     --input: 240 6% 62%;
@@ -368,6 +415,8 @@ All colors MUST be HSL. Light mode in :root, dark mode in .dark.
 
   .dark[data-contrast="high"] {
     --foreground: 0 0% 100%;
+    --texto: 0 0% 100%;
+    --card-foreground: 0 0% 100%;
     --muted-foreground: 225 15% 74%;
     --border: 225 26% 30%;
     --input: 225 26% 30%;
@@ -380,14 +429,18 @@ All colors MUST be HSL. Light mode in :root, dark mode in .dark.
   }
 
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background;
+    /* El texto corriente en --texto; lo fuerte se pide (text-foreground, h1–h3). */
+    color: hsl(var(--texto));
   }
 
   /* Reskin: los títulos llevan la fuente display (Sora). Los headings
      semánticos la heredan solos; los títulos hechos con <div> se migran
-     pantalla por pantalla con la clase `font-display`. */
+     pantalla por pantalla con la clase `font-display`. Y van en el color
+     fuerte: lo que es título se lee primero (una clase de color les gana). */
   h1, h2, h3 {
     @apply font-display;
+    color: hsl(var(--foreground));
   }
 
   /* Rediseño 09/2026: el fondo se queda quieto. Antes había dos manchas radiales
@@ -1478,6 +1531,26 @@ html[data-skin="negro"] .fondo-glass-sutil {
     linear-gradient(180deg, #0a0a0c 0%, #060607 58%, #000000 100%);
   background-attachment: fixed;
 }
+
+/* Skin BLANCO en claro: sin atmósfera de color ni vidrio grisáceo. Fondo casi
+   blanco (#f6f6f7) y todo lo que flota en blanco puro con filo fino y sombra
+   mínima, como una hoja. */
+html[data-skin="blanco"]:not(.dark) .fondo-glass,
+html[data-skin="blanco"]:not(.dark) .fondo-glass-sutil {
+  background: #f6f6f7;
+  animation: none;
+}
+html[data-skin="blanco"]:not(.dark) .vidrio,
+html[data-skin="blanco"]:not(.dark) .vidrio-panel,
+html[data-skin="blanco"]:not(.dark) .vidrio-barra {
+  background: #ffffff;
+  border: 1px solid rgba(15, 15, 25, .07);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  box-shadow: 0 1px 2px rgba(15, 15, 25, .04), 0 8px 24px rgba(15, 15, 25, .05);
+}
+html[data-skin="blanco"]:not(.dark) .vidrio-lift:hover { box-shadow: 0 2px 4px rgba(15, 15, 25, .05), 0 14px 32px rgba(15, 15, 25, .08); }
+html[data-skin="blanco"]:not(.dark) .vidrio-glow::before { display: none; }
 
 /* RECOLOR POR SKIN — cómo cambia TODA la atmósfera con el color elegido sin
    romper nada (Alvaro, 03/11: "el color tiene que cambiar con todo"):
