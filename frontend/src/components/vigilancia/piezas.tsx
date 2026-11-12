@@ -1,3 +1,4 @@
+import type { CSSProperties } from "react";
 import { cn } from "@/lib/utils";
 import type { TranslationKey } from "@/lib/i18n";
 import type { EstadoVivo } from "@/lib/motivosVivos";
@@ -49,6 +50,16 @@ export function tonoDeNota(puntos: number): { texto: string; barra: string } {
   return { texto: "text-destructive", barra: "bg-destructive" };
 }
 
+/** Tono propio de cada persona (sale del nombre, siempre el mismo). Solo se ve
+ *  en Blanco puro (clases .avatar-letra / .avatar-fondo de index.css). Tonos
+ *  escogidos a mano para que ninguno salga barroso. */
+const TONOS_PERSONA = [212, 160, 28, 268, 340, 190, 135, 248, 8, 300, 45, 176];
+export function tonoDePersona(nombre: string): number {
+  let h = 0;
+  for (const c of nombre.trim().toLowerCase()) h = (h * 31 + c.codePointAt(0)!) >>> 0;
+  return TONOS_PERSONA[h % TONOS_PERSONA.length];
+}
+
 /** Avatar de UNA letra (regla de diseño v5), redondo, sobre vidrio neutro. */
 export function LetraAvatar({ nombre, tamano = "sm", sobreOscuro = false, className }: {
   nombre: string;
@@ -62,8 +73,9 @@ export function LetraAvatar({ nombre, tamano = "sm", sobreOscuro = false, classN
   return (
     <span
       aria-hidden
+      style={{ "--av-h": tonoDePersona(nombre) } as CSSProperties}
       className={cn(
-        "inline-flex shrink-0 items-center justify-center rounded-full font-semibold ring-1",
+        "avatar-letra inline-flex shrink-0 items-center justify-center rounded-full font-semibold ring-1",
         sobreOscuro ? "bg-white/[0.08] text-white/90 ring-white/15" : "bg-foreground/[0.06] text-foreground/90 ring-border",
         medidas,
         className,

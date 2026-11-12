@@ -30,7 +30,6 @@ export type SkinId =
   | "diva"
   | "gris"
   | "negro"
-  | "blanco"
   | "unlimited"
   | "unlok";
 
@@ -48,9 +47,6 @@ export interface SkinDef {
   /** "linea" = skin de línea de negocio (Unlimited/Unlok): en el picker van
       después del separador "Líneas". Sin group = preset base. */
   group?: "linea";
-  /** Fondo del swatch cuando el gradiente primary→accent no lo representa
-      (Blanco: botones grafito, pero lo que se ve es todo blanco). */
-  muestra?: string;
 }
 
 const definirSkin = (def: Omit<SkinDef, "labelKey" | "label">, labelKey: TranslationKey): SkinDef =>
@@ -69,8 +65,6 @@ export const SKINS: SkinDef[] = [
   // Neutros (gris / negro): solo acento; la atmósfera NO se tiñe (ver applySkin).
   definirSkin({ id: "gris", primary: "hsl(220 8% 38%)", accent: "hsl(220 8% 48%)" }, "int.skin.gris"),
   definirSkin({ id: "negro", primary: "hsl(220 10% 20%)", accent: "hsl(220 9% 34%)" }, "int.skin.negro"),
-  // Blanco (Alvaro, 12/11): todo blanco en claro, botones grafito. Ajustes pone el tema en Claro.
-  definirSkin({ id: "blanco", primary: "hsl(220 12% 14%)", accent: "hsl(220 9% 30%)", muestra: "linear-gradient(135deg, #ffffff 0%, #ffffff 55%, #e4e5ea 100%)" }, "int.skin.blanco"),
   // Líneas de negocio — van después del separador "Líneas" del picker
   // (Kash ya tiene su preset propio arriba, "Rojo Kash").
   definirSkin({ id: "unlimited", primary: "hsl(150 56% 33%)", accent: "hsl(190 90% 45%)", group: "linea" }, "int.skin.unlimited"),
@@ -100,7 +94,7 @@ const hueDeSkin = (skin: SkinId): number => {
 // directo (bloques html[data-skin="gris"|"negro"] .fondo-glass en index.css),
 // no el hue. Acá solo se evita rotar los glows de las tarjetas (rot = 0) y se
 // deja --skin-h en el base, ya que para estos skins la atmósfera no lo usa.
-const SKINS_NEUTROS = new Set<SkinId>(["gris", "negro", "blanco"]);
+const SKINS_NEUTROS = new Set<SkinId>(["gris", "negro"]);
 
 export const applySkin = (skin: SkinId) => {
   if (skin === "maven") delete document.documentElement.dataset.skin;
@@ -116,9 +110,22 @@ export const applySkin = (skin: SkinId) => {
   document.documentElement.style.setProperty("--skin-h", `${h}`);
 };
 
+/** «blanco» fue skin unas horas (12/11/2026); ahora es la preferencia
+ *  «Blanco puro» y se combina con cualquier color. Quien lo tenía guardado
+ *  como skin pasa a Maven + Blanco puro prendido. */
+export const SKIN_VIEJO_BLANCO = "blanco";
+
 export const getStoredSkin = (): SkinId => {
   try {
     const stored = localStorage.getItem(STORAGE_KEY);
+    if (stored === SKIN_VIEJO_BLANCO) {
+      localStorage.setItem(STORAGE_KEY, "maven");
+      try {
+        const prefs = JSON.parse(localStorage.getItem("maven-ui-prefs") || "{}");
+        localStorage.setItem("maven-ui-prefs", JSON.stringify({ ...prefs, blanco: true }));
+      } catch { /* prefs ilegibles: solo se pierde el blanco */ }
+      return "maven";
+    }
     return isSkinId(stored) ? stored : "maven";
   } catch {
     return "maven";
@@ -149,6 +156,8 @@ export const applyStoredSkin = () => applySkin(getStoredSkin());
 export type UiPrefs = {
   /** Negro puro en tema oscuro (data-oled). */
   oled?: boolean;
+  /** Blanco puro en tema claro (data-blanco): fondos y tarjetas blancas. */
+  blanco?: boolean;
   /** Alto contraste (data-contrast="high"). */
   contrast?: boolean;
   /** Hue 0-360 del skin Personalizado; null/ausente = sin skin custom. */
@@ -173,6 +182,7 @@ export const sanitizeUiPrefs = (raw: unknown): UiPrefs => {
   const o = raw as Record<string, unknown>;
   const prefs: UiPrefs = {};
   if (typeof o.oled === "boolean") prefs.oled = o.oled;
+  if (typeof o.blanco === "boolean") prefs.blanco = o.blanco;
   if (typeof o.contrast === "boolean") prefs.contrast = o.contrast;
   if (typeof o.customHue === "number" && Number.isFinite(o.customHue)) {
     prefs.customHue = Math.min(360, Math.max(0, Math.round(o.customHue)));
@@ -205,6 +215,7 @@ const storePrefs = (prefs: UiPrefs) => {
 // Sin eso, apagarla no la borraría del perfil (ver guardarAparienciaEnPerfil).
 const CLAVES_DE_APARIENCIA: Record<keyof UiPrefs, true> = {
   oled: true,
+  blanco: true,
   contrast: true,
   customHue: true,
   seasonalOptOut: true,
@@ -318,6 +329,8 @@ export const applyAppearancePrefs = () => {
   const root = document.documentElement;
   if (prefs.oled) root.dataset.oled = "";
   else delete root.dataset.oled;
+  if (prefs.blanco) root.dataset.blanco = "";
+  else delete root.dataset.blanco;
   if (prefs.contrast) root.dataset.contrast = "high";
   else delete root.dataset.contrast;
   if (prefs.density === "compact") root.dataset.density = "compact";
@@ -473,6 +486,13 @@ export const useSkinSync = () => {
         // ui_prefs: mismo criterio que ui_skin — lo del perfil es lo último
         // elegido en ALGÚN dispositivo, gana si difiere de lo local.
         const remotePrefs = sanitizeUiPrefs(data?.ui_prefs);
+        // El skin viejo «blanco» se muda una sola vez: Maven + Blanco puro, y
+        // el perfil queda escrito así (si no, volvería a prenderlo siempre).
+        if (raw === SKIN_VIEJO_BLANCO) {
+          remotePrefs.blanco = true;
+          supabase.from("profiles").update({ ui_skin: "maven" }).eq("id", user.id).then(() => {}, () => {});
+          void guardarAparienciaEnPerfil(remotePrefs);
+        }
         if (JSON.stringify(remotePrefs) !== JSON.stringify(getStoredPrefs())) {
           storePrefs(remotePrefs);
           applyAppearancePrefs();
