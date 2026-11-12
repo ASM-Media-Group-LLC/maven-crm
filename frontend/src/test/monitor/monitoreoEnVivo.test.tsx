@@ -164,7 +164,8 @@ describe("2 · «Quién está bajando ahora»", () => {
     expect(alcanceDeVigilancia(true, false, "dueno")).toBe("dueno");
     expect(alcanceDeVigilancia(false, true, "agente")).toBe("rrhh");
     expect(alcanceDeVigilancia(false, false, "supervisor")).toBe("equipo");
-    expect(alcanceDeVigilancia(false, false, "admin")).toBeNull();
+    expect(alcanceDeVigilancia(false, false, "admin")).toBe("dueno");   // Grace, Juan, Jackeline
+    expect(alcanceDeVigilancia(false, false, "manager")).toBe("equipo"); // Luis (sus equipos a cargo)
     expect(alcanceDeVigilancia(false, false, "agente")).toBeNull();
   });
 
