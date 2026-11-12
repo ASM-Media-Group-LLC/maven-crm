@@ -118,7 +118,17 @@ export function TarjetaDeApariencia({ conDensidad = true }: { conDensidad?: bool
     if (guardado.kind === "custom") { applySkin(skin); applyCustomHue(guardado.hue); }
     else { applyCustomHue(null); applySkin(guardado.id); }
   };
+  // Blanco es todo blanco: al elegirlo el tema pasa a Claro; si se descarta,
+  // vuelve el tema que había.
+  const temaPrevio = useRef<string | null>(null);
   const elegir = (sel: Sel) => {
+    if (sel.kind === "preset" && sel.id === "blanco" && theme !== "light") {
+      temaPrevio.current = theme ?? "dark";
+      setTheme("light");
+    } else if (temaPrevio.current && !(sel.kind === "preset" && sel.id === "blanco")) {
+      setTheme(temaPrevio.current);
+      temaPrevio.current = null;
+    }
     previsualizar(sel);
     setPendiente(mismo(sel, guardado) ? null : sel);
   };
@@ -131,14 +141,23 @@ export function TarjetaDeApariencia({ conDensidad = true }: { conDensidad?: bool
       setPrefs({ customHue: pendiente.hue });
       avisarme(t("settings.skinApplied"), t("settings.skinCustom"));
     }
+    temaPrevio.current = null;
     setPendiente(null);
   };
-  const descartar = () => { restaurarGuardado(); setPendiente(null); };
+  const descartar = () => {
+    restaurarGuardado();
+    if (temaPrevio.current) { setTheme(temaPrevio.current); temaPrevio.current = null; }
+    setPendiente(null);
+  };
 
   // Si el usuario sale de Ajustes con una vista previa sin guardar, el color
   // debe volver al guardado (no dejar aplicado algo que no eligió de verdad).
   const salidaRef = useRef<() => void>(() => {});
-  salidaRef.current = () => { if (pendiente) restaurarGuardado(); };
+  salidaRef.current = () => {
+    if (!pendiente) return;
+    restaurarGuardado();
+    if (temaPrevio.current) setTheme(temaPrevio.current);
+  };
   useEffect(() => () => salidaRef.current(), []);
 
   const customEnVista = vista.kind === "custom";
@@ -209,7 +228,7 @@ export function TarjetaDeApariencia({ conDensidad = true }: { conDensidad?: bool
                 key={s.id}
                 label={s.label}
                 active={vista.kind === "preset" && vista.id === s.id}
-                background={`linear-gradient(135deg, ${s.primary}, ${s.accent})`}
+                background={s.muestra ?? `linear-gradient(135deg, ${s.primary}, ${s.accent})`}
                 onClick={() => elegir({ kind: "preset", id: s.id })}
               />
             ))}
@@ -228,7 +247,7 @@ export function TarjetaDeApariencia({ conDensidad = true }: { conDensidad?: bool
                 key={s.id}
                 label={s.label}
                 active={vista.kind === "preset" && vista.id === s.id}
-                background={`linear-gradient(135deg, ${s.primary}, ${s.accent})`}
+                background={s.muestra ?? `linear-gradient(135deg, ${s.primary}, ${s.accent})`}
                 onClick={() => elegir({ kind: "preset", id: s.id })}
               />
             ))}

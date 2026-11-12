@@ -14,6 +14,15 @@ export default {
       },
     },
     extend: {
+      // LETRA UN PASO MÁS LIVIANA (Alvaro, 12/11/2026: «la letra es muy pesada,
+      // todo parece importante»). Había ~1.950 textos en negrita/seminegrita: se
+      // baja un escalón en TODA la plataforma sin tocar cada pantalla. medium
+      // queda en 500; lo que era seminegrita ya no grita.
+      fontWeight: {
+        semibold: "500",
+        bold: "600",
+        extrabold: "700",
+      },
       colors: {
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
