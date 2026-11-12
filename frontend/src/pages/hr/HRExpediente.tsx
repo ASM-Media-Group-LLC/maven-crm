@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
-import { ArrowLeft, ChevronLeft, ChevronRight, ChevronDown, AlertTriangle, ScreenShare, ScreenShareOff, CameraOff, ImageIcon, Loader2, Gauge, CalendarDays, Sparkles, ShieldCheck, Check } from "lucide-react";
+import { ArrowLeft, ChevronLeft, ChevronRight, ChevronDown, AlertTriangle, ScreenShare, ScreenShareOff, CameraOff, ImageIcon, Loader2, Gauge, CalendarDays, Sparkles, ShieldCheck, Check, Play, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useLanguage } from "@/hooks/useLanguage";
 import { UserAvatar } from "@/components/UserAvatar";
@@ -11,7 +11,12 @@ import { Page } from "@/components/ui/page";
 import { PageHeader } from "@/components/ui/page-header";
 import { useExpedienteEmpleado, type DiaExpediente, type CapturaDia } from "@/hooks/useExpedienteEmpleado";
 import { usePerdonarCaptura, usePuedePerdonar } from "@/hooks/usePerdonarCaptura";
-import { urlCaptura, urlsDeNas } from "@/hooks/useMonitorEventos";
+import { urlCaptura } from "@/hooks/useMonitorEventos";
+import { useArgosDia, useEvidenciaDia } from "@/hooks/useArgosJornada";
+import type { HoraJornada } from "@/lib/argosJornada";
+import { piezasEntre, type ClipArgos, type Momento, type Pieza } from "@/lib/argosMomentos";
+import { BarraDelTurno } from "@/components/argos/BarraDelTurno";
+import { Cuadrito, NOMBRE_ESTADO, hora, horaRedonda, pct, textoMin } from "@/components/argos/piezas";
 import { LABEL_FALTA, type FaltaTipo } from "@/lib/monitorFaltas";
 import type { BandaNota } from "@/lib/notaEmpleado";
 import type { TranslationKey } from "@/lib/i18n";
@@ -27,6 +32,12 @@ import { Mail } from "lucide-react";
 // horas arriba, y la TIRA de pantallazos del día —cada pantalla con su cámara
 // pegada en la esquina— agrupada por hora. Para otros días, flechas ‹ ayer / hoy ›
 // y un calendario opcional. Todo por t().
+//
+// 11/11 (Alvaro: «desde el clock in contabilizamos cada minuto»): los cuadritos
+// suman minutos sin cámara, sin pantalla, almuerzo, fallas (cortes de 1 min o
+// más) y cada cuánto, y horas productivas (90 % o más), todo del turno minuto a
+// minuto (useArgosDia). Debajo de Argos, la barra del turno de la hora de
+// entrada a la de salida; y la tira de pantallazos va hora por hora, en fila.
 
 const TONO: Record<BandaNota, { bg: string; tx: string; bar: string; chip: string }> = {
   bien: { bg: "bg-success/15 border-success/30", tx: "text-success", bar: "bg-success", chip: "bg-success/10 text-success" },
@@ -43,117 +54,71 @@ function sumarDias(ymd: string, delta: number): string {
   return dt.toISOString().slice(0, 10);
 }
 
-// Dónde firmar cada captura: si ya está en el NAS (enNas), por su nasPath; si no,
-// por su path del buzón.
-const claveFoto = (c: CapturaDia | null): string | null => (c ? (c.enNas ? c.nasPath : c.path) : null);
-
 // Abrir una captura del buzón por su path (las faltas de monitor_eventos nunca van al NAS).
 const abrirPath = async (path: string) => { const u = await urlCaptura(path); if (u) window.open(u, "_blank", "noopener"); };
 
-// Un MOMENTO del día: una pantalla con su cámara pegada (o, si no hay pantalla,
-// la cámara sola). Se emparejan por cercanía en el tiempo (≤ 90 s).
-interface Momento { id: string; createdAt: string; pantalla: CapturaDia | null; camara: CapturaDia | null; fueraDeLugar: boolean | null; veredicto: string | null; capId: string; perdonado: boolean; }
-
-function construirMomentos(capturas: CapturaDia[]): Momento[] {
-  const desc = (a: CapturaDia, b: CapturaDia) => (a.createdAt < b.createdAt ? 1 : -1);
-  const pantallas = capturas.filter((c) => c.tipo === "pantalla").sort(desc);
-  const camaras = capturas.filter((c) => c.tipo === "camara").sort(desc);
-  const usadas = new Set<string>();
-  const momentos: Momento[] = [];
-  for (const p of pantallas) {
-    let best: CapturaDia | null = null;
-    let bestD = Infinity;
-    for (const cam of camaras) {
-      if (usadas.has(cam.id)) continue;
-      const d = Math.abs(Date.parse(cam.createdAt) - Date.parse(p.createdAt));
-      if (d < bestD) { bestD = d; best = cam; }
-    }
-    if (best && bestD <= 90_000) usadas.add(best.id); else best = null;
-    momentos.push({ id: p.id, createdAt: p.createdAt, pantalla: p, camara: best, fueraDeLugar: p.fueraDeLugar, veredicto: p.veredicto, capId: p.id, perdonado: p.perdonado });
-  }
-  for (const cam of camaras) {
-    if (usadas.has(cam.id)) continue;
-    momentos.push({ id: cam.id, createdAt: cam.createdAt, pantalla: null, camara: cam, fueraDeLugar: cam.fueraDeLugar, veredicto: cam.veredicto, capId: cam.id, perdonado: cam.perdonado });
-  }
-  return momentos.sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
-}
-
-const TOPE_MOMENTOS = 72; // lo más reciente primero; el resto se cuenta aparte
-
-// La TIRA de pantallazos del día (modelo Hubstaff): agrupada por hora, cada
-// momento con su pantalla grande y su cámara pegada en la esquina. Firma las URLs
-// de lo visible y se re-firma al cambiar de día (caducan a 2 min).
+// LA TIRA DEL DÍA, POR HORA (Alvaro, 11/11/2026: «la grilla se ve barata»). Una
+// fila por hora del turno, como Hubstaff: arriba cuántos pantallazos y
+// grabaciones hubo, su % trabajando bien y si fue productiva (90 % o más);
+// debajo, las miniaturas EN FILA, todas del mismo marco, con una sola línea de
+// texto. Las fuera de lugar llevan el filo rojo y lo dicen en su línea (sin
+// cartel encima). Las grabaciones de Argos van en su minuto, dentro de la fila.
 type FiltroCaptura = "todos" | "fuera" | "camara" | "pantalla";
 const sinCamaraMom = (m: Momento): boolean => !m.camara || m.camara.caraVisible === false;
 function pasaFiltro(m: Momento, f: FiltroCaptura): boolean {
-  if (f === "fuera") return m.fueraDeLugar === true;
+  if (f === "fuera") return m.flojo;
   if (f === "camara") return sinCamaraMom(m);
   if (f === "pantalla") return !m.pantalla;
   return true;
 }
+const HORA_MS = 3_600_000;
+const mismaPieza = (a: Pieza, b: Pieza) => a.tipo === b.tipo && (a.tipo === "clip" ? b.tipo === "clip" && a.c.id === b.c.id : b.tipo === "momento" && a.m.id === b.m.id);
 
-function TiraDelDia({ capturas, t }: { capturas: CapturaDia[]; t: Tr }) {
-  const momentos = useMemo(() => construirMomentos(capturas), [capturas]);
+function TiraDelDia({ momentos, clips, horas, t, lang }: {
+  momentos: Momento[];
+  clips: ClipArgos[];
+  horas: HoraJornada[] | null;
+  t: Tr;
+  lang: string;
+}) {
   const [filtro, setFiltro] = useState<FiltroCaptura>("todos");
   const conteos = useMemo(() => ({
-    fuera: momentos.filter((m) => m.fueraDeLugar === true).length,
+    fuera: momentos.filter((m) => m.flojo).length,
     camara: momentos.filter(sinCamaraMom).length,
     pantalla: momentos.filter((m) => !m.pantalla).length,
   }), [momentos]);
-  const visibles = useMemo(() => momentos.filter((m) => pasaFiltro(m, filtro)).slice(0, TOPE_MOMENTOS), [momentos, filtro]);
-  const [urls, setUrls] = useState<Record<string, string>>({});
+  const visibles = useMemo(() => momentos.filter((m) => pasaFiltro(m, filtro)), [momentos, filtro]);
+  const clipsVisibles = filtro === "todos" ? clips : [];
 
-  // Si una miniatura del buzón falla (p. ej. la firma venció tras una sesión
-  // larga), se RE-FIRMA sola una vez — así nunca queda el ícono de imagen rota.
-  // Las del NAS se firman por argos-foto, no acá. Alvaro, 04/11.
-  const refirmados = useRef<Set<string>>(new Set());
-  const reFirmar = async (c: CapturaDia | null) => {
-    if (!c || c.enNas || refirmados.current.has(c.path)) return;
-    refirmados.current.add(c.path);
-    const u = await urlCaptura(c.path);
-    if (u) setUrls((prev) => ({ ...prev, [c.path]: u }));
-  };
+  // Las filas: cada hora del turno (aunque no haya capturas) y cualquier otra
+  // hora con capturas (fuera de su horario). De la primera a la última.
+  const filas = useMemo(() => {
+    const porHora = new Map<number, HoraJornada | null>();
+    if (filtro === "todos") for (const h of horas ?? []) porHora.set(Math.floor(h.desde / HORA_MS) * HORA_MS, h);
+    for (const m of visibles) { const k = Math.floor(m.at / HORA_MS) * HORA_MS; if (!porHora.has(k)) porHora.set(k, (horas ?? []).find((h) => Math.floor(h.desde / HORA_MS) * HORA_MS === k) ?? null); }
+    for (const c of clipsVisibles) { const k = Math.floor(Date.parse(c.desde) / HORA_MS) * HORA_MS; if (!porHora.has(k)) porHora.set(k, null); }
+    return [...porHora.entries()].sort((a, b) => a[0] - b[0]).map(([desde, h]) => ({
+      desde, h, piezas: piezasEntre(visibles, clipsVisibles, desde, desde + HORA_MS),
+    }));
+  }, [horas, visibles, clipsVisibles, filtro]);
+  const todas = useMemo(() => filas.flatMap((f) => f.piezas), [filas]);
 
-  useEffect(() => {
-    let vivo = true;
-    void (async () => {
-      // Las del buzón se firman con Supabase; las que ya están en el NAS, por la
-      // edge argos-foto (un solo viaje). El mapa se indexa por clave (path o nasPath).
-      const buzon = new Set<string>();
-      const nas = new Set<string>();
-      for (const m of visibles) {
-        for (const c of [m.pantalla, m.camara]) {
-          if (!c) continue;
-          if (c.enNas && c.nasPath) nas.add(c.nasPath);
-          else if (!c.enNas) buzon.add(c.path);
-        }
-      }
-      const [nasUrls, buzonPairs] = await Promise.all([
-        urlsDeNas([...nas]),
-        Promise.all([...buzon].map(async (p) => [p, await urlCaptura(p)] as const)),
-      ]);
-      if (vivo) setUrls({ ...nasUrls, ...Object.fromEntries(buzonPairs.filter(([, u]) => !!u) as [string, string][]) });
-    })();
-    return () => { vivo = false; };
-  }, [visibles]);
-
-  // Visor pop-up: índice del momento abierto dentro de `visibles`. Flechas del
-  // teclado pasan entre momentos; Esc cierra. (visibles va de más nuevo a más viejo.)
+  // Visor pop-up: la pieza abierta dentro de `todas` (en orden de hora).
   const [visorIdx, setVisorIdx] = useState<number | null>(null);
   const puedePerdonar = usePuedePerdonar();
   const perdonar = usePerdonarCaptura();
   useEffect(() => {
     if (visorIdx === null) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "ArrowRight") setVisorIdx((i) => (i === null ? i : Math.max(0, i - 1)));
-      else if (e.key === "ArrowLeft") setVisorIdx((i) => (i === null ? i : Math.min(visibles.length - 1, i + 1)));
+      if (e.key === "ArrowRight") setVisorIdx((i) => (i === null ? i : Math.min(todas.length - 1, i + 1)));
+      else if (e.key === "ArrowLeft") setVisorIdx((i) => (i === null ? i : Math.max(0, i - 1)));
       else if (e.key === "Escape") setVisorIdx(null);
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [visorIdx, visibles.length]);
+  }, [visorIdx, todas.length]);
 
-  if (momentos.length === 0) {
+  if (momentos.length === 0 && clips.length === 0 && (horas ?? []).length === 0) {
     return (
       <div className="flex flex-col items-center gap-2 py-12 text-center text-muted-foreground">
         <ScreenShare className="h-7 w-7 opacity-40" />
@@ -162,184 +127,139 @@ function TiraDelDia({ capturas, t }: { capturas: CapturaDia[]; t: Tr }) {
     );
   }
 
-  // Agrupar por hora (lo más reciente primero).
-  const grupos: Array<{ hora: string; items: Momento[] }> = [];
-  for (const m of visibles) {
-    const hora = format(new Date(m.createdAt), "h a", { locale: es });
-    const ult = grupos[grupos.length - 1];
-    if (ult && ult.hora === hora) ult.items.push(m);
-    else grupos.push({ hora, items: [m] });
-  }
-
   const chips: Array<{ k: FiltroCaptura; lbl: string; n?: number }> = [
     { k: "todos", lbl: t("hr.exp.filtroTodos") },
     { k: "fuera", lbl: t("hr.exp.filtroFuera"), n: conteos.fuera },
     { k: "camara", lbl: t("hr.exp.filtroCamara"), n: conteos.camara },
     { k: "pantalla", lbl: t("hr.exp.filtroPantalla"), n: conteos.pantalla },
   ];
+  const abrir = (p: Pieza) => setVisorIdx(todas.findIndex((x) => mismaPieza(x, p)));
 
   return (
     <div className="flex flex-col gap-5">
       {/* Filtros: ver solo fuera de lugar, sin cámara o sin pantalla. */}
       <div className="flex flex-wrap items-center gap-2">
         {chips.map((c) => (
-          <button
-            key={c.k}
-            type="button"
-            onClick={() => setFiltro(c.k)}
-            className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition ${filtro === c.k ? "border-primary/50 bg-primary/10 text-primary" : "border-border/50 text-muted-foreground hover:bg-foreground/5"}`}
-          >
+          <button key={c.k} type="button" onClick={() => setFiltro(c.k)}
+            className={`inline-flex items-center gap-1.5 rounded-control border px-3 py-1 text-xs font-medium transition ${filtro === c.k ? "border-primary/50 bg-primary/10 text-primary" : "border-border/60 text-muted-foreground hover:bg-foreground/5"}`}>
             {c.lbl}
-            {c.n != null && c.n > 0 && <span className={`rounded-full px-1.5 py-0.5 text-[10px] tabular-nums ${filtro === c.k ? "bg-primary/20" : "bg-warning/20 text-warning"}`}>{c.n}</span>}
+            {c.n != null && c.n > 0 && <span className="text-[11px] font-semibold tabular-nums">{c.n}</span>}
           </button>
         ))}
       </div>
 
-      {visibles.length === 0 ? (
+      {filas.length === 0 ? (
         <p className="py-10 text-center text-sm text-muted-foreground">{t("hr.exp.filtroVacio")}</p>
-      ) : grupos.map((g) => (
-        <div key={g.hora}>
-          <p className="mb-2 text-xs font-semibold text-muted-foreground">{g.hora}</p>
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-5">
-            {g.items.map((m) => {
-              const urlP = m.pantalla ? urls[claveFoto(m.pantalla)!] : undefined;
-              const urlC = m.camara ? urls[claveFoto(m.camara)!] : undefined;
-              const hora = a12(format(new Date(m.createdAt), "HH:mm"));
-              const abrir = () => setVisorIdx(visibles.indexOf(m)); // pop-up, no pestaña nueva
-              return (
-                <button
-                  key={m.id}
-                  type="button"
-                  onClick={abrir}
-                  title={`${hora}${m.veredicto ? ` · ${m.veredicto}` : ""}`}
-                  className={`group relative overflow-hidden rounded-xl border bg-muted/40 transition ${m.fueraDeLugar ? "border-destructive/60" : "border-border/40 hover:border-primary/50"}`}
-                >
-                  <div className="relative aspect-[16/10] w-full">
-                    {/* GRANDE: la pantalla; si no compartía, una X */}
-                    {m.pantalla ? (
-                      urlP ? (
-                        <img src={urlP} alt={hora} loading="lazy" onError={() => reFirmar(m.pantalla)} className="h-full w-full object-cover" />
-                      ) : (
-                        <div className="flex h-full w-full items-center justify-center text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /></div>
-                      )
-                    ) : (
-                      <div className="flex h-full w-full flex-col items-center justify-center gap-1 bg-muted/30 text-muted-foreground">
-                        <ScreenShareOff className="h-5 w-5 opacity-60" />
-                        <span className="text-[9px] font-medium">{t("hr.exp.sinPantalla")}</span>
-                      </div>
-                    )}
-                    {/* ESQUINA: la cámara; si estaba apagada, una X roja */}
-                    <div className="absolute bottom-1 right-1 h-11 w-16 overflow-hidden rounded-control border-2 border-background/80 shadow-md">
-                      {m.camara ? (
-                        urlC ? (
-                          <img src={urlC} alt="" loading="lazy" onError={() => reFirmar(m.camara)} className="h-full w-full object-cover" />
-                        ) : (
-                          <div className="flex h-full w-full items-center justify-center bg-muted/60 text-muted-foreground"><Loader2 className="h-3 w-3 animate-spin" /></div>
-                        )
-                      ) : (
-                        <div className="flex h-full w-full items-center justify-center bg-destructive/15 text-destructive" title={t("hr.exp.camaraApagada")}>
-                          <CameraOff className="h-3.5 w-3.5" />
-                        </div>
-                      )}
-                    </div>
-                    <span className="absolute bottom-1 left-1 rounded bg-black/55 px-1 py-0.5 text-[9px] font-semibold tabular-nums text-white backdrop-blur-sm">{hora}</span>
-                    {m.fueraDeLugar && (
-                      <span className="absolute left-1 top-1 inline-flex items-center gap-0.5 rounded bg-destructive px-1 py-0.5 text-[9px] font-semibold text-destructive-foreground">
-                        <AlertTriangle className="h-2.5 w-2.5" />{t("hr.exp.fueraDeLugar")}
-                      </span>
-                    )}
+      ) : (
+        <div className="flex flex-col divide-y divide-border/40">
+          {filas.map(({ desde, h, piezas }) => {
+            const pantallazos = piezas.filter((p) => p.tipo === "momento" && p.m.pantalla).length;
+            const grabaciones = piezas.filter((p) => p.tipo === "clip").length;
+            const futura = !!h && h.seg.pendiente >= (h.hasta - h.desde) / 1000 - 1;
+            const mayor = h ? (Object.keys(h.seg) as Array<keyof typeof h.seg>).filter((e) => e !== "pendiente").reduce((a, e) => (h.seg[e] > h.seg[a] ? e : a), "bien" as keyof typeof h.seg) : null;
+            return (
+              <div key={desde} className={`py-3 first:pt-0 ${futura ? "opacity-50" : ""}`}>
+                <div className="mb-2 flex flex-wrap items-baseline gap-x-3 gap-y-0.5">
+                  <span className="text-sm font-semibold tabular-nums">{horaRedonda(desde, lang)}</span>
+                  <span className="text-xs tabular-nums text-muted-foreground">{pantallazos === 1 ? t("argos.tira.pantallazo1") : t("argos.tira.pantallazos", { n: pantallazos })} · {grabaciones === 1 ? t("argos.tira.grabacion1") : t("argos.tira.grabaciones", { n: grabaciones })}</span>
+                  <span className="ml-auto flex items-baseline gap-2 text-xs">
+                    {!h ? <span className="text-muted-foreground">{t("argos.tira.fueraDeTurno")}</span>
+                      : futura ? <span className="text-muted-foreground">{t("argos.hora.aunNo")}</span>
+                      : <>
+                          <span className="font-semibold tabular-nums">{pct(h.pctBien)}</span>
+                          <span className={h.productiva ? "font-medium text-success" : "text-muted-foreground"}>
+                            {h.productiva === null ? t("argos.hora.pausa") : h.productiva ? t("argos.hora.productiva") : t("argos.hora.noProductiva")}
+                          </span>
+                        </>}
+                  </span>
+                </div>
+                {piezas.length > 0 ? (
+                  <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1">
+                    {piezas.map((p) => <Miniatura key={`${p.tipo}-${p.tipo === "clip" ? p.c.id : p.m.id}`} p={p} onAbrir={() => abrir(p)} t={t} lang={lang} />)}
                   </div>
-                </button>
-              );
-            })}
-          </div>
+                ) : h && !futura && mayor ? (
+                  <p className="text-xs text-muted-foreground">{t("argos.hora.sinCapturas", { e: t(NOMBRE_ESTADO[mayor]), m: textoMin(h.seg[mayor] / 60, t) })}</p>
+                ) : null}
+              </div>
+            );
+          })}
         </div>
-      ))}
-      {momentos.length > visibles.length && (
-        <p className="text-[11px] text-muted-foreground">{t("hr.exp.masCapturas", { n: momentos.length - visibles.length })}</p>
       )}
 
-      {/* ── Pop-up: pantalla (1) grande + cámara (2) flotante, con su minuto exacto ── */}
-      {visorIdx !== null && visibles[visorIdx] && (() => {
-        const m = visibles[visorIdx];
-        const urlP = m.pantalla ? urls[claveFoto(m.pantalla)!] : undefined;
-        const urlC = m.camara ? urls[claveFoto(m.camara)!] : undefined;
-        const hp = m.pantalla ? format(new Date(m.pantalla.createdAt), "HH:mm:ss") : null;
-        const hc = m.camara ? format(new Date(m.camara.createdAt), "HH:mm:ss") : null;
+      {/* ── Pop-up: pantalla grande + cámara flotante (o la grabación), con su minuto exacto ── */}
+      {visorIdx !== null && todas[visorIdx] && (() => {
+        const p = todas[visorIdx];
+        const m = p.tipo === "momento" ? p.m : null;
+        const hp = m?.pantalla ? format(new Date(m.pantalla.at), "HH:mm:ss") : null;
+        const hc = m?.camara ? format(new Date(m.camara.at), "HH:mm:ss") : null;
+        const veredicto = m?.pantalla?.veredicto ?? null;
         return (
           <Dialog open onOpenChange={(o) => { if (!o) setVisorIdx(null); }}>
             <DialogContent className="max-w-5xl bg-none from-transparent p-2 sm:p-3">
               <DialogTitle className="sr-only">{t("hr.exp.pantallazosDia")}</DialogTitle>
               <div className="flex flex-col gap-2.5">
-                <div className="relative overflow-hidden rounded-xl border border-border/50 bg-black">
+                <div className="relative overflow-hidden rounded-panel border border-border/50 bg-black">
                   <div className="relative aspect-[16/10] w-full">
-                    {m.pantalla ? (
-                      urlP ? <img src={urlP} alt="" className="h-full w-full object-contain" /> : <div className="flex h-full w-full items-center justify-center text-muted-foreground"><Loader2 className="h-6 w-6 animate-spin" /></div>
+                    {p.tipo === "clip" ? (
+                      p.c.url ? <video key={p.c.id} src={p.c.url} controls autoPlay muted playsInline className="h-full w-full object-contain" />
+                        : <div className="flex h-full w-full items-center justify-center px-6 text-center text-sm text-white/75">{t("argos.visor.videoEnArchivo")}</div>
+                    ) : m?.pantalla ? (
+                      m.pantalla.url ? <img src={m.pantalla.url} alt="" className="h-full w-full object-contain" /> : <div className="flex h-full w-full items-center justify-center text-muted-foreground"><Loader2 className="h-6 w-6 animate-spin" /></div>
                     ) : (
                       <div className="flex h-full w-full flex-col items-center justify-center gap-2 text-muted-foreground"><ScreenShareOff className="h-9 w-9 opacity-60" /><span className="text-xs font-semibold">{t("hr.exp.sinPantalla")}</span></div>
                     )}
-                    {/* 1 Pantalla + su hora */}
-                    <span className="absolute left-2.5 top-2.5 inline-flex items-center gap-2 rounded-lg bg-black/60 px-2.5 py-1.5 text-xs font-semibold text-white backdrop-blur-sm">
-                      <span className="flex h-5 w-5 items-center justify-center rounded-full bg-primary text-[11px] text-primary-foreground">1</span>
-                      {t("hr.exp.pantalla")}{hp && <span className="font-normal tabular-nums opacity-75">· {hp}</span>}
+                    <span className="absolute left-2.5 top-2.5 inline-flex items-center gap-2 rounded-control bg-black/60 px-2.5 py-1.5 text-xs font-semibold text-white backdrop-blur-sm">
+                      {p.tipo === "clip" ? t("argos.visor.video") : t("hr.exp.pantalla")}
+                      <span className="font-normal tabular-nums opacity-75">· {p.tipo === "clip" ? hora(p.at, lang) : hp ?? hora(p.at, lang)}</span>
                     </span>
-                    {m.fueraDeLugar && (
-                      <span className="absolute left-2.5 top-11 inline-flex items-center gap-1 rounded-lg bg-destructive px-2 py-1 text-[11px] font-semibold text-destructive-foreground">
-                        <AlertTriangle className="h-3 w-3" />{t("hr.exp.fueraDeLugar")}
-                      </span>
-                    )}
-                    {/* 2 Cámara, flotante */}
-                    <div className="absolute bottom-2.5 right-2.5 w-[32%] max-w-[230px] overflow-hidden rounded-lg border-2 border-white/80 shadow-xl">
-                      <div className="relative aspect-[4/3] bg-black">
-                        {m.camara ? (
-                          urlC ? <img src={urlC} alt="" className="h-full w-full object-cover" /> : <div className="flex h-full w-full items-center justify-center text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /></div>
-                        ) : (
-                          <div className="flex h-full w-full flex-col items-center justify-center gap-1 text-destructive"><CameraOff className="h-5 w-5" /><span className="text-[9px] font-semibold">{t("hr.exp.camaraApagada")}</span></div>
-                        )}
-                        <span className="absolute left-1.5 top-1.5 inline-flex items-center gap-1 rounded bg-black/60 px-1.5 py-0.5 text-[10px] font-semibold text-white backdrop-blur-sm">
-                          <span className="flex h-4 w-4 items-center justify-center rounded-full bg-primary text-[9px] text-primary-foreground">2</span>{t("hr.exp.camara")}{hc && <span className="font-normal tabular-nums opacity-75">· {hc}</span>}
-                        </span>
+                    {m && (
+                      <div className="absolute bottom-2.5 right-2.5 w-[32%] max-w-[230px] overflow-hidden rounded-control border-2 border-white/80 shadow-xl">
+                        <div className="relative aspect-[4/3] bg-black">
+                          {m.camara?.url ? <img src={m.camara.url} alt="" className="h-full w-full object-cover" />
+                            : <div className="flex h-full w-full flex-col items-center justify-center gap-1 text-destructive"><CameraOff className="h-5 w-5" /><span className="text-[9px] font-semibold">{t("hr.exp.camaraApagada")}</span></div>}
+                          <span className="absolute left-1.5 top-1.5 rounded-control bg-black/60 px-1.5 py-0.5 text-[10px] font-semibold text-white backdrop-blur-sm">
+                            {t("hr.exp.camara")}{hc && <span className="font-normal tabular-nums opacity-75"> · {hc}</span>}
+                          </span>
+                        </div>
                       </div>
-                    </div>
+                    )}
                   </div>
                 </div>
-                {/* Veredicto de la IA */}
-                {m.veredicto && (
-                  <div className={`flex items-start gap-2 rounded-lg border border-border/40 bg-card/40 px-3 py-2 text-sm ${m.fueraDeLugar && !m.perdonado ? "text-destructive" : "text-muted-foreground"}`}>
-                    <Sparkles className="mt-0.5 h-4 w-4 shrink-0 opacity-70" /><span>{m.veredicto}</span>
+                {/* Lo que dijo Argos */}
+                {(veredicto || p.tipo === "clip") && (
+                  <div className={`flex items-start gap-2 rounded-panel border border-border/40 bg-card/40 px-3 py-2 text-sm ${m?.flojo ? "text-destructive" : "text-muted-foreground"}`}>
+                    <Sparkles className="mt-0.5 h-4 w-4 shrink-0 opacity-70" />
+                    <span>{p.tipo === "clip" ? `${t(MOTIVO_CLIP[p.c.motivo ?? "distraido"] ?? "argos.visor.motivo.distraido")}${p.c.duracionSeg ? ` · ${textoMin(p.c.duracionSeg / 60, t)}` : ""}` : veredicto}</span>
                   </div>
                 )}
-                {/* Perdonar la falta (solo dueño + admins): no baja la nota. Ej.: un
-                    PR que SÍ puede ver redes de sus creadoras. */}
-                {m.fueraDeLugar && (
-                  m.perdonado ? (
-                    <div className="flex items-center justify-between gap-2 rounded-lg border border-success/30 bg-success/10 px-3 py-2 text-sm text-success">
+                {/* Perdonar la falta (solo dueño + admins): no baja la nota. */}
+                {m?.pantalla && m.pantalla.fueraDeLugar === true && (
+                  m.pantalla.perdonado ? (
+                    <div className="flex items-center justify-between gap-2 rounded-panel border border-success/30 bg-success/10 px-3 py-2 text-sm text-success">
                       <span className="flex items-center gap-2"><Check className="h-4 w-4 shrink-0" />{t("hr.exp.perdonada")}</span>
                       {puedePerdonar && (
-                        <button type="button" disabled={perdonar.isPending}
-                          onClick={() => perdonar.mutate({ id: m.capId, perdonar: false })}
+                        <button type="button" disabled={perdonar.isPending} onClick={() => perdonar.mutate({ id: m.pantalla!.id, perdonar: false })}
                           className="text-xs font-medium text-muted-foreground underline-offset-2 hover:underline disabled:opacity-50">
                           {t("hr.exp.perdonarQuitar")}
                         </button>
                       )}
                     </div>
                   ) : puedePerdonar ? (
-                    <button type="button" disabled={perdonar.isPending}
-                      onClick={() => perdonar.mutate({ id: m.capId, perdonar: true })}
-                      className="flex items-center justify-center gap-2 rounded-lg border border-primary/30 bg-primary/10 px-3 py-2 text-sm font-semibold text-primary transition hover:bg-primary/15 disabled:opacity-50">
+                    <button type="button" disabled={perdonar.isPending} onClick={() => perdonar.mutate({ id: m.pantalla!.id, perdonar: true })}
+                      className="flex items-center justify-center gap-2 rounded-panel border border-primary/30 bg-primary/10 px-3 py-2 text-sm font-semibold text-primary transition hover:bg-primary/15 disabled:opacity-50">
                       {perdonar.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <ShieldCheck className="h-4 w-4" />}
                       {t("hr.exp.perdonar")}
                     </button>
                   ) : null
                 )}
-                {/* Navegación entre momentos */}
+                {/* Navegación entre momentos (en orden de hora) */}
                 <div className="flex items-center justify-between">
-                  <button type="button" onClick={() => setVisorIdx((i) => (i === null ? i : Math.min(visibles.length - 1, i + 1)))} disabled={visorIdx >= visibles.length - 1} className="flex h-9 items-center gap-1.5 rounded-lg border border-border/50 bg-card/40 px-3 text-sm font-medium text-muted-foreground transition hover:text-foreground disabled:opacity-40">
-                    <ChevronLeft className="h-4 w-4" />{t("hr.exp.masViejo")}
+                  <button type="button" onClick={() => setVisorIdx((i) => (i === null ? i : Math.max(0, i - 1)))} disabled={visorIdx <= 0} className="flex h-9 items-center gap-1.5 rounded-control border border-border/50 bg-card/40 px-3 text-sm font-medium text-muted-foreground transition hover:text-foreground disabled:opacity-40">
+                    <ChevronLeft className="h-4 w-4" />{t("argos.visor.anterior")}
                   </button>
-                  <span className="text-xs tabular-nums text-muted-foreground">{a12(format(new Date(m.createdAt), "HH:mm"))} · {visibles.length - visorIdx}/{visibles.length}</span>
-                  <button type="button" onClick={() => setVisorIdx((i) => (i === null ? i : Math.max(0, i - 1)))} disabled={visorIdx <= 0} className="flex h-9 items-center gap-1.5 rounded-lg border border-border/50 bg-card/40 px-3 text-sm font-medium text-muted-foreground transition hover:text-foreground disabled:opacity-40">
-                    {t("hr.exp.masNuevo")}<ChevronRight className="h-4 w-4" />
+                  <span className="text-xs tabular-nums text-muted-foreground">{hora(p.at, lang)} · {visorIdx + 1}/{todas.length}</span>
+                  <button type="button" onClick={() => setVisorIdx((i) => (i === null ? i : Math.min(todas.length - 1, i + 1)))} disabled={visorIdx >= todas.length - 1} className="flex h-9 items-center gap-1.5 rounded-control border border-border/50 bg-card/40 px-3 text-sm font-medium text-muted-foreground transition hover:text-foreground disabled:opacity-40">
+                    {t("argos.visor.siguiente")}<ChevronRight className="h-4 w-4" />
                   </button>
                 </div>
               </div>
@@ -348,6 +268,54 @@ function TiraDelDia({ capturas, t }: { capturas: CapturaDia[]; t: Tr }) {
         );
       })()}
     </div>
+  );
+}
+
+const MOTIVO_CLIP: Record<string, TranslationKey> = {
+  distraido: "argos.visor.motivo.distraido",
+  usando_celular: "argos.visor.motivo.celular",
+  celular: "argos.visor.motivo.celular",
+  no_mira: "argos.visor.motivo.no_mira",
+  fuera_lugar: "argos.visor.motivo.fuera_lugar",
+};
+
+/** Una miniatura de la tira: mismo marco para todas, la cámara en la esquina y una sola línea abajo. */
+function Miniatura({ p, onAbrir, t, lang }: { p: Pieza; onAbrir: () => void; t: Tr; lang: string }) {
+  if (p.tipo === "clip") {
+    return (
+      <button type="button" onClick={onAbrir} className="group w-[124px] shrink-0 text-left sm:w-[148px]">
+        <span className="relative flex aspect-[16/10] w-full items-center justify-center overflow-hidden rounded-control border border-border/60 bg-foreground/80 text-background transition group-hover:border-primary/60">
+          <Play className="h-5 w-5" />
+        </span>
+        <span className="mt-1 block truncate text-[11px] tabular-nums text-muted-foreground">
+          {hora(p.at, lang)} · {t("argos.tira.grabacion")}{p.c.duracionSeg ? ` ${textoMin(p.c.duracionSeg / 60, t)}` : ""}
+        </span>
+      </button>
+    );
+  }
+  const m = p.m;
+  return (
+    <button type="button" onClick={onAbrir} title={m.pantalla?.veredicto ?? undefined} className="group w-[124px] shrink-0 text-left sm:w-[148px]">
+      <span className={`relative block aspect-[16/10] w-full overflow-hidden rounded-control border bg-muted/40 transition ${m.flojo ? "border-destructive/70" : "border-border/60 group-hover:border-primary/60"}`}>
+        {m.pantalla ? (
+          m.pantalla.url ? <img src={m.pantalla.url} alt="" loading="lazy" className="h-full w-full object-cover" />
+            : <span className="flex h-full w-full items-center justify-center text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /></span>
+        ) : m.camara?.url ? (
+          <img src={m.camara.url} alt="" loading="lazy" className="h-full w-full object-cover opacity-80" />
+        ) : (
+          <span className="flex h-full w-full items-center justify-center text-muted-foreground"><ScreenShareOff className="h-4 w-4 opacity-60" /></span>
+        )}
+        {m.pantalla && (
+          <span className="absolute bottom-1 right-1 h-7 w-10 overflow-hidden rounded-[4px] border border-background/80 bg-muted/60">
+            {m.camara?.url ? <img src={m.camara.url} alt="" loading="lazy" className="h-full w-full object-cover" />
+              : <span className="flex h-full w-full items-center justify-center bg-destructive/15 text-destructive"><CameraOff className="h-3 w-3" /></span>}
+          </span>
+        )}
+      </span>
+      <span className={`mt-1 block truncate text-[11px] tabular-nums ${m.flojo ? "font-medium text-destructive" : "text-muted-foreground"}`}>
+        {hora(m.at, lang)}{m.flojo ? ` · ${t("hr.exp.fueraDeLugar").toLowerCase()}` : !m.pantalla ? ` · ${t("hr.exp.sinPantalla").toLowerCase()}` : ""}
+      </span>
+    </button>
   );
 }
 
@@ -753,7 +721,7 @@ function DesgloseNotaContenido({ dia, atencion, t, compacto }: {
 
 export default function HRExpediente() {
   const { userId } = useParams<{ userId: string }>();
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const navigate = useNavigate();
   const location = useLocation();
   // Volver SIEMPRE a Argos (a la pestaña de donde saliste): si vinimos de un
@@ -767,6 +735,9 @@ export default function HRExpediente() {
   const anio = Number(diaSel.slice(0, 4));
   const mes = Number(diaSel.slice(5, 7));
   const { expediente, cargando, error, hoy } = useExpedienteEmpleado(userId ?? null, anio, mes);
+  const argos = useArgosDia(userId ?? null, diaSel);
+  const jornada = argos.dia?.jornada ?? null;
+  const evidencia = useEvidenciaDia(userId ?? null, jornada);
 
   const esHoy = diaSel === hoy;
   const puedeAvanzar = diaSel < hoy;
@@ -878,36 +849,36 @@ export default function HRExpediente() {
             </div>
           )}
 
-          {/* Stats del día */}
-          <div className="mt-4 grid grid-cols-3 gap-2 sm:grid-cols-5">
-            <div className={`rounded-panel border p-2.5 text-center ${c ? c.bg : "border-border/40 bg-card/40"}`}>
-              <div className={`font-display text-lg font-bold tabular-nums ${c?.tx ?? ""}`}>{dia.nota.valor ?? "—"}</div>
-              <div className="text-[10px] text-muted-foreground">{t("hr.exp.nota")}</div>
-            </div>
-            {/* % de atención del día: el sí-o-no con número */}
-            <div className="rounded-panel border border-border/40 bg-card/40 p-2.5 text-center" title={atencion ? t("hr.exp.atencionDetalle", { ok: atencion.ok, n: atencion.n }) : undefined}>
-              <div className={`font-display text-lg font-bold tabular-nums ${tonoAt}`}>{atencion ? `${atencion.pct}%` : "—"}</div>
-              <div className="text-[10px] text-muted-foreground">{t("hr.exp.atencion")}</div>
-            </div>
-            <div className="rounded-panel border border-border/40 bg-card/40 p-2.5 text-center">
-              <div className="font-display text-lg font-bold tabular-nums">{dia.horas.toFixed(1)}h</div>
-              <div className="text-[10px] text-muted-foreground">{t("hr.exp.horas")}</div>
-            </div>
-            <div className="rounded-panel border border-border/40 bg-card/40 p-2.5 text-center">
-              <div className="font-display text-lg font-bold tabular-nums">{dia.faltas.length}</div>
-              <div className="text-[10px] text-muted-foreground">{t("hr.exp.faltas")}</div>
-            </div>
-            <div className="rounded-panel border border-border/40 bg-card/40 p-2.5 text-center">
-              <div className="font-display text-lg font-bold tabular-nums">{Math.round(dia.minutosPausaDeMas)}m</div>
-              <div className="text-[10px] text-muted-foreground">{t("hr.exp.pausas")}</div>
-            </div>
+          {/* Las cifras del día. Las nuevas (11/11) salen del turno minuto a minuto:
+              sin cámara, sin pantalla, almuerzo, fallas de 1 min o más y cada
+              cuánto, horas productivas. Mientras carga: «—» (nunca un 0 falso). */}
+          <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-5">
+            <Cuadrito valor={String(dia.nota.valor ?? "—")} etiqueta={t("hr.exp.nota")} tono={c?.tx} className={c?.bg} />
+            <Cuadrito valor={atencion ? `${atencion.pct}%` : "—"} etiqueta={t("hr.exp.atencion")} tono={tonoAt}
+              title={atencion ? t("hr.exp.atencionDetalle", { ok: atencion.ok, n: atencion.n }) : undefined} />
+            <Cuadrito valor={jornada ? textoMin(jornada.conectadoSeg / 60, t) : `${dia.horas.toFixed(1)}h`} etiqueta={t("hr.exp.horas")} />
+            <Cuadrito valor={String(dia.faltas.length)} etiqueta={t("hr.exp.faltas")} />
+            <Cuadrito valor={`${Math.round(dia.minutosPausaDeMas)}m`} etiqueta={t("hr.exp.pausas")} />
+            <Cuadrito valor={jornada ? textoMin((jornada.seg.sin_camara + jornada.seg.fuera_de_camara) / 60, t) : "—"} etiqueta={t("argos.cuadro.sinCamara")} />
+            <Cuadrito valor={jornada ? textoMin(jornada.seg.sin_pantalla / 60, t) : "—"} etiqueta={t("argos.cuadro.sinPantalla")} />
+            <Cuadrito valor={jornada ? textoMin((jornada.pausaPorTipo.almuerzo ?? 0) / 60, t) : "—"} etiqueta={t("argos.cuadro.almuerzo")} />
+            <Cuadrito valor={jornada ? String(jornada.fallas.length) : "—"} etiqueta={t("argos.cuadro.fallas")}
+              tono={jornada && jornada.fallas.length > 0 ? "text-destructive" : undefined}
+              detalle={jornada ? (jornada.cadaMin ? t("argos.cifra.cadaMin", { m: textoMin(jornada.cadaMin, t) }) : t("argos.cuadro.ninguna")) : undefined} />
+            <Cuadrito valor={jornada ? t("argos.cifra.deN", { a: jornada.horasProductivas, b: jornada.horasEvaluadas }) : "—"} etiqueta={t("argos.cifra.horasProductivas")}
+              detalle={t("argos.cuadro.productiva")} />
           </div>
         </div>
       </section>
 
       {/* Argos como MANAGER del día: lo PRIMERO, juzga el día con criterio
           (Alvaro, 09/11). Reemplaza las barras abiertas de pantalla/cámara. */}
-      <TarjetaArgos nombre={nombre} dia={dia} horario={expediente?.horario ?? { entrada: null, salida: null }} />
+      <TarjetaArgos nombre={nombre} dia={dia} horario={expediente?.horario ?? { entrada: null, salida: null }} jornada={jornada} clips={evidencia.evidencia?.clips ?? null} />
+
+      {/* El turno MINUTO A MINUTO, de la hora de entrada a la de salida (11/11). */}
+      <BarraDelTurno jornada={jornada} cargando={argos.cargando} error={argos.error} onReintentar={argos.reintentar}
+        momentos={evidencia.evidencia?.momentos ?? []} onAbrirMomento={() => document.getElementById("tira-del-dia")?.scrollIntoView({ behavior: "smooth" })}
+        t={t} lang={language} />
 
       {/* Asistencia + el desglose técnico, ya COLAPSADO: el perfil abre limpio y
           el detalle (pantalla/cámara/atención) se abre solo si se quiere. */}
@@ -938,17 +909,24 @@ export default function HRExpediente() {
       {userId && <AvisosDeArgos userId={userId} fecha={dia.fecha} />}
 
       {/* La tira de pantallazos del día (Hubstaff) */}
-      <section className="vidrio sube mt-5 p-4 lg:p-5" style={{ animationDelay: "0.05s" }}>
+      <section id="tira-del-dia" className="vidrio sube mt-5 p-4 lg:p-5" style={{ animationDelay: "0.05s" }}>
         <div className="v-cont">
           <p className="mb-3 flex items-center gap-1.5 text-xs font-semibold text-muted-foreground">
             <ScreenShare className="h-3.5 w-3.5" />{t("hr.exp.pantallazosDia")}
           </p>
-          {error ? (
-            <div className="flex flex-col items-center gap-2 py-12 text-center text-muted-foreground"><AlertTriangle className="h-7 w-7 text-destructive/70" /><p className="text-sm">{t("hr.exp.error")}</p></div>
-          ) : cargando ? (
+          {error || evidencia.error ? (
+            <div role="alert" className="flex flex-col items-center gap-2 py-12 text-center text-muted-foreground">
+              <AlertTriangle className="h-7 w-7 text-destructive/70" /><p className="text-sm">{t("hr.exp.error")}</p>
+              {evidencia.error && (
+                <button type="button" onClick={evidencia.reintentar} className="inline-flex items-center gap-1.5 rounded-control border border-border px-2.5 py-1 text-xs font-medium hover:bg-muted">
+                  <RefreshCw className="h-3.5 w-3.5" />{t("argos.reintentar")}
+                </button>
+              )}
+            </div>
+          ) : cargando || argos.cargando || (jornada && evidencia.cargando) ? (
             <div className="flex items-center justify-center py-16 text-muted-foreground"><Loader2 className="h-6 w-6 animate-spin" /></div>
           ) : (
-            <TiraDelDia capturas={dia.capturas} t={t} />
+            <TiraDelDia momentos={evidencia.evidencia?.momentos ?? []} clips={evidencia.evidencia?.clips ?? []} horas={jornada?.horas ?? null} t={t} lang={language} />
           )}
 
           {/* Faltas del día, si hay */}
@@ -959,8 +937,7 @@ export default function HRExpediente() {
                 {dia.faltas.slice(0, 20).map((f) => {
                   const lbl = LABEL_FALTA[f.tipo as FaltaTipo];
                   return (
-                    <div key={f.id} className="flex items-center gap-2 rounded-xl border border-border/40 bg-card/30 px-2.5 py-1.5">
-                      <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-destructive/80" />
+                    <div key={f.id} className="flex items-center gap-2 rounded-control border border-border/50 bg-card/40 px-2.5 py-1.5">
                       <span className="min-w-0 flex-1 truncate text-xs">{lbl ? t(lbl) : f.tipo}{f.detalle ? ` · ${f.detalle}` : ""}</span>
                       {f.capturaPath && (
                         <button type="button" onClick={() => abrirPath(f.capturaPath!)} className="shrink-0 text-muted-foreground hover:text-primary" title={t("hr.exp.abrir")}><ImageIcon className="h-3.5 w-3.5" /></button>

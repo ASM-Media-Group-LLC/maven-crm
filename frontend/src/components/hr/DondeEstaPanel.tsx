@@ -14,6 +14,7 @@ import { type FilaDondeEsta, separarPantalla, type Tono, tonoDe, useDondeEsta } 
 // pantalla… y abajo los que están bien y los que no están en turno. Cada fila
 // dice desde cuándo, qué tenía en pantalla en la última captura que leyó la IA
 // y cuántas veces se salió hoy. Clic → su expediente. Se refresca cada 20 s.
+// 11/11: radios chicos parejos (sin pastillas) y más contraste en lo chico.
 
 const ETIQUETA: Record<string, TranslationKey> = {
   activo: "hr.donde.estado.activo",
@@ -113,7 +114,7 @@ export function DondeEstaPanel() {
         <div className="flex flex-wrap gap-1.5" role="group" aria-label={t("hr.donde.titulo")}>
           {FILTROS.map((x) => (
             <button key={x.k} type="button" onClick={() => setFiltro(x.k)} aria-pressed={filtro === x.k}
-              className={`rounded-full border px-3 py-1 text-xs font-semibold tabular-nums transition ${filtro === x.k ? "border-primary/40 bg-primary/15 text-primary" : "border-border/60 text-muted-foreground hover:text-foreground"}`}>
+              className={`rounded-control border px-3 py-1 text-xs font-semibold tabular-nums transition ${filtro === x.k ? "border-primary/40 bg-primary/15 text-primary" : "border-border/60 text-foreground/70 hover:text-foreground"}`}>
               {t(x.label)} · {conteo[x.k]}
             </button>
           ))}
@@ -136,17 +137,17 @@ export function DondeEstaPanel() {
                     <UserAvatar name={f.nombre ?? "—"} size="sm" />
                     <div className="min-w-0">
                       <p className="truncate text-sm font-semibold">{f.nombre ?? "—"}</p>
-                      <p className="truncate text-xs text-muted-foreground">
+                      <p className="truncate text-xs text-foreground/70">
                         {[f.puesto, f.entrada && f.salida ? t("hr.donde.turno", { e: f.entrada.slice(0, 5), s: f.salida.slice(0, 5) }) : t("hr.donde.sinHorario")].filter(Boolean).join(" · ")}
                       </p>
                     </div>
                   </div>
                   <div className="flex min-w-0 flex-col items-start gap-1">
-                    <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold ${PASTILLA[tono]}`}>
+                    <span className={`inline-flex items-center rounded-control px-2 py-0.5 text-xs font-semibold ${PASTILLA[tono]}`}>
                       {t(ETIQUETA[f.estado] ?? "hr.donde.estado.otro")}
                     </span>
                     {f.estado_desde && f.estado !== "fuera_de_turno" && (
-                      <span className="text-[11px] text-muted-foreground tabular-nums">
+                      <span className="text-[11px] text-foreground/70 tabular-nums">
                         {t("hr.donde.desde", { h: horaBogota(f.estado_desde), d: duracion(f.estado_desde) })}
                       </span>
                     )}
@@ -163,7 +164,7 @@ export function DondeEstaPanel() {
                           {que && <span className="text-muted-foreground">{que}</span>}
                           <span className="text-muted-foreground"> · {duracion(f.pantalla_at)}</span>
                           {f.pantalla_fuera_de_lugar && (
-                            <span className="ml-1.5 inline-flex rounded-full bg-destructive/15 px-1.5 py-0.5 text-[10px] font-semibold text-destructive">{t("hr.donde.fueraDeLugar")}</span>
+                            <span className="ml-1.5 inline-flex rounded-control bg-destructive/15 px-1.5 py-0.5 text-[10px] font-semibold text-destructive">{t("hr.donde.fueraDeLugar")}</span>
                           )}
                         </span>
                       </p>
@@ -173,7 +174,7 @@ export function DondeEstaPanel() {
                       <p className="text-muted-foreground">{t("hr.donde.sinPantallazos")}</p>
                     )}
                     {f.fuera_hoy_veces > 0 && (
-                      <p className="font-medium text-destructive tabular-nums">{t("hr.donde.fueraHoy", { n: f.fuera_hoy_veces, m: f.fuera_hoy_min })}</p>
+                      <p className="font-medium text-destructive tabular-nums">{f.fuera_hoy_veces === 1 ? t("hr.donde.fueraHoy1", { m: f.fuera_hoy_min }) : t("hr.donde.fueraHoy", { n: f.fuera_hoy_veces, m: f.fuera_hoy_min })}</p>
                     )}
                   </div>
                 </Link>

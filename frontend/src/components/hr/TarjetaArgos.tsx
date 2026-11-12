@@ -1,18 +1,52 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { format } from "date-fns";
-import { Bot, Monitor, AlertTriangle, CameraOff, ScreenShareOff, Loader2, Sparkles, X } from "lucide-react";
+import { Bot, Monitor, CameraOff, ScreenShareOff, Loader2, Sparkles } from "lucide-react";
 import { useLanguage } from "@/hooks/useLanguage";
-import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
-import { a12 } from "@/lib/horaBogota";
 import { urlCaptura, urlsDeNas } from "@/hooks/useMonitorEventos";
 import type { CapturaDia, DiaExpediente } from "@/hooks/useExpedienteEmpleado";
 import type { TranslationKey } from "@/lib/i18n";
+import { razonesDelDia, type Jornada, type Razon } from "@/lib/argosJornada";
+import { hora as horaDe, horaRedonda, pct, textoMin } from "@/components/argos/piezas";
+import { VisorEvidencia, type FotoEvidencia } from "@/components/argos/VisorEvidencia";
+import { separarPantalla } from "@/hooks/useDondeEsta";
+import type { ClipArgos } from "@/lib/argosMomentos";
 
 // Argos como MANAGER del día, estilo FICHA CON EVIDENCIA (Alvaro, 09/11, v2).
 // Antes era un párrafo rojo que DECÍA lo que encontró pero no dejaba verlo. Ahora
 // es una ficha: veredicto corto arriba + las MINIATURAS de lo que Argos pilló, a
 // la vista. Lo fuera de lugar resaltado; si todo bien, una muestra de lo que hacía.
 // Cada foto se toca y se agranda (pantalla + cámara + lo que escribió Argos).
+//
+// 11/11 (Alvaro: «Isabel tiene un día flojo no dice POR QUÉ»): debajo del
+// titular va el porqué EN MINUTOS, sacado del turno minuto a minuto (se fue
+// antes, fuera de Cowork, sin pantalla, sin cámara…), de lo más grande a lo más
+// chico. Los hechos van en texto simple, sin pastillas ni ⚠.
+//
+// Las FOTOS (Alvaro, 11/11: «ahí se mira algo, quiero verlo mejor»): por hora,
+// cada hora con su % · productiva sí/no · cuántos pantallazos y grabaciones; dos
+// por fila en la compu y una en el teléfono, la pantalla ENTERA (sin recortar);
+// debajo UNA línea: la hora · Bien / Flojo · qué hacía en pocas palabras. Las
+// flojas llevan marco rojo y el cartel «Flojo». La descripción completa, la cámara
+// y el zoom van en el visor.
+
+const HORA_MS = 3_600_000;
+/** Las primeras palabras de lo que hacía (la app, si Argos la dijo). */
+function enPocasPalabras(veredicto: string | null, max = 6): string {
+  const { app, que } = separarPantalla(veredicto);
+  const base = app ?? que ?? "";
+  const palabras = base.split(/\s+/).filter(Boolean);
+  return palabras.length > max ? `${palabras.slice(0, max).join(" ")}…` : base;
+}
+
+const RAZON: Partial<Record<Razon["estado"], TranslationKey>> = {
+  se_fue: "argos.razon.se_fue",
+  no_entro: "argos.razon.no_entro",
+  fuera_cowork: "argos.razon.fuera_cowork",
+  sin_pantalla: "argos.razon.sin_pantalla",
+  sin_camara: "argos.razon.sin_camara",
+  fuera_de_camara: "argos.razon.fuera_de_camara",
+  distraido: "argos.razon.distraido",
+  pausa_de_mas: "argos.razon.pausa_de_mas",
+};
 
 type Tono = "verde" | "ambar" | "rojo" | "neutro";
 type Frase = { k: TranslationKey; p?: Record<string, string | number> };
@@ -52,12 +86,22 @@ function camaraDe(pantalla: CapturaDia, camaras: CapturaDia[], usadas: Set<strin
 
 const MAX_EVIDENCIAS = 6;
 
-export function TarjetaArgos({ nombre, dia, horario }: {
+export function TarjetaArgos({ nombre, dia, horario, jornada, clips }: {
   nombre: string;
   dia: DiaExpediente;
   horario: { entrada: string | null; salida: string | null };
+  /** El turno minuto a minuto: de aquí sale el porqué en minutos. */
+  jornada?: Jornada | null;
+  /** Las grabaciones del día (para contar cuántas hubo en cada hora). */
+  clips?: ClipArgos[] | null;
 }) {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
+  const razones = jornada ? razonesDelDia(jornada) : [];
+  const veces = (n: number) => (n === 0 ? t("argos.veces.cortas") : n === 1 ? t("argos.veces.una") : t("argos.veces.n", { n }));
+  const frase = (r: Razon) => {
+    const k = r.estado === "no_entro" && jornada?.sinSenal ? "argos.razon.noVino" : RAZON[r.estado] ?? "argos.razon.fuera_cowork";
+    return t(k, { m: textoMin(r.min, t), v: veces(r.veces), h: horaDe(r.estado === "no_entro" ? jornada?.entro : jornada?.salio, language) });
+  };
 
   const r = useMemo(() => {
     const nom = nombre.split(" ")[0] || nombre;
@@ -105,13 +149,13 @@ export function TarjetaArgos({ nombre, dia, horario }: {
     if (juzgadas.length > 0) hechos.push({ k: "hr.exp.mgr.hecho.momentos", p: { n: juzgadas.length }, tono: "neutro" });
     if (fuera.length > 0) hechos.push({ k: "hr.exp.mgr.hecho.fuera", p: { n: fuera.length }, tono: "rojo" });
     if (enSala) hechos.push({ k: "hr.exp.mgr.hecho.enSala", tono: "neutro" });
-    else if (difSal != null && difSal < -5) hechos.push({ k: "hr.exp.mgr.hecho.salioAntes", p: { min: Math.abs(difSal) }, tono: "ambar" });
-    if (difEnt != null && difEnt > 5) hechos.push({ k: "hr.exp.mgr.hecho.entroTarde", p: { min: difEnt }, tono: "ambar" });
-    if (fPant != null && fPant < 50) hechos.push({ k: "hr.exp.mgr.hecho.pantalla", p: { pct: Math.round(fPant) }, tono: "ambar" });
-    if (fCam != null && fCam < 50) hechos.push({ k: "hr.exp.mgr.hecho.camara", p: { pct: Math.round(fCam) }, tono: "ambar" });
+    else if (!jornada && difSal != null && difSal < -5) hechos.push({ k: "hr.exp.mgr.hecho.salioAntes", p: { min: Math.abs(difSal) }, tono: "ambar" });
+    if (!jornada && difEnt != null && difEnt > 5) hechos.push({ k: "hr.exp.mgr.hecho.entroTarde", p: { min: difEnt }, tono: "ambar" });
+    if (!jornada && fPant != null && fPant < 50) hechos.push({ k: "hr.exp.mgr.hecho.pantalla", p: { pct: Math.round(fPant) }, tono: "ambar" });
+    if (!jornada && fCam != null && fCam < 50) hechos.push({ k: "hr.exp.mgr.hecho.camara", p: { pct: Math.round(fCam) }, tono: "ambar" });
 
     return { nom, tono, titular, hechos, sistemas, evid, hayFuera: fuera.length > 0, hayJuicio: juzgadas.length > 0 };
-  }, [nombre, dia, horario]);
+  }, [nombre, dia, horario, jornada]);
 
   // Firmar las URLs de las miniaturas de evidencia (buzón + NAS).
   const [urls, setUrls] = useState<Record<string, string>>({});
@@ -139,13 +183,23 @@ export function TarjetaArgos({ nombre, dia, horario }: {
     if (u) setUrls((prev) => ({ ...prev, [c.path]: u }));
   };
 
-  const [visor, setVisor] = useState<Evidencia | null>(null);
-  useEffect(() => {
-    if (!visor) return;
-    const h = (e: KeyboardEvent) => { if (e.key === "Escape") setVisor(null); };
-    window.addEventListener("keydown", h);
-    return () => window.removeEventListener("keydown", h);
-  }, [visor]);
+  // Las fotos en orden de hora, agrupadas por hora (el visor pasa de una a otra).
+  const ordenadas = useMemo(() => [...r.evid].sort((a, b) => (a.createdAt < b.createdAt ? -1 : 1)), [r.evid]);
+  const grupos = useMemo(() => {
+    const m = new Map<number, Evidencia[]>();
+    for (const e of ordenadas) {
+      const k = Math.floor(Date.parse(e.createdAt) / HORA_MS) * HORA_MS;
+      m.set(k, [...(m.get(k) ?? []), e]);
+    }
+    return [...m.entries()].map(([desde, items]) => ({
+      desde,
+      items,
+      h: jornada?.horas.find((x) => Math.floor(x.desde / HORA_MS) * HORA_MS === desde) ?? null,
+      pantallazos: dia.capturas.filter((c) => c.tipo === "pantalla" && Math.floor(Date.parse(c.createdAt) / HORA_MS) * HORA_MS === desde).length,
+      grabaciones: (clips ?? []).filter((c) => Math.floor(Date.parse(c.desde) / HORA_MS) * HORA_MS === desde).length,
+    }));
+  }, [ordenadas, jornada, dia.capturas, clips]);
+  const [visorIdx, setVisorIdx] = useState<number | null>(null);
 
   const miniPantalla = (e: Evidencia) => (e.pantalla ? urls[claveFoto(e.pantalla)!] : undefined);
   const miniCamara = (e: Evidencia) => (e.camara ? urls[claveFoto(e.camara)!] : undefined);
@@ -163,48 +217,87 @@ export function TarjetaArgos({ nombre, dia, horario }: {
           <span className={`h-2 w-2 shrink-0 rounded-full ${PUNTO[r.tono]}`} />
           {t(r.titular.k, r.titular.p)}
         </p>
-        {r.hechos.length > 0 && (
-          <div className="mt-2 flex flex-wrap gap-1.5">
-            {r.hechos.map((h, i) => (
-              <span key={i} className={`rounded-full border px-2.5 py-1 text-xs font-medium ${
-                h.tono === "rojo" ? "border-destructive/40 bg-destructive/5 text-destructive"
-                : h.tono === "ambar" ? "border-warning/40 bg-warning/5 text-warning"
-                : "border-border/50 bg-card/40 text-foreground/80"}`}>
-                {t(h.k, h.p)}
-              </span>
-            ))}
+        {razones.length > 0 && (
+          <div className="mt-2.5">
+            <p className="mb-1 text-[11px] font-semibold text-muted-foreground">{t("argos.dia.porQue")}</p>
+            <ul className="space-y-1">
+              {razones.map((x) => (
+                <li key={x.estado} className="flex gap-2.5 text-sm">
+                  <span className="w-[4.75rem] shrink-0 text-right font-semibold tabular-nums">{textoMin(x.min, t)}</span>
+                  <span className="min-w-0 text-foreground/80">{frase(x)}</span>
+                </li>
+              ))}
+            </ul>
           </div>
         )}
+        {r.hechos.length > 0 && (
+          <p className="mt-2 text-xs text-muted-foreground">
+            {r.hechos.map((h, i) => (
+              <span key={i} className={h.tono === "rojo" ? "font-semibold text-destructive" : h.tono === "ambar" ? "font-medium text-warning" : undefined}>
+                {i > 0 && <span className="text-muted-foreground"> · </span>}{t(h.k, h.p)}
+              </span>
+            ))}
+          </p>
+        )}
 
-        {/* La evidencia a la vista: miniaturas de lo que Argos vio. */}
-        {r.evid.length > 0 && (
-          <div className="mt-3.5">
-            <p className="mb-2 flex items-center gap-1.5 text-[11px] font-semibold text-muted-foreground">
+        {/* Las fotos de Argos, por hora: grandes, una línea clara y las flojas a la vista. */}
+        {grupos.length > 0 && (
+          <div className="mt-4">
+            <p className="mb-3 flex items-center gap-1.5 text-[11px] font-semibold text-muted-foreground">
               <Sparkles className="h-3 w-3 text-primary" />{r.hayFuera ? t("hr.exp.mgr.pruebaFuera") : t("hr.exp.mgr.pruebaMuestra")}
             </p>
-            <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3">
-              {r.evid.map((e) => {
-                const up = miniPantalla(e), uc = miniCamara(e);
-                const hora = a12(format(new Date(e.createdAt), "HH:mm"));
-                return (
-                  <button key={e.id} type="button" onClick={() => setVisor(e)}
-                    className={`group overflow-hidden rounded-xl border text-left transition ${e.fueraDeLugar ? "border-destructive/60 ring-1 ring-destructive/30" : "border-border/40 hover:border-primary/50"}`}>
-                    <div className="relative aspect-[16/10] w-full bg-muted/40">
-                      {e.pantalla ? (up ? (
-                        <img src={up} alt={hora} loading="lazy" onError={() => reFirmar(e.pantalla)} className="h-full w-full object-cover" />
-                      ) : <div className="flex h-full w-full items-center justify-center"><Loader2 className="h-4 w-4 animate-spin text-muted-foreground" /></div>
-                      ) : <div className="flex h-full w-full flex-col items-center justify-center gap-1 text-muted-foreground"><ScreenShareOff className="h-5 w-5 opacity-60" /><span className="text-[9px]">{t("hr.exp.sinPantalla")}</span></div>}
-                      <div className="absolute bottom-1 right-1 h-9 w-14 overflow-hidden rounded-md border-2 border-background/80 shadow">
-                        {e.camara ? (uc ? <img src={uc} alt="" loading="lazy" onError={() => reFirmar(e.camara)} className="h-full w-full object-cover" /> : <div className="flex h-full w-full items-center justify-center bg-muted/60"><Loader2 className="h-3 w-3 animate-spin text-muted-foreground" /></div>)
-                          : <div className="flex h-full w-full items-center justify-center bg-destructive/15 text-destructive"><CameraOff className="h-3.5 w-3.5" /></div>}
-                      </div>
-                      <span className="absolute bottom-1 left-1 rounded bg-black/55 px-1 py-0.5 text-[9px] font-semibold tabular-nums text-white backdrop-blur-sm">{hora}</span>
-                      {e.fueraDeLugar && <span className="absolute left-1 top-1 inline-flex items-center gap-0.5 rounded bg-destructive px-1 py-0.5 text-[9px] font-semibold text-white"><AlertTriangle className="h-2.5 w-2.5" />{t("hr.exp.fueraDeLugar")}</span>}
-                    </div>
-                    {e.veredicto && <p className={`px-2 py-1.5 text-[11px] leading-snug ${e.fueraDeLugar ? "text-destructive" : "text-muted-foreground"}`}>{e.veredicto}</p>}
-                  </button>
-                );
-              })}
+            <div className="flex flex-col gap-6">
+              {grupos.map((g) => (
+                <div key={g.desde}>
+                  <div className="mb-3 flex flex-wrap items-baseline gap-x-3 gap-y-1 border-b border-border/50 pb-2">
+                    <span className="text-sm font-semibold tabular-nums">{horaRedonda(g.desde, language)}</span>
+                    {g.h && g.h.productiva !== null && (
+                      <>
+                        <span className="text-sm font-semibold tabular-nums">{pct(g.h.pctBien)}</span>
+                        <span className={`text-xs ${g.h.productiva ? "font-medium text-success" : "text-muted-foreground"}`}>
+                          {g.h.productiva ? t("argos.hora.productiva") : t("argos.hora.noProductiva")}
+                        </span>
+                      </>
+                    )}
+                    <span className="ml-auto text-xs tabular-nums text-muted-foreground">
+                      {g.pantallazos === 1 ? t("argos.tira.pantallazo1") : t("argos.tira.pantallazos", { n: g.pantallazos })}
+                      {" · "}
+                      {g.grabaciones === 1 ? t("argos.tira.grabacion1") : t("argos.tira.grabaciones", { n: g.grabaciones })}
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    {g.items.map((e) => {
+                      const up = miniPantalla(e), uc = miniCamara(e);
+                      const hora = horaDe(e.createdAt, language);
+                      return (
+                        <button key={e.id} type="button" onClick={() => setVisorIdx(ordenadas.indexOf(e))}
+                          className={`group overflow-hidden rounded-panel border-2 bg-card/40 text-left transition ${e.fueraDeLugar ? "border-destructive" : "border-border/60 hover:border-primary/60"}`}>
+                          <div className="relative aspect-[16/10] w-full bg-black">
+                            {e.pantalla ? (up ? (
+                              <img src={up} alt={hora} loading="lazy" onError={() => reFirmar(e.pantalla)} className="h-full w-full object-contain" />
+                            ) : <div className="flex h-full w-full items-center justify-center"><Loader2 className="h-4 w-4 animate-spin text-muted-foreground" /></div>
+                            ) : <div className="flex h-full w-full flex-col items-center justify-center gap-1 text-white/60"><ScreenShareOff className="h-6 w-6" /><span className="text-xs">{t("hr.exp.sinPantalla")}</span></div>}
+                            <div className="absolute bottom-2 right-2 h-14 w-20 overflow-hidden rounded-control border border-white/70 shadow-lg">
+                              {e.camara ? (uc ? <img src={uc} alt="" loading="lazy" onError={() => reFirmar(e.camara)} className="h-full w-full object-cover" /> : <div className="flex h-full w-full items-center justify-center bg-muted/60"><Loader2 className="h-3 w-3 animate-spin text-muted-foreground" /></div>)
+                                : <div className="flex h-full w-full items-center justify-center bg-destructive/20 text-destructive"><CameraOff className="h-4 w-4" /></div>}
+                            </div>
+                            {e.fueraDeLugar && (
+                              <span className="absolute left-0 top-0 rounded-br-control bg-destructive px-2.5 py-1 text-xs font-bold text-destructive-foreground">{t("argos.foto.flojo")}</span>
+                            )}
+                          </div>
+                          <p className="flex min-w-0 items-baseline gap-1.5 px-3 py-2 text-sm">
+                            <span className="shrink-0 font-semibold tabular-nums">{hora}</span>
+                            <span className="text-muted-foreground">·</span>
+                            <span className={`shrink-0 font-semibold ${e.fueraDeLugar ? "text-destructive" : "text-success"}`}>{e.fueraDeLugar ? t("argos.foto.flojo") : t("argos.foto.bien")}</span>
+                            <span className="text-muted-foreground">·</span>
+                            <span className="min-w-0 truncate text-foreground/80">{enPocasPalabras(e.veredicto)}</span>
+                          </p>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
         )}
@@ -217,9 +310,9 @@ export function TarjetaArgos({ nombre, dia, horario }: {
             </p>
             <div className="flex flex-wrap gap-1.5">
               {r.sistemas.map(([sistema, n]) => (
-                <span key={sistema} className="inline-flex items-center gap-1.5 rounded-full border border-border/50 bg-card/40 px-2.5 py-1 text-xs">
+                <span key={sistema} className="inline-flex items-center gap-1.5 rounded-control border border-border/60 bg-card/50 px-2.5 py-1 text-xs">
                   <span className="max-w-[180px] truncate">{sistema}</span>
-                  <span className="rounded-full bg-primary/15 px-1.5 text-[10px] font-semibold tabular-nums text-primary">{n}</span>
+                  <span className="text-[11px] font-semibold tabular-nums text-muted-foreground">{n}</span>
                 </span>
               ))}
             </div>
@@ -227,38 +320,13 @@ export function TarjetaArgos({ nombre, dia, horario }: {
         )}
       </div>
 
-      {/* Visor: la prueba en grande al tocar una miniatura. */}
-      {visor && (
-        <Dialog open onOpenChange={(o) => { if (!o) setVisor(null); }}>
-          <DialogContent className="max-w-3xl bg-none from-transparent p-2 sm:p-3">
-            <DialogTitle className="sr-only">{t("hr.exp.mgr.titulo")}</DialogTitle>
-            <div className="flex flex-col gap-2.5">
-              <div className="relative overflow-hidden rounded-xl border border-border/50 bg-black">
-                <div className="relative aspect-[16/10] w-full">
-                  {visor.pantalla && miniPantalla(visor) ? <img src={miniPantalla(visor)} alt="" className="h-full w-full object-contain" />
-                    : <div className="flex h-full w-full flex-col items-center justify-center gap-2 text-muted-foreground"><ScreenShareOff className="h-9 w-9 opacity-60" /><span className="text-xs font-semibold">{t("hr.exp.sinPantalla")}</span></div>}
-                  <div className="absolute bottom-2.5 right-2.5 w-[32%] max-w-[220px] overflow-hidden rounded-lg border-2 border-white/80 shadow-xl">
-                    <div className="relative aspect-[4/3] bg-black">
-                      {visor.camara && miniCamara(visor) ? <img src={miniCamara(visor)} alt="" className="h-full w-full object-cover" />
-                        : <div className="flex h-full w-full flex-col items-center justify-center gap-1 text-destructive"><CameraOff className="h-5 w-5" /><span className="text-[9px] font-semibold">{t("hr.exp.camaraApagada")}</span></div>}
-                    </div>
-                  </div>
-                  <span className="absolute left-2.5 top-2.5 rounded-lg bg-black/60 px-2.5 py-1.5 text-xs font-semibold tabular-nums text-white backdrop-blur-sm">{a12(format(new Date(visor.createdAt), "HH:mm"))}</span>
-                  {visor.fueraDeLugar && <span className="absolute left-2.5 top-11 inline-flex items-center gap-1 rounded-lg bg-destructive px-2 py-1 text-[11px] font-semibold text-white"><AlertTriangle className="h-3 w-3" />{t("hr.exp.fueraDeLugar")}</span>}
-                </div>
-              </div>
-              {visor.veredicto && (
-                <div className={`flex items-start gap-2 rounded-lg border border-border/40 bg-card/40 px-3 py-2 text-sm ${visor.fueraDeLugar ? "text-destructive" : "text-muted-foreground"}`}>
-                  <Sparkles className="mt-0.5 h-4 w-4 shrink-0 opacity-70" /><span>{visor.veredicto}</span>
-                </div>
-              )}
-              <button type="button" onClick={() => setVisor(null)} className="flex items-center justify-center gap-1.5 rounded-lg border border-border/50 bg-card/40 py-2 text-sm font-medium text-muted-foreground transition hover:text-foreground">
-                <X className="h-4 w-4" />{t("hr.exp.clips.cerrar")}
-              </button>
-            </div>
-          </DialogContent>
-        </Dialog>
-      )}
+      {/* Visor grande: pantalla entera con zoom, la cámara al lado, lo que dijo Argos y anterior / siguiente. */}
+      <VisorEvidencia
+        fotos={ordenadas.map((e): FotoEvidencia => ({
+          id: e.id, at: e.createdAt, pantallaUrl: miniPantalla(e), camaraUrl: miniCamara(e),
+          tienePantalla: !!e.pantalla, tieneCamara: !!e.camara, veredicto: e.veredicto, fueraDeLugar: e.fueraDeLugar,
+        }))}
+        indice={visorIdx} onIndice={setVisorIdx} onCerrar={() => setVisorIdx(null)} t={t} lang={language} />
     </section>
   );
 }
