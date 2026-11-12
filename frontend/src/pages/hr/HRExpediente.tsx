@@ -21,6 +21,7 @@ import { a12, rango12 } from "@/lib/horaBogota";
 import { ClipsDelDia } from "@/components/hr/ClipsDelDia";
 import { AvisosDeArgos } from "@/components/hr/AvisosDeArgos";
 import { TarjetaArgos } from "@/components/hr/TarjetaArgos";
+import { useDisenoPulido } from "@/hooks/useDisenoPulido";
 import { Mail } from "lucide-react";
 
 // Expediente del empleado, estilo Hubstaff: se abre en HOY, con su nota y sus
@@ -378,6 +379,9 @@ function AsistenciaDia({ horario, dia, userId, nombre, t }: {
       return new Date(iso).toLocaleTimeString("es-CO", { timeZone: "America/Bogota", hour: "2-digit", minute: "2-digit", hour12: false });
     } catch { return null; }
   };
+  // PULIDO (Alvaro, 12/11: «los colores se ven vibe coding»): las tres casillas
+  // neutras y la hora en blanco; lo malo solo con un puntito y el «+7 min» en gris.
+  const pulido = useDisenoPulido();
   const entradaReal = hhmm(dia.entroAt);
   const salidaReal = hhmm(dia.salioAt);
   const minDif = (hAsig: string | null, hReal: string | null): number | null => {
@@ -401,10 +405,48 @@ function AsistenciaDia({ horario, dia, userId, nombre, t }: {
   const dioSalidaTemprano = !enSalaAhora && difSalida != null && difSalida < -5;
 
   return (
-    <div className="mt-3 rounded-2xl border border-border/40 bg-card/20 p-3.5">
-      <p className="mb-2.5 flex items-center gap-2 text-xs font-semibold text-muted-foreground">
-        <Gauge className="h-3.5 w-3.5 text-primary" />{t("hr.exp.asistencia")}
+    <div className={pulido ? "mt-3 rounded-[12px] border border-border/60 bg-card/20 p-3.5" : "mt-3 rounded-2xl border border-border/40 bg-card/20 p-3.5"}>
+      <p className={`mb-2.5 flex items-center gap-2 text-xs text-muted-foreground ${pulido ? "font-medium" : "font-semibold"}`}>
+        <Gauge className={`h-3.5 w-3.5 ${pulido ? "" : "text-primary"}`} />{t("hr.exp.asistencia")}
       </p>
+      {pulido ? (
+        <div className="grid gap-2.5 sm:grid-cols-3">
+          <div className="rounded-[10px] border border-border/60 bg-card/30 p-3">
+            <div className="text-xs font-medium text-muted-foreground">{t("hr.exp.asigHorario")}</div>
+            <div className="mt-1 text-[15px] font-semibold tabular-nums text-foreground">
+              {horario.entrada && horario.salida ? rango12(horario.entrada, horario.salida) : t("hr.exp.sinHorarioAsignado")}
+            </div>
+          </div>
+          <div className="rounded-[10px] border border-border/60 bg-card/30 p-3">
+            <div className="text-xs font-medium text-muted-foreground">{t("hr.exp.entroHora")}</div>
+            <div className="mt-1 flex items-center gap-2 text-[15px] font-semibold tabular-nums text-foreground">
+              {a12(entradaReal) ?? "—"}
+              {diasTardes && difEntrada != null && (
+                <span className="inline-flex items-center gap-1 text-[11px] font-medium text-muted-foreground">
+                  <span className="h-1.5 w-1.5 rounded-full bg-destructive" aria-hidden />+{difEntrada} min
+                </span>
+              )}
+            </div>
+          </div>
+          <div className="rounded-[10px] border border-border/60 bg-card/30 p-3">
+            <div className="text-xs font-medium text-muted-foreground">{t("hr.exp.salioHora")}</div>
+            {enSalaAhora ? (
+              <div className="mt-1 flex items-center gap-2 text-[15px] font-semibold text-foreground">
+                <span className="h-1.5 w-1.5 rounded-full bg-success" aria-hidden />{t("hr.exp.enSala")}
+              </div>
+            ) : (
+              <div className="mt-1 flex items-center gap-2 text-[15px] font-semibold tabular-nums text-foreground">
+                {a12(salidaReal) ?? "—"}
+                {dioSalidaTemprano && difSalida != null && (
+                  <span className="inline-flex items-center gap-1 text-[11px] font-medium text-muted-foreground">
+                    <span className="h-1.5 w-1.5 rounded-full bg-warning" aria-hidden />{difSalida} min
+                  </span>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      ) : (
       <div className="grid gap-2.5 sm:grid-cols-3">
         <div className="rounded-panel border border-border/40 bg-card/30 p-2.5">
           <div className="text-xs font-semibold text-muted-foreground">{t("hr.exp.asigHorario")}</div>
@@ -433,6 +475,7 @@ function AsistenciaDia({ horario, dia, userId, nombre, t }: {
           )}
         </div>
       </div>
+      )}
       {(diasTardes || dioSalidaTemprano) && (
         <p className="mt-2 text-[11px] text-muted-foreground">{t("hr.exp.asistenciaNota")}</p>
       )}
@@ -449,6 +492,7 @@ function AsistenciaDia({ horario, dia, userId, nombre, t }: {
           entradaReal={entradaReal}
           tardeMin={difEntrada ?? 0}
           capturas={dia.capturas}
+          pulido={pulido}
           t={t}
         />
       )}
@@ -471,7 +515,8 @@ function fotoDeEntrada(capturas: CapturaDia[], entroAt: string | null): CapturaD
   return best;
 }
 
-function PruebaTardanza({ userId, fecha, nombre, entroAt, horarioEntrada, entradaReal, tardeMin, capturas, t }: {
+function PruebaTardanza({ userId, fecha, nombre, entroAt, horarioEntrada, entradaReal, tardeMin, capturas, pulido, t }: {
+  pulido: boolean;
   userId: string | undefined;
   fecha: string;
   nombre: string;
@@ -520,11 +565,18 @@ function PruebaTardanza({ userId, fecha, nombre, entroAt, horarioEntrada, entrad
   const correoHoraTxt = a12(hhmm(correo?.enviadoAt ?? null));
 
   return (
-    <div className="mt-3 rounded-2xl border border-destructive/25 bg-destructive/5 p-3.5">
+    <div className={pulido ? "mt-3 rounded-[12px] border border-border/60 bg-card/20 p-3.5" : "mt-3 rounded-2xl border border-destructive/25 bg-destructive/5 p-3.5"}>
+      {pulido ? (
+        <p className="mb-3 flex items-center gap-2 text-xs font-medium text-foreground/90">
+          <span className="h-1.5 w-1.5 rounded-full bg-destructive" aria-hidden />{t("hr.exp.prueba.titulo")}
+          <span className="font-normal text-muted-foreground">· {t("hr.exp.prueba.entroTarde", { min: tardeMin })}</span>
+        </p>
+      ) : (
       <p className="mb-3 flex items-center gap-2 text-xs font-semibold text-destructive">
         <AlertTriangle className="h-3.5 w-3.5" />{t("hr.exp.prueba.titulo")}
         <span className="font-normal text-muted-foreground">· {t("hr.exp.prueba.entroTarde", { min: tardeMin })}</span>
       </p>
+      )}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-stretch">
         {/* Foto del momento de entrada */}
         <div className="shrink-0">
@@ -544,11 +596,11 @@ function PruebaTardanza({ userId, fecha, nombre, entroAt, horarioEntrada, entrad
         </div>
 
         {/* Info del correo + botón */}
-        <div className="flex min-w-0 flex-1 flex-col justify-between gap-2 rounded-xl border border-border/40 bg-card/30 p-3">
+        <div className={`flex min-w-0 flex-1 flex-col justify-between gap-2 border bg-card/30 p-3 ${pulido ? "rounded-[10px] border-border/60" : "rounded-xl border-border/40"}`}>
           <div className="flex items-start gap-2">
-            <Mail className={`mt-0.5 h-4 w-4 shrink-0 ${correo?.enviadoAt ? "text-success" : "text-muted-foreground"}`} />
+            <Mail className={`mt-0.5 h-4 w-4 shrink-0 ${correo?.enviadoAt && !pulido ? "text-success" : "text-muted-foreground"}`} />
             <div className="min-w-0">
-              <p className={`text-sm font-semibold ${correo?.enviadoAt ? "text-success" : "text-muted-foreground"}`}>
+              <p className={`text-sm ${pulido ? `font-medium ${correo?.enviadoAt ? "text-foreground" : "text-muted-foreground"}` : `font-semibold ${correo?.enviadoAt ? "text-success" : "text-muted-foreground"}`}`}>
                 {correo?.enviadoAt
                   ? t("hr.exp.prueba.correoSi", { n: correo.a?.length ?? 0, hora: correoHoraTxt ?? "—" })
                   : t("hr.exp.prueba.correoNo")}
