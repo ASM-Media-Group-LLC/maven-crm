@@ -6,7 +6,7 @@ import { describe, it, expect } from "vitest";
 // la ruta vuelven a pasar por canAccess("HR", "Monitor IA") o por soloDueno, a
 // Grace (admin) y a Daniel/Breyner/Vanessa (supervisores) se les esconde el ojo.
 const fuentes = (import.meta as unknown as {
-  glob: (p: string, o: Record<string, unknown>) => Record<string, string>;
+  glob: (p: string | string[], o: Record<string, unknown>) => Record<string, string>;
 }).glob(["/frontend/src/App.tsx", "/frontend/src/components/dashboard/DashboardSidebar.tsx"], { query: "?raw", import: "default", eager: true });
 
 const app = fuentes["/frontend/src/App.tsx"];
