@@ -1199,6 +1199,7 @@ export const hr = {
   "hr.exp.elegirDia": { es: "Elige un día del calendario para ver el detalle", en: "Pick a day from the calendar to see the detail" },
   "hr.exp.sinDatos": { es: "Sin datos este día", en: "No data this day" },
   "hr.exp.fueraDeLugar": { es: "Fuera de lugar", en: "Off-task" },
+  "hr.exp.mgr.trabajando": { es: "Trabajando", en: "Working" },
   "hr.exp.asistencia": { es: "Asistencia", en: "Attendance" },
   "hr.exp.asigHorario": { es: "Horario asignado", en: "Assigned schedule" },
   "hr.exp.sinHorarioAsignado": { es: "Sin asignar", en: "Not assigned" },
