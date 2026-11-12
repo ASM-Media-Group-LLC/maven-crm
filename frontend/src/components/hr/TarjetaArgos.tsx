@@ -27,8 +27,8 @@ import { useEsDueno } from "@/hooks/useEsDueno";
 // solo con un puntito); las fotos parejas (16:10, radio 12, filo de 1 px y sombra
 // suave). Lo que dice cada foto va ENCIMA de ella, sobre un degradado: el ícono de
 // la app con su puntito de estado, el nombre limpio de la app y, debajo, qué hacía
-// en corto (o «Fuera de lugar» si lo estaba). El degradado es fuerte y el texto
-// lleva sombra (Alvaro, 12/11: «que se mire mejor la letra»). La hora y la cámara arriba. La foto
+// en corto (o «Fuera de lugar» si lo estaba). El texto va sobre una franja oscura
+// esmerilada que se ve clara (Alvaro, 12/11: «sombreado») y lleva sombra. La hora y la cámara arriba. La foto
 // fuera de lugar: un filo rojo fino. Sin bloques ni textos rojos.
 
 type Tono = "verde" | "ambar" | "rojo" | "neutro";
@@ -289,7 +289,7 @@ export function TarjetaArgosPulida({ nombre, dia, horario }: {
                       {/* Abajo, ENCIMA de la foto: el ícono de la app (con su puntito de
                           estado, como el de las personas), la app y qué hacía. Si estaba
                           fuera de lugar, eso es lo que se lee. */}
-                      <div className="absolute inset-x-0 bottom-0 flex items-end gap-2.5 bg-[linear-gradient(to_top,rgba(0,0,0,0.94)_0%,rgba(0,0,0,0.82)_38%,rgba(0,0,0,0.45)_70%,transparent_100%)] px-3 pb-2.5 pt-16 [text-shadow:0_1px_2px_rgba(0,0,0,0.95),0_0_14px_rgba(0,0,0,0.7)]">
+                      <div className="absolute inset-x-0 bottom-0 flex items-center gap-2.5 border-t border-white/10 bg-black/70 px-3 py-2.5 backdrop-blur-md [text-shadow:0_1px_2px_rgba(0,0,0,0.95),0_0_14px_rgba(0,0,0,0.7)]">
                         <span className="relative flex h-8 w-8 shrink-0 items-center justify-center rounded-[9px] bg-white/[0.14] text-white ring-1 ring-white/20 shadow-[0_2px_10px_rgba(0,0,0,0.6)] backdrop-blur-md">
                           {Icono ? <Icono className="h-4 w-4" /> : <span className="font-display text-sm font-bold leading-none">{ap.letra}</span>}
                           <span className={`absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full ring-2 ring-black/80 ${e.fueraDeLugar ? "bg-destructive" : "bg-success"}`} aria-hidden />
