@@ -1083,6 +1083,8 @@ export const hr = {
   "hr.donde.fueraDeLugar": { es: "Fuera de lugar", en: "Off task" },
   "hr.donde.sinLeer": { es: "Pantallazo {d}; la IA aún no lo lee", en: "Screenshot {d}; the AI hasn't read it yet" },
   "hr.donde.sinPantallazos": { es: "Sin pantallazos hoy", en: "No screenshots today" },
+  "hr.donde.volverDeptos": { es: "Volver a departamentos", en: "Back to departments" },
+  "hr.donde.gente": { es: "{n} personas", en: "{n} people" },
   "hr.donde.fueraHoy": { es: "Fuera de Cowork hoy: {n} veces · {d}", en: "Out of Cowork today: {n} times · {d}" },
   "hr.donde.fueraHoyUna": { es: "Fuera de Cowork hoy: 1 vez · {d}", en: "Out of Cowork today: once · {d}" },
   "hr.donde.durMin": { es: "{n} min", en: "{n} min" },

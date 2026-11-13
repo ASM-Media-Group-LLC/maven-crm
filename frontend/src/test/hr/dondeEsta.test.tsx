@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter } from "react-router-dom";
 import type { ReactNode } from "react";
@@ -63,6 +63,8 @@ describe("el tablero", () => {
       fila("Karem", "fuera_de_cowork", { fuera_hoy_veces: 2, fuera_hoy_min: 14 }),
     ] };
     render(<DondeEstaPanel />, { wrapper: envolver });
+    // Primero las cajitas por departamento (13/11/2026); al tocar una, su lista.
+    fireEvent.click(await screen.findByRole("button", { name: /Chatters/ }));
     const filas = await screen.findAllByRole("listitem");
     expect(filas[0]).toHaveTextContent("Karem");
     expect(within(filas[0]).getByText("hr.donde.estado.fueraDeCowork")).toBeInTheDocument();

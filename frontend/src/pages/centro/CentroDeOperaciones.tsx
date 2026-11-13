@@ -397,18 +397,19 @@ export default function CentroDeOperaciones() {
             )}
           </section>
 
-          {/* Salud de la plataforma (Alvaro, 08/11 noche): "¿está todo trabajando bien?"
-              — NAS/Drive, Correo, Mensajería, Argos + entradas/desconexiones del día.
-              El propio bloque se oculta a quien no es admin/dueño. */}
-          <SaludPlataformaBloque compacto />
-
-          {/* Espacio del NAS, CERRADO (Alvaro, 10/11): una línea con lo justo y
-              «Entrar al NAS»; todo el detalle vive en /oficina/espacio-nas. Solo
-              admin/dueño; para los demás no se dibuja. */}
-          <EspacioNasLinea />
-
         </aside>
       </div>
+
+      {/* Salud de la plataforma, A LO ANCHO y al final (Alvaro, 13/11/2026: «¿te
+          parece buena estética tener eso hasta allá abajo esquinado?»). En la
+          columna angosta quedaba sola en la esquina y dejaba la izquierda vacía;
+          aquí cierra la página en su cuadrícula. Solo admin/dueño la ven. */}
+      <SaludPlataformaBloque />
+
+      {/* Espacio del NAS, CERRADO (Alvaro, 10/11): una línea con lo justo y
+          «Entrar al NAS»; todo el detalle vive en /oficina/espacio-nas. Solo
+          admin/dueño; para los demás no se dibuja. */}
+      <EspacioNasLinea />
     </div>
   );
 }

@@ -133,23 +133,23 @@ export function ArgosAjustesContenido() {
     <div className="grid gap-4">
       {/* Estado, de un vistazo. */}
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-        <div className="rounded-2xl border border-border/60 bg-card p-4">
+        <div className="vidrio p-4">
           <p className="text-xs font-semibold text-muted-foreground">{t("hr.argoscentro.estado")}</p>
-          <p className="mt-1 font-display text-lg font-bold text-foreground">{t("hr.argoscentro.estadoVoz")}</p>
+          <p className="mt-1 font-display text-lg font-semibold text-foreground">{t("hr.argoscentro.estadoVoz")}</p>
         </div>
-        <div className="rounded-2xl border border-border/60 bg-card p-4">
+        <div className="vidrio p-4">
           <p className="text-xs font-semibold text-muted-foreground">{t("hr.argoscentro.estado")}</p>
-          <p className="mt-1 flex items-center gap-2 font-display text-lg font-bold text-foreground"><span className="h-1.5 w-1.5 shrink-0 rounded-full bg-success" aria-hidden />{t("hr.argoscentro.estadoLive", { n: liveN })}</p>
+          <p className="mt-1 flex items-center gap-2 font-display text-lg font-semibold text-foreground"><span className="h-1.5 w-1.5 shrink-0 rounded-full bg-success" aria-hidden />{t("hr.argoscentro.estadoLive", { n: liveN })}</p>
         </div>
-        <div className="rounded-2xl border border-border/60 bg-card p-4">
+        <div className="vidrio p-4">
           <p className="text-xs font-semibold text-muted-foreground">{t("hr.argoscentro.estado")}</p>
           <p className="mt-1 flex items-center gap-2 font-display text-base font-bold text-foreground"><span className="h-1.5 w-1.5 shrink-0 rounded-full bg-warning" aria-hidden />{t("hr.argoscentro.estadoBeta")}</p>
         </div>
       </div>
 
       {/* La voz. */}
-      <div className="rounded-2xl border border-border/60 bg-card p-5 sm:p-6">
-        <h2 className="flex items-center gap-2 font-display text-lg font-bold tracking-tight">
+      <div className="vidrio p-5 sm:p-6">
+        <h2 className="flex items-center gap-2 font-display text-lg font-semibold tracking-tight">
           <Volume2 className="h-5 w-5 text-foreground/75" />
           {t("hr.argoscentro.vozTitle")}
         </h2>
@@ -169,8 +169,8 @@ export function ArgosAjustesContenido() {
       </div>
 
       {/* El catálogo: lista de Argos (con chequeo de hoy) + lista del supervisor. */}
-      <div className="rounded-2xl border border-border/60 bg-card p-5 sm:p-6">
-        <h2 className="font-display text-lg font-bold tracking-tight">{t("hr.argoscentro.catTitle")}</h2>
+      <div className="vidrio p-5 sm:p-6">
+        <h2 className="font-display text-lg font-semibold tracking-tight">{t("hr.argoscentro.catTitle")}</h2>
         <p className="mt-1 text-sm text-muted-foreground">{t("hr.argoscentro.catSub")}</p>
 
         {/* ✓ Lo que hace Argos (su lista granular, con el chequeo de hoy). */}
@@ -185,7 +185,7 @@ export function ArgosAjustesContenido() {
             return (
               <div
                 key={s.slug}
-                className={`flex flex-wrap items-center gap-x-3 gap-y-2 rounded-2xl border border-border/60 bg-background/40 px-4 py-3 ${encendida ? "" : "opacity-55"}`}
+                className={`flex flex-wrap items-center gap-x-3 gap-y-2 rounded-[12px] border border-border/50 bg-card/30 px-4 py-3 ${encendida ? "" : "opacity-55"}`}
               >
                 <span className="w-6 shrink-0 self-start pt-0.5 text-sm font-semibold text-muted-foreground">{i + 1}</span>
                 <div className="min-w-0 flex-1">
@@ -247,7 +247,7 @@ export function ArgosAjustesContenido() {
           {supList.map((s, i) => (
             <div
               key={s.slug}
-              className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-2xl border border-border/60 bg-background/40 px-4 py-3"
+              className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-[12px] border border-border/50 bg-card/30 px-4 py-3"
             >
               <span className="w-6 shrink-0 self-start pt-0.5 text-sm font-semibold text-muted-foreground">{i + 1}</span>
               <div className="min-w-0 flex-1">
@@ -266,14 +266,14 @@ export function ArgosAjustesContenido() {
 
       {/* La mezcla + regla anti-falsos. */}
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <div className="rounded-2xl border border-border/60 bg-muted/20 p-5">
+        <div className="vidrio p-5">
           <h3 className="flex items-center gap-2 font-display text-base font-bold">
             <Users className="h-4 w-4 text-muted-foreground" />
             {t("hr.argoscentro.mezclaTitle")}
           </h3>
           <p className="mt-2 text-sm text-muted-foreground">{t("hr.argoscentro.mezclaDesc")}</p>
         </div>
-        <div className="rounded-2xl border border-border/60 bg-muted/20 p-5">
+        <div className="vidrio p-5">
           <h3 className="flex items-center gap-2 font-display text-base font-bold">
             <Shield className="h-4 w-4 text-muted-foreground" />
             {t("hr.argoscentro.antifalsos")}
@@ -295,7 +295,7 @@ export function ArgosAjustesContenido() {
               ) : (
                 <div className="grid max-h-80 gap-1.5 overflow-y-auto">
                   {verQuien.gente.map((g, i) => (
-                    <div key={i} className="flex items-center justify-between rounded-xl border border-border/60 bg-background/40 px-3 py-2 text-sm">
+                    <div key={i} className="flex items-center justify-between rounded-[10px] border border-border/50 bg-card/30 px-3 py-2 text-sm">
                       <span className="min-w-0 truncate text-foreground">{g.nombre}</span>
                       <span className="shrink-0 tabular-nums text-muted-foreground">{g.hora}</span>
                     </div>
