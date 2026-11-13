@@ -3,7 +3,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import {
   caidaSePaga, equipoDeCuerpo, estadoDeTiempo, latidoDeCuerpo, latidoDeEquipoAfuera, noCobrabaAlCaerse, sinConexionPagadaMs,
-  LATIDO_VENCIDO_MS, TOPE_SIN_CONEXION_MS, VENTANA_SIN_CONEXION_MS, type Exigencias, type TramoGuardado,
+  EXIGE_TODO, LATIDO_VENCIDO_MS, TOPE_SIN_CONEXION_MS, VENTANA_SIN_CONEXION_MS, type Exigencias, type TramoGuardado,
 } from "../_shared/cowork-tiempo.ts";
 import { agenciaDePersona, agenciaDeSesion, esUuid, revisarPedido, topeDeLaTabla } from "./agencia.ts";
 
@@ -625,13 +625,23 @@ serve(async (req) => {
       if (!sessionId) return err(req, "sessionId required");
       const ahora = Date.now();
 
-      // Sin asignación activa no hay sala, y sin sala no hay reloj.
+      // Sin asignación activa no hay sala, y sin sala no hay reloj… salvo el
+      // ANFITRIÓN: el supervisor trabaja desde su panel (el Hub), sin sala
+      // asignada, y su tiempo ahí cuenta como trabajo (Alvaro, 13/11/2026:
+      // Daniel, Breyner, Vanessa y Luis «se la pasan en la parte del supervisor»).
       const { data: asignacion } = await admin.from("cowork_room_assignments")
         .select("room_id").eq("session_id", sessionId).eq("user_id", userId).eq("is_active", true).maybeSingle();
+      let esAnfitrion = false;
       if (!asignacion) {
-        await cerrarSegmentosAbiertos({ userId });
-        return json(req, { ok: true, estado: null, motivo: "sin sala" });
+        const { data: membresia } = await admin.from("cowork_memberships")
+          .select("role").eq("session_id", sessionId).eq("user_id", userId).maybeSingle();
+        esAnfitrion = membresia?.role === "host";
+        if (!esAnfitrion) {
+          await cerrarSegmentosAbiertos({ userId });
+          return json(req, { ok: true, estado: null, motivo: "sin sala" });
+        }
       }
+      const salaId: string | null = asignacion?.room_id ?? null;
 
       // La pausa se mira en la base, no en lo que diga el cliente: es lo único
       // que sobrevive a que recargue la pestaña.
@@ -650,7 +660,9 @@ serve(async (req) => {
       const umbralMs = umbralFueraDeCamaraMs(sesionReloj?.alert_rules);
       // Y qué exige: si el supervisor apagó la pantalla para su equipo
       // (managers), el reloj no se detiene por pantalla. Jhon, 07/09.
-      const exige = exigenciasDelReloj(sesionReloj?.alert_rules);
+      // El anfitrión, cámara y pantalla SIEMPRE (Alvaro, 13/11/2026: «con cámara y
+      // pantalla como todos»): las reglas de la sesión son para su equipo.
+      const exige = esAnfitrion ? EXIGE_TODO : exigenciasDelReloj(sesionReloj?.alert_rules);
 
       // El tramo abierto se lee ANTES de decidir: si la sala está caída, qué se
       // paga depende de él (y de las caídas de la última hora). Nunca de un dato
@@ -659,7 +671,7 @@ serve(async (req) => {
         .select("id, estado, room_id, session_id, started_at, last_seen_at, equipo")
         .eq("user_id", userId).is("ended_at", null).maybeSingle();
       const vigente = !!abierto
-        && abierto.room_id === asignacion.room_id && abierto.session_id === sessionId
+        && (abierto.room_id ?? null) === salaId && abierto.session_id === sessionId
         && ahora - new Date(abierto.last_seen_at).getTime() <= LATIDO_VENCIDO_MS;
 
       const latido = latidoDeCuerpo(body, { enPausa: !!pausa, enMeet: !!enMeet });
@@ -714,7 +726,7 @@ serve(async (req) => {
         await admin.from("cowork_tiempo_segmentos").update({ ended_at: abierto.last_seen_at }).eq("id", abierto.id);
       }
       const { data: nuevo, error: insErr } = await admin.from("cowork_tiempo_segmentos")
-        .insert({ session_id: sessionId, room_id: asignacion.room_id, user_id: userId, estado, detalle, started_at: ahoraIso, last_seen_at: ahoraIso, equipo })
+        .insert({ session_id: sessionId, room_id: salaId, user_id: userId, estado, detalle, started_at: ahoraIso, last_seen_at: ahoraIso, equipo })
         .select("id").single();
       if (insErr) return err(req, insErr.message, 500);
       return json(req, { ok: true, estado, detalle, segmento: nuevo.id, segundosHoy: await segundosHoy() });
