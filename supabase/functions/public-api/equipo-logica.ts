@@ -1,7 +1,7 @@
 // Piezas PURAS del equipo que manda la plataforma de la agencia (Backstage u otra;
 // POST /public-api/equipo/sync): leer el cuerpo y comparar la lista de la plataforma
 // con lo que Maven tiene, para decir qué cambiaría; y armar lo que Maven devuelve
-// (GET /equipo, /equipo/horas, /equipo/notas). Sin base, sin red y sin imports: el test
+// (GET /equipo, /equipo/horas, /equipo/notas, /equipo/argos). Sin base, sin red y sin imports: el test
 // lo verifica, igual que con escritura-formato.ts, porque recursos-como-usuario.ts
 // importa valores de aquí.
 //
@@ -19,6 +19,10 @@
 //   · Más bajas que el freno en un solo envío: no se aplica ninguna.
 //   · Un campo que no viene no se toca; un campo que viene en null se vacía (equipo,
 //     jefe y horario; el rol y el nivel no se vacían).
+//   · horario_semana (13/11/2026): el turno de cada día de la semana. Un día que no
+//     viene o viene en null es descanso; null en todo el campo quita el horario por
+//     semana (vuelve a valer hora_entrada / hora_salida). Si algo del horario está mal,
+//     no se toca nada del horario de esa persona (medio horario sería peor).
 //
 // La base vuelve a validar cada cambio antes de aplicarlo (api_equipo_aplicar): lo
 // de aquí decide qué pedir, no es la pared.
@@ -29,7 +33,7 @@ export type Json = string | number | boolean | null | Json[] | { [clave: string]
 export const TOPE_PERSONAS = 1000;
 /** Tope de roles por envío (la base vuelve a exigirlo: api_equipo_roles). */
 export const TOPE_ROLES = 50;
-/** El rango más largo de /equipo/horas y /equipo/notas, en días (la base también). */
+/** El rango más largo de /equipo/horas, /equipo/notas y /equipo/argos, en días (la base también). */
 export const RANGO_MAX_DIAS = 93;
 /** Sin desde/hasta: los últimos 7 días, hoy incluido. */
 export const RANGO_POR_DEFECTO_DIAS = 7;
@@ -40,7 +44,14 @@ const LARGO_MAX_TEXTO = 100;
 const LARGO_MAX_EQUIPO = 80;
 const LARGO_MAX_CORREO = 254;
 
-export type Campo = "rol" | "nivel" | "equipo" | "reporta_a" | "hora_entrada" | "hora_salida" | "papelera";
+export type Campo = "rol" | "nivel" | "equipo" | "reporta_a" | "hora_entrada" | "hora_salida" | "horario_semana" | "papelera";
+
+/** Los días de horario_semana, en el orden en que se leen (lunes primero). */
+export const DIAS_SEMANA = ["lun", "mar", "mie", "jue", "vie", "sab", "dom"] as const;
+export type DiaSemana = (typeof DIAS_SEMANA)[number];
+/** El horario por semana completo: los 7 días, cada uno [entrada, salida] en "HH:MM:SS"
+ *  (un turno puede cruzar la medianoche) o null (descanso). */
+export type HorarioSemana = Record<DiaSemana, [string, string] | null>;
 
 export type MotivoDeRechazo =
   | "no_es_un_objeto"
@@ -53,6 +64,8 @@ export type MotivoDeRechazo =
   | "nivel_de_admin"
   | "rol_de_admin"
   | "hora_invalida"
+  | "dia_desconocido"
+  | "entrada_igual_salida"
   | "jefe_no_esta_en_maven"
   | "jefe_es_la_misma_persona"
   | "jefe_en_papelera"
@@ -79,6 +92,7 @@ export type PersonaDeBackstage = {
   reporta_a?: string | null;
   hora_entrada?: string | null;
   hora_salida?: string | null;
+  horario_semana?: HorarioSemana | null;
 };
 
 export type PedidoDeSync = {
@@ -101,7 +115,7 @@ export type ProblemaDelEquipo =
   | { tipo: "roles_invalidos" };
 
 const CAMPOS_DEL_CUERPO = ["personas", "ensayo", "roles"];
-const CAMPOS_DE_PERSONA = ["correo", "nombre", "rol", "equipo", "reporta_a", "nivel", "activo", "hora_entrada", "hora_salida"];
+const CAMPOS_DE_PERSONA = ["correo", "nombre", "rol", "equipo", "reporta_a", "nivel", "activo", "hora_entrada", "hora_salida", "horario_semana"];
 const CORREO = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const HORA = /^([01]?[0-9]|2[0-3]):([0-5][0-9])(?::([0-5][0-9]))?$/;
 
@@ -132,6 +146,56 @@ export function normalizarHora(v: string): string | null {
   const m = v.trim().match(HORA);
   if (!m) return null;
   return `${m[1].padStart(2, "0")}:${m[2]}:${m[3] ?? "00"}`;
+}
+
+/** Un problema del horario por semana: el motivo y lo que llegó (con el día). */
+export type ProblemaDeHorario = { motivo: MotivoDeRechazo; valor: Json };
+
+/** Lee horario_semana: null (quitar el horario por semana) o un objeto con hasta 7
+ *  días (lun, mar, mie, jue, vie, sab, dom), cada uno null o ["HH:MM", "HH:MM"] en 24 h
+ *  (también "9:00" o "09:00:00", como hora_entrada). Lo que falta es descanso. Devuelve
+ *  los 7 días con las horas en "HH:MM:SS", o todos los problemas. */
+export function leerHorarioSemana(v: unknown):
+  { ok: true; horario: HorarioSemana | null } | { ok: false; problemas: ProblemaDeHorario[] } {
+  if (v === null) return { ok: true, horario: null };
+  if (!esObjeto(v)) return { ok: false, problemas: [{ motivo: "tipo_invalido", valor: valorCorto(v) }] };
+  const problemas: ProblemaDeHorario[] = [];
+  const horario = Object.fromEntries(DIAS_SEMANA.map((d) => [d, null])) as HorarioSemana;
+  for (const k of Object.keys(v).sort()) {
+    if (!(DIAS_SEMANA as readonly string[]).includes(k)) {
+      problemas.push({ motivo: "dia_desconocido", valor: valorCorto(k) });
+      continue;
+    }
+    const dia = v[k];
+    if (dia === null) continue;
+    if (!Array.isArray(dia) || dia.length !== 2 || !dia.every((h) => typeof h === "string")) {
+      problemas.push({ motivo: "tipo_invalido", valor: valorCorto(`${k}: ${JSON.stringify(dia) ?? String(dia)}`) });
+      continue;
+    }
+    const [entrada, salida] = [normalizarHora(dia[0] as string), normalizarHora(dia[1] as string)];
+    if (!entrada || !salida) {
+      problemas.push({ motivo: "hora_invalida", valor: valorCorto(`${k}: ${dia.join("-")}`) });
+      continue;
+    }
+    // Un turno de cero horas (o de 24: no se sabe cuál) no es un turno.
+    if (entrada === salida) {
+      problemas.push({ motivo: "entrada_igual_salida", valor: valorCorto(`${k}: ${dia.join("-")}`) });
+      continue;
+    }
+    horario[k as DiaSemana] = [entrada, salida];
+  }
+  return problemas.length ? { ok: false, problemas } : { ok: true, horario };
+}
+
+/** El horario por semana en una línea, para el resumen y la bitácora (los cambios son
+ *  texto): «lun 08:00-16:00, mar 08:00-16:00, …, dom -». null = sin horario por semana. */
+export function horarioSemanaEnTexto(h: HorarioSemana | null): string | null {
+  if (h === null) return null;
+  const hm = (x: string) => x.replace(/^(\d{2}:\d{2}):00$/, "$1");
+  return DIAS_SEMANA.map((d) => {
+    const t = h[d];
+    return t ? `${d} ${hm(t[0])}-${hm(t[1])}` : `${d} -`;
+  }).join(", ");
 }
 
 /** Lee y valida el cuerpo de POST /equipo/sync. Lo que está mal en TODO el envío es
@@ -245,6 +309,12 @@ function leerPersona(item: unknown, indice: number, rechazados: Rechazado[]): Pe
     }
   }
 
+  if (item.horario_semana !== undefined) {
+    const h = leerHorarioSemana(item.horario_semana);
+    if (h.ok) p.horario_semana = h.horario;
+    else for (const x of h.problemas) rechazados.push({ indice, correo, campo: "horario_semana", motivo: x.motivo, valor: x.valor });
+  }
+
   return p;
 }
 
@@ -267,6 +337,8 @@ export type PersonaDeMaven = {
   nivel: string | null;
   hora_entrada: string | null;
   hora_salida: string | null;
+  /** null = sin horario por semana (también si la base todavía no lo dice). */
+  horario_semana?: HorarioSemana | null;
   equipo: string | null;
   reporta_a: string | null;
   en_papelera: boolean;
@@ -305,6 +377,14 @@ export function leerEstado(v: unknown): EstadoDeMaven | null {
     if (!esObjeto(p) || typeof p.id !== "string") return null;
     if (![p.correo, p.nombre, p.rol, p.nivel, p.hora_entrada, p.hora_salida, p.equipo, p.reporta_a].every(textoONulo)) return null;
     if (typeof p.en_papelera !== "boolean" || typeof p.protegido !== "boolean") return null;
+    // horario_semana llegó después (20261114000000): si falta, cuenta como «sin horario
+    // por semana». Si viene, tiene que tener la forma (si no, el contrato está roto).
+    let horario: HorarioSemana | null = null;
+    if (p.horario_semana !== undefined && p.horario_semana !== null) {
+      const h = leerHorarioSemana(p.horario_semana);
+      if (!h.ok || h.horario === null) return null;
+      horario = h.horario;
+    }
     personas.push({
       id: p.id,
       correo: p.correo === null ? null : (p.correo as string).toLowerCase(),
@@ -313,6 +393,7 @@ export function leerEstado(v: unknown): EstadoDeMaven | null {
       nivel: p.nivel as string | null,
       hora_entrada: p.hora_entrada === null ? null : normalizarHora(p.hora_entrada as string) ?? (p.hora_entrada as string),
       hora_salida: p.hora_salida === null ? null : normalizarHora(p.hora_salida as string) ?? (p.hora_salida as string),
+      horario_semana: horario,
       equipo: p.equipo as string | null,
       reporta_a: p.reporta_a as string | null,
       en_papelera: p.en_papelera,
@@ -377,7 +458,7 @@ export type Resumen = {
  *  que dar exactamente el mismo resumen (la huella de la bitácora). */
 const cmp = (a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0);
 const porCorreo = <T extends { correo: string | null }>(a: T, b: T) => cmp(a.correo ?? "", b.correo ?? "");
-const ORDEN_DE_CAMPO: Campo[] = ["rol", "nivel", "equipo", "reporta_a", "hora_entrada", "hora_salida", "papelera"];
+const ORDEN_DE_CAMPO: Campo[] = ["rol", "nivel", "equipo", "reporta_a", "hora_entrada", "hora_salida", "horario_semana", "papelera"];
 
 /** Compara la lista de Backstage con Maven. Puro: no decide si se aplica (eso lo dice
  *  la base, con el interruptor) y devuelve todo ordenado, para que dos envíos iguales
@@ -467,6 +548,16 @@ export function calcularCambios(estado: EstadoDeMaven, pedido: PedidoDeSync): { 
     for (const campo of ["hora_entrada", "hora_salida"] as const) {
       const v = b[campo];
       if (v !== undefined && v !== m[campo]) cambio(campo, m[campo], v, v);
+    }
+
+    // El horario por semana se compara en su línea de texto (los 7 días, en orden). A la
+    // base va el JSON de los 7 días, o null para quitarlo.
+    if (b.horario_semana !== undefined) {
+      const antes = horarioSemanaEnTexto(m.horario_semana ?? null);
+      const despues = horarioSemanaEnTexto(b.horario_semana);
+      if (antes !== despues) {
+        cambio("horario_semana", antes, despues, b.horario_semana === null ? null : JSON.stringify(b.horario_semana));
+      }
     }
   }
 
@@ -640,13 +731,14 @@ export function armarEquipo(agencia: string, estado: EstadoDeMaven) {
         reporta_a: p.reporta_a === null ? null : correoDeId.get(p.reporta_a) ?? null,
         hora_entrada: p.hora_entrada,
         hora_salida: p.hora_salida,
+        horario_semana: p.horario_semana ?? null,
         activo: !p.en_papelera,
       }))
       .sort(porCorreo),
   };
 }
 
-// ─── GET /equipo/horas y /equipo/notas: el rango y la respuesta ──────────────
+// ─── GET /equipo/horas, /equipo/notas y /equipo/argos: el rango y la respuesta ─
 
 const FECHA = /^(\d{4})-(\d{2})-(\d{2})$/;
 const DIA_MS = 86_400_000;
@@ -693,21 +785,35 @@ export function leerRango(consulta: Record<string, string>, hoy: string):
   return { ok: true, desde: msAFecha(ini), hasta: msAFecha(fin) };
 }
 
+export type PersonaDelReporte = {
+  correo: string;
+  nombre: string | null;
+  /** Solo /equipo/argos: si Argos la vigila y el link a su expediente en Maven. */
+  vigilado?: boolean;
+  expediente_url?: string;
+  dias: { [clave: string]: Json }[];
+};
+
 export type Reporte = {
   desde: string;
   hasta: string;
-  personas: { correo: string; nombre: string | null; dias: { [clave: string]: Json }[] }[];
+  personas: PersonaDelReporte[];
 };
 
-/** Lo que devuelven api_equipo_horas y api_equipo_notas; null si llegó con otra forma
- *  (un contrato roto: 503, nunca «no hay nadie»). */
+/** Lo que devuelven api_equipo_horas, api_equipo_notas y api_equipo_argos; null si
+ *  llegó con otra forma (un contrato roto: 503, nunca «no hay nadie»). */
 export function leerReporte(v: unknown): Reporte | null {
   if (!esObjeto(v) || typeof v.desde !== "string" || typeof v.hasta !== "string" || !Array.isArray(v.personas)) return null;
   const personas: Reporte["personas"] = [];
   for (const p of v.personas) {
     if (!esObjeto(p) || typeof p.correo !== "string" || !textoONulo(p.nombre ?? null) || !Array.isArray(p.dias)) return null;
     if (!p.dias.every((d) => esObjeto(d) && typeof d.fecha === "string")) return null;
-    personas.push({ correo: p.correo, nombre: (p.nombre as string | null) ?? null, dias: p.dias as { [clave: string]: Json }[] });
+    if (p.vigilado !== undefined && typeof p.vigilado !== "boolean") return null;
+    if (p.expediente_url !== undefined && typeof p.expediente_url !== "string") return null;
+    const persona: PersonaDelReporte = { correo: p.correo, nombre: (p.nombre as string | null) ?? null, dias: p.dias as { [clave: string]: Json }[] };
+    if (p.vigilado !== undefined) persona.vigilado = p.vigilado as boolean;
+    if (p.expediente_url !== undefined) persona.expediente_url = p.expediente_url as string;
+    personas.push(persona);
   }
   return { desde: v.desde, hasta: v.hasta, personas };
 }

@@ -5,13 +5,14 @@ mandar su equipo a Maven y leer de vuelta lo que pasa. Decisiones de Alvaro (11/
 próxima agencia que llegue conecta su plataforma sola, sin pasar por nosotros.**
 
 - La plataforma **manda** quién está en el equipo, su rol, su equipo, a quién reporta y su
-  horario, y **la lista de roles**. Maven crea los roles que falten con el mismo nombre, **sin
+  horario (también **el de cada día de la semana**: lo que no trae turno es descanso, y ese día
+  Argos no le exige estar en Cowork), y **la lista de roles**. Maven crea los roles que falten con el mismo nombre, **sin
   permisos**: no ven nada hasta que el dueño marca qué ve cada uno en Maven. No se inventa nada.
 - Quien **no tiene cuenta** en Maven queda **pendiente**: el dueño o un admin la aprueba con un
   clic (se le crea la cuenta) o la descarta. Una descartada sigue descartada en los envíos
   siguientes.
 - Maven **devuelve**: el equipo como quedó, las horas y la asistencia de Cowork, la nota de Argos
-  con su desglose, y **avisos por webhook** cuando alguien entra, sale (papelera) o cambia de rol,
+  con su desglose, lo que Argos vio en cada turno, y **avisos por webhook** cuando alguien entra, sale (papelera) o cambia de rol,
   ya sea por la plataforma o desde la app de Maven.
 - Todo nace en **ensayo**: hasta que el dueño de la agencia prenda «aplicar», Maven solo contesta
   qué haría y no toca nada.
@@ -19,8 +20,9 @@ próxima agencia que llegue conecta su plataforma sola, sin pasar por nosotros.*
   ella. Funciona igual con una agencia que con varias.
 
 Las piezas: `supabase/migrations/20261111120000_backstage_equipo.sql` (el interruptor, la
-bitácora, aplicar) y `20261111190000_agencias_conectadas.sql` (roles, pendientes, horas, notas y
-webhooks); el endpoint en `supabase/functions/public-api/` (`equipo-logica.ts` es lo puro); los
+bitácora, aplicar), `20261111190000_agencias_conectadas.sql` (roles, pendientes, horas, notas y
+webhooks) y `20261114000000_equipo_horario_semana_y_argos.sql` (el horario por semana, los turnos
+que mira Argos y `/equipo/argos`); el endpoint en `supabase/functions/public-api/` (`equipo-logica.ts` es lo puro); los
 avisos los manda `supabase/functions/messenger-webhooks/equipo.ts`. Los bancos con dos agencias:
 `supabase/tests/equipo_backstage.ts` y `supabase/tests/agencias_conectadas.ts`.
 
@@ -50,6 +52,7 @@ Cupo:          60 pedidos por minuto y 1000 por hora por key (429 + Retry-After)
 | `GET` | `/equipo` | El equipo como quedó en Maven. |
 | `GET` | `/equipo/horas?desde=AAAA-MM-DD&hasta=AAAA-MM-DD` | Horas y asistencia de Cowork, por persona y día. |
 | `GET` | `/equipo/notas?desde=AAAA-MM-DD&hasta=AAAA-MM-DD` | La nota de Argos (0–100) con su desglose, por persona y día. |
+| `GET` | `/equipo/argos?desde=AAAA-MM-DD&hasta=AAAA-MM-DD` | Lo que Argos vio en cada turno: sin pantalla contra lo permitido, salidas de Cowork, llamados, reportes, faltas y fotos, con el link al expediente. |
 
 ## 2. Mandar el equipo — `POST /equipo/sync`
 
@@ -69,7 +72,11 @@ Cuerpo (JSON, hasta **64 KB**; de 1 a 1000 personas; hasta 50 roles):
       "nivel": "agente",
       "activo": true,
       "hora_entrada": "08:00",
-      "hora_salida": "16:00"
+      "hora_salida": "16:00",
+      "horario_semana": {
+        "lun": ["08:00", "16:00"], "mar": ["08:00", "16:00"], "mie": ["08:00", "16:00"],
+        "jue": ["08:00", "16:00"], "vie": ["08:00", "14:00"], "sab": null, "dom": ["22:00", "06:00"]
+      }
     },
     { "correo": "carla@agencia.com", "activo": false }
   ]
@@ -88,9 +95,24 @@ Cuerpo (JSON, hasta **64 KB**; de 1 a 1000 personas; hasta 50 roles):
 | `reporta_a` | no | **Correo** del jefe (tiene que estar en Maven y activo). `null` lo vacía. |
 | `nivel` | no | `agente`, `supervisor` o `manager` (admin y dueño, solo a mano en Maven). |
 | `activo` | no (`true`) | `false` = a la papelera (30 días, como «Eliminar»). |
-| `hora_entrada`, `hora_salida` | no | `HH:MM` de 24 h. `null` vacía el horario propio. |
+| `hora_entrada`, `hora_salida` | no | `HH:MM` de 24 h. `null` vacía el horario propio. Es un solo turno para **todos** los días. |
+| `horario_semana` | no | El turno de **cada día** (hora de Bogotá): un objeto con las claves `lun`, `mar`, `mie`, `jue`, `vie`, `sab`, `dom` (solo esas), cada una `["HH:MM", "HH:MM"]` de 24 h o `null`. Un día en `null` o que **no viene es descanso**. Un turno puede cruzar la medianoche (`["22:00", "06:00"]`: el domingo de noche termina el lunes a las 06:00). `null` en todo el campo **quita** el horario por semana (vuelve a valer `hora_entrada`/`hora_salida`). `{}` = toda la semana de descanso (vacaciones). |
 
 Un campo que **no viene** no se toca; uno en `null` se vacía (equipo, jefe, horario).
+
+### El horario por semana
+
+- Si la persona tiene `horario_semana`, **manda sobre** `hora_entrada`/`hora_salida`: Argos la
+  espera en Cowork solo en los turnos de esa semana. En su día de descanso no la llama, no la
+  reporta como «no ha entrado» y no le arma resumen de turno.
+- Se manda entero cada vez (los 7 días): lo que no viene es descanso, no «lo de antes».
+- Si algo del horario está mal (un día que no existe, `"25:00"`, entrada igual a salida, un día
+  que no es `[entrada, salida]`), **no se toca nada del horario** de esa persona (medio horario
+  sería peor) y sale en `rechazados` con `campo: "horario_semana"` y su `motivo`
+  (`dia_desconocido`, `hora_invalida`, `entrada_igual_salida`, `tipo_invalido`). El resto de la
+  persona sí se aplica.
+- En `cambios` el horario va en una línea: `"lun 08:00-16:00, mar 08:00-16:00, …, sab -, dom 22:00-06:00"`
+  (`-` = descanso; `null` = sin horario por semana).
 
 ### Las reglas
 
@@ -160,13 +182,15 @@ Un campo que **no viene** no se toca; uno en `null` se vacía (equipo, jefe, hor
 
 - `roles` es `null` si el envío no trajo `roles`; `pendientes` es `null` en ensayo o si no hubo
   nadie sin cuenta (en ensayo, `pendientes_de_crear` igual dice quiénes quedarían pendientes).
-- `campo` de un cambio: `rol`, `nivel`, `equipo`, `reporta_a`, `hora_entrada`, `hora_salida` o
-  `papelera`. `aplicado`: se hizo en este envío. `se_aplicaria`: la base lo validó.
+- `campo` de un cambio: `rol`, `nivel`, `equipo`, `reporta_a`, `hora_entrada`, `hora_salida`,
+  `horario_semana` o `papelera`. `aplicado`: se hizo en este envío. `se_aplicaria`: la base lo
+  validó.
 - `motivo` de un rechazo: `no_es_un_objeto`, `campo_desconocido`, `correo_invalido`,
   `correo_repetido`, `tipo_invalido`, `texto_muy_largo`, `nivel_invalido`, `nivel_de_admin`,
-  `rol_de_admin`, `hora_invalida`, `jefe_no_esta_en_maven`, `jefe_es_la_misma_persona`,
-  `jefe_en_papelera`, `freno_de_bajas`, o uno de la base (`protegido`, `en_papelera`,
-  `no_es_de_la_agencia`, `rol_desconocido`, `error_de_base`…).
+  `rol_de_admin`, `hora_invalida`, `dia_desconocido`, `entrada_igual_salida`,
+  `jefe_no_esta_en_maven`, `jefe_es_la_misma_persona`, `jefe_en_papelera`, `freno_de_bajas`, o uno
+  de la base (`protegido`, `en_papelera`, `no_es_de_la_agencia`, `rol_desconocido`,
+  `horario_invalido`, `error_de_base`…).
 - `pendientes.ignoradas[].motivo`: `correo_invalido` o `ya_tiene_cuenta`.
 
 ## 3. Leer de vuelta
@@ -184,7 +208,11 @@ Un campo que **no viene** no se toca; uno en `null` se vacía (equipo, jefe, hor
   "personas": [
     { "correo": "ana@agencia.com", "nombre": "Ana Pérez", "rol": "Closer", "nivel": "agente",
       "equipo": "Ventas A", "reporta_a": "beto@agencia.com", "hora_entrada": "08:00:00",
-      "hora_salida": "16:00:00", "activo": true }
+      "hora_salida": "16:00:00",
+      "horario_semana": { "lun": ["08:00:00", "16:00:00"], "mar": ["08:00:00", "16:00:00"],
+        "mie": ["08:00:00", "16:00:00"], "jue": ["08:00:00", "16:00:00"], "vie": ["08:00:00", "14:00:00"],
+        "sab": null, "dom": ["22:00:00", "06:00:00"] },
+      "activo": true }
   ]
 }
 ```
@@ -192,9 +220,10 @@ Un campo que **no viene** no se toca; uno en `null` se vacía (equipo, jefe, hor
 - `origen`: `null` = el rol se hizo en Maven; `"plataforma"` = lo creó la plataforma.
 - `con_permisos`: si el rol ya ve algo en Maven.
 - `activo`: `false` = está en la papelera. `reporta_a` va por correo.
+- `horario_semana`: `null` si no tiene; si tiene, los 7 días (`null` = descanso).
 - No acepta parámetros (uno de más es un `400`).
 
-### `GET /equipo/horas` y `GET /equipo/notas`
+### `GET /equipo/horas`, `GET /equipo/notas` y `GET /equipo/argos`
 
 - `desde` y `hasta` como `AAAA-MM-DD`, días de Bogotá. Sin ninguno: los últimos 7 días hasta hoy;
   con uno solo, el otro se completa a 7 días. Hasta **93 días**. Otro parámetro, una fecha mal o
@@ -242,6 +271,49 @@ Notas (van las personas con al menos un día con datos):
 
 - La fórmula es la de `/argos/notas`: pantalla (sobre 8 h) + cámara con la cara + foco (las
   capturas perdonadas no cuentan).
+
+Argos (`GET /equipo/argos`): lo que Argos vio **en cada turno**. Un día es el turno que **empieza**
+ese día de Bogotá (con `horario_semana`, el de ese día; sin él, `hora_entrada`/`hora_salida`, el
+turno asignado o el del rol). Un día **sin turno** (descanso, o sin horario) **no aparece**; un
+turno que todavía no empieza tampoco; el que está en curso va con `en_curso: true` (sus números
+son hasta ahora). No van admins ni dueños (Argos no los vigila). Van todas las personas activas
+(con `dias: []` si no tuvieron turnos) y las de la papelera que entraron en algún turno del
+rango (solo los turnos de antes de irse).
+
+```json
+{
+  "desde": "2026-11-02",
+  "hasta": "2026-11-08",
+  "personas": [
+    { "correo": "ana@agencia.com", "nombre": "Ana Pérez", "vigilado": true,
+      "expediente_url": "https://app.maven-ai.me/hr/expediente/7c1e…",
+      "dias": [
+        { "fecha": "2026-11-02",
+          "turno": { "inicio": "2026-11-02T13:00:00+00:00", "fin": "2026-11-02T21:00:00+00:00" },
+          "en_curso": false, "entro": true,
+          "sin_pantalla_min": 75, "permitido_min": 40,
+          "fuera_de_cowork_veces": 1, "fuera_de_cowork_min": 25, "llamados_fuera": 3, "reportado_fuera": true,
+          "no_entro_llamados": 0, "no_entro_reportado": false,
+          "reportes_en_sala": { "camara_apagada": 1, "fuera_cuadro": 0, "sin_pantalla": 1 },
+          "faltas": 1, "fotos": 3 }
+      ] }
+  ]
+}
+```
+
+| Campo | Qué es |
+|---|---|
+| `vigilado` | Si Argos la vigila (`false`: está libre de Cowork o exenta de cámara y pantalla). |
+| `expediente_url` | Su expediente en Maven (lo ve quien tenga permiso en Maven). |
+| `turno` | Inicio y fin del turno (un turno de noche termina al día siguiente). |
+| `entro` | Si estuvo en Cowork en ese turno (o hasta 30 min antes). |
+| `sin_pantalla_min` / `permitido_min` | Minutos sin compartir pantalla en el turno (pausas, sin pantalla, sin cámara, caídas y fuera de Cowork), contra los permitidos (comida + baño). Lo mismo que mide el vigía; `0` si no entró. |
+| `fuera_de_cowork_veces` / `fuera_de_cowork_min` | Las veces que salió de Cowork en su turno y los minutos fuera (dentro del turno). |
+| `llamados_fuera` / `reportado_fuera` | Los llamados de Argos para que volviera y si llegó a reportarlo a sus jefes. |
+| `no_entro_llamados` / `no_entro_reportado` | Lo mismo cuando no entró en su turno. |
+| `reportes_en_sala` | Los reportes de Argos estando en Cowork, por tipo: cámara apagada, fuera de cuadro, sin pantalla. |
+| `faltas` | Las faltas del monitor en el turno (sin las descartadas por RR. HH.). |
+| `fotos` | Las fotos de pantalla del turno. |
 
 ## 4. Avisos por webhook
 
@@ -357,6 +429,8 @@ select created_at, repeticiones, ensayo, recibidas, aplicados, rechazados_base
 - El equipo y el jefe se guardan, pero Maven todavía no los usa para la supervisión (Pulso, Argos):
   hoy el equipo se deduce del rol.
 - No avisa cambios de nivel, de equipo ni de horario (solo entrar, salir y el rol).
+- El horario por semana solo llega por la plataforma: en Maven todavía no hay pantalla para
+  editarlo (se ve en `GET /equipo` y lo usa Argos).
 
 ---
 
@@ -381,10 +455,18 @@ LA LLAVE
     "roles": ["<nombre de cada rol que usamos>", ...],        (hasta 50)
     "personas": [{ "correo", "nombre", "rol", "equipo", "reporta_a" (correo del jefe),
                    "nivel" ("agente"|"supervisor"|"manager"), "activo", "hora_entrada" ("HH:MM"),
-                   "hora_salida" ("HH:MM") }]
+                   "hora_salida" ("HH:MM"),
+                   "horario_semana": { "lun": ["HH:MM","HH:MM"] | null, "mar", "mie", "jue",
+                                       "vie", "sab", "dom" } }]
   }
   - SIEMPRE la lista COMPLETA, también las personas que salieron (con "activo": false). Maven no
     saca a nadie por no venir en la lista.
+  - horario_semana: si nuestra plataforma sabe el turno de cada día, mándalo SIEMPRE con los 7
+    días (hora de Bogotá, 24 h). Solo esas 7 claves; cada una [entrada, salida] o null. Un día
+    null o que falta es DESCANSO (ese día Maven no le exige Cowork). Un turno de noche va como
+    ["22:00","06:00"] en el día en que EMPIEZA. Entrada igual a salida no vale. Si una persona no
+    tiene horario por semana, no mandes el campo; null lo borra en Maven. Si Maven rechaza el
+    horario de alguien (rechazados con campo "horario_semana"), no cambió nada de su horario.
   - Un campo que no conoces, NO lo mandes (null borra el valor en Maven).
   - Nunca nivel admin ni dueño, ni un rol de admin: Maven los rechaza.
   - Cada 15 minutos (MAVEN_SYNC_MINUTOS) y además 30 s después de cualquier cambio del equipo,
@@ -401,6 +483,13 @@ LA LLAVE
     con activo y el correo de su jefe).
   - GET /equipo/horas?desde=AAAA-MM-DD&hasta=AAAA-MM-DD → horas y asistencia por persona y día.
   - GET /equipo/notas?desde=AAAA-MM-DD&hasta=AAAA-MM-DD → nota de Argos (0-100) con desglose.
+  - GET /equipo/argos?desde=AAAA-MM-DD&hasta=AAAA-MM-DD → lo que Argos vio en cada turno, por
+    persona (vigilado, expediente_url) y turno: entro, sin_pantalla_min contra permitido_min,
+    fuera_de_cowork_veces/_min, llamados_fuera, reportado_fuera, no_entro_llamados,
+    no_entro_reportado, reportes_en_sala (camara_apagada, fuera_cuadro, sin_pantalla), faltas y
+    fotos. Un día sin turno no viene; en_curso = true es un turno que todavía no termina (no lo
+    guardes como cerrado: vuelve a pedirlo después). Muéstralo en la ficha de cada persona con un
+    link a expediente_url.
   - Hasta 93 días por pedido; sin fechas, los últimos 7 días.
 
 3) RECIBIR AVISOS (webhook)
@@ -418,6 +507,8 @@ ERRORES (todas las rutas): { "error": "<código>", "message": "<texto>" }
 
 PRUEBAS QUE QUIERO
   - El cuerpo lleva a TODAS las personas (también las inactivas) y los roles.
+  - horario_semana va con los 7 días y los descansos en null; un turno de noche, en el día en que
+    empieza.
   - Un campo desconocido no se manda como null.
   - No hay dos envíos a la vez; los cambios seguidos se juntan.
   - 429/503 reintentan respetando Retry-After; 400/401/403/413 no.

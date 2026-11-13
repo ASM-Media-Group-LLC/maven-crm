@@ -68,7 +68,7 @@ export const SCOPE_CATALOG_COMPLETO: ScopeDef[] = [
     group: "Empleados",
     label: "⚠️ Tu plataforma manda el equipo",
     description:
-      "Para la plataforma de RR. HH. de la agencia (Backstage u otra): POST /equipo/sync con sus roles y la lista completa del equipo (correo, rol, equipo, a quién reporta, nivel, horario y si sigue activo), y GET /equipo, /equipo/horas y /equipo/notas para leer de vuelta. Maven cambia rol, nivel, horario, equipo y jefe, y manda a la papelera a quien venga inactivo; los roles nuevos nacen sin permisos y quien no tiene cuenta queda pendiente hasta que el dueño o un admin lo apruebe. Nunca toca a admins ni dueños y nunca sube a nadie a admin. Mientras el dueño no prenda «aplicar», todo es ensayo: solo contesta qué cambiaría. Solo sirve si quien crea la key es admin o dueño.",
+      "Para la plataforma de RR. HH. de la agencia (Backstage u otra): POST /equipo/sync con sus roles y la lista completa del equipo (correo, rol, equipo, a quién reporta, nivel, horario y si sigue activo), y GET /equipo, /equipo/horas, /equipo/notas y /equipo/argos para leer de vuelta. Maven cambia rol, nivel, horario, equipo y jefe, y manda a la papelera a quien venga inactivo; los roles nuevos nacen sin permisos y quien no tiene cuenta queda pendiente hasta que el dueño o un admin lo apruebe. Nunca toca a admins ni dueños y nunca sube a nadie a admin. Mientras el dueño no prenda «aplicar», todo es ensayo: solo contesta qué cambiaría. Solo sirve si quien crea la key es admin o dueño.",
   },
   {
     key: "hubstaff:read",

@@ -94,7 +94,7 @@ export function useTurnoPersonas(dia: string, hDesde: number, hHasta: number, ha
         sinTipar.from("user_roles").select("user_id, role").in("user_id", ids),
         sinTipar.from("monitor_config").select("roles_calificados").eq("id", 1).maybeSingle(),
         cargarExoneracion(ids),
-        cargarHorarios(ids),
+        cargarHorarios(ids, dia),
         // Para entró/salió dentro del turno: primer/último segmento de trabajo
         // (no cuenta pausa ni sin_conexion) en el rango.
         sinTipar.from("cowork_tiempo_segmentos")

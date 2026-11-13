@@ -923,6 +923,7 @@ export const servirMessenger: Handler = (yo, ctx) => {
     case "equipo_ver":
     case "equipo_horas":
     case "equipo_notas":
+    case "equipo_argos":
       return Promise.resolve(falla("una ruta de /equipo llegó al Messenger"));
   }
 };
@@ -935,9 +936,10 @@ export const servirMessenger: Handler = (yo, ctx) => {
 // que Maven tiene (api_equipo_estado, con la sesión de la persona de la llave) y se le
 // pide a la base que aplique cada cambio, o que solo diga qué haría mientras el
 // interruptor de la agencia esté en ensayo (api_equipo_aplicar). Y se lee de vuelta lo
-// que Maven tiene: el equipo, las horas de Cowork y la nota de Argos. La base vuelve a
-// validar todo y cruza todo con la agencia de la llave: la pared es ella (migraciones
-// 20261111120000 y 20261111190000). Lo puro vive en ./equipo-logica.ts.
+// que Maven tiene: el equipo, las horas de Cowork, la nota de Argos y lo que Argos vio
+// en cada turno. La base vuelve a validar todo y cruza todo con la agencia de la llave:
+// la pared es ella (migraciones 20261111120000, 20261111190000 y 20261114000000). Lo
+// puro vive en ./equipo-logica.ts.
 
 /** El 400 de un cuerpo que no sirve para nada (lo de UNA persona va en `rechazados`). */
 function problemaDelEquipo(idioma: Idioma, p: ProblemaDelEquipo): Resultado {
@@ -1014,7 +1016,7 @@ async function verEquipo(yo: SupabaseClient, ctx: Contexto): Promise<Resultado> 
   return { ok: true, estado: 200, cuerpo: armarEquipo(ctx.agenciaDeLaLlave, e.estado) };
 }
 
-/** El rango de /equipo/horas y /equipo/notas, o el 400. */
+/** El rango de /equipo/horas, /equipo/notas y /equipo/argos, o el 400. */
 function rangoDelPedido(ctx: Contexto): { ok: true; desde: string; hasta: string } | { ok: false; r: Resultado } {
   const rango = leerRango(ctx.consulta, hoyEnBogota(Date.now()));
   if (!rango.ok) return { ok: false, r: { ok: false, estado: 400, error: "invalid_range", mensaje: msg(ctx.idioma, "equipo_rango_invalido") } };
@@ -1043,7 +1045,21 @@ async function notasDelEquipo(yo: SupabaseClient, ctx: Contexto): Promise<Result
   return { ok: true, estado: 200, cuerpo: reporte };
 }
 
-/** /equipo/* — GET /equipo, POST /equipo/sync, GET /equipo/horas y GET /equipo/notas. */
+/** GET /equipo/argos?desde&hasta — lo que Argos vio en cada turno: sin pantalla contra
+ *  lo permitido, salidas de Cowork, llamados y reportes, faltas y fotos, y el link al
+ *  expediente de cada persona. Un día sin turno no aparece. */
+async function argosDelEquipo(yo: SupabaseClient, ctx: Contexto): Promise<Resultado> {
+  const rango = rangoDelPedido(ctx);
+  if (!rango.ok) return rango.r;
+  const r = await llamar(yo.rpc("api_equipo_argos", { _desde: rango.desde, _hasta: rango.hasta }));
+  if (r.error) return resultadoDeError(ctx.idioma, clasificarErrorDeEscritura(r.error));
+  const reporte = leerReporte(r.data);
+  if (!reporte) return falla("api_equipo_argos devolvió otra forma");
+  return { ok: true, estado: 200, cuerpo: reporte };
+}
+
+/** /equipo/* — GET /equipo, POST /equipo/sync, GET /equipo/horas, GET /equipo/notas y
+ *  GET /equipo/argos. */
 export const servirEquipo: Handler = (yo, ctx) => {
   const ruta = scopesDeLaRuta("equipo", ctx.metodo, ctx.ruta);
   if (!ruta.ok && ruta.estado === 405) return Promise.resolve(metodoNoPermitido(ctx.idioma, ruta.permitidos));
@@ -1053,6 +1069,7 @@ export const servirEquipo: Handler = (yo, ctx) => {
     case "equipo_ver": return verEquipo(yo, ctx);
     case "equipo_horas": return horasDelEquipo(yo, ctx);
     case "equipo_notas": return notasDelEquipo(yo, ctx);
+    case "equipo_argos": return argosDelEquipo(yo, ctx);
     default: return Promise.resolve({ ok: false, estado: 404, error: "not_found", mensaje: msg(ctx.idioma, "equipo_rutas") });
   }
 };
@@ -1074,7 +1091,8 @@ export const SCOPE_REQUERIDO: Record<string, ScopesDelRecurso> = {
   me: { lectura: null, escritura: null },
   messenger: { lectura: "messenger:read", escritura: "messenger:write" },
   // Un solo scope para todo /equipo: la plataforma que manda el equipo es la que lee
-  // cómo quedó, las horas y las notas (equipo:write como lectura y como escritura).
+  // cómo quedó, las horas, las notas y lo de Argos (equipo:write como lectura y como
+  // escritura).
   equipo: { lectura: "equipo:write", escritura: "equipo:write" },
 };
 

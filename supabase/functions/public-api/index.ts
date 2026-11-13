@@ -25,6 +25,7 @@
 //   GET  /public-api/equipo                              equipo:write   (el equipo como quedó)
 //   GET  /public-api/equipo/horas?desde&hasta            equipo:write   (horas y asistencia de Cowork)
 //   GET  /public-api/equipo/notas?desde&hasta            equipo:write   (la nota de Argos con su desglose)
+//   GET  /public-api/equipo/argos?desde&hasta            equipo:write   (lo que Argos vio en cada turno)
 //
 // Escribir en el Messenger (messenger:write, que va siempre con messenger:read):
 //   GET    /public-api/messenger/people                                  a quién se le puede escribir
@@ -348,11 +349,12 @@ Deno.serve(async (req) => {
         { method: "PATCH", path: "/messenger/conversations/{id}/messages/{message_id}", scope: "messenger:write" },
         { method: "DELETE", path: "/messenger/conversations/{id}/messages/{message_id}", scope: "messenger:write" },
         // La plataforma de la agencia manda el equipo (ensayo hasta que el dueño prenda
-        // «aplicar») y lee cómo quedó, las horas y las notas.
+        // «aplicar») y lee cómo quedó, las horas, las notas y lo de Argos.
         { method: "GET", path: "/equipo", scope: "equipo:write" },
         { method: "POST", path: "/equipo/sync", scope: "equipo:write" },
         { method: "GET", path: "/equipo/horas", scope: "equipo:write" },
         { method: "GET", path: "/equipo/notas", scope: "equipo:write" },
+        { method: "GET", path: "/equipo/argos", scope: "equipo:write" },
         { path: "/creators", scope: "creators:read" },
         { path: "/creators/{id}", scope: "creators:read" },
         { path: "/contacts", scope: "contacts:read" },

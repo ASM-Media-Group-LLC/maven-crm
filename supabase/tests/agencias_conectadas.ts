@@ -20,6 +20,11 @@
 //   5. Webhooks: registrar (solo mi agencia, llave con equipo:write), encolar solo para
 //      la agencia de la persona, la ventana que junta, el despachador (reclamar,
 //      anotar, detener) y quién puede qué.
+//   6. Horario por semana y /equipo/argos (20261114000000, que también carga encima de
+//      las dos y vuelve a correr todo lo de arriba con sus copias de api_equipo_estado y
+//      api_equipo_aplicar): aplicar y validar horario_semana, la RLS, turno_del_dia,
+//      turno_en_curso y horario_de; los vigías ya no persiguen a nadie en su descanso; y
+//      api_equipo_argos por turno, solo de la agencia de la key.
 //
 // Sale con código 1 si algo falla. Corre en el guard de cada PR.
 import { PGlite } from "npm:@electric-sql/pglite@0.3";
@@ -29,6 +34,8 @@ const BASE = "20261111120000_backstage_equipo.sql";
 const N = "20261111190000_agencias_conectadas.sql";
 const M_BASE = leer(`../migrations/${BASE}`);
 const M = leer(`../migrations/${N}`);
+const N2 = "20261114000000_equipo_horario_semana_y_argos.sql";
+const M2 = leer(`../migrations/${N2}`);
 // La regla de URL de los webhooks del Messenger, tal cual está en prod.
 const HOST_DE_URL = (() => {
   const src = leer("../migrations/20260926120000_api_webhooks_tablas.sql");
@@ -101,12 +108,14 @@ create table public.tenant_owners (tenant_id uuid not null, user_id uuid not nul
 create table public.profiles (
   id uuid primary key references auth.users(id) on delete cascade, full_name text, created_at timestamptz default now(),
   deleted_at timestamptz, deleted_by uuid, nivel text, hora_entrada time, hora_salida time,
+  turno_id uuid, exonera_camara_pantalla boolean default false, comida_min integer, bano_min integer,
   constraint profiles_nivel_check check (nivel = any (array['dueno', 'admin', 'manager', 'supervisor', 'agente']))
 );
 create table public.user_roles (id uuid primary key default gen_random_uuid(), user_id uuid not null references auth.users(id) on delete cascade,
   role text not null, tenant_id uuid references public.tenants(id) on delete cascade, unique (user_id, role));
 create table public.roles_config (id uuid primary key default gen_random_uuid(), name text not null, is_active boolean not null default true,
   tenant_id uuid not null, level integer not null default 20, created_at timestamptz not null default now(),
+  hora_entrada time, hora_salida time, exonera_camara_pantalla boolean default false, comida_min integer, bano_min integer,
   constraint roles_config_agencia_nombre unique (tenant_id, name));
 create table public.role_groups (role_name text not null, is_admin boolean not null default false, tenant_id uuid not null,
   primary key (tenant_id, role_name));
@@ -161,6 +170,87 @@ begin
   delete from auth.refresh_tokens where user_id = p_user_id::text;
   delete from auth.sessions where user_id = p_user_id;
 end; $$;
+
+-- Lo que usa 20261114000000 (horario por semana, los vigías y /equipo/argos): los
+-- turnos, Argos y Cowork, con los cuerpos de prod (13/11/2026) donde importan.
+create table public.rol_turnos (id uuid primary key default gen_random_uuid(), role text, nombre text,
+  hora_entrada time not null, hora_salida time not null);
+create table public.cowork_fuera (id uuid primary key default gen_random_uuid(), user_id uuid not null, tenant_id uuid not null,
+  desde timestamptz not null, hasta timestamptz, motivo text, avisado_at timestamptz, created_at timestamptz not null default now(),
+  llamados integer not null default 0, ultimo_llamado_at timestamptz, reportado_at timestamptz);
+create unique index cowork_fuera_uno_abierto on public.cowork_fuera (user_id) where hasta is null;
+create table public.argos_reportes (id uuid primary key default gen_random_uuid(), user_id uuid not null,
+  tipo text not null check (tipo in ('camara_apagada', 'fuera_cuadro', 'sin_pantalla')), created_at timestamptz not null default now());
+create table public.monitor_eventos (id uuid primary key default gen_random_uuid(), user_id uuid not null, tipo text,
+  estado text not null default 'pendiente', created_at timestamptz not null default now());
+create table public.argos_no_entro (user_id uuid not null, turno date not null, llamados integer not null default 0,
+  ultimo_llamado_at timestamptz, reportado_at timestamptz, tenant_id uuid, primary key (user_id, turno));
+create table public.argos_tiempo_avisos (user_id uuid not null, turno date not null, tipo text not null check (tipo in ('pasado', 'resumen')),
+  sin_pantalla_min integer, permitido_min integer, faltas integer, fotos integer, entro boolean, tenant_id uuid,
+  created_at timestamptz not null default now(), primary key (user_id, turno, tipo));
+create table public.cowork_libres (user_id uuid primary key);
+create table public.cowork_breaks (id uuid primary key default gen_random_uuid(), user_id uuid not null, kind text,
+  started_at timestamptz not null, ended_at timestamptz);
+create table public.llamada_maven_latido (user_id uuid primary key, last_seen_at timestamptz not null);
+create table public.notifications (id uuid primary key default gen_random_uuid(), user_id uuid not null, type text, title text,
+  message text, reference_id uuid, reference_type text, module_origin text, priority text, status text, visibility_scope text,
+  deep_link_url text, created_at timestamptz not null default now());
+
+create function public.debe_estar_en_cowork(_uid uuid) returns boolean language sql stable security definer set search_path to 'public' as $$
+  select _uid is not null
+     and not public.es_admin_o_dueno(_uid)
+     and not exists (select 1 from public.cowork_libres l where l.user_id = _uid); $$;
+create function public.presente_en_cowork(_uid uuid, _ahora timestamptz default now()) returns boolean language sql stable
+  security definer set search_path to 'public' as $$
+  select exists (
+           select 1 from public.cowork_tiempo_segmentos s
+            where s.user_id = _uid and s.ended_at is null and s.last_seen_at > _ahora - interval '90 seconds')
+      or exists (
+           select 1 from public.cowork_breaks b
+            where b.user_id = _uid and b.ended_at is null and b.started_at > _ahora - interval '4 hours')
+      or exists (
+           select 1 from public.llamada_maven_latido l
+            where l.user_id = _uid and l.last_seen_at > _ahora - interval '90 seconds'); $$;
+create function public.argos_permitido_min(_uid uuid) returns integer language sql stable security definer set search_path to 'public' as $$
+  select greatest(coalesce(p.comida_min, r.comida, 30), 0) + greatest(coalesce(p.bano_min, r.bano, 10), 0)
+    from public.profiles p
+    left join lateral (
+      select max(c.comida_min) as comida, max(c.bano_min) as bano
+        from public.user_roles ur
+        join public.roles_config c on lower(c.name) = lower(ur.role) and c.is_active
+                                  and (c.tenant_id = ur.tenant_id or ur.tenant_id is null)
+       where ur.user_id = p.id
+    ) r on true
+   where p.id = _uid; $$;
+create function public.argos_sin_pantalla_seg(_uid uuid, _desde timestamptz, _hasta timestamptz) returns integer language sql stable
+  security definer set search_path to 'public' as $$
+  select (
+    coalesce((
+      select sum(extract(epoch from (least(coalesce(s.ended_at, s.last_seen_at), _hasta) - greatest(s.started_at, _desde))))
+        from public.cowork_tiempo_segmentos s
+       where s.user_id = _uid
+         and s.estado in ('pausa', 'sin_pantalla', 'sin_camara', 'sin_conexion', 'sin_conexion_larga')
+         and s.started_at < _hasta and coalesce(s.ended_at, s.last_seen_at) > _desde
+    ), 0)
+    + coalesce((
+      select sum(extract(epoch from (least(coalesce(f.hasta, now()), _hasta) - greatest(f.desde, _desde))))
+        from public.cowork_fuera f
+       where f.user_id = _uid and f.desde < _hasta and coalesce(f.hasta, now()) > _desde
+    ), 0)
+  )::int; $$;
+-- A quién le llegan los avisos de alguien: aquí, el dueño de su agencia.
+create function public.destinatarios_de_aviso(_uid uuid) returns table(user_id uuid) language sql stable security definer
+  set search_path to 'public' as $$
+  select o.user_id from public.tenant_owners o join public.tenant_members m on m.tenant_id = o.tenant_id where m.user_id = _uid; $$;
+-- puede_vigilar_a cerrada para authenticated (como en prod) y puede_vigilar abierta: aquí
+-- vigila el dueño o un admin.
+create function public.puede_vigilar_a(_viewer uuid, _target uuid) returns boolean language sql stable security definer
+  set search_path to 'public' as $$
+  select _viewer is not null and _target is not null and _viewer <> _target and public.es_admin_o_dueno(_viewer); $$;
+revoke all on function public.puede_vigilar_a(uuid, uuid) from public, anon, authenticated;
+create function public.puede_vigilar(_target uuid) returns boolean language sql stable security definer set search_path to 'public' as $$
+  select public.puede_vigilar_a((select auth.uid()), _target); $$;
+revoke all on function public.puede_vigilar(uuid) from public, anon;
 `;
 
 const AGENCIAS = `insert into public.tenants (id, slug, name) values ('${T1}', 'kash', 'Kash Agency'), ('${T2}', 'otra', 'Otra agencia');`;
@@ -257,6 +347,9 @@ await aplicar(db, N, M);
 check(true, "las dos migraciones cargan (la de prod y esta)");
 await aplicar(db, `${N} (otra vez)`, M);
 check(true, "y esta se puede volver a correr");
+await aplicar(db, N2, M2);
+await aplicar(db, `${N2} (otra vez)`, M2);
+check(true, "la del horario por semana y /equipo/argos carga encima, y se puede volver a correr");
 await db.exec(GENTE);
 {
   const jobs = (await q(db, `select jobname, schedule from cron.job order by jobname`)).map((j) => `${j.jobname}@${j.schedule}`);
@@ -732,6 +825,258 @@ const PEND = [
     "equipo_pendiente_resolver(uuid, text, uuid)", "equipo_roles_sin_permisos()", "equipo_webhook_crear(uuid, text, text[])"]) {
     const a = await uno(db, `select has_function_privilege('anon', 'public.${f}', 'execute') a, has_function_privilege('authenticated', 'public.${f}', 'execute') u`);
     check(a?.a === false && a?.u === true, `${f}: authenticated sí (la función se cuida sola), anon no`);
+  }
+}
+
+// ════ 6. Horario por semana y /equipo/argos ═══════════════════════════════════
+{
+  const [LUNA, MARTIN, NICO, OSCAR, RAUL, SARA, TOMAS, UGO, VERA] = [31, 32, 33, 34, 35, 36, 37, 38, 41].map(P);
+  const nuevos: [string, string, string][] = [
+    [LUNA, "luna@kash.test", T1], [MARTIN, "martin@kash.test", T1], [NICO, "nico@kash.test", T1], [OSCAR, "oscar@kash.test", T1],
+    [RAUL, "raul@kash.test", T1], [SARA, "sara@kash.test", T1], [TOMAS, "tomas@kash.test", T1], [UGO, "ugo@kash.test", T1],
+    [VERA, "vera@otra.test", T2],
+  ];
+  // Las llaves del dueño de arriba quedaron revocadas o sin el scope (sección 5): una nueva.
+  const K_DUENO_3 = K(9);
+  await db.exec(`insert into public.api_keys (id, scopes, tenant_id, acts_as_user_id) values ('${K_DUENO_3}', '{equipo:write}', '${T1}', '${DUENO}')`);
+  const DUENO_K6: Quien = { persona: DUENO, key: K_DUENO_3 };
+  for (const [id, correo, t] of nuevos) {
+    await db.exec(`insert into auth.users (id, email, raw_app_meta_data) values ('${id}', '${correo}', '{}');
+      insert into public.profiles (id, full_name, nivel) values ('${id}', '${correo.split("@")[0]}', 'agente');
+      insert into public.tenant_members (user_id, tenant_id) values ('${id}', '${t}');
+      insert into public.user_roles (user_id, role) values ('${id}', 'Chatter');`);
+  }
+  const DIAS = ["lun", "mar", "mie", "jue", "vie", "sab", "dom"];
+  const SEMANA = { lun: ["08:00:00", "16:00:00"], mar: ["08:00:00", "16:00:00"], mie: ["08:00:00", "16:00:00"],
+    jue: ["08:00:00", "16:00:00"], vie: ["08:00:00", "16:00:00"], sab: null, dom: ["22:00:00", "06:00:00"] };
+  const FILAS_SEMANA = ["0:22:00:00-06:00:00", "1:08:00:00-16:00:00", "2:08:00:00-16:00:00", "3:08:00:00-16:00:00",
+    "4:08:00:00-16:00:00", "5:08:00:00-16:00:00", "6:descanso"];
+  const mismoHorario = (a: Fila | null | undefined, b: Fila) => !!a && Object.keys(a).length === 7 && DIAS.every((d) => igual(a[d], b[d]));
+  const aplicarH = async (quien: Quien, cambios: unknown[], ensayo = false) =>
+    (await como(db, quien, `select public.api_equipo_aplicar($1::jsonb, '{"recibidas":1}'::jsonb, $2) r`, [JSON.stringify(cambios), ensayo]))[0].r as Fila;
+  const filas = async (uid: string) =>
+    (await q(db, `select dia, entrada::text e, salida::text s from public.horario_semanal where user_id = $1 order by dia`, [uid]))
+      .map((f) => `${f.dia}:${f.e ? `${f.e}-${f.s}` : "descanso"}`);
+
+  // ── Aplicar horario_semana (api_equipo_aplicar) ──
+  const ens = await aplicarH(DUENO_K6, [{ user_id: LUNA, campo: "horario_semana", valor: JSON.stringify(SEMANA) }], true);
+  // (jsonb ordena las claves: se compara campo por campo, no el texto del objeto)
+  const aplicadosDe = (r: Fila) => ((r.aplicados ?? []) as Fila[]).map((x) => `${x.user_id}|${x.campo}`);
+  check(ens.ensayo === true && igual(aplicadosDe(ens), [`${LUNA}|horario_semana`]) && (await filas(LUNA)).length === 0,
+    `horario_semana en ensayo: se aplicaría y no se guarda (${corto(ens)})`);
+  const ap = await aplicarH(DUENO_K6, [{ user_id: LUNA, campo: "horario_semana", valor: JSON.stringify(SEMANA) }]);
+  check(ap.ensayo === false && igual(ap.rechazados, []), `horario_semana se aplica (${corto(ap)})`);
+  check(igual(await filas(LUNA), FILAS_SEMANA), `los 7 días, con el sábado de descanso (${await filas(LUNA)})`);
+  const MALOS: [string, unknown][] = [
+    ["un día que no existe", JSON.stringify({ lun: ["08:00", "16:00"], domingo: ["10:00", "12:00"] })],
+    ["una hora fuera de 24 h", JSON.stringify({ lun: ["25:00", "16:00"] })],
+    ["entrada igual a salida", JSON.stringify({ lun: ["08:00", "08:00:00"] })],
+    ["un día que no es una lista", JSON.stringify({ lun: "08:00-16:00" })],
+    ["una lista de uno", JSON.stringify({ lun: ["08:00"] })],
+    ["números en vez de horas", JSON.stringify({ lun: [8, 16] })],
+    ["texto que no es JSON", "lunes a viernes"],
+    ["JSON que no es un objeto", "[1, 2]"],
+    ["un texto JSON", JSON.stringify("08:00")],
+  ];
+  for (const [que, valor] of MALOS) {
+    const r = await aplicarH(DUENO_K6, [{ user_id: LUNA, campo: "horario_semana", valor }]);
+    check(igual(r.aplicados, []) && r.rechazados?.[0]?.motivo === "horario_invalido", `horario_semana: ${que} → horario_invalido, sin romper (${corto(r)})`);
+  }
+  const obj = await aplicarH(DUENO_K6, [{ user_id: LUNA, campo: "horario_semana", valor: { lun: ["08:00", "16:00"] } }]);
+  check(obj.rechazados?.[0]?.motivo === "valor_invalido", "un objeto en vez del texto con el JSON: valor_invalido");
+  check(igual(await filas(LUNA), FILAS_SEMANA), "lo rechazado no tocó el horario que había");
+  const prot = await aplicarH(DUENO_K6, [
+    { user_id: ADMIN, campo: "horario_semana", valor: JSON.stringify(SEMANA) },
+    { user_id: VERA, campo: "horario_semana", valor: JSON.stringify(SEMANA) },
+  ]);
+  check(igual((prot.rechazados as Fila[]).map((x) => x.motivo).sort(), ["no_es_de_la_agencia", "protegido"]),
+    `ni a un admin ni a alguien de otra agencia (${corto(prot.rechazados)})`);
+  check((await q(db, `select 1 from public.horario_semanal where user_id in ('${ADMIN}', '${VERA}')`)).length === 0, "y no se guardó nada de ellos");
+  // null lo quita (vuelve a valer el horario de siempre).
+  await aplicarH(DUENO_K6, [{ user_id: TOMAS, campo: "horario_semana", valor: JSON.stringify(SEMANA) }]);
+  const quitar = await aplicarH(DUENO_K6, [{ user_id: TOMAS, campo: "horario_semana", valor: null }]);
+  check(igual(aplicadosDe(quitar), [`${TOMAS}|horario_semana`]) && (await filas(TOMAS)).length === 0, "null quita el horario por semana");
+  // La otra agencia pone el de los suyos con su key.
+  await aplicarH(OLGA_K, [{ user_id: VERA, campo: "horario_semana", valor: JSON.stringify(SEMANA) }]);
+  check(igual(await filas(VERA), FILAS_SEMANA), "la key de la otra agencia pone el horario de los suyos");
+
+  // ── api_equipo_estado ──
+  const est = (await como(db, DUENO_K6, `select public.api_equipo_estado() e`))[0].e as Fila;
+  const enEstado = (id: string) => (est.personas as Fila[]).find((p) => p.id === id);
+  check(mismoHorario(enEstado(LUNA)?.horario_semana, SEMANA), `estado: el horario por semana, los 7 días (${corto(enEstado(LUNA)?.horario_semana)})`);
+  check(enEstado(ANA)?.horario_semana === null && enEstado(TOMAS)?.horario_semana === null, "estado: null para quien no tiene");
+  check(!enEstado(VERA), "estado: nada de la otra agencia");
+
+  // ── La RLS de horario_semanal ──
+  check((await como(db, { persona: LUNA }, `select count(*)::int n from public.horario_semanal`))[0].n === 7, "la persona ve su horario por semana");
+  check((await como(db, { persona: ANA }, `select count(*)::int n from public.horario_semanal`))[0].n === 0, "otra agente no ve el de nadie");
+  const delJefe = await probar(db, { persona: DUENO }, `select count(*)::int n from public.horario_semanal where user_id = $1`, [LUNA]);
+  check(Array.isArray(delJefe) && delJefe[0].n === 7, `quien la puede vigilar lo ve, sin que la política falle por permisos (${corto(delJefe)})`);
+  check(esError(await probar(db, { persona: LUNA }, `insert into public.horario_semanal (user_id, dia, entrada, salida) values ($1, 6, '08:00', '12:00')`, [LUNA]),
+    /permission denied/), "nadie lo escribe con su sesión");
+  check(esError(await probar(db, { persona: DUENO }, `update public.horario_semanal set entrada = '07:00' where user_id = $1`, [LUNA]), /permission denied/),
+    "ni el dueño desde la app (solo por api_equipo_aplicar)");
+  check(esError(await probar(db, "anon", `select * from public.horario_semanal`), /permission denied/), "anon no lo lee");
+  for (const f of ["turno_del_dia(uuid, date)", "equipo_horario_semana(uuid)", "equipo_horario_semana_valido(jsonb)"]) {
+    const r = await uno(db, `select has_function_privilege('authenticated', 'public.${f}', 'execute') u, has_function_privilege('anon', 'public.${f}', 'execute') a`);
+    check(r?.u === false && r?.a === false, `la app no ejecuta ${f}`);
+  }
+
+  // ── turno_del_dia, turno_en_curso y horario_de ──
+  await db.exec(`update public.profiles set hora_entrada = '09:00', hora_salida = '17:00' where id in ('${MARTIN}', '${DARIO}', '${CARLA}');
+    insert into public.cowork_libres (user_id) values ('${MARTIN}');`);
+  const tramo = (f: Fila) => `${new Date(f.inicio).toISOString().slice(0, 16)}→${new Date(f.fin).toISOString().slice(0, 16)}`;
+  const turno = async (uid: string, dia: string) => (await q(db, `select inicio, fin from public.turno_del_dia($1, $2::date)`, [uid, dia])).map(tramo);
+  const enCurso = async (uid: string, ahora: string) =>
+    (await q(db, `select inicio, fin from public.turno_en_curso($1, $2::timestamptz)`, [uid, ahora])).map(tramo);
+  check(igual(await turno(LUNA, "2026-11-09"), ["2026-11-09T13:00→2026-11-09T21:00"]), "turno_del_dia: el lunes, 08:00–16:00 de Bogotá");
+  check(igual(await turno(LUNA, "2026-11-14"), []), "turno_del_dia: el sábado es descanso, sin turno");
+  check(igual(await turno(LUNA, "2026-11-15"), ["2026-11-16T03:00→2026-11-16T11:00"]), "turno_del_dia: el domingo de noche cruza la medianoche");
+  check(igual(await turno(MARTIN, "2026-11-14"), ["2026-11-14T14:00→2026-11-14T22:00"]), "turno_del_dia: sin horario por semana, el de siempre (todos los días)");
+  check(igual(await enCurso(LUNA, "2026-11-16T05:00:00Z"), ["2026-11-16T03:00→2026-11-16T11:00"]), "turno_en_curso: a la medianoche del lunes, el del domingo");
+  check(igual(await enCurso(LUNA, "2026-11-14T15:00:00Z"), []), "turno_en_curso: el sábado, ninguno");
+  check(igual(await enCurso(LUNA, "2026-11-09T15:00:00Z"), ["2026-11-09T13:00→2026-11-09T21:00"]), "turno_en_curso: el lunes a media mañana");
+  check(igual(await enCurso(LUNA, "2026-11-09T21:00:00Z"), []), "turno_en_curso: al terminar, ya no");
+  check(igual(await enCurso(MARTIN, "2026-11-14T15:00:00Z"), ["2026-11-14T14:00→2026-11-14T22:00"]), "turno_en_curso: sin horario por semana, igual que antes");
+  const hd = await uno(db, `select extract(dow from now() at time zone 'America/Bogota')::int d, h.entrada::text e, h.salida::text s, h.exento
+    from public.horario_de($1) h`, [LUNA]);
+  const hoyEsperado = hd?.d === 6 ? [null, null] : hd?.d === 0 ? ["22:00:00", "06:00:00"] : ["08:00:00", "16:00:00"];
+  check(igual([hd?.e, hd?.s], hoyEsperado) && hd?.exento === false, `horario_de: el de hoy en su horario por semana (${corto(hd)})`);
+  const hm = await uno(db, `select h.entrada::text e, h.salida::text s from public.horario_de($1) h`, [MARTIN]);
+  check(igual([hm?.e, hm?.s], ["09:00:00", "17:00:00"]), "horario_de: sin horario por semana, el de siempre");
+
+  // ── Los vigías, con turnos de verdad alrededor de ahora ──
+  // NICO: por semana, solo el día en que empezó su turno (hace 20 min, dura 5 h 20).
+  // RAUL: el mismo turno, pero con hora_entrada/hora_salida (todos los días).
+  // OSCAR: ese mismo horario de siempre, pero su horario por semana es todo descanso ({}).
+  // SARA: por semana, un turno que terminó hace 30 min. UGO: el mismo, con el de siempre.
+  // TOMAS: el mismo de siempre, pero con la semana entera de descanso.
+  const ts = await uno(db, `select
+      to_char(date_trunc('second', now() - interval '20 minutes') at time zone 'America/Bogota', 'YYYY-MM-DD HH24:MI:SS') ini,
+      to_char(date_trunc('second', now() + interval '5 hours') at time zone 'America/Bogota', 'YYYY-MM-DD HH24:MI:SS') fin,
+      to_char(date_trunc('second', now() - interval '2 hours') at time zone 'America/Bogota', 'YYYY-MM-DD HH24:MI:SS') ini2,
+      to_char(date_trunc('second', now() - interval '30 minutes') at time zone 'America/Bogota', 'YYYY-MM-DD HH24:MI:SS') fin2`);
+  const semanaDeUnDia = (uid: string, ini: string, fin: string) =>
+    db.exec(`insert into public.horario_semanal (user_id, dia, entrada, salida)
+      select '${uid}', d, case when d = extract(dow from '${ini}'::timestamp)::int then '${ini}'::timestamp::time end,
+                          case when d = extract(dow from '${ini}'::timestamp)::int then '${fin}'::timestamp::time end
+        from generate_series(0, 6) as d`);
+  await semanaDeUnDia(NICO, ts.ini, ts.fin);
+  await semanaDeUnDia(SARA, ts.ini2, ts.fin2);
+  await db.exec(`update public.profiles set hora_entrada = '${ts.ini}'::timestamp::time, hora_salida = '${ts.fin}'::timestamp::time
+      where id in ('${RAUL}', '${OSCAR}');
+    update public.profiles set hora_entrada = '${ts.ini2}'::timestamp::time, hora_salida = '${ts.fin2}'::timestamp::time
+      where id in ('${UGO}', '${TOMAS}');`);
+  const vacia = await aplicarH(DUENO_K6, [{ user_id: OSCAR, campo: "horario_semana", valor: "{}" }, { user_id: TOMAS, campo: "horario_semana", valor: "{}" }]);
+  check(igual(vacia.rechazados, []) && (await filas(OSCAR)).every((f) => f.endsWith("descanso")) && (await filas(OSCAR)).length === 7,
+    "una semana sin días ({}) se guarda: los 7 de descanso");
+  check((await enCurso(NICO, new Date().toISOString())).length === 1, "NICO está en su turno (por semana)");
+  check((await enCurso(RAUL, new Date().toISOString())).length === 1, "RAUL está en su turno (el de siempre)");
+  check((await enCurso(OSCAR, new Date().toISOString())).length === 0, "OSCAR descansa: su horario por semana manda sobre el de siempre");
+  const estOscar = ((await como(db, DUENO_K6, `select public.api_equipo_estado() e`))[0].e.personas as Fila[]).find((p) => p.id === OSCAR);
+  check(DIAS.every((d) => estOscar?.horario_semana?.[d] === null), "estado: la semana de descanso son 7 días en null (no «sin horario»)");
+
+  await q(db, `select public.vigilar_fuera_de_cowork()`);
+  const noEntro = await q(db, `select user_id, turno::text t, llamados from public.argos_no_entro where user_id in ('${NICO}', '${RAUL}', '${OSCAR}')`);
+  check(noEntro.some((f) => f.user_id === NICO && f.llamados === 1 && f.t === ts.ini.slice(0, 10)),
+    `con horario por semana, en su turno y sin entrar: Argos lo llama (${corto(noEntro)})`);
+  check(noEntro.some((f) => f.user_id === RAUL), "sin horario por semana, igual que antes");
+  check(!noEntro.some((f) => f.user_id === OSCAR), "en su día de descanso Argos no lo llama, aunque su horario de siempre diga que es su turno");
+  const avisoNico = await q(db, `select message from public.notifications where user_id = '${NICO}' and type = 'cowork_no_entro_tu'`);
+  check(avisoNico.length === 1 && String(avisoNico[0].message).includes(ts.ini.slice(11, 16)),
+    `el aviso dice la hora a la que empezó su turno (${corto(avisoNico)})`);
+  check((await q(db, `select 1 from public.notifications where user_id = '${OSCAR}'`)).length === 0, "a OSCAR no le llegó nada");
+
+  await q(db, `select public.vigilar_tiempo_sin_pantalla()`);
+  const resumen = await q(db, `select user_id, turno::text t, entro from public.argos_tiempo_avisos
+    where tipo = 'resumen' and user_id in ('${SARA}', '${UGO}', '${TOMAS}')`);
+  check(resumen.some((f) => f.user_id === SARA && f.t === ts.ini2.slice(0, 10) && f.entro === false),
+    `el turno de su día (por semana) tiene su resumen al cerrar (${corto(resumen)})`);
+  check(resumen.some((f) => f.user_id === UGO), "resumen: sin horario por semana, igual que antes");
+  check(!resumen.some((f) => f.user_id === TOMAS), "resumen: un día de descanso no tiene");
+
+  // ── GET /equipo/argos (api_equipo_argos) ──
+  const S = (n: number) => `d0000000-0000-4000-8000-${String(n).padStart(12, "0")}`;
+  await db.exec(`insert into public.cowork_tiempo_segmentos (session_id, user_id, estado, started_at, last_seen_at, ended_at, seconds) values
+    ('${S(1)}', '${LUNA}', 'activo', '2026-11-02 13:00+00', '2026-11-02 15:00+00', '2026-11-02 15:00+00', 7200),
+    ('${S(1)}', '${LUNA}', 'sin_pantalla', '2026-11-02 15:00+00', '2026-11-02 15:20+00', '2026-11-02 15:20+00', 1200),
+    ('${S(1)}', '${LUNA}', 'pausa', '2026-11-02 15:20+00', '2026-11-02 15:50+00', '2026-11-02 15:50+00', 1800),
+    ('${S(1)}', '${LUNA}', 'activo', '2026-11-02 15:50+00', '2026-11-02 21:00+00', '2026-11-02 21:00+00', 18600),
+    ('${S(2)}', '${LUNA}', 'activo', '2026-11-07 15:00+00', '2026-11-07 16:00+00', '2026-11-07 16:00+00', 3600),
+    ('${S(3)}', '${LUNA}', 'activo', '2026-11-09 03:30+00', '2026-11-09 04:00+00', '2026-11-09 04:00+00', 1800),
+    ('${S(4)}', '${DARIO}', 'activo', '2026-11-02 15:00+00', '2026-11-02 16:00+00', '2026-11-02 16:00+00', 3600),
+    ('${S(5)}', '${VERA}', 'activo', '2026-11-02 13:00+00', '2026-11-02 14:00+00', '2026-11-02 14:00+00', 3600);
+  insert into public.cowork_fuera (user_id, tenant_id, desde, hasta, motivo, llamados, reportado_at) values
+    ('${LUNA}', '${T1}', '2026-11-02 16:00+00', '2026-11-02 16:25+00', 'volvio', 3, '2026-11-02 16:05+00');
+  insert into public.argos_reportes (user_id, tipo, created_at) values
+    ('${LUNA}', 'camara_apagada', '2026-11-02 14:00+00'), ('${LUNA}', 'sin_pantalla', '2026-11-02 15:10+00'),
+    ('${LUNA}', 'camara_apagada', '2026-11-02 22:00+00');
+  insert into public.monitor_eventos (user_id, tipo, estado, created_at) values
+    ('${LUNA}', 'celular', 'falta', '2026-11-02 14:30+00'), ('${LUNA}', 'celular', 'descartado', '2026-11-02 15:30+00'),
+    ('${LUNA}', 'celular', 'pendiente', '2026-11-02 21:30+00');
+  insert into public.monitor_capturas (user_id, tipo, cara_visible, fuera_de_lugar, perdonado, created_at) values
+    ('${LUNA}', 'pantalla', null, false, false, '2026-11-02 13:30+00'), ('${LUNA}', 'pantalla', null, false, false, '2026-11-02 14:30+00'),
+    ('${LUNA}', 'pantalla', null, false, false, '2026-11-02 20:59+00'), ('${LUNA}', 'camara', true, null, false, '2026-11-02 14:00+00'),
+    ('${LUNA}', 'pantalla', null, false, false, '2026-11-02 21:05+00');
+  insert into public.argos_no_entro (user_id, turno, llamados, ultimo_llamado_at, reportado_at, tenant_id) values
+    ('${LUNA}', '2026-11-03', 3, '2026-11-03 13:40+00', '2026-11-03 13:40+00', '${T1}');`);
+  const argos = async (quien: Quien, desde: string, hasta: string) =>
+    (await como(db, quien, `select public.api_equipo_argos($1::date, $2::date) a`, [desde, hasta]))[0].a as Fila;
+  const a = await argos(DUENO_K6, "2026-11-02", "2026-11-08");
+  const porCorreo = new Map((a.personas as Fila[]).map((p) => [p.correo, p]));
+  check(a.desde === "2026-11-02" && a.hasta === "2026-11-08", "argos: dice el rango");
+  const correosA = [...porCorreo.keys()];
+  check(!correosA.some((c) => ["dueno@kash.test", "admin@kash.test", "sofi@gmail.test", "pepe@otra.test", "vera@otra.test", "olga@otra.test"].includes(c)),
+    `argos: sin admins ni dueños, sin cuentas externas, sin la otra agencia (${correosA})`);
+  const luna = porCorreo.get("luna@kash.test");
+  check(luna?.vigilado === true && luna?.expediente_url === `https://app.maven-ai.me/hr/expediente/${LUNA}`, `argos: vigilado y el link a su expediente (${corto(luna)})`);
+  check(igual(luna?.dias?.map((d: Fila) => d.fecha), ["2026-11-02", "2026-11-03", "2026-11-04", "2026-11-05", "2026-11-06", "2026-11-08"]),
+    `argos: un día por turno; el sábado de descanso no aparece aunque haya entrado (${luna?.dias?.map((d: Fila) => d.fecha)})`);
+  const lun = luna?.dias?.[0] as Fila;
+  check(Date.parse(lun?.turno?.inicio) === Date.parse("2026-11-02T13:00:00Z") && Date.parse(lun?.turno?.fin) === Date.parse("2026-11-02T21:00:00Z")
+    && lun?.en_curso === false, `argos: el turno del lunes (${corto(lun?.turno)})`);
+  check(lun?.entro === true && lun?.sin_pantalla_min === 75 && lun?.permitido_min === 40,
+    `argos: 20 sin pantalla + 30 de pausa + 25 fuera de Cowork = 75 de 40 permitidos (${corto(lun)})`);
+  check(lun?.fuera_de_cowork_veces === 1 && lun?.fuera_de_cowork_min === 25 && lun?.llamados_fuera === 3 && lun?.reportado_fuera === true,
+    "argos: la salida de Cowork, con sus llamados y el reporte");
+  const rs = lun?.reportes_en_sala as Fila | undefined;
+  check(Object.keys(rs ?? {}).length === 3 && rs?.camara_apagada === 1 && rs?.fuera_cuadro === 0 && rs?.sin_pantalla === 1 && lun?.faltas === 1 && lun?.fotos === 3,
+    `argos: reportes en la sala, faltas (sin las descartadas) y fotos de pantalla, solo dentro del turno (${corto(lun?.reportes_en_sala)})`);
+  const mar = luna?.dias?.[1] as Fila;
+  check(mar?.entro === false && mar?.sin_pantalla_min === 0 && mar?.no_entro_llamados === 3 && mar?.no_entro_reportado === true,
+    `argos: el martes no entró y Argos lo reportó (${corto(mar)})`);
+  check(luna?.dias?.[2]?.no_entro_llamados === 0 && luna?.dias?.[2]?.no_entro_reportado === false, "argos: sin llamados, en cero");
+  check(luna?.dias?.[5]?.entro === true, "argos: el turno del domingo de noche cuenta lo del lunes de madrugada");
+  const martin = porCorreo.get("martin@kash.test");
+  check(martin?.vigilado === false && martin?.dias?.length === 7, "argos: sin horario por semana, un turno cada día; libre de Cowork = no vigilado");
+  check(igual(porCorreo.get("ana@kash.test")?.dias, []), "argos: quien no tiene horario va con dias = []");
+  const dario = porCorreo.get("dario@kash.test");
+  check(dario?.dias?.length === 7 && dario?.dias?.[0]?.entro === true, "argos: alguien de la papelera que entró en el rango, con sus turnos de antes de irse");
+  const carlaBorrada = await uno(db, `select deleted_at is not null b from public.profiles where id = '${CARLA}'`);
+  check(carlaBorrada?.b === true && !porCorreo.has("carla@kash.test"), "argos: alguien de la papelera que no entró, no");
+  const ao = await argos(OLGA_K, "2026-11-02", "2026-11-08");
+  const deOlga = (ao.personas as Fila[]).map((p) => p.correo).sort();
+  check(igual(deOlga, ["pepe@otra.test", "quique@otra.test", "vera@otra.test"]), `argos: la key de la otra agencia ve solo a los suyos, sin su dueña (${deOlga})`);
+  check((ao.personas as Fila[]).find((p) => p.correo === "vera@otra.test")?.dias?.[0]?.entro === true, "argos: con lo de los suyos");
+  // Un turno en curso va marcado; uno que no empezó, no va.
+  const hoy = await uno(db, `select ((now() at time zone 'America/Bogota')::date - 1)::text a, ((now() at time zone 'America/Bogota')::date + 1)::text b`);
+  const ahora = await argos(DUENO_K6, hoy.a, hoy.b);
+  const nico = (ahora.personas as Fila[]).find((p) => p.correo === "nico@kash.test");
+  check(nico?.dias?.length === 1 && nico?.dias?.[0]?.en_curso === true && nico?.dias?.[0]?.entro === false, `argos: el turno en curso (${corto(nico?.dias)})`);
+  const futuros = (ahora.personas as Fila[]).flatMap((p) => p.dias as Fila[]).filter((d) => Date.parse(d.turno.inicio) > Date.now());
+  check(futuros.length === 0, "argos: ningún turno que todavía no empieza");
+  // La puerta y el rango, como horas y notas.
+  check(esError(await probar(db, DUENO_K6, `select public.api_equipo_argos('2026-01-01', '2026-04-04')`), /de 1 a 93/), "argos: más de 93 días, no");
+  check(esError(await probar(db, DUENO_K6, `select public.api_equipo_argos('2026-11-10', '2026-11-09')`), /de 1 a 93/), "argos: desde después de hasta, no");
+  check(esError(await probar(db, { persona: DUENO }, `select public.api_equipo_argos('2026-11-02', '2026-11-08')`), /api_sin_llave/), "argos: desde la app, no");
+  check(esError(await probar(db, { persona: ANA, key: K_ANA }, `select public.api_equipo_argos('2026-11-02', '2026-11-08')`), /api_equipo_sin_permiso/),
+    "argos: la key de alguien que no es admin, no");
+  const g = await uno(db, `select has_function_privilege('anon', 'public.api_equipo_argos(date, date)', 'execute') a,
+    has_function_privilege('authenticated', 'public.api_equipo_argos(date, date)', 'execute') u`);
+  check(g?.a === false && g?.u === true, "api_equipo_argos(date, date): authenticated sí (la función se cuida sola), anon no");
+  for (const f of ["vigilar_fuera_de_cowork()", "vigilar_tiempo_sin_pantalla()"]) {
+    const r = await uno(db, `select has_function_privilege('authenticated', 'public.${f}', 'execute') u`);
+    check(r?.u === false, `la app no ejecuta ${f}`);
   }
 }
 

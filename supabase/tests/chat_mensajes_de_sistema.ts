@@ -134,6 +134,12 @@ const NO_CARGAN_AQUI: Record<string, string> = {
     "RR. HH. recibe copia de los avisos de vigilancia (se salió de Cowork) y se le prende el push. Entra a esta " +
     "cadena solo porque su vigía inserta avisos en notifications, pero usa las tablas del reloj de Cowork y " +
     "es_admin_o_dueno, que este fixture no trae; no toca nada del Messenger.",
+  "20261114000000_equipo_horario_semana_y_argos.sql":
+    "Horario por semana desde la plataforma (horario_semanal, turno_del_dia), los vigías de Argos y " +
+    "GET /equipo/argos. Entra a esta cadena porque sus vigías insertan avisos en notifications y api_equipo_aplicar " +
+    "toca profiles y user_roles, pero usa las tablas de Cowork y de Argos, roles_config, rol_turnos, puede_vigilar " +
+    "y las RPC api_equipo_*, que este fixture no trae; no toca nada del Messenger. Se prueba en su propio banco, " +
+    "agencias_conectadas.ts.",
   "20261113240000_andrea_ve_todos_los_coworks.sql":
     "Cowork: anfitriones en todas las sesiones (Andrea, RR. HH.). Usa las tablas de Cowork y es_admin_o_dueno, " +
     "que este fixture no trae; no toca nada del Messenger.",

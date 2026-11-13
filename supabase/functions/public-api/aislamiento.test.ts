@@ -540,6 +540,7 @@ Deno.test("lo como_usuario escribe SOLO por estas RPC, una en cada handler, por 
     "current_tenant_id", "get_last_messages", "messenger_unread_counts", "api_mi_llave", "messenger_directorio", "api_escritura_habilitada",
     "api_messenger_enviar", "api_messenger_abrir_directo", "api_messenger_editar", "api_messenger_borrar",
     "api_equipo_estado", "api_equipo_aplicar", "api_equipo_roles", "api_equipo_pendientes", "api_equipo_horas", "api_equipo_notas",
+    "api_equipo_argos",
   ];
   assertEquals([...new Set(rpcs)].filter((r) => !PERMITIDAS.includes(r)), [], "una función de base no autorizada");
   assert(!/\.(from|rpc)\(\s*[^"\s]/.test(RECURSOS_USUARIO), "from()/rpc() con un nombre que no es literal");
@@ -559,7 +560,7 @@ Deno.test("lo como_usuario escribe SOLO por estas RPC, una en cada handler, por 
     api_escritura_habilitada: "personasDelDirectorio",
     api_equipo_estado: "estadoDelEquipo", api_equipo_aplicar: "sincronizarEquipo",
     api_equipo_roles: "sincronizarEquipo", api_equipo_pendientes: "sincronizarEquipo",
-    api_equipo_horas: "horasDelEquipo", api_equipo_notas: "notasDelEquipo",
+    api_equipo_horas: "horasDelEquipo", api_equipo_notas: "notasDelEquipo", api_equipo_argos: "argosDelEquipo",
   };
   for (const [rpc, handler] of Object.entries(DUENO)) {
     const llamadas = RECURSOS_USUARIO.match(new RegExp(`\\.rpc\\(\\s*"${rpc}"`, "g")) ?? [];
