@@ -107,6 +107,11 @@ const NO_CARGAN_AQUI: Record<string, string> = {
     "RR. HH. recibe copia de los avisos de vigilancia (se salió de Cowork) y se le prende el push. Entra a esta " +
     "cadena solo porque su vigía inserta avisos en notifications, pero usa las tablas del reloj de Cowork y " +
     "es_admin_o_dueno, que este fixture no trae; no toca nada del Messenger.",
+  "20261113200000_argos_tiempo_sin_pantalla.sql":
+    "Argos: aviso al pasarse del tiempo sin pantalla (40/70 min) y resumen al cerrar el turno. Entra a esta " +
+    "cadena solo porque su vigía inserta avisos en notifications, pero usa es_admin_o_dueno, turno_en_curso, " +
+    "horario_de, destinatarios_de_aviso, las tablas del reloj de Cowork y pg_cron, que este fixture no trae; " +
+    "no toca nada del Messenger.",
   "20261112210000_avisos_a_quien_le_llegan.sql":
     "Avisos del equipo con una sola regla (destinatarios_de_aviso) y equipos a cargo de un jefe. Entra a esta " +
     "cadena solo porque sus vigías insertan avisos en notifications, pero usa es_admin_o_dueno, equipo_de, " +
