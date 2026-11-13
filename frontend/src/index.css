@@ -122,14 +122,14 @@ All colors MUST be HSL. Light mode in :root, dark mode in .dark.
        No toca los botones (usan *-foreground: 0 0% 100%) ni el texto sobre
        fotos/video (text-white). Decisión de Alvaro (19/10): "todo un poco más
        suave, dos niveles". */
-    /* 89% → 84% (Alvaro, 13/11/2026: «el blanco de los nombres y títulos se roba
-       la vista»): lo fuerte sigue siendo lo más claro, sin encandilar. */
-    --foreground: 240 8% 82%;
+    /* 89% → 82% → 76% (Alvaro, 13/11/2026, dos veces: «las letras siguen robando
+       atención»): lo fuerte sigue siendo lo más claro, pero ya no encandila. */
+    --foreground: 240 7% 76%;
     /* Texto corriente un escalón bajo el fuerte (ver :root). */
-    --texto: 240 6% 71%;
+    --texto: 240 6% 66%;
 
     --card: 240 12% 7%;
-    --card-foreground: 240 6% 71%;
+    --card-foreground: 240 6% 66%;
 
     --popover: 240 12% 7%;
     --popover-foreground: 240 12% 89%;
@@ -141,7 +141,7 @@ All colors MUST be HSL. Light mode in :root, dark mode in .dark.
     --secondary-foreground: 240 12% 89%;
 
     --muted: 240 10% 12%;
-    --muted-foreground: 240 8% 61%;
+    --muted-foreground: 240 7% 57%;
 
     --accent: 268 76% 70%;
     --accent-foreground: 0 0% 100%;

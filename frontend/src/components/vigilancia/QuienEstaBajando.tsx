@@ -76,7 +76,7 @@ function FilaBajandoPulida({ f, t, onAbrir }: { f: FilaQuienBaja; t: Tr; onAbrir
         )}
       </span>
       <span className="flex min-w-0 flex-1 flex-col gap-1">
-        <span className="truncate text-[15px] font-semibold leading-tight text-foreground">{f.nombre || "—"}</span>
+        <span className="truncate text-[15px] font-medium leading-tight text-foreground/90">{f.nombre || "—"}</span>
         <span className="flex min-w-0 items-center gap-1.5 text-[13px] leading-tight text-muted-foreground">
           <span className={cn("h-1.5 w-1.5 shrink-0 rounded-full", PUNTO_ESTADO[f.estado] ?? "bg-destructive")} aria-hidden />
           <span className="truncate">{t(ETIQUETA_ESTADO[f.estado])}</span>
@@ -89,7 +89,7 @@ function FilaBajandoPulida({ f, t, onAbrir }: { f: FilaQuienBaja; t: Tr; onAbrir
         </span>
       </span>
       <span className="flex shrink-0 flex-col items-end pr-0.5" aria-label={t("vigilancia.nota.aria", { n: f.puntos })}>
-        <span className="font-display text-xl font-semibold leading-none tabular-nums text-foreground">{f.puntos}</span>
+        <span className="font-display text-lg font-medium leading-none tabular-nums text-foreground/85">{f.puntos}</span>
         <span className="mt-1 text-[11px] leading-none text-muted-foreground">{t("vigilancia.nota.corta")}</span>
       </span>
       <ChevronRight className="hidden h-4 w-4 shrink-0 text-muted-foreground/50 transition-transform group-hover:translate-x-0.5 sm:block" />
