@@ -31,7 +31,11 @@ import { FotoConZoom } from "@/components/hr/FotoConZoom";
 
 type Tono = "verde" | "ambar" | "rojo" | "neutro";
 type Frase = { k: TranslationKey; p?: Record<string, string | number> };
-interface Evidencia { id: string; createdAt: string; pantalla: CapturaDia | null; camara: CapturaDia | null; fueraDeLugar: boolean; veredicto: string | null; }
+type Etiqueta = "entrada" | "salida" | "cambio" | "poca";
+interface Evidencia { id: string; createdAt: string; pantalla: CapturaDia | null; camara: CapturaDia | null; fueraDeLugar: boolean; veredicto: string | null; etiqueta?: Etiqueta | null; }
+const ETIQUETA_LBL: Record<Etiqueta, TranslationKey> = {
+  entrada: "hr.exp.mgr.etq.entrada", salida: "hr.exp.mgr.etq.salida", cambio: "hr.exp.mgr.etq.cambio", poca: "hr.exp.mgr.etq.poca",
+};
 
 const PUNTO: Record<Tono, string> = { verde: "bg-success", ambar: "bg-warning", rojo: "bg-destructive", neutro: "bg-muted-foreground" };
 
@@ -132,7 +136,7 @@ function camaraDe(pantalla: CapturaDia, camaras: CapturaDia[], usadas: Set<strin
   return null;
 }
 
-const MAX_EVIDENCIAS = 6;
+const MAX_EVIDENCIAS = 8; // las IMPORTANTES (lo malo va aparte, hasta 9)
 
 export function TarjetaArgosPulida({ nombre, dia, horario }: {
   nombre: string;
@@ -155,12 +159,37 @@ export function TarjetaArgosPulida({ nombre, dia, horario }: {
       id: c.id, createdAt: c.createdAt, pantalla: c, camara: camaraDe(c, camaras, usadas),
       fueraDeLugar: c.fueraDeLugar === true && !c.perdonado, veredicto: c.veredicto,
     });
-    const evid: Evidencia[] = [...fuera.map(tomar)];
-    for (const c of juzgadas) {
-      if (evid.length >= MAX_EVIDENCIAS) break;
-      if (evid.some((e) => e.id === c.id)) continue;
-      evid.push(tomar(c));
+    // LO MALO → LO IMPORTANTE (Alvaro, 13/11/2026). Primero lo que hizo mal; luego
+    // lo importante del día: su entrada y su salida, cada cambio de programa y los
+    // momentos de menos atención (cara fuera de cuadro aunque no sea falla).
+    const malas: Evidencia[] = fuera.slice(0, 9).map(tomar);
+    const ya = new Set(malas.map((e) => e.id));
+    const asc = [...juzgadas].sort((a, b) => (a.createdAt < b.createdAt ? -1 : 1));
+    const elegidas: Array<{ c: CapturaDia; etq: Etiqueta }> = [];
+    const poner = (c: CapturaDia | undefined, etq: Etiqueta) => {
+      if (!c || ya.has(c.id) || elegidas.length >= MAX_EVIDENCIAS) return;
+      ya.add(c.id); elegidas.push({ c, etq });
+    };
+    poner(asc[0], "entrada");
+    poner(asc[asc.length - 1], "salida");
+    let prev: string | null = null, cambios = 0;
+    for (const c of asc) {
+      const { app, que } = separar(c.veredicto);
+      const n = appDe(app ?? que).nombre || null;
+      if (prev && n && n !== prev && cambios < 4) { const antes = elegidas.length; poner(c, "cambio"); if (elegidas.length > antes) cambios++; }
+      if (n) prev = n;
     }
+    let pocas = 0;
+    for (const c of asc) {
+      if (pocas >= 2) break;
+      const t0 = Date.parse(c.createdAt);
+      const sinCara = camaras.some((k) => k.caraVisible === false && Math.abs(Date.parse(k.createdAt) - t0) <= 90_000);
+      if (sinCara) { const antes = elegidas.length; poner(c, "poca"); if (elegidas.length > antes) pocas++; }
+    }
+    const importantes: Evidencia[] = elegidas
+      .sort((a, b) => (a.c.createdAt < b.c.createdAt ? -1 : 1))
+      .map(({ c, etq }) => ({ ...tomar(c), etiqueta: etq }));
+    const evid: Evidencia[] = [...malas, ...importantes];
 
     const conteo = new Map<string, number>();
     for (const c of juzgadas) for (const s of sistemasDe(c.veredicto!)) conteo.set(s, (conteo.get(s) ?? 0) + 1);
@@ -176,11 +205,18 @@ export function TarjetaArgosPulida({ nombre, dia, horario }: {
     const ultCap = dia.capturas.reduce((mx, c) => (c.createdAt > mx ? c.createdAt : mx), "");
     const enSala = dia.fecha === hoyB && !!ultCap && Date.now() - Date.parse(ultCap) < 5 * 60_000;
 
-    const titular: Frase = banda === "bien" ? { k: "hr.exp.mgr.bien", p: { n: nom } }
+    // ¿Debía estar trabajando y no ha entrado? Eso es lo primero (Alvaro, 13/11:
+    // «está supuesto a trabajar… no puede decir "no hay con qué juzgar"»).
+    const ahoraMin = (() => { const [h, m] = (hhmm(new Date().toISOString()) ?? "0:0").split(":").map(Number); return h * 60 + m; })();
+    const entMin = (() => { if (!horario.entrada) return null; const [h, m] = horario.entrada.split(":").map(Number); return h * 60 + m; })();
+    const noEntro = dia.fecha === hoyB && !dia.entroAt && entMin != null && ahoraMin > entMin + 5;
+    const tarde = noEntro ? ahoraMin - entMin! : 0;
+    const titular: Frase = noEntro ? { k: "hr.exp.mgr.noEntro", p: { n: nom, h: horario.entrada!, d: tarde < 60 ? `${tarde} min` : `${Math.floor(tarde / 60)} h ${String(tarde % 60).padStart(2, "0")} min` } }
+      : banda === "bien" ? { k: "hr.exp.mgr.bien", p: { n: nom } }
       : banda === "ojo" ? { k: "hr.exp.mgr.ojo", p: { n: nom } }
       : banda === "mal" ? { k: "hr.exp.mgr.mal", p: { n: nom } }
       : { k: "hr.exp.mgr.sindatos", p: { n: nom } };
-    const tono: Tono = banda === "bien" ? "verde" : banda === "ojo" ? "ambar" : banda === "mal" ? "rojo" : "neutro";
+    const tono: Tono = noEntro ? "rojo" : banda === "bien" ? "verde" : banda === "ojo" ? "ambar" : banda === "mal" ? "rojo" : "neutro";
 
     // Hechos cortos (reemplazan el párrafo): cada uno con su color semántico.
     const hechos: Array<{ k: TranslationKey; p?: Record<string, string | number>; tono: "neutro" | "rojo" | "ambar" }> = [];
@@ -192,7 +228,7 @@ export function TarjetaArgosPulida({ nombre, dia, horario }: {
     if (fPant != null && fPant < 50) hechos.push({ k: "hr.exp.mgr.hecho.pantalla", p: { pct: Math.round(fPant) }, tono: "ambar" });
     if (fCam != null && fCam < 50) hechos.push({ k: "hr.exp.mgr.hecho.camara", p: { pct: Math.round(fCam) }, tono: "ambar" });
 
-    return { nom, tono, titular, hechos, sistemas, evid, hayFuera: fuera.length > 0, hayJuicio: juzgadas.length > 0 };
+    return { nom, tono, titular, hechos, sistemas, evid, malas, importantes, hayFuera: fuera.length > 0, hayJuicio: juzgadas.length > 0 };
   }, [nombre, dia, horario]);
 
   // Firmar las URLs de las miniaturas de evidencia (buzón + NAS).
@@ -258,14 +294,9 @@ export function TarjetaArgosPulida({ nombre, dia, horario }: {
           </div>
         )}
 
-        {/* La evidencia a la vista: miniaturas de lo que Argos vio. */}
-        {r.evid.length > 0 && (
-          <div className="mt-6">
-            <p className="mb-3 flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
-              <Sparkles className="h-3.5 w-3.5" />{t("hr.exp.mgr.loQueVio")}
-            </p>
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4">
-              {r.evid.map((e) => {
+        {/* La evidencia a la vista: primero LO QUE HIZO MAL, luego LO IMPORTANTE. */}
+        {(() => {
+          const tarjeta = (e: Evidencia) => {
                 const up = miniPantalla(e), uc = miniCamara(e);
                 const hora = a12(format(new Date(e.createdAt), "HH:mm"));
                 const { app, que } = separar(e.veredicto);
@@ -285,7 +316,7 @@ export function TarjetaArgosPulida({ nombre, dia, horario }: {
                           Adentro, en el visor, la foto va limpia y con zoom. */}
                       <div className="pointer-events-none absolute inset-0 bg-black/45 transition-opacity duration-300 group-hover:opacity-30" aria-hidden />
                       {/* Arriba: la hora (izquierda) y la cámara (derecha). */}
-                      <span className="absolute left-2 top-2 rounded-full bg-black/50 px-2 py-0.5 text-[10px] font-medium tabular-nums text-white/95 ring-1 ring-white/10 backdrop-blur-md">{hora}</span>
+                      <span className="absolute left-2 top-2 rounded-full bg-black/50 px-2 py-0.5 text-[10px] font-medium tabular-nums text-white/95 ring-1 ring-white/10 backdrop-blur-md">{hora}{e.etiqueta ? ` · ${t(ETIQUETA_LBL[e.etiqueta])}` : ""}</span>
                       <div className="absolute right-2 top-2 h-9 w-14 overflow-hidden rounded-[6px] border border-white/40 shadow-md sm:h-10 sm:w-16">
                         {e.camara ? (uc ? <img src={uc} alt="" loading="lazy" onError={() => reFirmar(e.camara)} className="h-full w-full object-cover" /> : <div className="flex h-full w-full items-center justify-center bg-muted/60"><Loader2 className="h-3 w-3 animate-spin text-muted-foreground" /></div>)
                           : <div className="flex h-full w-full items-center justify-center bg-black/70 text-white/80"><CameraOff className="h-3.5 w-3.5" /></div>}
@@ -308,10 +339,28 @@ export function TarjetaArgosPulida({ nombre, dia, horario }: {
                     </div>
                   </button>
                 );
-              })}
-            </div>
-          </div>
-        )}
+              };
+          return (
+            <>
+              {r.malas.length > 0 && (
+                <div className="mt-6">
+                  <p className="mb-3 flex items-center gap-1.5 text-xs font-semibold text-foreground/85">
+                    <span className="h-1.5 w-1.5 rounded-full bg-destructive" aria-hidden />{t("hr.exp.mgr.loMalo", { n: r.malas.length })}
+                  </p>
+                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4">{r.malas.map(tarjeta)}</div>
+                </div>
+              )}
+              {r.importantes.length > 0 && (
+                <div className="mt-6">
+                  <p className="mb-3 flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+                    <Sparkles className="h-3.5 w-3.5" />{t("hr.exp.mgr.loImportante")}
+                  </p>
+                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4">{r.importantes.map(tarjeta)}</div>
+                </div>
+              )}
+            </>
+          );
+        })()}
 
         {/* Dónde pasó el tiempo: las mismas pastillas neutras. */}
         {r.sistemas.length > 0 && (

@@ -79,7 +79,6 @@ function construirMomentos(capturas: CapturaDia[]): Momento[] {
   return momentos.sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
 }
 
-const TOPE_MOMENTOS = 72; // lo más reciente primero; el resto se cuenta aparte
 
 // La TIRA de pantallazos del día (modelo Hubstaff): agrupada por hora, cada
 // momento con su pantalla grande y su cámara pegada en la esquina. Firma las URLs
@@ -101,7 +100,19 @@ function TiraDelDia({ capturas, t }: { capturas: CapturaDia[]; t: Tr }) {
     camara: momentos.filter(sinCamaraMom).length,
     pantalla: momentos.filter((m) => !m.pantalla).length,
   }), [momentos]);
-  const visibles = useMemo(() => momentos.filter((m) => pasaFiltro(m, filtro)).slice(0, TOPE_MOMENTOS), [momentos, filtro]);
+  const filtrados = useMemo(() => momentos.filter((m) => pasaFiltro(m, filtro)), [momentos, filtro]);
+  const horaDe = (m: Momento) => format(new Date(m.createdAt), "h a", { locale: es });
+  // Horas abiertas: las que tienen algo malo y la más reciente; el resto se abre
+  // al tocar su hora (así no se firman cientos de fotos de una vez).
+  const [abiertas, setAbiertas] = useState<Set<string>>(new Set());
+  useEffect(() => {
+    const s = new Set<string>();
+    if (filtrados[0]) s.add(horaDe(filtrados[0]));
+    for (const m of filtrados) if (m.fueraDeLugar === true) s.add(horaDe(m));
+    setAbiertas(s);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [capturas, filtro]);
+  const visibles = useMemo(() => filtrados.filter((m) => abiertas.has(horaDe(m))), [filtrados, abiertas]);
   const [urls, setUrls] = useState<Record<string, string>>({});
 
   // Si una miniatura del buzón falla (p. ej. la firma venció tras una sesión
@@ -163,9 +174,9 @@ function TiraDelDia({ capturas, t }: { capturas: CapturaDia[]; t: Tr }) {
     );
   }
 
-  // Agrupar por hora (lo más reciente primero).
+  // Agrupar por hora (lo más reciente primero): TODAS las horas del filtro.
   const grupos: Array<{ hora: string; items: Momento[] }> = [];
-  for (const m of visibles) {
+  for (const m of filtrados) {
     const hora = format(new Date(m.createdAt), "h a", { locale: es });
     const ult = grupos[grupos.length - 1];
     if (ult && ult.hora === hora) ult.items.push(m);
@@ -188,19 +199,29 @@ function TiraDelDia({ capturas, t }: { capturas: CapturaDia[]; t: Tr }) {
             key={c.k}
             type="button"
             onClick={() => setFiltro(c.k)}
-            className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition ${filtro === c.k ? "border-primary/50 bg-primary/10 text-primary" : "border-border/50 text-muted-foreground hover:bg-foreground/5"}`}
+            className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition ${filtro === c.k ? "border-foreground/30 bg-foreground/10 text-foreground" : "border-border/50 text-muted-foreground hover:bg-foreground/5"}`}
           >
             {c.lbl}
-            {c.n != null && c.n > 0 && <span className={`rounded-full px-1.5 py-0.5 text-[10px] tabular-nums ${filtro === c.k ? "bg-primary/20" : "bg-warning/20 text-warning"}`}>{c.n}</span>}
+            {c.n != null && c.n > 0 && <span className="rounded-full bg-foreground/10 px-1.5 py-0.5 text-[10px] tabular-nums text-foreground/85">{c.n}</span>}
           </button>
         ))}
       </div>
 
-      {visibles.length === 0 ? (
+      {filtrados.length === 0 ? (
         <p className="py-10 text-center text-sm text-muted-foreground">{t("hr.exp.filtroVacio")}</p>
-      ) : grupos.map((g) => (
+      ) : grupos.map((g) => {
+        const abierta = abiertas.has(g.hora);
+        const malos = g.items.filter((m) => m.fueraDeLugar === true).length;
+        return (
         <div key={g.hora}>
-          <p className="mb-2 text-xs font-semibold text-muted-foreground">{g.hora}</p>
+          <button type="button" onClick={() => setAbiertas((v) => { const n = new Set(v); if (n.has(g.hora)) n.delete(g.hora); else n.add(g.hora); return n; })}
+            className="mb-2 flex w-full items-center gap-2 rounded-lg px-1 py-1 text-left text-xs font-semibold text-muted-foreground transition hover:text-foreground">
+            <ChevronRight className={`h-3.5 w-3.5 transition-transform ${abierta ? "rotate-90" : ""}`} />
+            <span className="text-foreground/85">{g.hora}</span>
+            <span className="font-normal tabular-nums">· {t("hr.exp.fotosN", { n: g.items.length })}</span>
+            {malos > 0 && <span className="inline-flex items-center gap-1 font-medium text-foreground/85"><span className="h-1.5 w-1.5 rounded-full bg-destructive" aria-hidden />{t("hr.exp.fueraN", { n: malos })}</span>}
+          </button>
+          {abierta && (
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-5">
             {g.items.map((m) => {
               const urlP = m.pantalla ? urls[claveFoto(m.pantalla)!] : undefined;
@@ -254,11 +275,10 @@ function TiraDelDia({ capturas, t }: { capturas: CapturaDia[]; t: Tr }) {
               );
             })}
           </div>
+          )}
         </div>
-      ))}
-      {momentos.length > visibles.length && (
-        <p className="text-[11px] text-muted-foreground">{t("hr.exp.masCapturas", { n: momentos.length - visibles.length })}</p>
-      )}
+        );
+      })}
 
       {/* ── Pop-up: pantalla (1) grande + cámara (2) flotante, con su minuto exacto ── */}
       {visorIdx !== null && visibles[visorIdx] && (() => {
@@ -848,6 +868,8 @@ export default function HRExpediente() {
     const ok = juzgadas.filter((x) => x.fueraDeLugar !== true || x.perdonado).length;
     return { pct: Math.round((ok / juzgadas.length) * 100), ok, n: juzgadas.length };
   }, [dia]);
+  const permitidoMin = expediente?.permitidoMin ?? 40;
+  const sinPantallaMin = Math.round(((dia.segSinPantalla ?? 0) + (dia.segPausa ?? 0) + (dia.segSinConexion ?? 0)) / 60 + (dia.minFueraCowork ?? 0));
   const tonoAt = atencion == null ? "" : atencion.pct >= 80 ? "text-success" : atencion.pct >= 60 ? "text-warning" : "text-destructive";
   const diaTexto = esHoy ? t("hr.exp.hoy") : format(new Date(diaSel + "T12:00:00"), "EEEE d 'de' MMMM", { locale: es });
 
@@ -941,9 +963,13 @@ export default function HRExpediente() {
           {/* Stats del día. Pulido: casillas neutras (filo fino, radio 10), la cifra
               en blanco y la etiqueta arriba en gris; lo flojo, solo un puntito. */}
           {pulido ? (
-          <div className="mt-4 grid grid-cols-3 gap-2 sm:grid-cols-5">
+          <div className="mt-4 grid grid-cols-3 gap-2 lg:grid-cols-6">
             {[
               { k: "hr.exp.nota" as const, v: dia.nota.valor != null ? String(dia.nota.valor) : "—", punto: null },
+              // Sin pantalla (Alvaro, 13/11/2026): pausas + sin compartir + sin conexión +
+              // fuera de Cowork, contra lo permitido (40 chats, 70 el resto).
+              { k: "hr.exp.sinPantallaTile" as const, p: { n: permitidoMin }, v: `${sinPantallaMin} min`,
+                punto: sinPantallaMin > permitidoMin ? "bg-destructive" : sinPantallaMin > permitidoMin * 0.8 ? "bg-warning" : null },
               { k: "hr.exp.atencion" as const, v: atencion ? `${atencion.pct}%` : "—", punto: atencion == null ? null : atencion.pct < 60 ? "bg-destructive" : atencion.pct < 80 ? "bg-warning" : null, title: atencion ? t("hr.exp.atencionDetalle", { ok: atencion.ok, n: atencion.n }) : undefined },
               { k: "hr.exp.horas" as const, v: `${dia.horas.toFixed(1)}h`, punto: null },
               { k: "hr.exp.faltas" as const, v: String(dia.faltas.length), punto: null },
@@ -952,7 +978,7 @@ export default function HRExpediente() {
               <div key={x.k} title={"title" in x ? x.title : undefined} className="rounded-[10px] border border-border/60 bg-card/30 px-3 py-2.5">
                 <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
                   {x.punto && <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${x.punto}`} aria-hidden />}
-                  <span className="truncate">{t(x.k)}</span>
+                  <span className="truncate">{"p" in x && x.p ? t(x.k, x.p) : t(x.k)}</span>
                 </div>
                 <div className="mt-1 font-display text-xl font-semibold tabular-nums leading-tight text-foreground">{x.v}</div>
               </div>
@@ -990,39 +1016,12 @@ export default function HRExpediente() {
           (Alvaro, 09/11). Reemplaza las barras abiertas de pantalla/cámara. */}
       <TarjetaArgos nombre={nombre} dia={dia} horario={expediente?.horario ?? { entrada: null, salida: null }} />
 
-      {/* Asistencia + el desglose técnico, ya COLAPSADO: el perfil abre limpio y
-          el detalle (pantalla/cámara/atención) se abre solo si se quiere. */}
-      <section className="vidrio sube mt-4 p-4 lg:p-5">
-        <div className="v-cont">
-          {expediente && <AsistenciaDia horario={expediente.horario} dia={dia} userId={userId} nombre={nombre} t={t} />}
-
-          <button
-            type="button"
-            onClick={() => setVerDesglose((v) => !v)}
-            className="mt-3 flex w-full items-center justify-between rounded-2xl border border-border/40 bg-card/20 px-3.5 py-2.5 text-xs font-semibold text-muted-foreground transition hover:bg-card/40"
-          >
-            <span className="flex items-center gap-2"><Gauge className="h-3.5 w-3.5 text-primary" />{verDesglose ? t("hr.exp.ocultarDesglose") : t("hr.exp.verDesglose")}</span>
-            <ChevronDown className={`h-4 w-4 transition-transform ${verDesglose ? "rotate-180" : ""}`} />
-          </button>
-          {verDesglose && (
-            <div className="mt-2 rounded-2xl border border-border/40 bg-card/20 p-3.5">
-              <DesgloseNotaContenido dia={dia} atencion={atencion} t={t} compacto />
-            </div>
-          )}
-        </div>
-      </section>
-
-      {/* Videos de Argos del día (si los hubo). Se esconde solo si no hay. */}
-      {userId && <ClipsDelDia userId={userId} fecha={dia.fecha} />}
-
-      {/* Qué le dijo Argos ese día: cronología de nudges (Alvaro, 09/11). */}
-      {userId && <AvisosDeArgos userId={userId} fecha={dia.fecha} />}
-
-      {/* La tira de pantallazos del día (Hubstaff) */}
+      {/* TODO EL DÍA, justo debajo de Argos (Alvaro, 13/11/2026: «no puedo ver los
+          pantallazos de todo el día»): todas las fotos por hora, sin tope. */}
       <section className="vidrio sube mt-5 p-4 lg:p-5" style={{ animationDelay: "0.05s" }}>
         <div className="v-cont">
           <p className="mb-3 flex items-center gap-1.5 text-xs font-semibold text-muted-foreground">
-            <ScreenShare className="h-3.5 w-3.5" />{t("hr.exp.pantallazosDia")}
+            <ScreenShare className="h-3.5 w-3.5" />{t("hr.exp.todoElDia")}
           </p>
           {error ? (
             <div className="flex flex-col items-center gap-2 py-12 text-center text-muted-foreground"><AlertTriangle className="h-7 w-7 text-destructive/70" /><p className="text-sm">{t("hr.exp.error")}</p></div>
@@ -1055,6 +1054,35 @@ export default function HRExpediente() {
           )}
         </div>
       </section>
+
+      {/* Asistencia + el desglose técnico, ya COLAPSADO: el perfil abre limpio y
+          el detalle (pantalla/cámara/atención) se abre solo si se quiere. */}
+      <section className="vidrio sube mt-4 p-4 lg:p-5">
+        <div className="v-cont">
+          {expediente && <AsistenciaDia horario={expediente.horario} dia={dia} userId={userId} nombre={nombre} t={t} />}
+
+          <button
+            type="button"
+            onClick={() => setVerDesglose((v) => !v)}
+            className="mt-3 flex w-full items-center justify-between rounded-2xl border border-border/40 bg-card/20 px-3.5 py-2.5 text-xs font-semibold text-muted-foreground transition hover:bg-card/40"
+          >
+            <span className="flex items-center gap-2"><Gauge className="h-3.5 w-3.5 text-primary" />{verDesglose ? t("hr.exp.ocultarDesglose") : t("hr.exp.verDesglose")}</span>
+            <ChevronDown className={`h-4 w-4 transition-transform ${verDesglose ? "rotate-180" : ""}`} />
+          </button>
+          {verDesglose && (
+            <div className="mt-2 rounded-2xl border border-border/40 bg-card/20 p-3.5">
+              <DesgloseNotaContenido dia={dia} atencion={atencion} t={t} compacto />
+            </div>
+          )}
+        </div>
+      </section>
+
+      {/* Videos de Argos del día (si los hubo). Se esconde solo si no hay. */}
+      {userId && <ClipsDelDia userId={userId} fecha={dia.fecha} />}
+
+      {/* Qué le dijo Argos ese día: cronología de nudges (Alvaro, 09/11). */}
+      {userId && <AvisosDeArgos userId={userId} fecha={dia.fecha} />}
+
     </Page>
   );
 }

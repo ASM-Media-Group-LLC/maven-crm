@@ -24,6 +24,11 @@ export interface DiaExpediente {
   segSinPantalla?: number;
   segSinCamara?: number;
   segFueraCamara?: number;
+  // Lo que suma «sin pantalla» (Alvaro, 13/11/2026: «cuánto lleva sin pantalla en
+  // las 8 horas; solo tiene lo del almuerzo»): pausas, sin conexión y fuera de Cowork.
+  segPausa?: number;
+  segSinConexion?: number;
+  minFueraCowork?: number;
   // Asistencia del día (Alvaro 05/11): entró y salió reales + comparado al horario.
   entroAt?: string | null;  // ISO
   salioAt?: string | null;  // ISO
@@ -35,6 +40,8 @@ export interface Expediente {
   avatarSeed: string | null;
   /** Horario asignado (entrada/salida HH:MM) para comparar entró/salió reales. */
   horario: { entrada: string | null; salida: string | null };
+  /** Minutos permitidos sin pantalla (comida + baño): 40 el grupo de chats, 70 el resto. */
+  permitidoMin: number;
   dias: Map<string, DiaExpediente>;  // por YYYY-MM-DD
 }
 
@@ -65,6 +72,11 @@ export function useExpedienteEmpleado(userId: string | null, anio: number, mes: 
       const inicioISO = `${desde}T00:00:00-05:00`;
       const finISO = `${hasta}T23:59:59-05:00`;
 
+      // Fuera de Cowork en su turno: va aparte del Promise.all (con un elemento más,
+      // TypeScript se ahoga infiriendo la tupla).
+      type FilaFuera = { desde: string; hasta: string | null };
+      const fueraP = (supabase as unknown as { from: (t: string) => { select: (c: string) => { eq: (k: string, v: string) => { gte: (k: string, v: string) => { lte: (k: string, v: string) => { limit: (n: number) => Promise<{ data: FilaFuera[] | null }> } } } } } })
+        .from("cowork_fuera").select("desde, hasta").eq("user_id", userId!).gte("desde", inicioISO).lte("desde", finISO).limit(1000);
       const [perfRes, tiempoRes, eventosRes, pausasRes, capturasRes, exo, rolesRes, horarioRes] = await Promise.all([
         supabase.from("profiles").select("full_name, avatar_url, avatar_seed").eq("id", userId!).maybeSingle(),
         db.rpc("cowork_tiempo_diario", { _desde: desde, _hasta: hasta, _user_id: userId, _limit: 100, _offset: 0 }),
@@ -75,6 +87,7 @@ export function useExpedienteEmpleado(userId: string | null, anio: number, mes: 
         (supabase as unknown as { from: (t: string) => { select: (c: string) => { eq: (k: string, v: string) => Promise<{ data: Array<{ role: string }> | null }> } } }).from("user_roles").select("role").eq("user_id", userId!),
         cargarHorarios([userId!]),
       ]);
+      const fueraRes = await fueraP;
       // ¿Exonerado de cámara/pantalla? (por persona o por rol) → no se califica en esos factores.
       const rolesUser = new Set(((rolesRes.data ?? []) as Array<{ role: string }>).map((r) => r.role));
       const exentoCamPant = esExento(exo, userId!, rolesUser);
@@ -84,12 +97,12 @@ export function useExpedienteEmpleado(userId: string | null, anio: number, mes: 
       const dias = new Map<string, DiaExpediente>();
       const asegura = (f: string): DiaExpediente => {
         let d = dias.get(f);
-        if (!d) { d = { fecha: f, horas: 0, faltas: [], minutosPausaDeMas: 0, capturas: [], segActivo: 0, segSinPantalla: 0, segSinCamara: 0, segFueraCamara: 0, nota: { valor: null, banda: null, factores: [] } }; dias.set(f, d); }
+        if (!d) { d = { fecha: f, horas: 0, faltas: [], minutosPausaDeMas: 0, capturas: [], segActivo: 0, segSinPantalla: 0, segSinCamara: 0, segFueraCamara: 0, segPausa: 0, segSinConexion: 0, minFueraCowork: 0, nota: { valor: null, banda: null, factores: [] } }; dias.set(f, d); }
         return d;
       };
 
       // segundos por estado por día (para la nota) + horas de trabajo + entró/salió
-      for (const r of (tiempoRes.data ?? []) as Array<{ dia: string; seg_activo: number | string; seg_sin_pantalla?: number | string; seg_sin_camara?: number | string; seg_fuera_de_camara?: number | string; primer_ingreso?: string | null; ultima_salida?: string | null }>) {
+      for (const r of (tiempoRes.data ?? []) as Array<{ dia: string; seg_activo: number | string; seg_sin_pantalla?: number | string; seg_sin_camara?: number | string; seg_fuera_de_camara?: number | string; seg_pausa?: number | string; seg_sin_conexion?: number | string; seg_sin_conexion_larga?: number | string; primer_ingreso?: string | null; ultima_salida?: string | null }>) {
         const f = r.dia?.slice(0, 10);
         if (!f) continue;
         const d = asegura(f);
@@ -97,9 +110,19 @@ export function useExpedienteEmpleado(userId: string | null, anio: number, mes: 
         d.segSinPantalla = Number(r.seg_sin_pantalla ?? 0);
         d.segSinCamara = Number(r.seg_sin_camara ?? 0);
         d.segFueraCamara = Number(r.seg_fuera_de_camara ?? 0);
+        d.segPausa = Number(r.seg_pausa ?? 0);
+        d.segSinConexion = Number(r.seg_sin_conexion ?? 0) + Number(r.seg_sin_conexion_larga ?? 0);
         d.horas = (d.segActivo + d.segSinPantalla + d.segSinCamara + d.segFueraCamara) / 3600;
         d.entroAt = r.primer_ingreso ?? null;
         d.salioAt = r.ultima_salida ?? null;
+      }
+      // fuera de Cowork en su turno, por día (minutos; si sigue abierto, hasta ahora)
+      for (const x of (fueraRes.data ?? [])) {
+        const ini = Date.parse(x.desde);
+        const fin = x.hasta ? Date.parse(x.hasta) : Date.now();
+        if (!Number.isFinite(ini) || fin <= ini) continue;
+        const d = asegura(diaDe(x.desde));
+        d.minFueraCowork = (d.minFueraCowork ?? 0) + Math.round((fin - ini) / 60_000);
       }
       // faltas por día
       for (const e of (eventosRes.data ?? []) as Array<{ id: string; tipo: string; fuente: string; detalle: string | null; captura_path: string | null; created_at: string }>) {
@@ -147,6 +170,7 @@ export function useExpedienteEmpleado(userId: string | null, anio: number, mes: 
         avatarUrl: p?.avatar_url ?? null,
         avatarSeed: p?.avatar_seed ?? null,
         horario: { entrada: toHHMM(horarioUser.entrada), salida: toHHMM(horarioUser.salida) },
+        permitidoMin: Math.round(horarioUser.exentoSeg / 60),
         dias,
       };
     },
