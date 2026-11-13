@@ -144,6 +144,10 @@ const NO_TOCAN_EL_MESSENGER: Record<string, string> = {
     "RR. HH. recibe copia de los avisos de vigilancia (se salió de Cowork) y se le prende el push. Entra a esta " +
     "cadena solo porque su vigía inserta avisos en notifications, pero usa las tablas del reloj de Cowork y " +
     "es_admin_o_dueno, que este fixture no trae; no toca nada del Messenger.",
+  "20261112210000_avisos_a_quien_le_llegan.sql":
+    "Avisos del equipo con una sola regla (destinatarios_de_aviso) y equipos a cargo de un jefe. Entra a esta " +
+    "cadena solo porque sus vigías insertan avisos en notifications, pero usa es_admin_o_dueno, equipo_de, " +
+    "tenant_owners y las tablas del reloj de Cowork, que este fixture no trae; no toca nada del Messenger.",
   "20261111210000_monitoreo_en_vivo.sql":
     "Monitoreo en vivo: los avisos de «se salió de Cowork» abren la vista en vivo, «Revisado ✓» y «Avisarle» por " +
     "RPC, y supervisores/RR. HH. ven las fotos de su gente. Entra a esta cadena solo porque su vigía inserta avisos " +
