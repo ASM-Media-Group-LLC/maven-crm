@@ -42,3 +42,60 @@ export async function cerrarNudge(uid: string, tipo: TipoNudge): Promise<void> {
       .eq("user_id", uid).eq("tipo", tipo).is("cerrado_at", null);
   } catch { /* ignore */ }
 }
+
+// ── Al 3er llamado: «te estoy reportando» (Alvaro, 13/11/2026) ───────────────
+// Dentro de Cowork, si la persona no hace caso a 3 llamados seguidos, Argos se lo
+// dice y el reporte SALE de verdad a sus jefes (argos_reportarme, que lo vuelve a
+// mandar cada 10 min si sigue igual). Las frases son habladas: van en español,
+// como las demás de la voz de Argos.
+
+/** Llamado desde el que Argos dice que la reporta (y la reporta). */
+export const LLAMADO_DE_REPORTE = 3;
+
+const FRASES_REPORTE: Record<TipoNudge, string[]> = {
+  camara_apagada: [
+    "Te estoy reportando con tu supervisor: sigues con la cámara apagada. Enciéndela ya o márcate en pausa.",
+    "Ya le avisé a tu supervisor. Enciende la cámara ahora.",
+  ],
+  fuera_cuadro: [
+    "Te estoy reportando con tu supervisor: no te veo en la cámara. Ponte frente a la cámara ya.",
+    "Ya le avisé a tu supervisor. Vuelve a ponerte frente a la cámara.",
+  ],
+  sin_pantalla: [
+    "Te estoy reportando con tu supervisor: sigues sin compartir pantalla. Compártela ya.",
+    "Ya le avisé a tu supervisor. Comparte tu pantalla ahora.",
+  ],
+};
+
+/** La frase del llamado `n` (desde el 3ro) de este problema. */
+export function fraseDeReporte(tipo: TipoNudge, n: number): string {
+  const lista = FRASES_REPORTE[tipo];
+  return lista[Math.max(0, n - LLAMADO_DE_REPORTE) % lista.length];
+}
+
+/** Avisa a sus jefes que no hizo caso. El servidor decide si toca (cada 10 min
+ *  como mucho) y a quién; si falla, el llamado igual sonó. */
+export async function reportarme(tipo: TipoNudge): Promise<void> {
+  try {
+    await (supabase as unknown as { rpc: (f: string, a: Record<string, unknown>) => Promise<unknown> })
+      .rpc("argos_reportarme", { _tipo: tipo });
+  } catch { /* el llamado ya se hizo; el próximo lo vuelve a intentar */ }
+}
+
+/** Lo que Argos le dice a quien está FUERA de Cowork en su turno, por llamado
+ *  (lo cuenta el servidor, cada 2 min). Desde el 3ro, que la está reportando. */
+export function fraseFueraDeCowork(n: number, nuncaEntro: boolean): string {
+  if (n >= LLAMADO_DE_REPORTE) {
+    return nuncaEntro
+      ? "Te estoy reportando con tu supervisor: no has entrado a Cowork. Entra ya."
+      : "Te estoy reportando con tu supervisor: sigues fuera de Cowork. Entra ya.";
+  }
+  if (n === 2) {
+    return nuncaEntro
+      ? "Sigues sin entrar a Cowork. Entra ya, por favor."
+      : "Sigues fuera de Cowork. Vuelve a entrar ya, por favor.";
+  }
+  return nuncaEntro
+    ? "Ya empezó tu turno y no has entrado a Cowork. Entra ahora, con cámara y pantalla."
+    : "Estás fuera de Cowork y estás en tu turno. Entra ya, con cámara y pantalla.";
+}

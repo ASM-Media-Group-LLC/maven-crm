@@ -284,6 +284,13 @@ export const internos = {
     en: "Get in front of the camera. If you need to step away, use the pause button.",
   },
   "int.face.noScreen": { es: "No estás compartiendo pantalla", en: "You're not sharing your screen" },
+  "int.face.reportando": { es: "Te estoy reportando con tu supervisor", en: "I'm reporting you to your supervisor" },
+  "int.argosFuera.titulo": { es: "Estás fuera de Cowork en tu turno", en: "You're out of Cowork during your shift" },
+  "int.argosFuera.tituloNoEntro": { es: "Ya empezó tu turno y no has entrado a Cowork", en: "Your shift started and you haven't joined Cowork" },
+  "int.argosFuera.lleva": { es: "Llevas {n} min fuera. Mientras estés fuera cuenta en tu nota.", en: "You've been out for {n} min. It counts against your score while you're out." },
+  "int.argosFuera.debiaEntrar": { es: "Tu turno empezó a las {h}. Entra con cámara y pantalla.", en: "Your shift started at {h}. Join with camera and screen." },
+  "int.argosFuera.reportado": { es: "Argos ya le avisó a tu supervisor.", en: "Argos already notified your supervisor." },
+  "int.argosFuera.entrar": { es: "Entrar a Cowork", en: "Join Cowork" },
   "int.face.noScreenDesc": {
     es: "Compartir pantalla es obligatorio durante tu turno.",
     en: "Screen sharing is required during your shift.",
