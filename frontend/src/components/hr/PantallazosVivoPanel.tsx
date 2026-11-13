@@ -6,7 +6,7 @@ import { UserAvatar } from "@/components/UserAvatar";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { useCapturasVivo, type PersonaVivo } from "@/hooks/useCapturasVivo";
 import { useSemaforos, PUNTO_SEM, type Semaforo } from "@/hooks/useSemaforos";
-import { fraseCorta, separar } from "@/components/hr/TarjetaArgos";
+import { separar } from "@/components/hr/TarjetaArgos";
 
 // LA MURALLA EN VIVO de Argos (modelo Hubstaff): las FOTOS de lo que pasa en los
 // últimos minutos, con identidad propia de MURAL — NO es la lista de Conectados
@@ -217,23 +217,22 @@ function SelloEstado({ p, t, sem, chico }: { p: PersonaVivo; t: Tr; sem: Semafor
   );
 }
 
-// ── Vista MURALLA (12/11/2026: «cada cuadrito no se mira estético»): el mismo
-// lenguaje de las fotos del Expediente. Todo va ENCIMA de la foto: arriba el
-// estado (rojo sólido si algo anda mal) y la cámara; abajo, sobre una franja
-// oscura esmerilada, la persona, la hora y qué hace en corto. Lo malo lleva
-// además el filo rojo de la tarjeta.
+// ── Vista MURALLA (12–13/11/2026: «cada cuadrito no se mira estético», y luego
+// «no tan chiquitas: como antes, pero con mejor diseño»). La tarjeta GRANDE de
+// siempre —foto arriba, texto abajo— con orden: la foto con sombreo suave, el
+// estado arriba a la izquierda (rojo sólido si algo anda mal) y la cámara abajo
+// a la derecha; debajo, la persona y la hora, el estado en una línea y lo que vio
+// Argos (la app en una pastilla y la frase). Lo malo: filo rojo y estado en rojo.
 function CardMuralla({ p, t, hace, sem, onClick }: { p: PersonaVivo; t: Tr; hace: (iso: string) => string; sem: Semaforo; onClick: () => void }) {
   const nombre = p.nombre || t("hr.noName");
   const malo = sem === "rojo" || p.fueraDeLugar === true;
   const { app, que } = separar(p.veredicto);
-  const frase = fraseCorta(que);
-  const linea = [app, frase].filter(Boolean).join(" · ") || t("hr.pantallazos.analizando");
   return (
     <button
       type="button"
       onClick={onClick}
       title={`${nombre}${p.veredicto ? ` · ${p.veredicto}` : ""}`}
-      className={`group relative block w-full overflow-hidden rounded-[14px] border text-left shadow-[0_1px_2px_rgba(0,0,0,0.10),0_12px_28px_-16px_rgba(0,0,0,0.55)] transition-colors ${malo ? "border-destructive ring-1 ring-destructive/50" : "border-border/50 hover:border-foreground/25"}`}
+      className={`group relative flex w-full flex-col overflow-hidden rounded-[14px] border bg-background/60 text-left shadow-[0_1px_2px_rgba(0,0,0,0.10),0_12px_28px_-16px_rgba(0,0,0,0.55)] transition-colors ${malo ? "border-destructive ring-1 ring-destructive/50" : "border-border/50 hover:border-foreground/25"}`}
     >
       <div className="relative aspect-[16/10] w-full overflow-hidden bg-muted/40">
         {p.principalUrl ? (
@@ -242,22 +241,30 @@ function CardMuralla({ p, t, hace, sem, onClick }: { p: PersonaVivo; t: Tr; hace
           <div className="flex h-full w-full items-center justify-center text-muted-foreground"><Loader2 className="h-5 w-5 animate-spin" /></div>
         )}
         {/* Sombreo suave: la pantalla se ve, pero no grita. */}
-        <div className="pointer-events-none absolute inset-0 bg-black/25 transition-opacity duration-300 group-hover:opacity-40" aria-hidden />
-        {/* Arriba: el estado (izquierda) y la cámara (derecha). */}
+        <div className="pointer-events-none absolute inset-0 bg-black/20 transition-opacity duration-300 group-hover:opacity-0" aria-hidden />
         <span className="absolute left-2 top-2"><SelloEstado p={p} t={t} sem={sem} /></span>
         {p.camaraUrl && p.tienePantalla && (
-          <img src={p.camaraUrl} alt="" loading="lazy" className="absolute right-2 top-2 h-12 w-[4.5rem] rounded-[8px] border border-white/40 object-cover shadow-md" />
+          <img src={p.camaraUrl} alt="" loading="lazy" className="absolute bottom-2 right-2 h-14 w-20 rounded-[8px] border border-white/40 object-cover shadow-md" />
         )}
-        {/* Abajo, encima de la foto: la persona, la hora y qué hace. */}
-        <div className="absolute inset-x-0 bottom-0 flex items-center gap-2.5 border-t border-white/10 bg-black/55 px-3 py-2.5 backdrop-blur-md [text-shadow:0_1px_2px_rgba(0,0,0,0.9)]">
+      </div>
+      <div className="flex flex-1 flex-col gap-2.5 px-3.5 pb-3.5 pt-3">
+        {/* La persona y la hora. */}
+        <div className="flex items-center gap-2.5">
           <UserAvatar name={nombre} src={p.avatarUrl} seed={p.avatarSeed} size="sm" />
-          <div className="min-w-0 flex-1">
-            <div className="flex items-baseline gap-2">
-              <span className="min-w-0 flex-1 truncate text-sm font-semibold leading-tight text-white">{nombre}</span>
-              <span className="shrink-0 text-[11px] tabular-nums text-white/60">{hace(p.ultima)}</span>
-            </div>
-            <p className="mt-0.5 truncate text-xs leading-snug text-white/70">{linea}</p>
-          </div>
+          <span className="min-w-0 flex-1 truncate text-[15px] font-semibold leading-tight text-foreground">{nombre}</span>
+          <span className="shrink-0 text-xs tabular-nums text-muted-foreground">{hace(p.ultima)}</span>
+        </div>
+        {/* El estado, en una línea: rojo si algo anda mal; si no, gris con su puntito. */}
+        <p className={`flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide ${malo ? "text-destructive" : "text-muted-foreground"}`}>
+          <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${malo ? "bg-destructive" : PUNTO_SEM[sem]}`} aria-hidden />
+          {t((malo ? MSG_SEM.rojo : MSG_SEM[sem]) as Parameters<typeof t>[0])}
+        </p>
+        {/* Lo que vio Argos: la app en su pastilla y la frase. */}
+        <div className="flex flex-col items-start gap-1.5">
+          {app && (
+            <span className="max-w-full truncate rounded-full border border-border/60 bg-foreground/[0.04] px-2 py-0.5 text-[11px] font-medium text-foreground/80">{app}</span>
+          )}
+          <p className="line-clamp-3 text-[13px] leading-snug text-foreground/70">{que || p.veredicto || t("hr.pantallazos.analizando")}</p>
         </div>
       </div>
     </button>
