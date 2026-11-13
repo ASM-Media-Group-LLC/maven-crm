@@ -73,6 +73,62 @@ async function capturarJPEG(track: MediaStreamTrack, maxAncho = 640, calidad = 0
   });
 }
 
+/** PANTALLA + CÁMARA EN EL MISMO VIDEO (Alvaro, 13/11/2026: «cuando graba un video
+ *  de alguien solo le graba la pantalla, no la pantalla con la cámara»). Se dibujan
+ *  las dos en un lienzo —la pantalla entera y la cámara en un recuadro abajo a la
+ *  derecha— y se graba el lienzo. Con un temporizador y no con requestAnimationFrame:
+ *  la llamada sigue en la ventanita cuando la persona está en otra sección y rAF se
+ *  frena con la pestaña escondida. Las pistas de LiveKit NUNCA se detienen acá. */
+export function medidasDelCompuesto(anchoPantalla?: number, altoPantalla?: number): { w: number; h: number; camW: number; camH: number; margen: number } {
+  const aw = anchoPantalla && anchoPantalla > 0 ? anchoPantalla : 1280;
+  const ah = altoPantalla && altoPantalla > 0 ? altoPantalla : 720;
+  const w = Math.min(1280, aw);
+  const h = Math.round((w * ah) / aw / 2) * 2;
+  const camW = Math.round(w * 0.24);
+  const camH = Math.round((camW * 3) / 4);
+  return { w, h, camW, camH, margen: Math.round(w * 0.015) };
+}
+
+function crearCompuesto(pantalla: MediaStreamTrack, camara: MediaStreamTrack | null): { stream: MediaStream; detener: () => void } | null {
+  const lienzo = document.createElement("canvas");
+  if (typeof (lienzo as HTMLCanvasElement & { captureStream?: unknown }).captureStream !== "function") return null;
+  const s = pantalla.getSettings();
+  const m = medidasDelCompuesto(s.width, s.height);
+  lienzo.width = m.w; lienzo.height = m.h;
+  const ctx = lienzo.getContext("2d");
+  if (!ctx) return null;
+  const video = (track: MediaStreamTrack) => {
+    const v = document.createElement("video");
+    v.muted = true; v.playsInline = true; v.srcObject = new MediaStream([track]);
+    void v.play().catch(() => { /* se reintenta en cada cuadro */ });
+    return v;
+  };
+  const vPantalla = video(pantalla);
+  const vCamara = camara && camara.readyState === "live" ? video(camara) : null;
+  const dibujar = () => {
+    ctx.fillStyle = "#000";
+    ctx.fillRect(0, 0, m.w, m.h);
+    if (vPantalla.readyState >= 2) ctx.drawImage(vPantalla, 0, 0, m.w, m.h);
+    if (vCamara && vCamara.readyState >= 2 && camara?.readyState === "live") {
+      const x = m.w - m.camW - m.margen, y = m.h - m.camH - m.margen;
+      ctx.fillStyle = "rgba(255,255,255,0.85)";
+      ctx.fillRect(x - 2, y - 2, m.camW + 4, m.camH + 4);
+      ctx.drawImage(vCamara, x, y, m.camW, m.camH);
+    }
+  };
+  dibujar();
+  const reloj = window.setInterval(dibujar, 200); // 5 cuadros por segundo
+  const stream = (lienzo as HTMLCanvasElement & { captureStream: (fps?: number) => MediaStream }).captureStream(5);
+  return {
+    stream,
+    detener: () => {
+      window.clearInterval(reloj);
+      for (const t of stream.getTracks()) t.stop(); // solo las del lienzo
+      for (const v of [vPantalla, vCamara]) { if (v) { v.pause(); v.srcObject = null; } }
+    },
+  };
+}
+
 /** Mejor mimeType de video que el navegador soporte, o null si ninguno. */
 function mejorMimeVideo(): string | null {
   const opciones = ["video/webm;codecs=vp9", "video/webm;codecs=vp8", "video/webm"];
@@ -111,6 +167,7 @@ export function useArgosEscaleraClip({ trackCamara, trackPantalla, faceWatch, ac
     let recStartedAt = 0;
     let recMotivo = "distraida";
     let topeTimer: number | undefined;
+    let detenerCompuesto: (() => void) | null = null;
 
     const detenerGrabacion = async (razon: "vuelve" | "tope" | "cleanup"): Promise<void> => {
       if (!rec || rec.state === "inactive") { rec = null; return; }
@@ -119,6 +176,7 @@ export function useArgosEscaleraClip({ trackCamara, trackPantalla, faceWatch, ac
         try { rec!.stop(); } catch { resolve(); }
       });
       if (topeTimer) { window.clearTimeout(topeTimer); topeTimer = undefined; }
+      if (detenerCompuesto) { detenerCompuesto(); detenerCompuesto = null; }
       const blob = new Blob(chunks, { type: rec?.mimeType || "video/webm" });
       chunks = [];
       rec = null;
@@ -154,8 +212,12 @@ export function useArgosEscaleraClip({ trackCamara, trackPantalla, faceWatch, ac
       const mime = mejorMimeVideo();
       if (!mime) return; // navegador sin soporte: no grabamos, solo subimos ritmo
       try {
-        const stream = new MediaStream([pantalla]);
-        const r = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: 800_000 });
+        // Pantalla con la cámara en un recuadro; si el navegador no puede componer,
+        // queda la pantalla sola como antes.
+        const compuesto = crearCompuesto(pantalla, trackCamRef.current);
+        detenerCompuesto = compuesto?.detener ?? null;
+        const stream = compuesto?.stream ?? new MediaStream([pantalla]);
+        const r = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: 900_000 });
         chunks = [];
         r.ondataavailable = (e) => { if (e.data && e.data.size > 0) chunks.push(e.data); };
         r.start(2000); // chunk cada 2 s (por si se corta algo, no se pierde todo)
@@ -165,6 +227,7 @@ export function useArgosEscaleraClip({ trackCamara, trackPantalla, faceWatch, ac
         // Tope duro de 10 min para no eternizar.
         topeTimer = window.setTimeout(() => { void detenerGrabacion("tope"); }, TOPE_GRABACION_MS);
       } catch (e) {
+        if (detenerCompuesto) { detenerCompuesto(); detenerCompuesto = null; }
         console.warn("[argos-clip] MediaRecorder falló", (e as Error)?.message);
       }
     };
