@@ -10,9 +10,6 @@ import { a12 } from "@/lib/horaBogota";
 import { urlCaptura, urlsDeNas } from "@/hooks/useMonitorEventos";
 import type { CapturaDia, DiaExpediente } from "@/hooks/useExpedienteEmpleado";
 import type { TranslationKey } from "@/lib/i18n";
-import { TarjetaArgosClasica } from "@/components/hr/TarjetaArgosClasica";
-import { disenoPulidoPrendido } from "@/lib/disenoDePrueba";
-import { useEsDueno } from "@/hooks/useEsDueno";
 import { FotoConZoom } from "@/components/hr/FotoConZoom";
 
 // Argos como MANAGER del día, estilo FICHA CON EVIDENCIA (Alvaro, 09/11, v2).
@@ -392,10 +389,7 @@ export function TarjetaArgosPulida({ nombre, dia, horario }: {
 }
 
 
-/** La tarjeta del Expediente. El diseño pulido sale solo para el dueño que lo
- *  prendió con su link (`?diseno=pulido`); todos los demás ven el de siempre. */
+/** La tarjeta del Expediente: el diseño pulido, para todos (12/11/2026). */
 export function TarjetaArgos(props: Parameters<typeof TarjetaArgosPulida>[0]) {
-  const { esDueno } = useEsDueno();
-  if (esDueno === true && disenoPulidoPrendido()) return <TarjetaArgosPulida {...props} />;
-  return <TarjetaArgosClasica {...props} />;
+  return <TarjetaArgosPulida {...props} />;
 }
