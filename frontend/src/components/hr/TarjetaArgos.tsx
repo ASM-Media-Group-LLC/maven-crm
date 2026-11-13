@@ -66,7 +66,7 @@ function conNumero(texto: string, valores: Array<string | number> | undefined) {
 }
 
 /** «Instagram Reels · Navegando en…» → la app y lo que hacía. */
-function separar(veredicto: string | null): { app: string | null; que: string | null } {
+export function separar(veredicto: string | null): { app: string | null; que: string | null } {
   const v = (veredicto ?? "").trim();
   if (!v) return { app: null, que: null };
   const i = v.indexOf(" · ");
