@@ -6,6 +6,7 @@ import { Activity, AlertTriangle, CheckCircle2, ChevronRight, Loader2, ShieldAle
 import { useLanguage } from "@/hooks/useLanguage";
 import { UserAvatar } from "@/components/UserAvatar";
 import { TarjetaKpi } from "@/components/ui/TarjetaKpi";
+import { ListaDeNumeros, type FilaNumero } from "@/components/ui/ListaDeNumeros";
 import { usePulsoEquipo } from "@/hooks/usePulsoEquipo";
 import { useEsDueno } from "@/hooks/useEsDueno";
 import { useVigilancia } from "@/hooks/useVigilancia";
@@ -133,12 +134,36 @@ export function CajaDelEquipo({ caja, t, lang, abrir }: { caja: CajaEquipo; t: T
   );
 }
 
-export default function PulsoEquipoVivo({ coworkConectados, conEquipo = false }: {
+/** Los números del Pulso como filas de ListaDeNumeros (el inicio en dos
+ *  columnas los pone a la derecha, 13/11/2026). Mismos valores que las tarjetas. */
+export function NumerosDelInicio({ coworkConectados, extra = [] }: { coworkConectados?: number | null; extra?: FilaNumero[] }) {
+  const { t, language } = useLanguage();
+  const { puedeVer, pulso, ultimaRonda } = usePulsoEquipo();
+  const ultima = ultimaRonda ? hace(ultimaRonda.toISOString(), language) : null;
+  const filas: FilaNumero[] = [];
+  if (puedeVer && pulso && pulso.total > 0) {
+    filas.push(
+      coworkConectados === undefined
+        ? { icono: Users, tono: "success", etiqueta: t("dashboard.pulso.conectadosAhora"), valor: pulso.conectados, detalle: t("dashboard.pulso.deTotal", { total: pulso.total }) }
+        : { icono: Users, tono: "success", etiqueta: t("dashboard.pulso.enCowork"), valor: coworkConectados == null ? "–" : coworkConectados, detalle: t("dashboard.pulso.conApp", { n: pulso.conectados }) },
+      { icono: Gauge, tono: tonoBanda(pulso.notaViva ?? null).tono, etiqueta: t("dashboard.pulso.notaViva"), valor: pulso.notaViva ?? "—",
+        detalle: pulso.conectados === 0 ? t("dashboard.pulso.sinConectados") : t("dashboard.pulso.trabajandoProblema", { trabajando: pulso.trabajando, problema: pulso.conProblema }) },
+      { icono: CheckCircle2, tono: "success", etiqueta: t("dashboard.pulso.trabajando"), valor: pulso.trabajando, detalle: ultima ? t("dashboard.pulso.ultimaRonda", { hace: ultima }) : undefined },
+      { icono: AlertTriangle, tono: pulso.conProblema > 0 ? "danger" : "success", etiqueta: t("dashboard.pulso.conProblema"), valor: pulso.conProblema,
+        detalle: pulso.conProblema === 0 ? t("dashboard.pulso.todoEnOrden") : t("dashboard.pulso.hazClicProblema") },
+    );
+  }
+  return <ListaDeNumeros titulo={t("dashboard.centro.numeros")} icono={Gauge} filas={[...filas, ...extra]} />;
+}
+
+export default function PulsoEquipoVivo({ coworkConectados, conEquipo = false, conNumeros = true }: {
   /** Conectados en Cowork según LiveKit (solo el Centro lo trae). Sin él, la
    *  primera tarjeta cuenta los conectados del propio Pulso. */
   coworkConectados?: number | null;
   /** Muestra además quién es quién, por equipo (tableros de supervisor y RR. HH.). */
   conEquipo?: boolean;
+  /** Las 4 tarjetas de números. El inicio en dos columnas las pone aparte (NumerosDelInicio). */
+  conNumeros?: boolean;
 }) {
   const { t, language } = useLanguage();
   const navigate = useNavigate();
@@ -194,6 +219,7 @@ export default function PulsoEquipoVivo({ coworkConectados, conEquipo = false }:
         <>
           {/* MISMAS TARJETAS KPI que el resto del dashboard: ícono + etiqueta +
               número grande + detalle. Todo con el lenguaje glassy compartido. */}
+          {conNumeros && (
           <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
             {coworkConectados === undefined ? (
               <TarjetaKpi
@@ -241,6 +267,7 @@ export default function PulsoEquipoVivo({ coworkConectados, conEquipo = false }:
               detalle={pulso.conProblema === 0 ? t("dashboard.pulso.todoEnOrden") : t("dashboard.pulso.hazClicProblema")}
             />
           </div>
+          )}
 
           {/* "Quién la está bajando" como su propia sección glassy. Para quien
               vigila lo reemplaza «Quién está bajando ahora» (con miniatura y en
