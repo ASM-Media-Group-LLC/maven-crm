@@ -1,11 +1,12 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { MonitorPlay, Loader2, AlertTriangle, ScreenShare, RefreshCw, Sparkles, LayoutGrid, Grid3x3, X, FileClock } from "lucide-react";
+import { MonitorPlay, Loader2, AlertTriangle, RefreshCw, LayoutGrid, Grid3x3, X, FileClock } from "lucide-react";
 import { useLanguage } from "@/hooks/useLanguage";
 import { UserAvatar } from "@/components/UserAvatar";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { useCapturasVivo, type PersonaVivo } from "@/hooks/useCapturasVivo";
 import { useSemaforos, PUNTO_SEM, type Semaforo } from "@/hooks/useSemaforos";
+import { fraseCorta, separar } from "@/components/hr/TarjetaArgos";
 
 // LA MURALLA EN VIVO de Argos (modelo Hubstaff): las FOTOS de lo que pasa en los
 // últimos minutos, con identidad propia de MURAL — NO es la lista de Conectados
@@ -194,70 +195,70 @@ const BORDE_SEM: Record<Semaforo, string> = {
   rojo: "border-destructive/50 hover:border-destructive/80",
   gris: "border-border/40 hover:border-foreground/25",
 };
-const TEXTO_SEM: Record<Semaforo, string> = {
-  verde: "text-muted-foreground", amarillo: "text-foreground/85", naranja: "text-foreground/85", rojo: "text-foreground/85", gris: "text-muted-foreground",
-};
 
-// EL SELLO de la pantalla compartida (Alvaro, 04/11): cuando alguien comparte,
-// Argos juzga si lo que se ve es TRABAJO. El sello lo dice de un golpe —
-// "Trabajando" (verde) o "Revisar" (rojo, salta) — sin tener que leer el
-// análisis chico. Solo aparece si hay pantalla; si la IA aún no juzgó, "Revisando…".
-function SelloPantalla({ p, t, chico }: { p: PersonaVivo; t: Tr; chico?: boolean }) {
-  if (!p.tienePantalla) return null;
-  const base = `absolute right-1.5 top-1.5 inline-flex items-center gap-1 rounded-control font-semibold backdrop-blur-sm ${chico ? "px-1 py-0.5 text-[9px]" : "px-1.5 py-0.5 text-[10px]"}`;
-  // Sello de vidrio oscuro con un puntito (12/11/2026): ya no la placa verde/roja sólida.
-  if (p.fueraDeLugar === true) {
-    return <span className={`${base} bg-black/60 text-white ring-1 ring-white/10`}><span className="h-1.5 w-1.5 rounded-full bg-destructive" aria-hidden />{t("hr.pantallazos.selloRevisar")}</span>;
+// EL SELLO del estado, uno solo (Alvaro, 12/11/2026: «lo que sale en rojo sí
+// podría ser un poco más llamativo»). Lo MALO (no está en lo suyo, o Argos vio
+// algo que no es trabajo) va en placa ROJA sólida con su ícono: se ve de lejos.
+// Lo demás, en vidrio oscuro con un puntito del color del semáforo.
+function SelloEstado({ p, t, sem, chico }: { p: PersonaVivo; t: Tr; sem: Semaforo; chico?: boolean }) {
+  const malo = sem === "rojo" || p.fueraDeLugar === true;
+  const tam = chico ? "px-1.5 py-0.5 text-[9px]" : "px-2 py-0.5 text-[11px]";
+  if (malo) {
+    return (
+      <span className={`inline-flex items-center gap-1 rounded-full bg-destructive font-semibold text-white shadow-[0_2px_10px_rgba(0,0,0,0.45)] ${tam}`}>
+        <AlertTriangle className={chico ? "h-2.5 w-2.5" : "h-3 w-3"} />{t(MSG_SEM.rojo as Parameters<typeof t>[0])}
+      </span>
+    );
   }
-  if (p.fueraDeLugar === false) {
-    return <span className={`${base} bg-black/55 text-white ring-1 ring-white/10`}><span className="h-1.5 w-1.5 rounded-full bg-success" aria-hidden />{t("hr.pantallazos.selloTrabajando")}</span>;
-  }
-  return <span className={`${base} bg-black/55 text-white`}><Sparkles className="h-3 w-3" />{t("hr.pantallazos.selloMirando")}</span>;
+  return (
+    <span className={`inline-flex items-center gap-1.5 rounded-full bg-black/55 font-medium text-white ring-1 ring-white/10 backdrop-blur-md ${tam}`}>
+      <span className={`h-1.5 w-1.5 rounded-full ${PUNTO_SEM[sem]}`} aria-hidden />{t(MSG_SEM[sem] as Parameters<typeof t>[0])}
+    </span>
+  );
 }
 
-// ── Vista MURALLA: tarjeta grande (foto + semáforo + mensaje + análisis) ──
+// ── Vista MURALLA (12/11/2026: «cada cuadrito no se mira estético»): el mismo
+// lenguaje de las fotos del Expediente. Todo va ENCIMA de la foto: arriba el
+// estado (rojo sólido si algo anda mal) y la cámara; abajo, sobre una franja
+// oscura esmerilada, la persona, la hora y qué hace en corto. Lo malo lleva
+// además el filo rojo de la tarjeta.
 function CardMuralla({ p, t, hace, sem, onClick }: { p: PersonaVivo; t: Tr; hace: (iso: string) => string; sem: Semaforo; onClick: () => void }) {
   const nombre = p.nombre || t("hr.noName");
+  const malo = sem === "rojo" || p.fueraDeLugar === true;
+  const { app, que } = separar(p.veredicto);
+  const frase = fraseCorta(que);
+  const linea = [app, frase].filter(Boolean).join(" · ") || t("hr.pantallazos.analizando");
   return (
     <button
       type="button"
       onClick={onClick}
-      title={t("hr.pantallazos.verExpediente", { nombre })}
-      className={`group relative block w-full overflow-hidden rounded-2xl border bg-background/60 text-left transition-colors ${BORDE_SEM[sem]}`}
+      title={`${nombre}${p.veredicto ? ` · ${p.veredicto}` : ""}`}
+      className={`group relative block w-full overflow-hidden rounded-[14px] border text-left shadow-[0_1px_2px_rgba(0,0,0,0.10),0_12px_28px_-16px_rgba(0,0,0,0.55)] transition-colors ${malo ? "border-destructive ring-1 ring-destructive/50" : "border-border/50 hover:border-foreground/25"}`}
     >
-      <div className="relative aspect-[16/10] w-full bg-muted/40">
+      <div className="relative aspect-[16/10] w-full overflow-hidden bg-muted/40">
         {p.principalUrl ? (
-          <img src={p.principalUrl} alt={nombre} className="h-full w-full object-cover" loading="lazy" />
+          <img src={p.principalUrl} alt={nombre} className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.03]" loading="lazy" />
         ) : (
           <div className="flex h-full w-full items-center justify-center text-muted-foreground"><Loader2 className="h-5 w-5 animate-spin" /></div>
         )}
-        {p.tienePantalla && (
-          <span className="absolute left-1.5 top-1.5 inline-flex items-center gap-1 rounded-control bg-black/55 px-1.5 py-0.5 text-[10px] font-semibold text-white backdrop-blur-sm">
-            <ScreenShare className="h-3 w-3" />{t("hr.pantallazos.pantalla")}
-          </span>
-        )}
-        {/* El SELLO de Argos: ¿la pantalla compartida es trabajo? Trabajando / Revisar */}
-        <SelloPantalla p={p} t={t} />
+        {/* Sombreo suave: la pantalla se ve, pero no grita. */}
+        <div className="pointer-events-none absolute inset-0 bg-black/25 transition-opacity duration-300 group-hover:opacity-40" aria-hidden />
+        {/* Arriba: el estado (izquierda) y la cámara (derecha). */}
+        <span className="absolute left-2 top-2"><SelloEstado p={p} t={t} sem={sem} /></span>
         {p.camaraUrl && p.tienePantalla && (
-          <img src={p.camaraUrl} alt={nombre} loading="lazy" className="absolute bottom-1.5 right-1.5 h-14 w-20 rounded-lg border-2 border-background/80 object-cover shadow-md" />
+          <img src={p.camaraUrl} alt="" loading="lazy" className="absolute right-2 top-2 h-12 w-[4.5rem] rounded-[8px] border border-white/40 object-cover shadow-md" />
         )}
-      </div>
-      <div className="flex items-center gap-2 px-2.5 py-2">
-        {/* El semáforo también en el pantallazo: el sí-o-no en color */}
-        <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${PUNTO_SEM[sem]}`} />
-        <UserAvatar name={nombre} src={p.avatarUrl} seed={p.avatarSeed} size="sm" />
-        <span className="min-w-0 flex-1 truncate text-sm font-semibold">{nombre}</span>
-        <span className="shrink-0 text-[10px] tabular-nums text-muted-foreground">{hace(p.ultima)}</span>
-      </div>
-      {/* El MENSAJE (estado en palabras) + el ANÁLISIS de la IA */}
-      <div className="border-t border-border/40 px-2.5 py-2 text-muted-foreground">
-        <p className={`text-[11px] font-bold uppercase tracking-wide ${TEXTO_SEM[sem]}`}>
-          {t(MSG_SEM[sem] as Parameters<typeof t>[0])}
-        </p>
-        <p className="mt-0.5 flex items-start gap-1.5 text-xs">
-          <Sparkles className="mt-0.5 h-3.5 w-3.5 shrink-0 opacity-70" />
-          <span className="min-w-0 flex-1 leading-snug">{p.veredicto || t("hr.pantallazos.analizando")}</span>
-        </p>
+        {/* Abajo, encima de la foto: la persona, la hora y qué hace. */}
+        <div className="absolute inset-x-0 bottom-0 flex items-center gap-2.5 border-t border-white/10 bg-black/55 px-3 py-2.5 backdrop-blur-md [text-shadow:0_1px_2px_rgba(0,0,0,0.9)]">
+          <UserAvatar name={nombre} src={p.avatarUrl} seed={p.avatarSeed} size="sm" />
+          <div className="min-w-0 flex-1">
+            <div className="flex items-baseline gap-2">
+              <span className="min-w-0 flex-1 truncate text-sm font-semibold leading-tight text-white">{nombre}</span>
+              <span className="shrink-0 text-[11px] tabular-nums text-white/60">{hace(p.ultima)}</span>
+            </div>
+            <p className="mt-0.5 truncate text-xs leading-snug text-white/70">{linea}</p>
+          </div>
+        </div>
       </div>
     </button>
   );
@@ -271,7 +272,7 @@ function CeldaCuadricula({ p, t, sem, onClick }: { p: PersonaVivo; t: Tr; sem: S
       type="button"
       onClick={onClick}
       title={`${nombre} · ${t(MSG_SEM[sem] as Parameters<typeof t>[0])}${p.veredicto ? ` · ${p.veredicto}` : ""}`}
-      className={`group relative block w-full overflow-hidden rounded-xl border bg-background/60 text-left transition-colors ${BORDE_SEM[sem]}`}
+      className={`group relative block w-full overflow-hidden rounded-xl border bg-background/60 text-left transition-colors ${sem === "rojo" || p.fueraDeLugar === true ? "border-destructive ring-1 ring-destructive/50" : BORDE_SEM[sem]}`}
     >
       <div className="relative aspect-[16/10] w-full bg-muted/40">
         {p.principalUrl ? (
@@ -282,10 +283,8 @@ function CeldaCuadricula({ p, t, sem, onClick }: { p: PersonaVivo; t: Tr; sem: S
         {p.camaraUrl && p.tienePantalla && (
           <img src={p.camaraUrl} alt="" loading="lazy" className="absolute bottom-1 right-1 h-8 w-12 rounded border border-background/80 object-cover shadow" />
         )}
-        {/* El semáforo en la esquina */}
-        <span className={`absolute left-1 top-1 h-2.5 w-2.5 rounded-full ring-2 ring-black/40 ${PUNTO_SEM[sem]}`} />
-        {/* El sello de Argos (Trabajando / Revisar) también en la cuadrícula */}
-        <SelloPantalla p={p} t={t} chico />
+        {/* El estado, el mismo sello que la muralla (rojo sólido si algo anda mal). */}
+        <span className="absolute left-1 top-1"><SelloEstado p={p} t={t} sem={sem} chico /></span>
         <span className="absolute inset-x-0 bottom-0 truncate bg-gradient-to-t from-black/70 to-transparent px-1.5 pb-1 pt-4 text-[11px] font-semibold text-white">{nombre}</span>
       </div>
     </button>
