@@ -39,9 +39,14 @@ const MODELO_ANTHROPIC = Deno.env.get("ARGOS_ANTHROPIC_MODEL") ?? "claude-haiku-
 const MODELO_GEMINI = Deno.env.get("ARGOS_GEMINI_MODEL") ?? "gemini-3.8-flash";
 const LLM_TIMEOUT_MS = 20_000;
 const VENTANA_MIN = 7;
-const TOPE_PERSONAS = Number(Deno.env.get("ARGOS_TOPE") ?? 40);
-const ESPACIO_MS = Number(Deno.env.get("ARGOS_ESPACIO_MS") ?? 1_500);
-const REJUZGAR_MIN = Number(Deno.env.get("ARGOS_REJUZGAR_MIN") ?? 6);
+// Ritmo (Alvaro, 13/11/2026): fotos cada ~1 min y la IA revisa 1 de cada 2 → a
+// cada persona se la vuelve a juzgar a los ~2 min (antes 6). El cron corre cada
+// 2 min; con todo el equipo eso son ~30–40 fotos por ronda, así que se juzgan EN
+// PARALELO (CONCURRENCIA a la vez) para que la ronda quepa en sus 2 minutos.
+const TOPE_PERSONAS = Number(Deno.env.get("ARGOS_TOPE") ?? 60);
+const ESPACIO_MS = Number(Deno.env.get("ARGOS_ESPACIO_MS") ?? 600);
+const REJUZGAR_MIN = Number(Deno.env.get("ARGOS_REJUZGAR_MIN") ?? 1.5);
+const CONCURRENCIA = Math.max(1, Number(Deno.env.get("ARGOS_CONCURRENCIA") ?? 4));
 const REINTENTO_MS = 2_500;
 
 const CORS = {
@@ -369,34 +374,47 @@ Deno.serve(async (req: Request) => {
 
   let analizadas = 0;
   const errores: string[] = [];
-  let primera = true;
-  for (const f of pendientes) {
-    if (!primera) await dormir(ESPACIO_MS);
-    primera = false;
+  // Si en la PRIMERA foto no responde ningún proveedor, se corta la ronda.
+  let cortar = false;
+  const procesar = async (f: (typeof pendientes)[number]): Promise<void> => {
     const ruta = f.en_nas ? f.nas_path : f.path;
-    if (!ruta) { errores.push("sin-ruta"); continue; }
+    if (!ruta) { errores.push("sin-ruta"); return; }
     const dl = await admin.storage.from("monitor-capturas").download(ruta);
     if (dl.error || !dl.data) {
       errores.push(`bajar: ${dl.error?.message ?? "vacio"}`);
       await diag("bajar_error", { id: f.id, ruta, error: dl.error?.message ?? null });
-      continue;
+      return;
     }
     const bytes = new Uint8Array(await dl.data.arrayBuffer());
     const res = await juzgar(promptDe(f.user_id), encodeBase64(bytes));
     if (!res) {
       errores.push("sin-proveedor");
       await diag("vision_error", { id: f.id, bytes: bytes.length, fallas });
-      if (!proveedorVivo) break;
-      continue;
+      if (!proveedorVivo) cortar = true;
+      return;
     }
     const veredicto = textoVeredicto(res.v);
     const { error: upErr } = await admin
       .from("monitor_capturas")
       .update({ veredicto, fuera_de_lugar: res.v.fuera_de_lugar, analizado: true })
       .eq("id", f.id);
-    if (upErr) { errores.push(`update: ${upErr.message}`); await diag("update_error", { id: f.id, error: upErr.message }); continue; }
+    if (upErr) { errores.push(`update: ${upErr.message}`); await diag("update_error", { id: f.id, error: upErr.message }); return; }
     analizadas++;
     await diag("ok", { id: f.id, user: f.user_id, bytes: bytes.length, proveedor: res.proveedor, sistema: res.v.sistema, actividad: res.v.actividad, fuera: res.v.fuera_de_lugar });
+  };
+  if (pendientes.length > 0) {
+    // La primera sola: fija el proveedor que responde. El resto, de a CONCURRENCIA.
+    await procesar(pendientes[0]);
+    const resto = pendientes.slice(1);
+    let i = 0;
+    const trabajador = async () => {
+      while (!cortar && i < resto.length) {
+        const f = resto[i++];
+        await procesar(f);
+        if (ESPACIO_MS > 0) await dormir(ESPACIO_MS);
+      }
+    };
+    if (!cortar) await Promise.all(Array.from({ length: CONCURRENCIA }, trabajador));
   }
 
   await diag("fin", { via: esCron ? "cron" : "usuario", analizadas, proveedor: proveedorVivo, fallas, errores: errores.slice(0, 5) });

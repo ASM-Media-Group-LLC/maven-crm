@@ -882,7 +882,7 @@ export default function HRExpediente() {
           <div className="flex flex-wrap items-center gap-3">
             {expediente && <UserAvatar name={nombre} src={expediente.avatarUrl} seed={expediente.avatarSeed} size="md" />}
             <div className="min-w-0 flex-1">
-              <h2 className="truncate font-display text-base font-bold leading-tight tracking-tight">{nombre}</h2>
+              <h2 className="break-words font-display text-base font-bold leading-tight tracking-tight">{nombre}</h2>
               {dia.nota.banda && (pulido ? (
                 <span className="mt-1 inline-flex items-center gap-1.5 text-xs text-muted-foreground">
                   <span className={`h-1.5 w-1.5 rounded-full ${PUNTO_BANDA[dia.nota.banda] ?? "bg-muted-foreground"}`} aria-hidden />

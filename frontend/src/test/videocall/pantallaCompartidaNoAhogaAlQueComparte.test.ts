@@ -47,8 +47,12 @@ describe("la pantalla compartida se publica con su propio perfil", () => {
     expect(s).toMatch(/setScreenShareEnabled\(\s*newState,[^)]*PUBLICACION_DE_PANTALLA\s*\)/);
   });
 
-  it("la capa chica es barata: 360p a 3 fps, no 540p a 15", () => {
-    expect(s).toMatch(/screenShareSimulcastLayers:\s*\[\s*ScreenSharePresets\.h360fps3\s*\]/);
+  it("la capa chica se lee y no ahoga: 720p a 5 fps (no 540p a 15, no 360p a 3)", () => {
+    // 13/11/2026 (Alvaro): a 360p@3 las miniaturas del tablero se veían
+    // pixeladas y a saltos. 720p@5 se lee en chiquito y cuesta menos que el
+    // 540p@15 que ahogaba al que comparte (≈4,6 M px/s contra 7,5 M px/s).
+    expect(s).toMatch(/screenShareSimulcastLayers:\s*\[\s*ScreenSharePresets\.h720fps5\s*\]/);
+    expect(s).not.toMatch(/ScreenSharePresets\.h540fps15|ScreenSharePresets\.h360fps3\]/);
   });
 
   it("⚠️ NO se apaga el simulcast del todo", () => {

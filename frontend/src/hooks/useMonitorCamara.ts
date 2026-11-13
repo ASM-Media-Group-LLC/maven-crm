@@ -38,10 +38,11 @@ interface Params {
 const UMBRAL_FALTA_MS = 20_000; // una mala postura sostenida >20 s cuenta como falta
 const CHEQUEO_MS = 5_000; // cada cuánto se revisa la duración del estado
 const LATIDO_MS = 60_000; // cada cuánto se deja el latido del rondín (monitor_rondas)
-// Un pantallazo cada ~2 min a HORA ALEATORIA (modelo Hubstaff): no se sabe el
-// momento exacto, para que no se pueda jugar. Promedio 2 min, entre 90 y 150 s.
-const CAPTURA_MIN_MS = 90_000;
-const CAPTURA_RANGO_MS = 60_000;
+// Un pantallazo cada ~1 min a HORA ALEATORIA (modelo Hubstaff): no se sabe el
+// momento exacto, para que no se pueda jugar. Promedio 1 min, entre 45 y 75 s
+// (Alvaro, 13/11/2026: «cada minuto»; antes ~2 min, 90–150 s).
+const CAPTURA_MIN_MS = 45_000;
+const CAPTURA_RANGO_MS = 30_000;
 const BUCKET_CAPTURAS = "monitor-capturas"; // buzón privado; luego se mueve al NAS
 
 // Avísale a la persona que se le tomó un pantallazo (transparencia, como Hubstaff),
@@ -298,7 +299,7 @@ export function useMonitorCamara({ track, trackPantalla = null, camaraRealOn, fa
         try { toast(t("hr.monitor.pantallazo"), { duration: 2600 }); } catch { /* sin toast no pasa nada */ }
       }
     };
-    // Primer pantallazo a los ~8 s; luego cada ~2 min a HORA ALEATORIA (90–150 s).
+    // Primer pantallazo a los ~8 s; luego cada ~1 min a HORA ALEATORIA (45–75 s).
     const agendar = (ms: number) => {
       timer = window.setTimeout(async () => {
         await tick();

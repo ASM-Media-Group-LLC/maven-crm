@@ -68,6 +68,8 @@ export function DondeEstaPanel() {
   // Primero cajitas por departamento; al tocar una, su lista (Alvaro, 13/11/2026:
   // «aquí deberían estar cajitas lindas por departamentos y ya después miro listados»).
   const [deptoSel, setDeptoSel] = useState<string | null>(null);
+  // Fuera de turno va plegado (Alvaro, 13/11: «solo quien debería trabajar ahora»).
+  const [verFueraTurno, setVerFueraTurno] = useState<Set<string>>(new Set());
   const ahora = Date.now();
 
   const duracion = (desdeIso: string | null): string => {
@@ -77,6 +79,8 @@ export function DondeEstaPanel() {
     if (min < 60) return t("hr.donde.min", { n: min });
     return t("hr.donde.horas", { h: Math.floor(min / 60), m: min % 60 });
   };
+  const hoyBogota = new Date().toLocaleDateString("en-CA", { timeZone: "America/Bogota" });
+  const entradaDeHoy = (hhmmss: string | null) => (hhmmss ? `${hoyBogota}T${hhmmss.slice(0, 8)}-05:00` : null);
   // Minutos sueltos → «390 min» se lee mal; «6 h 30 min» no.
   const minutosATexto = (min: number): string =>
     min < 60 ? t("hr.donde.durMin", { n: min }) : t("hr.donde.durHoras", { h: Math.floor(min / 60), m: String(min % 60).padStart(2, "0") });
@@ -158,41 +162,52 @@ export function DondeEstaPanel() {
       )}
 
       {verDeptos ? (
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+        // CARAS POR DEPARTAMENTO (Alvaro, 13/11/2026; eligió esta entre tres):
+        // cada departamento con las caras de su gente y un puntito (verde en
+        // Cowork, ámbar con problema, rojo fuera, gris apagado fuera de turno).
+        // Tocar una cara abre a esa persona; «Ver lista» abre el departamento.
+        <div className="grid gap-3 lg:grid-cols-2">
           {deptos.map((d) => {
-            const seg = [
-              { n: d.enCowork, c: "bg-success/70" }, { n: d.problema, c: "bg-warning/70" },
-              { n: d.fuera, c: "bg-destructive/70" }, { n: d.fueraTurno, c: "bg-muted-foreground/30" },
-            ];
+            const orden: Record<string, number> = { rojo: 0, naranja: 1, verde: 2, neutro: 2, gris: 3 };
+            const gente = filas.filter((f) => (f.equipo ?? "Otros") === d.nombre)
+              .sort((a, b) => (orden[tonoDe(a.estado)] ?? 9) - (orden[tonoDe(b.estado)] ?? 9) || (a.nombre ?? "").localeCompare(b.nombre ?? "", "es"));
             return (
-              <button key={d.nombre} type="button" onClick={() => setDeptoSel(d.nombre)}
-                className={`group vidrio vidrio-lift flex flex-col gap-3 p-4 text-left ${d.fuera > 0 ? "ring-1 ring-destructive/40" : ""}`}>
-                <div className="flex items-start gap-3">
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-[15px] font-semibold text-foreground">{d.nombre}</p>
-                    <p className="text-[11px] text-muted-foreground tabular-nums">{t("hr.donde.gente", { n: d.total })}</p>
-                  </div>
-                  <div className="flex shrink-0 flex-col items-end">
-                    <span className="font-display text-[28px] font-semibold leading-none tabular-nums text-foreground">{d.enCowork}</span>
-                    <span className="mt-0.5 text-[10px] text-muted-foreground">{t("hr.donde.filtro.enCowork")}</span>
-                  </div>
+              <section key={d.nombre} className={`vidrio flex flex-col gap-3 p-4 ${d.total > 12 ? "lg:col-span-2" : ""}`}>
+                <button type="button" onClick={() => setDeptoSel(d.nombre)} className="group flex items-baseline gap-2 text-left">
+                  <span className="text-[15px] font-semibold text-foreground">{d.nombre}</span>
+                  <span className="text-[11px] text-muted-foreground tabular-nums">{t("hr.donde.gente", { n: d.total })}</span>
+                  <span className="ml-auto text-xs text-muted-foreground tabular-nums">
+                    <span className="font-display text-base font-semibold text-foreground">{d.enCowork}</span> {t("hr.donde.filtro.enCowork")}
+                  </span>
+                </button>
+                <div className="flex flex-wrap gap-2.5">
+                  {gente.filter((f) => tonoDe(f.estado) !== "gris" || verFueraTurno.has(d.nombre)).map((f) => {
+                    const tono = tonoDe(f.estado);
+                    return (
+                      <Link key={f.user_id} to={`/hr/expediente/${f.user_id}`} title={`${f.nombre ?? "—"} · ${t(ETIQUETA[f.estado] ?? "hr.donde.estado.otro")}`}
+                        className={`relative shrink-0 rounded-full transition hover:scale-105 ${tono === "gris" ? "opacity-45" : ""}`}>
+                        <UserAvatar name={f.nombre ?? "—"} size="md" />
+                        <span className={`absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full ring-2 ring-background ${PUNTO[tono]}`} aria-hidden />
+                      </Link>
+                    );
+                  })}
                 </div>
-                {/* La barra del departamento: cómo está repartida su gente ahora. */}
-                <span className="flex h-2 w-full gap-0.5 overflow-hidden rounded-full bg-foreground/10">
-                  {seg.filter((x) => x.n > 0).map((x, i) => (
-                    <span key={i} className={`h-full ${x.c}`} style={{ width: `${(x.n / Math.max(1, d.total)) * 100}%` }} />
-                  ))}
-                </span>
-                <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-[11px] text-muted-foreground tabular-nums">
-                  <span className="flex items-center gap-1.5"><span className="h-1.5 w-1.5 rounded-full bg-success" aria-hidden />{t("hr.donde.filtro.enCowork")} · <span className="text-foreground/85">{d.enCowork}</span></span>
-                  <span className="flex items-center gap-1.5"><span className="h-1.5 w-1.5 rounded-full bg-destructive" aria-hidden />{t("hr.donde.filtro.fuera")} · <span className="text-foreground/85">{d.fuera}</span></span>
-                  <span className="flex items-center gap-1.5"><span className="h-1.5 w-1.5 rounded-full bg-warning" aria-hidden />{t("hr.donde.filtro.problemas")} · <span className="text-foreground/85">{d.problema}</span></span>
-                  <span className="flex items-center gap-1.5"><span className="h-1.5 w-1.5 rounded-full bg-muted-foreground/50" aria-hidden />{t("hr.donde.filtro.fueraTurno")} · <span className="text-foreground/85">{d.fueraTurno}</span></span>
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-border/40 pt-2.5 text-[11px] text-muted-foreground tabular-nums">
+                  {d.fuera > 0 && <span className="inline-flex items-center gap-1.5 text-foreground/85"><span className="h-1.5 w-1.5 rounded-full bg-destructive" aria-hidden />{d.fuera} {t("hr.donde.filtro.fuera")}</span>}
+                  {d.problema > 0 && <span className="inline-flex items-center gap-1.5"><span className="h-1.5 w-1.5 rounded-full bg-warning" aria-hidden />{d.problema} {t("hr.donde.filtro.problemas")}</span>}
+                  <span className="inline-flex items-center gap-1.5"><span className="h-1.5 w-1.5 rounded-full bg-success" aria-hidden />{d.enCowork} {t("hr.donde.filtro.enCowork")}</span>
+                  {d.fueraTurno > 0 && (
+                    <button type="button" className="inline-flex items-center gap-1.5 transition hover:text-foreground"
+                      onClick={() => setVerFueraTurno((v) => { const n = new Set(v); if (n.has(d.nombre)) n.delete(d.nombre); else n.add(d.nombre); return n; })}>
+                      <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground/50" aria-hidden />{d.fueraTurno} {t("hr.donde.filtro.fueraTurno")}
+                      <span className="underline-offset-2 hover:underline">{verFueraTurno.has(d.nombre) ? t("hr.donde.ocultar") : t("hr.donde.mostrar")}</span>
+                    </button>
+                  )}
+                  <button type="button" onClick={() => setDeptoSel(d.nombre)} className="ml-auto inline-flex items-center gap-0.5 font-medium text-muted-foreground transition hover:text-foreground">
+                    {t("hr.donde.verLista")}<ChevronRight className="h-3.5 w-3.5" />
+                  </button>
                 </div>
-                <span className="flex items-center justify-end text-[11px] text-muted-foreground">
-                  <ChevronRight className="h-4 w-4 transition group-hover:translate-x-0.5 group-hover:text-foreground" />
-                </span>
-              </button>
+              </section>
             );
           })}
         </div>
@@ -201,8 +216,8 @@ export function DondeEstaPanel() {
       {vistas.length === 0 ? (
         <p className="vidrio p-6 text-sm text-muted-foreground">{t("hr.donde.nadie")}</p>
       ) : (
-        <ul className="vidrio divide-y divide-border/50 overflow-hidden">
-          {vistas.map((f) => {
+        (() => {
+          const fila = (f: FilaDondeEsta) => {
             const tono = tonoDe(f.estado);
             const { app, que } = separarPantalla(f.pantalla_que);
             const enCowork = tono === "verde" || tono === "neutro" || tono === "naranja";
@@ -224,7 +239,11 @@ export function DondeEstaPanel() {
                       <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${PUNTO[tono]}`} aria-hidden />
                       {t(ETIQUETA[f.estado] ?? "hr.donde.estado.otro")}
                     </span>
-                    {f.estado_desde && f.estado !== "fuera_de_turno" && (
+                    {f.estado === "no_ha_entrado" && f.entrada ? (
+                      <span className="text-[11px] text-foreground/85 tabular-nums">
+                        {t("hr.donde.debiaEntrar", { h: f.entrada.slice(0, 5), d: duracion(entradaDeHoy(f.entrada)) })}
+                      </span>
+                    ) : f.estado_desde && f.estado !== "fuera_de_turno" && (
                       <span className="text-[11px] text-muted-foreground tabular-nums">
                         {t("hr.donde.desde", { h: horaBogota(f.estado_desde), d: duracion(f.estado_desde) })}
                       </span>
@@ -263,8 +282,23 @@ export function DondeEstaPanel() {
                 </Link>
               </li>
             );
-          })}
-        </ul>
+          };
+          const enTurno = vistas.filter((f) => tonoDe(f.estado) !== "gris");
+          const fuera = vistas.filter((f) => tonoDe(f.estado) === "gris");
+          return (
+            <div className="flex flex-col gap-3">
+              {enTurno.length > 0 && <ul className="vidrio divide-y divide-border/50 overflow-hidden">{enTurno.map(fila)}</ul>}
+              {fuera.length > 0 && (
+                <details className="vidrio overflow-hidden">
+                  <summary className="cursor-pointer select-none px-4 py-3 text-xs font-medium text-muted-foreground">
+                    {t("hr.donde.fueraTurnoPlegado", { n: fuera.length })}
+                  </summary>
+                  <ul className="divide-y divide-border/50 border-t border-border/50">{fuera.map(fila)}</ul>
+                </details>
+              )}
+            </div>
+          );
+        })()
       )}
       </>)}
     </div>
