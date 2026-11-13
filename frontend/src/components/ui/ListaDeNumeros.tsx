@@ -39,7 +39,7 @@ export function ListaDeNumeros({ titulo, icono: IconoTitulo, filas }: { titulo: 
               <span className="block truncate text-[13px] font-medium text-foreground/85">{etiqueta}</span>
               {detalle != null && <span className="block truncate text-[11px] text-muted-foreground">{detalle}</span>}
             </span>
-            <span className="shrink-0 font-display text-xl font-semibold tabular-nums text-foreground">{valor}</span>
+            <span className="shrink-0 font-display text-lg font-medium tabular-nums text-foreground/90">{valor}</span>
           </li>
         ))}
       </ul>
