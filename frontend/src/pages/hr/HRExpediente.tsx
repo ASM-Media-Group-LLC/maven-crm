@@ -869,7 +869,9 @@ export default function HRExpediente() {
     return { pct: Math.round((ok / juzgadas.length) * 100), ok, n: juzgadas.length };
   }, [dia]);
   const permitidoMin = expediente?.permitidoMin ?? 40;
-  const sinPantallaMin = Math.round(((dia.segSinPantalla ?? 0) + (dia.segPausa ?? 0) + (dia.segSinConexion ?? 0)) / 60 + (dia.minFueraCowork ?? 0));
+  // La misma cuenta que el vigía (argos_sin_pantalla_seg): con la cámara apagada el
+  // reloj ya no ve la pantalla, así que también cuenta (13/11/2026).
+  const sinPantallaMin = Math.round(((dia.segSinPantalla ?? 0) + (dia.segSinCamara ?? 0) + (dia.segPausa ?? 0) + (dia.segSinConexion ?? 0)) / 60 + (dia.minFueraCowork ?? 0));
   const tonoAt = atencion == null ? "" : atencion.pct >= 80 ? "text-success" : atencion.pct >= 60 ? "text-warning" : "text-destructive";
   const diaTexto = esHoy ? t("hr.exp.hoy") : format(new Date(diaSel + "T12:00:00"), "EEEE d 'de' MMMM", { locale: es });
 
