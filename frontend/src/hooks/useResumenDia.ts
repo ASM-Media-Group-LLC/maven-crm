@@ -122,7 +122,7 @@ export function useResumenDia(dia: string) {
         sinTipar.from("user_roles").select("user_id, role").in("user_id", [...ids]),
         sinTipar.from("monitor_config").select("roles_calificados").eq("id", 1).maybeSingle(),
         cargarExoneracion([...ids]),
-        cargarHorarios([...ids]),
+        cargarHorarios([...ids], dia),
       ]);
       const perfilPor = new Map(((perfRes.data ?? []) as Array<{ id: string; full_name: string | null; avatar_url: string | null; avatar_seed: string | null }>).map((p) => [p.id, p]));
 

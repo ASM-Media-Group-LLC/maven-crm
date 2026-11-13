@@ -367,8 +367,8 @@ export const MENSAJES = {
 
   // --- El equipo de la plataforma conectada (/equipo, 11/11) ---
   equipo_rutas: {
-    es: "Usa GET /equipo, POST /equipo/sync, GET /equipo/horas o GET /equipo/notas",
-    en: "Use GET /equipo, POST /equipo/sync, GET /equipo/horas or GET /equipo/notas",
+    es: "Usa GET /equipo, POST /equipo/sync, GET /equipo/horas, GET /equipo/notas o GET /equipo/argos",
+    en: "Use GET /equipo, POST /equipo/sync, GET /equipo/horas, GET /equipo/notas or GET /equipo/argos",
   },
   equipo_personas_invalidas: {
     es: "personas tiene que ser una lista de 1 a 1000 personas",

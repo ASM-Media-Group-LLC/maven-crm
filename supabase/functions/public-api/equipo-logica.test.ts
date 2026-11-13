@@ -16,8 +16,11 @@ import {
   armarRespuesta,
   calcularCambios,
   type EstadoDeMaven,
+  type HorarioSemana,
+  horarioSemanaEnTexto,
   hoyEnBogota,
   leerEstado,
+  leerHorarioSemana,
   leerRango,
   leerReporte,
   leerResultadoDeLaBase,
@@ -452,7 +455,7 @@ Deno.test("armarEquipo: roles con su origen, personas con el jefe por correo y a
   ]);
   assertEquals(r.personas[0], {
     correo: "ana@kash.test", nombre: "ana", rol: "Chatter", nivel: "agente", equipo: "A", reporta_a: "beto@kash.test",
-    hora_entrada: "09:00:00", hora_salida: null, activo: true,
+    hora_entrada: "09:00:00", hora_salida: null, horario_semana: null, activo: true,
   });
   assertEquals(r.personas.map((p) => [p.correo, p.activo, p.reporta_a]), [
     ["ana@kash.test", true, "beto@kash.test"], ["beto@kash.test", true, null], ["dario@kash.test", false, null],
@@ -595,4 +598,175 @@ Deno.test("GET /equipo/horas y /equipo/notas: el rango va a la base; un rango ma
     const post = await servirComoUsuario("equipo", clienteFalso({}).cliente, { ...CTX, ruta: [ruta] });
     assert(!post.ok && post.estado === 405);
   }
+});
+
+// ─── El horario por semana (13/11/2026) ──────────────────────────────────────
+
+const SEMANA_LV: HorarioSemana = {
+  lun: ["08:00:00", "16:00:00"], mar: ["08:00:00", "16:00:00"], mie: ["08:00:00", "16:00:00"],
+  jue: ["08:00:00", "16:00:00"], vie: ["08:00:00", "16:00:00"], sab: null, dom: null,
+};
+
+Deno.test("leerHorarioSemana: los 7 días en orden, lo que falta es descanso, y las horas como hora_entrada", () => {
+  const r = leerHorarioSemana({ lun: ["8:00", "16:00"], mar: ["08:00", "16:00:00"], mie: ["08:00", "16:00"], jue: ["08:00", "16:00"], vie: ["08:00", "16:00"], sab: null });
+  assert(r.ok);
+  assertEquals(r.horario, SEMANA_LV);
+  assertEquals(Object.keys(r.horario!), ["lun", "mar", "mie", "jue", "vie", "sab", "dom"]);
+  // Un turno de noche cruza la medianoche; una semana sin días es toda descanso.
+  const noche = leerHorarioSemana({ vie: ["22:00", "06:00"] });
+  assert(noche.ok && noche.horario?.vie?.join() === "22:00:00,06:00:00" && noche.horario?.lun === null);
+  const vacia = leerHorarioSemana({});
+  assert(vacia.ok && vacia.horario !== null && Object.values(vacia.horario).every((d) => d === null));
+  // null quita el horario por semana.
+  assertEquals(leerHorarioSemana(null), { ok: true, horario: null });
+});
+
+Deno.test("leerHorarioSemana: lo que está mal dice qué y en qué día", () => {
+  for (const malo of ["lunes a viernes", 7, ["08:00", "16:00"], true]) {
+    const r = leerHorarioSemana(malo);
+    assert(!r.ok && r.problemas.length === 1 && r.problemas[0].motivo === "tipo_invalido", JSON.stringify(malo));
+  }
+  const r = leerHorarioSemana({
+    lunes: ["08:00", "16:00"], mar: ["25:00", "16:00"], mie: ["08:00"], jue: "08:00-16:00", vie: ["08:00", "08:00"], sab: [8, 16], dom: null,
+  });
+  assert(!r.ok);
+  assertEquals(r.problemas.map((p) => `${p.motivo}|${p.valor}`).sort(), [
+    "dia_desconocido|lunes",
+    "entrada_igual_salida|vie: 08:00-08:00",
+    "hora_invalida|mar: 25:00-16:00",
+    "tipo_invalido|jue: \"08:00-16:00\"",
+    "tipo_invalido|mie: [\"08:00\"]",
+    "tipo_invalido|sab: [8,16]",
+  ]);
+});
+
+Deno.test("horarioSemanaEnTexto: una línea con los 7 días, sin segundos en punto", () => {
+  assertEquals(horarioSemanaEnTexto(null), null);
+  assertEquals(horarioSemanaEnTexto(SEMANA_LV),
+    "lun 08:00-16:00, mar 08:00-16:00, mie 08:00-16:00, jue 08:00-16:00, vie 08:00-16:00, sab -, dom -");
+  assertEquals(horarioSemanaEnTexto({ ...SEMANA_LV, lun: ["22:00:30", "06:00:00"] })?.slice(0, 19), "lun 22:00:30-06:00,");
+});
+
+Deno.test("leerSync: horario_semana malo va a rechazados y no se toca el horario de esa persona", () => {
+  const r = leerSync({
+    personas: [
+      { correo: "ana@kash.test", horario_semana: { lun: ["08:00", "16:00"], domingo: ["10:00", "14:00"] }, rol: "Chatter" },
+      { correo: "eva@kash.test", horario_semana: { lun: ["08:00", "16:00"] } },
+      { correo: "carla@kash.test", horario_semana: null },
+    ],
+  });
+  assert(r.ok);
+  const [ana, eva, carla] = r.pedido.personas;
+  assertEquals(ana.horario_semana, undefined, "medio horario sería peor: no se toca");
+  assertEquals(ana.rol, "Chatter", "lo demás de esa persona sigue");
+  assertEquals(eva.horario_semana?.lun, ["08:00:00", "16:00:00"]);
+  assertEquals(eva.horario_semana?.mar, null);
+  assertEquals(carla.horario_semana, null);
+  assertEquals(r.pedido.rechazados.map((x) => `${x.indice}|${x.correo}|${x.campo}|${x.motivo}|${x.valor}`),
+    ["0|ana@kash.test|horario_semana|dia_desconocido|domingo"]);
+});
+
+Deno.test("calcular: horario_semana — el cambio en texto, a la base el JSON; null lo quita; igual no es cambio", () => {
+  const conSemana: EstadoDeMaven = {
+    ...ESTADO,
+    personas: ESTADO.personas.map((p) => p.correo === "eva@kash.test" ? { ...p, horario_semana: SEMANA_LV } : p),
+  };
+  const { resumen, paraLaBase } = calcularCambios(conSemana, pedido([
+    { correo: "ana@kash.test", horario_semana: { lun: ["08:00", "16:00"], sab: ["09:00", "13:00"] } },
+    { correo: "eva@kash.test", horario_semana: null },
+    { correo: "carla@kash.test" },
+  ]));
+  assertEquals(resumen.cambios.map((c) => `${c.correo}|${c.campo}|${c.antes}→${c.despues}`), [
+    "ana@kash.test|horario_semana|null→lun 08:00-16:00, mar -, mie -, jue -, vie -, sab 09:00-13:00, dom -",
+    `eva@kash.test|horario_semana|${horarioSemanaEnTexto(SEMANA_LV)}→null`,
+  ]);
+  const deAna = paraLaBase.find((c) => c.user_id === ID(2))!;
+  assertEquals(deAna.campo, "horario_semana");
+  assertEquals(JSON.parse(deAna.valor!), {
+    lun: ["08:00:00", "16:00:00"], mar: null, mie: null, jue: null, vie: null, sab: ["09:00:00", "13:00:00"], dom: null,
+  });
+  assertEquals(paraLaBase.find((c) => c.user_id === ID(6)), { user_id: ID(6), campo: "horario_semana", valor: null });
+  // Lo mismo que ya tiene (aunque llegue en otro formato) no es un cambio.
+  const igual = calcularCambios(conSemana, pedido([{ correo: "eva@kash.test", horario_semana: {
+    lun: ["8:00", "16:00"], mar: ["08:00", "16:00"], mie: ["08:00", "16:00"], jue: ["08:00", "16:00"], vie: ["08:00:00", "16:00"],
+  } }]));
+  assertEquals(igual.paraLaBase, []);
+  // Va después de las horas y antes de la papelera en el orden del resumen.
+  const orden = calcularCambios(ESTADO, pedido([{ correo: "ana@kash.test", hora_entrada: "07:00", horario_semana: {}, nivel: "manager" }]));
+  assertEquals(orden.resumen.cambios.map((c) => c.campo), ["nivel", "hora_entrada", "horario_semana"]);
+});
+
+Deno.test("leerEstado: horario_semana de la base (sin él, cuenta como «sin horario por semana»; uno roto es 503)", () => {
+  const base = { ...ESTADO_DE_LA_BASE, personas: [{ ...ESTADO.personas[1] }] };
+  assertEquals(leerEstado(base)?.personas[0].horario_semana, null, "antes de la migración no viene");
+  const con = leerEstado({ ...base, personas: [{ ...ESTADO.personas[1], horario_semana: {
+    lun: ["08:00:00", "16:00:00"], mar: null, mie: null, jue: null, vie: null, sab: null, dom: null,
+  } }] });
+  assertEquals(con?.personas[0].horario_semana?.lun, ["08:00:00", "16:00:00"]);
+  assertEquals(leerEstado({ ...base, personas: [{ ...ESTADO.personas[1], horario_semana: null }] })?.personas[0].horario_semana, null);
+  assertEquals(leerEstado({ ...base, personas: [{ ...ESTADO.personas[1], horario_semana: { lunes: ["08:00", "16:00"] } }] }), null);
+  assertEquals(leerEstado({ ...base, personas: [{ ...ESTADO.personas[1], horario_semana: "lun-vie" }] }), null);
+  // GET /equipo lo devuelve tal cual.
+  assertEquals(armarEquipo("a", con!).personas[0].horario_semana?.lun, ["08:00:00", "16:00:00"]);
+});
+
+Deno.test("handler sync: horario_semana llega a la base como texto con el JSON de los 7 días", async () => {
+  const { cliente, llamadas } = clienteFalso({
+    api_equipo_estado: ok(ESTADO_DE_LA_BASE),
+    api_equipo_aplicar: ok({ ensayo: true, aplicar: false, sync_id: "s1", aplicados: [{ user_id: ID(2), campo: "horario_semana" }], rechazados: [] }),
+  });
+  const r = await servirComoUsuario("equipo", cliente, {
+    ...CTX, cuerpo: { ensayo: true, personas: [{ correo: "ana@kash.test", horario_semana: { lun: ["22:00", "06:00"] } }] },
+  });
+  assert(r.ok, JSON.stringify(r));
+  const aplicar = llamadas.find((l) => l.nombre === "api_equipo_aplicar")!;
+  const [cambio] = aplicar.args._cambios as { user_id: string; campo: string; valor: string }[];
+  assertEquals([cambio.user_id, cambio.campo], [ID(2), "horario_semana"]);
+  assertEquals(JSON.parse(cambio.valor).lun, ["22:00:00", "06:00:00"]);
+  assertEquals(aplicar.args._ensayo, true, "el ensayo del pedido llega a la base");
+  const c = r.cuerpo as Record<string, any>;
+  assertEquals(c.cambios.map((x: any) => [x.campo, x.aplicado, x.se_aplicaria]), [["horario_semana", false, true]]);
+});
+
+// ─── GET /equipo/argos ───────────────────────────────────────────────────────
+
+Deno.test("GET /equipo/argos: el rango va a la base y vuelve con vigilado y el link al expediente", async () => {
+  const ARGOS = {
+    desde: "2026-11-09", hasta: "2026-11-10",
+    personas: [{
+      correo: "ana@kash.test", nombre: "Ana", vigilado: true, expediente_url: `https://app.maven-ai.me/hr/expediente/${ID(2)}`,
+      dias: [{ fecha: "2026-11-10", entro: true, sin_pantalla_min: 12, permitido_min: 40, reportes_en_sala: { camara_apagada: 1 } }],
+    }],
+  };
+  const { cliente, llamadas } = clienteFalso({ api_equipo_argos: ok(ARGOS) });
+  const r = await servirComoUsuario("equipo", cliente, { ...GET, ruta: ["argos"], consulta: { desde: "2026-11-09", hasta: "2026-11-10" } });
+  assert(r.ok, JSON.stringify(r));
+  assertEquals(r.cuerpo, ARGOS);
+  assertEquals(llamadas[1], { nombre: "api_equipo_argos", args: { _desde: "2026-11-09", _hasta: "2026-11-10" } });
+  // Las mismas reglas de rango que horas y notas, sin tocar la base.
+  const malo = clienteFalso({});
+  const r2 = await servirComoUsuario("equipo", malo.cliente, { ...GET, ruta: ["argos"], consulta: { desde: "2026-11-10", hasta: "2026-11-09" } });
+  assert(!r2.ok && r2.estado === 400 && "error" in r2 && r2.error === "invalid_range");
+  assertEquals(malo.llamadas.map((l) => l.nombre), ["current_tenant_id"]);
+  // Una forma rota es 503 (también un vigilado que no es booleano).
+  for (const roto of [{ personas: "x" }, { ...ARGOS, personas: [{ ...ARGOS.personas[0], vigilado: "si" }] },
+    { ...ARGOS, personas: [{ ...ARGOS.personas[0], expediente_url: 7 }] }]) {
+    const r3 = await servirComoUsuario("equipo", clienteFalso({ api_equipo_argos: ok(roto) }).cliente, { ...GET, ruta: ["argos"] });
+    assert(!r3.ok && r3.estado === 503, JSON.stringify(roto).slice(0, 60));
+  }
+  // La base dice que no (la key de alguien que no es admin) → 403; sin el scope, 403 sin tocarla.
+  const prohibido = clienteFalso({
+    api_equipo_argos: { data: null, error: { code: "MV403", message: "api_equipo_sin_permiso", details: '{"error": "forbidden"}' } },
+  });
+  const r4 = await servirComoUsuario("equipo", prohibido.cliente, { ...GET, ruta: ["argos"] });
+  assert(!r4.ok && r4.estado === 403);
+  const sin = await servirComoUsuario("equipo", clienteFalso({}).cliente, { ...GET, ruta: ["argos"], scopes: ["argos:read"] });
+  assert(!sin.ok && sin.estado === 403, "pide equipo:write, no argos:read");
+  const post = await servirComoUsuario("equipo", clienteFalso({}).cliente, { ...CTX, ruta: ["argos"] });
+  assert(!post.ok && post.estado === 405);
+});
+
+Deno.test("leerReporte: horas y notas siguen sin vigilado ni expediente (no se inventan)", () => {
+  const r = leerReporte({ desde: "a", hasta: "b", personas: [{ correo: "x@y.z", nombre: null, dias: [] }] });
+  assertEquals(r?.personas[0], { correo: "x@y.z", nombre: null, dias: [] });
 });

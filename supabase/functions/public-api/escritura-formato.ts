@@ -28,7 +28,7 @@ export type Accion =
   | "me"
   | "bandeja" | "conversacion" | "mensajes" | "feed" | "personas"
   | "abrir" | "enviar" | "editar" | "borrar"
-  | "equipo_sync" | "equipo_ver" | "equipo_horas" | "equipo_notas";
+  | "equipo_sync" | "equipo_ver" | "equipo_horas" | "equipo_notas" | "equipo_argos";
 
 /** Las rutas del Messenger: el camino (null = un id) y qué hace cada método. */
 const RUTAS_MESSENGER: readonly { camino: readonly (string | null)[]; metodos: Partial<Record<Metodo, Accion>> }[] = [
@@ -41,12 +41,13 @@ const RUTAS_MESSENGER: readonly { camino: readonly (string | null)[]; metodos: P
 ];
 
 /** Las rutas del equipo de la plataforma conectada (/equipo/*): mandar el equipo
- *  (POST /equipo/sync) y leer cómo quedó, las horas y las notas (GET). */
+ *  (POST /equipo/sync) y leer cómo quedó, las horas, las notas y lo de Argos (GET). */
 const RUTAS_EQUIPO: readonly { camino: readonly (string | null)[]; metodos: Partial<Record<Metodo, Accion>> }[] = [
   { camino: [], metodos: { GET: "equipo_ver" } },
   { camino: ["sync"], metodos: { POST: "equipo_sync" } },
   { camino: ["horas"], metodos: { GET: "equipo_horas" } },
   { camino: ["notas"], metodos: { GET: "equipo_notas" } },
+  { camino: ["argos"], metodos: { GET: "equipo_argos" } },
 ];
 
 /** Lo que pide messenger:write además de messenger:read: escribir y el directorio

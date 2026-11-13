@@ -205,15 +205,19 @@ describe("las instrucciones que se copian", () => {
     expect(cuerpo.ensayo).toBe(true);
     expect(Array.isArray(cuerpo.roles)).toBe(true);
     expect(Object.keys(cuerpo.personas[0]).sort()).toEqual(
-      ["activo", "correo", "equipo", "hora_entrada", "hora_salida", "nivel", "nombre", "reporta_a", "rol"].sort(),
+      ["activo", "correo", "equipo", "hora_entrada", "hora_salida", "horario_semana", "nivel", "nombre", "reporta_a", "rol"].sort(),
     );
+    // El horario por semana: las 7 claves, cada una [entrada, salida] o null (descanso).
+    expect(Object.keys(cuerpo.personas[0].horario_semana)).toEqual(["lun", "mar", "mie", "jue", "vie", "sab", "dom"]);
+    expect(cuerpo.personas[0].horario_semana.sab).toBeNull();
   });
 
-  it("en los dos idiomas: la base, los cuatro endpoints, los avisos y la regla de la llave", () => {
+  it("en los dos idiomas: la base, los cinco endpoints, los avisos y la regla de la llave", () => {
     for (const t of [tEs, tEn]) {
       const texto = armarInstrucciones(t, "https://api.example.com/functions/v1/public-api");
       expect(texto).toContain("https://api.example.com/functions/v1/public-api");
-      for (const ep of ["POST /equipo/sync", "GET /equipo`", "GET /equipo/horas?desde=", "GET /equipo/notas?desde="]) {
+      expect(texto).toContain("`horario_semana`");
+      for (const ep of ["POST /equipo/sync", "GET /equipo`", "GET /equipo/horas?desde=", "GET /equipo/notas?desde=", "GET /equipo/argos?desde="]) {
         expect(texto).toContain(ep);
       }
       for (const e of EVENTOS_EQUIPO) expect(texto).toContain(e);

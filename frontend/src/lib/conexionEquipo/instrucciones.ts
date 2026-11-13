@@ -22,7 +22,11 @@ export const EJEMPLO_SYNC = `{
       "equipo": "Turno A",
       "reporta_a": "jefe@tuagencia.com",
       "hora_entrada": "08:00",
-      "hora_salida": "16:00"
+      "hora_salida": "16:00",
+      "horario_semana": {
+        "lun": ["08:00", "16:00"], "mar": ["08:00", "16:00"], "mie": ["08:00", "16:00"],
+        "jue": ["08:00", "16:00"], "vie": ["08:00", "16:00"], "sab": null, "dom": null
+      }
     },
     { "correo": "sale@tuagencia.com", "nombre": "Luis Gil", "activo": false }
   ]
@@ -93,6 +97,7 @@ export function armarInstrucciones(t: T, base: string): string {
     `- ${t("conexionEquipo.instr.leer.equipo")}`,
     `- ${t("conexionEquipo.instr.leer.horas")}`,
     `- ${t("conexionEquipo.instr.leer.notas")}`,
+    `- ${t("conexionEquipo.instr.leer.argos")}`,
     "",
     t("conexionEquipo.instr.avisos.titulo"),
     t("conexionEquipo.instr.avisos.cuerpo"),

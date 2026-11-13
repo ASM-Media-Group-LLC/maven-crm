@@ -159,8 +159,8 @@ export const conexionEquipo = {
     en: "Send the full list whenever something changes (or once an hour). The body:",
   },
   "conexionEquipo.instr.sync.reglas": {
-    es: "- `roles` (opcional) va primero y Maven lo procesa antes que a las personas: los roles que no tiene se crean con el mismo nombre y sin permisos, y el dueño marca qué ve cada uno. En ensayo no se crea nada, y quien tenga un rol por crear sale en `roles_desconocidos`.\n- `correo`, `nombre` y `activo` van siempre; lo demás es opcional. Un campo que no viene no se toca; uno que viene en `null` se vacía.\n- `nivel`: `manager`, `supervisor` o `agente`. Nadie sube a admin ni a dueño por aquí.\n- `reporta_a`: el correo de su jefe.\n- `hora_entrada` y `hora_salida`: en 24 horas, como `08:00`.\n- `activo: false` manda a la persona a la papelera de Maven (30 días, se puede recuperar). Faltar en la lista no es irse: a quien no viene no se le toca.\n- Quien no tiene cuenta en Maven queda pendiente hasta que el dueño o un admin la apruebe.\n- Con `ensayo: true`, Maven contesta qué cambiaría sin tocar nada. Mientras el dueño no active «Aplicar», todo es ensayo.",
-    en: "- `roles` (optional) goes first and Maven handles it before the people: the roles it doesn't have are created with the same name and no permissions, and the owner marks what each one sees. In a dry run nothing is created, and anyone with a role still to be created shows up under `roles_desconocidos`.\n- `correo`, `nombre` and `activo` are always sent; the rest is optional. A field that isn't sent is left alone; one sent as `null` is cleared.\n- `nivel`: `manager`, `supervisor` or `agente`. Nobody is promoted to admin or owner this way.\n- `reporta_a`: their manager's email.\n- `hora_entrada` and `hora_salida`: 24-hour time, like `08:00`.\n- `activo: false` moves the person to Maven's trash (30 days, can be restored). Missing from the list doesn't mean leaving: whoever isn't sent is left alone.\n- Whoever has no Maven account stays pending until the owner or an admin approves them.\n- With `ensayo: true`, Maven answers what would change without touching anything. Until the owner turns on “Apply”, everything is a dry run.",
+    es: "- `roles` (opcional) va primero y Maven lo procesa antes que a las personas: los roles que no tiene se crean con el mismo nombre y sin permisos, y el dueño marca qué ve cada uno. En ensayo no se crea nada, y quien tenga un rol por crear sale en `roles_desconocidos`.\n- `correo`, `nombre` y `activo` van siempre; lo demás es opcional. Un campo que no viene no se toca; uno que viene en `null` se vacía.\n- `nivel`: `manager`, `supervisor` o `agente`. Nadie sube a admin ni a dueño por aquí.\n- `reporta_a`: el correo de su jefe.\n- `hora_entrada` y `hora_salida`: en 24 horas, como `08:00`.\n- `horario_semana` (opcional): el turno de cada día, con las claves `lun`, `mar`, `mie`, `jue`, `vie`, `sab` y `dom`, cada una `[\"08:00\", \"16:00\"]` o `null`. Un día en `null` o que no viene es descanso (ese día Maven no le exige estar en Cowork), y un turno puede cruzar la medianoche (`[\"22:00\", \"06:00\"]`). `null` en todo el campo quita el horario por semana y vuelve a valer `hora_entrada`/`hora_salida`.\n- `activo: false` manda a la persona a la papelera de Maven (30 días, se puede recuperar). Faltar en la lista no es irse: a quien no viene no se le toca.\n- Quien no tiene cuenta en Maven queda pendiente hasta que el dueño o un admin la apruebe.\n- Con `ensayo: true`, Maven contesta qué cambiaría sin tocar nada. Mientras el dueño no active «Aplicar», todo es ensayo.",
+    en: "- `roles` (optional) goes first and Maven handles it before the people: the roles it doesn't have are created with the same name and no permissions, and the owner marks what each one sees. In a dry run nothing is created, and anyone with a role still to be created shows up under `roles_desconocidos`.\n- `correo`, `nombre` and `activo` are always sent; the rest is optional. A field that isn't sent is left alone; one sent as `null` is cleared.\n- `nivel`: `manager`, `supervisor` or `agente`. Nobody is promoted to admin or owner this way.\n- `reporta_a`: their manager's email.\n- `hora_entrada` and `hora_salida`: 24-hour time, like `08:00`.\n- `horario_semana` (optional): the shift for each day, with the keys `lun`, `mar`, `mie`, `jue`, `vie`, `sab` and `dom`, each one `[\"08:00\", \"16:00\"]` or `null`. A day that is `null` or missing is a day off (Maven doesn't require Cowork that day), and a shift can cross midnight (`[\"22:00\", \"06:00\"]`). `null` for the whole field removes the weekly schedule and `hora_entrada`/`hora_salida` apply again.\n- `activo: false` moves the person to Maven's trash (30 days, can be restored). Missing from the list doesn't mean leaving: whoever isn't sent is left alone.\n- Whoever has no Maven account stays pending until the owner or an admin approves them.\n- With `ensayo: true`, Maven answers what would change without touching anything. Until the owner turns on “Apply”, everything is a dry run.",
   },
   "conexionEquipo.instr.sync.respuesta": {
     es: "La respuesta (200) dice qué cambió (o cambiaría), quién quedó pendiente, qué roles faltan y qué se rechazó y por qué:",
@@ -186,6 +186,10 @@ export const conexionEquipo = {
   "conexionEquipo.instr.leer.notas": {
     es: "`GET /equipo/notas?desde=YYYY-MM-DD&hasta=YYYY-MM-DD`: la nota de Argos (0 a 100) por persona y día: `fecha`, `nota`, `desglose` (`pantalla`, `camara`, `foco`), `maximos` y `crudo` (los segundos y las capturas de donde sale).",
     en: "`GET /equipo/notas?desde=YYYY-MM-DD&hasta=YYYY-MM-DD`: the Argos score (0 to 100) per person and day: `fecha`, `nota`, `desglose` (`pantalla`, `camara`, `foco`), `maximos` and `crudo` (the seconds and captures it comes from).",
+  },
+  "conexionEquipo.instr.leer.argos": {
+    es: "`GET /equipo/argos?desde=YYYY-MM-DD&hasta=YYYY-MM-DD`: lo que Argos vio en cada turno, por persona (`vigilado`, `expediente_url`) y por turno (un día sin turno no aparece): `fecha`, `turno` (`inicio`, `fin`), `en_curso`, `entro`, `sin_pantalla_min` contra `permitido_min`, `fuera_de_cowork_veces`, `fuera_de_cowork_min`, `llamados_fuera`, `reportado_fuera`, `no_entro_llamados`, `no_entro_reportado`, `reportes_en_sala` (`camara_apagada`, `fuera_cuadro`, `sin_pantalla`), `faltas` y `fotos`.",
+    en: "`GET /equipo/argos?desde=YYYY-MM-DD&hasta=YYYY-MM-DD`: what Argos saw on each shift, per person (`vigilado`, `expediente_url`) and per shift (a day with no shift doesn't show up): `fecha`, `turno` (`inicio`, `fin`), `en_curso`, `entro`, `sin_pantalla_min` against `permitido_min`, `fuera_de_cowork_veces`, `fuera_de_cowork_min`, `llamados_fuera`, `reportado_fuera`, `no_entro_llamados`, `no_entro_reportado`, `reportes_en_sala` (`camara_apagada`, `fuera_cuadro`, `sin_pantalla`), `faltas` and `fotos`.",
   },
   "conexionEquipo.instr.avisos.titulo": { es: "## 3. Avisos de Maven (webhook)", en: "## 3. Notices from Maven (webhook)" },
   "conexionEquipo.instr.avisos.cuerpo": {
@@ -258,6 +262,7 @@ export const conexionEquipo = {
   "conexionEquipo.campo.reporta_a": { es: "Jefe", en: "Manager" },
   "conexionEquipo.campo.hora_entrada": { es: "Entrada", en: "Start time" },
   "conexionEquipo.campo.hora_salida": { es: "Salida", en: "End time" },
+  "conexionEquipo.campo.horario_semana": { es: "Horario por semana", en: "Weekly schedule" },
   "conexionEquipo.campo.papelera": { es: "Salida del equipo", en: "Leaving the team" },
   "conexionEquipo.campo.persona": { es: "Persona", en: "Person" },
   "conexionEquipo.campo.correo": { es: "Correo", en: "Email" },
@@ -285,6 +290,18 @@ export const conexionEquipo = {
     en: "That's an admin role: it's assigned by hand in Maven.",
   },
   "conexionEquipo.motivo.hora_invalida": { es: "La hora no es válida (en 24 horas, como 08:00).", en: "The time isn't valid (24-hour time, like 08:00)." },
+  "conexionEquipo.motivo.dia_desconocido": {
+    es: "El horario por semana trae un día que Maven no conoce (van lun, mar, mie, jue, vie, sab y dom).",
+    en: "The weekly schedule has a day Maven doesn't know (use lun, mar, mie, jue, vie, sab and dom).",
+  },
+  "conexionEquipo.motivo.entrada_igual_salida": {
+    es: "Un día del horario por semana entra y sale a la misma hora.",
+    en: "A day in the weekly schedule starts and ends at the same time.",
+  },
+  "conexionEquipo.motivo.horario_invalido": {
+    es: "El horario por semana no es válido: no se cambió nada del horario.",
+    en: "The weekly schedule isn't valid: nothing in the schedule was changed.",
+  },
   "conexionEquipo.motivo.jefe_no_esta_en_maven": { es: "Su jefe no tiene cuenta en Maven.", en: "Their manager has no Maven account." },
   "conexionEquipo.motivo.jefe_es_la_misma_persona": { es: "Una persona no puede ser su propio jefe.", en: "A person can't be their own manager." },
   "conexionEquipo.motivo.jefe_en_papelera": { es: "Su jefe está en la papelera de Maven.", en: "Their manager is in Maven's trash." },
