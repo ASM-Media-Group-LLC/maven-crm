@@ -19,10 +19,10 @@ import rnnoiseSimdWasmUrl from "@sapphi-red/web-noise-suppressor/rnnoise_simd.wa
 // se arma la cadena de antes (solo la puerta) y se deja constancia en consola.
 // NUNCA se queda sin audio: el peor caso es el comportamiento de ayer.
 //
-// El toggle de la interfaz y la preferencia guardada no cambian: es el mismo
-// botón, con mejor motor detrás.
+// Desde el 13/11/2026 es OBLIGATORIA: no hay botón para apagarla (ver
+// loadNCPreference abajo) y lib/estadoNC.ts mide si de verdad está corriendo.
 
-/** Qué hay detrás del botón de cancelación de ruido en esta pestaña. */
+/** Qué motor de cancelación de ruido quedó armado en esta pestaña. */
 export type MotorNC = "rnnoise+puerta" | "puerta";
 
 /** El último motor que se armó. Para el aviso al usuario y para depurar. */
@@ -34,7 +34,7 @@ export function motorNCVigente(): MotorNC | null {
 // La librería se importa PEREZOSA, dentro de la cadena, por dos motivos: su
 // módulo define clases que extienden AudioWorkletNode al cargarse (en Node/
 // vitest eso revienta al importar cualquier cosa que toque este archivo), y
-// así el código del denoiser solo se baja cuando alguien activa el botón.
+// así el código del denoiser solo se baja cuando se arma la primera cadena.
 type LibNC = typeof import("@sapphi-red/web-noise-suppressor");
 let libNC: Promise<LibNC> | null = null;
 function cargarLibNC(): Promise<LibNC> {
@@ -329,30 +329,23 @@ export function supportsNoiseSuppression(): boolean {
 const NC_STORAGE_KEY = "call-noise-cancellation-enabled";
 
 /**
- * ACTIVADA POR DEFECTO (03/09/2026, pedido de Jhon). Antes arrancaba apagada y
- * solo se prendía si esta clave ya decía "true" — que hasta hoy no se podía
- * tocar desde ninguna pantalla, así que en la práctica nadie la tenía.
+ * OBLIGATORIA DESDE EL 13/11/2026 (Alvaro). Antes (03/09) arrancaba activada
+ * pero se podía apagar desde el menú del micrófono, y quien la apagaba una vez
+ * quedaba apagado para siempre en ese navegador. Ahora siempre se arma: el botón
+ * se quitó de la llamada y un «false» guardado de antes se IGNORA (y se borra,
+ * para que no reaparezca si algún día vuelve el botón).
  *
- * Por qué activada: el trabajo lo hace cada navegador (1–3 % de un núcleo) y
- * al servidor le conviene —con la voz limpia y silencios de verdad, Opus con
- * DTX manda menos paquetes; el ruido de fondo es lo más caro de codificar—.
- * Por qué apagable y con memoria: a alguna voz suave o a algún micrófono raro
- * RNNoise puede recortarle sílabas. Quien la apague una vez queda apagado en
- * ese navegador; quien nunca tocó nada, la tiene puesta. Y si el motor no
- * carga, la cadena cae a la puerta de antes: nunca sin audio.
+ * Lo que NO cambia: si el navegador no la soporta o el motor no carga, la cadena
+ * cae a la puerta de antes o al micrófono crudo. Obligatoria nunca quiere decir
+ * «sin audio». Si de verdad está corriendo lo mide lib/estadoNC.ts en cada
+ * muestra de la llamada.
+ *
+ * Se conserva el nombre porque lo usan la llamada y el micrófono que el
+ * supervisor de Cowork reparte a las salas.
  */
 export function loadNCPreference(): boolean {
   try {
-    const val = localStorage.getItem(NC_STORAGE_KEY);
-    if (val === null) return true;   // nunca eligió: activada
-    return val === "true";
-  } catch {
-    return true;
-  }
-}
-
-export function saveNCPreference(enabled: boolean) {
-  try {
-    localStorage.setItem(NC_STORAGE_KEY, String(enabled));
-  } catch {}
+    if (localStorage.getItem(NC_STORAGE_KEY) !== null) localStorage.removeItem(NC_STORAGE_KEY);
+  } catch { /* sin storage: da igual, es obligatoria */ }
+  return true;
 }

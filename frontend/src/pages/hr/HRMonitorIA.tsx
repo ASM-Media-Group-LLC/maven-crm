@@ -22,6 +22,7 @@ import { PantallazosVivoPanel } from "@/components/hr/PantallazosVivoPanel";
 import { ContextoEmpresaPanel } from "@/components/hr/ContextoEmpresaPanel";
 import { ArgosPanelDia } from "@/components/hr/ArgosPanelDia";
 import { ArgosHistorial } from "@/components/hr/ArgosHistorial";
+import { LlamadasPanel } from "@/components/hr/LlamadasPanel";
 import { ArgosAjustesContenido } from "@/pages/hr/ArgosAjustes";
 import type { TranslationKey } from "@/lib/i18n";
 
@@ -140,10 +141,11 @@ export default function HRMonitorIA() {
   // La pestaña vive en la URL (?t=…) para volver DONDE ESTABAS al entrar a un
   // perfil y pulsar atrás. Mapeamos los nombres viejos (panel/equipo/envivo/
   // historial) a los nuevos para no romper links guardados.
-  type TabArgos = "donde" | "ahora" | "dia" | "ajustes";
+  //   · Llamadas (13/11/2026) = a quién se le corta la llamada hoy y por qué.
+  type TabArgos = "donde" | "ahora" | "dia" | "llamadas" | "ajustes";
   const [searchParams, setSearchParams] = useSearchParams();
   const VIEJO_A_NUEVO: Record<string, TabArgos> = {
-    donde: "donde", ahora: "ahora", dia: "dia", ajustes: "ajustes",
+    donde: "donde", ahora: "ahora", dia: "dia", llamadas: "llamadas", ajustes: "ajustes",
     equipo: "ahora", envivo: "ahora", panel: "dia", historial: "dia", resumen: "dia", atencion: "ahora",
   };
   const tabURL = searchParams.get("t");
@@ -185,6 +187,7 @@ export default function HRMonitorIA() {
           { k: "donde", label: t("hr.monia.tab.donde") },
           { k: "dia", label: t("hr.monia.tab.dia") },
           { k: "ahora", label: t("hr.monia.tab.ahora") },
+          { k: "llamadas", label: t("hr.monia.tab.llamadas") },
           ...(isAdmin ? [{ k: "ajustes" as TabArgos, label: t("hr.monia.tab.ajustes") }] : []),
         ];
         return (
@@ -225,6 +228,14 @@ export default function HRMonitorIA() {
       {tab === "dia" && (
         <div className="mt-5 flex flex-col gap-5">
           {vistaCompleta ? <ArgosHistorial /> : <ArgosPanelDia />}
+        </div>
+      )}
+
+      {/* LLAMADAS — a quién se le corta la llamada hoy, por qué, su internet
+          medido de verdad y si la cancelación de ruido le corre (13/11/2026). */}
+      {tab === "llamadas" && (
+        <div className="mt-5">
+          <LlamadasPanel />
         </div>
       )}
 

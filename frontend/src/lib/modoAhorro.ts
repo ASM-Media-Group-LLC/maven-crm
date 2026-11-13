@@ -47,3 +47,16 @@ export function siguienteAhorro(
   if (prev.activo && buenas >= BUENAS_PARA_APAGAR) return { activo: false, malas: 0, buenas };
   return { activo: prev.activo, malas, buenas };
 }
+
+// 13/11/2026: la subida de arriba es la ESTIMACIÓN de WebRTC, que refleja lo que
+// la llamada usa y no lo que el internet aguanta. En Cowork ahora además se mide
+// de verdad (lib/pruebaDeRed.ts). Una prueba que da menos de 1,5 Mbps de subida
+// prende el ahorro en el acto, sin esperar los dos minutos: es una medida real,
+// no una sospecha. Una prueba buena NO lo apaga: si el navegador sigue limitando
+// el video por ancho de banda, eso manda (se apaga con la regla de siempre).
+export const SUBIDA_PRUEBA_JUSTA_MBPS = 1.5;
+
+export function ahorroPorPrueba(prev: EstadoAhorro, subidaMbps: number | null): EstadoAhorro {
+  if (prev.activo || subidaMbps === null || !(subidaMbps < SUBIDA_PRUEBA_JUSTA_MBPS)) return prev;
+  return { activo: true, malas: Math.max(prev.malas, MALAS_PARA_PRENDER), buenas: 0 };
+}

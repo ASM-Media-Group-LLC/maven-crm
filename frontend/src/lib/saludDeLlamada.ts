@@ -16,6 +16,13 @@
 // La muestra va a llamada_salud y la última viaja como `contexto` de cada corte.
 // El servidor (vigilar_cortes_de_llamada) junta todo y le dice a la persona y a
 // su supervisor la causa. Todo es fuego y olvido: medir jamás rompe la llamada.
+//
+// ⚠️ 13/11/2026: `subida_kbps` (availableOutgoingBitrate) es una ESTIMACIÓN del
+// control de congestión: sigue a lo que la llamada usa, no mide el internet (sin
+// video mandándose da números absurdos, como 1.000.000). Por eso cada muestra
+// lleva además `nc` (si la cancelación de ruido corre de verdad, lib/estadoNC.ts)
+// y, en Cowork, al entrar y cada 30 min, `prueba` = la velocidad MEDIDA
+// (lib/pruebaDeRed.ts). Argos › Llamadas muestra la prueba, no la estimación.
 
 export interface MuestraDeLlamada {
   vis: "visible" | "hidden" | string;

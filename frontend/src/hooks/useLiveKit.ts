@@ -8,13 +8,12 @@ import {
   DisconnectReason,
   Participant,
   VideoPresets,
-  ScreenSharePresets,
   ConnectionQuality,
   RoomOptions,
   TrackEvent,
   VideoQuality,
 } from "livekit-client";
-import type { ScreenShareCaptureOptions, TrackPublishOptions } from "livekit-client";
+import type { ScreenShareCaptureOptions } from "livekit-client";
 import { esOtraPestana } from "@/lib/sesionDuplicada";
 import { fueUnaCaida } from "@/lib/conexionSala";
 import {
@@ -27,7 +26,7 @@ import { toast } from "sonner";
 // callbacks, no en el JSX, y los lee la persona en su propio idioma.
 import { traducir } from "@/lib/i18n";
 import { esPantallaCompleta, puedeCompartirPantalla, motivoDeFalloAlCompartir } from "@/lib/compartirPantalla";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase, SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY } from "@/integrations/supabase/client";
 import { avisarSalidaDeLlamada, mostrarAvisoDeSala, ID_AVISO_ME_SILENCIARON } from "@/lib/avisosDeLlamada";
 import type { BackgroundEffect } from "@/lib/fondoDeLlamada";
 import {
@@ -35,13 +34,16 @@ import {
   resolverImagenDeFondo, leerFondoGuardado, guardarFondo,
 } from "@/lib/fondoDeLlamada";
 import type { ImagenDeFondo } from "@/lib/fondoDeLlamada";
-import { NoiseSuppresionTrackProcessor, supportsNoiseSuppression, loadNCPreference, saveNCPreference } from "@/lib/noise-suppression-processor";
+import { NoiseSuppresionTrackProcessor, supportsNoiseSuppression, loadNCPreference } from "@/lib/noise-suppression-processor";
+import { estadoDeNC, type EstadoNC } from "@/lib/estadoNC";
+import { elegirPerfilDePantalla, opcionesDePantalla } from "@/lib/perfilDePantalla";
+import { medirRed, salaConPrueba, tocaProbar, PRUEBA_CADA_MS, REINTENTO_TRAS_FALLO_MS, type PruebaDeRed } from "@/lib/pruebaDeRed";
 import { marcarConexionEnCurso, marcarLlamadaActiva, quitarLlamadaActiva } from "@/lib/llamadaActiva";
 import {
   armarMuestra, borrarLlamadaEnCurso, leerReporte, marcarLlamadaEnCurso, medirRetraso, recargaConLlamada,
   type LecturaDePista, type MuestraDeLlamada,
 } from "@/lib/saludDeLlamada";
-import { AHORRO_INICIAL, PANTALLA_AHORRO, siguienteAhorro, type EstadoAhorro } from "@/lib/modoAhorro";
+import { AHORRO_INICIAL, PANTALLA_AHORRO, ahorroPorPrueba, siguienteAhorro, type EstadoAhorro } from "@/lib/modoAhorro";
 
 // La recarga a mitad de llamada se revisa UNA vez por página (al primer connect,
 // cuando ya hay sesión para anotarla). Ver saludDeLlamada.ts.
@@ -327,45 +329,8 @@ const ROOM_OPTIONS: RoomOptions = {
 // llamada, el 26% del audio tuvo que ser inventado por el corrector de pérdidas
 // — la voz se cortaba a ráfagas, cada vez que su máquina se saturaba.
 //
-// Hasta ahora esto se publicaba SIN opciones, así que heredaba el
-// `simulcast: true` de publishDefaults, que se escribió pensando en CÁMARAS.
-// Para una pantalla, LiveKit arma con eso DOS codificaciones en paralelo —
-// 1080p@15 y 540p@15— las dos a resolución alta y a 15 fps, sobre contenido en
-// movimiento. Sumadas a las TRES capas de la cámara, son cinco codificaciones
-// de video al mismo tiempo en un portátil.
-//
-// Ninguno de los dos cambios toca la nitidez de la capa principal:
-//
-//  1. La capa chica pasa de 540p@15 a 360p@3. Sirve para lo mismo —las
-//     miniaturas del tablero de Cowork, donde un supervisor mira varias
-//     pantallas a la vez— pero cuesta del orden de cinco veces menos: un cuarto
-//     de los píxeles y un quinto de los cuadros.
-//     ⚠️ NO se apaga el simulcast del todo, que es lo que uno haría de primera:
-//     sin capa chica cada miniatura de Cowork se traería el 1080p entero y el
-//     que sufriría sería el supervisor. Se abarata la capa, no se elimina.
-//
-//  2. `maintain-framerate` le dice al codificador que cuando no dé abasto
-//     ACHIQUE la imagen en vez de congelarla. Es exactamente el fallo medido:
-//     se aferró a los 540p y se desplomó a 2,5 fps. Una pantalla que se achica
-//     se sigue leyendo; una que se congela, no.
-//
-// Lo que NO se toca a propósito: la resolución de la capa principal sigue en
-// 1080p. Bajarla arreglaría el caso de un portátil lento a costa de que a TODOS
-// se les vuelva ilegible una hoja de cálculo o un código, que es lo que el
-// equipo comparte casi siempre. Si hiciera falta, ese es otro cambio y con su
-// propia medición.
-//
-// publishDefaults se COMBINA con esto (LocalParticipant hace
-// `Object.assign({}, publishDefaults, options)`), así que dtx, red y el códec
-// vp8 se heredan igual; acá solo va lo que cambia.
-// 13/11/2026 (Alvaro: «compartir pantalla en modo chiquito se ve todo
-// pixelado»): la capa chica a 360p@3 se veía borrosa y a saltos en las
-// miniaturas del tablero de supervisión. Sube a 720p@5: se lee en chiquito y
-// aun así cuesta menos que el 540p@15 de antes (≈4,6 M px/s contra 7,5 M px/s).
-const PUBLICACION_DE_PANTALLA: TrackPublishOptions = {
-  screenShareSimulcastLayers: [ScreenSharePresets.h720fps5],
-  degradationPreference: "maintain-framerate",
-};
+// El perfil con que se publica la pantalla compartida (normal o liviano, según
+// el internet de quien comparte) vive en lib/perfilDePantalla.ts.
 
 /**
  * Los tiles que dibuja una persona. Quien comparte pantalla SIEMPRE tiene dos:
@@ -520,10 +485,33 @@ export function useLiveKit() {
   }, []);
 
   type InsertaSalud = (tabla: "llamada_salud") => {
-    insert: (fila: { sala: string; datos: MuestraDeLlamada & { ahorro: boolean } }) => PromiseLike<{ error: { message: string } | null }>;
+    insert: (fila: { sala: string; datos: MuestraDeLlamada & { ahorro: boolean; nc: EstadoNC; prueba?: PruebaDeRed } }) =>
+      PromiseLike<{ error: { message: string } | null }>;
   };
   // Si el componente se desmonta sin colgar, el reloj de muestras no queda vivo.
   useEffect(() => () => { pararMuestreoRef.current?.(); }, []);
+  // El modo ahorro de la llamada vigente (lo lee también toggleScreenShare para
+  // elegir el perfil de la pantalla).
+  const ahorroRef = useRef<EstadoAhorro>(AHORRO_INICIAL);
+  // La última prueba de velocidad real (lib/pruebaDeRed.ts) y cuándo toca la
+  // próxima. Viven por pestaña, no por conexión: una re-entrada tras una caída o
+  // un cambio de sala dentro de la media hora no vuelve a medir.
+  const ultimaPruebaRef = useRef<{ resultado: PruebaDeRed; at: number } | null>(null);
+  const proximaPruebaRef = useRef<number | null>(null);
+  const pruebaEnCursoRef = useRef(false);
+  /** Corre la prueba de velocidad con la sesión de la persona. Nunca tira. */
+  const correrPruebaDeRed = useCallback(async (): Promise<PruebaDeRed | null> => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) return null;
+      return await medirRed({
+        url: `${SUPABASE_URL}/functions/v1/prueba-de-red`,
+        headers: { apikey: SUPABASE_PUBLISHABLE_KEY, Authorization: `Bearer ${session.access_token}` },
+      });
+    } catch {
+      return null;
+    }
+  }, []);
 
   /** Mide la llamada una vez por minuto (y una a los 15 s de entrar). */
   const iniciarMuestreo = useCallback((room: Room) => {
@@ -531,8 +519,10 @@ export function useLiveKit() {
     const retraso = medirRetraso();
     // Modo ahorro (lib/modoAhorro.ts): con la subida lenta, cámara en calidad
     // media y pantalla a 5 cuadros por segundo, solo para esta persona.
-    let ahorro: EstadoAhorro = AHORRO_INICIAL;
+    ahorroRef.current = AHORRO_INICIAL;
     let ahorroAvisado = false;
+    // La prueba de velocidad real, solo en las salas de Cowork.
+    const conPrueba = salaConPrueba(room.name);
     const originales = new Map<RTCRtpSender, Array<{ maxFramerate?: number; maxBitrate?: number }>>();
     const aplicarAhorro = async (activo: boolean) => {
       try {
@@ -582,8 +572,37 @@ export function useLiveKit() {
         });
         ultimaMuestraRef.current = muestra;
         marcarLlamadaEnCurso(room.name); // la marca de «sigue viva» se renueva
-        const estabaEnAhorro = ahorro.activo;
-        ahorro = siguienteAhorro(ahorro, muestra);
+        // Si la cancelación de ruido está corriendo de verdad (lib/estadoNC.ts).
+        const nc = leerEstadoNC(room);
+        setEstadoNC(nc);
+        // La prueba de velocidad (al entrar y cada 30 min). Las estadísticas de
+        // arriba ya se leyeron, así que la prueba no ensucia esta muestra; el
+        // resultado viaja en ella. Pestaña oculta o llamada reconectando: no.
+        let prueba: PruebaDeRed | undefined;
+        if (conPrueba && tocaProbar({
+          proximaMs: proximaPruebaRef.current,
+          ahora: Date.now(),
+          visible: document.visibilityState === "visible",
+          conectada: room.state === ConnectionState.Connected,
+          enCurso: pruebaEnCursoRef.current,
+        })) {
+          pruebaEnCursoRef.current = true;
+          try {
+            const r = await correrPruebaDeRed();
+            if (r && (r.subida_mbps !== null || r.bajada_mbps !== null)) {
+              prueba = r;
+              ultimaPruebaRef.current = { resultado: r, at: Date.now() };
+              proximaPruebaRef.current = Date.now() + PRUEBA_CADA_MS;
+            } else {
+              proximaPruebaRef.current = Date.now() + REINTENTO_TRAS_FALLO_MS;
+            }
+          } finally {
+            pruebaEnCursoRef.current = false;
+          }
+        }
+        const estabaEnAhorro = ahorroRef.current.activo;
+        ahorroRef.current = ahorroPorPrueba(siguienteAhorro(ahorroRef.current, muestra), prueba?.subida_mbps ?? null);
+        const ahorro = ahorroRef.current;
         // Prendido se vuelve a aplicar cada minuto: LiveKit puede reponer capas.
         if (ahorro.activo) void aplicarAhorro(true);
         else if (estabaEnAhorro) void aplicarAhorro(false);
@@ -592,7 +611,7 @@ export function useLiveKit() {
           toast(traducir("shared.call.ahorroTitulo"), { description: traducir("shared.call.ahorroDesc"), duration: 10_000 });
         }
         void (supabase.from as unknown as InsertaSalud)("llamada_salud")
-          .insert({ sala: room.name, datos: { ...muestra, ahorro: ahorro.activo } })
+          .insert({ sala: room.name, datos: { ...muestra, ahorro: ahorro.activo, nc, ...(prueba ? { prueba } : {}) } })
           .then(({ error }) => { if (error) console.warn("[llamada_salud]", error.message); });
       } catch { /* medir jamás rompe la llamada */ }
     };
@@ -666,9 +685,29 @@ export function useLiveKit() {
     return () => window.clearInterval(id);
   }, []);
   // ── Noise cancellation ──────────────────────────────────────────
-  const [isNoiseCancellationOn, setIsNoiseCancellationOn] = useState(false);
+  // OBLIGATORIA desde el 13/11/2026: no hay botón para apagarla. `ncEnabledRef`
+  // dice si se quiere (siempre que el navegador la soporte) y `estadoNC` si de
+  // verdad está corriendo (lib/estadoNC.ts): eso va en cada muestra de la
+  // llamada y lo muestra Argos › Llamadas.
+  const [estadoNC, setEstadoNC] = useState<EstadoNC>("sin_micro");
   const ncProcessorRef = useRef<NoiseSuppresionTrackProcessor | null>(null);
   const ncEnabledRef = useRef(false);
+  // El aviso de «se apagó por fallo» sale UNA vez por llamada: como ahora se
+  // reintenta en cada micrófono nuevo, sin esto un navegador que no puede
+  // armarla avisaría en cada desmuteo.
+  const ncFalloAvisadoRef = useRef(false);
+  /** Lo que de verdad pasa con la cancelación de ruido del micrófono de esta sala. */
+  const leerEstadoNC = useCallback((room: Room | null): EstadoNC => {
+    const micPub = room
+      ? Array.from(room.localParticipant.audioTrackPublications.values()).find((p) => p.source === Track.Source.Microphone)
+      : undefined;
+    const t = micPub?.track as (LocalAudioTrack & { getProcessor?: () => unknown }) | undefined;
+    const proc = t?.getProcessor?.() as { motor?: "rnnoise+puerta" | "puerta" | null } | undefined;
+    return estadoDeNC({ soportada: supportsNoiseSuppression(), hayMicro: !!t, motor: proc?.motor ?? null });
+  }, []);
+  const refrescarEstadoNC = useCallback(() => {
+    setEstadoNC(leerEstadoNC(roomRef.current));
+  }, [leerEstadoNC]);
 
   const buildParticipant = useCallback((p: Participant, isLocal: boolean): LKParticipant => {
     const audioTrack = Array.from(p.audioTrackPublications.values()).find(
@@ -1702,14 +1741,14 @@ export function useLiveKit() {
       // micro encendido. Antes solo se fijaba dentro de `if (shouldEnableMic)`:
       // quien entraba silenciado —que es SIEMPRE el caso en Cowork, y lo normal
       // en un Meet— arrancaba con la cancelación en falso, y al prender el micro
-      // después `reapplyNC` no hacía nada porque miraba esa bandera. Resultado:
-      // el interruptor decía "Desactivada" con la preferencia en "true", y en
-      // Cowork la cancelación no se aplicaba nunca. El procesador en sí se
-      // engancha cuando hay un track de micro: ahora si entra encendido, o en
-      // `reapplyNC` cuando lo prenda.
+      // después `reapplyNC` no hacía nada porque miraba esa bandera. El
+      // procesador en sí se engancha cuando hay un track de micro: ahora si
+      // entra encendido, o en `reapplyNC` cuando lo prenda.
+      // Desde el 13/11/2026 es obligatoria: loadNCPreference() siempre dice que
+      // sí; solo queda afuera el navegador que no la soporta.
       const ncDeseado = loadNCPreference() && supportsNoiseSuppression();
       ncEnabledRef.current = ncDeseado;
-      setIsNoiseCancellationOn(ncDeseado);
+      ncFalloAvisadoRef.current = false;
 
       if (shouldEnableMic) {
         await room.localParticipant.setMicrophoneEnabled(true, getDeviceConstraint(options.audioDeviceId));
@@ -1728,12 +1767,14 @@ export function useLiveKit() {
               console.info("[LiveKit] Noise cancellation applied on connect");
             }
           } catch (err) {
+            // Sin filtro pero con micrófono. No se apaga la intención: el
+            // próximo micrófono nuevo (desmutear, cambiar de dispositivo) lo
+            // vuelve a intentar.
             console.warn("[LiveKit] NC init error:", err);
-            ncEnabledRef.current = false;
-            setIsNoiseCancellationOn(false);
           }
         }
       }
+      refrescarEstadoNC();
 
       if (shouldEnableCam) {
         const shouldGateVideoUntilBackground = backgroundEffectRef.current !== "none" && !skipAutoBackgroundRestoreRef.current;
@@ -1836,7 +1877,7 @@ export function useLiveKit() {
     try { ncProcessorRef.current?.destroy(); } catch {}
     ncProcessorRef.current = null;
     ncEnabledRef.current = false;
-    setIsNoiseCancellationOn(false);
+    setEstadoNC("sin_micro");
     intentoRef.current++;
     roomRef.current?.disconnect(true);
     roomRef.current = null;
@@ -1873,10 +1914,10 @@ export function useLiveKit() {
   /** El filtro dejó de funcionar andando: se apaga para que el micrófono vuelva
    *  crudo (al parar el procesador LiveKit vuelve a publicar el track original)
    *  y se avisa. Mejor ruido que silencio: así quedó Andrea el 10/09 sin saberlo. */
+  //  Como es obligatoria, la intención NO se apaga: el próximo micrófono nuevo
+  //  (desmutear, cambiar de dispositivo, reparar) la vuelve a intentar.
   const apagarNCPorFallo = useCallback(async (motivo: string) => {
     const room = roomRef.current;
-    ncEnabledRef.current = false;
-    setIsNoiseCancellationOn(false);
     console.warn("[LiveKit] cancelación de ruido apagada por fallo:", motivo);
     try {
       const micPub = Array.from(room?.localParticipant.audioTrackPublications.values() ?? []).find(
@@ -1885,12 +1926,15 @@ export function useLiveKit() {
       await (micPub?.track as LocalAudioTrack | undefined)?.stopProcessor?.();
     } catch { /* el procesador ya estaba caído */ }
     ncProcessorRef.current = null;
+    setEstadoNC(leerEstadoNC(room ?? null));
+    if (ncFalloAvisadoRef.current) return;
+    ncFalloAvisadoRef.current = true;
     toast.warning(traducir("shared.call.ncOff"), {
       id: "nc-fallo",
       description: traducir("shared.call.ncOffDesc"),
       duration: 10000,
     });
-  }, []);
+  }, [leerEstadoNC]);
   alFallarNCRef.current = apagarNCPorFallo;
 
   const reapplyNC = useCallback(async () => {
@@ -1913,8 +1957,10 @@ export function useLiveKit() {
       console.info("[LiveKit] Noise cancellation re-aplicado al track nuevo del micrófono");
     } catch (err) {
       console.warn("[LiveKit] no pude re-aplicar el noise cancellation:", err);
+    } finally {
+      setEstadoNC(leerEstadoNC(room));
     }
-  }, []);
+  }, [leerEstadoNC]);
 
   // Volver a PEDIRLE el micrófono al sistema. Es lo único que devuelve el audio
   // cuando LiveKit ya vació el emisor: con la publicación viva, prender el micro
@@ -2115,38 +2161,8 @@ export function useLiveKit() {
     }
   }, [refreshParticipants, reapplyNC, vigilarMicro, avisarMicroIrrecuperable]);
 
-  // ── Noise Cancellation toggle ─────────────────────────────────
-  const toggleNoiseCancellation = useCallback(async () => {
-    const room = roomRef.current;
-    if (!room) return;
-    const newState = !ncEnabledRef.current;
-    ncEnabledRef.current = newState;
-    setIsNoiseCancellationOn(newState);
-    saveNCPreference(newState);
-    const micPub = Array.from(room.localParticipant.audioTrackPublications.values()).find(
-      (pub) => pub.source === Track.Source.Microphone,
-    );
-    const localAudioTrack = micPub?.track;
-    if (!localAudioTrack) return;
-    if (newState) {
-      if (!supportsNoiseSuppression()) { ncEnabledRef.current = false; setIsNoiseCancellationOn(false); return; }
-      try {
-        const processor = new NoiseSuppresionTrackProcessor((m) => alFallarNCRef.current(m));
-        ncProcessorRef.current = processor;
-        await (localAudioTrack as any).setProcessor(processor);
-        console.info("[LiveKit] Noise cancellation enabled");
-      } catch (err) {
-        console.error("[LiveKit] NC toggle error:", err);
-        ncProcessorRef.current = null;
-        ncEnabledRef.current = false;
-        setIsNoiseCancellationOn(false);
-      }
-    } else {
-      try { await (localAudioTrack as any).stopProcessor(); } catch {}
-      if (ncProcessorRef.current) { try { await ncProcessorRef.current.destroy(); } catch {} ncProcessorRef.current = null; }
-      console.info("[LiveKit] Noise cancellation disabled");
-    }
-  }, []);
+  // (El interruptor de la cancelación de ruido se quitó el 13/11/2026: es
+  // obligatoria. Ver noise-suppression-processor.ts › loadNCPreference.)
 
   // ── Camera toggle ─────────────────────────────────────────────
   const toggleCam = useCallback(async () => {
@@ -2268,7 +2284,19 @@ export function useLiveKit() {
       const captura: ScreenShareCaptureOptions = exigir
         ? { audio: true, video: { displaySurface: "monitor" }, selfBrowserSurface: "exclude", surfaceSwitching: "exclude" }
         : { audio: newState };
-      await room.localParticipant.setScreenShareEnabled(newState, captura, PUBLICACION_DE_PANTALLA);
+      // El perfil (normal o liviano) se elige CADA VEZ que empieza a compartir,
+      // con lo último que se sabe de su internet: la prueba de velocidad real, el
+      // modo ahorro y la última muestra de la llamada (lib/perfilDePantalla.ts).
+      const pruebaVigente = ultimaPruebaRef.current;
+      const perfil = elegirPerfilDePantalla({
+        prueba: pruebaVigente ? { subida_mbps: pruebaVigente.resultado.subida_mbps, edadMs: Date.now() - pruebaVigente.at } : null,
+        ahorroActivo: ahorroRef.current.activo,
+        limiteCam: ultimaMuestraRef.current?.limite_cam ?? null,
+        limitePant: ultimaMuestraRef.current?.limite_pant ?? null,
+      });
+      const pantalla = opcionesDePantalla(perfil, captura);
+      if (newState) console.info(`[LiveKit] compartiendo pantalla con el perfil ${perfil}`);
+      await room.localParticipant.setScreenShareEnabled(newState, pantalla.captura, pantalla.publicacion);
       if (exigir) {
         const superficie = room.localParticipant.getTrackPublication(Track.Source.ScreenShare)?.track?.mediaStreamTrack?.getSettings?.().displaySurface;
         if (!esPantallaCompleta(superficie)) {
@@ -2649,7 +2677,6 @@ export function useLiveKit() {
     switchAudioInput,
     switchAudioOutput,
     switchVideoInput,
-    isNoiseCancellationOn,
-    toggleNoiseCancellation,
+    estadoNC,
   };
 }
