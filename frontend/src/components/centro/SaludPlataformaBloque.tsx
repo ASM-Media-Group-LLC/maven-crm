@@ -64,11 +64,16 @@ function Chequeo({ icono: Icono, titulo, estado, detalle, loading, onClick }: {
   onClick?: () => void;
 }) {
   const clickeable = !!onClick;
+  // Un poco de color (12/11): ícono en el color de su estado, tinte leve y brillo suave.
+  const glow = estado === "ok" ? "glow-g" : estado === "mal" ? "glow-r" : "glow-a";
+  const chip = estado === "ok" ? "bg-success/[0.08] text-success/90 ring-success/20"
+    : estado === "mal" ? "bg-destructive/[0.08] text-destructive/90 ring-destructive/20"
+    : "bg-warning/[0.08] text-warning/90 ring-warning/20";
   return (
     <button type="button" onClick={onClick} disabled={!clickeable}
-      className={`vidrio p-3 text-left w-full ${clickeable ? "transition hover:brightness-110 cursor-pointer" : "cursor-default"}`}>
+      className={`vidrio vidrio-glow glow-suave ${glow} p-3 text-left w-full ${clickeable ? "transition hover:brightness-110 cursor-pointer" : "cursor-default"}`}>
       <div className="v-cont flex items-start gap-3">
-        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-border/70 bg-foreground/[0.04] text-foreground/75">
+        <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full ring-1 ${chip}`}>
           <Icono className="h-4.5 w-4.5" />
         </span>
         <div className="min-w-0 flex-1">
@@ -273,7 +278,7 @@ export default function SaludPlataformaBloque() {
     <section className="vidrio sube p-4" style={{ animationDelay: "0.1s" }}>
       <div className="mb-3 flex items-center justify-between gap-3">
         <h2 className="flex items-center gap-2 text-sm font-semibold">
-          <span className="flex h-7 w-7 items-center justify-center rounded-full border border-border/70 bg-foreground/[0.04] text-foreground/75"><Activity className="h-4 w-4" /></span>
+          <span className="flex h-7 w-7 items-center justify-center rounded-full bg-primary/[0.08] text-primary/90 ring-1 ring-primary/20"><Activity className="h-4 w-4" /></span>
           {t("dashboard.centro.salud.titulo")}
         </h2>
         <span className="text-[11px] text-muted-foreground">{t("dashboard.centro.salud.soloDueno")}</span>
@@ -295,9 +300,9 @@ export default function SaludPlataformaBloque() {
           <Chequeo icono={Activity} titulo={t("dashboard.centro.salud.infra")} estado="ok" detalle={t("dashboard.centro.salud.infraVer")}
             onClick={() => navegar("/oficina/costos?vista=conexiones")} />
           <button type="button" onClick={() => navegar("/oficina/costos")}
-            className="vidrio w-full cursor-pointer p-3 text-left transition hover:brightness-110">
+            className="vidrio vidrio-glow glow-suave glow-b w-full cursor-pointer p-3 text-left transition hover:brightness-110">
             <div className="v-cont flex items-start gap-3">
-              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-border/70 bg-foreground/[0.04] text-foreground/75"><Wallet className="h-4.5 w-4.5" /></span>
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/[0.08] text-primary/90 ring-1 ring-primary/20"><Wallet className="h-4.5 w-4.5" /></span>
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2">
                   <span className="truncate text-sm font-semibold">{t("dashboard.centro.salud.gastos")}</span>
@@ -324,9 +329,9 @@ export default function SaludPlataformaBloque() {
       {(entradas > 0 || avatares.length > 0) && (
       <div className="mt-3 grid gap-2.5 sm:grid-cols-[auto_1fr] sm:items-stretch">
         {entradas > 0 && (
-          <div className="vidrio p-3">
+          <div className="vidrio vidrio-glow glow-suave glow-b p-3">
             <div className="v-cont flex items-center gap-3">
-              <span className="flex h-10 w-10 items-center justify-center rounded-full border border-border/70 bg-foreground/[0.04] text-foreground/75"><Users className="h-5 w-5" /></span>
+              <span className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/[0.08] text-primary/90 ring-1 ring-primary/20"><Users className="h-5 w-5" /></span>
               <div>
                 <div className="font-display text-2xl font-bold tabular-nums leading-none">{entradas}</div>
                 <div className="mt-0.5 text-[11px] text-muted-foreground">{t("dashboard.centro.salud.entraronHoy")}</div>

@@ -1381,6 +1381,15 @@ All colors MUST be HSL. Light mode in :root, dark mode in .dark.
 .glow-a { --glow: rgba(255,179,107,.22); }
 .glow-r { --glow: rgba(240,90,110,.22); }
 .glow-v { --glow: rgba(179,155,255,.22); }
+/* INICIALES SUAVES (Alvaro, 12/11/2026: «demasiado prendidos los colores»): las
+   iniciales de quien no tiene foto ni muñequito dejan el degradado fuerte y van
+   en un tono propio apagado (oscuro) o pastel (claro). El tono sale del nombre. */
+.avatar-iniciales { background: hsl(var(--av-h, 220) 26% 32%); color: hsl(var(--av-h, 220) 55% 90%); }
+html:not(.dark) .avatar-iniciales { background: hsl(var(--av-h, 220) 72% 92%); color: hsl(var(--av-h, 220) 45% 32%); }
+
+/* Brillo SUAVE (Alvaro, 12/11/2026: «sin colorcitos» y luego «un poquitito más de
+   color no estaría mal»): el mismo glow de esquina, quieto y a menos de la mitad. */
+.glow-suave::before { animation: none; opacity: .26; }
 :root[data-contrast="high"] .vidrio-glow::before { display: none; }
 
 /* PANELES FLOTANTES DEL CASCARÓN (como el link: riel, barra y contenido son
