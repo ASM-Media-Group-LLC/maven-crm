@@ -358,8 +358,12 @@ const ROOM_OPTIONS: RoomOptions = {
 // publishDefaults se COMBINA con esto (LocalParticipant hace
 // `Object.assign({}, publishDefaults, options)`), así que dtx, red y el códec
 // vp8 se heredan igual; acá solo va lo que cambia.
+// 13/11/2026 (Alvaro: «compartir pantalla en modo chiquito se ve todo
+// pixelado»): la capa chica a 360p@3 se veía borrosa y a saltos en las
+// miniaturas del tablero de supervisión. Sube a 720p@5: se lee en chiquito y
+// aun así cuesta menos que el 540p@15 de antes (≈4,6 M px/s contra 7,5 M px/s).
 const PUBLICACION_DE_PANTALLA: TrackPublishOptions = {
-  screenShareSimulcastLayers: [ScreenSharePresets.h360fps3],
+  screenShareSimulcastLayers: [ScreenSharePresets.h720fps5],
   degradationPreference: "maintain-framerate",
 };
 
