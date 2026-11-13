@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { AlertTriangle, Loader2, MapPin, Monitor, RefreshCw, Search } from "lucide-react";
+import { AlertTriangle, ChevronLeft, ChevronRight, Loader2, MapPin, Monitor, RefreshCw, Search } from "lucide-react";
 import { useLanguage } from "@/hooks/useLanguage";
 import type { TranslationKey } from "@/lib/i18n";
 import { Button } from "@/components/ui/button";
@@ -65,6 +65,9 @@ export function DondeEstaPanel() {
   const q = useDondeEsta();
   const [filtro, setFiltro] = useState<Filtro>("todos");
   const [busqueda, setBusqueda] = useState("");
+  // Primero cajitas por departamento; al tocar una, su lista (Alvaro, 13/11/2026:
+  // «aquí deberían estar cajitas lindas por departamentos y ya después miro listados»).
+  const [deptoSel, setDeptoSel] = useState<string | null>(null);
   const ahora = Date.now();
 
   const duracion = (desdeIso: string | null): string => {
@@ -87,8 +90,25 @@ export function DondeEstaPanel() {
   const vistas = useMemo(() => {
     const norm = (s: string | null | undefined) => (s ?? "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
     const b = norm(busqueda.trim());
-    return filas.filter((f) => pasaFiltro(f, filtro) && (!b || [f.nombre, f.puesto, f.equipo].some((x) => norm(x).includes(b))));
-  }, [filas, filtro, busqueda]);
+    return filas.filter((f) => pasaFiltro(f, filtro)
+      && (!deptoSel || (f.equipo ?? "Otros") === deptoSel)
+      && (!b || [f.nombre, f.puesto, f.equipo].some((x) => norm(x).includes(b))));
+  }, [filas, filtro, busqueda, deptoSel]);
+  // Las cajitas: cuántos en Cowork, fuera, con problema y fuera de turno por
+  // departamento. Primero donde hay más gente fuera.
+  const deptos = useMemo(() => {
+    const m = new Map<string, FilaDondeEsta[]>();
+    for (const f of filas) { const k = f.equipo ?? "Otros"; (m.get(k) ?? m.set(k, []).get(k)!).push(f); }
+    return [...m.entries()].map(([nombre, gente]) => ({
+      nombre,
+      total: gente.length,
+      enCowork: gente.filter((f) => pasaFiltro(f, "enCowork")).length,
+      fuera: gente.filter((f) => pasaFiltro(f, "rojo")).length,
+      problema: gente.filter((f) => pasaFiltro(f, "naranja")).length,
+      fueraTurno: gente.filter((f) => pasaFiltro(f, "gris")).length,
+    })).sort((a, b) => b.fuera - a.fuera || b.problema - a.problema || a.nombre.localeCompare(b.nombre, "es"));
+  }, [filas]);
+  const verDeptos = !deptoSel && !busqueda.trim();
 
   if (q.isLoading) {
     return <div className="flex items-center justify-center py-16"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>;
@@ -116,15 +136,67 @@ export function DondeEstaPanel() {
           <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input value={busqueda} onChange={(e) => setBusqueda(e.target.value)} placeholder={t("hr.donde.buscar")} aria-label={t("hr.donde.buscar")} className="pl-8" />
         </div>
-        <div className="flex flex-wrap gap-1.5" role="group" aria-label={t("hr.donde.titulo")}>
+        {!verDeptos && <div className="flex flex-wrap gap-1.5" role="group" aria-label={t("hr.donde.titulo")}>
           {FILTROS.map((x) => (
             <button key={x.k} type="button" onClick={() => setFiltro(x.k)} aria-pressed={filtro === x.k}
               className={`rounded-full border px-3 py-1 text-xs font-medium tabular-nums transition ${filtro === x.k ? "border-foreground/30 bg-foreground/10 text-foreground" : "border-border/60 text-muted-foreground hover:text-foreground"}`}>
               {t(x.label)} · {conteo[x.k]}
             </button>
           ))}
-        </div>
+        </div>}
       </div>
+
+      {/* Dentro de un departamento: volver a las cajitas. */}
+      {deptoSel && (
+        <div className="flex flex-wrap items-center gap-2">
+          <button type="button" onClick={() => { setDeptoSel(null); setFiltro("todos"); }}
+            className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-xs text-muted-foreground transition hover:bg-foreground/5 hover:text-foreground">
+            <ChevronLeft className="h-4 w-4" />{t("hr.donde.volverDeptos")}
+          </button>
+          <span className="text-sm font-semibold text-foreground">{deptoSel}</span>
+        </div>
+      )}
+
+      {verDeptos ? (
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+          {deptos.map((d) => {
+            const seg = [
+              { n: d.enCowork, c: "bg-success/70" }, { n: d.problema, c: "bg-warning/70" },
+              { n: d.fuera, c: "bg-destructive/70" }, { n: d.fueraTurno, c: "bg-muted-foreground/30" },
+            ];
+            return (
+              <button key={d.nombre} type="button" onClick={() => setDeptoSel(d.nombre)}
+                className={`group vidrio vidrio-lift flex flex-col gap-3 p-4 text-left ${d.fuera > 0 ? "ring-1 ring-destructive/40" : ""}`}>
+                <div className="flex items-start gap-3">
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-[15px] font-semibold text-foreground">{d.nombre}</p>
+                    <p className="text-[11px] text-muted-foreground tabular-nums">{t("hr.donde.gente", { n: d.total })}</p>
+                  </div>
+                  <div className="flex shrink-0 flex-col items-end">
+                    <span className="font-display text-[28px] font-semibold leading-none tabular-nums text-foreground">{d.enCowork}</span>
+                    <span className="mt-0.5 text-[10px] text-muted-foreground">{t("hr.donde.filtro.enCowork")}</span>
+                  </div>
+                </div>
+                {/* La barra del departamento: cómo está repartida su gente ahora. */}
+                <span className="flex h-2 w-full gap-0.5 overflow-hidden rounded-full bg-foreground/10">
+                  {seg.filter((x) => x.n > 0).map((x, i) => (
+                    <span key={i} className={`h-full ${x.c}`} style={{ width: `${(x.n / Math.max(1, d.total)) * 100}%` }} />
+                  ))}
+                </span>
+                <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-[11px] text-muted-foreground tabular-nums">
+                  <span className="flex items-center gap-1.5"><span className="h-1.5 w-1.5 rounded-full bg-success" aria-hidden />{t("hr.donde.filtro.enCowork")} · <span className="text-foreground/85">{d.enCowork}</span></span>
+                  <span className="flex items-center gap-1.5"><span className="h-1.5 w-1.5 rounded-full bg-destructive" aria-hidden />{t("hr.donde.filtro.fuera")} · <span className="text-foreground/85">{d.fuera}</span></span>
+                  <span className="flex items-center gap-1.5"><span className="h-1.5 w-1.5 rounded-full bg-warning" aria-hidden />{t("hr.donde.filtro.problemas")} · <span className="text-foreground/85">{d.problema}</span></span>
+                  <span className="flex items-center gap-1.5"><span className="h-1.5 w-1.5 rounded-full bg-muted-foreground/50" aria-hidden />{t("hr.donde.filtro.fueraTurno")} · <span className="text-foreground/85">{d.fueraTurno}</span></span>
+                </div>
+                <span className="flex items-center justify-end text-[11px] text-muted-foreground">
+                  <ChevronRight className="h-4 w-4 transition group-hover:translate-x-0.5 group-hover:text-foreground" />
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      ) : (<>
 
       {vistas.length === 0 ? (
         <p className="vidrio p-6 text-sm text-muted-foreground">{t("hr.donde.nadie")}</p>
@@ -194,6 +266,7 @@ export function DondeEstaPanel() {
           })}
         </ul>
       )}
+      </>)}
     </div>
   );
 }

@@ -463,14 +463,6 @@ function EquiposVista({ dia, t, onPersona, equipoInicial }: { dia: string; t: Tr
   );
 }
 
-function Metrica({ label, valor, color }: { label: string; valor: number | null; color: string }) {
-  return (
-    <div className="flex items-center justify-between text-xs">
-      <span className="flex items-center gap-1.5 text-muted-foreground"><span className="h-2 w-2 shrink-0 rounded-full" style={{ background: color }} />{label}</span>
-      <span className="font-semibold tabular-nums">{valor == null ? "—" : `${valor}%`}</span>
-    </div>
-  );
-}
 
 export function ArgosHistorial() {
   const { t } = useLanguage();
@@ -558,7 +550,7 @@ export function ArgosHistorial() {
                       onClick={() => setTurnoSel(turno)}
                       disabled={!r.hayDatos}
                       title={t("hr.hist.gente")}
-                      className="rounded-2xl border border-border/40 bg-card/20 p-3.5 text-left transition hover:border-primary/40 hover:bg-card/40 disabled:cursor-default disabled:opacity-70 disabled:hover:border-border/40 disabled:hover:bg-card/20"
+                      className="rounded-[14px] border border-border/50 bg-card/30 p-4 text-left transition-colors hover:border-foreground/25 hover:bg-card/50 disabled:cursor-default disabled:opacity-60 disabled:hover:border-border/50 disabled:hover:bg-card/30"
                     >
                       <div className="mb-2.5 flex items-center gap-2">
                         <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full" style={{ background: `${turno.color}1f`, color: turno.color }}><Icono className="h-4 w-4" /></span>
@@ -570,9 +562,9 @@ export function ArgosHistorial() {
                       </div>
                       {r.hayDatos ? (
                         <div className="space-y-1.5">
-                          <Metrica label={t("hr.resumen.pantalla")} valor={r.pantalla} color={COLOR.pantalla} />
-                          <Metrica label={t("hr.resumen.camara")} valor={r.camara} color={COLOR.camara} />
-                          <Metrica label={t("hr.resumen.atencion")} valor={r.atencion} color={COLOR.atencion} />
+                          <Barra label={t("hr.resumen.pantalla")} valor={r.pantalla} />
+                          <Barra label={t("hr.resumen.camara")} valor={r.camara} />
+                          <Barra label={t("hr.resumen.atencion")} valor={r.atencion} />
                           <div className="mt-1.5 border-t border-border/40 pt-1.5 text-[11px] text-muted-foreground">{t("hr.hist.turnoPersonas", { n: r.personas })}</div>
                         </div>
                       ) : (
