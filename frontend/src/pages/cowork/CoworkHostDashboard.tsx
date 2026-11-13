@@ -54,6 +54,8 @@ import MeetGrupalDialog from "./MeetGrupalDialog";
 import type { CoworkMeet } from "@/hooks/useCoworkSession";
 import PausaSupervisorBoton from "./PausaSupervisorBoton";
 import { leerPausaSupervisor, suscribirPausaSupervisor, esEstadoSupervisor } from "@/lib/pausaSupervisor";
+import { iniciarLatido, actualizarLatido, detenerLatido } from "@/lib/coworkLatido";
+import { marcarPausa } from "@/lib/coworkPausa";
 import type { useCoworkSession, CoworkRoom } from "@/hooks/useCoworkSession";
 import { useUserRole } from "@/hooks/useUserRole";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -197,7 +199,11 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
   // Finalizar y repartir el enlace de host son del CREADOR de la sesión (o de
   // un admin). Los demás hosts supervisan, pero no apagan la sesión para todos
   // ni convierten en host a nadie: así se cortó la racha de cierres.
-  const { isAdmin } = useUserRole();
+  const { isAdmin, role: miRol } = useUserRole();
+  // Argos vigila a todos menos a los admins (y el dueño, que es admin): al
+  // supervisor que trabaja desde este panel le pide cámara y pantalla, le toma
+  // fotos y le cuenta el tiempo (Alvaro, 13/11/2026). Mientras el rol carga, no.
+  const vigilarAnfitrion = miRol !== null && !isAdmin;
   const puedeFinalizar = !!cowork.session && (cowork.session.created_by === userId || isAdmin);
   // Avisar: los cuatro designados (lista fija en lib/coworkAvisos, NO el rol
   // admin — hay admins que Álvaro no nombró) le avisan a un CHATTER; el dueño
@@ -888,7 +894,10 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
   const colgarHub = useCallback(() => {
     setHubMaximized(false);
     endCall();
-  }, [endCall]);
+    // Colgó el Hub: deja de trabajar en el panel, se cierra su reloj.
+    detenerLatido();
+    void cowork.leaveRoom?.();
+  }, [endCall, cowork.leaveRoom]);
 
   // Refs del navegador de SESIONES. DECLARADOS acá arriba (antes de
   // conectarHub, que los usa) pero SINCRONIZADOS más abajo, donde viven la
@@ -912,6 +921,14 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
       initialMicOn: false,
       initialCamOn: false,
       getToken: getHubToken,
+      // ARGOS TAMBIÉN AL SUPERVISOR (Alvaro, 13/11/2026): en el panel trabaja con
+      // cámara y pantalla como todos; Argos le toma fotos y su tiempo cuenta.
+      // Los callbacks van a funciones de módulo: siguen vivos con el Hub flotando
+      // en otra sección.
+      supervisorEncuadre: vigilarAnfitrion,
+      onFaceStateChange: (w) => actualizarLatido({ faceState: w.state, faceSince: w.since }),
+      onMediaStateChange: (m) =>
+        actualizarLatido({ camOn: m.camOn, screenShareOn: m.screenShareOn, conexionSala: m.conexionSala ?? null }),
       incomingAudioMuted: hubSilenciado,
       // La tacita: break / almuerzo / ausente. Es un elemento fijo que lee su
       // estado del store, así que no queda viejo aunque esta config se arme
@@ -931,7 +948,31 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
         onSwitch: (id: string) => cambiarDeSesionRef.current(id),
       },
     });
-  }, [hubRoom, hubKey, displayName, colgarHub, getHubToken, startCall, hubSilenciado, fijarHubSilencio, cowork.session?.id]);
+  }, [hubRoom, hubKey, displayName, colgarHub, getHubToken, startCall, hubSilenciado, fijarHubSilencio, cowork.session?.id, vigilarAnfitrion]);
+
+  // EL RELOJ DEL SUPERVISOR (Alvaro, 13/11/2026): con el Hub conectado late como
+  // cualquiera en su sala, y su tiempo en el panel cuenta como trabajo. No se
+  // apaga al desmontar (el Hub sigue en la ventanita flotante); solo al colgar.
+  const sesionDelHub = cowork.session?.id ?? null;
+  useEffect(() => {
+    if (!sesionDelHub || !hubConnected || !vigilarAnfitrion) return;
+    iniciarLatido(sesionDelHub, {
+      camOn: false, screenShareOn: false, faceState: null, faceSince: null,
+      onBreak: esEstadoSupervisor(leerPausaSupervisor()), conexionSala: null,
+    });
+  }, [sesionDelHub, hubConnected, vigilarAnfitrion]);
+  // La tacita (break / almuerzo / ausente) es su pausa: el reloj marca pausa y
+  // Argos no le reclama mientras tanto.
+  useEffect(() => {
+    if (!vigilarAnfitrion) return;
+    const aplicar = (e: unknown) => {
+      const enPausa = esEstadoSupervisor(e);
+      actualizarLatido({ onBreak: enPausa });
+      marcarPausa(enPausa);
+    };
+    aplicar(leerPausaSupervisor());
+    return suscribirPausaSupervisor(aplicar);
+  }, [vigilarAnfitrion]);
 
   // Entrar al Hub al abrir la sesión. UNA sola vez: sin el candado, colgar el
   // Hub lo volvería a conectar en el mismo instante.
@@ -953,9 +994,10 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
   // llamada (setConfig re-renderiza, no remonta).
   useEffect(() => {
     if (yaEntroAlHub.current && activeKey === hubKey) conectarHub();
-    // Solo cuando cambia el silencio; conectarHub cambia de identidad justo por eso.
+    // Solo cuando cambia el silencio o se sabe si se le vigila (el rol llega
+    // después); conectarHub cambia de identidad justo por eso.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [hubSilenciado]);
+  }, [hubSilenciado, vigilarAnfitrion]);
 
   const getActiveRoomToken = useCallback(async () => {
     const result = activeMeetId
