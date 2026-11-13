@@ -14,8 +14,10 @@ import { createClient } from "jsr:@supabase/supabase-js@2";
 //                        el de la sala (alert_rules.pausas) o el de la empresa.
 //   4. cámara/puesto   — faltas de los últimos 5 min en monitor_eventos (cámara
 //                        apagada/tapada, se fue, cara incompleta, celular…).
-// Al ABRIRSE una alerta se avisa (notifications → push automático) a los DUEÑOS
-// de la empresa (tenant_owners): «avisar siempre», pero una sola vez por alerta,
+// Al ABRIRSE una alerta se avisa (notifications → push automático) según LA regla
+// destinatarios_de_aviso (Alvaro, 12/11/2026): dueño, admins y RR. HH. todo;
+// supervisores su equipo; jefes sus equipos a cargo. «Avisar siempre», pero una
+// sola vez por alerta,
 // no cada 2 min. Solo entra por cron (X-Cron-Token). Huella en argos_diag.
 // El aviso abre /hr/en-vivo/<persona>?alerta=<id> (la vista en vivo, 11/11).
 
@@ -259,9 +261,15 @@ Deno.serve(async (req: Request) => {
     if (error || !fila) { errores.push(`abrir: ${error?.message ?? "sin-fila"}`); continue; }
     abiertasN++;
 
-    const destinatarios = [...duenos, ...rrhh]
-      .filter((o) => (!tenantId || o.tenant_id === tenantId) && o.user_id !== d.user_id)
-      .map((o) => o.user_id);
+    // A quién: LA regla de la base. Si no responde, al menos dueño y RR. HH.
+    // (un aviso que falta es peor que uno de menos) y queda anotado.
+    const regla = await admin.rpc("destinatarios_de_aviso", { _target: d.user_id });
+    if (regla.error) await diag("destinatarios_error", { error: regla.error.message });
+    const destinatarios = regla.error
+      ? [...duenos, ...rrhh]
+          .filter((o) => (!tenantId || o.tenant_id === tenantId) && o.user_id !== d.user_id)
+          .map((o) => o.user_id)
+      : ((regla.data ?? []) as Array<{ user_id: string }>).map((x) => x.user_id).filter((u) => u && u !== d.user_id);
     if (destinatarios.length === 0) continue;
     const nombre = nombreDe.get(d.user_id) ?? "Alguien";
     const filas = [...new Set(destinatarios)].map((uid) => ({
@@ -280,8 +288,8 @@ Deno.serve(async (req: Request) => {
       // — no el expediente con fotos. Si la alerta ya cerró, ahí mismo sale el
       // video de esos minutos.
       deep_link_url: `/hr/en-vivo/${d.user_id}?alerta=${fila.id}`,
-      required_permission_module: "HR",
-      required_permission_submodule: "Monitor IA",
+      // Sin required_permission: a quién le llega ya lo decidió la regla; con el
+      // permiso de HR, la campana se lo escondía a supervisores y jefes.
     }));
     const { error: nErr } = await admin.from("notifications").insert(filas);
     if (nErr) { errores.push(`avisar: ${nErr.message}`); continue; }

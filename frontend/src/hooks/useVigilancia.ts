@@ -20,8 +20,13 @@ export type AlcanceVigilancia = "dueno" | "rrhh" | "equipo";
 
 export function alcanceDeVigilancia(esDueno: boolean, esRh: boolean, nivel: string | null): AlcanceVigilancia | null {
   if (esDueno) return "dueno";
+  // Admins: todo el equipo, como el dueño (Alvaro, 12/11/2026).
+  if (nivel === "admin") return "dueno";
   if (esRh) return "rrhh";
   if (nivel === "supervisor") return "equipo";
+  // Jefe con equipos a cargo (Luis: Chatters, PR y Editores). La base filtra a
+  // su gente (equipos_a_cargo); sin equipos a cargo no ve a nadie.
+  if (nivel === "manager") return "equipo";
   return null;
 }
 
