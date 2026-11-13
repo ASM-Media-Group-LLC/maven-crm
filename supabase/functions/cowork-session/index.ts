@@ -475,6 +475,24 @@ serve(async (req) => {
         memberRole = "host";
       }
 
+      // SALA POR DEFECTO (Alvaro, 13/11/2026: «con que estén en un tipo de rol
+      // deberían de poder entrar»). El participante solo ve SU sala (RLS), así que
+      // quien es nuevo en un Cowork no tiene a cuál entrar y se le pedía código. Sin
+      // `roomId`, el servidor elige: su última sala de esta sesión o la primera.
+      const salaPorDefecto = async (): Promise<string | null> => {
+        const { data: ultima } = await admin.from("cowork_room_assignments")
+          .select("room_id").eq("session_id", sessionId).eq("user_id", userId)
+          .order("assigned_at", { ascending: false }).limit(1).maybeSingle();
+        if (ultima?.room_id) {
+          const { data: sigue } = await admin.from("cowork_rooms").select("id").eq("id", ultima.room_id).eq("session_id", sessionId).maybeSingle();
+          if (sigue) return sigue.id as string;
+        }
+        const { data: primera } = await admin.from("cowork_rooms").select("id").eq("session_id", sessionId)
+          .order("sort_order", { ascending: true }).limit(1).maybeSingle();
+        return (primera?.id as string | undefined) ?? null;
+      };
+      const salaPedida: string | null = roomId ?? (memberRole === "participant" ? await salaPorDefecto() : null);
+
       // Check if already a member
       const { data: existing } = await admin.from("cowork_memberships").select("id, role").eq("session_id", sessionId).eq("user_id", userId).single();
 
@@ -482,15 +500,15 @@ serve(async (req) => {
         // Same role → return as-is
         if (existing.role === memberRole) {
           // If participant re-joins with a roomId but has no active assignment, create one
-          if (memberRole === "participant" && roomId) {
+          if (memberRole === "participant" && salaPedida) {
             const { data: currentAssignment } = await admin.from("cowork_room_assignments")
               .select("id").eq("session_id", sessionId).eq("user_id", userId).eq("is_active", true).single();
             if (!currentAssignment) {
               const { data: roomCheck } = await admin.from("cowork_rooms")
-                .select("id").eq("id", roomId).eq("session_id", sessionId).single();
+                .select("id").eq("id", salaPedida).eq("session_id", sessionId).single();
               if (roomCheck) {
                 await admin.from("cowork_room_assignments").insert({
-                  session_id: sessionId, user_id: userId, room_id: roomId, assigned_by: userId,
+                  session_id: sessionId, user_id: userId, room_id: salaPedida, assigned_by: userId,
                 });
               }
             }
@@ -517,13 +535,13 @@ serve(async (req) => {
         if (memberRole === "host") {
           // Switching to host: remove active room assignments (hosts use Hub)
           await admin.from("cowork_room_assignments").update({ is_active: false }).eq("session_id", sessionId).eq("user_id", userId).eq("is_active", true);
-        } else if (memberRole === "participant" && roomId) {
+        } else if (memberRole === "participant" && salaPedida) {
           // Switching to participant: assign room
-          const { data: roomCheck } = await admin.from("cowork_rooms").select("id").eq("id", roomId).eq("session_id", sessionId).single();
+          const { data: roomCheck } = await admin.from("cowork_rooms").select("id").eq("id", salaPedida).eq("session_id", sessionId).single();
           if (roomCheck) {
             await admin.from("cowork_room_assignments").update({ is_active: false }).eq("session_id", sessionId).eq("user_id", userId).eq("is_active", true);
             await admin.from("cowork_room_assignments").insert({
-              session_id: sessionId, user_id: userId, room_id: roomId, assigned_by: userId,
+              session_id: sessionId, user_id: userId, room_id: salaPedida, assigned_by: userId,
             });
           }
         }
@@ -537,12 +555,12 @@ serve(async (req) => {
       }).select().single();
       if (memErr) return err(req, memErr.message, 500);
 
-      // Auto-assign participant to room if roomId provided
-      if (memberRole === "participant" && roomId) {
-        const { data: roomCheck } = await admin.from("cowork_rooms").select("id").eq("id", roomId).eq("session_id", sessionId).single();
+      // Auto-assign participant to room (la pedida o la de por defecto)
+      if (memberRole === "participant" && salaPedida) {
+        const { data: roomCheck } = await admin.from("cowork_rooms").select("id").eq("id", salaPedida).eq("session_id", sessionId).single();
         if (roomCheck) {
           await admin.from("cowork_room_assignments").insert({
-            session_id: sessionId, user_id: userId, room_id: roomId, assigned_by: userId,
+            session_id: sessionId, user_id: userId, room_id: salaPedida, assigned_by: userId,
           });
         }
       }
