@@ -97,7 +97,9 @@ interface PersonaRonda { userId: string; nombre: string | null; avatarUrl: strin
  * a los demás). Los nombres técnicos solo salen si es dueño; los supervisores
  * ven la versión funcional (Drive / Correo / Mensajería).
  */
-export default function SaludPlataformaBloque() {
+/** `compacto`: en la columna angosta del inicio (dos columnas, 13/11/2026) los
+ *  chequeos van uno debajo del otro. */
+export default function SaludPlataformaBloque({ compacto = false }: { compacto?: boolean } = {}) {
   const { t, language } = useLanguage();
   const { user } = useAuth();
   const { esDueno } = useEsDueno();
@@ -286,7 +288,7 @@ export default function SaludPlataformaBloque() {
 
       {/* 4 chequeos funcionales — visibles para dueño/admin. Nombres neutros
           (Drive/Correo/Mensajería/Argos); los proveedores reales solo si es dueño. */}
-      <div className="grid gap-2.5 sm:grid-cols-2 lg:grid-cols-4">
+      <div className={compacto ? "grid gap-2" : "grid gap-2.5 sm:grid-cols-2 lg:grid-cols-4"}>
         <Chequeo icono={HardDrive} titulo={t("dashboard.centro.salud.drive")} estado={nasEstado} detalle={nasDetalle} loading={cargando} onClick={() => setDiagTipo("drive")} />
         <Chequeo icono={Mail} titulo={t("dashboard.centro.salud.correo")} estado={correoEstado} detalle={correoDetalle} loading={cargando} onClick={() => setDiagTipo("correo")} />
         <Chequeo icono={Activity} titulo={t("dashboard.centro.salud.mensajeria")} estado={mensajeriaEstado} detalle={mensajeriaDetalle} onClick={() => setDiagTipo("mensajeria")} />
@@ -295,7 +297,7 @@ export default function SaludPlataformaBloque() {
 
       {/* Bloque técnico (solo dueño): crons + nombres de proveedores. */}
       {verDetalleTecnico && (
-        <div className="mt-2.5 grid gap-2.5 sm:grid-cols-2 lg:grid-cols-3">
+        <div className={compacto ? "mt-2 grid gap-2" : "mt-2.5 grid gap-2.5 sm:grid-cols-2 lg:grid-cols-3"}>
           <Chequeo icono={Database} titulo={t("dashboard.centro.salud.crons")} estado={cronEstado} detalle={cronDetalle} loading={cargando} />
           <Chequeo icono={Activity} titulo={t("dashboard.centro.salud.infra")} estado="ok" detalle={t("dashboard.centro.salud.infraVer")}
             onClick={() => navegar("/oficina/costos?vista=conexiones")} />
@@ -327,7 +329,7 @@ export default function SaludPlataformaBloque() {
       {/* Entradas de hoy + tira de desconectados recientes. Alvaro (08/11 noche):
           cajas vacías no van — si no hay nada que mostrar, no aparece. */}
       {(entradas > 0 || avatares.length > 0) && (
-      <div className="mt-3 grid gap-2.5 sm:grid-cols-[auto_1fr] sm:items-stretch">
+      <div className={compacto ? "mt-2 grid gap-2" : "mt-3 grid gap-2.5 sm:grid-cols-[auto_1fr] sm:items-stretch"}>
         {entradas > 0 && (
           <div className="vidrio vidrio-glow glow-suave glow-b p-3">
             <div className="v-cont flex items-center gap-3">

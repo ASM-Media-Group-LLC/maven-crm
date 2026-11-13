@@ -15,15 +15,17 @@ All colors MUST be HSL. Light mode in :root, dark mode in .dark.
      toca: primary-foreground sigue blanco y el primario mantiene su luminosidad. */
   :root {
     --background: 240 20% 98%;
-    --foreground: 240 20% 12%;
+    /* En claro, el negro un punto abajo (13/11/2026: «en blanco también están muy
+       negras»): lo fuerte gris muy oscuro, no tinta. */
+    --foreground: 240 12% 18%;
     /* TEXTO CORRIENTE (Alvaro, 12/11: «blanco solo para lo clave»): tres niveles.
        fuerte = --foreground (títulos, nombres, cifras: quien lo pide con
        text-foreground o un h1–h3), corriente = --texto (todo lo demás, lo que
        hereda del body y de las tarjetas), tenue = --muted-foreground. */
-    --texto: 240 10% 26%;
+    --texto: 240 8% 32%;
 
     --card: 0 0% 100%;
-    --card-foreground: 240 10% 26%;
+    --card-foreground: 240 8% 32%;
 
     --popover: 0 0% 100%;
     --popover-foreground: 240 20% 12%;
@@ -120,12 +122,14 @@ All colors MUST be HSL. Light mode in :root, dark mode in .dark.
        No toca los botones (usan *-foreground: 0 0% 100%) ni el texto sobre
        fotos/video (text-white). Decisión de Alvaro (19/10): "todo un poco más
        suave, dos niveles". */
-    --foreground: 240 12% 89%;
+    /* 89% → 84% (Alvaro, 13/11/2026: «el blanco de los nombres y títulos se roba
+       la vista»): lo fuerte sigue siendo lo más claro, sin encandilar. */
+    --foreground: 240 8% 82%;
     /* Texto corriente un escalón bajo el fuerte (ver :root). */
-    --texto: 240 7% 76%;
+    --texto: 240 6% 71%;
 
     --card: 240 12% 7%;
-    --card-foreground: 240 7% 76%;
+    --card-foreground: 240 6% 71%;
 
     --popover: 240 12% 7%;
     --popover-foreground: 240 12% 89%;
@@ -302,7 +306,7 @@ All colors MUST be HSL. Light mode in :root, dark mode in .dark.
   html[data-blanco]:not(.dark) {
     --background: 0 0% 100%;
     /* Un punto menos negro (Alvaro, 12/11: «la letra sigue muy fuerte»). */
-    --foreground: 240 8% 14%;
+    --foreground: 240 8% 18%;
     --texto: 240 5% 34%;
     --card: 0 0% 100%;
     --card-foreground: 240 5% 34%;

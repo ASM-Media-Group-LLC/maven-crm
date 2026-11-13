@@ -321,6 +321,7 @@ export const dashboard = {
   "dashboard.pulso.trabajando": { es: "Trabajando bien", en: "Working well" },
   "dashboard.pulso.conProblema": { es: "Con problema", en: "With issues" },
   "dashboard.pulso.hazClicProblema": { es: "Quién, abajo", en: "Who — below" },
+  "dashboard.centro.numeros": { es: "Los números de hoy", en: "Today's numbers" },
   "dashboard.centro.virtualOffice": { es: "Virtual Office", en: "Virtual Office" },
   // Página de Virtual Office (agentes AI de Paperclip)
   "dashboard.virtualOffice.titulo": { es: "Virtual Office", en: "Virtual Office" },
