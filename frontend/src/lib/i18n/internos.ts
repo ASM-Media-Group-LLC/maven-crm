@@ -284,6 +284,7 @@ export const internos = {
     en: "Get in front of the camera. If you need to step away, use the pause button.",
   },
   "int.face.noScreen": { es: "No estás compartiendo pantalla", en: "You're not sharing your screen" },
+  "int.coworkObligatorio.aviso": { es: "Para usar Maven tienes que estar en Cowork. Entra a tu sala.", en: "To use Maven you need to be in Cowork. Join your room." },
   "int.face.reportando": { es: "Te estoy reportando con tu supervisor", en: "I'm reporting you to your supervisor" },
   "int.argosFuera.titulo": { es: "Estás fuera de Cowork en tu turno", en: "You're out of Cowork during your shift" },
   "int.argosFuera.tituloNoEntro": { es: "Ya empezó tu turno y no has entrado a Cowork", en: "Your shift started and you haven't joined Cowork" },

@@ -1,5 +1,6 @@
 import { Suspense, useEffect } from "react";
-import { Outlet } from "react-router-dom";
+import { Navigate, Outlet, useLocation } from "react-router-dom";
+import { toast } from "sonner";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import { Skeleton } from "@/components/ui/skeleton";
 import DashboardSidebar from "@/components/dashboard/DashboardSidebar";
@@ -13,6 +14,8 @@ import AnnouncementPopup from "@/components/dashboard/AnnouncementPopup";
 import { ArgosVigilante } from "@/components/ArgosVigilante";
 import { AvisoNasCaido } from "@/components/oficina/AvisoNasCaido";
 import { AvisoFueraDeCowork } from "@/components/cowork/AvisoFueraDeCowork";
+import { useCoworkObligatorio, debeIrACowork } from "@/hooks/useCoworkObligatorio";
+import { traducir } from "@/lib/i18n";
 import { useAnnouncementsByChannel } from "@/hooks/useAnnouncements";
 import { useWaInboxNotifications } from "@/hooks/useWaInboxNotifications";
 import { useTgInboxNotifications } from "@/hooks/useTgInboxNotifications";
@@ -77,6 +80,14 @@ const AppShell = () => {
   // Al tocar una notificación push, el service worker enfoca esta ventana y le
   // pide navegar a la conversación (postMessage "abrir-url").
   useNavegarDesdeNotificacion();
+  // Todos adentro de Cowork (Alvaro, 13/11/2026): quien debe estar y no está en su
+  // sala no usa el resto de Maven; se le manda a Cowork (ver useCoworkObligatorio).
+  const { pathname } = useLocation();
+  const { estado: estadoCowork, enSalaAqui } = useCoworkObligatorio();
+  const irACowork = debeIrACowork(estadoCowork, enSalaAqui, pathname);
+  useEffect(() => {
+    if (irACowork) toast.info(traducir("int.coworkObligatorio.aviso"), { id: "cowork-obligatorio", duration: 8_000 });
+  }, [irACowork]);
 
   return (
     // El buzón de tecleo va POR FUERA del ChatProvider: este árbol contiene las
@@ -109,7 +120,7 @@ const AppShell = () => {
           <AvisoFueraDeCowork />
           <main className="vidrio-panel relative flex flex-1 flex-col min-h-0 overflow-hidden">
             <Suspense fallback={<ContentLoadingFallback />}>
-              <Outlet />
+              {irACowork ? <Navigate to="/cowork" replace /> : <Outlet />}
             </Suspense>
           </main>
         </div>
