@@ -135,29 +135,29 @@ export function ArgosAjustesContenido() {
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         <div className="rounded-2xl border border-border/60 bg-card p-4">
           <p className="text-xs font-semibold text-muted-foreground">{t("hr.argoscentro.estado")}</p>
-          <p className="mt-1 font-display text-lg font-bold text-primary">{t("hr.argoscentro.estadoVoz")}</p>
+          <p className="mt-1 font-display text-lg font-bold text-foreground">{t("hr.argoscentro.estadoVoz")}</p>
         </div>
         <div className="rounded-2xl border border-border/60 bg-card p-4">
           <p className="text-xs font-semibold text-muted-foreground">{t("hr.argoscentro.estado")}</p>
-          <p className="mt-1 font-display text-lg font-bold text-success">{t("hr.argoscentro.estadoLive", { n: liveN })}</p>
+          <p className="mt-1 flex items-center gap-2 font-display text-lg font-bold text-foreground"><span className="h-1.5 w-1.5 shrink-0 rounded-full bg-success" aria-hidden />{t("hr.argoscentro.estadoLive", { n: liveN })}</p>
         </div>
         <div className="rounded-2xl border border-border/60 bg-card p-4">
           <p className="text-xs font-semibold text-muted-foreground">{t("hr.argoscentro.estado")}</p>
-          <p className="mt-1 font-display text-base font-bold text-warning">{t("hr.argoscentro.estadoBeta")}</p>
+          <p className="mt-1 flex items-center gap-2 font-display text-base font-bold text-foreground"><span className="h-1.5 w-1.5 shrink-0 rounded-full bg-warning" aria-hidden />{t("hr.argoscentro.estadoBeta")}</p>
         </div>
       </div>
 
       {/* La voz. */}
       <div className="rounded-2xl border border-border/60 bg-card p-5 sm:p-6">
         <h2 className="flex items-center gap-2 font-display text-lg font-bold tracking-tight">
-          <Volume2 className="h-5 w-5 text-primary" />
+          <Volume2 className="h-5 w-5 text-foreground/75" />
           {t("hr.argoscentro.vozTitle")}
         </h2>
-        <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-3 rounded-2xl border border-primary/40 bg-primary/5 px-4 py-3">
+        <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-3 rounded-2xl border border-border/60 bg-foreground/[0.03] px-4 py-3">
           <div className="min-w-0 flex-1">
             <p className="text-sm font-semibold text-foreground">{t("hr.argoscentro.vozJavi")}</p>
-            <span className="mt-1 inline-block rounded-full bg-success/15 px-2.5 py-0.5 text-xs font-semibold text-success">
-              {t("hr.argoscentro.vozActiva")}
+            <span className="mt-1 inline-flex items-center gap-1.5 rounded-full border border-border/60 bg-foreground/[0.04] px-2.5 py-0.5 text-xs font-medium text-foreground/85">
+              <span className="h-1.5 w-1.5 rounded-full bg-success" aria-hidden />{t("hr.argoscentro.vozActiva")}
             </span>
           </div>
           <Btn id="voz" texto={vozPrueba} grande />
@@ -174,8 +174,8 @@ export function ArgosAjustesContenido() {
         <p className="mt-1 text-sm text-muted-foreground">{t("hr.argoscentro.catSub")}</p>
 
         {/* ✓ Lo que hace Argos (su lista granular, con el chequeo de hoy). */}
-        <h3 className="mb-2.5 mt-5 flex items-center gap-2 font-display text-sm font-bold text-success">
-          <Check className="h-4 w-4" />
+        <h3 className="mb-2.5 mt-5 flex items-center gap-2 font-display text-sm font-bold text-foreground">
+          <Check className="h-4 w-4 text-muted-foreground" />
           {t("hr.argoscentro.secArgos")} ({ARGOS_SITS.length})
         </h3>
         <div className="grid gap-2">
@@ -197,7 +197,7 @@ export function ArgosAjustesContenido() {
                 {s.tipo ? (
                   conteo === null ? null : (
                     <div className="flex shrink-0 items-center gap-2 self-start">
-                      <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold tabular-nums ${datos?.total ? "bg-primary/15 text-primary" : "bg-muted text-muted-foreground"}`}>
+                      <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold tabular-nums ${datos?.total ? "border border-border/60 bg-foreground/[0.04] text-foreground" : "bg-muted text-muted-foreground"}`}>
                         {t("hr.argoscentro.vecesHoy", { n: datos?.total ?? 0 })}
                       </span>
                       <button
@@ -216,16 +216,14 @@ export function ArgosAjustesContenido() {
                   </span>
                 )}
 
-                <span
-                  className={`inline-flex shrink-0 items-center gap-1.5 self-start rounded-full px-2.5 py-0.5 text-xs font-semibold ${s.live ? "bg-success/15 text-success" : "bg-warning/15 text-warning"}`}
-                >
-                  {s.live ? <Check className="h-3.5 w-3.5" /> : <Info className="h-3.5 w-3.5" />}
+                <span className="inline-flex shrink-0 items-center gap-1.5 self-start rounded-full border border-border/60 bg-foreground/[0.04] px-2.5 py-0.5 text-xs font-medium text-foreground/85">
+                  <span className={`h-1.5 w-1.5 rounded-full ${s.live ? "bg-success" : "bg-warning"}`} aria-hidden />
                   {s.live ? t("hr.argoscentro.enPiso") : t("hr.argoscentro.pronto")}
                 </span>
                 <button
                   type="button"
                   onClick={() => alternar(s.slug)}
-                  className={`shrink-0 self-start transition ${encendida ? "text-primary" : "text-muted-foreground"}`}
+                  className={`shrink-0 self-start transition ${encendida ? "text-foreground" : "text-muted-foreground/60"}`}
                   aria-label={s.slug}
                 >
                   {encendida ? <ToggleRight className="h-6 w-6" /> : <ToggleLeft className="h-6 w-6" />}
@@ -241,8 +239,8 @@ export function ArgosAjustesContenido() {
         </p>
 
         {/* ✗ Lo que manda el supervisor. */}
-        <h3 className="mb-2.5 mt-6 flex items-center gap-2 font-display text-sm font-bold text-destructive">
-          <X className="h-4 w-4" />
+        <h3 className="mb-2.5 mt-6 flex items-center gap-2 font-display text-sm font-bold text-foreground">
+          <X className="h-4 w-4 text-muted-foreground" />
           {t("hr.argoscentro.secSup")} ({supList.length})
         </h3>
         <div className="grid gap-2">
@@ -256,8 +254,8 @@ export function ArgosAjustesContenido() {
                 <p className="text-sm font-semibold text-foreground">{t(s.etiqueta)}</p>
                 <p className="mt-0.5 text-sm text-muted-foreground">&ldquo;{s.vozEs}&rdquo;</p>
               </div>
-              <span className="inline-flex shrink-0 items-center gap-1.5 self-start rounded-full bg-destructive/15 px-2.5 py-0.5 text-xs font-semibold text-destructive">
-                <X className="h-3.5 w-3.5" />
+              <span className="inline-flex shrink-0 items-center gap-1.5 self-start rounded-full border border-border/60 bg-foreground/[0.04] px-2.5 py-0.5 text-xs font-medium text-foreground/85">
+                <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground" aria-hidden />
                 {t("hr.argoscentro.tagManual")}
               </span>
               <Btn id={s.slug} texto={s.vozEs} />
@@ -270,14 +268,14 @@ export function ArgosAjustesContenido() {
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <div className="rounded-2xl border border-border/60 bg-muted/20 p-5">
           <h3 className="flex items-center gap-2 font-display text-base font-bold">
-            <Users className="h-4 w-4 text-primary" />
+            <Users className="h-4 w-4 text-muted-foreground" />
             {t("hr.argoscentro.mezclaTitle")}
           </h3>
           <p className="mt-2 text-sm text-muted-foreground">{t("hr.argoscentro.mezclaDesc")}</p>
         </div>
         <div className="rounded-2xl border border-border/60 bg-muted/20 p-5">
           <h3 className="flex items-center gap-2 font-display text-base font-bold">
-            <Shield className="h-4 w-4 text-success" />
+            <Shield className="h-4 w-4 text-muted-foreground" />
             {t("hr.argoscentro.antifalsos")}
           </h3>
         </div>

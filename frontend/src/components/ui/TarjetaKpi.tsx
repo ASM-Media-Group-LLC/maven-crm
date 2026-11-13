@@ -20,26 +20,23 @@ export function TarjetaKpi({
   /** Orden de entrada: escalona la animación "sube". */
   indice?: number;
 }) {
-  const chip =
-    tono === "success" ? "bg-success/10 text-success"
-    : tono === "warning" ? "bg-warning/10 text-warning"
-    : tono === "danger" ? "bg-destructive/10 text-destructive"
-    : "bg-primary/10 text-primary";
-  const glow =
-    tono === "success" ? "glow-g"
-    : tono === "warning" ? "glow-a"
-    : tono === "danger" ? "glow-r"
-    : "glow-b";
+  // Sin colorcitos (Alvaro, 12/11/2026): ícono neutro, sin brillo de color, la
+  // cifra en blanco. Lo malo (warning/danger) se marca solo con un puntito junto
+  // a la etiqueta; lo bueno no lleva nada.
+  const punto = tono === "warning" ? "bg-warning" : tono === "danger" ? "bg-destructive" : null;
   return (
-    <div className={`vidrio vidrio-glow vidrio-lift sube ${glow} p-4`} style={{ animationDelay: `${indice * 0.06}s` }}>
+    <div className="vidrio vidrio-lift sube p-4" style={{ animationDelay: `${indice * 0.06}s` }}>
       <div className="v-cont flex flex-col gap-3">
         <div className="flex items-center gap-2.5">
-          <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-panel ${chip}`}>
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-border/70 bg-foreground/[0.04] text-foreground/75">
             <Icono className="h-[18px] w-[18px]" />
           </span>
-          <span className="text-xs font-medium text-muted-foreground">{etiqueta}</span>
+          <span className="flex min-w-0 items-center gap-1.5 text-xs font-medium text-muted-foreground">
+            {punto && <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${punto}`} aria-hidden />}
+            <span className="truncate">{etiqueta}</span>
+          </span>
         </div>
-        <div className="font-display text-[22px] sm:text-[26px] font-bold leading-tight tracking-tight tabular-nums [text-wrap:balance]">{valor}</div>
+        <div className="font-display text-[22px] sm:text-[26px] font-bold leading-tight tracking-tight tabular-nums text-foreground [text-wrap:balance]">{valor}</div>
         <div className="text-xs text-muted-foreground">{detalle}</div>
       </div>
     </div>

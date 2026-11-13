@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { formatDistanceToNowStrict } from "date-fns";
 import { es as esLocale } from "date-fns/locale";
 import { useNavigate } from "react-router-dom";
-import { Activity, AlertCircle, ArrowRight, CheckCircle2, CloudOff, Database, Mail, Users, UserMinus, HardDrive, Loader2, Wallet } from "lucide-react";
+import { Activity, ArrowRight, Database, Mail, Users, UserMinus, HardDrive, Loader2, Wallet } from "lucide-react";
 import { mensual, usd, type ServicioCosto } from "@/lib/costos";
 import { SaludDiagnosticoModal } from "./SaludDiagnosticoModal";
 import { supabase } from "@/integrations/supabase/client";
@@ -48,11 +48,10 @@ function minutosDesde(iso: string | null | undefined): number {
 type Estado = "ok" | "mal" | "duda";
 
 function Pastilla({ estado, texto }: { estado: Estado; texto: string }) {
-  const cls = estado === "ok" ? "bg-success/10 text-success/90 border-success/30"
-    : estado === "mal" ? "bg-destructive/10 text-destructive/90 border-destructive/30"
-    : "bg-warning/10 text-warning/90 border-warning/30";
-  return <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-semibold ${cls}`}>
-    {estado === "ok" ? <CheckCircle2 className="h-3 w-3" /> : estado === "mal" ? <AlertCircle className="h-3 w-3" /> : <CloudOff className="h-3 w-3" />}
+  // Sin colorcitos (Alvaro, 12/11/2026): pastilla neutra; el estado, un puntito.
+  const punto = estado === "ok" ? "bg-success" : estado === "mal" ? "bg-destructive" : "bg-warning";
+  return <span className="inline-flex items-center gap-1.5 rounded-full border border-border/60 bg-foreground/[0.04] px-2 py-0.5 text-[11px] font-medium text-foreground/85">
+    <span className={`h-1.5 w-1.5 rounded-full ${punto}`} aria-hidden />
     {texto}
   </span>;
 }
@@ -64,13 +63,12 @@ function Chequeo({ icono: Icono, titulo, estado, detalle, loading, onClick }: {
   /** Si viene, la caja es clickeable y abre el modal de diagnóstico en vivo. */
   onClick?: () => void;
 }) {
-  const glow = estado === "ok" ? "glow-g" : estado === "mal" ? "glow-r" : "glow-a";
   const clickeable = !!onClick;
   return (
     <button type="button" onClick={onClick} disabled={!clickeable}
-      className={`vidrio vidrio-glow ${glow} p-3 text-left w-full ${clickeable ? "transition hover:brightness-110 cursor-pointer" : "cursor-default"}`}>
+      className={`vidrio p-3 text-left w-full ${clickeable ? "transition hover:brightness-110 cursor-pointer" : "cursor-default"}`}>
       <div className="v-cont flex items-start gap-3">
-        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-panel bg-primary/10 text-primary">
+        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-border/70 bg-foreground/[0.04] text-foreground/75">
           <Icono className="h-4.5 w-4.5" />
         </span>
         <div className="min-w-0 flex-1">
@@ -275,7 +273,7 @@ export default function SaludPlataformaBloque() {
     <section className="vidrio sube p-4" style={{ animationDelay: "0.1s" }}>
       <div className="mb-3 flex items-center justify-between gap-3">
         <h2 className="flex items-center gap-2 text-sm font-semibold">
-          <span className="flex h-7 w-7 items-center justify-center rounded-panel bg-primary/10 text-primary"><Activity className="h-4 w-4" /></span>
+          <span className="flex h-7 w-7 items-center justify-center rounded-full border border-border/70 bg-foreground/[0.04] text-foreground/75"><Activity className="h-4 w-4" /></span>
           {t("dashboard.centro.salud.titulo")}
         </h2>
         <span className="text-[11px] text-muted-foreground">{t("dashboard.centro.salud.soloDueno")}</span>
@@ -297,9 +295,9 @@ export default function SaludPlataformaBloque() {
           <Chequeo icono={Activity} titulo={t("dashboard.centro.salud.infra")} estado="ok" detalle={t("dashboard.centro.salud.infraVer")}
             onClick={() => navegar("/oficina/costos?vista=conexiones")} />
           <button type="button" onClick={() => navegar("/oficina/costos")}
-            className="vidrio vidrio-glow glow-b w-full cursor-pointer p-3 text-left transition hover:brightness-110">
+            className="vidrio w-full cursor-pointer p-3 text-left transition hover:brightness-110">
             <div className="v-cont flex items-start gap-3">
-              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-panel bg-primary/10 text-primary"><Wallet className="h-4.5 w-4.5" /></span>
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-border/70 bg-foreground/[0.04] text-foreground/75"><Wallet className="h-4.5 w-4.5" /></span>
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2">
                   <span className="truncate text-sm font-semibold">{t("dashboard.centro.salud.gastos")}</span>
@@ -326,9 +324,9 @@ export default function SaludPlataformaBloque() {
       {(entradas > 0 || avatares.length > 0) && (
       <div className="mt-3 grid gap-2.5 sm:grid-cols-[auto_1fr] sm:items-stretch">
         {entradas > 0 && (
-          <div className="vidrio vidrio-glow glow-b p-3">
+          <div className="vidrio p-3">
             <div className="v-cont flex items-center gap-3">
-              <span className="flex h-10 w-10 items-center justify-center rounded-panel bg-primary/10 text-primary"><Users className="h-5 w-5" /></span>
+              <span className="flex h-10 w-10 items-center justify-center rounded-full border border-border/70 bg-foreground/[0.04] text-foreground/75"><Users className="h-5 w-5" /></span>
               <div>
                 <div className="font-display text-2xl font-bold tabular-nums leading-none">{entradas}</div>
                 <div className="mt-0.5 text-[11px] text-muted-foreground">{t("dashboard.centro.salud.entraronHoy")}</div>
@@ -339,7 +337,7 @@ export default function SaludPlataformaBloque() {
         {avatares.length > 0 && (
         <div className="vidrio p-3">
           <div className="v-cont flex items-center gap-3">
-            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-panel bg-foreground/5 text-muted-foreground"><UserMinus className="h-5 w-5" /></span>
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-border/70 bg-foreground/[0.04] text-foreground/75"><UserMinus className="h-5 w-5" /></span>
             <div className="min-w-0 flex-1">
               <div className="flex items-baseline gap-2">
                 <span className="text-sm font-semibold">{t("dashboard.centro.salud.desconectados")}</span>
