@@ -113,6 +113,10 @@ const NO_CARGAN_AQUI: Record<string, string> = {
     "toca profiles y user_roles, pero usa las tablas de Cowork y de Argos, roles_config, rol_turnos, puede_vigilar " +
     "y las RPC api_equipo_*, que este fixture no trae; no toca nada del Messenger. Se prueba en su propio banco, " +
     "agencias_conectadas.ts.",
+  "20261114010000_avisos_prioridad_valida.sql":
+    "Avisos: prioridad válida ('medium' en vez de 'normal') en vigilar_tiempo_sin_pantalla y " +
+    "vigilar_cortes_de_llamada, re-creadas desde su definición actual con pg_get_functiondef. Esas funciones " +
+    "no están en este fixture; no toca nada del Messenger.",
   "20261113240000_andrea_ve_todos_los_coworks.sql":
     "Cowork: anfitriones en todas las sesiones (Andrea, RR. HH.). Usa las tablas de Cowork y es_admin_o_dueno, " +
     "que este fixture no trae; no toca nada del Messenger.",
