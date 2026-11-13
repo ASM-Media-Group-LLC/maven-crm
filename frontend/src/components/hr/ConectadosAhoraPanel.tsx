@@ -6,19 +6,21 @@ import { UserAvatar } from "@/components/UserAvatar";
 import { useCapturasVivo } from "@/hooks/useCapturasVivo";
 import { useSemaforos, PUNTO_SEM, type Semaforo } from "@/hooks/useSemaforos";
 
-// El ANILLO de color de cada cara en la muralla (mismo semáforo que el punto).
+// Sin el verde prendido (Alvaro, 12/11/2026: «está muy prendido el color
+// verde»): el anillo de cada cara es neutro y el estado va en gris; el color
+// queda SOLO en el puntito del semáforo. Lo malo se lee en blanco, no en rojo.
 const ANILLO_SEM: Record<Semaforo, string> = {
-  verde: "ring-success/70",
-  amarillo: "ring-warning/70",
-  naranja: "ring-orange-500/70",
-  rojo: "ring-destructive",
-  gris: "ring-border",
+  verde: "ring-border/70",
+  amarillo: "ring-border/70",
+  naranja: "ring-border/70",
+  rojo: "ring-border/70",
+  gris: "ring-border/50",
 };
 const TONO_SEM: Record<Semaforo, string> = {
-  verde: "text-success",
-  amarillo: "text-warning",
-  naranja: "text-orange-500",
-  rojo: "text-destructive",
+  verde: "text-muted-foreground",
+  amarillo: "text-foreground/85",
+  naranja: "text-foreground/85",
+  rojo: "text-foreground/85",
   gris: "text-muted-foreground",
 };
 
@@ -71,9 +73,9 @@ export function ConectadosAhoraPanel() {
     <section className="vidrio sube p-4 lg:p-5">
       <div className="v-cont">
         <div className="mb-4 flex flex-wrap items-center gap-3">
-          <span className="relative flex h-9 w-9 shrink-0 items-center justify-center rounded-panel bg-primary/10 text-primary">
+          <span className="relative flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-border/70 bg-foreground/[0.04] text-foreground/75">
             <Radio className="h-[18px] w-[18px]" />
-            {personas.length > 0 && <span className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-success shadow-[0_0_6px_hsl(var(--success))]" />}
+            {personas.length > 0 && <span className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-success/80" />}
           </span>
           <div className="min-w-0 flex-1">
             <h2 className="font-display text-base font-bold leading-tight tracking-tight">{t("hr.conectados.title")}</h2>
@@ -110,7 +112,7 @@ export function ConectadosAhoraPanel() {
                   type="button"
                   onClick={() => setFiltro(f.k)}
                   className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium transition-colors ${
-                    activo ? "border-primary/60 bg-primary/15 text-foreground" : "border-border/40 bg-card/30 text-muted-foreground hover:bg-card/50"
+                    activo ? "border-foreground/30 bg-foreground/10 text-foreground" : "border-border/40 bg-card/30 text-muted-foreground hover:bg-card/50"
                   }`}
                 >
                   {f.punto && <span className={`h-1.5 w-1.5 rounded-full ${f.punto}`} />}
@@ -154,7 +156,7 @@ export function ConectadosAhoraPanel() {
                   type="button"
                   onClick={() => navigate(`/hr/expediente/${p.userId}`, { state: { volverA: "/hr/monitor-ia?t=ahora" } })}
                   title={`${nombre} · ${estado}`}
-                  className={`group flex flex-col items-center gap-1.5 rounded-2xl border bg-card/20 px-2 py-3 text-center transition-colors hover:bg-card/40 ${sem === "rojo" || sem === "naranja" ? "border-destructive/40" : "border-border/40 hover:border-primary/40"}`}
+                  className={`group flex flex-col items-center gap-1.5 rounded-2xl border bg-card/20 px-2 py-3 text-center transition-colors hover:bg-card/40 border-border/40 hover:border-foreground/25`}
                 >
                   {/* La cara con su anillo de color + el punto del semáforo */}
                   <span className={`relative rounded-full p-0.5 ring-2 ${ANILLO_SEM[sem]}`}>

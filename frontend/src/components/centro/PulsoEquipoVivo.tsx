@@ -70,8 +70,8 @@ function FilaPersona({ p, t, lang, onAbrir, problema }: { p: PersonaPulso; t: Tr
   return (
     <Raiz {...(onAbrir ? { type: "button" as const, onClick: onAbrir } : {})}
       className={`group flex items-center gap-2.5 rounded-panel border px-2.5 py-1.5 text-left transition ${
-        problema ? "border-destructive/20 bg-destructive/5 hover:border-destructive/40 hover:bg-destructive/10"
-                 : "border-border/40 bg-card/30 hover:border-primary/30 hover:bg-card/50"
+        problema ? "border-border/60 bg-card/30 hover:border-foreground/25 hover:bg-card/50"
+                 : "border-border/40 bg-card/30 hover:border-foreground/25 hover:bg-card/50"
       }`}>
       <span className="relative shrink-0">
         <UserAvatar name={p.nombre || "·"} src={p.avatarUrl} seed={p.avatarSeed} size="sm" />
@@ -79,7 +79,7 @@ function FilaPersona({ p, t, lang, onAbrir, problema }: { p: PersonaPulso; t: Tr
       </span>
       <span className="min-w-0 flex-1">
         <span className="block truncate text-sm font-semibold leading-tight">{p.nombre || "—"}</span>
-        <span className={`block text-[11px] font-medium leading-tight ${ui.texto}`}>
+        <span className="block text-[11px] leading-tight text-muted-foreground">
           {t(ESTADO_LBL[p.estado])}{desde && <span className="font-normal text-muted-foreground"> · {desde}</span>}
         </span>
       </span>
@@ -102,7 +102,7 @@ export function CajaDelEquipo({ caja, t, lang, abrir }: { caja: CajaEquipo; t: T
           <span className="text-[11px] text-muted-foreground tabular-nums">
             {t("dashboard.pulso.conectadosCaja", { conectados: caja.conectados, total: caja.total })}
           </span>
-          {caja.nota != null && <span className={`ml-auto font-display text-base font-semibold tabular-nums ${tn.texto}`}>{caja.nota}</span>}
+          {caja.nota != null && <span className="ml-auto font-display text-base font-semibold tabular-nums text-foreground">{caja.nota}</span>}
         </div>
         {conectados.length === 0 ? (
           <p className="text-xs text-muted-foreground">{t("dashboard.pulso.sinConectados")}</p>
@@ -161,9 +161,9 @@ export default function PulsoEquipoVivo({ coworkConectados, conEquipo = false }:
       {/* Cabecera del Pulso (solo título + en vivo + aviso) */}
       <div className="flex flex-wrap items-center justify-between gap-2 px-0.5">
         <h2 className="flex items-center gap-2 text-sm font-semibold">
-          <span className="flex h-7 w-7 items-center justify-center rounded-panel bg-primary/10 text-primary"><Activity className="h-4 w-4" /></span>
+          <span className="flex h-7 w-7 items-center justify-center rounded-full border border-border/70 bg-foreground/[0.04] text-foreground/75"><Activity className="h-4 w-4" /></span>
           {t("dashboard.pulso.titulo")}
-          <span className="inline-flex items-center gap-1 text-[11px] font-medium text-success">
+          <span className="inline-flex items-center gap-1 text-[11px] font-medium text-muted-foreground">
             <span className="relative flex h-2 w-2">
               <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-success opacity-60 motion-reduce:animate-none" />
               <span className="relative inline-flex h-2 w-2 rounded-full bg-success" />
@@ -246,10 +246,10 @@ export default function PulsoEquipoVivo({ coworkConectados, conEquipo = false }:
               vigila lo reemplaza «Quién está bajando ahora» (con miniatura y en
               vivo); los demás (admin, manager) siguen viendo esta lista. */}
           {pulso.conProblema > 0 && vigila !== true && (
-            <div className="vidrio vidrio-glow glow-r p-4">
+            <div className="vidrio p-4">
               <div className="v-cont space-y-2.5">
                 <div className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground">
-                  <AlertTriangle className="h-3.5 w-3.5 text-destructive" />
+                  <span className="h-1.5 w-1.5 rounded-full bg-destructive" aria-hidden />
                   {t("dashboard.pulso.quienLaBaja")}
                 </div>
                 <div className="grid gap-1.5 sm:grid-cols-2 lg:grid-cols-3">
