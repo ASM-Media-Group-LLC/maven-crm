@@ -130,8 +130,10 @@ export default function EnVivoPersona() {
         className="mb-1 h-10 gap-1.5 self-start px-2 text-muted-foreground hover:text-foreground">
         <ArrowLeft className="h-4 w-4" />{t("vigilancia.comun.volver")}
       </Button>
+      {/* El título es la vista, NO la persona (Alvaro, 13/11: «me manda al perfil»):
+          el nombre va en el héroe, junto a LO QUE PASÓ. */}
       <PageHeader
-        title={nombre || t("vigilancia.titulo")}
+        title={t("vigilancia.titulo")}
         subtitle={obs.sala?.nombre ? t("vigilancia.subtituloSala", { sala: obs.sala.nombre }) : t("vigilancia.subtitulo")}
         icon={<Radio />}
       />
@@ -152,6 +154,7 @@ export default function EnVivoPersona() {
         </div>
       ) : (
         <EnVivoPersonaVista
+          nombre={nombre}
           razon={razon}
           razonNoEncontrada={datos?.razonNoEncontrada ?? false}
           otras={datos?.otras ?? []}
