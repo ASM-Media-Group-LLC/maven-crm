@@ -1,4 +1,4 @@
--- A QUIÉN LE LLEGAN LOS AVISOS DEL EQUIPO (Alvaro, 12/11/2026).
+-- A QUIÉN LE LLEGAN LOS AVISOS DEL EQUIPO (Alvaro, 12/11/2026; avisos sobre supervisores solo a dueño, admins y RR. HH. el 13/11).
 -- «A Andrea (RR. HH.) le tiene que llegar todo lo que está pasando de todo el
 --  equipo. A los admin también. A Daniel, Breyner y Vanessa, la del equipo de
 --  chatters. A Luis, la de chatters, la de PR y la de los coordinadores
@@ -44,7 +44,11 @@ set search_path to 'public'
 as $$
   with t as (
     select (select m.tenant_id from public.tenant_members m where m.user_id = _target limit 1) as tenant_id,
-           public.equipo_de(_target) as equipo
+           public.equipo_de(_target) as equipo,
+           -- Avisos SOBRE un supervisor o jefe (Alvaro, 13/11/2026): solo dueño,
+           -- admins y RR. HH.; no le llegan a sus pares.
+           (coalesce((select p.nivel from public.profiles p where p.id = _target) in ('supervisor', 'manager', 'admin', 'dueno'), false)
+             or exists (select 1 from public.equipos_a_cargo e where e.user_id = _target)) as es_jefe
   ),
   miembros as (
     select p.id
@@ -67,12 +71,14 @@ as $$
       union
       -- Supervisores de su mismo equipo.
       select s.id from public.profiles s, t
-       where s.nivel = 'supervisor' and s.id in (select id from miembros)
+       where not t.es_jefe
+         and s.nivel = 'supervisor' and s.id in (select id from miembros)
          and t.equipo <> 'Otros' and public.equipo_de(s.id) = t.equipo
       union
       -- Jefes con ese equipo a cargo.
       select e.user_id from public.equipos_a_cargo e, t
-       where e.equipo = t.equipo and e.user_id in (select id from miembros)
+       where not t.es_jefe
+         and e.equipo = t.equipo and e.user_id in (select id from miembros)
     ) d
    where d.uid is not null and d.uid <> _target;
 $$;
