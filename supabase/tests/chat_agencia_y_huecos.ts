@@ -144,6 +144,10 @@ const NO_TOCAN_EL_MESSENGER: Record<string, string> = {
     "RR. HH. recibe copia de los avisos de vigilancia (se salió de Cowork) y se le prende el push. Entra a esta " +
     "cadena solo porque su vigía inserta avisos en notifications, pero usa las tablas del reloj de Cowork y " +
     "es_admin_o_dueno, que este fixture no trae; no toca nada del Messenger.",
+  "20261113210000_argos_insiste_y_reporta.sql":
+    "Argos insiste y reporta: llamados cada 2 min a quien está fuera de Cowork y el reporte al 3ro. Entra a " +
+    "esta cadena solo porque sus vigías insertan avisos en notifications, pero usa el reloj de Cowork, " +
+    "turno_en_curso, horario_de y destinatarios_de_aviso, que este fixture no trae; no toca nada del Messenger.",
   "20261113200000_argos_tiempo_sin_pantalla.sql":
     "Argos: aviso al pasarse del tiempo sin pantalla (40/70 min) y resumen al cerrar el turno. Entra a esta " +
     "cadena solo porque su vigía inserta avisos en notifications, pero usa es_admin_o_dueno, turno_en_curso, " +

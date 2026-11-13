@@ -12,6 +12,7 @@ import { MessengerDockProvider } from "@/components/messenger/MessengerDock";
 import AnnouncementPopup from "@/components/dashboard/AnnouncementPopup";
 import { ArgosVigilante } from "@/components/ArgosVigilante";
 import { AvisoNasCaido } from "@/components/oficina/AvisoNasCaido";
+import { AvisoFueraDeCowork } from "@/components/cowork/AvisoFueraDeCowork";
 import { useAnnouncementsByChannel } from "@/hooks/useAnnouncements";
 import { useWaInboxNotifications } from "@/hooks/useWaInboxNotifications";
 import { useTgInboxNotifications } from "@/hooks/useTgInboxNotifications";
@@ -104,6 +105,8 @@ const AppShell = () => {
           <DashboardTopbar />
           <BackToDashboardBar />
           <AvisoNasCaido />
+          {/* Argos: en su turno y fuera de Cowork → cartel + voz en cualquier página (13/11/2026). */}
+          <AvisoFueraDeCowork />
           <main className="vidrio-panel relative flex flex-1 flex-col min-h-0 overflow-hidden">
             <Suspense fallback={<ContentLoadingFallback />}>
               <Outlet />

@@ -8,7 +8,7 @@ import { estaEnPausa } from "@/lib/coworkPausa";
 import { estaEnLlamadaDeMaven } from "@/lib/llamadaEnMaven";
 import { reglasActuales, reglaDeEstado } from "@/lib/coworkReglas";
 import { traducir, type TranslationKey } from "@/lib/i18n";
-import { VOZ_ARGOS, tipoDeEncuadre, registrarNudge, cerrarNudge } from "@/lib/argosNudge";
+import { VOZ_ARGOS, tipoDeEncuadre, registrarNudge, cerrarNudge, LLAMADO_DE_REPORTE, fraseDeReporte, reportarme } from "@/lib/argosNudge";
 
 // Mensaje LEGIBLE que queda en el expediente por cada tipo (distinto de la frase
 // hablada, que rota). Es lo que el dueño ve: "Argos le dijo: …".
@@ -148,6 +148,8 @@ export function useFaceNudge(
 ) {
   const { user } = useAuth();
   const ultimoAviso = useRef(0);
+  // Llamados de ESTE episodio: al 3ro sin hacer caso, «te estoy reportando».
+  const llamados = useRef(0);
   const avisadoCoordinador = useRef(false);
   const alCoordinadorRef = useRef(onPasaAlCoordinador);
   alCoordinadorRef.current = onPasaAlCoordinador;
@@ -156,6 +158,7 @@ export function useFaceNudge(
     if (!watch) return;
     if (!esProblemaDeEncuadre(watch.state)) {
       ultimoAviso.current = 0;
+      llamados.current = 0;
       avisadoCoordinador.current = false;
       // Se corrigió: cerrar el episodio abierto en el expediente (si lo había).
       if (user) { void cerrarNudge(user.id, "camara_apagada"); void cerrarNudge(user.id, "fuera_cuadro"); }
@@ -169,6 +172,7 @@ export function useFaceNudge(
       // que la pausa: la cámara está EN esa llamada, no ausente (Grace, 01/09).
       if (enPausaProp || estaEnPausa() || estaEnLlamadaDeMaven()) {
         ultimoAviso.current = 0;
+        llamados.current = 0;
         avisadoCoordinador.current = false;
         return;
       }
@@ -179,6 +183,7 @@ export function useFaceNudge(
       const regla = reglaDeEstado(reglasActuales(), watch.state);
       if (!regla || !regla.activa) {
         ultimoAviso.current = 0;
+        llamados.current = 0;
         avisadoCoordinador.current = false;
         return;
       }
@@ -190,8 +195,13 @@ export function useFaceNudge(
       const ahora = Date.now();
       if (ahora - ultimoAviso.current >= regla.repetirSeg * 1000) {
         const conSonido = supervisorMs !== null && fuera >= supervisorMs;
+        llamados.current += 1;
+        const tipoLlamado = tipoDeEncuadre(watch.state);
+        // Con `supervisorSeg` en null la sesión decidió que ningún jefe se entera por
+        // esto: se insiste, pero no se reporta.
+        const reporta = !!tipoLlamado && supervisorMs !== null && llamados.current >= LLAMADO_DE_REPORTE;
         toast.warning(
-          traducir(TITULOS[watch.state] ?? "int.face.noFace"),
+          reporta ? traducir("int.face.reportando") : traducir(TITULOS[watch.state] ?? "int.face.noFace"),
           {
             description: traducir(DESCRIPCIONES[watch.state] ?? "int.face.defaultDesc"),
             duration: 10_000,
@@ -218,7 +228,11 @@ export function useFaceNudge(
         // sigue siendo caro, y la persona ya tuvo avisos hablados para
         // corregirlo sola.
         playMessageNotification(0.5);
-        void anunciar(siguienteFrase(watch.state), { volumen: conSonido ? 0.9 : 0.7, voiceId: VOZ_ARGOS });
+        // Al 3er llamado sin hacer caso: «te estoy reportando», y el reporte sale
+        // de verdad a sus jefes (Alvaro, 13/11/2026).
+        void anunciar(reporta && tipoLlamado ? fraseDeReporte(tipoLlamado, llamados.current) : siguienteFrase(watch.state),
+          { volumen: reporta || conSonido ? 0.9 : 0.7, voiceId: VOZ_ARGOS });
+        if (reporta && tipoLlamado) void reportarme(tipoLlamado);
         ultimoAviso.current = ahora;
         // Registrar en el expediente que Argos le llamó la atención (una fila por
         // episodio; el índice parcial evita duplicar mientras no se corrija).
@@ -312,10 +326,12 @@ export function useScreenShareNudge(compartiendo: boolean, activo: boolean) {
   const { user } = useAuth();
   const ultimo = useRef(0);
   const desde = useRef<number | null>(null);
+  // Llamados de ESTE episodio: al 3ro sin hacer caso, «te estoy reportando».
+  const llamados = useRef(0);
 
   useEffect(() => {
     if (!activo || compartiendo) {
-      desde.current = null; ultimo.current = 0;
+      desde.current = null; ultimo.current = 0; llamados.current = 0;
       // Volvió a compartir: cerrar el episodio en el expediente (si lo había).
       if (compartiendo && user) void cerrarNudge(user.id, "sin_pantalla");
       return;
@@ -326,20 +342,24 @@ export function useScreenShareNudge(compartiendo: boolean, activo: boolean) {
       // La pausa se consulta en cada tic, igual que en el encuadre: quien
       // avisó que se iba no tiene por qué estar compartiendo nada. Y en una
       // llamada de Maven tampoco se reclama pantalla: la misma regla que arriba.
-      if (estaEnPausa() || estaEnLlamadaDeMaven()) { desde.current = null; ultimo.current = 0; return; }
+      if (estaEnPausa() || estaEnLlamadaDeMaven()) { desde.current = null; ultimo.current = 0; llamados.current = 0; return; }
       // La regla de la sesión, en cada tic. Apagada = acá no se pide pantalla:
       // se olvida el reloj para que, si la vuelven a encender, cuente desde ahí
       // y no desde que la persona entró.
       const regla = reglasActuales().pantalla;
-      if (!regla.activa) { desde.current = null; ultimo.current = 0; return; }
+      if (!regla.activa) { desde.current = null; ultimo.current = 0; llamados.current = 0; return; }
       if (desde.current === null) desde.current = Date.now();
       if (Date.now() - desde.current < regla.primerAvisoSeg * 1000) return;
       const ahora = Date.now();
       if (ahora - ultimo.current < regla.repetirSeg * 1000) return;
       ultimo.current = ahora;
+      llamados.current += 1;
+      const reporta = regla.supervisorSeg !== null && llamados.current >= LLAMADO_DE_REPORTE;
       playMessageNotification(0.5);
-      void anunciar(FRASES_SIN_PANTALLA[idxSinPantalla++ % FRASES_SIN_PANTALLA.length], { voiceId: VOZ_ARGOS });
-      toast.warning(traducir("int.face.noScreen"), {
+      void anunciar(reporta ? fraseDeReporte("sin_pantalla", llamados.current) : FRASES_SIN_PANTALLA[idxSinPantalla++ % FRASES_SIN_PANTALLA.length],
+        { voiceId: VOZ_ARGOS, volumen: reporta ? 0.9 : undefined });
+      if (reporta) void reportarme("sin_pantalla");
+      toast.warning(reporta ? traducir("int.face.reportando") : traducir("int.face.noScreen"), {
         description: traducir("int.face.noScreenDesc"),
         duration: 10_000,
         id: "sin-pantalla",
