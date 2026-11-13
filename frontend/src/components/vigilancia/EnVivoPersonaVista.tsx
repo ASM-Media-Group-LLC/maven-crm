@@ -1,6 +1,6 @@
-import { useState, type ReactNode } from "react";
+import type { ReactNode } from "react";
 import { Camera, Check, CheckCheck, Film, Loader2, Megaphone, Radio } from "lucide-react";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { FotoConZoom } from "@/components/hr/FotoConZoom";
 import { cn } from "@/lib/utils";
 import { minutosDesde } from "@/lib/motivosVivos";
 import type { RazonEnVivo } from "@/hooks/useEnVivoPersona";
@@ -41,13 +41,17 @@ export function etiquetaDeRazon(r: RazonEnVivo): TranslationKey {
   return ETIQUETA_TIPO[r.tipo] ?? (r.estado ? ETIQUETA_ESTADO[r.estado] : "vigilancia.alerta.otra");
 }
 
-/** Lo que hay que leer de un vistazo: qué vio Argos, si sigue, desde cuándo y
- *  cuánto lleva, con su nota viva. Compacta: en el teléfono el en vivo queda
- *  a la vista sin bajar. */
-function CabeceraRazon({ razon, razonNoEncontrada, puntos, t, lang }: {
+/** LO QUE PASÓ, de un vistazo (Alvaro, 13/11/2026: «me manda al perfil… todo
+ *  está en chiquitito… debería ser muy claro qué fue lo que pasó»). Arriba de
+ *  todo: QUIÉN, QUÉ (en grande) y LA FOTO que lo disparó, grande y con zoom; lo
+ *  que escribió Argos; desde cuándo y cuánto lleva. Si sigue pasando, sello
+ *  rojo sólido y filo rojo. El en vivo y el video van DEBAJO. */
+function HeroRazon({ razon, razonNoEncontrada, puntos, fotoRazon, nombre, t, lang }: {
   razon: RazonEnVivo | null;
   razonNoEncontrada: boolean;
   puntos: number | null;
+  fotoRazon: string | null;
+  nombre: string;
   t: Tr;
   lang: string;
 }) {
@@ -59,8 +63,9 @@ function CabeceraRazon({ razon, razonNoEncontrada, puntos, t, lang }: {
       <section className="vidrio sube p-4">
         <div className="v-cont flex items-start gap-3">
           <div className="min-w-0 flex-1">
-            <p className="text-xs font-medium text-muted-foreground">{t("vigilancia.razon.ahora")}</p>
-            <h2 className="mt-0.5 text-[17px] font-semibold leading-snug">
+            {nombre && <p className="text-[15px] font-semibold text-foreground">{nombre}</p>}
+            <p className="mt-0.5 text-xs font-medium text-muted-foreground">{t("vigilancia.razon.ahora")}</p>
+            <h2 className="mt-1 text-[17px] font-semibold leading-snug">
               {razonNoEncontrada ? t("vigilancia.razon.noEncontrada") : t("vigilancia.razon.sinNada")}
             </h2>
           </div>
@@ -70,65 +75,62 @@ function CabeceraRazon({ razon, razonNoEncontrada, puntos, t, lang }: {
     );
   }
 
+  const conFoto = !!razon.capturaPath;
+  const PILDORA = "inline-flex items-center gap-1.5 rounded-full border border-border/60 bg-foreground/[0.04] px-2.5 py-1 text-xs text-foreground/85 tabular-nums";
   return (
-    <section className={cn("vidrio sube p-4", abierta && "vidrio-glow glow-r")}>
-      <div className="v-cont flex flex-col gap-3">
-        <div className="flex items-start gap-3">
-          <div className="min-w-0 flex-1">
-            <p className="text-xs font-medium text-muted-foreground">
-              {razon.fuente === "clip" ? t("vigilancia.razon.argosGrabo") : razon.fuente === "fuera" ? t("vigilancia.razon.cowork") : t("vigilancia.razon.argosVio")}
-            </p>
-            <h2 className="mt-0.5 text-[17px] font-semibold leading-snug">{t(etiquetaDeRazon(razon))}</h2>
-            <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
-              {razon.fuente === "clip" ? null : abierta ? (
-                <span className="inline-flex items-center gap-1.5 rounded-full bg-destructive/15 px-2 py-0.5 text-[11px] font-semibold text-destructive">
-                  <span className="h-1.5 w-1.5 rounded-full bg-destructive" />{t("vigilancia.razon.sigue")}
-                </span>
-              ) : (
-                <span className="rounded-full bg-foreground/[0.06] px-2 py-0.5 text-[11px] font-semibold text-muted-foreground">
-                  {t("vigilancia.razon.cerro", { hora: horaCorta(razon.hasta, lang) })}
-                </span>
-              )}
-              {razon.revisadoAt && (
-                <span className="inline-flex items-center gap-1 rounded-full bg-success/15 px-2 py-0.5 text-[11px] font-semibold text-success">
-                  <CheckCheck className="h-3 w-3" />{t("vigilancia.razon.revisadoChip")}
-                </span>
-              )}
+    <section className={cn("vidrio sube overflow-hidden", abierta && "ring-1 ring-destructive/60")}>
+      <div className={cn("grid", conFoto && "lg:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)]")}>
+        {conFoto && (
+          <div className="relative aspect-[16/10] w-full bg-black lg:aspect-auto lg:min-h-[340px]">
+            {fotoRazon
+              ? <FotoConZoom src={fotoRazon} alt={t("vigilancia.razon.foto")} />
+              : <div className="flex h-full w-full items-center justify-center gap-2 text-xs text-white/60"><Camera className="h-4 w-4" />{t("vigilancia.razon.fotoArchivo")}</div>}
+          </div>
+        )}
+        <div className="v-cont flex min-w-0 flex-col gap-3 p-4 sm:p-5">
+          <div className="flex items-start gap-3">
+            <div className="min-w-0 flex-1">
+              <p className="text-xs font-medium text-muted-foreground">
+                {razon.fuente === "clip" ? t("vigilancia.razon.argosGrabo") : razon.fuente === "fuera" ? t("vigilancia.razon.cowork") : t("vigilancia.razon.argosVio")}
+              </p>
+              {nombre && <p className="mt-1 truncate text-[15px] font-semibold text-foreground">{nombre}</p>}
+              <h2 className="mt-0.5 font-display text-[22px] font-semibold leading-tight text-foreground sm:text-2xl">{t(etiquetaDeRazon(razon))}</h2>
             </div>
+            {puntos != null && <NotaViva puntos={puntos} t={t} />}
           </div>
-          {puntos != null && <NotaViva puntos={puntos} t={t} />}
+
+          {/* Si sigue pasando: sello rojo sólido (lo malo se ve). */}
+          <div className="flex flex-wrap items-center gap-1.5">
+            {razon.fuente === "clip" ? null : abierta ? (
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-destructive px-2.5 py-1 text-xs font-semibold text-white">
+                <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-white motion-reduce:animate-none" />{t("vigilancia.razon.sigue")}
+              </span>
+            ) : (
+              <span className={PILDORA}>{t("vigilancia.razon.cerro", { hora: horaCorta(razon.hasta, lang) })}</span>
+            )}
+            <span className={PILDORA}><span className="text-muted-foreground">{t("vigilancia.razon.desde")}</span>{horaCorta(razon.desde, lang)}</span>
+            <span className={PILDORA}><span className="text-muted-foreground">{abierta ? t("vigilancia.razon.lleva") : t("vigilancia.razon.duro")}</span>{textoDuracion(minutos, t)}</span>
+            {razon.revisadoAt && (
+              <span className={PILDORA}><CheckCheck className="h-3.5 w-3.5 text-success" />{t("vigilancia.razon.revisadoChip")}</span>
+            )}
+          </div>
+
+          {razon.detalle && <p className="text-[15px] leading-relaxed text-foreground/85">{razon.detalle}</p>}
         </div>
-
-        {razon.detalle && <p className="text-sm leading-snug text-foreground/85">{razon.detalle}</p>}
-
-        <dl className="grid grid-cols-2 gap-2">
-          <div className="rounded-control border border-border/50 bg-foreground/[0.03] px-3 py-1.5">
-            <dt className="text-[11px] text-muted-foreground">{t("vigilancia.razon.desde")}</dt>
-            <dd className="font-display text-base font-semibold tabular-nums leading-tight">{horaCorta(razon.desde, lang)}</dd>
-          </div>
-          <div className="rounded-control border border-border/50 bg-foreground/[0.03] px-3 py-1.5">
-            <dt className="text-[11px] text-muted-foreground">{abierta ? t("vigilancia.razon.lleva") : t("vigilancia.razon.duro")}</dt>
-            <dd className="font-display text-base font-semibold tabular-nums leading-tight">{textoDuracion(minutos, t)}</dd>
-          </div>
-        </dl>
       </div>
     </section>
   );
 }
 
-/** Lo que completa la razón: la foto que la disparó, quién la revisó y qué
- *  más tiene abierto. En el teléfono va debajo del escenario. */
-function ExtrasRazon({ razon, otras, fotoRazon, t, lang }: {
+/** Lo que completa la razón: quién la revisó y qué más tiene abierto. */
+function ExtrasRazon({ razon, otras, t, lang }: {
   razon: RazonEnVivo | null;
   otras: RazonEnVivo[];
-  fotoRazon: string | null;
   t: Tr;
   lang: string;
 }) {
-  const [verFoto, setVerFoto] = useState(false);
-  const conFoto = !!razon?.capturaPath;
   const conRevision = !!razon?.revisadoAt;
-  if (!conFoto && !conRevision && otras.length === 0) return null;
+  if (!conRevision && otras.length === 0) return null;
   const ahora = Date.now();
 
   return (
@@ -141,21 +143,6 @@ function ExtrasRazon({ razon, otras, fotoRazon, t, lang }: {
               ? t("vigilancia.razon.revisadoPor", { nombre: razon.revisadoNombre, hora: horaCorta(razon.revisadoAt, lang) })
               : t("vigilancia.razon.revisadoA", { hora: horaCorta(razon.revisadoAt, lang) })}
           </p>
-        )}
-
-        {conFoto && (
-          <button type="button" onClick={() => fotoRazon && setVerFoto(true)} disabled={!fotoRazon}
-            className="group flex items-center gap-3 rounded-control border border-border/50 bg-foreground/[0.03] p-2 text-left transition-colors hover:border-primary/35 disabled:cursor-default">
-            <span className="relative h-14 w-[92px] shrink-0 overflow-hidden rounded-control bg-black/85 ring-1 ring-white/10">
-              {fotoRazon
-                ? <img src={fotoRazon} alt="" className="h-full w-full object-cover" />
-                : <span className="flex h-full items-center justify-center"><Camera className="h-4 w-4 text-white/50" /></span>}
-            </span>
-            <span className="min-w-0 flex-1">
-              <span className="block text-sm font-semibold leading-tight">{t("vigilancia.razon.foto")}</span>
-              <span className="block text-xs text-muted-foreground">{fotoRazon ? t("vigilancia.razon.fotoToca") : t("vigilancia.razon.fotoArchivo")}</span>
-            </span>
-          </button>
         )}
 
         {otras.length > 0 && (
@@ -171,16 +158,6 @@ function ExtrasRazon({ razon, otras, fotoRazon, t, lang }: {
           </div>
         )}
       </div>
-
-      <Dialog open={verFoto} onOpenChange={setVerFoto}>
-        <DialogContent className="max-w-4xl gap-3 p-3 sm:p-4">
-          <DialogHeader className="text-left">
-            <DialogTitle className="text-base">{t("vigilancia.razon.foto")}</DialogTitle>
-            <DialogDescription>{razon ? horaCorta(razon.desde, lang) : ""}</DialogDescription>
-          </DialogHeader>
-          {fotoRazon && <img src={fotoRazon} alt="" className="w-full rounded-panel bg-black object-contain" />}
-        </DialogContent>
-      </Dialog>
     </section>
   );
 }
@@ -221,7 +198,7 @@ function BotonesAccion({ acciones, t, className }: { acciones: AccionesVivo; t: 
 }
 
 export function EnVivoPersonaVista({
-  razon, razonNoEncontrada, otras, fotoRazon, puntos, modo, onModo, escenario, video, acciones, pie, t, lang,
+  razon, razonNoEncontrada, otras, fotoRazon, puntos, modo, onModo, escenario, video, acciones, pie, nombre = "", t, lang,
 }: {
   razon: RazonEnVivo | null;
   razonNoEncontrada: boolean;
@@ -235,14 +212,19 @@ export function EnVivoPersonaVista({
   acciones: AccionesVivo;
   /** Debajo de todo (p. ej. «Ver su expediente»). */
   pie?: ReactNode;
+  /** Quién (va en el héroe, no como título de página: no es su perfil). */
+  nombre?: string;
   t: Tr;
   lang: string;
 }) {
   return (
-    <div className="mt-4 flex flex-col gap-4">
-      <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_380px]">
-        {/* Escenario (en el teléfono va DESPUÉS de la razón). */}
-        <div className="order-2 flex min-w-0 flex-col gap-3 lg:order-1">
+    <div className="mt-3 flex flex-col gap-4">
+      {/* 1) LO QUE PASÓ: arriba de todo, a lo ancho, con la foto grande. */}
+      <HeroRazon razon={razon} razonNoEncontrada={razonNoEncontrada} puntos={puntos} fotoRazon={fotoRazon} nombre={nombre} t={t} lang={lang} />
+
+      {/* 2) Su pantalla ahora (o el video de esos minutos) y, en la computadora, las acciones al lado. */}
+      <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_340px]">
+        <div className="flex min-w-0 flex-col gap-3">
           <div role="tablist" aria-label={t("vigilancia.vivo.queVer")}
             className="grid grid-cols-2 gap-1 rounded-panel border border-border/60 bg-foreground/[0.03] p-1">
             {(["vivo", "video"] as const).map((m) => (
@@ -259,20 +241,16 @@ export function EnVivoPersonaVista({
           {modo === "vivo" ? escenario : video}
         </div>
 
-        {/* La razón, arriba en el teléfono; a la derecha en la computadora. */}
-        <aside className="order-1 flex min-w-0 flex-col gap-3 lg:sticky lg:top-0 lg:order-2">
-          <CabeceraRazon razon={razon} razonNoEncontrada={razonNoEncontrada} puntos={puntos} t={t} lang={lang} />
-          <div className="hidden flex-col gap-3 lg:flex">
-            <ExtrasRazon razon={razon} otras={otras} fotoRazon={fotoRazon} t={t} lang={lang} />
-            <BotonesAccion acciones={acciones} t={t} />
-            {pie}
-          </div>
+        <aside className="hidden min-w-0 flex-col gap-3 lg:sticky lg:top-0 lg:flex">
+          <BotonesAccion acciones={acciones} t={t} />
+          <ExtrasRazon razon={razon} otras={otras} t={t} lang={lang} />
+          {pie}
         </aside>
       </div>
 
-      {/* Teléfono: la foto, quién lo revisó y lo demás, debajo del escenario. */}
+      {/* Teléfono: quién lo revisó y lo demás, debajo. */}
       <div className="flex flex-col gap-3 lg:hidden">
-        <ExtrasRazon razon={razon} otras={otras} fotoRazon={fotoRazon} t={t} lang={lang} />
+        <ExtrasRazon razon={razon} otras={otras} t={t} lang={lang} />
         {pie}
       </div>
 

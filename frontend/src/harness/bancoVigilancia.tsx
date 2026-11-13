@@ -9,7 +9,6 @@ import { useState } from "react";
 import { MemoryRouter } from "react-router-dom";
 import { Radio, ArrowLeft } from "lucide-react";
 import { Page } from "@/components/ui/page";
-import { PageHeader } from "@/components/ui/page-header";
 import { Button } from "@/components/ui/button";
 import { useLanguage } from "@/hooks/useLanguage";
 import { QuienEstaBajandoVista } from "@/components/vigilancia/QuienEstaBajando";
@@ -128,8 +127,9 @@ function VistaEnVivo({ cerrada }: { cerrada: boolean }) {
         <Button variant="ghost" size="sm" className="mb-1 h-10 gap-1.5 self-start px-2 text-muted-foreground">
           <ArrowLeft className="h-4 w-4" />{t("vigilancia.comun.volver")}
         </Button>
-        <PageHeader title="Karem Pérez" subtitle={t("vigilancia.subtituloSala", { sala: "Sala 4 · Kash" })} icon={<Radio />} />
+        <p className="flex items-center gap-1.5 px-0.5 text-xs text-muted-foreground"><Radio className="h-3.5 w-3.5" />{t("vigilancia.subtituloSala", { sala: "Sala 4 · Kash" })}</p>
         <EnVivoPersonaVista
+          nombre="Karem Pérez"
           razon={razon}
           razonNoEncontrada={false}
           otras={cerrada ? [] : OTRAS}
