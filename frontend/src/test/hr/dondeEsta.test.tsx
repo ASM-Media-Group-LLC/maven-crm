@@ -66,7 +66,7 @@ describe("el tablero", () => {
     const filas = await screen.findAllByRole("listitem");
     expect(filas[0]).toHaveTextContent("Karem");
     expect(within(filas[0]).getByText("hr.donde.estado.fueraDeCowork")).toBeInTheDocument();
-    expect(within(filas[0]).getByText(/hr.donde.fueraHoy.*"n":2.*"m":14/)).toBeInTheDocument();
+    expect(within(filas[0]).getByText(/hr\.donde\.fueraHoy.*"n":2.*durMin.*14/)).toBeInTheDocument();
     expect(within(filas[1]).getByText("Infloww")).toBeInTheDocument();
     expect(within(filas[0]).getByRole("link")).toHaveAttribute("href", "/hr/expediente/u-Karem");
   });
