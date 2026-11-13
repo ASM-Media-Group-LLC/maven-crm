@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { MonitorPlay, Loader2, AlertTriangle, ScreenShare, RefreshCw, Sparkles, LayoutGrid, Grid3x3, Check, Eye, X, FileClock } from "lucide-react";
+import { MonitorPlay, Loader2, AlertTriangle, ScreenShare, RefreshCw, Sparkles, LayoutGrid, Grid3x3, X, FileClock } from "lucide-react";
 import { useLanguage } from "@/hooks/useLanguage";
 import { UserAvatar } from "@/components/UserAvatar";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
@@ -184,16 +184,18 @@ type Tr = ReturnType<typeof useLanguage>["t"];
 const MSG_SEM: Record<Semaforo, string> = {
   verde: "hr.sem.msg.verde", amarillo: "hr.sem.msg.amarillo", naranja: "hr.sem.msg.naranja", rojo: "hr.sem.msg.rojo", gris: "hr.sem.msg.gris",
 };
-// Borde y color de texto por semáforo, para las tarjetas.
+// Borde y color de texto por semáforo, para las tarjetas. Sin el verde prendido
+// (Alvaro, 12/11/2026): bordes neutros (solo lo malo con un filo de color fino)
+// y el mensaje en gris; el color queda en el puntito.
 const BORDE_SEM: Record<Semaforo, string> = {
-  verde: "border-border/40 hover:border-primary/60",
-  amarillo: "border-warning/50 hover:border-warning",
-  naranja: "border-orange-500/50 hover:border-orange-500",
-  rojo: "border-destructive/60 hover:border-destructive",
-  gris: "border-border/40 hover:border-primary/60",
+  verde: "border-border/40 hover:border-foreground/25",
+  amarillo: "border-warning/40 hover:border-warning/70",
+  naranja: "border-warning/40 hover:border-warning/70",
+  rojo: "border-destructive/50 hover:border-destructive/80",
+  gris: "border-border/40 hover:border-foreground/25",
 };
 const TEXTO_SEM: Record<Semaforo, string> = {
-  verde: "text-success", amarillo: "text-warning", naranja: "text-orange-500", rojo: "text-destructive", gris: "text-muted-foreground",
+  verde: "text-muted-foreground", amarillo: "text-foreground/85", naranja: "text-foreground/85", rojo: "text-foreground/85", gris: "text-muted-foreground",
 };
 
 // EL SELLO de la pantalla compartida (Alvaro, 04/11): cuando alguien comparte,
@@ -203,11 +205,12 @@ const TEXTO_SEM: Record<Semaforo, string> = {
 function SelloPantalla({ p, t, chico }: { p: PersonaVivo; t: Tr; chico?: boolean }) {
   if (!p.tienePantalla) return null;
   const base = `absolute right-1.5 top-1.5 inline-flex items-center gap-1 rounded-control font-semibold backdrop-blur-sm ${chico ? "px-1 py-0.5 text-[9px]" : "px-1.5 py-0.5 text-[10px]"}`;
+  // Sello de vidrio oscuro con un puntito (12/11/2026): ya no la placa verde/roja sólida.
   if (p.fueraDeLugar === true) {
-    return <span className={`${base} bg-destructive text-destructive-foreground`}><Eye className="h-3 w-3" />{t("hr.pantallazos.selloRevisar")}</span>;
+    return <span className={`${base} bg-black/60 text-white ring-1 ring-white/10`}><span className="h-1.5 w-1.5 rounded-full bg-destructive" aria-hidden />{t("hr.pantallazos.selloRevisar")}</span>;
   }
   if (p.fueraDeLugar === false) {
-    return <span className={`${base} bg-success text-success-foreground`}><Check className="h-3 w-3" />{t("hr.pantallazos.selloTrabajando")}</span>;
+    return <span className={`${base} bg-black/55 text-white ring-1 ring-white/10`}><span className="h-1.5 w-1.5 rounded-full bg-success" aria-hidden />{t("hr.pantallazos.selloTrabajando")}</span>;
   }
   return <span className={`${base} bg-black/55 text-white`}><Sparkles className="h-3 w-3" />{t("hr.pantallazos.selloMirando")}</span>;
 }
@@ -220,7 +223,7 @@ function CardMuralla({ p, t, hace, sem, onClick }: { p: PersonaVivo; t: Tr; hace
       type="button"
       onClick={onClick}
       title={t("hr.pantallazos.verExpediente", { nombre })}
-      className={`group relative block w-full overflow-hidden rounded-2xl border bg-card/30 text-left transition-colors ${BORDE_SEM[sem]}`}
+      className={`group relative block w-full overflow-hidden rounded-2xl border bg-background/60 text-left transition-colors ${BORDE_SEM[sem]}`}
     >
       <div className="relative aspect-[16/10] w-full bg-muted/40">
         {p.principalUrl ? (
@@ -268,7 +271,7 @@ function CeldaCuadricula({ p, t, sem, onClick }: { p: PersonaVivo; t: Tr; sem: S
       type="button"
       onClick={onClick}
       title={`${nombre} · ${t(MSG_SEM[sem] as Parameters<typeof t>[0])}${p.veredicto ? ` · ${p.veredicto}` : ""}`}
-      className={`group relative block w-full overflow-hidden rounded-xl border bg-card/30 text-left transition-colors ${BORDE_SEM[sem]}`}
+      className={`group relative block w-full overflow-hidden rounded-xl border bg-background/60 text-left transition-colors ${BORDE_SEM[sem]}`}
     >
       <div className="relative aspect-[16/10] w-full bg-muted/40">
         {p.principalUrl ? (
