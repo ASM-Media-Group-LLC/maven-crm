@@ -20,21 +20,28 @@ export function TarjetaKpi({
   /** Orden de entrada: escalona la animación "sube". */
   indice?: number;
 }) {
-  // Sin colorcitos (Alvaro, 12/11/2026): ícono neutro, sin brillo de color, la
-  // cifra en blanco. Lo malo (warning/danger) se marca solo con un puntito junto
-  // a la etiqueta; lo bueno no lleva nada.
-  const punto = tono === "warning" ? "bg-warning" : tono === "danger" ? "bg-destructive" : null;
+  // Color en dosis chica (Alvaro, 12/11/2026: primero «sin colorcitos», luego
+  // «un poquitito más de color no estaría mal»): el ícono en su color, sobre un
+  // tinte muy leve con filo fino, y un brillo de esquina suave y quieto. La cifra
+  // sigue en blanco.
+  const chip =
+    tono === "success" ? "bg-success/[0.08] text-success/90 ring-success/20"
+    : tono === "warning" ? "bg-warning/[0.08] text-warning/90 ring-warning/20"
+    : tono === "danger" ? "bg-destructive/[0.08] text-destructive/90 ring-destructive/20"
+    : "bg-primary/[0.08] text-primary/90 ring-primary/20";
+  const glow =
+    tono === "success" ? "glow-g"
+    : tono === "warning" ? "glow-a"
+    : tono === "danger" ? "glow-r"
+    : "glow-b";
   return (
-    <div className="vidrio vidrio-lift sube p-4" style={{ animationDelay: `${indice * 0.06}s` }}>
+    <div className={`vidrio vidrio-glow glow-suave vidrio-lift sube ${glow} p-4`} style={{ animationDelay: `${indice * 0.06}s` }}>
       <div className="v-cont flex flex-col gap-3">
         <div className="flex items-center gap-2.5">
-          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-border/70 bg-foreground/[0.04] text-foreground/75">
+          <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full ring-1 ${chip}`}>
             <Icono className="h-[18px] w-[18px]" />
           </span>
-          <span className="flex min-w-0 items-center gap-1.5 text-xs font-medium text-muted-foreground">
-            {punto && <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${punto}`} aria-hidden />}
-            <span className="truncate">{etiqueta}</span>
-          </span>
+          <span className="truncate text-xs font-medium text-muted-foreground">{etiqueta}</span>
         </div>
         <div className="font-display text-[22px] sm:text-[26px] font-bold leading-tight tracking-tight tabular-nums text-foreground [text-wrap:balance]">{valor}</div>
         <div className="text-xs text-muted-foreground">{detalle}</div>

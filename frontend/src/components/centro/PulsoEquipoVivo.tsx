@@ -161,7 +161,7 @@ export default function PulsoEquipoVivo({ coworkConectados, conEquipo = false }:
       {/* Cabecera del Pulso (solo título + en vivo + aviso) */}
       <div className="flex flex-wrap items-center justify-between gap-2 px-0.5">
         <h2 className="flex items-center gap-2 text-sm font-semibold">
-          <span className="flex h-7 w-7 items-center justify-center rounded-full border border-border/70 bg-foreground/[0.04] text-foreground/75"><Activity className="h-4 w-4" /></span>
+          <span className="flex h-7 w-7 items-center justify-center rounded-full bg-primary/[0.08] text-primary/90 ring-1 ring-primary/20"><Activity className="h-4 w-4" /></span>
           {t("dashboard.pulso.titulo")}
           <span className="inline-flex items-center gap-1 text-[11px] font-medium text-muted-foreground">
             <span className="relative flex h-2 w-2">

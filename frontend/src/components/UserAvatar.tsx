@@ -8,7 +8,8 @@
 //   - `ring`: fuerza el anillo también sin muñequito (destacados/podios).
 //   - `status`: punto de presencia (online/busy/away) sobre el borde.
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { avatarGradient } from "@/lib/avatarColor";
+import { tonoDeAvatar } from "@/lib/avatarColor";
+import type { CSSProperties } from "react";
 import { dicebearUri, initials } from "@/lib/avatar";
 import { cn } from "@/lib/utils";
 
@@ -87,11 +88,8 @@ export function UserAvatar({
         </AvatarFallback>
       ) : (
         <AvatarFallback
-          className={cn(
-            "bg-gradient-to-br font-semibold text-white",
-            avatarGradient(name),
-            s.text,
-          )}
+          style={{ "--av-h": tonoDeAvatar(name) } as CSSProperties}
+          className={cn("avatar-iniciales font-semibold", s.text)}
         >
           {initials(name)}
         </AvatarFallback>
