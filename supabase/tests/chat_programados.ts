@@ -113,6 +113,9 @@ const NO_CARGAN_AQUI: Record<string, string> = {
     "RR. HH. recibe copia de los avisos de vigilancia (se salió de Cowork) y se le prende el push. Entra a esta " +
     "cadena solo porque su vigía inserta avisos en notifications, pero usa las tablas del reloj de Cowork y " +
     "es_admin_o_dueno, que este fixture no trae; no toca nada del Messenger.",
+  "20261113240000_andrea_ve_todos_los_coworks.sql":
+    "Cowork: anfitriones en todas las sesiones (Andrea, RR. HH.). Usa las tablas de Cowork y es_admin_o_dueno, " +
+    "que este fixture no trae; no toca nada del Messenger.",
   "20261113220000_un_cowork_por_departamento.sql":
     "Cowork: un Cowork por departamento, anfitriones designados por sesión y todos obligados a estar en Cowork. " +
     "Entra a esta cadena porque sus vigías insertan avisos en notifications, pero usa las tablas de Cowork, " +

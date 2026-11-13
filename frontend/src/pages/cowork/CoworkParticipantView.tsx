@@ -104,7 +104,8 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
   // Pantalla "no tengo sala": código para entrar y la última sala para reanudar.
   const [roomCode, setRoomCode] = useState("");
   const [joiningByCode, setJoiningByCode] = useState(false);
-  const [lastRoomId, setLastRoomId] = useState<string | null>(null);
+  // undefined = todavía no se sabe; null = nunca estuvo en una sala de esta sesión.
+  const [lastRoomId, setLastRoomId] = useState<string | null | undefined>(undefined);
   const [resuming, setResuming] = useState(false);
 
   const myAssignment = cowork.myAssignment;
@@ -119,9 +120,29 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
     let alive = true;
     cowork.getMyLastRoomId(sid)
       .then((rid) => { if (alive) setLastRoomId(rid); })
-      .catch(() => { /* noop */ });
+      .catch(() => { if (alive) setLastRoomId(null); });
     return () => { alive = false; };
   }, [cowork.session?.id, myAssignment, cowork.getMyLastRoomId]);
+
+  // ENTRA SOLO, SIN CÓDIGO (Alvaro, 13/11/2026: «con que estén en un tipo de rol
+  // deberían de poder entrar»). Cada quien es participante del Cowork de su
+  // departamento: sin sala, se le mete a su última sala de esta sesión o, si nunca
+  // estuvo, a la primera. El código queda solo para que un coordinador lo mueva.
+  const autoEntro = useRef<string | null>(null);
+  useEffect(() => {
+    const sid = cowork.session?.id;
+    if (!sid || myAssignment || lastRoomId === undefined || autoEntro.current === sid) return;
+    if (cowork.myMembership?.role === "host") return;
+    const primera = [...cowork.rooms].sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0))[0];
+    const sala = (lastRoomId && cowork.rooms.some((r) => r.id === lastRoomId)) ? lastRoomId : primera?.id;
+    if (!sala) return;
+    autoEntro.current = sid;
+    setResuming(true);
+    cowork.joinSession(sid, "participant", undefined, sala)
+      .then(() => cowork.refetch())
+      .catch((e: unknown) => toast.error((e as Error)?.message || t("cowork.participant.resumeError")))
+      .finally(() => setResuming(false));
+  }, [cowork.session?.id, myAssignment, lastRoomId, cowork.rooms, cowork.myMembership?.role, cowork.joinSession, cowork.refetch, t]);
 
   // `persistente`: la presencia del chatter tiene que durar lo que dura su
   // LLAMADA, no lo que dura esta página. Al navegar a otra sección la llamada

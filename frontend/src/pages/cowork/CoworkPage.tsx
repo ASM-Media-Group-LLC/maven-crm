@@ -100,6 +100,19 @@ export default function CoworkPage() {
     return () => { alive = false; };
   }, [sessionId, cowork.listMyActiveSessions, cowork.listMyEndedSessions]);
 
+  // Quien trabaja en UN solo Cowork (el de su departamento, 13/11/2026) no tiene
+  // nada que elegir: se le abre el suyo directo. Los que ven varias (admins,
+  // supervisores) siguen viendo la lista.
+  const yaAbrioLaSuya = useRef(false);
+  useEffect(() => {
+    if (sessionId || loadingSessions || veTodasLasSesiones || yaAbrioLaSuya.current) return;
+    const comoParticipante = mySessions.filter((m) => m.role !== "host");
+    if (mySessions.length === 1 && comoParticipante.length === 1) {
+      yaAbrioLaSuya.current = true;
+      setSearchParams({ session: comoParticipante[0].id });
+    }
+  }, [sessionId, loadingSessions, veTodasLasSesiones, mySessions, setSearchParams]);
+
   // Admin: cargar todas las sesiones activas y refrescar la ocupación cada 30s
   // mientras el landing esté abierto. Es UNA llamada al edge (que hace un solo
   // ListRooms a LiveKit) — nada de canales de presencia por sesión (#1458).
