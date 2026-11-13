@@ -42,6 +42,14 @@ const PUNTO: Record<Tono, string> = { verde: "bg-success", ambar: "bg-warning", 
 function sistemasDe(veredicto: string): string[] {
   return veredicto.split("·")[0].trim().split("/").map((s) => s.trim()).filter((s) => s.length > 1);
 }
+// Toma hasta n elementos repartidos parejo en la lista (primero, último y en medio).
+export function repartir<T>(xs: T[], n: number): T[] {
+  if (xs.length <= n) return xs;
+  if (n <= 1) return xs.slice(0, n);
+  const out: T[] = [];
+  for (let i = 0; i < n; i++) out.push(xs[Math.round((i * (xs.length - 1)) / (n - 1))]);
+  return out;
+}
 function hhmm(iso: string | null | undefined): string | null {
   if (!iso) return null;
   try { return new Date(iso).toLocaleTimeString("es-CO", { timeZone: "America/Bogota", hour: "2-digit", minute: "2-digit", hour12: false }); }
@@ -172,20 +180,24 @@ export function TarjetaArgosPulida({ nombre, dia, horario }: {
     };
     poner(asc[0], "entrada");
     poner(asc[asc.length - 1], "salida");
-    let prev: string | null = null, cambios = 0;
+    // Poca atención: la cámara lo vio sin cara o Argos anotó una falta (distraído,
+    // fuera de cuadro…) a menos de 90 s de esa foto de pantalla.
+    const marcasAtencion = [
+      ...camaras.filter((k) => k.caraVisible === false).map((k) => Date.parse(k.createdAt)),
+      ...dia.faltas.map((f) => Date.parse(f.createdAt)),
+    ];
+    const pocasCand = asc.filter((c) => { const t0 = Date.parse(c.createdAt); return marcasAtencion.some((m) => Math.abs(m - t0) <= 90_000); });
+    // Cambios de programa a lo largo del día (no todos en la primera hora).
+    const cambiosCand: CapturaDia[] = [];
+    let prev: string | null = null;
     for (const c of asc) {
       const { app, que } = separar(c.veredicto);
       const n = appDe(app ?? que).nombre || null;
-      if (prev && n && n !== prev && cambios < 4) { const antes = elegidas.length; poner(c, "cambio"); if (elegidas.length > antes) cambios++; }
+      if (prev && n && n !== prev) cambiosCand.push(c);
       if (n) prev = n;
     }
-    let pocas = 0;
-    for (const c of asc) {
-      if (pocas >= 2) break;
-      const t0 = Date.parse(c.createdAt);
-      const sinCara = camaras.some((k) => k.caraVisible === false && Math.abs(Date.parse(k.createdAt) - t0) <= 90_000);
-      if (sinCara) { const antes = elegidas.length; poner(c, "poca"); if (elegidas.length > antes) pocas++; }
-    }
+    for (const c of repartir(pocasCand, 2)) poner(c, "poca");
+    for (const c of repartir(cambiosCand, 4)) poner(c, "cambio");
     const importantes: Evidencia[] = elegidas
       .sort((a, b) => (a.c.createdAt < b.c.createdAt ? -1 : 1))
       .map(({ c, etq }) => ({ ...tomar(c), etiqueta: etq }));
