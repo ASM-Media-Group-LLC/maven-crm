@@ -133,16 +133,16 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
     const sid = cowork.session?.id;
     if (!sid || myAssignment || lastRoomId === undefined || autoEntro.current === sid) return;
     if (cowork.myMembership?.role === "host") return;
-    const primera = [...cowork.rooms].sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0))[0];
-    const sala = (lastRoomId && cowork.rooms.some((r) => r.id === lastRoomId)) ? lastRoomId : primera?.id;
-    if (!sala) return;
+    // El participante solo ve SU sala (RLS): sin sala, la lista llega vacía. Por eso
+    // la sala la elige el servidor (última de esta sesión o la primera) cuando no se
+    // le pasa ninguna.
     autoEntro.current = sid;
     setResuming(true);
-    cowork.joinSession(sid, "participant", undefined, sala)
+    cowork.joinSession(sid, "participant", undefined, lastRoomId ?? undefined)
       .then(() => cowork.refetch())
       .catch((e: unknown) => toast.error((e as Error)?.message || t("cowork.participant.resumeError")))
       .finally(() => setResuming(false));
-  }, [cowork.session?.id, myAssignment, lastRoomId, cowork.rooms, cowork.myMembership?.role, cowork.joinSession, cowork.refetch, t]);
+  }, [cowork.session?.id, myAssignment, lastRoomId, cowork.myMembership?.role, cowork.joinSession, cowork.refetch, t]);
 
   // `persistente`: la presencia del chatter tiene que durar lo que dura su
   // LLAMADA, no lo que dura esta página. Al navegar a otra sección la llamada
