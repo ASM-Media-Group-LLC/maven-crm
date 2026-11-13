@@ -68,53 +68,118 @@ function fallasDe(p: PersonaTurno, t: Tr): string[] {
   return tiposFallaDe(p).map((tf) => t(FLAG_LBL[tf]));
 }
 
-// Una persona del turno: cara, nombre, sus 3 factores, las fallas (chips) y la
-// nota; clic → su expediente (y sus pantallazos de ese día). Peor → mejor.
-// Nota como TILE de color TENUE (Alvaro 08/11: "vida con glow, tono apagado, no
-// neón"). El color se insinúa, no grita.
-const NOTA_TILE: Record<string, string> = {
-  bien: "bg-success/10 text-success/90", ojo: "bg-warning/10 text-warning/90", mal: "bg-destructive/10 text-destructive/90",
-};
-function PersonaFilaTurno({ p, t, onClick }: { p: PersonaTurno; t: Tr; onClick: () => void }) {
-  const f = (c: string) => p.nota.factores.find((x) => x.clave === c)?.sub ?? null;
-  const txt = (v: number | null) => (v == null ? "—" : `${Math.round(v)}%`);
-  const fallas = fallasDe(p, t);
-  const notaTile = p.nota.banda ? NOTA_TILE[p.nota.banda] : "bg-muted/40 text-muted-foreground";
+// INDICADORES (Alvaro, 13/11/2026: «es pobre, chiquito… indicadores… cuando me
+// meto a Chatters deberían ser pequeñas tarjetitas donde vea cómo van»).
+// Una barra fina por factor: el color insinúa (bien/ojo/mal), la cifra en blanco.
+function Barra({ label, valor }: { label: string; valor: number | null }) {
+  const v = valor == null ? null : Math.max(0, Math.min(100, valor));
+  const color = v == null ? "bg-muted-foreground/30" : v >= 80 ? "bg-success/70" : v >= 60 ? "bg-warning/70" : "bg-destructive/70";
   return (
-    <button type="button" onClick={onClick} title={t("hr.hist.verExpediente")} className="group flex w-full items-center gap-3 rounded-xl border border-border/40 bg-card/20 px-3 py-2 text-left transition hover:border-primary/30 hover:bg-card/40">
-      <UserAvatar name={p.nombre || t("hr.noName")} src={p.avatarUrl} seed={p.avatarSeed} size="sm" />
-      <div className="min-w-0 flex-1">
-        <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-          <span className="truncate text-sm font-medium">{p.nombre || t("hr.noName")}</span>
-          {/* Pastillas SUAVES (apagadas): se notan sin chillar. */}
-          {fallas.map((fl) => (
-            <span key={fl} className="inline-flex items-center gap-1 rounded-full bg-foreground/5 px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground"><AlertTriangle className="h-2.5 w-2.5 text-warning/70" />{fl}</span>
+    <div className="flex items-center gap-2 text-[11px]">
+      <span className="w-[4.5rem] shrink-0 truncate text-muted-foreground">{label}</span>
+      <span className="h-1.5 min-w-0 flex-1 overflow-hidden rounded-full bg-foreground/10">
+        <span className={`block h-full rounded-full ${color}`} style={{ width: `${v ?? 0}%` }} />
+      </span>
+      <span className="w-9 shrink-0 text-right tabular-nums text-foreground/85">{v == null ? "—" : `${Math.round(v)}%`}</span>
+    </div>
+  );
+}
+const PUNTO_BANDA: Record<string, string> = { bien: "bg-success", ojo: "bg-warning", mal: "bg-destructive" };
+
+// Una persona como TARJETITA: cara y nombre, su nota grande, sus 3 barras, a qué
+// hora entró (y si llegó tarde) y sus fallas con un puntito. Clic → expediente.
+function PersonaTarjeta({ p, t, onClick }: { p: PersonaTurno; t: Tr; onClick: () => void }) {
+  const f = (c: string) => p.nota.factores.find((x) => x.clave === c)?.sub ?? null;
+  const fallas = tiposFallaDe(p);
+  const tarde = p.tardeMin != null && p.tardeMin > 0;
+  const mala = p.nota.banda === "mal";
+  return (
+    <button type="button" onClick={onClick} title={t("hr.hist.verExpediente")}
+      className={`group flex flex-col gap-3 rounded-[14px] border bg-card/30 p-3.5 text-left transition-colors hover:bg-card/50 ${mala ? "border-destructive/50" : "border-border/50 hover:border-foreground/25"}`}>
+      <div className="flex items-center gap-2.5">
+        <UserAvatar name={p.nombre || t("hr.noName")} src={p.avatarUrl} seed={p.avatarSeed} size="md" />
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-sm font-semibold text-foreground">{p.nombre || t("hr.noName")}</p>
+          <p className="flex items-center gap-1.5 text-[11px] text-muted-foreground tabular-nums">
+            {p.entroHHMM ? t("hr.hist.entro", { h: p.entroHHMM }) : t("hr.hist.sinEntrada")}
+            {tarde && <span className="inline-flex items-center gap-1 text-foreground/85"><span className="h-1.5 w-1.5 rounded-full bg-warning" aria-hidden />+{p.tardeMin} min</span>}
+            {p.horasTurno > 0 && <span>· {p.horasTurno.toFixed(1)}h</span>}
+          </p>
+        </div>
+        <div className="flex shrink-0 flex-col items-end">
+          <span className="flex items-center gap-1.5 font-display text-2xl font-semibold leading-none tabular-nums text-foreground">
+            {p.nota.banda && <span className={`h-1.5 w-1.5 rounded-full ${PUNTO_BANDA[p.nota.banda] ?? "bg-muted-foreground"}`} aria-hidden />}
+            {p.nota.valor ?? "—"}
+          </span>
+          <span className="mt-0.5 text-[10px] text-muted-foreground">{t("hr.hist.nota")}</span>
+        </div>
+      </div>
+      <div className="flex flex-col gap-1.5">
+        <Barra label={t("hr.resumen.pantalla")} valor={p.pantallaPct ?? f("pantalla")} />
+        <Barra label={t("hr.resumen.camara")} valor={p.camaraPct ?? f("camara")} />
+        <Barra label={t("hr.resumen.atencion")} valor={p.atencionPct ?? f("atencion")} />
+      </div>
+      {fallas.length > 0 && (
+        <div className="flex flex-wrap gap-1.5">
+          {fallas.map((tf) => (
+            <span key={tf} className="inline-flex items-center gap-1.5 rounded-full border border-border/60 bg-foreground/[0.04] px-2 py-0.5 text-[10px] font-medium text-foreground/80">
+              <span className={`h-1.5 w-1.5 rounded-full ${tf === "fuera" ? "bg-destructive" : "bg-warning"}`} aria-hidden />{t(FLAG_LBL[tf])}
+            </span>
           ))}
         </div>
-        <div className="mt-0.5 flex flex-wrap gap-x-2.5 text-[11px] text-muted-foreground">
-          <span>{t("hr.resumen.pantalla")} <span className="tabular-nums">{txt(f("pantalla"))}</span></span>
-          <span>{t("hr.resumen.camara")} <span className="tabular-nums">{txt(f("camara"))}</span></span>
-          <span>{t("hr.resumen.atencion")} <span className="tabular-nums">{txt(f("atencion"))}</span></span>
-        </div>
-        {/* Horas trabajadas en el turno + entró/salió (Alvaro 05/11: "¿a qué horas?"). */}
-        {(p.horasTurno > 0 || p.entroHHMM) && (
-          <div className="mt-0.5 flex flex-wrap items-center gap-x-2.5 text-[11px] text-muted-foreground">
-            <span className="tabular-nums font-semibold text-foreground/70">{p.horasTurno.toFixed(1)}h</span>
-            {p.entroHHMM && (
-              <span className="tabular-nums">
-                · entró {p.entroHHMM}
-                {p.tardeMin != null && p.tardeMin > 0 && <span className="ml-1 text-warning/80">(+{p.tardeMin}m)</span>}
-              </span>
-            )}
-            {p.salioHHMM && <span className="tabular-nums">· salió {p.salioHHMM}</span>}
-          </div>
-        )}
-      </div>
-      <span className={`shrink-0 rounded-lg px-2 py-1 font-display text-sm font-bold tabular-nums ${notaTile}`}>{p.nota.valor ?? "—"}</span>
-      <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground/60 transition group-hover:translate-x-0.5 group-hover:text-foreground" />
+      )}
     </button>
   );
 }
+
+// Un grupo (departamento o equipo) como tarjeta de INDICADORES: nombre y gente,
+// la nota promedio grande, las 3 barras promedio y cuántos con falla / tarde.
+function TarjetaGrupo({ nombre, gente, nota, pantalla, camara, atencion, conFallas, conTarde, t, onClick }: {
+  nombre: string; gente: number; nota: number | null; pantalla: number | null; camara: number | null; atencion: number | null;
+  conFallas: number; conTarde: number; t: Tr; onClick: () => void;
+}) {
+  const banda = nota == null ? null : nota >= 80 ? "bien" : nota >= 60 ? "ojo" : "mal";
+  return (
+    <button type="button" onClick={onClick}
+      className={`group vidrio vidrio-lift flex flex-col gap-3 p-4 text-left ${banda === "mal" ? "ring-1 ring-destructive/40" : ""}`}>
+      <div className="v-cont flex flex-col gap-3">
+        <div className="flex items-start gap-3">
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-[15px] font-semibold text-foreground">{nombre}</p>
+            <p className="text-[11px] text-muted-foreground tabular-nums">{t("hr.hist.deptoGente", { n: gente })}</p>
+          </div>
+          <div className="flex shrink-0 flex-col items-end">
+            <span className="flex items-center gap-1.5 font-display text-[28px] font-semibold leading-none tabular-nums text-foreground">
+              {banda && <span className={`h-2 w-2 rounded-full ${PUNTO_BANDA[banda]}`} aria-hidden />}
+              {nota ?? "—"}
+            </span>
+            <span className="mt-0.5 text-[10px] text-muted-foreground">{t("hr.hist.notaPromedio")}</span>
+          </div>
+        </div>
+        <div className="flex flex-col gap-1.5">
+          <Barra label={t("hr.resumen.pantalla")} valor={pantalla} />
+          <Barra label={t("hr.resumen.camara")} valor={camara} />
+          <Barra label={t("hr.resumen.atencion")} valor={atencion} />
+        </div>
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-border/40 pt-2.5 text-[11px] text-muted-foreground">
+          {conFallas > 0 ? (
+            <span className="inline-flex items-center gap-1.5 text-foreground/85"><span className="h-1.5 w-1.5 rounded-full bg-destructive" aria-hidden />{t("hr.hist.deptoConFallas", { n: conFallas })}</span>
+          ) : (
+            <span className="inline-flex items-center gap-1.5"><span className="h-1.5 w-1.5 rounded-full bg-success" aria-hidden />{t("hr.hist.deptoSinFallas")}</span>
+          )}
+          {conTarde > 0 && (
+            <span className="inline-flex items-center gap-1.5"><span className="h-1.5 w-1.5 rounded-full bg-warning" aria-hidden />{t("hr.hist.deptoTarde", { n: conTarde })}</span>
+          )}
+          <ChevronRight className="ml-auto h-4 w-4 shrink-0 text-muted-foreground/60 transition group-hover:translate-x-0.5 group-hover:text-foreground" />
+        </div>
+      </div>
+    </button>
+  );
+}
+const promedio = (gente: PersonaTurno[], f: (p: PersonaTurno) => number | null) => {
+  const v = gente.map(f).filter((x): x is number => x != null);
+  return v.length ? Math.round(v.reduce((a, b) => a + b, 0) / v.length) : null;
+};
 
 // PÁGINA de un turno (antes era pop-up, Alvaro 05/11): botón volver, diagnóstico
 // (promedios + en problema), filtro "solo con fallas" y la gente del turno
@@ -151,14 +216,16 @@ function TurnoDetalle({ turno, dia, resumen, t, onVolver, onPersona }: {
           { lbl: t("hr.resumen.camara"), v: resumen.camara, c: COLOR.camara },
           { lbl: t("hr.resumen.atencion"), v: resumen.atencion, c: COLOR.atencion },
         ].map((m) => (
-          <div key={m.lbl} className="rounded-xl border border-border/40 bg-card/20 p-2.5 text-center">
-            <div className="font-display text-lg font-bold tabular-nums" style={{ color: m.c }}>{m.v == null ? "—" : `${m.v}%`}</div>
-            <div className="text-[10px] text-muted-foreground">{m.lbl}</div>
+          <div key={m.lbl} className="rounded-[12px] border border-border/50 bg-card/30 px-3 py-2.5">
+            <div className="text-[11px] font-medium text-muted-foreground">{m.lbl}</div>
+            <div className="mt-0.5 font-display text-xl font-semibold tabular-nums text-foreground">{m.v == null ? "—" : `${m.v}%`}</div>
           </div>
         ))}
-        <div className={`rounded-xl border p-2.5 text-center ${enProblema > 0 ? "border-destructive/40 bg-destructive/5" : "border-border/40 bg-card/20"}`}>
-          <div className={`font-display text-lg font-bold tabular-nums ${enProblema > 0 ? "text-destructive" : ""}`}>{enProblema}</div>
-          <div className="text-[10px] text-muted-foreground">{t("hr.hist.enProblemaLbl")}</div>
+        <div className={`rounded-[12px] border bg-card/30 px-3 py-2.5 ${enProblema > 0 ? "border-destructive/50" : "border-border/50"}`}>
+          <div className="flex items-center gap-1.5 text-[11px] font-medium text-muted-foreground">
+            {enProblema > 0 && <span className="h-1.5 w-1.5 rounded-full bg-destructive" aria-hidden />}{t("hr.hist.enProblemaLbl")}
+          </div>
+          <div className="mt-0.5 font-display text-xl font-semibold tabular-nums text-foreground">{enProblema}</div>
         </div>
       </div>
 
@@ -168,11 +235,11 @@ function TurnoDetalle({ turno, dia, resumen, t, onVolver, onPersona }: {
       <div className="flex items-center justify-end">
         <div className="inline-flex rounded-full border border-border/50 bg-card/20 p-0.5 text-xs">
           <button type="button" onClick={() => setVista("personas")}
-            className={`rounded-full px-3 py-1 font-medium transition ${vista === "personas" ? "bg-primary/15 text-primary" : "text-muted-foreground hover:text-foreground"}`}>
+            className={`rounded-full px-3 py-1 font-medium transition ${vista === "personas" ? "bg-foreground/10 text-foreground" : "text-muted-foreground hover:text-foreground"}`}>
             {t("hr.hist.vistaPersonas")}
           </button>
           <button type="button" onClick={() => setVista("deptos")}
-            className={`rounded-full px-3 py-1 font-medium transition ${vista === "deptos" ? "bg-primary/15 text-primary" : "text-muted-foreground hover:text-foreground"}`}>
+            className={`rounded-full px-3 py-1 font-medium transition ${vista === "deptos" ? "bg-foreground/10 text-foreground" : "text-muted-foreground hover:text-foreground"}`}>
             {t("hr.hist.vistaDeptos")}
           </button>
         </div>
@@ -247,41 +314,13 @@ function DeptosDelTurno({ personas, cargando, t, onPersona }: {
 
   return (
     <div>
-      <p className="mb-2 flex items-center gap-1.5 text-xs font-semibold text-muted-foreground"><Eye className="h-3.5 w-3.5" />{t("hr.hist.deptos")}</p>
-      <div className="grid gap-2.5 sm:grid-cols-2 lg:grid-cols-3">
-        {deptos.map((d) => {
-          // Glassy con VIDA (Alvaro 08/11): resplandor sutil del vidrio según cómo
-          // va el depto (no un semáforo chillón) + nota como tile de color TENUE.
-          // El texto queda neutro; el color se insinúa, no grita.
-          const glow = d.conFallas > 0 ? "glow-a" : (d.notaProm ?? 100) < 80 ? "glow-a" : "glow-g";
-          const notaTile = d.notaProm == null ? "bg-muted/40 text-muted-foreground" :
-            d.notaProm >= 80 ? "bg-success/10 text-success/90" : d.notaProm >= 60 ? "bg-warning/10 text-warning/90" : "bg-destructive/10 text-destructive/90";
-          return (
-            <button key={d.nombre} type="button" onClick={() => setDeptoSel(d.nombre)}
-              className={`group vidrio vidrio-glow vidrio-lift ${glow} text-left`}>
-              <div className="v-cont flex items-center gap-3 px-3.5 py-2.5">
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-baseline gap-2">
-                    <span className="truncate text-sm font-semibold">{d.nombre}</span>
-                    <span className="text-[11px] text-muted-foreground tabular-nums">{t("hr.hist.deptoGente", { n: d.total })}</span>
-                  </div>
-                  <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] text-muted-foreground">
-                    {d.conFallas > 0 ? (
-                      <span className="inline-flex items-center gap-1"><AlertTriangle className="h-3 w-3 text-warning/70" />{t("hr.hist.deptoConFallas", { n: d.conFallas })}</span>
-                    ) : (
-                      <span>{t("hr.hist.deptoSinFallas")}</span>
-                    )}
-                    {d.conTarde > 0 && (
-                      <span className="inline-flex items-center gap-1">· <Clock className="h-3 w-3" />{t("hr.hist.deptoTarde", { n: d.conTarde })}</span>
-                    )}
-                  </div>
-                </div>
-                <span className={`shrink-0 rounded-lg px-2 py-1 font-display text-sm font-bold tabular-nums ${notaTile}`}>{d.notaProm ?? "—"}</span>
-                <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground/60 transition group-hover:translate-x-0.5 group-hover:text-foreground" />
-              </div>
-            </button>
-          );
-        })}
+      <p className="mb-2.5 flex items-center gap-1.5 text-xs font-semibold text-muted-foreground"><Eye className="h-3.5 w-3.5" />{t("hr.hist.deptos")}</p>
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+        {deptos.map((d) => (
+          <TarjetaGrupo key={d.nombre} nombre={d.nombre} gente={d.total} nota={d.notaProm}
+            pantalla={promedio(d.gente, (p) => p.pantallaPct)} camara={promedio(d.gente, (p) => p.camaraPct)} atencion={promedio(d.gente, (p) => p.atencionPct)}
+            conFallas={d.conFallas} conTarde={d.conTarde} t={t} onClick={() => setDeptoSel(d.nombre)} />
+        ))}
       </div>
     </div>
   );
@@ -316,14 +355,15 @@ function PersonasConFiltro({ personas, cargando, t, onPersona, agruparPorEquipo 
   const grupos = agruparPorEquipo
     ? [...mostradas.reduce((m, p) => { (m.get(p.equipo) ?? m.set(p.equipo, []).get(p.equipo)!).push(p); return m; }, new Map<string, PersonaTurno[]>())].sort((a, b) => a[0].localeCompare(b[0], "es"))
     : null;
-  const fila = (p: PersonaTurno) => <PersonaFilaTurno key={p.userId} p={p} t={t} onClick={() => onPersona(p.userId)} />;
+  const fila = (p: PersonaTurno) => <PersonaTarjeta key={p.userId} p={p} t={t} onClick={() => onPersona(p.userId)} />;
+  const REJILLA = "grid gap-3 sm:grid-cols-2 xl:grid-cols-3";
   return (
     <div>
       <div className="mb-3 flex flex-wrap items-center gap-2">
         {chips.map((c) => (
-          <button key={c.k} type="button" onClick={() => setFiltroTipo(c.k)} className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition ${filtroTipo === c.k ? "border-primary/50 bg-primary/10 text-primary" : "border-border/50 text-muted-foreground hover:bg-foreground/5"}`}>
+          <button key={c.k} type="button" onClick={() => setFiltroTipo(c.k)} className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition ${filtroTipo === c.k ? "border-foreground/30 bg-foreground/10 text-foreground" : "border-border/50 text-muted-foreground hover:bg-foreground/5"}`}>
             {c.lbl}
-            {c.n != null && c.n > 0 && <span className={`rounded-full px-1.5 py-0.5 text-[10px] tabular-nums ${filtroTipo === c.k ? "bg-primary/20" : "bg-warning/20 text-warning"}`}>{c.n}</span>}
+            {c.n != null && c.n > 0 && <span className="rounded-full bg-foreground/10 px-1.5 py-0.5 text-[10px] tabular-nums text-foreground/85">{c.n}</span>}
           </button>
         ))}
       </div>
@@ -336,7 +376,7 @@ function PersonasConFiltro({ personas, cargando, t, onPersona, agruparPorEquipo 
           {grupos.map(([eq, gente]) => (
             <div key={eq}>
               <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground/80">{eq} · {gente.length}</p>
-              <div className="flex flex-col gap-1.5">{gente.map(fila)}</div>
+              <div className={REJILLA}>{gente.map(fila)}</div>
             </div>
           ))}
         </div>
@@ -353,7 +393,7 @@ function PersonasConFiltro({ personas, cargando, t, onPersona, agruparPorEquipo 
                   <p className="mb-1.5 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
                     <Clock className="h-3 w-3 text-warning/70" />{t("hr.hist.secTarde", { n: tarde.length })}
                   </p>
-                  <div className="flex flex-col gap-1.5">{tarde.map(fila)}</div>
+                  <div className={REJILLA}>{tarde.map(fila)}</div>
                 </div>
               )}
               {puntuales.length > 0 && (
@@ -361,7 +401,7 @@ function PersonasConFiltro({ personas, cargando, t, onPersona, agruparPorEquipo 
                   <p className="mb-1.5 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground/70">
                     <Clock className="h-3 w-3" />{t("hr.hist.secATiempo", { n: puntuales.length })}
                   </p>
-                  <div className="flex flex-col gap-1.5">{puntuales.map(fila)}</div>
+                  <div className={REJILLA}>{puntuales.map(fila)}</div>
                 </div>
               )}
             </div>
@@ -412,27 +452,13 @@ function EquiposVista({ dia, t, onPersona, equipoInicial }: { dia: string; t: Tr
   if (cargando) return <div className="flex justify-center py-10"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>;
   if (equipos.length === 0) return <p className="py-8 text-center text-sm text-muted-foreground">{t("hr.hist.sinGente")}</p>;
   return (
-    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-      {equipos.map((e) => {
-        const color = e.nota == null ? "text-muted-foreground" : e.nota < 60 ? "text-destructive" : e.nota < 80 ? "text-warning" : "text-success";
-        return (
-          <button key={e.eq} type="button" onClick={() => setEquipoSel(e.eq)} className="rounded-2xl border border-border/40 bg-card/20 p-3.5 text-left transition hover:border-primary/40 hover:bg-card/40">
-            <div className="mb-2 flex items-center gap-2">
-              <span className="min-w-0 flex-1 truncate text-sm font-semibold">{e.eq}</span>
-              <span className="shrink-0 text-[11px] text-muted-foreground">{e.gente.length}</span>
-              <span className={`shrink-0 font-display text-xl font-bold tabular-nums ${color}`}>{e.nota ?? "—"}</span>
-            </div>
-            <div className="space-y-1.5">
-              <Metrica label={t("hr.resumen.pantalla")} valor={e.pantalla} color={COLOR.pantalla} />
-              <Metrica label={t("hr.resumen.camara")} valor={e.camara} color={COLOR.camara} />
-              <Metrica label={t("hr.resumen.atencion")} valor={e.atencion} color={COLOR.atencion} />
-            </div>
-            <div className={`mt-2 flex items-center gap-1 border-t border-border/40 pt-2 text-[11px] ${e.conFallas > 0 ? "text-warning" : "text-muted-foreground"}`}>
-              {e.conFallas > 0 ? <><AlertTriangle className="h-3 w-3" />{t("hr.hist.equipoConFallas", { n: e.conFallas })}</> : t("hr.hist.equipoSinFallas")}
-            </div>
-          </button>
-        );
-      })}
+    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+      {equipos.map((e) => (
+        <TarjetaGrupo key={e.eq} nombre={e.eq} gente={e.gente.length} nota={e.nota}
+          pantalla={e.pantalla} camara={e.camara} atencion={e.atencion}
+          conFallas={e.conFallas} conTarde={e.gente.filter((p) => p.tardeMin != null && p.tardeMin > 0).length}
+          t={t} onClick={() => setEquipoSel(e.eq)} />
+      ))}
     </div>
   );
 }
