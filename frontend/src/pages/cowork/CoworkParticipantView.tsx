@@ -723,10 +723,9 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
       onMediaStateChange: handleMediaStateChange,
       onFaceStateChange: handleFaceStateChange,
       supervisorEncuadre: true,
-      // En SU sala oye a todos pero no descarga el video de los compañeros: con
-      // ~1 Mbps eso le quitaba aire a lo que tiene que subir (lib/videoAjeno.ts).
-      // El meet y la 1:1 de abajo no lo llevan: ahí sí se ven.
-      sinVideoAjeno: true,
+      // Ven a sus compañeros como siempre, con pantalla y cámara (Alvaro, 14/11/2026:
+      // «tienen que quedar como estaba» — las pantallas de los compañeros hacen falta
+      // para los empalmes). El modo «solo audio» (lib/videoAjeno.ts) queda apagado.
       leaveLabel: traducir("cowork.participant.leaveAndBack"),
       leaveIcon: LogOut,
     });
