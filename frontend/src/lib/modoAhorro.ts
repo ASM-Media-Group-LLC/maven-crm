@@ -8,6 +8,8 @@
 // Alvaro eligió «automático según su internet»: a quien tenga la subida lenta,
 // Maven le baja SOLO a esa persona la cámara a calidad media y la pantalla a 5
 // cuadros por segundo (se sigue leyendo); quien tiene buen internet, igual.
+// (13/11/2026: lo de la cámara lo aplica su perfil, lib/perfilDeCamara.ts, que
+// cuenta el modo ahorro como una de sus señales.)
 //
 // La decisión (esta función) se toma con la muestra de cada minuto y con
 // histéresis para no subir y bajar a cada rato: se prende con 2 minutos

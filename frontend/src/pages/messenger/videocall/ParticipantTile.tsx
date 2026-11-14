@@ -2,7 +2,7 @@ import { useEffect, useRef, memo, useCallback, useState } from "react";
 import { MARCA_AUDIO, reanudarAudioConGesto } from "@/lib/audioDeLaLlamada";
 import { Track, Room } from "livekit-client";
 import { UserAvatar } from "@/components/UserAvatar";
-import { MicOff, Hand, Monitor, WifiOff, Pin, PinOff, MoreVertical, UserX, ZoomIn, ZoomOut, Minimize2 } from "lucide-react";
+import { MicOff, Hand, Monitor, WifiOff, Pin, PinOff, MoreVertical, UserX, ZoomIn, ZoomOut, Minimize2, Headphones } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
@@ -59,6 +59,7 @@ function areParticipantPropsEqual(prev: ParticipantTileProps, next: ParticipantT
     prevP.handRaised === nextP.handRaised &&
     prevP.connectionQuality === nextP.connectionQuality &&
     prevP.hasVideoTrack === nextP.hasVideoTrack &&
+    prevP.videoOculto === nextP.videoOculto &&
     areReactionsEqual(prevP.reactions, nextP.reactions) &&
     prev.isAdmin === next.isAdmin &&
     prev.onMuteParticipant === next.onMuteParticipant &&
@@ -539,6 +540,22 @@ const ParticipantTile = memo(function ParticipantTile({
         <div className="absolute top-3 left-1/2 -translate-x-1/2 z-10">
           <div className="flex items-center gap-1.5 bg-[hsl(220_3%_14%/0.8)] backdrop-blur-sm text-foreground text-[10px] font-medium rounded-full px-2.5 py-1">
             <Monitor className="h-3 w-3" /> {t("messenger.tile.compartiendoPantalla")}
+          </div>
+        </div>
+      )}
+
+      {/* Compañero en la sala de Cowork del participante: su video no se recibe a
+          propósito (lib/videoAjeno.ts). Se dice, para que no parezca que apagó la
+          cámara ni que algo se rompió. En el recuadro chico, solo el ícono. */}
+      {participant.videoOculto && (
+        <div className="absolute top-2 left-1/2 -translate-x-1/2 z-10" title={t("messenger.tile.soloAudioDesc")}>
+          <div className={cn(
+            // Texto blanco fijo sobre la placa oscura fija: se lee en tema claro y oscuro.
+            "flex items-center gap-1 whitespace-nowrap rounded-full bg-[hsl(220_3%_14%/0.8)] backdrop-blur-sm text-white/85 font-medium",
+            compact ? "px-1.5 py-0.5" : "px-2.5 py-1 text-[10px]",
+          )}>
+            <Headphones className="h-3 w-3" aria-hidden />
+            {compact ? <span className="sr-only">{t("messenger.tile.soloAudio")}</span> : t("messenger.tile.soloAudio")}
           </div>
         </div>
       )}

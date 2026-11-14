@@ -122,6 +122,10 @@ interface LiveKitCallViewProps {
    *  pantalla de login (feedback de Jhon 21/08). Meet pasa acá su link
    *  público /entrar/<código>. */
   shareLink?: string;
+  /** Sala de Cowork del PARTICIPANTE: oye a todos pero no recibe el video de
+   *  sus compañeros (lib/videoAjeno.ts). Solo lo pasa CoworkParticipantView
+   *  para su sala; el tablero, el Hub, los meets y las 1:1 no lo pasan. */
+  sinVideoAjeno?: boolean;
 }
 
 /** ¿Este dispositivo se maneja con el dedo? Se mide una sola vez: nadie cambia
@@ -133,7 +137,7 @@ function usePunteroGrueso(): boolean {
   return grueso;
 }
 
-export default function LiveKitCallView({ roomName, displayName, callDisplayName, isAdmin = false, onLeave, initialMicOn = true, initialCamOn = true, initialScreenShareOn = false, initialAudioDeviceId, initialVideoDeviceId, initialAudioOutputDeviceId, initialBackgroundEffect = "none", hideShareLink, hideScreenShare, hideLeaveButton, leaveLabel, leaveIcon, suppressLeaveToast, compact, autoPip = true, autoLeaveOnEmpty, getToken, onMediaStateChange, onFaceStateChange, supervisorEncuadre, incomingAudioMuted, roomSwitcher, recording, shareLink: shareLinkProp, hideEndForAll, controlesExtra }: LiveKitCallViewProps) {
+export default function LiveKitCallView({ roomName, displayName, callDisplayName, isAdmin = false, onLeave, initialMicOn = true, initialCamOn = true, initialScreenShareOn = false, initialAudioDeviceId, initialVideoDeviceId, initialAudioOutputDeviceId, initialBackgroundEffect = "none", hideShareLink, hideScreenShare, hideLeaveButton, leaveLabel, leaveIcon, suppressLeaveToast, compact, autoPip = true, autoLeaveOnEmpty, getToken, onMediaStateChange, onFaceStateChange, supervisorEncuadre, incomingAudioMuted, roomSwitcher, recording, shareLink: shareLinkProp, hideEndForAll, controlesExtra, sinVideoAjeno = false }: LiveKitCallViewProps) {
   // Lista de salas del navegador (solo Cowork supervisor+): estado del popup.
   const [salasAbiertas, setSalasAbiertas] = useState(false);
   const lk = useLiveKit();
@@ -332,6 +336,10 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
   displayNameRef.current = displayName;
   const getTokenRef = useRef(getToken);
   getTokenRef.current = getToken;
+  // Por ref, como el nombre: no cambia en una misma llamada y, si estuviera en
+  // las dependencias del efecto de conexión, cualquier cambio la reconectaría.
+  const sinVideoAjenoRef = useRef(sinVideoAjeno);
+  sinVideoAjenoRef.current = sinVideoAjeno;
 
   useEffect(() => {
     let cancelled = false;
@@ -354,6 +362,7 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
           audioOutputDeviceId: initialAudioOutputDeviceId,
           backgroundEffect: bgInicialRef.current,
           tokenProvider: getTokenRef.current ? () => getTokenRef.current!() : undefined,
+          sinVideoAjeno: sinVideoAjenoRef.current,
         });
       } catch (err: any) {
         if (cancelled) return;

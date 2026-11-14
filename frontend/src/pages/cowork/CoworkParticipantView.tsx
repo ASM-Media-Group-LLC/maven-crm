@@ -723,6 +723,10 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
       onMediaStateChange: handleMediaStateChange,
       onFaceStateChange: handleFaceStateChange,
       supervisorEncuadre: true,
+      // En SU sala oye a todos pero no descarga el video de los compañeros: con
+      // ~1 Mbps eso le quitaba aire a lo que tiene que subir (lib/videoAjeno.ts).
+      // El meet y la 1:1 de abajo no lo llevan: ahí sí se ven.
+      sinVideoAjeno: true,
       leaveLabel: traducir("cowork.participant.leaveAndBack"),
       leaveIcon: LogOut,
     });

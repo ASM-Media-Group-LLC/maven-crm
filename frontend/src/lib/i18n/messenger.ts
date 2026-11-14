@@ -550,6 +550,11 @@ export const messenger = {
   "messenger.tile.silenciarDesc": { es: "Deja de escucharse para toda la sala, no solo para ti. Se le avisa que lo silenciaron y puede volver a activar su micrófono cuando quiera — tú no puedes hacerlo por él.", en: "They stop being heard by the whole room, not just you. They're told they were muted and can turn their microphone back on whenever they want — you can't do it for them." },
   "messenger.tile.anclado": { es: "Anclado", en: "Pinned" },
   "messenger.tile.compartiendoPantalla": { es: "Compartiendo pantalla", en: "Sharing screen" },
+  "messenger.tile.soloAudio": { es: "Solo audio", en: "Audio only" },
+  "messenger.tile.soloAudioDesc": {
+    es: "Para cuidar tu internet, en tu sala de Cowork no recibes el video de tus compañeros. Sí los escuchas.",
+    en: "To save your connection, in your Cowork room you don't receive your teammates' video. You can still hear them.",
+  },
 
   // Llamada: la sala de espera antes de entrar (PreJoinLobby).
   "messenger.lobby.fondoNoDisponible": { es: "Tu fondo ya no está disponible", en: "Your background is no longer available" },
