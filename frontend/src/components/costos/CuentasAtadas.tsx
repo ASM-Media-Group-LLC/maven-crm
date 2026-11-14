@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery, type UseQueryResult } from "@tanstack/react-query";
-import { AlertTriangle, Loader2, RefreshCw } from "lucide-react";
+import { Loader2, RefreshCw } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useLanguage } from "@/hooks/useLanguage";
 import type { TranslationKey } from "@/lib/i18n";
@@ -9,13 +9,14 @@ import {
   type Candidato, type ConteoCuentas, type CuentaAtada, type EstadoCasillaZoho, type EstadoCuenta,
   type ServicioCosto, type ZohoEnVivo,
 } from "@/lib/costos";
+import { Cargando, FalloCompacto, Pastilla, Panel } from "./comun";
 
 // CUENTAS ATADAS (Alvaro, 11/11/2026: «no me dijiste cuántas cuentas había
-// atadas para poder bajar costos»). Dentro del diseño «A · Una cifra»: un solo
-// color (el de Maven) para lo que se puede soltar, contorno para lo que no se
-// ve, números como fichas y barras. Tres piezas:
-//   · BloqueBajarCostos: arriba en el tablero, cuánto podrías bajar al mes y
-//     dónde, servicio por servicio (sea o no Maven).
+// atadas para poder bajar costos»). Un solo color (el de Maven) para lo que se
+// puede soltar, contorno para lo que no se ve, números como fichas. Tres piezas:
+//   · BloqueBajarCostos: «Dónde puedes recortar», al final de «Por parte de
+//     Maven» (13/11: compacto, una fila por servicio): cuánto podrías bajar al
+//     mes y dónde, servicio por servicio (sea o no Maven).
 //   · SeccionCuentas: en la ficha de cada servicio, sus casillas, proyectos,
 //     llaves, servidores y puestos, con su estado y su ahorro.
 //   · ZohoEnVivo: en la ficha de Zoho, las licencias y cada casilla leídas en
@@ -49,7 +50,7 @@ const CHIP: Record<EstadoCuenta | EstadoCasillaZoho, string> = {
   sin_cuenta_en_maven: "border border-dashed border-border text-muted-foreground",
 };
 
-export function usarCuentas() {
+export function useCuentas() {
   return useQuery({
     queryKey: ["costos-cuentas"],
     staleTime: 5 * 60_000,
@@ -69,20 +70,6 @@ function Chip({ estado }: { estado: EstadoCuenta | EstadoCasillaZoho }) {
   return <span className={`shrink-0 whitespace-nowrap rounded-full px-2 py-0.5 text-[10px] font-medium ${CHIP[estado]}`}>{t(CLAVE_CHIP[estado])}</span>;
 }
 
-function Fallo({ onReintentar }: { onReintentar: () => void }) {
-  const { t } = useLanguage();
-  return (
-    <div role="alert" className="flex flex-wrap items-center gap-3 rounded-panel border border-destructive/30 bg-destructive/5 p-3 text-sm">
-      <AlertTriangle className="h-4 w-4 shrink-0 text-destructive" />
-      <span className="min-w-0 flex-1">{t("oficina.costos.fallo")}</span>
-      <button type="button" onClick={onReintentar} className="inline-flex items-center gap-1.5 rounded-control border border-border px-2.5 py-1 text-xs font-medium hover:bg-muted">
-        <RefreshCw className="h-3.5 w-3.5" />{t("oficina.costos.reintentar")}
-      </button>
-    </div>
-  );
-}
-
-const Cargando = () => <div className="flex justify-center py-6"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>;
 
 /** «13 de gente que salió · 3 sin uso». */
 function lineaDeConteo(k: ConteoCuentas, t: (c: TranslationKey, p?: Record<string, string | number>) => string): string {
@@ -92,86 +79,70 @@ function lineaDeConteo(k: ConteoCuentas, t: (c: TranslationKey, p?: Record<strin
   return partes.join(" · ");
 }
 
-/** Ancho de la barra de un ahorro, contra el más grande (mínimo 4 % para que se vea). */
-function anchoDeBarra(ahorro: number, mayor: number): string {
-  return `${Math.max(4, Math.min(100, (ahorro / Math.max(mayor, 1)) * 100))}%`;
-}
-
-function FilaCandidato({ c, mayor, onAbrir }: { c: Candidato; mayor: number; onAbrir: (id: string) => void }) {
+function FilaCandidato({ c, onAbrir }: { c: Candidato; onAbrir: (id: string) => void }) {
   const { t } = useLanguage();
   const s = c.servicio;
   const conteo = c.conteo && c.conteo.liberables > 0 ? lineaDeConteo(c.conteo, t) : "";
+  const detalle = [s.ahorro_detalle, conteo].filter(Boolean).join(" · ");
   return (
     <li>
       <button type="button" onClick={() => onAbrir(s.id)}
-        className="grid w-full grid-cols-1 gap-2 border-b border-border/40 py-3 text-left transition hover:bg-muted/30 sm:grid-cols-[minmax(0,1fr)_9.5rem] sm:items-center sm:gap-5">
-        <span className="min-w-0">
-          <span className="flex flex-wrap items-baseline gap-x-2">
-            <span className="text-sm font-medium">{s.nombre}</span>
-            {!s.es_maven && <span className="text-[11px] text-muted-foreground">{t("oficina.costos.bajar.noEsMaven")}</span>}
+        className="flex w-full items-start gap-3 border-t border-border/40 px-4 py-2.5 text-left transition hover:bg-muted/30 sm:px-5">
+        <span className="min-w-0 flex-1">
+          <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
+            <span className="text-sm font-medium text-foreground">{s.nombre}</span>
+            {!s.es_maven && <Pastilla color="hsl(var(--muted-foreground) / 0.5)">{t("oficina.costos.bajar.noEsMaven")}</Pastilla>}
           </span>
-          {s.ahorro_detalle && <span className="mt-0.5 block text-xs text-muted-foreground">{s.ahorro_detalle}</span>}
-          {conteo && <span className="mt-0.5 block text-[11px] text-muted-foreground/80">{conteo}</span>}
+          {detalle && <span className="mt-0.5 block text-xs text-muted-foreground">{detalle}</span>}
         </span>
-        <span className="flex flex-col gap-1.5 sm:items-end">
-          {c.ahorro !== null ? (
-            <>
-              <span className="font-display text-sm font-semibold tabular-nums">{t("oficina.costos.bajar.menos", { m: exacto(c.ahorro) })}</span>
-              <span className="h-[3px] w-full overflow-hidden rounded-full bg-border/60" aria-hidden>
-                <span className="block h-full rounded-full bg-primary" style={{ width: anchoDeBarra(c.ahorro, mayor) }} />
-              </span>
-            </>
-          ) : (
-            <span className="text-xs text-muted-foreground">{t("oficina.costos.bajar.sinPrecioFila")}</span>
-          )}
-        </span>
+        {c.ahorro !== null
+          ? <span className="shrink-0 whitespace-nowrap pt-0.5 text-sm font-medium tabular-nums text-foreground">{t("oficina.costos.bajar.menos", { m: exacto(c.ahorro) })}</span>
+          : <span className="shrink-0 whitespace-nowrap pt-0.5 text-xs text-muted-foreground">{t("oficina.costos.bajar.sinPrecioFila")}</span>}
       </button>
     </li>
   );
 }
 
-/** «Dónde puedes bajar costos»: la suma de lo que podrías bajar al mes y, por
- *  servicio, qué soltar. Toca uno y se abre su ficha con sus cuentas. */
+/** «Dónde puedes recortar»: la suma de lo que podrías bajar al mes y, por
+ *  servicio, qué soltar, en filas compactas. Toca uno y se abre su ficha. */
 export function BloqueBajarCostos({ servicios, cuentas, onAbrir }: {
   servicios: ServicioCosto[]; cuentas: UseQueryResult<CuentaAtada[]>; onAbrir: (id: string) => void;
 }) {
   const { t } = useLanguage();
+  const datos = cuentas.data ? dondeBajarCostos(servicios, cuentas.data) : null;
   return (
-    <section className="vidrio sube flex flex-col gap-4 p-5" aria-labelledby="bajar-costos">
-      <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <h2 id="bajar-costos" className="text-sm font-semibold text-muted-foreground">{t("oficina.costos.bajar.titulo")}</h2>
-        <span className="text-xs text-muted-foreground">{t("oficina.costos.bajar.toca")}</span>
-      </div>
+    <Panel id="bajar-costos" titulo={t("oficina.costos.bajar.titulo")} sub={t("oficina.costos.bajar.toca")}
+      derecha={datos && datos.candidatos.length > 0 ? (
+        <span className="text-right">
+          <span className="text-lg font-semibold tabular-nums text-foreground">{redondo(datos.total)}</span>
+          <span className="ml-1.5 text-xs text-muted-foreground">{t("oficina.costos.bajar.cifra")}</span>
+        </span>
+      ) : undefined}>
       {cuentas.isLoading ? <Cargando />
-        : cuentas.isError || !cuentas.data ? <Fallo onReintentar={() => void cuentas.refetch()} />
+        : cuentas.isError || !cuentas.data ? <FalloCompacto onReintentar={() => void cuentas.refetch()} ocupado={cuentas.isFetching} />
         : <ContenidoBajar servicios={servicios} cuentas={cuentas.data} onAbrir={onAbrir} />}
-    </section>
+    </Panel>
   );
 }
 
 function ContenidoBajar({ servicios, cuentas, onAbrir }: { servicios: ServicioCosto[]; cuentas: CuentaAtada[]; onAbrir: (id: string) => void }) {
   const { t } = useLanguage();
   const activos = new Set(servicios.filter((s) => s.activo).map((s) => s.id));
-  const { candidatos, total, sinPrecio } = dondeBajarCostos(servicios, cuentas);
+  const { candidatos, sinPrecio } = dondeBajarCostos(servicios, cuentas);
   const k = contarCuentas(cuentas.filter((c) => activos.has(c.servicio_id)));
-  const mayor = candidatos.reduce((a, c) => Math.max(a, c.ahorro ?? 0), 0);
-  if (candidatos.length === 0) return <p className="text-sm text-muted-foreground">{t("oficina.costos.bajar.nada")}</p>;
+  if (candidatos.length === 0) return <p className="px-4 py-3 text-sm text-muted-foreground sm:px-5">{t("oficina.costos.bajar.nada")}</p>;
   return (
-    <div className="grid gap-5 lg:grid-cols-[minmax(0,16rem)_minmax(0,1fr)] lg:gap-8">
-      <div className="flex flex-col gap-1">
-        <span className="font-display text-4xl font-bold tabular-nums tracking-tight sm:text-5xl">{redondo(total)}</span>
-        <span className="text-sm text-muted-foreground">{t("oficina.costos.bajar.cifra")}</span>
-        {sinPrecio > 0 && <span className="text-xs text-muted-foreground">{t("oficina.costos.bajar.sinPrecio", { n: sinPrecio })}</span>}
-        {k.total > 0 && (
-          <span className="mt-3 text-xs text-muted-foreground/90">
-            {t("oficina.costos.bajar.revise", { t: k.total, u: k.en_uso, s: k.sin_uso, g: k.de_alguien_que_salio, v: k.no_se_puede_ver })}
-          </span>
-        )}
-      </div>
-      <ul className="flex flex-col">
-        {candidatos.map((c) => <FilaCandidato key={c.servicio.id} c={c} mayor={mayor} onAbrir={onAbrir} />)}
+    <>
+      <ul className="-mt-px flex flex-col">
+        {candidatos.map((c) => <FilaCandidato key={c.servicio.id} c={c} onAbrir={onAbrir} />)}
       </ul>
-    </div>
+      {(sinPrecio > 0 || k.total > 0) && (
+        <p className="border-t border-border/40 px-4 py-2.5 text-[11px] text-muted-foreground sm:px-5">
+          {k.total > 0 && t("oficina.costos.bajar.revise", { t: k.total, u: k.en_uso, s: k.sin_uso, g: k.de_alguien_que_salio, v: k.no_se_puede_ver })}
+          {sinPrecio > 0 && <> {t("oficina.costos.bajar.sinPrecio", { n: sinPrecio })}</>}
+        </p>
+      )}
+    </>
   );
 }
 
@@ -181,7 +152,7 @@ export function SeccionCuentas({ servicioId, cuentas }: { servicioId: string; cu
   const { t } = useLanguage();
   const titulo = <h3 className="text-xs font-semibold text-muted-foreground">{t("oficina.costos.cuentas.titulo")}</h3>;
   if (cuentas.isLoading) return <div className="flex flex-col gap-1.5">{titulo}<Cargando /></div>;
-  if (cuentas.isError || !cuentas.data) return <div className="flex flex-col gap-1.5">{titulo}<Fallo onReintentar={() => void cuentas.refetch()} /></div>;
+  if (cuentas.isError || !cuentas.data) return <div className="flex flex-col gap-1.5">{titulo}<FalloCompacto onReintentar={() => void cuentas.refetch()} ocupado={cuentas.isFetching} /></div>;
   const propias = ordenarCuentas(cuentas.data.filter((c) => c.servicio_id === servicioId));
   if (propias.length === 0) return servicioId === "zoho" ? <ZohoEnVivoPanel /> : null;
   const k = contarCuentas(propias);
