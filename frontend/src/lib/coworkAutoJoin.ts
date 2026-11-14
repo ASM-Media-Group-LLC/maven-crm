@@ -51,3 +51,29 @@ export function decidirAutoJoin(p: {
 export function salaParaAutoUnir(urlRoomId: string | null, ultimaSala: string | null): string | null {
   return urlRoomId ?? ultimaSala;
 }
+
+/**
+ * ¿El enlace (`?session=`) NO es el Cowork de esta persona y hay que mandarla al
+ * suyo? (14/11/2026). Desde que hay un Cowork por departamento, una pestaña con el
+ * enlace de antes dejaba a la persona en «Unirse» sin entrar nunca a su sala.
+ *
+ * Solo para quien trabaja en UN Cowork (no ve todas las sesiones) y solo con datos
+ * ciertos: la sesión no es visible para ella (0 filas, no un fallo de red), ya se
+ * cerró, o está activa pero ella no es miembro (membresías leídas bien). Mientras
+ * carga, con un enlace con código o rol (los que canjea un coordinador), nunca.
+ */
+export function debeIrAlSuyo(p: {
+  sessionId: string | null;
+  veTodasLasSesiones: boolean;
+  cargando: boolean;
+  sesionNoVisible: boolean;
+  estado: string | null;
+  membresiasCargadas: boolean;
+  tieneMembresia: boolean;
+  conCodigo: boolean;
+}): boolean {
+  if (!p.sessionId || p.veTodasLasSesiones || p.cargando || p.conCodigo) return false;
+  if (p.sesionNoVisible) return true;
+  if (p.estado === "ended") return true;
+  return p.estado === "active" && p.membresiasCargadas && !p.tieneMembresia;
+}

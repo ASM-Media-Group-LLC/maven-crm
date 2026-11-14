@@ -175,6 +175,12 @@ export function useCoworkSession(sessionId: string | null) {
   const [myMembership, setMyMembership] = useState<CoworkMembership | null>(null);
   const [myAssignment, setMyAssignment] = useState<CoworkAssignment | null>(null);
   const [loading, setLoading] = useState(true);
+  /** La sesión del enlace no existe o no es visible para esta persona (PostgREST
+   *  respondió «0 filas», PGRST116): no es su Cowork. Un fallo de red NO la marca. */
+  const [sesionNoVisible, setSesionNoVisible] = useState(false);
+  /** Las membresías de la sesión ya se leyeron bien al menos una vez. */
+  const [membresiasCargadas, setMembresiasCargadas] = useState(false);
+  useEffect(() => { setSesionNoVisible(false); setMembresiasCargadas(false); }, [sessionId]);
   const [profiles, setProfiles] = useState<Record<string, string>>({});
   /** Foto real y avatar_seed (DiceBear) de cada miembro, para que el tablero
    *  dibuje la misma cara que el Messenger y no solo iniciales (Jhon, 10/09). */
@@ -214,7 +220,8 @@ export function useCoworkSession(sessionId: string | null) {
       pasoRef.current = "sesion";
       const { data: sess, error: eSess } = await supabase.from("cowork_sessions").select("*").eq("id", sessionId).single();
       if (!vigente()) return;
-      if (!eSess && sess) setSession(sess);
+      if (!eSess && sess) { setSession(sess); setSesionNoVisible(false); }
+      else if ((eSess as { code?: string } | null)?.code === "PGRST116") setSesionNoVisible(true);
 
       pasoRef.current = "salas";
       const { data: rms, error: eRms } = await supabase.from("cowork_rooms").select("*").eq("session_id", sessionId).order("sort_order");
@@ -226,6 +233,7 @@ export function useCoworkSession(sessionId: string | null) {
       if (!vigente()) return;
       const memsOk = !eMems && mems ? (mems as CoworkMembership[]) : null;
       if (memsOk) {
+        setMembresiasCargadas(true);
         setMemberships(memsOk);
         setMyMembership(memsOk.find(m => m.user_id === user.id) || null);
       }
@@ -568,7 +576,7 @@ export function useCoworkSession(sessionId: string | null) {
 
   return {
     session, rooms, memberships, assignments, hostRequests, screenShareRequests, meets,
-    myMembership, myAssignment, isHost, loading, profiles, avatares,
+    myMembership, myAssignment, isHost, loading, profiles, avatares, sesionNoVisible, membresiasCargadas,
     createSession, joinSession, joinByCode, getMyLastRoomId, renameSession, updateAlertRules, addRoom, updateRoom, closeRoom,
     issueLiveKitToken, requestHost, ackHostRequest, resolveHostRequest, barrerAsignacionesColgadas,
     crearMeetGrupal, terminarMeetGrupal, salirDeMeetGrupal, joinMeetGrupal,

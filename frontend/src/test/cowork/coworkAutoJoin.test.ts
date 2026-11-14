@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { decidirAutoJoin, salaParaAutoUnir } from "@/lib/coworkAutoJoin";
+import { debeIrAlSuyo, decidirAutoJoin, salaParaAutoUnir } from "@/lib/coworkAutoJoin";
 
 const base = { role: null, code: null, roomId: null, membresia: null, tieneAsignacion: false };
 
@@ -42,5 +42,30 @@ describe("salaParaAutoUnir — el link del coordinador manda sobre la última sa
   });
   it("sin link ni historial: nada", () => {
     expect(salaParaAutoUnir(null, null)).toBe(null);
+  });
+});
+
+// EL ENLACE NO ES SU COWORK (14/11/2026): 7 personas quedaron en «Unirse» desde el
+// Cowork por departamento (13/11) porque su pestaña tenía el enlace del de antes.
+
+describe("debeIrAlSuyo: un enlace que no es su Cowork la manda al suyo", () => {
+  const base = {
+    sessionId: "s-vieja", veTodasLasSesiones: false, cargando: false, sesionNoVisible: false,
+    estado: "active" as string | null, membresiasCargadas: true, tieneMembresia: false, conCodigo: false,
+  };
+  it("la sesión no es visible (0 filas), se cerró, o no es miembro → al suyo", () => {
+    expect(debeIrAlSuyo({ ...base, sesionNoVisible: true, estado: null })).toBe(true);
+    expect(debeIrAlSuyo({ ...base, estado: "ended", tieneMembresia: true })).toBe(true);
+    expect(debeIrAlSuyo(base)).toBe(true);
+  });
+  it("en su propio Cowork se queda", () => {
+    expect(debeIrAlSuyo({ ...base, tieneMembresia: true })).toBe(false);
+  });
+  it("nunca mientras carga, sin membresías leídas, con código, sin enlace, ni a quien ve todas", () => {
+    expect(debeIrAlSuyo({ ...base, cargando: true })).toBe(false);
+    expect(debeIrAlSuyo({ ...base, membresiasCargadas: false })).toBe(false);
+    expect(debeIrAlSuyo({ ...base, conCodigo: true, sesionNoVisible: true })).toBe(false);
+    expect(debeIrAlSuyo({ ...base, sessionId: null })).toBe(false);
+    expect(debeIrAlSuyo({ ...base, veTodasLasSesiones: true, sesionNoVisible: true })).toBe(false);
   });
 });
