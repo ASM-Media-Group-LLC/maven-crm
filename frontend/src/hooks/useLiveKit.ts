@@ -11,7 +11,6 @@ import {
   ConnectionQuality,
   RoomOptions,
   TrackEvent,
-  VideoQuality,
 } from "livekit-client";
 import type { ScreenShareCaptureOptions } from "livekit-client";
 import { esOtraPestana } from "@/lib/sesionDuplicada";
@@ -44,6 +43,11 @@ import {
   type LecturaDePista, type MuestraDeLlamada,
 } from "@/lib/saludDeLlamada";
 import { AHORRO_INICIAL, PANTALLA_AHORRO, ahorroPorPrueba, siguienteAhorro, type EstadoAhorro } from "@/lib/modoAhorro";
+import {
+  CAMARA_INICIAL, copiarTopes, elegirPerfilDeCamara, escribirTopes, siguientePerfilDeCamara, topesLivianos,
+  type EstadoCamara, type PerfilDeCamara, type SenalesDeSubida, type TopeDeCodificacion,
+} from "@/lib/perfilDeCamara";
+import { ajustarSuscripciones, esSupervisorEnLaSala, soloAudioDeLosCompaneros } from "@/lib/videoAjeno";
 
 // La recarga a mitad de llamada se revisa UNA vez por página (al primer connect,
 // cuando ya hay sesión para anotarla). Ver saludDeLlamada.ts.
@@ -77,6 +81,10 @@ export interface LKParticipant {
   reactions: string[];
   connectionQuality: ConnectionQualityLevel;
   hasVideoTrack: boolean;
+  /** Un compañero cuyo video esta conexión NO recibe a propósito (la sala de
+   *  Cowork del participante, lib/videoAjeno.ts): se dibuja con su nombre y
+   *  el rótulo «solo audio», nunca como un recuadro de video vacío. */
+  videoOculto?: boolean;
 }
 
 export interface LKChatMessage {
@@ -101,6 +109,10 @@ export interface ConnectOptions {
   backgroundEffect?: BackgroundEffect;
   /** If provided, used instead of calling the generic livekit-token edge function */
   tokenProvider?: () => Promise<{ token: string; url: string }>;
+  /** Sala de Cowork del participante: no recibir el video de los compañeros,
+   *  solo su audio (lib/videoAjeno.ts). Solo vale en una sala de trabajo de
+   *  Cowork y sin admin; en cualquier otra llamada no hace nada. */
+  sinVideoAjeno?: boolean;
 }
 
 function getDeviceConstraint(deviceId?: string) {
@@ -485,7 +497,7 @@ export function useLiveKit() {
   }, []);
 
   type InsertaSalud = (tabla: "llamada_salud") => {
-    insert: (fila: { sala: string; datos: MuestraDeLlamada & { ahorro: boolean; nc: EstadoNC; prueba?: PruebaDeRed } }) =>
+    insert: (fila: { sala: string; datos: MuestraDeLlamada & { ahorro: boolean; nc: EstadoNC; prueba?: PruebaDeRed; perfil_cam: PerfilDeCamara } }) =>
       PromiseLike<{ error: { message: string } | null }>;
   };
   // Si el componente se desmonta sin colgar, el reloj de muestras no queda vivo.
@@ -499,6 +511,24 @@ export function useLiveKit() {
   const ultimaPruebaRef = useRef<{ resultado: PruebaDeRed; at: number } | null>(null);
   const proximaPruebaRef = useRef<number | null>(null);
   const pruebaEnCursoRef = useRef(false);
+  // El perfil de la CÁMARA (lib/perfilDeCamara.ts) de la llamada vigente y quién
+  // lo aplica sobre el emisor de la cámara. Lo fija iniciarMuestreo en cada
+  // conexión; lo llama también la publicación de la cámara (LocalTrackPublished).
+  const perfilCamaraRef = useRef<EstadoCamara>(CAMARA_INICIAL);
+  const aplicarCamaraRef = useRef<(() => Promise<void>) | null>(null);
+  /** Lo último que se sabe del internet de subida de esta persona. */
+  const senalesDeSubida = useCallback((muestra: MuestraDeLlamada | null): SenalesDeSubida => {
+    const prueba = ultimaPruebaRef.current;
+    return {
+      prueba: prueba ? { subida_mbps: prueba.resultado.subida_mbps, edadMs: Date.now() - prueba.at } : null,
+      ahorroActivo: ahorroRef.current.activo,
+      limiteCam: muestra?.limite_cam ?? null,
+      limitePant: muestra?.limite_pant ?? null,
+    };
+  }, []);
+  // Sala de Cowork del participante: solo el audio de los compañeros, no su
+  // video (lib/videoAjeno.ts). Lo fija connect() para la conexión vigente.
+  const soloAudioRef = useRef(false);
   /** Corre la prueba de velocidad con la sesión de la persona. Nunca tira. */
   const correrPruebaDeRed = useCallback(async (): Promise<PruebaDeRed | null> => {
     try {
@@ -524,11 +554,12 @@ export function useLiveKit() {
     // La prueba de velocidad real, solo en las salas de Cowork.
     const conPrueba = salaConPrueba(room.name);
     const originales = new Map<RTCRtpSender, Array<{ maxFramerate?: number; maxBitrate?: number }>>();
+    // La CÁMARA ya no se toca aquí: la maneja su perfil (lib/perfilDeCamara.ts),
+    // que cuenta el modo ahorro como una de sus señales. Antes el ahorro apagaba
+    // la capa de 720p con setPublishingQuality, pero dynacast la volvía a prender
+    // en cuanto alguien la pedía, y la de 360p que quedaba no tenía tope.
     const aplicarAhorro = async (activo: boolean) => {
       try {
-        const cam = room.localParticipant.getTrackPublication(Track.Source.Camera)?.track as
-          { setPublishingQuality?: (q: VideoQuality) => void } | undefined;
-        cam?.setPublishingQuality?.(activo ? VideoQuality.MEDIUM : VideoQuality.HIGH);
         const sender = room.localParticipant.getTrackPublication(Track.Source.ScreenShare)?.track?.sender;
         if (!sender) return;
         const params = sender.getParameters();
@@ -553,6 +584,43 @@ export function useLiveKit() {
         await sender.setParameters(params);
       } catch { /* ajustar la calidad jamás rompe la llamada */ }
     };
+    // La cámara según el internet de subida (lib/perfilDeCamara.ts). Se aplica EN
+    // VIVO sobre el emisor (sender.setParameters), sin volver a publicar: en
+    // liviano se topan las capas (arriba 360p@15 y 350 kbps); al volver al normal
+    // se dejan exactamente como estaban. Si no hay nada distinto, no se llama.
+    perfilCamaraRef.current = CAMARA_INICIAL;
+    const originalesCam = new Map<RTCRtpSender, TopeDeCodificacion[]>();
+    const aplicarCamara = async () => {
+      try {
+        if (roomRef.current !== room) return;
+        const pista = room.localParticipant.getTrackPublication(Track.Source.Camera)?.track;
+        const sender = pista?.sender;
+        if (!pista || !sender) return;
+        const params = sender.getParameters();
+        if (!params.encodings?.length) return;
+        if (perfilCamaraRef.current.perfil === "liviano") {
+          let antes = originalesCam.get(sender);
+          if (!antes) {
+            antes = params.encodings.map(copiarTopes);
+            originalesCam.set(sender, antes);
+          }
+          // El alto REAL de lo que entra al codificador (720 normalmente, 540 con
+          // fondo virtual): de ahí sale cuánto achicar cada capa.
+          const ajustes = pista.mediaStreamTrack?.getSettings?.();
+          const ladoCorto = ajustes?.width && ajustes?.height
+            ? Math.min(ajustes.width, ajustes.height)
+            : pista.dimensions ? Math.min(pista.dimensions.width, pista.dimensions.height) : null;
+          if (!escribirTopes(params.encodings, topesLivianos(antes, ladoCorto))) return;
+        } else {
+          const antes = originalesCam.get(sender);
+          if (!antes) return;
+          originalesCam.delete(sender);
+          if (!escribirTopes(params.encodings, antes)) return;
+        }
+        await sender.setParameters(params);
+      } catch { /* ajustar la calidad jamás rompe la llamada */ }
+    };
+    aplicarCamaraRef.current = aplicarCamara;
     const leer = async (fuente: Track.Source): Promise<LecturaDePista | null> => {
       const pista = room.localParticipant.getTrackPublication(fuente)?.track;
       if (!pista) return null;
@@ -610,8 +678,17 @@ export function useLiveKit() {
           ahorroAvisado = true;
           toast(traducir("shared.call.ahorroTitulo"), { description: traducir("shared.call.ahorroDesc"), duration: 10_000 });
         }
+        // La cámara se vuelve a decidir con cada muestra: aquí mismo acaban de
+        // llegar la prueba de velocidad (si tocaba) y el modo ahorro. Bajar es
+        // inmediato; volver al normal pide 5 minutos sin señales malas. Liviana
+        // se vuelve a aplicar cada minuto (no cuesta nada si ya está puesta).
+        const perfilCamAntes = perfilCamaraRef.current.perfil;
+        perfilCamaraRef.current = siguientePerfilDeCamara(perfilCamaraRef.current, senalesDeSubida(muestra));
+        const perfilCam = perfilCamaraRef.current.perfil;
+        if (perfilCam !== perfilCamAntes) console.info(`[LiveKit] cámara: perfil ${perfilCam}`);
+        if (perfilCam === "liviano" || perfilCamAntes === "liviano") void aplicarCamara();
         void (supabase.from as unknown as InsertaSalud)("llamada_salud")
-          .insert({ sala: room.name, datos: { ...muestra, ahorro: ahorro.activo, nc, ...(prueba ? { prueba } : {}) } })
+          .insert({ sala: room.name, datos: { ...muestra, ahorro: ahorro.activo, nc, perfil_cam: perfilCam, ...(prueba ? { prueba } : {}) } })
           .then(({ error }) => { if (error) console.warn("[llamada_salud]", error.message); });
       } catch { /* medir jamás rompe la llamada */ }
     };
@@ -621,9 +698,10 @@ export function useLiveKit() {
       window.clearTimeout(primera);
       window.clearInterval(cada);
       retraso.parar();
+      if (aplicarCamaraRef.current === aplicarCamara) aplicarCamaraRef.current = null;
       pararMuestreoRef.current = null;
     };
-  }, []);
+  }, [senalesDeSubida]);
   // Nos sacaron porque esta misma cuenta entró desde otra pestaña o equipo.
   // Va aparte de `error` a propósito: no se rompió nada, y sobre todo NO se
   // reintenta — reintentar es lo que arma la pelea infinita entre las dos.
@@ -798,7 +876,17 @@ export function useLiveKit() {
       return tilesDeParticipante(base, !!screenPub?.track && !screenPub.isMuted, !!camPub?.track && !camPub.isMuted);
     };
     result.push(...tilesDe(room.localParticipant, local));
-    room.remoteParticipants.forEach((p) => { result.push(...tilesDe(p, buildParticipant(p, false))); });
+    room.remoteParticipants.forEach((p) => {
+      // Un compañero cuyo video NO se recibe a propósito (lib/videoAjeno.ts): UN
+      // solo recuadro con su nombre, sin el de su pantalla. Sin esto, quien
+      // comparte pantalla seguía «compartiendo» (la publicación existe), se
+      // armaba su recuadro de pantalla y la vista lo ponía en grande… vacío.
+      if (soloAudioRef.current && !esSupervisorEnLaSala(p)) {
+        result.push({ ...buildParticipant(p, false), isScreenSharing: false, isCameraOff: true, hasVideoTrack: false, videoOculto: true });
+        return;
+      }
+      result.push(...tilesDe(p, buildParticipant(p, false)));
+    });
 
     setParticipants(result);
   }, [buildParticipant]);
@@ -1428,8 +1516,19 @@ export function useLiveKit() {
       // Mientras se esperaba el token se pidió otro intento (o salir): este ya no
       // es el vigente y NO crea sala.
       if (!vigente()) return;
+      // ¿Sala de Cowork del participante? Entonces solo el audio de los
+      // compañeros (lib/videoAjeno.ts): se entra con autoSubscribe apagado y
+      // `ajustarVideoAjeno` se suscribe a lo que sí se recibe.
+      const soloAudio = soloAudioDeLosCompaneros({ sala: roomName, sinVideoAjeno: options.sinVideoAjeno, isAdmin });
+      soloAudioRef.current = soloAudio;
       const room = new Room(ROOM_OPTIONS);
       roomRef.current = room;
+      // Idempotente (solo toca lo que está distinto): se llama en cada evento que
+      // puede traer una pista nueva y en el repaso de cada 3 s.
+      const ajustarVideoAjeno = () => {
+        if (!soloAudio || roomRef.current !== room) return;
+        try { ajustarSuscripciones(room, true); } catch { /* el repaso de 3 s lo vuelve a intentar */ }
+      };
 
       // ── Wire events ──────────────────────────────────────────
       room.on(RoomEvent.ConnectionStateChanged, (state) => {
@@ -1449,6 +1548,7 @@ export function useLiveKit() {
         setIsReconnecting(false);
         anotarCorte("parpadeo_ok", room.name);
         console.info("[LiveKit] Reconnected successfully");
+        ajustarVideoAjeno();
         refreshParticipants();
 
         // Force audio re-kick after reconnection
@@ -1467,6 +1567,7 @@ export function useLiveKit() {
       room.on(RoomEvent.ParticipantConnected, (p) => {
         console.info("[LiveKit] Participant connected:", p.identity, p.name);
         if (avisaEntradasYSalidas(room.name)) playJoinSound();
+        ajustarVideoAjeno();
         refreshParticipants();
 
         // El chat de LiveKit es EFIMERO: solo llega a quien esta conectado en
@@ -1526,6 +1627,7 @@ export function useLiveKit() {
       room.on(RoomEvent.TrackUnsubscribed, debouncedRefresh);
       room.on(RoomEvent.TrackPublished, (_pub, participant) => {
         console.info("[LiveKit] Track published by:", participant.identity);
+        ajustarVideoAjeno();
         debouncedRefresh();
       });
       room.on(RoomEvent.TrackMuted, debouncedRefresh);
@@ -1563,6 +1665,15 @@ export function useLiveKit() {
       room.on(RoomEvent.TrackUnmuted, debouncedRefresh);
       room.on(RoomEvent.LocalTrackPublished, (publication) => {
         if (publication?.source === Track.Source.Microphone) vigilarMicro(room);
+        // La cámara recién publicada (o republicada tras una reconexión, con un
+        // emisor nuevo) sale con el perfil que le toca según lo último que se
+        // sabe del internet de subida (lib/perfilDeCamara.ts).
+        if (publication?.source === Track.Source.Camera) {
+          if (elegirPerfilDeCamara(senalesDeSubida(ultimaMuestraRef.current)) === "liviano") {
+            perfilCamaraRef.current = { perfil: "liviano", buenas: 0 };
+          }
+          if (perfilCamaraRef.current.perfil === "liviano") void aplicarCamaraRef.current?.();
+        }
         debouncedRefresh();
         // NOTE: Background is handled by scheduleBackgroundApply on connect
         // and applyConfiguredBackgroundIfNeeded on explicit toggleCam.
@@ -1719,8 +1830,15 @@ export function useLiveKit() {
       });
 
       // ── Connect & publish tracks ────────────────────────────
-      await room.connect(livekitUrl, tokenData.token);
+      if (soloAudio) await room.connect(livekitUrl, tokenData.token, { autoSubscribe: false });
+      else await room.connect(livekitUrl, tokenData.token);
       if (!vigente()) { void room.disconnect(true); return; }
+      // Los que ya estaban en la sala no disparan TrackPublished (LiveKit solo
+      // emite con la sala conectada): se les ajusta la suscripción acá.
+      if (soloAudio) {
+        ajustarVideoAjeno();
+        console.info("[LiveKit] sala de Cowork del participante: solo el audio de los compañeros");
+      }
       // Que la página NO se recargue sola por un deploy mientras esto dure.
       marcarLlamadaActiva(roomName);
       marcarLlamadaEnCurso(roomName);
@@ -1815,6 +1933,7 @@ export function useLiveKit() {
 
       clearSyncInterval();
       syncIntervalRef.current = setInterval(() => {
+        ajustarVideoAjeno();
         refreshParticipants();
         vigilarSalidaDelMicroRef.current();
       }, PARTICIPANT_SYNC_INTERVAL_MS);
@@ -1832,7 +1951,7 @@ export function useLiveKit() {
       // Tampoco libera el cerrojo del intento que lo reemplazó.
       if (vigente()) connectingRef.current = false;
     }
-  }, [refreshParticipants, debouncedRefresh, clearSyncInterval, clearBackgroundReapplyTimer, cleanupAudioResumeListeners, hasActiveCameraPublication, enableCameraWithRecovery, disposeBackgroundProcessor, applyConfiguredBackgroundIfNeeded, applyBackgroundBeforeLocalVideoVisible, scheduleBackgroundApply, scheduleDeferredBackgroundReapply, kickAudioPlayback, vigilarMicro, anotarCorte, iniciarMuestreo]);
+  }, [refreshParticipants, debouncedRefresh, clearSyncInterval, clearBackgroundReapplyTimer, cleanupAudioResumeListeners, hasActiveCameraPublication, enableCameraWithRecovery, disposeBackgroundProcessor, applyConfiguredBackgroundIfNeeded, applyBackgroundBeforeLocalVideoVisible, scheduleBackgroundApply, scheduleDeferredBackgroundReapply, kickAudioPlayback, vigilarMicro, anotarCorte, iniciarMuestreo, senalesDeSubida]);
 
   // Debajo de connect porque lo usa; por ref para que el handler de
   // Disconnected (que nace dentro de cada connect) vea siempre la versión
