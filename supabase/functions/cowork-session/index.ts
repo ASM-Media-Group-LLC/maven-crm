@@ -43,10 +43,25 @@ interface LKGrants {
   hidden?: boolean; // observador invisible: se suscribe pero no aparece en la lista de participantes
 }
 
+// COMPATIBILIDAD CON EL MAVEN DEL 13/11 (14/11/2026; se puede quitar desde el 28/11).
+// El 13/11 (PR #99) la sala de trabajo de Cowork dejó de descargar el video de los
+// compañeros salvo el de quien trae `isHost: true` en la metadata (lib/videoAjeno.ts).
+// Alvaro lo revirtió el 14/11 (PR #101: los chatters necesitan ver las pantallas para
+// los empalmes), pero las pestañas que no recargaron siguen con el código de antes y
+// ven «Solo audio». Con `isHost: true` en la metadata de TODOS en las salas de trabajo,
+// esas pestañas vuelven a ver a todos sin recargar. Nadie más lee `isHost` de la
+// metadata: los permisos de LiveKit van en `video` (grants) y el frontend nuevo ya no
+// mira esto. Ver también infra/livekit/ver-a-todos.py (el repaso de los ya conectados).
+const SALA_DE_COWORK_QUE_NO_ES_DE_TRABAJO = /^cowork_(hub|meet|1on1)_/;
+function esSalaDeTrabajoDeCowork(sala: string | undefined): boolean {
+  return !!sala && sala.startsWith("cowork_") && !SALA_DE_COWORK_QUE_NO_ES_DE_TRABAJO.test(sala);
+}
+
 async function createLKToken(apiKey: string, apiSecret: string, identity: string, name: string, grants: LKGrants, ttl = 86400): Promise<string> {
   const now = Math.floor(Date.now() / 1000);
   const header = { alg: "HS256", typ: "JWT" };
-  const payload = { iss: apiKey, sub: identity, iat: now, nbf: now, exp: now + ttl, name, video: grants, metadata: JSON.stringify({ name, isHost: !!grants.roomAdmin }) };
+  const isHost = !!grants.roomAdmin || esSalaDeTrabajoDeCowork(grants.room);
+  const payload = { iss: apiKey, sub: identity, iat: now, nbf: now, exp: now + ttl, name, video: grants, metadata: JSON.stringify({ name, isHost }) };
   const hB64 = base64UrlEncode(strToBytes(JSON.stringify(header)));
   const pB64 = base64UrlEncode(strToBytes(JSON.stringify(payload)));
   const sig = await signHS256(`${hB64}.${pB64}`, apiSecret);

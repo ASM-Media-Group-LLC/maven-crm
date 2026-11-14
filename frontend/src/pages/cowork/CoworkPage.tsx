@@ -6,7 +6,7 @@ import { useRoleTier } from "@/hooks/useRoleTier";
 import { usePermissions } from "@/hooks/usePermissions";
 import { supabase } from "@/integrations/supabase/client";
 import { avisarPersona } from "@/lib/avisoPersona";
-import { decidirAutoJoin, salaParaAutoUnir } from "@/lib/coworkAutoJoin";
+import { debeIrAlSuyo, decidirAutoJoin, salaParaAutoUnir } from "@/lib/coworkAutoJoin";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
@@ -58,7 +58,7 @@ export default function CoworkPage() {
   // "subordinados" el landing lista sesiones ajenas: la RPC del edge ya filtra
   // por alcance (todo, o solo las que tienen a alguien de nivel inferior). Antes
   // esto era solo-admin y un rol con "Todos los datos" veía únicamente las suyas.
-  const { dataScope } = usePermissions();
+  const { dataScope, isLoading: alcanceCargando, hayError: alcanceFallo } = usePermissions();
   const veTodasLasSesiones = isAdmin || dataScope("Cowork") !== "self";
   const [allSessions, setAllSessions] = useState<AdminSessionRow[]>([]);
   const [enteringId, setEnteringId] = useState<string | null>(null);
@@ -112,6 +112,25 @@ export default function CoworkPage() {
       setSearchParams({ session: comoParticipante[0].id });
     }
   }, [sessionId, loadingSessions, veTodasLasSesiones, mySessions, setSearchParams]);
+
+  // EL ENLACE NO ES SU COWORK (14/11/2026). Desde que hay un Cowork por departamento
+  // (13/11), quien tenía la pestaña con el enlace de su Cowork de antes quedaba en la
+  // pantalla de «Unirse» (la sesión ya no es visible para él, se cerró o no es la
+  // suya) y nunca entraba a su sala: Maven lo dejaba en /cowork sin llamada y Argos
+  // lo reportaba como «no ha entrado». Quien trabaja en UN Cowork no elige: se quita
+  // el enlace y la portada le abre el suyo, que entra solo a su sala. Los que ven
+  // todas las sesiones (admins, supervisores) y los enlaces con código siguen igual.
+  const noEsSuCowork = debeIrAlSuyo({
+    // Sin saber todavía qué ve (permisos cargando o fallidos) se trata como quien
+    // ve todas: un admin nunca puede quedar sacado de una sesión por un bache.
+    sessionId, veTodasLasSesiones: veTodasLasSesiones || alcanceCargando || alcanceFallo, cargando: cowork.loading || autoJoining,
+    sesionNoVisible: cowork.sesionNoVisible, estado: cowork.session?.status ?? null,
+    membresiasCargadas: cowork.membresiasCargadas, tieneMembresia: !!cowork.myMembership,
+    conCodigo: !!searchParams.get("code") || !!searchParams.get("role"),
+  });
+  useEffect(() => {
+    if (noEsSuCowork) setSearchParams({}, { replace: true });
+  }, [noEsSuCowork, setSearchParams]);
 
   // Admin: cargar todas las sesiones activas y refrescar la ocupación cada 30s
   // mientras el landing esté abierto. Es UNA llamada al edge (que hace un solo
