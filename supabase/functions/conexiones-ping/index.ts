@@ -11,6 +11,7 @@
 // tokens ni contraseñas. Solo lee; no cambia nada en Zoho.
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.4";
+import { pickAllowedOrigin } from "../_shared/cors.ts";
 import { licenciasDeZoho, listAccounts, zohoConfigured } from "../_shared/zoho.ts";
 import {
   type Chequeo, type CuentaDeMaven, clasificarCasillas, httpDeWs, miles, sinConfigurar, veredicto,
@@ -20,11 +21,15 @@ const env = (k: string) => Deno.env.get(k) ?? "";
 const SUPABASE_URL = env("SUPABASE_URL");
 const admin = createClient(SUPABASE_URL, env("SUPABASE_SERVICE_ROLE_KEY"));
 
-const ORIGENES = ["https://app.maven-ai.me", "https://maven-ai.me", "http://localhost:8080", "http://127.0.0.1:8080"];
+// Los orígenes son los de TODA la app (_shared/cors.ts). Esta función tenía su
+// propia lista corta (sin www, sin los dominios históricos ni el preview local
+// de :4173): desde un origen fuera de esa lista el navegador hacía el preflight,
+// recibía otro origen permitido y NUNCA mandaba el POST. La tarjeta «Servicios
+// externos» decía «No se pudo cargar esta parte» sin que la función se enterara
+// (13/11: los logs solo tenían OPTIONS 204, ningún POST).
 function cors(req: Request): Record<string, string> {
-  const origin = req.headers.get("Origin") ?? "";
   return {
-    "Access-Control-Allow-Origin": ORIGENES.includes(origin) ? origin : ORIGENES[0],
+    "Access-Control-Allow-Origin": pickAllowedOrigin(req),
     "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
     "Access-Control-Allow-Methods": "POST, OPTIONS",
     "Vary": "Origin",
@@ -85,10 +90,22 @@ async function elevenlabs(): Promise<Chequeo> {
     ? ` Este mes: ${miles(s.character_count)} de ${miles(s.character_limit)} créditos (plan ${s.tier ?? "?"}).` : "";
   return veredicto("elevenlabs", g, `Llave viva.${uso}`);
 }
+/** El cliente de Zoho no trae tope de tiempo: sin esto, un Zoho colgado deja
+ *  esperando a TODA la tarjeta (los chequeos van juntos en un Promise.all). */
+function conTope<T>(p: Promise<T>, ms: number, siNoContesta: T): Promise<T> {
+  let reloj: number | undefined;
+  const espera = new Promise<T>((listo) => { reloj = setTimeout(() => listo(siNoContesta), ms); });
+  return Promise.race([p, espera]).finally(() => clearTimeout(reloj));
+}
+
 async function zoho(): Promise<Chequeo> {
   if (!zohoConfigured()) return sinConfigurar("zoho", "ZOHO_CLIENT_ID / ZOHO_REFRESH_TOKEN");
   const t0 = Date.now();
-  const r = await licenciasDeZoho().catch((e) => ({ ok: false as const, error: String(e) }));
+  const r = await conTope(
+    licenciasDeZoho().catch((e) => ({ ok: false as const, error: String(e) })),
+    8_000,
+    { ok: false as const, error: "no contestó en 8 s" },
+  );
   const ms = Date.now() - t0;
   if (r.ok && "data" in r && r.data) return { id: "zoho", estado: "ok", ms, detalle: `Conectado: ${r.data.usadas} de ${r.data.compradas} licencias en uso.` };
   const err = String((r as { error?: unknown }).error ?? "");
