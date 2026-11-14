@@ -49,6 +49,13 @@ const PING = { ok: true, en: "2026-11-11T19:00:00Z", chequeos: [
   { id: "whatsapp", estado: "sin_configurar", ms: null, detalle: "Falta WHATSAPP_EVOLUTION_URL" },
 ] };
 
+// El saldo de Gemini (14/11/2026), arriba de las pestañas.
+const SALDO = {
+  estado: "bien", saldo_usd: 19.77, punto: { id: 1, saldo_usd: 19.87, medido_at: "2026-11-14T14:17:00Z", origen: "recarga" },
+  juzgadas_desde: 36, gastado_usd: 0.1, precio_foto_usd: 0.0027, ritmo_dia_usd: 5.2, dias_restantes: 3.8,
+  se_acaba_at: "2026-11-18T09:36:00Z", ultimo_ok: "2026-11-14T14:24:00Z", sin_saldo_at: null, argos_activo: true,
+  calculado_at: "2026-11-14T14:24:00Z",
+};
 const COBROS = [{ servicio_id: "google_ia", fecha: HOY, monto_usd: "17.44", fuente: "factura", nota: null }];
 // Las cuentas atadas (11/11): 2 proyectos parados de Supabase con su ahorro, 1
 // casilla de alguien que salió, el resto en uso y una cosa que no se ve.
@@ -86,6 +93,7 @@ const tabla = (t: string) => ({
 });
 const rpc = vi.fn((f: string) => {
   if (f === "costos_uso_del_mes") return Promise.resolve(fallaUso ? { data: null, error: { message: "no existe" } } : { data: USO, error: null });
+  if (f === "ia_saldo_estado") return Promise.resolve({ data: SALDO, error: null });
   return Promise.resolve({ data: BASE, error: null });
 });
 const invocar = vi.fn((_f: string, o?: { body?: { accion?: string } }) =>

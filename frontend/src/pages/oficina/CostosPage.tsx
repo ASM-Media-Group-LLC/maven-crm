@@ -9,6 +9,7 @@ import type { TranslationKey } from "@/lib/i18n";
 import VistaPorParte from "@/components/costos/VistaPorParte";
 import VistaPorProveedor from "@/components/costos/VistaPorProveedor";
 import VistaConexiones from "@/components/costos/VistaConexiones";
+import SaldoGemini from "@/components/costos/SaldoGemini";
 
 // COSTOS Y CONEXIONES (Alvaro, 11/11/2026; rediseño del 13/11/2026). Solo el
 // dueño (la ruta usa soloDueno y la base también lo exige: RLS de costos_*,
@@ -20,6 +21,7 @@ import VistaConexiones from "@/components/costos/VistaConexiones";
 //   conexiones  si cada servicio del que depende Maven está funcionando, y qué
 //               hacer cuando no.
 // Un fallo se dice como fallo, con Reintentar; nunca como «no hay nada».
+// Arriba de las pestañas, siempre a la vista, el saldo de Gemini en vivo (14/11/2026).
 
 const VISTAS = ["partes", "proveedor", "conexiones"] as const;
 type Vista = (typeof VISTAS)[number];
@@ -53,6 +55,7 @@ export default function CostosPage() {
           </Button>
         )}
       />
+      <div className="mb-4"><SaldoGemini /></div>
       <Tabs value={vista} onValueChange={(v) => setParams({ vista: v }, { replace: true })} className="flex min-w-0 flex-col gap-4">
         {/* En el teléfono las tres pestañas caben a lo ancho (el texto puede ir en dos líneas). */}
         <TabsList className="h-auto w-full sm:w-auto sm:self-start">
