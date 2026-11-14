@@ -283,15 +283,13 @@ const vista = (final: string): string => {
 };
 
 describe("quién lo pide", () => {
-  it("la sala del participante (la llamada persistente) lo pide", () => {
+  it("la sala del participante YA NO lo pide: ven a sus compañeros como siempre (14/11/2026, empalmes)", () => {
     const s = vista("CoworkParticipantView.tsx");
     const inicio = s.indexOf("startCall({");
     expect(inicio).toBeGreaterThan(0);
     const config = s.slice(inicio, s.indexOf("});", inicio));
     expect(config).toContain("roomName: connectedLkRoom");
-    expect(config).toMatch(/sinVideoAjeno:\s*true/);
-    // …y solo ahí: el meet y la 1:1 se dibujan con su propio LiveKitCallView, sin la bandera.
-    expect(s.match(/sinVideoAjeno/g)?.length).toBe(1);
+    expect(config).not.toMatch(/sinVideoAjeno:\s*true/);
   });
 
   it("el tablero del anfitrión, /call/:sala y el invitado de Meet NO lo piden", () => {
