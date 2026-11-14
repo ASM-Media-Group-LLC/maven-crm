@@ -397,6 +397,12 @@ verify_jwt = false  # auth propia: Bearer del usuario (subscribe/notify); valida
 [functions.storage-retencion]
 verify_jwt = false
 
+# Limpiezas diarias de fotos y videos del monitor y de Argos (monitor-capturas y
+# argos-clips) por la API de Storage. verify_jwt=false: la despiertan solo tres
+# crons con X-Cron-Token (tiempo constante); sin camino de usuario.
+[functions.limpieza-storage]
+verify_jwt = false
+
 # Contador de visitas por el dominio histórico. verify_jwt=false: la mayoría de
 # esas visitas son de gente sin cuenta en Maven (candidatos, invitados a Meet).
 [functions.dominio-legacy-hit]
