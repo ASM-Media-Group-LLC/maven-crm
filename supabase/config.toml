@@ -59,6 +59,12 @@ verify_jwt = false
 [functions.livekit-token]
 verify_jwt = false
 
+# Prueba de velocidad de las llamadas de Cowork (subida y bajada de verdad, no la
+# estimación de WebRTC). verify_jwt=true: la llama el navegador con la sesión; adentro
+# revive al usuario. No guarda nada: el resultado va en llamada_salud desde el navegador.
+[functions.prueba-de-red]
+verify_jwt = true
+
 [functions.notification-automations]
 verify_jwt = false
 

@@ -16,7 +16,7 @@ const props = {
   onSendReaction: vi.fn(), onLeave: vi.fn(), onAudioInputChange: vi.fn(),
   onAudioOutputChange: vi.fn(), onVideoInputChange: vi.fn(),
   onOpenVideoSettings: vi.fn(), onOpenMetrics: vi.fn(),
-  isNoiseCancellationOn: false, onToggleNoiseCancellation: vi.fn(),
+  estadoNC: "activa" as const,
   onToggleBlurBackground: vi.fn(),
 };
 

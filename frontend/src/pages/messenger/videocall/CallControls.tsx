@@ -11,7 +11,8 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { esBlur, type BackgroundEffect } from "@/lib/fondoDeLlamada";
 import { useLanguage } from "@/hooks/useLanguage";
-import { traducir, type TranslationKey } from "@/lib/i18n";
+import type { TranslationKey } from "@/lib/i18n";
+import { ncFunciona, type EstadoNC } from "@/lib/estadoNC";
 
 interface DeviceInfo {
   deviceId: string;
@@ -70,8 +71,9 @@ interface CallControlsProps {
    *  La fila ya envuelve (`flex-wrap`), así que si no entran pasa a dos líneas
    *  en vez de salirse de la pantalla. */
   tactil?: boolean;
-  isNoiseCancellationOn?: boolean;
-  onToggleNoiseCancellation?: () => void;
+  /** Si la cancelación de ruido (obligatoria) está corriendo. Sin esto, el menú
+   *  no la menciona. Ya no hay interruptor: se quitó el 13/11/2026. */
+  estadoNC?: EstadoNC;
   backgroundEffect?: BackgroundEffect;
   onToggleBlurBackground?: () => void;
   /** Un control más, a la derecha del chat. Lo usa el Supervisor Hub para la
@@ -275,40 +277,33 @@ function useDevices(open: boolean) {
    día hay que agregar algo, que sea ADENTRO del panel.
    ────────────────────────────────────────────────────────────────────────── */
 
-/** Lo que se le dice a la persona al cambiar la cancelación de ruido. El
- *  cambio es invisible (no hay nada que se vea distinto en la llamada), así que
- *  sin aviso nadie sabe si el toque hizo algo. */
-//
-// traducir() y no el hook: es un aviso que se arma y se muestra una vez, desde
-// un click.
-function avisarNC(activada: boolean) {
-  if (activada) {
-    toast.success(traducir("messenger.call.ncActivada"), { description: traducir("messenger.call.ncActivadaDesc"), id: "nc" });
-  } else {
-    toast.info(traducir("messenger.call.ncDesactivada"), { description: traducir("messenger.call.ncDesactivadaDesc"), id: "nc" });
-  }
-}
-
-/** Interruptor de la cancelación de ruido en el menú del micro (escritorio). */
-function FilaCancelacionRuido({ activa, onClick }: { activa: boolean; onClick: () => void }) {
+/** La cancelación de ruido en el menú del micro. Desde el 13/11/2026 es
+ *  OBLIGATORIA (Alvaro): ya no es un interruptor sino una nota que dice que está
+ *  siempre activa, o que este navegador no puede correrla (entonces el micro sale
+ *  sin filtro, nunca mudo). Ya no lleva rol de interruptor: no hay nada que apagar. */
+function NotaCancelacionRuido({ estado, className }: { estado: EstadoNC; className?: string }) {
   const { t } = useLanguage();
+  const funciona = ncFunciona(estado);
   return (
-    <button
-      type="button"
-      role="switch"
-      aria-checked={activa}
-      onClick={() => { onClick(); avisarNC(!activa); }}
-      className={cn(
-        "mt-2 w-full h-10 px-3 rounded-lg flex items-center gap-2.5 text-sm transition-colors border",
-        activa ? "bg-primary/15 text-primary border-primary/30" : "text-foreground hover:bg-muted border-border",
-      )}
+    <div
+      role="note"
+      aria-label={t("messenger.call.cancelacionRuido")}
+      className={cn("w-full px-3 py-2 rounded-lg flex items-start gap-2.5 text-sm border border-border/60 bg-foreground/[0.03]", className)}
     >
-      <AudioLines className="h-4 w-4 shrink-0" />
-      <span className="flex-1 text-left">{t("messenger.call.cancelacionRuido")}</span>
-      <span className={cn("text-[11px] font-medium rounded-full px-2 py-0.5", activa ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground")}>
-        {activa ? t("messenger.call.activada") : t("messenger.call.desactivada")}
+      <AudioLines className="h-4 w-4 shrink-0 mt-0.5 text-muted-foreground" />
+      <span className="flex-1 min-w-0 text-left">
+        <span className="flex items-center gap-2">
+          <span className="text-foreground">{t("messenger.call.cancelacionRuido")}</span>
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-border/60 px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
+            <span className={cn("h-1.5 w-1.5 rounded-full", funciona ? "bg-success" : "bg-warning")} aria-hidden />
+            {funciona ? t("messenger.call.ncSiempreActiva") : t("messenger.call.ncNoDisponible")}
+          </span>
+        </span>
+        <span className="block text-[11px] text-muted-foreground mt-0.5">
+          {funciona ? t("messenger.call.ncSiempreActivaDesc") : t("messenger.call.ncNoDisponibleDesc")}
+        </span>
       </span>
-    </button>
+    </div>
   );
 }
 
@@ -366,7 +361,7 @@ function GrupoDispositivos({ titulo, icon: Icon, devices, selectedId, onSelect }
 export default function CallControls({
   isMicOn, isCamOn, isScreenSharing, isHandRaised, isChatOpen, unreadChatCount, isParticipantsOpen,
   currentAudioInputId, currentAudioOutputId, currentVideoInputId,
-  onToggleMic, isNoiseCancellationOn, onToggleNoiseCancellation, onToggleCam, onToggleScreenShare, onToggleHand,
+  onToggleMic, estadoNC, onToggleCam, onToggleScreenShare, onToggleHand,
   onToggleChat, onToggleParticipants,
   onSendReaction, onLeave,
   onAudioInputChange, onAudioOutputChange, onVideoInputChange,
@@ -444,12 +439,9 @@ export default function CallControls({
                   <DevicePill icon={Mic} tipo="micrófono" devices={devices.audioInputs} selectedId={currentAudioInputId || ""} onSelect={onAudioInputChange} onPedirPermiso={() => devices.pedirPermiso("audio")} pidiendo={devices.pidiendo} />
                   <DevicePill icon={Volume2} tipo="altavoz" devices={devices.audioOutputs} selectedId={currentAudioOutputId || ""} onSelect={onAudioOutputChange} onPedirPermiso={() => devices.pedirPermiso("audio")} pidiendo={devices.pidiendo} />
                 </div>
-                {/* La cancelación de ruido vivía en el hook pero NINGUNA pantalla la
-                    mostraba: Jhon la buscó en una llamada y no estaba. Va aquí, junto
-                    al micro, que es donde uno la busca. */}
-                {onToggleNoiseCancellation && (
-                  <FilaCancelacionRuido activa={!!isNoiseCancellationOn} onClick={onToggleNoiseCancellation} />
-                )}
+                {/* La cancelación de ruido va junto al micro, que es donde uno la
+                    busca. Desde el 13/11/2026 es obligatoria: una nota, no un botón. */}
+                {estadoNC && <NotaCancelacionRuido estado={estadoNC} className="mt-2" />}
               </PopoverContent>
             </Popover>
             <button
@@ -639,11 +631,7 @@ export default function CallControls({
                   <GrupoDispositivos titulo={t("messenger.call.altavoz")} icon={Volume2} devices={devices.audioOutputs}
                     selectedId={currentAudioOutputId} onSelect={(id) => cerrarY(() => onAudioOutputChange(id))()} />
                   <div className="h-px bg-border my-1" />
-                  {onToggleNoiseCancellation && (
-                    <FilaMenu icon={AudioLines} label={isNoiseCancellationOn ? t("messenger.call.cancelacionRuidoActivada") : t("messenger.call.cancelacionRuido")}
-                      activa={!!isNoiseCancellationOn}
-                      onClick={cerrarY(() => { onToggleNoiseCancellation(); avisarNC(!isNoiseCancellationOn); })} />
-                  )}
+                  {estadoNC && <NotaCancelacionRuido estado={estadoNC} className="my-1" />}
                   <FilaMenu icon={Cloud} label={t("messenger.call.difuminarFondo")}
                     activa={esBlur(backgroundEffect)}
                     onClick={cerrarY(onToggleBlurBackground)} />

@@ -95,8 +95,8 @@ export const compartido = {
   },
   "shared.call.ncOff": { es: "Cancelación de ruido apagada", en: "Noise cancellation turned off" },
   "shared.call.ncOffDesc": {
-    es: "El filtro dejó de procesar tu voz y te habrían dejado de escuchar. Sigues al aire sin él; puedes volver a activarlo desde el botón.",
-    en: "The filter stopped processing your voice and people would have stopped hearing you. You're still on the air without it; you can turn it back on from the button.",
+    es: "El filtro dejó de procesar tu voz y te habrían dejado de escuchar. Sigues al aire sin él; se vuelve a intentar solo la próxima vez que prendas el micrófono.",
+    en: "The filter stopped processing your voice and people would have stopped hearing you. You're still on the air without it; it will try again on its own the next time you turn on your microphone.",
   },
   "shared.call.micWontStart": { es: "No pude encender el micrófono", en: "Couldn't turn on your microphone" },
   "shared.call.micWontStartDesc": {

@@ -1124,8 +1124,7 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
         currentAudioOutputId={audioOutputId}
         currentVideoInputId={videoInputId}
         onToggleMic={salaCaida ? primeroReconectar : lk.toggleMic}
-        isNoiseCancellationOn={lk.isNoiseCancellationOn}
-        onToggleNoiseCancellation={lk.toggleNoiseCancellation}
+        estadoNC={lk.estadoNC}
         onToggleCam={salaCaida ? primeroReconectar : lk.toggleCam}
         onToggleScreenShare={salaCaida ? primeroReconectar : lk.toggleScreenShare}
         onToggleHand={lk.toggleHand}

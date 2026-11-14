@@ -29,8 +29,7 @@ describe("CallControls", () => {
     onVideoInputChange: vi.fn(),
     onOpenVideoSettings: vi.fn(),
     onOpenMetrics: vi.fn(),
-    isNoiseCancellationOn: false,
-    onToggleNoiseCancellation: vi.fn(),
+    estadoNC: "activa" as const,
   };
 
   it("explica que falta permiso en vez de dejar el selector mudo", async () => {
@@ -119,24 +118,29 @@ describe("CallControls", () => {
     render(<CallControls {...defaultProps} hideScreenShare={false} />);
     expect(screen.getByTitle("Compartir pantalla")).toBeInTheDocument();
   });
-  // La cancelación de ruido existía en el hook desde hace meses, pero NINGUNA
-  // pantalla la mostraba: Jhon la buscó en una llamada y no estaba. Ahora vive
-  // en el menú del micrófono; esto cuida que siga ahí y que el toque llegue.
-  it("la cancelación de ruido se activa desde el menú del micrófono", async () => {
-    const onToggleNoiseCancellation = vi.fn();
-    render(<CallControls {...defaultProps} onToggleNoiseCancellation={onToggleNoiseCancellation} />);
+  // La cancelación de ruido vive en el menú del micrófono (Jhon la buscó y no
+  // estaba). Desde el 13/11/2026 es OBLIGATORIA: el menú dice que está siempre
+  // activa y no ofrece ningún interruptor para apagarla.
+  it("el menú del micrófono dice que la cancelación de ruido está siempre activa, sin interruptor", async () => {
+    render(<CallControls {...defaultProps} />);
     // El caret del micro es el primer botón de la barra (abre el popover de dispositivos).
     fireEvent.click(screen.getAllByRole("button")[0]);
-    const fila = await screen.findByRole("switch", { name: /cancelación de ruido/i });
-    expect(fila).toHaveAttribute("aria-checked", "false");
-    fireEvent.click(fila);
-    expect(onToggleNoiseCancellation).toHaveBeenCalledTimes(1);
+    const nota = await screen.findByRole("note", { name: /cancelación de ruido/i });
+    expect(nota).toHaveTextContent(/siempre activa/i);
+    expect(screen.queryByRole("switch", { name: /cancelación de ruido/i })).toBeNull();
   });
 
-  it("si la pantalla no ofrece el interruptor, el menú no lo dibuja", async () => {
-    render(<CallControls {...defaultProps} onToggleNoiseCancellation={undefined} />);
+  it("si este navegador no la puede correr, lo dice (el micro sale sin filtro, nunca mudo)", async () => {
+    render(<CallControls {...defaultProps} estadoNC="no_soportada" />);
+    fireEvent.click(screen.getAllByRole("button")[0]);
+    const nota = await screen.findByRole("note", { name: /cancelación de ruido/i });
+    expect(nota).toHaveTextContent(/no disponible/i);
+  });
+
+  it("si la pantalla no le pasa el estado, el menú no la menciona", async () => {
+    render(<CallControls {...defaultProps} estadoNC={undefined} />);
     fireEvent.click(screen.getAllByRole("button")[0]);
     await new Promise((r) => setTimeout(r, 50));
-    expect(screen.queryByRole("switch", { name: /cancelación de ruido/i })).toBeNull();
+    expect(screen.queryByRole("note", { name: /cancelación de ruido/i })).toBeNull();
   });
 });
