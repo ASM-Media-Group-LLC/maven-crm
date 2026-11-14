@@ -153,6 +153,11 @@ const NO_TOCAN_EL_MESSENGER: Record<string, string> = {
   "20261114030000_donde_esta_por_cowork.sql":
     "Dónde está: el equipo es el Cowork de la persona (re-crea donde_esta_cada_uno desde pg_get_functiondef). " +
     "Esa función no está en este fixture; no toca nada del Messenger.",
+  "20261114080000_saldo_de_gemini_en_vivo.sql":
+    "Costos: el saldo de Gemini en vivo (costos_saldo, ia_saldo_estado) y el vigía que avisa al dueño antes de " +
+    "que se acabe. Entra a esta cadena solo porque su vigía inserta avisos en notifications, pero usa " +
+    "costos_servicios, monitor_capturas, argos_diag, monitor_config, tenant_owners y pg_cron, que este fixture " +
+    "no trae; no toca nada del Messenger.",
   "20261114010000_avisos_prioridad_valida.sql":
     "Avisos: prioridad válida ('medium' en vez de 'normal') en vigilar_tiempo_sin_pantalla y " +
     "vigilar_cortes_de_llamada, re-creadas desde su definición actual con pg_get_functiondef. Esas funciones " +
