@@ -1,18 +1,20 @@
-import type { ReactNode } from "react";
+import { useEffect, useState, type CSSProperties, type ReactNode } from "react";
 import { useLanguage } from "@/hooks/useLanguage";
 import { calcularTableroGasto, type DiaGasto, type FilaGasto, type TableroGasto as Tablero } from "@/lib/tableroGasto";
 import SaldoGemini from "./SaldoGemini";
 import { Cargando, FalloCompacto, Panel, exacto, fechaCorta, hoyEnColombia, nombreDeMes, useCostos, useUsoDelMes } from "./comun";
 
-// EL TABLERO DE GASTO (Alvaro, 14/11/2026; estructura elegida por Q&A el mismo día):
-//   · UN bloque grande arriba: lo gastado del mes enorme, «hoy +X», la barra de
-//     cuánto va del mes (pintada por servicio) y el gráfico de cada día adentro;
-//   · debajo, una tarjeta por servicio con su color, su gastado y su mes;
-//   · al final, el saldo de Gemini y lo que falta / dónde ahorrar.
-// «Sabor»: cada servicio con su color suave propio (el mismo en su tarjeta, en la
-// barra del mes y en el gráfico); las cifras grandes en blanco. Los colores son los
-// --chart-* de index.css: no dependen del skin (con un primario gris, Argos se
-// confundía con lo fijo). Las cuentas viven en lib/tableroGasto.ts (con pruebas).
+// EL TABLERO DE GASTO (Alvaro, 14/11/2026). Estructura elegida por Q&A: UN bloque
+// grande arriba (lo gastado del mes enorme, «hoy +X», la barra del mes pintada por
+// servicio y el gráfico de cada día) y una tarjeta por servicio con su color.
+// Estética elegida el 15/11: «como la portada» — el «cuadrito» de Oficina.tsx /
+// portada.css: una CONSOLA con profundidad (filo de luz arriba, sombra honda y un
+// brillo suave de color), la barrita de consola (semáforo, «en vivo» latiendo y el
+// reloj en letra mono), las tarjetas de servicio como las salas (fondo apenas
+// iluminado, se encienden con el color de su servicio) y el día de hoy que brilla.
+// Los colores son los --chart-* de index.css: no dependen del skin (con un primario
+// gris, Argos se confundía con lo fijo). Sin clases nuevas en index.css (regla del
+// sistema de diseño): todo con utilidades. Las cuentas viven en lib/tableroGasto.ts.
 
 /** El color de cada servicio, el mismo en todo el tablero. */
 const COLOR_SERVICIO: Record<string, string> = {
@@ -28,15 +30,68 @@ const colorDe = (id: string) => COLOR_SERVICIO[id] ?? "hsl(var(--muted-foregroun
 /** Los servicios que cuestan (los de USD 0 no pintan nada). */
 const conCosto = (tb: Tablero) => tb.filas.filter((f) => (f.alMes ?? 0) > 0 || (f.gastado ?? 0) > 0);
 
+/** «USD 113,35» con el USD y los centavos más chicos: la cifra manda. */
+function Monto({ valor, tam }: { valor: number; tam: "xl" | "md" }) {
+  const texto = valor.toLocaleString("es-CO", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const coma = texto.lastIndexOf(",");
+  const entero = coma >= 0 ? texto.slice(0, coma) : texto;
+  const cent = coma >= 0 ? texto.slice(coma) : "";
+  const grande = tam === "xl";
+  return (
+    <span className="inline-flex items-baseline gap-1.5 whitespace-nowrap font-display tabular-nums text-foreground">
+      <span className={`font-semibold text-muted-foreground ${grande ? "text-lg sm:text-xl" : "text-xs"}`}>USD</span>
+      <span className={`font-semibold tracking-tight ${grande ? "text-5xl sm:text-6xl" : "text-2xl"}`}>{entero}</span>
+      <span className={`-ml-1 font-semibold text-foreground/60 ${grande ? "text-2xl sm:text-3xl" : "text-sm"}`}>{cent}</span>
+    </span>
+  );
+}
+
+/** El reloj de pared de la barrita (cada 30 s alcanza: muestra horas y minutos). */
+function useReloj() {
+  const [ahora, setAhora] = useState(() => new Date());
+  useEffect(() => {
+    const id = window.setInterval(() => setAhora(new Date()), 30_000);
+    return () => window.clearInterval(id);
+  }, []);
+  return ahora;
+}
+
+function BarritaDeConsola({ hoy }: { hoy: string }) {
+  const { t, language } = useLanguage();
+  const ahora = useReloj();
+  return (
+    <div className="flex items-center gap-2.5 border-b border-border/60 bg-foreground/[0.02] px-4 py-2.5 sm:px-5">
+      <span aria-hidden className="flex shrink-0 items-center gap-1.5">
+        <span className="h-2 w-2 rounded-full bg-foreground/15" />
+        <span className="h-2 w-2 rounded-full bg-foreground/15" />
+        <span className="h-2 w-2 rounded-full bg-foreground/15" />
+      </span>
+      <span className="truncate font-mono text-xs tracking-wide text-muted-foreground">
+        {t("oficina.costos.tablero.consola", { mes: nombreDeMes(hoy, language) })}
+      </span>
+      <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-success/30 px-2 py-0.5 font-mono text-[10.5px] tracking-wide text-success">
+        <span className="relative flex h-1.5 w-1.5">
+          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-success opacity-60 motion-reduce:animate-none" />
+          <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-success" />
+        </span>
+        {t("oficina.costos.tablero.enVivo")}
+      </span>
+      <span className="ml-auto shrink-0 font-mono text-[11px] tabular-nums text-muted-foreground/70">
+        {ahora.toLocaleTimeString(language, { hour: "2-digit", minute: "2-digit" })}
+      </span>
+    </div>
+  );
+}
+
 function BarraDelMes({ tb }: { tb: Tablero }) {
   const filas = conCosto(tb);
   const llenado = tb.proyeccion > 0 ? Math.min(100, (tb.gastado / tb.proyeccion) * 100) : 0;
   return (
-    <div className="h-2.5 overflow-hidden rounded-full bg-foreground/[0.07]">
+    <div className="h-2.5 overflow-hidden rounded-full bg-foreground/[0.07] [box-shadow:inset_0_1px_2px_rgb(0_0_0/.25)]">
       <div className="flex h-full gap-px" style={{ width: `${llenado}%` }}>
         {filas.map((f) => (
           <div key={f.id} className="h-full first:rounded-l-full last:rounded-r-full"
-            style={{ width: `${tb.gastado > 0 ? ((f.gastado ?? 0) / tb.gastado) * 100 : 0}%`, background: colorDe(f.id) }} />
+            style={{ width: `${tb.gastado > 0 ? ((f.gastado ?? 0) / tb.gastado) * 100 : 0}%`, background: colorDe(f.id), boxShadow: `0 0 12px -2px ${colorDe(f.id)}` }} />
         ))}
       </div>
     </div>
@@ -54,61 +109,49 @@ function GraficoDiario({ tb, hoy }: { tb: Tablero; hoy: string }) {
   // Hoy siempre; las demás marcas, salvo la pegada a hoy («14» y «15» juntos se leían «1415»).
   const conMarca = (i: number, dia: string) => dia === hoy || (marcas.has(i + 1) && Math.abs(i + 1 - diaHoy) !== 1);
   return (
-    <div className="flex min-w-0 flex-col gap-1.5">
-      <span className="text-[11.5px] uppercase tracking-wide text-muted-foreground">{t("oficina.costos.tablero.diario", { mes: nombreDeMes(hoy, language) })}</span>
-      <div className="flex h-24 items-end gap-[2px] sm:h-28" role="img" aria-label={t("oficina.costos.tablero.diario", { mes: nombreDeMes(hoy, language) })}>
-        {tb.serie.map((d) => (
-          <div key={d.dia} title={`${fechaCorta(d.dia, language)} · ${exacto(total(d))}`} className="flex h-full min-w-0 flex-1 flex-col justify-end">
-            {d.futuro ? (
-              <div className="w-full rounded-t-[3px] border border-dashed border-muted-foreground/30" style={{ height: `${Math.max(2, (total(d) / max) * 100)}%` }} />
-            ) : (
-              <div className={`flex w-full flex-col overflow-hidden rounded-t-[3px] ${d.dia === hoy ? "ring-1 ring-foreground/50" : ""}`}
-                style={{ height: `${Math.max(2, (total(d) / max) * 100)}%` }}>
-                {d.argos > 0 && <div style={{ height: `${(d.argos / total(d)) * 100}%`, background: colorDe(argosId) }} />}
-                {fijos.map((f) => (
-                  <div key={f.id} style={{ height: `${(f.porDia / total(d)) * 100}%`, background: colorDe(f.id), opacity: 0.55 }} />
-                ))}
+    <div className="flex min-w-0 flex-col gap-2">
+      <span className="font-mono text-[10.5px] uppercase tracking-[0.12em] text-muted-foreground/80">
+        {t("oficina.costos.tablero.diario", { mes: nombreDeMes(hoy, language) })}
+      </span>
+      <div className="relative">
+        {/* Rejilla tenue de fondo, como un monitor. */}
+        <div aria-hidden className="pointer-events-none absolute inset-0 flex flex-col justify-between">
+          <span className="border-t border-dashed border-foreground/[0.06]" />
+          <span className="border-t border-dashed border-foreground/[0.06]" />
+          <span className="border-t border-dashed border-foreground/[0.06]" />
+        </div>
+        <div className="relative flex h-28 items-end gap-[3px] sm:h-32" role="img" aria-label={t("oficina.costos.tablero.diario", { mes: nombreDeMes(hoy, language) })}>
+          {tb.serie.map((d) => {
+            const alto = `${Math.max(3, (total(d) / max) * 100)}%`;
+            const esHoy = d.dia === hoy;
+            return (
+              <div key={d.dia} title={`${fechaCorta(d.dia, language)} · ${exacto(total(d))}`} className="flex h-full min-w-0 flex-1 flex-col justify-end">
+                {d.futuro ? (
+                  <div className="w-full rounded-t-[4px] border border-dashed border-foreground/15" style={{ height: alto }} />
+                ) : (
+                  <div className="flex w-full flex-col overflow-hidden rounded-t-[4px]"
+                    style={{ height: alto, boxShadow: esHoy ? `0 0 18px 0 ${colorDe(argosId)}, 0 0 0 1px hsl(0 0% 100% / .35)` : undefined }}>
+                    {d.argos > 0 && <div style={{ height: `${(d.argos / total(d)) * 100}%`, background: `linear-gradient(180deg, hsl(var(--chart-3)), ${colorDe(argosId)})` }} />}
+                    {fijos.map((f) => (
+                      <div key={f.id} style={{ height: `${(f.porDia / total(d)) * 100}%`, background: colorDe(f.id), opacity: 0.5 }} />
+                    ))}
+                  </div>
+                )}
               </div>
-            )}
-          </div>
-        ))}
+            );
+          })}
+        </div>
       </div>
-      <div className="flex h-3 gap-[2px] text-[10px] tabular-nums text-muted-foreground" aria-hidden>
+      <div className="flex h-3 gap-[3px] font-mono text-[10px] tabular-nums text-muted-foreground" aria-hidden>
         {tb.serie.map((d, i) => (
           <span key={d.dia} className="relative min-w-0 flex-1">
             {conMarca(i, d.dia) && (
-              <span className={`absolute left-1/2 -translate-x-1/2 ${d.dia === hoy ? "font-medium text-foreground" : ""}`}>{i + 1}</span>
+              <span className={`absolute left-1/2 -translate-x-1/2 ${d.dia === hoy ? "font-semibold text-foreground" : ""}`}>{i + 1}</span>
             )}
           </span>
         ))}
       </div>
     </div>
-  );
-}
-
-function BloqueGastado({ tb, hoy }: { tb: Tablero; hoy: string }) {
-  const { t, language } = useLanguage();
-  return (
-    <section className="vidrio sube overflow-hidden" aria-label={t("oficina.costos.tablero.titulo")}>
-      <div className="grid gap-6 p-5 sm:p-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)] lg:items-end">
-        <div className="flex min-w-0 flex-col gap-3">
-          <span className="text-[11.5px] uppercase tracking-wide text-muted-foreground">
-            {t("oficina.costos.tablero.gastado", { mes: nombreDeMes(hoy, language), d: tb.dia })}
-          </span>
-          <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
-            <span className="font-display text-5xl font-semibold tabular-nums tracking-tight text-foreground sm:text-6xl">{exacto(tb.gastado)}</span>
-            <span className="text-sm font-medium tabular-nums text-foreground/80">{t("oficina.costos.tablero.hoyMas", { m: exacto(tb.hoy) })}</span>
-          </div>
-          <BarraDelMes tb={tb} />
-          <span className="text-[13px] text-muted-foreground">
-            {t("oficina.costos.tablero.deMes", { m: exacto(tb.proyeccion) })}
-            {tb.falta.length > 0 && ` · ${t("oficina.costos.tablero.sinLoQueFalta", { n: tb.falta.length })}`}
-          </span>
-          {tb.sinUso && <span className="text-xs text-destructive">{t("oficina.costos.tablero.sinUso")}</span>}
-        </div>
-        <GraficoDiario tb={tb} hoy={hoy} />
-      </div>
-    </section>
   );
 }
 
@@ -117,26 +160,67 @@ function TarjetaServicio({ f, tb }: { f: FilaGasto; tb: Tablero }) {
   const color = colorDe(f.id);
   const pct = f.alMes && f.gastado !== null ? Math.min(100, (f.gastado / f.alMes) * 100) : 0;
   return (
-    <div className="vidrio sube flex min-w-0 flex-col gap-2 p-4">
+    <div style={{ "--c": color } as CSSProperties}
+      className="group flex min-w-0 flex-col gap-2.5 rounded-[14px] border border-border/60 bg-[linear-gradient(180deg,hsl(var(--foreground)/.035),hsl(var(--foreground)/.01))] p-3.5 transition-[border-color,box-shadow,transform] duration-300 [box-shadow:inset_0_1px_0_hsl(0_0%_100%/.05)] hover:-translate-y-0.5 hover:border-[color:var(--c)] hover:[box-shadow:inset_0_1px_0_hsl(0_0%_100%/.06),0_18px_40px_-22px_var(--c)] motion-reduce:transition-none motion-reduce:hover:translate-y-0">
       <span className="flex min-w-0 items-start gap-2">
-        <span aria-hidden className="mt-1 h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: color, boxShadow: `0 0 10px ${color}` }} />
-        <span className="line-clamp-2 min-h-[2.5em] text-[13px] font-medium leading-tight text-foreground/90" title={f.nombre}>{f.nombre}</span>
+        <span aria-hidden className="mt-1 h-2 w-2 shrink-0 rounded-full" style={{ background: color, boxShadow: `0 0 10px ${color}` }} />
+        <span className="line-clamp-2 min-h-[2.5em] text-[12.5px] font-medium leading-tight text-foreground/85" title={f.nombre}>{f.nombre}</span>
       </span>
-      <span className="font-display text-2xl font-semibold tabular-nums text-foreground">{f.gastado === null ? "—" : exacto(f.gastado)}</span>
-      <div className="h-1.5 overflow-hidden rounded-full bg-foreground/[0.07]">
-        <div className="h-full rounded-full" style={{ width: `${pct}%`, background: color }} />
+      {f.gastado === null ? <span className="font-display text-2xl text-muted-foreground">—</span> : <Monto valor={f.gastado} tam="md" />}
+      <div className="h-1 overflow-hidden rounded-full bg-foreground/[0.07]">
+        <div className="h-full rounded-full" style={{ width: `${pct}%`, background: color, boxShadow: `0 0 8px ${color}` }} />
       </div>
-      <span className="text-xs tabular-nums text-muted-foreground">
+      <span className="font-mono text-[10.5px] tabular-nums text-muted-foreground">
         {f.alMes === null ? "" : t(f.porUso ? "oficina.costos.tablero.alRitmo" : "oficina.costos.tablero.deAlMes", { m: exacto(f.alMes) })}
       </span>
       {f.porUso && tb.argos?.lectura && (
-        <span className="text-[11px] leading-snug text-muted-foreground">
+        <span className="text-[10.5px] leading-snug text-muted-foreground/90">
           {t("oficina.costos.tablero.cuadre", {
             g: exacto(tb.argos.lectura.monto), f: fechaCorta(tb.argos.lectura.fecha, language), m: exacto(tb.argos.despues ?? 0),
           })}
         </span>
       )}
     </div>
+  );
+}
+
+function Consola({ tb, hoy }: { tb: Tablero; hoy: string }) {
+  const { t, language } = useLanguage();
+  const filas = conCosto(tb);
+  return (
+    <section aria-label={t("oficina.costos.tablero.titulo")}
+      className="sube relative overflow-hidden rounded-[22px] border border-border/70 bg-[linear-gradient(180deg,hsl(var(--card)/.72),hsl(var(--background)/.6))] backdrop-blur-xl [box-shadow:inset_0_1px_0_hsl(0_0%_100%/.07),0_40px_90px_-40px_rgb(0_0_0/.85),0_26px_80px_-34px_hsl(var(--chart-1)/.45)]">
+      {/* Brillos de ambiente, como la portada: azul arriba a la izquierda, violeta a la derecha. */}
+      <div aria-hidden className="pointer-events-none absolute -left-24 -top-24 h-64 w-64 rounded-full bg-[hsl(var(--chart-1)/.16)] blur-3xl" />
+      <div aria-hidden className="pointer-events-none absolute -right-20 top-10 h-56 w-56 rounded-full bg-[hsl(var(--chart-5)/.14)] blur-3xl" />
+      <div className="relative">
+        <BarritaDeConsola hoy={hoy} />
+        <div className="grid gap-7 p-5 sm:p-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)] lg:items-end">
+          <div className="flex min-w-0 flex-col gap-3">
+            <span className="font-mono text-[10.5px] uppercase tracking-[0.12em] text-muted-foreground/80">
+              {t("oficina.costos.tablero.gastado", { mes: nombreDeMes(hoy, language), d: tb.dia })}
+            </span>
+            <div className="flex flex-wrap items-baseline gap-x-4 gap-y-2">
+              <Monto valor={tb.gastado} tam="xl" />
+              <span className="inline-flex items-center rounded-full border border-border/70 bg-foreground/[0.04] px-2.5 py-1 font-mono text-[11px] tabular-nums text-foreground/85">
+                {t("oficina.costos.tablero.hoyMas", { m: exacto(tb.hoy) })}
+              </span>
+            </div>
+            <BarraDelMes tb={tb} />
+            <span className="text-[13px] text-muted-foreground">
+              {t("oficina.costos.tablero.deMes", { m: exacto(tb.proyeccion) })}
+              {tb.falta.length > 0 && ` · ${t("oficina.costos.tablero.sinLoQueFalta", { n: tb.falta.length })}`}
+            </span>
+            {tb.sinUso && <span className="text-xs text-destructive">{t("oficina.costos.tablero.sinUso")}</span>}
+          </div>
+          <GraficoDiario tb={tb} hoy={hoy} />
+        </div>
+        <div aria-label={t("oficina.costos.tablero.servicios")} role="group"
+          className="grid grid-cols-2 gap-2.5 border-t border-border/60 p-4 sm:p-5 md:grid-cols-3 xl:grid-cols-6">
+          {filas.map((f) => <TarjetaServicio key={f.id} f={f} tb={tb} />)}
+        </div>
+      </div>
+    </section>
   );
 }
 
@@ -149,14 +233,14 @@ function FaltaYAhorro({ tb }: { tb: Tablero }) {
         {tb.falta.map((s) => (
           <li key={s.id} className="flex flex-wrap items-baseline justify-between gap-x-3 px-4 py-2.5 sm:px-5">
             <span className="min-w-0 text-sm text-foreground">{s.nombre}</span>
-            <span className="text-xs font-medium text-warning">{t("oficina.costos.tablero.sinMonto")}</span>
+            <span className="font-mono text-[11px] font-medium text-warning">{t("oficina.costos.tablero.sinMonto")}</span>
           </li>
         ))}
         {tb.ahorro.map((a) => (
           <li key={a.id} className="flex flex-col gap-0.5 px-4 py-2.5 sm:px-5">
             <span className="flex flex-wrap items-baseline justify-between gap-x-3">
               <span className="min-w-0 text-sm text-foreground">{a.nombre}</span>
-              <span className="text-sm font-semibold tabular-nums text-success">{t("oficina.costos.tablero.ahorro", { m: exacto(a.ahorro) })}</span>
+              <span className="font-display text-sm font-semibold tabular-nums text-success">{t("oficina.costos.tablero.ahorro", { m: exacto(a.ahorro) })}</span>
             </span>
             <span className="text-[11px] text-muted-foreground">{a.detalle}</span>
           </li>
@@ -178,18 +262,14 @@ export default function TableroGasto() {
     cuerpo = <div className="vidrio overflow-hidden"><FalloCompacto onReintentar={() => void q.refetch()} ocupado={q.isFetching} /></div>;
   } else {
     const tb = calcularTableroGasto(q.data.servicios, q.data.lecturas ?? [], uso.data ?? null, hoy);
-    const filas = conCosto(tb);
     cuerpo = (
       <div className="flex flex-col gap-4">
-        <BloqueGastado tb={tb} hoy={hoy} />
+        <Consola tb={tb} hoy={hoy} />
         {uso.isError && (
           <div className="vidrio overflow-hidden">
             <FalloCompacto texto={t("oficina.costos.partes.sinUso")} onReintentar={() => void uso.refetch()} ocupado={uso.isFetching} />
           </div>
         )}
-        <section aria-label={t("oficina.costos.tablero.servicios")} className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
-          {filas.map((f) => <TarjetaServicio key={f.id} f={f} tb={tb} />)}
-        </section>
         <div className="grid gap-4 lg:grid-cols-2">
           <SaldoGemini />
           <FaltaYAhorro tb={tb} />
