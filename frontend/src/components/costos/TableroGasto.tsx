@@ -16,6 +16,8 @@ import { Cargando, FalloCompacto, Panel, exacto, fechaCorta, hoyEnColombia, nomb
 // Los colores son los --chart-* de index.css: no dependen del skin (con un primario
 // gris, Argos se confundía con lo fijo). Sin clases nuevas en index.css (regla del
 // sistema de diseño): todo con utilidades. Las cuentas viven en lib/tableroGasto.ts.
+// 15/11: lo que se paga al año o de una vez (el dominio) no es «del mes»: sale de las
+// tarjetas y va en su franja «aparte del mes», con borde punteado, monto entero y fecha.
 
 /** El color de cada servicio, el mismo en todo el tablero. */
 const COLOR_SERVICIO: Record<string, string> = {
@@ -36,6 +38,12 @@ const NOMBRE_CORTO: Record<string, TranslationKey> = {
   resend: "oficina.costos.tablero.corto.resend",
   elevenlabs: "oficina.costos.tablero.corto.elevenlabs",
   godaddy_maven: "oficina.costos.tablero.corto.godaddy_maven",
+};
+
+/** Columnas de las tarjetas según cuántas hay (sin huecos ni una sola en la fila). */
+const COLUMNAS: Record<number, string> = {
+  1: "grid-cols-1", 2: "grid-cols-2", 3: "grid-cols-2 md:grid-cols-3", 4: "grid-cols-2 lg:grid-cols-4",
+  5: "grid-cols-2 md:grid-cols-3 xl:grid-cols-5", 6: "grid-cols-2 md:grid-cols-3 xl:grid-cols-6",
 };
 
 /** Los servicios que cuestan (los de USD 0 no pintan nada). */
@@ -200,6 +208,44 @@ function TarjetaServicio({ f, tb }: { f: FilaGasto; tb: Tablero }) {
   );
 }
 
+function AparteDelMes({ tb }: { tb: Tablero }) {
+  const { t, language } = useLanguage();
+  if (tb.aparte.length === 0) return null;
+  return (
+    <div role="group" aria-label={t("oficina.costos.tablero.aparte")} className="flex flex-col gap-2.5 border-t border-border/60 px-4 py-4 sm:px-5">
+      <span className="font-mono text-[10.5px] uppercase tracking-[0.12em] text-muted-foreground/80">{t("oficina.costos.tablero.aparte")}</span>
+      <ul className="flex flex-col gap-2">
+        {tb.aparte.map((p) => {
+          const color = colorDe(p.id);
+          const corto = NOMBRE_CORTO[p.id] ? t(NOMBRE_CORTO[p.id]) : p.nombre;
+          const cuando = p.proximo ? t("oficina.costos.tablero.seCobra", { f: fechaCorta(p.proximo, language) }) : t("oficina.costos.tablero.sinFecha");
+          return (
+            <li key={p.id} title={p.nombre}
+              className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-[14px] border border-dashed border-border/80 bg-foreground/[0.015] px-4 py-3">
+              <span className="flex min-w-0 items-start gap-2">
+                <span aria-hidden className="mt-1.5 h-2 w-2 shrink-0 rounded-full" style={{ background: color, boxShadow: `0 0 10px ${color}` }} />
+                <span className="flex min-w-0 flex-col">
+                  <span className="truncate text-[13px] font-medium text-foreground/90">{corto}</span>
+                  <span className="truncate font-mono text-[10px] uppercase tracking-wider text-muted-foreground/70">{p.proveedor}</span>
+                </span>
+              </span>
+              <span className="ml-auto flex flex-wrap items-center gap-x-3 gap-y-1">
+                <Monto valor={p.monto} tam="md" />
+                <span className="font-mono text-[10.5px] tabular-nums text-muted-foreground">
+                  {t("oficina.costos.tablero.alAno")} · {cuando}
+                </span>
+                {p.esteMes && (
+                  <span className="rounded-full border border-warning/40 px-2 py-0.5 font-mono text-[10.5px] text-warning">{t("oficina.costos.tablero.esteMes")}</span>
+                )}
+              </span>
+            </li>
+          );
+        })}
+      </ul>
+    </div>
+  );
+}
+
 function Consola({ tb, hoy }: { tb: Tablero; hoy: string }) {
   const { t, language } = useLanguage();
   const filas = conCosto(tb);
@@ -239,9 +285,10 @@ function Consola({ tb, hoy }: { tb: Tablero; hoy: string }) {
           <GraficoDiario tb={tb} hoy={hoy} />
         </div>
         <div aria-label={t("oficina.costos.tablero.servicios")} role="group"
-          className="grid grid-cols-2 gap-2.5 border-t border-border/60 p-4 sm:p-5 md:grid-cols-3 xl:grid-cols-6">
+          className={`grid gap-2.5 border-t border-border/60 p-4 sm:p-5 ${COLUMNAS[Math.min(filas.length, 6)] ?? COLUMNAS[6]}`}>
           {filas.map((f) => <TarjetaServicio key={f.id} f={f} tb={tb} />)}
         </div>
+        <AparteDelMes tb={tb} />
       </div>
     </section>
   );

@@ -16,7 +16,7 @@ const servicio = (id: string, extra: Partial<ServicioConParte>): ServicioConPart
 const SERVICIOS: ServicioConParte[] = [
   servicio("google_ia", { parte: "argos", ciclo: "uso", precio_unitario_usd: 0.002, unidad: "foto_juzgada", monto_usd: 48 }),
   servicio("supabase_maven", { parte: "base", monto_usd: 120 }),
-  servicio("godaddy_maven", { parte: "base", monto_usd: 30, ciclo: "anual" }),
+  servicio("godaddy_maven", { parte: "base", monto_usd: 30, ciclo: "anual", proximo_cobro: "2026-12-19" }),
   servicio("contabo_principal", { parte: "base", monto_usd: null, fuente: "falta" }),
   servicio("resend", { parte: "correo", monto_usd: 20, ahorro_usd: 20, ahorro_detalle: "Plan gratis" }),
   servicio("claude", { parte: "herramientas", monto_usd: 200, activo: false }),
@@ -54,16 +54,25 @@ describe("la lectura de Google", () => {
 describe("el tablero", () => {
   const tb = calcularTableroGasto(SERVICIOS, [LECTURA], USO, "2026-11-10");
 
-  it("gastado = Argos (24 + 2 + 1) + lo fijo de 10 de 30 días (120 + 2,5 + 20) ÷ 3", () => {
+  it("gastado = Argos (24 + 2 + 1) + lo fijo de 10 de 30 días (120 + 20) ÷ 3", () => {
     expect(tb.argos?.gastado).toBe(27);
     expect(tb.argos?.despues).toBe(3);
-    expect(tb.gastado).toBeCloseTo(27 + (120 + 2.5 + 20) / 3, 1);
+    expect(tb.gastado).toBeCloseTo(27 + (120 + 20) / 3, 1);
     // Hoy: lo fijo de un día + lo de Argos de hoy.
-    expect(tb.hoy).toBeCloseTo((120 + 2.5 + 20) / 30 + 1, 1);
+    expect(tb.hoy).toBeCloseTo((120 + 20) / 30 + 1, 1);
   });
 
   it("la proyección: Argos al ritmo de lo que va + cada fijo su mes", () => {
-    expect(tb.proyeccion).toBeCloseTo(27 / 10 * 30 + 120 + 2.5 + 20, 1);
+    expect(tb.proyeccion).toBeCloseTo(27 / 10 * 30 + 120 + 20, 1);
+  });
+
+  it("lo del año va aparte, entero y con su fecha: no se reparte en el mes", () => {
+    expect(tb.filas.map((f) => f.id)).not.toContain("godaddy_maven");
+    expect(tb.aparte).toEqual([{ id: "godaddy_maven", nombre: "godaddy_maven", proveedor: "P", monto: 30, ciclo: "anual", proximo: "2026-12-19", esteMes: false }]);
+    // Si el cobro cae en el mes de hoy, se marca «este mes» (sigue sin sumar al mes).
+    const dic = calcularTableroGasto(SERVICIOS, [], { ...USO, hoy: "2026-12-05", desde: "2026-12-01", dias_del_mes: 31, dias: [] }, "2026-12-05");
+    expect(dic.aparte[0].esteMes).toBe(true);
+    expect(dic.filas.map((f) => f.id)).not.toContain("godaddy_maven");
   });
 
   it("lo que no es Maven, lo apagado y lo que no tiene monto no suman; lo sin monto va a «falta»", () => {
