@@ -1,0 +1,92 @@
+name: Molde de la casa (esquema de Maven sin datos)
+
+# TREN DE AGENCIAS · VAGÓN 1 (Alvaro, 15/11/2026). Cada agencia nueva vive en su
+# propia base («su casa»); Kash NO se toca. Este workflow saca el MOLDE: la
+# estructura completa de la base de Kash (tablas, funciones, políticas, triggers)
+# SIN UN SOLO DATO, y lo prueba levantándolo en un Postgres vacío del runner.
+#
+# Solo LEE de producción (pg_dump de esquema). No escribe nada en la base de Kash.
+# Usa SUPABASE_ACCESS_TOKEN: el CLI pide un usuario temporal de solo lectura de
+# esquema por la API de Supabase, así nadie maneja la clave de la base.
+#
+# Resultado: el artefacto «molde-casa» con:
+#   esquema.sql   lo que va dentro de public y los demás esquemas propios
+#   conteo.txt    cuántas tablas, funciones, políticas y triggers quedaron al
+#                 levantarlo en limpio (para compararlo con producción)
+#   errores.txt   lo que no pudo aplicar en limpio (vacío = el molde sirve)
+
+on:
+  workflow_dispatch:
+  # Mientras el tren no llega a main, corre al empujar la rama del vagón.
+  push:
+    branches: ['tren-vagon-1-molde']
+    paths: ['.github/workflows/molde-casa.yml']
+
+concurrency:
+  group: molde-casa
+  cancel-in-progress: false
+
+jobs:
+  molde:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      PROJECT_REF: lsagslbkliprespbyhts
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Guard — falta SUPABASE_ACCESS_TOKEN
+        run: |
+          if [ -z "${SUPABASE_ACCESS_TOKEN:-}" ]; then
+            echo "::error::Falta el secret SUPABASE_ACCESS_TOKEN."
+            exit 1
+          fi
+
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: 2.110.0
+
+      - name: Sacar el esquema de Kash (solo lectura, sin datos)
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/casa" molde
+          cd "$RUNNER_TEMP/casa"
+          supabase init --force >/dev/null
+          sed -i 's/^major_version = .*/major_version = 17/' supabase/config.toml
+          supabase link --project-ref "$PROJECT_REF" </dev/null
+          supabase db dump --linked -f "$GITHUB_WORKSPACE/molde/esquema.sql"
+          wc -c "$GITHUB_WORKSPACE/molde/esquema.sql"
+
+      - name: Levantar una base vacía (Postgres 17 de Supabase)
+        run: |
+          set -euo pipefail
+          cd "$RUNNER_TEMP/casa"
+          supabase db start
+
+      - name: Aplicar el molde en limpio
+        run: |
+          set -uo pipefail
+          URL="postgresql://postgres:postgres@127.0.0.1:54322/postgres"
+          psql "$URL" -v ON_ERROR_STOP=0 -q -f molde/esquema.sql 2> molde/errores.txt >/dev/null || true
+          echo "Errores al aplicar: $(grep -c 'ERROR' molde/errores.txt || true)"
+          psql "$URL" -At > molde/conteo.txt <<'SQL'
+          select 'tablas', count(*) from pg_tables where schemaname = 'public';
+          select 'funciones', count(*) from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'public';
+          select 'politicas', count(*) from pg_policies where schemaname = 'public';
+          select 'triggers', count(*) from pg_trigger t join pg_class c on c.oid = t.tgrelid join pg_namespace n on n.oid = c.relnamespace where n.nspname = 'public' and not t.tgisinternal;
+          select 'vistas', count(*) from pg_views where schemaname = 'public';
+          select 'tipos', count(*) from pg_type t join pg_namespace n on n.oid = t.typnamespace where n.nspname = 'public' and t.typtype = 'e';
+          select 'filas_en_public', coalesce(sum(n_live_tup), 0) from pg_stat_user_tables where schemaname = 'public';
+          SQL
+          cat molde/conteo.txt
+          head -c 4000 molde/errores.txt
+
+      - name: Guardar el molde
+        uses: actions/upload-artifact@v4
+        with:
+          name: molde-casa
+          path: molde/
+          retention-days: 14
