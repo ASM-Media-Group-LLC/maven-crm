@@ -27,6 +27,9 @@ function GastoDiario({ serie, hoy }: { serie: DiaGasto[]; hoy: string }) {
   const { t, language } = useLanguage();
   const max = Math.max(0.01, ...serie.map((d) => d.fijo + d.argos));
   const marcas = new Set([1, 8, 15, 22, serie.length]);
+  const diaHoy = Number(hoy.slice(8, 10));
+  // Hoy siempre; las demás marcas, salvo la pegada a hoy («14» y «15» juntos se leían «1415»).
+  const conMarca = (i: number, dia: string) => dia === hoy || (marcas.has(i + 1) && Math.abs(i + 1 - diaHoy) !== 1);
   return (
     <Panel id="tablero-diario" titulo={t("oficina.costos.tablero.diario", { mes: nombreDeMes(hoy, language) })}
       derecha={(
@@ -54,8 +57,7 @@ function GastoDiario({ serie, hoy }: { serie: DiaGasto[]; hoy: string }) {
         <div className="flex h-3 gap-[2px] text-[10px] tabular-nums text-muted-foreground sm:gap-1" aria-hidden>
           {serie.map((d, i) => (
             <span key={d.dia} className="relative min-w-0 flex-1">
-              {/* Una marca pegada a la de hoy se omite: «14» y «15» juntos se leían «1415». */}
-              {((marcas.has(i + 1) && Math.abs(i + 1 - Number(hoy.slice(8, 10))) > 1) || d.dia === hoy) && (
+              {conMarca(i, d.dia) && (
                 <span className={`absolute left-1/2 -translate-x-1/2 ${d.dia === hoy ? "font-medium text-foreground" : ""}`}>{i + 1}</span>
               )}
             </span>
