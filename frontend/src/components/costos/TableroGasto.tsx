@@ -1,5 +1,6 @@
 import { useEffect, useState, type CSSProperties, type ReactNode } from "react";
 import { useLanguage } from "@/hooks/useLanguage";
+import type { TranslationKey } from "@/lib/i18n";
 import { calcularTableroGasto, type DiaGasto, type FilaGasto, type TableroGasto as Tablero } from "@/lib/tableroGasto";
 import SaldoGemini from "./SaldoGemini";
 import { Cargando, FalloCompacto, Panel, exacto, fechaCorta, hoyEnColombia, nombreDeMes, useCostos, useUsoDelMes } from "./comun";
@@ -26,6 +27,16 @@ const COLOR_SERVICIO: Record<string, string> = {
   godaddy_maven: "hsl(var(--chart-3))",
 };
 const colorDe = (id: string) => COLOR_SERVICIO[id] ?? "hsl(var(--muted-foreground) / 0.6)";
+
+/** Nombre corto de cada servicio en su tarjeta (el largo queda en el título al pasar el mouse). */
+const NOMBRE_CORTO: Record<string, TranslationKey> = {
+  google_ia: "oficina.costos.tablero.corto.google_ia",
+  supabase_maven: "oficina.costos.tablero.corto.supabase_maven",
+  contabo_llamadas: "oficina.costos.tablero.corto.contabo_llamadas",
+  resend: "oficina.costos.tablero.corto.resend",
+  elevenlabs: "oficina.costos.tablero.corto.elevenlabs",
+  godaddy_maven: "oficina.costos.tablero.corto.godaddy_maven",
+};
 
 /** Los servicios que cuestan (los de USD 0 no pintan nada). */
 const conCosto = (tb: Tablero) => tb.filas.filter((f) => (f.alMes ?? 0) > 0 || (f.gastado ?? 0) > 0);
@@ -159,27 +170,32 @@ function TarjetaServicio({ f, tb }: { f: FilaGasto; tb: Tablero }) {
   const { t, language } = useLanguage();
   const color = colorDe(f.id);
   const pct = f.alMes && f.gastado !== null ? Math.min(100, (f.gastado / f.alMes) * 100) : 0;
+  const corto = NOMBRE_CORTO[f.id] ? t(NOMBRE_CORTO[f.id]) : f.nombre;
+  const nota = f.porUso && tb.argos?.lectura
+    ? t("oficina.costos.tablero.cuadre", { g: exacto(tb.argos.lectura.monto), f: fechaCorta(tb.argos.lectura.fecha, language), m: exacto(tb.argos.despues ?? 0) })
+    : "";
   return (
-    <div style={{ "--c": color } as CSSProperties}
-      className="group flex min-w-0 flex-col gap-2.5 rounded-[14px] border border-border/60 bg-[linear-gradient(180deg,hsl(var(--foreground)/.035),hsl(var(--foreground)/.01))] p-3.5 transition-[border-color,box-shadow,transform] duration-300 [box-shadow:inset_0_1px_0_hsl(0_0%_100%/.05)] hover:-translate-y-0.5 hover:border-[color:var(--c)] hover:[box-shadow:inset_0_1px_0_hsl(0_0%_100%/.06),0_18px_40px_-22px_var(--c)] motion-reduce:transition-none motion-reduce:hover:translate-y-0">
-      <span className="flex min-w-0 items-start gap-2">
-        <span aria-hidden className="mt-1 h-2 w-2 shrink-0 rounded-full" style={{ background: color, boxShadow: `0 0 10px ${color}` }} />
-        <span className="line-clamp-2 min-h-[2.5em] text-[12.5px] font-medium leading-tight text-foreground/85" title={f.nombre}>{f.nombre}</span>
+    <div style={{ "--c": color } as CSSProperties} title={nota ? `${f.nombre} · ${nota}` : f.nombre}
+      className="group relative flex min-w-0 flex-col gap-3 overflow-hidden rounded-[14px] border border-border/60 bg-[linear-gradient(180deg,hsl(var(--foreground)/.04),hsl(var(--foreground)/.01))] p-4 transition-[border-color,box-shadow,transform] duration-300 [box-shadow:inset_0_1px_0_hsl(0_0%_100%/.05)] hover:-translate-y-0.5 hover:border-[color:var(--c)] hover:[box-shadow:inset_0_1px_0_hsl(0_0%_100%/.06),0_18px_40px_-22px_var(--c)] motion-reduce:transition-none motion-reduce:hover:translate-y-0">
+      {/* La línea de luz arriba, del color del servicio. */}
+      <span aria-hidden className="pointer-events-none absolute inset-x-5 top-0 h-px opacity-80"
+        style={{ background: `linear-gradient(90deg, transparent, ${color}, transparent)` }} />
+      <span aria-hidden className="pointer-events-none absolute -top-10 left-1/2 h-16 w-24 -translate-x-1/2 rounded-full opacity-0 blur-2xl transition-opacity duration-300 group-hover:opacity-40 motion-reduce:transition-none"
+        style={{ background: color }} />
+      <span className="relative flex min-w-0 items-start gap-2">
+        <span aria-hidden className="mt-1.5 h-2 w-2 shrink-0 rounded-full" style={{ background: color, boxShadow: `0 0 10px ${color}` }} />
+        <span className="flex min-w-0 flex-col">
+          <span className="truncate text-[13px] font-medium text-foreground/90">{corto}</span>
+          <span className="truncate font-mono text-[10px] uppercase tracking-wider text-muted-foreground/70">{f.proveedor.replace(/ AI Studio$/, "")}</span>
+        </span>
       </span>
-      {f.gastado === null ? <span className="font-display text-2xl text-muted-foreground">—</span> : <Monto valor={f.gastado} tam="md" />}
-      <div className="h-1 overflow-hidden rounded-full bg-foreground/[0.07]">
+      <span className="relative">{f.gastado === null ? <span className="font-display text-2xl text-muted-foreground">—</span> : <Monto valor={f.gastado} tam="md" />}</span>
+      <div className="relative h-1 overflow-hidden rounded-full bg-foreground/[0.07]">
         <div className="h-full rounded-full" style={{ width: `${pct}%`, background: color, boxShadow: `0 0 8px ${color}` }} />
       </div>
-      <span className="font-mono text-[10.5px] tabular-nums text-muted-foreground">
+      <span className="relative font-mono text-[10.5px] tabular-nums text-muted-foreground">
         {f.alMes === null ? "" : t(f.porUso ? "oficina.costos.tablero.alRitmo" : "oficina.costos.tablero.deAlMes", { m: exacto(f.alMes) })}
       </span>
-      {f.porUso && tb.argos?.lectura && (
-        <span className="text-[10.5px] leading-snug text-muted-foreground/90">
-          {t("oficina.costos.tablero.cuadre", {
-            g: exacto(tb.argos.lectura.monto), f: fechaCorta(tb.argos.lectura.fecha, language), m: exacto(tb.argos.despues ?? 0),
-          })}
-        </span>
-      )}
     </div>
   );
 }
@@ -211,6 +227,13 @@ function Consola({ tb, hoy }: { tb: Tablero; hoy: string }) {
               {t("oficina.costos.tablero.deMes", { m: exacto(tb.proyeccion) })}
               {tb.falta.length > 0 && ` · ${t("oficina.costos.tablero.sinLoQueFalta", { n: tb.falta.length })}`}
             </span>
+            {tb.argos?.lectura && (
+              <span className="font-mono text-[10.5px] text-muted-foreground/80">
+                {t("oficina.costos.tablero.cuadreArgos", {
+                  g: exacto(tb.argos.lectura.monto), f: fechaCorta(tb.argos.lectura.fecha, language), m: exacto(tb.argos.despues ?? 0),
+                })}
+              </span>
+            )}
             {tb.sinUso && <span className="text-xs text-destructive">{t("oficina.costos.tablero.sinUso")}</span>}
           </div>
           <GraficoDiario tb={tb} hoy={hoy} />
