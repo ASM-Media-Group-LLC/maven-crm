@@ -1,17 +1,17 @@
-import { useState, type ReactNode } from "react";
+import { useState } from "react";
 import type { UseQueryResult } from "@tanstack/react-query";
 import { CheckCircle2 } from "lucide-react";
 import { useLanguage } from "@/hooks/useLanguage";
 import type { TranslationKey } from "@/lib/i18n";
 import { num } from "@/lib/costos";
 import {
-  COLOR_PARTE, ahorrosDe, calcularCostosPorParte, pesoDePartes,
-  type CostosPorParte, type DiaCosto, type Pieza, type ResumenParte, type UsoDelMes,
+  COLOR_PARTE, ahorrosDe, calcularCostosPorParte,
+  type Pieza, type ResumenParte, type UsoDelMes,
 } from "@/lib/costosPorParte";
 import { BloqueBajarCostos, useCuentas } from "./CuentasAtadas";
 import { HojaFicha } from "./FichaServicio";
 import {
-  CLAVE_PARTE, Cargando, FalloCompacto, Panel, Pastilla, Punto, exacto, fechaCorta, hoyEnColombia, miles, nombreDeMes, redondo,
+  CLAVE_PARTE, Cargando, FalloCompacto, Panel, Punto, exacto, hoyEnColombia, miles, redondo,
   useCostos, useUsoDelMes,
 } from "./comun";
 
@@ -217,100 +217,6 @@ function TarjetaParte({ parte, onAbrir }: { parte: ResumenParte; onAbrir: (id: s
   );
 }
 
-/** El gasto de cada día del mes: lo fijo (gris) + lo que se cobra por uso (color de Argos); lo que falta, en contorno. */
-function DiaPorDia({ serie, hoy }: { serie: DiaCosto[]; hoy: string }) {
-  const { t, language } = useLanguage();
-  const max = Math.max(0.01, ...serie.map((d) => d.fijo + d.uso));
-  const marcas = new Set([1, 8, 15, 22, serie.length]);
-  return (
-    <div className="flex flex-col gap-2">
-      <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-        <span className="text-xs font-medium text-foreground/85">{t("oficina.costos.partes.diaPorDia", { mes: nombreDeMes(hoy, language) })}</span>
-        <span className="flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
-          <span className="inline-flex items-center gap-1.5"><span className="h-2 w-2 rounded-[2px] bg-muted-foreground/40" />{t("oficina.costos.partes.leyendaFijo")}</span>
-          <span className="inline-flex items-center gap-1.5"><span className="h-2 w-2 rounded-[2px]" style={{ background: COLOR_PARTE.argos }} />{t("oficina.costos.partes.leyendaUso")}</span>
-          <span className="inline-flex items-center gap-1.5"><span className="h-2 w-2 rounded-[2px] border border-dashed border-muted-foreground/60" />{t("oficina.costos.partes.leyendaFalta")}</span>
-        </span>
-      </div>
-      <div className="flex h-16 items-end gap-[2px] sm:h-20 sm:gap-1" role="img" aria-label={t("oficina.costos.partes.diaPorDia", { mes: nombreDeMes(hoy, language) })}>
-        {serie.map((d) => {
-          const total = d.fijo + d.uso;
-          return (
-            <div key={d.dia} title={`${fechaCorta(d.dia, language)} · ${exacto(total)}`} className="flex h-full min-w-0 flex-1 flex-col justify-end">
-              <div className={`flex w-full flex-col overflow-hidden rounded-t-[3px] ${d.futuro ? "border border-dashed border-muted-foreground/40" : ""} ${d.dia === hoy ? "ring-1 ring-foreground/40" : ""}`}
-                style={{ height: `${Math.max(2, (total / max) * 100)}%` }}>
-                {!d.futuro && total > 0 && <div style={{ height: `${(d.uso / total) * 100}%`, background: COLOR_PARTE.argos }} />}
-                {!d.futuro && <div className="flex-1 bg-muted-foreground/40" />}
-              </div>
-            </div>
-          );
-        })}
-      </div>
-      <div className="flex h-3 gap-[2px] text-[10px] tabular-nums text-muted-foreground sm:gap-1" aria-hidden>
-        {serie.map((d, i) => (
-          <span key={d.dia} className="relative min-w-0 flex-1">
-            {(marcas.has(i + 1) || d.dia === hoy) && (
-              <span className={`absolute left-1/2 -translate-x-1/2 ${d.dia === hoy ? "font-medium text-foreground" : ""}`}>{i + 1}</span>
-            )}
-          </span>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-/** Lo de arriba: cómo cierra el mes, lo que va, el mes pasado, la barra por parte y el día a día. */
-function Resumen({ r, uso }: { r: CostosPorParte; uso: UseQueryResult<UsoDelMes> }) {
-  const { t, language } = useLanguage();
-  const hoy = r.serie[r.dia - 1]?.dia ?? hoyEnColombia();
-  const pesos = pesoDePartes(r.partes);
-  const sinDato = r.partes.flatMap((p) => p.piezas).filter((p) => !p.sinUso && p.cierre === null).map((p) => p.servicio?.nombre ?? "");
-  let cuerpo: ReactNode;
-  if (uso.isLoading) cuerpo = <Cargando />;
-  else if (uso.isError || !uso.data) cuerpo = <FalloCompacto texto={t("oficina.costos.partes.sinUso")} onReintentar={() => void uso.refetch()} ocupado={uso.isFetching} />;
-  else cuerpo = (
-    <div className="flex flex-col gap-5 p-4 sm:p-6">
-      <div className="flex flex-wrap gap-x-8 gap-y-5">
-        <div className="flex min-w-0 flex-[1_1_240px] flex-col gap-1.5">
-          <span className="text-[13px] text-muted-foreground">{t("oficina.costos.partes.alRitmo")}</span>
-          <span className="text-3xl font-semibold tabular-nums text-foreground sm:text-4xl">{redondo(r.total.cierre)}</span>
-          <span className="text-[13px] text-muted-foreground">
-            {t("oficina.costos.partes.llevas", { m: redondo(r.total.mes), d: r.dia })}
-            {" · "}
-            {r.mesPasado !== null ? t("oficina.costos.partes.mesPasado", { m: redondo(r.mesPasado) }) : t("oficina.costos.partes.sinMesPasado")}
-          </span>
-        </div>
-        <div className="flex min-w-0 flex-[2_1_380px] flex-col justify-center gap-2.5">
-          <div className="flex h-3 gap-0.5 overflow-hidden rounded-full bg-foreground/[0.05]">
-            {pesos.map((p) => <div key={p.parte} style={{ width: `${p.pct}%`, background: COLOR_PARTE[p.parte] }} />)}
-          </div>
-          <div className="flex flex-wrap gap-x-4 gap-y-1.5 text-xs text-muted-foreground">
-            {pesos.map((p) => (
-              <span key={p.parte} className="inline-flex items-center gap-1.5">
-                <Punto color={COLOR_PARTE[p.parte]} />{t(CLAVE_PARTE[p.parte].nombre)} <span className="tabular-nums">{p.pct < 1 ? "<1" : Math.round(p.pct)} %</span>
-              </span>
-            ))}
-            {sinDato.length > 0 && (
-              <span className="inline-flex items-center gap-1.5 text-warning">
-                <span aria-hidden className="h-2 w-2 rounded-full border border-dashed border-warning" />
-                {t("oficina.costos.partes.sinDatoLista", { lista: sinDato.join(", ") })}
-              </span>
-            )}
-          </div>
-        </div>
-      </div>
-      <DiaPorDia serie={r.serie} hoy={hoy} />
-      <div className="flex flex-wrap gap-2">
-        <Pastilla color="hsl(var(--success))">
-          {t("oficina.costos.partes.calculado", { h: new Date(uso.data.calculado_at).toLocaleTimeString(language, { hour: "numeric", minute: "2-digit" }) })}
-        </Pastilla>
-        {r.cuadradoAl && <Pastilla color="hsl(var(--success))">{t("oficina.costos.partes.cuadrado", { f: fechaCorta(r.cuadradoAl, language) })}</Pastilla>}
-      </div>
-    </div>
-  );
-  return <section aria-label={t("oficina.costos.partes.alRitmo")} className="vidrio sube overflow-hidden">{cuerpo}</section>;
-}
-
 export default function VistaPorParte() {
   const { t } = useLanguage();
   const q = useCostos();
@@ -329,7 +235,7 @@ export default function VistaPorParte() {
 
   return (
     <div className="flex flex-col gap-4">
-      <Resumen r={r} uso={uso} />
+      {/* Lo gastado del mes, el día a día y la proyección viven arriba, en el tablero de gasto (TableroGasto, 14/11/2026). */}
       {argos && <SeccionArgos parte={argos} uso={uso} onAbrir={setAbierto} />}
       {/* «Otras / no es Maven» va al final, en su tarjeta gris que dice que no suma. */}
       <div className="grid gap-4 md:grid-cols-2">

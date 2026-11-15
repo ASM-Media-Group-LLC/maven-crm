@@ -125,10 +125,12 @@ const reiniciar = () => { fallaCostos = false; fallaCuentas = false; fallaUso = 
 describe("Por parte de Maven (la pestaña de entrada)", () => {
   beforeEach(reiniciar);
 
-  it("arriba el cierre del mes al ritmo de hoy; Argos pieza por pieza con la cuenta; lo que no es Maven aparte", async () => {
+  it("arriba el tablero (lo gastado del mes, hoy y la proyección); Argos pieza por pieza con la cuenta; lo que no es Maven aparte", async () => {
     pintar("/oficina/costos");
-    expect(await screen.findByText("oficina.costos.partes.alRitmo")).toBeTruthy();
-    expect(screen.getByText(/^oficina\.costos\.partes\.llevas \{/)).toBeTruthy();
+    // El tablero de gasto (14/11/2026): lo gastado en lo que va del mes es el número grande.
+    expect(await screen.findByText(/^oficina\.costos\.tablero\.gastado \{/)).toBeTruthy();
+    expect(screen.getByText("oficina.costos.tablero.proyeccion")).toBeTruthy();
+    expect(screen.getByText("oficina.costos.tablero.servicios")).toBeTruthy();
     // La IA de Google: las fotos juzgadas de hoy × el precio por foto, y la factura del mes con la que se cuadra.
     expect(screen.getByText(/oficina\.costos\.pieza\.iaCuenta \{"n":"500","p":"USD 0,0026"/)).toBeTruthy();
     expect(screen.getAllByText(/oficina\.costos\.pieza\.facturado \{"m":"USD 17,44"\}/).length).toBeGreaterThan(0);
@@ -146,7 +148,7 @@ describe("Por parte de Maven (la pestaña de entrada)", () => {
     // Para ahorrar en Argos.
     expect(screen.getAllByText(/Pasar a Flash-Lite/).length).toBeGreaterThan(0);
     // El día a día del mes.
-    expect(screen.getByRole("img", { name: /oficina\.costos\.partes\.diaPorDia/ })).toBeTruthy();
+    expect(screen.getByRole("img", { name: /oficina\.costos\.tablero\.diario/ })).toBeTruthy();
   });
 
   it("si el uso no se puede leer, lo dice con Reintentar y lo fijo se sigue viendo (sin ceros inventados)", async () => {
@@ -163,8 +165,9 @@ describe("Por parte de Maven (la pestaña de entrada)", () => {
   it("si los costos no se pueden leer, lo dice y deja reintentar", async () => {
     fallaCostos = true;
     pintar("/oficina/costos");
-    expect(await screen.findByText("oficina.costos.fallo", undefined, { timeout: 4000 })).toBeTruthy();
-    expect(screen.getByText("oficina.costos.reintentar")).toBeTruthy();
+    // El tablero y la pestaña lo dicen cada uno en su fila, con Reintentar.
+    expect((await screen.findAllByText("oficina.costos.fallo", undefined, { timeout: 4000 })).length).toBeGreaterThan(0);
+    expect(screen.getAllByText("oficina.costos.reintentar").length).toBeGreaterThan(0);
   });
 
   it("al tocar una pieza con servicio se abre su ficha con sus cobros y el enlace a su factura", async () => {
@@ -222,7 +225,7 @@ describe("Dónde puedes recortar y cuentas atadas", () => {
     pintar("/oficina/costos");
     const bloque = (await screen.findByText("oficina.costos.bajar.titulo")).closest("section")!;
     expect(await within(bloque).findByText("oficina.costos.fallo", undefined, { timeout: 4000 })).toBeTruthy();
-    expect(screen.getByText("oficina.costos.partes.alRitmo")).toBeTruthy();
+    expect(screen.getByText(/^oficina\.costos\.tablero\.gastado \{/)).toBeTruthy();
     expect(screen.queryByText("oficina.costos.bajar.nada")).toBeNull();
   });
 });
@@ -233,7 +236,8 @@ describe("Por proveedor", () => {
   it("cada servicio con su parte de Maven; lo que no es Maven aparte; toca y se abre la ficha", async () => {
     pintar("/oficina/costos?vista=proveedor");
     expect(await screen.findByText("oficina.costos.porServicio")).toBeTruthy();
-    const fila = screen.getByText("Base de datos de Maven").closest("button")!;
+    // «Base de datos de Maven» sale también en el tablero de arriba: la fila de esta pestaña es la que es botón.
+    const fila = screen.getAllByText("Base de datos de Maven").map((e) => e.closest("button")).find(Boolean)!;
     expect(within(fila).getByText("oficina.costos.parte.base")).toBeTruthy();
     expect(screen.getByText("oficina.costos.proveedor.noSuma")).toBeTruthy();
     // La IA de Google al mes: el uso real al ritmo de hoy, no el monto viejo de la factura.
