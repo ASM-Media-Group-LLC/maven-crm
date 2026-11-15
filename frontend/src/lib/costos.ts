@@ -144,7 +144,10 @@ export function hacePasMasDe(iso: string | null | undefined, horas: number, ahor
 // ── Cobros, proyección y la serie del año (Alvaro, 11/11: «cuánto voy gastando
 // este mes, cuánto es el del año, cuánto me va a costar la proyección») ──────
 
-export interface Cobro { servicio_id: string; fecha: string; monto_usd: number; fuente: "factura" | "estimado"; nota: string | null }
+/** Un cobro del proveedor. «lectura» NO es un cobro: es lo que el proveedor dice
+ *  que va gastado en el mes hasta `fecha` (Gemini es prepago y no da su gasto por
+ *  API: se lee en AI Studio). useCostos la separa para que nunca se sume como pago. */
+export interface Cobro { servicio_id: string; fecha: string; monto_usd: number; fuente: "factura" | "estimado" | "lectura"; nota: string | null }
 
 const diasDelMes = (mes: string) => {
   const [a, m] = mes.split("-").map(Number);

@@ -95,11 +95,14 @@ describe("la tarjeta", () => {
 });
 
 describe("dónde va", () => {
-  const fuentes = (import.meta as unknown as { glob: (p: string, o: Record<string, unknown>) => Record<string, string> })
+  const pagina = (import.meta as unknown as { glob: (p: string, o: Record<string, unknown>) => Record<string, string> })
     .glob("/frontend/src/pages/oficina/CostosPage.tsx", { query: "?raw", import: "default", eager: true });
-  it("arriba de las pestañas de Costos, siempre a la vista", () => {
-    const src = Object.values(fuentes)[0] ?? "";
-    expect(src.indexOf("<SaldoGemini />")).toBeGreaterThan(0);
-    expect(src.indexOf("<SaldoGemini />")).toBeLessThan(src.indexOf("<Tabs"));
+  const tablero = (import.meta as unknown as { glob: (p: string, o: Record<string, unknown>) => Record<string, string> })
+    .glob("/frontend/src/components/costos/TableroGasto.tsx", { query: "?raw", import: "default", eager: true });
+  it("en el tablero de gasto, arriba de las pestañas de Costos, siempre a la vista", () => {
+    const src = Object.values(pagina)[0] ?? "";
+    expect(src.indexOf("<TableroGasto />")).toBeGreaterThan(0);
+    expect(src.indexOf("<TableroGasto />")).toBeLessThan(src.indexOf("<Tabs"));
+    expect(Object.values(tablero)[0] ?? "").toContain("<SaldoGemini />");
   });
 });

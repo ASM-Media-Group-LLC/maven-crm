@@ -37,7 +37,13 @@ export function useCostos() {
       ]);
       if (s.error) throw new Error(s.error.message);
       if (c.error) throw new Error(c.error.message);
-      return { servicios: (s.data ?? []) as ServicioConParte[], cobros: (c.data ?? []) as Cobro[] };
+      const todos = (c.data ?? []) as Cobro[];
+      // Las lecturas (lo gastado según el proveedor) van aparte: no son pagos.
+      return {
+        servicios: (s.data ?? []) as ServicioConParte[],
+        cobros: todos.filter((x) => x.fuente !== "lectura"),
+        lecturas: todos.filter((x) => x.fuente === "lectura"),
+      };
     },
   });
 }
