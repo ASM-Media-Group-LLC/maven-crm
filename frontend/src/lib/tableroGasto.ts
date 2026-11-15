@@ -5,8 +5,9 @@
 //     de AI Studio (lo que Google dice que va gastado hasta esa fecha) y, después,
 //     lo que Maven calcula foto por foto (fotos juzgadas × precio). Los días que
 //     cubre la lectura se escalan para que sumen lo que dijo Google;
-//   · lo que se cobra por mes (servidores, correo, dominio) cuenta la parte de los
-//     días que van;
+//   · lo que se cobra por mes (servidores, correo) cuenta la parte de los días que van;
+//   · lo que se paga una vez o al año (el dominio) NO entra en el mes (15/11: «dejas
+//     cosas que son one time versus el mes»): va aparte, con su monto entero y su fecha;
 //   · cada servicio con su gastado y su mes; lo que falta (sin monto) y dónde ahorrar.
 // Un dato que falta es null, nunca 0. Si el uso no se pudo leer, Argos queda en null.
 
@@ -28,6 +29,19 @@ export interface DiaGasto { dia: string; fijo: number; argos: number; futuro: bo
 
 export interface Lectura { fecha: string; monto: number; nota: string | null }
 
+/** Un pago que no es del mes (al año o de una vez): monto entero y cuándo se cobra. */
+export interface PagoAparte {
+  id: string;
+  nombre: string;
+  proveedor: string;
+  monto: number;
+  ciclo: "anual";
+  /** Próximo cobro (YYYY-MM-DD) o null si no se sabe. */
+  proximo: string | null;
+  /** El cobro cae en este mes. */
+  esteMes: boolean;
+}
+
 export interface TableroGasto {
   dia: number;
   diasDelMes: number;
@@ -38,6 +52,8 @@ export interface TableroGasto {
   argos: { gastado: number | null; lectura: Lectura | null; despues: number | null } | null;
   /** Servicios de Maven sin monto (no suman): «lo que falta». */
   falta: ServicioConParte[];
+  /** Lo que se paga al año o una vez: no suma en el mes, va aparte. */
+  aparte: PagoAparte[];
   ahorro: { id: string; nombre: string; ahorro: number; detalle: string }[];
   serie: DiaGasto[];
   /** El uso del mes no se pudo leer: Argos no se calcula (se dice, no se pone 0). */
@@ -98,6 +114,7 @@ export function calcularTableroGasto(
 
   const filas: FilaGasto[] = [];
   const falta: ServicioConParte[] = [];
+  const aparte: PagoAparte[] = [];
   let fijoDelDia = 0;
   let argos: TableroGasto["argos"] = null;
   let argosHoy = 0;
@@ -127,6 +144,13 @@ export function calcularTableroGasto(
       argosHoy = porDia.get(hoy) ?? 0;
       argos = { gastado, lectura, despues: lectura ? dos(despues) : null };
       filas.push({ id: s.id, nombre: s.nombre, proveedor: s.proveedor, gastado, alMes: proyectar(gastado, dia, dias), porUso: true });
+      continue;
+    }
+    if (s.ciclo === "anual") {
+      const monto = num(s.monto_usd);
+      if (monto === null) { falta.push(s); continue; }
+      const proximo = s.proximo_cobro ?? null;
+      aparte.push({ id: s.id, nombre: s.nombre, proveedor: s.proveedor, monto, ciclo: "anual", proximo, esteMes: !!proximo && proximo.slice(0, 7) === mes });
       continue;
     }
     const alMes = mensual(s);
@@ -159,6 +183,6 @@ export function calcularTableroGasto(
 
   return {
     dia, diasDelMes: dias, gastado, hoy: dos(fijoDelDia + argosHoy), proyeccion,
-    filas, argos, falta, ahorro, serie, sinUso,
+    filas, argos, falta, aparte, ahorro, serie, sinUso,
   };
 }

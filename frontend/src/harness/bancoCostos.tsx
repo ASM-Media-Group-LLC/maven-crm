@@ -14,13 +14,13 @@ const s = (id: string, nombre: string, proveedor: string, parte: string, monto: 
 const SERVICIOS = [
   s("claude", "Claude (plan Ultra)", "Anthropic", "herramientas", 93.67, { activo: false }),
   s("google_ia", "IA de Google (Argos y cámara)", "Google AI Studio", "argos", 48, { ciclo: "uso", precio_unitario_usd: 0.0022, unidad: "foto_juzgada" }),
-  s("elevenlabs", "Voz de los avisos (ElevenLabs)", "ElevenLabs", "argos", 2.87, { ciclo: "uso" }),
+  s("elevenlabs", "Voz de los avisos (ElevenLabs)", "ElevenLabs", "argos", 0),
   s("supabase_maven", "Base de datos de Maven (Supabase)", "Supabase", "base", 114.54),
   s("contabo_principal", "Servidor principal (Contabo)", "Contabo", "base", null),
   s("contabo_llamadas", "Servidor de llamadas (Contabo)", "Contabo", "cowork", 17),
-  s("resend", "Envío de correos (Resend Pro)", "Resend", "correo", 20, { ahorro_usd: 20, ahorro_detalle: "Bajar a plan gratis (3.000 correos al mes, 100 al día): Maven manda ~4 al día" }),
+  s("resend", "Envío de correos (Resend Pro)", "Resend", "correo", 20),
   s("zoho", "Correos del equipo (Zoho, @maven-ai.me)", "Zoho", "correo", null),
-  s("godaddy_maven", "Dominio maven-ai.me (GoDaddy)", "GoDaddy", "base", 29.99, { ciclo: "anual" }),
+  s("godaddy_maven", "Dominio maven-ai.me (GoDaddy)", "GoDaddy", "base", 29.99, { ciclo: "anual", proximo_cobro: "2026-12-19" }),
   s("github", "Código y pruebas (GitHub)", "GitHub", "herramientas", 0),
   s("supabase_otros", "Supabase: otros 21 proyectos", "Supabase", "otras", 212.97, { ahorro_usd: 78.48, ahorro_detalle: "Pausa los 8 proyectos que nadie usa (ninguno es Maven): cada uno cuesta ≈ USD 9,81 al mes." }),
 ];
