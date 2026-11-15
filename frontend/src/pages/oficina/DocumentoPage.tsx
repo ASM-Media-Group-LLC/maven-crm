@@ -17,6 +17,7 @@ import { useLanguage } from "@/hooks/useLanguage";
 import DialogoDeCompartir from "@/components/oficina/DialogoDeCompartir";
 import DialogoAbrirArchivo from "@/components/oficina/DialogoAbrirArchivo";
 import NombreEditable from "@/components/oficina/NombreEditable";
+import SinAccesoDocumento, { esSinAcceso } from "@/components/oficina/SinAccesoDocumento";
 import { atajoDeAbrir } from "@/lib/drive/abrirEnLaOficina";
 import type { DestinoDeOficina } from "@/lib/drive/tipoDeArchivo";
 
@@ -88,6 +89,16 @@ function DocumentoAbierto({ id, solo = false }: { id: string | undefined; solo?:
           <Skeleton className="h-9 w-2/3" />
           <Skeleton className="h-[70vh] w-full" />
         </div>
+      </Page>
+    );
+  }
+
+  // Un documento privado que no te compartieron: de quién es y «Pedir acceso».
+  // Un fallo de red o del servidor NO es «sin acceso»: sigue el aviso de abajo.
+  if (doc.isError && esSinAcceso(doc.error) && id) {
+    return (
+      <Page>
+        <SinAccesoDocumento id={id} onVolver={() => navigate("/oficina")} />
       </Page>
     );
   }

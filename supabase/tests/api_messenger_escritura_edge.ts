@@ -116,6 +116,10 @@ const NO_CARGAN_AQUI: Record<string, string> = {
   "20261114030000_donde_esta_por_cowork.sql":
     "Dónde está: el equipo es el Cowork de la persona (re-crea donde_esta_cada_uno desde pg_get_functiondef). " +
     "Esa función no está en este fixture; no toca nada del Messenger.",
+  "20261114130000_documentos_dueno_ve_todo_y_pedir_acceso.sql":
+    "Oficina: el dueño de la agencia ve todos los documentos de su gente y «Pedir acceso». Entra a esta cadena " +
+    "porque avisa por notifications, pero usa documents, document_shares, tenant_owners y tenant_members, que " +
+    "este fixture no trae; no toca nada del Messenger.",
   "20261114080000_saldo_de_gemini_en_vivo.sql":
     "Costos: el saldo de Gemini en vivo (costos_saldo, ia_saldo_estado) y el vigía que avisa al dueño antes de " +
     "que se acabe. Entra a esta cadena solo porque su vigía inserta avisos en notifications, pero usa " +
