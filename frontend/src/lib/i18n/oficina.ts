@@ -963,6 +963,8 @@ export const oficina = {
   "oficina.costos.tablero.servicios": { es: "Cada servicio", en: "Each service" },
   "oficina.costos.tablero.alRitmo": { es: "al ritmo: {m} al mes", en: "at this pace: {m} a month" },
   "oficina.costos.tablero.cuadre": { es: "Google: {g} hasta el {f} · Maven: {m} después", en: "Google: {g} through {f} · Maven: {m} since" },
+  "oficina.costos.tablero.consola": { es: "costos de maven · {mes}", en: "maven costs · {mes}" },
+  "oficina.costos.tablero.enVivo": { es: "en vivo", en: "live" },
   "oficina.costos.tablero.hoyMas": { es: "hoy +{m}", en: "today +{m}" },
   "oficina.costos.tablero.deMes": { es: "de ~{m} que costará el mes", en: "of ~{m} the month will cost" },
   "oficina.costos.tablero.deAlMes": { es: "de {m} al mes", en: "of {m} a month" },
