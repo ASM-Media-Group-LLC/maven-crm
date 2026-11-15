@@ -129,8 +129,8 @@ describe("Por parte de Maven (la pestaña de entrada)", () => {
     pintar("/oficina/costos");
     // El tablero de gasto (14/11/2026): lo gastado en lo que va del mes es el número grande.
     expect(await screen.findByText(/^oficina\.costos\.tablero\.gastado \{/)).toBeTruthy();
-    expect(screen.getByText("oficina.costos.tablero.proyeccion")).toBeTruthy();
-    expect(screen.getByText("oficina.costos.tablero.servicios")).toBeTruthy();
+    expect(screen.getByText(/oficina\.costos\.tablero\.deMes \{/)).toBeTruthy();
+    expect(screen.getByLabelText("oficina.costos.tablero.servicios")).toBeTruthy();
     // La IA de Google: las fotos juzgadas de hoy × el precio por foto, y la factura del mes con la que se cuadra.
     expect(screen.getByText(/oficina\.costos\.pieza\.iaCuenta \{"n":"500","p":"USD 0,0026"/)).toBeTruthy();
     expect(screen.getAllByText(/oficina\.costos\.pieza\.facturado \{"m":"USD 17,44"\}/).length).toBeGreaterThan(0);
