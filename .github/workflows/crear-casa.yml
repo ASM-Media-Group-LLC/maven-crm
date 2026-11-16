@@ -19,7 +19,7 @@ on:
         required: true
   push:
     branches: ['tren-vagon-1-molde']
-    paths: ['infra/casas/aplicar.json']
+    paths: ['infra/casas/aplicar.json', 'infra/casas/molde/**', 'infra/casas/preparar.sh']
 
 concurrency:
   group: crear-casa

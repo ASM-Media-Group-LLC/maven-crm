@@ -96,31 +96,13 @@ create policy user_avatars_lectura_publica on storage.objects as PERMISSIVE for 
 create policy user_avatars_reemplazo_lo_mio on storage.objects as PERMISSIVE for UPDATE to authenticated using (((bucket_id = 'user-avatars'::text) AND ((storage.foldername(name))[1] = (auth.uid())::text)));
 
 -- ─── 4. Las tablas que avisan en vivo (realtime) ────────────────────────────
-alter publication supabase_realtime add table public.calls;
-alter publication supabase_realtime add table public.chat_conversations;
-alter publication supabase_realtime add table public.chat_join_requests;
-alter publication supabase_realtime add table public.chat_messages;
-alter publication supabase_realtime add table public.chat_participants;
-alter publication supabase_realtime add table public.chatter_messages;
-alter publication supabase_realtime add table public.chatter_sessions;
-alter publication supabase_realtime add table public.cowork_avisos;
-alter publication supabase_realtime add table public.cowork_host_requests;
-alter publication supabase_realtime add table public.cowork_meet_participants;
-alter publication supabase_realtime add table public.cowork_meets;
-alter publication supabase_realtime add table public.cowork_memberships;
-alter publication supabase_realtime add table public.cowork_room_assignments;
-alter publication supabase_realtime add table public.cowork_rooms;
-alter publication supabase_realtime add table public.cowork_screenshare_requests;
-alter publication supabase_realtime add table public.cowork_sessions;
-alter publication supabase_realtime add table public.drive_nas_salud;
-alter publication supabase_realtime add table public.mail_messages;
-alter publication supabase_realtime add table public.meet_guest_requests;
-alter publication supabase_realtime add table public.model_phones;
-alter publication supabase_realtime add table public.models;
-alter publication supabase_realtime add table public.monitor_capturas;
-alter publication supabase_realtime add table public.monitor_eventos;
-alter publication supabase_realtime add table public.notifications;
-alter publication supabase_realtime add table public.tg_conversations;
-alter publication supabase_realtime add table public.tg_messages;
-alter publication supabase_realtime add table public.wa_conversation_messages;
-alter publication supabase_realtime add table public.wa_conversations;
+-- El molde a veces ya trae algunas: se agrega solo la que falta.
+do $$
+declare t text;
+begin
+  foreach t in array array['calls', 'chat_conversations', 'chat_join_requests', 'chat_messages', 'chat_participants', 'chatter_messages', 'chatter_sessions', 'cowork_avisos', 'cowork_host_requests', 'cowork_meet_participants', 'cowork_meets', 'cowork_memberships', 'cowork_room_assignments', 'cowork_rooms', 'cowork_screenshare_requests', 'cowork_sessions', 'drive_nas_salud', 'mail_messages', 'meet_guest_requests', 'model_phones', 'models', 'monitor_capturas', 'monitor_eventos', 'notifications', 'tg_conversations', 'tg_messages', 'wa_conversation_messages', 'wa_conversations'] loop
+    if not exists (select 1 from pg_publication_tables where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = t) then
+      execute format('alter publication supabase_realtime add table public.%I', t);
+    end if;
+  end loop;
+end $$;
