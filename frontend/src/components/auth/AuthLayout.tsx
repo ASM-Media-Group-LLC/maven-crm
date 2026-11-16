@@ -13,7 +13,7 @@ interface AuthLayoutProps {
 const AuthLayout = ({ children }: AuthLayoutProps) => {
   const { t } = useLanguage();
   return (
-    <div className="min-h-screen relative overflow-hidden bg-[hsl(240,10%,2%)]">
+    <div className="min-h-screen relative overflow-hidden bg-[#101827]">
       <AnimatedGradientBackground />
       <AnimatedWaves />
       {/* Topbar */}

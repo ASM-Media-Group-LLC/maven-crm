@@ -30,7 +30,9 @@ All colors MUST be HSL. Light mode in :root, dark mode in .dark.
     --popover: 0 0% 100%;
     --popover-foreground: 240 20% 12%;
 
-    --primary: 255 72% 50%;
+    /* Acento por defecto AZUL (16/11/2026, con el azul marino oficial). Quien
+       elija el skin Violeta conserva el morado. */
+    --primary: 213 72% 47%;
     --primary-foreground: 0 0% 100%;
 
     --secondary: 240 16% 95%;
@@ -39,7 +41,7 @@ All colors MUST be HSL. Light mode in :root, dark mode in .dark.
     --muted: 240 16% 95%;
     --muted-foreground: 240 8% 42%;
 
-    --accent: 268 74% 58%;
+    --accent: 202 82% 45%;
     --accent-foreground: 0 0% 100%;
 
     --destructive: 0 84% 60%;
@@ -53,18 +55,18 @@ All colors MUST be HSL. Light mode in :root, dark mode in .dark.
 
     --border: 240 14% 90%;
     --input: 240 14% 90%;
-    --ring: 255 72% 50%;
+    --ring: 213 72% 47%;
 
     --radius: 0.75rem;
 
     --sidebar-background: 240 18% 97%;
     --sidebar-foreground: 240 20% 12%;
-    --sidebar-primary: 255 72% 50%;
+    --sidebar-primary: 213 72% 47%;
     --sidebar-primary-foreground: 0 0% 100%;
     --sidebar-accent: 240 16% 94%;
     --sidebar-accent-foreground: 240 18% 12%;
     --sidebar-border: 240 14% 89%;
-    --sidebar-ring: 255 72% 50%;
+    --sidebar-ring: 213 72% 47%;
 
     --instagram-pink: 340 82% 59%;
     --instagram-purple: 271 91% 50%;
@@ -98,24 +100,26 @@ All colors MUST be HSL. Light mode in :root, dark mode in .dark.
     --card-foreground: 240 20% 12%;
     --popover: 0 0% 100%;
     --popover-foreground: 240 20% 12%;
-    --primary: 255 72% 50%;
+    --primary: 213 72% 47%;
     --primary-foreground: 0 0% 100%;
     --secondary: 240 16% 95%;
     --secondary-foreground: 240 18% 12%;
     --muted: 240 16% 95%;
     --muted-foreground: 240 8% 42%;
-    --accent: 268 74% 58%;
+    --accent: 202 82% 45%;
     --accent-foreground: 0 0% 100%;
     --border: 240 14% 90%;
     --input: 240 14% 90%;
-    --ring: 255 72% 50%;
+    --ring: 213 72% 47%;
   }
 
   .dark {
-    /* Negro de verdad con un guiño frío (hue 240, sat baja): el fondo ya no
-       "tira a morado". El morado vive en primary/accent/ring y en los estados
-       activos del sidebar (glass deriva de --primary/--accent). */
-    --background: 240 14% 4%;
+    /* Antes: negro frío (240 14% 4%). Desde el 16/11/2026 el oscuro es el azul
+       marino oficial (ver --background). El morado sigue en primary/accent/ring. */
+    /* AZUL MARINO OFICIAL (Alvaro, 16/11/2026: «es el color oficial de Maven,
+       por adelante, por atrás, por todos lados»): #101827 = 219 42% 11%. Todas
+       las superficies del oscuro van en ese mismo tono, un paso más claras. */
+    --background: 219 42% 11%;
     /* Blanco suavizado (antes 95%): el 95% sobre el fondo casi negro "quemaba"
        y aplanaba la jerarquía. Dos niveles: fuerte = este 89%, tenue =
        muted-foreground (bajado a 61% para que lo secundario se separe más).
@@ -124,26 +128,26 @@ All colors MUST be HSL. Light mode in :root, dark mode in .dark.
        suave, dos niveles". */
     /* 89% → 82% → 76% (Alvaro, 13/11/2026, dos veces: «las letras siguen robando
        atención»): lo fuerte sigue siendo lo más claro, pero ya no encandila. */
-    --foreground: 240 7% 76%;
+    --foreground: 220 14% 78%;
     /* Texto corriente un escalón bajo el fuerte (ver :root). */
-    --texto: 240 6% 66%;
+    --texto: 220 12% 68%;
 
-    --card: 240 12% 7%;
-    --card-foreground: 240 6% 66%;
+    --card: 219 39% 13%;
+    --card-foreground: 220 12% 68%;
 
-    --popover: 240 12% 7%;
-    --popover-foreground: 240 12% 89%;
+    --popover: 219 39% 13%;
+    --popover-foreground: 220 20% 90%;
 
-    --primary: 255 74% 66%;
+    --primary: 213 90% 60%;
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 240 10% 12%;
-    --secondary-foreground: 240 12% 89%;
+    --secondary: 219 37% 16%;
+    --secondary-foreground: 220 20% 90%;
 
-    --muted: 240 10% 12%;
-    --muted-foreground: 240 7% 57%;
+    --muted: 219 37% 16%;
+    --muted-foreground: 220 16% 62%;
 
-    --accent: 268 76% 70%;
+    --accent: 202 85% 60%;
     --accent-foreground: 0 0% 100%;
 
     --destructive: 0 84% 60%;
@@ -158,18 +162,18 @@ All colors MUST be HSL. Light mode in :root, dark mode in .dark.
     --warning: 40 92% 56%;
     --warning-foreground: 40 90% 10%;
 
-    --border: 240 9% 15%;
-    --input: 240 9% 15%;
-    --ring: 255 74% 66%;
+    --border: 219 30% 19%;
+    --input: 219 30% 19%;
+    --ring: 213 90% 60%;
 
-    --sidebar-background: 240 14% 5%;
-    --sidebar-foreground: 240 12% 89%;
-    --sidebar-primary: 255 74% 66%;
+    --sidebar-background: 219 42% 9%;
+    --sidebar-foreground: 220 20% 90%;
+    --sidebar-primary: 213 90% 60%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 240 10% 12%;
-    --sidebar-accent-foreground: 240 12% 89%;
-    --sidebar-border: 240 9% 13%;
-    --sidebar-ring: 255 74% 66%;
+    --sidebar-accent: 219 37% 16%;
+    --sidebar-accent-foreground: 220 20% 90%;
+    --sidebar-border: 219 30% 16%;
+    --sidebar-ring: 213 90% 60%;
 
     --instagram-pink: 340 82% 59%;
     --instagram-purple: 271 91% 50%;
@@ -1474,10 +1478,11 @@ html:not(.dark) .avatar-iniciales { background: hsl(var(--av-h, 220) 72% 92%); c
    el mockup porque aquí hay huecos entre tarjetas donde asoma el fondo). */
 .dark .fondo-glass {
   background:
-    radial-gradient(60% 46% at 50% 70%, hsl(var(--skin-h, 213) 60% 52% / .40), transparent 64%),
-    radial-gradient(44% 42% at 14% 16%, hsl(calc(var(--skin-h, 213) + 22) 62% 56% / .34), transparent 62%),
-    radial-gradient(42% 42% at 90% 12%, hsl(calc(var(--skin-h, 213) - 14) 58% 50% / .32), transparent 62%),
-    linear-gradient(180deg, #0a0f1d 0%, #0b1020 40%, #080a16 72%, #050610 90%, #030308 100%);
+    radial-gradient(60% 46% at 50% 70%, hsl(var(--skin-h, 213) 60% 52% / .12), transparent 64%),
+    radial-gradient(44% 42% at 14% 16%, hsl(calc(var(--skin-h, 213) + 22) 62% 56% / .09), transparent 62%),
+    radial-gradient(42% 42% at 90% 12%, hsl(calc(var(--skin-h, 213) - 14) 58% 50% / .09), transparent 62%),
+    /* Azul marino oficial #101827 (16/11/2026): manda el fondo, las manchas solo lo acompañan. */
+    linear-gradient(180deg, #121b2d 0%, #101827 45%, #0d1421 100%);
   background-attachment: fixed;
 }
 /* Alto contraste: se apaga la atmósfera (prima la legibilidad). */
@@ -1499,10 +1504,10 @@ html:not(.dark) .avatar-iniciales { background: hsl(var(--av-h, 220) 72% 92%); c
 .dark .fondo-glass-sutil {
   background:
     repeating-linear-gradient(90deg, transparent 0 calc(20% - 2.5px), rgba(10,8,12,.4) calc(20% - 2.5px) calc(20% + .5px), transparent calc(20% + .5px) 20%),
-    radial-gradient(58% 44% at 50% 90%, hsl(var(--skin-h, 213) 58% 50% / .22), transparent 62%),
-    radial-gradient(42% 40% at 10% 4%, hsl(calc(var(--skin-h, 213) + 22) 60% 54% / .18), transparent 60%),
-    radial-gradient(38% 38% at 92% 2%, hsl(calc(var(--skin-h, 213) - 14) 56% 48% / .16), transparent 60%),
-    linear-gradient(180deg, #080b14 0%, #070912 50%, #050710 100%);
+    radial-gradient(58% 44% at 50% 90%, hsl(var(--skin-h, 213) 58% 50% / .08), transparent 62%),
+    radial-gradient(42% 40% at 10% 4%, hsl(calc(var(--skin-h, 213) + 22) 60% 54% / .06), transparent 60%),
+    radial-gradient(38% 38% at 92% 2%, hsl(calc(var(--skin-h, 213) - 14) 56% 48% / .06), transparent 60%),
+    linear-gradient(180deg, #111a2b 0%, #101827 50%, #0d1421 100%);
   background-attachment: fixed;
 }
 :root[data-contrast="high"] .fondo-glass-sutil { background: hsl(var(--background)); }

@@ -1,6 +1,7 @@
 const AnimatedGradientBackground = () => {
   return (
-    <div className="absolute inset-0 overflow-hidden pointer-events-none">
+    // Al 28%: sobre el azul marino oficial las manchas acompañan, no lo tapan.
+    <div className="absolute inset-0 overflow-hidden pointer-events-none opacity-[.28]">
       {/* Blob 1 - Red/Destructive */}
       <div
         className="absolute rounded-full"

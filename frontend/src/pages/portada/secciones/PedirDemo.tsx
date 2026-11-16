@@ -88,10 +88,9 @@ export default function PedirDemo({ publico }: { publico: Publico }) {
       <div className="wrap demo-grid">
         <div>
           <span className="eyebrow">pedir una demo</span>
-          <h2>Deja de operar en catorce pestañas.</h2>
+          <h2>Lleva tu negocio al siguiente nivel.</h2>
           <p className="bajada">
-            Maven nació dentro de una empresa que factura todos los días, no en una sala de
-            reuniones. Cuéntanos qué usas hoy y te mostramos qué se reemplaza con qué.
+            Cuéntanos de tu equipo y te mostramos tu oficina virtual funcionando.
           </p>
           <div className="demo-listo">
             <div>
