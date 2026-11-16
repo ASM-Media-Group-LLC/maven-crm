@@ -17,10 +17,11 @@
    en su propio chunk y no lo pagan las pantallas de adentro.
    ═══════════════════════════════════════════════════════════════════════════ */
 
-/* Sora ya la carga index.html. Instrument Sans (cuerpo) y JetBrains Mono
-   (horas, códigos, cifras) son de la portada nada más, así que se piden acá
-   y no en el HTML: quien entra logueado no las descarga. */
-@import url("https://fonts.googleapis.com/css2?family=Instrument+Sans:ital,wght@0,400;0,500;0,600;1,400&family=JetBrains+Mono:wght@400;500&display=swap");
+/* Sora (títulos), Instrument Sans (cuerpo) y JetBrains Mono (horas, códigos)
+   son de la portada nada más, así que se piden acá y no en el HTML: quien entra
+   logueado no las descarga. Ojo: index.html ya NO trae Sora (16/11/2026: los
+   títulos salían en la letra genérica del sistema por suponer que sí). */
+@import url("https://fonts.googleapis.com/css2?family=Instrument+Sans:ital,wght@0,400;0,500;0,600;1,400&family=JetBrains+Mono:wght@400;500&family=Sora:wght@500;600;700;800&display=swap");
 
   /* ═══════════════════════════════════════════════════════════════════════
      MAVEN · página de inicio
