@@ -877,10 +877,9 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
     const destino = activeRoomId && !activeMeetId
       ? activeRoomId
       : pilaHablar.current[pilaHablar.current.length - 1] ?? null;
+    // Sin aviso por sala: si no comparte, Argos se lo reclama desde el Hub (voz,
+    // cartel y reporte al 3er llamado). Pedírselo en cada sala era el estorbo.
     setRoomScreen(destino ? { [destino]: true } : {});
-    if (destino && !pantallaDelHub()) {
-      toast.info(traducir("cowork.host.unaPantalla.faltaHub"), { id: "una-pantalla" });
-    }
   }, [unaSolaPantalla, roomMic, activeRoomId, activeMeetId]);
 
   // ── Meet grupal ──────────────────────────────────────────────────────────
@@ -960,6 +959,8 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
       supervisorEncuadre: vigilarAnfitrion,
       // Su pantalla del Hub es la única: el tablero la reenvía a la sala donde habla.
       onLocalScreenTrack: fijarPantallaDelHub,
+      // …y en el Hub no la ve nadie: solo la sala a la que le habla.
+      pantallaSoloParaMi: vigilarAnfitrion,
       onFaceStateChange: (w) => actualizarLatido({ faceState: w.state, faceSince: w.since }),
       onMediaStateChange: (m) =>
         actualizarLatido({ camOn: m.camOn, screenShareOn: m.screenShareOn, conexionSala: m.conexionSala ?? null }),
@@ -2727,6 +2728,8 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
               // El supervisor no abre otra pantalla dentro de la sala: ahí ya le
               // llega la del Hub (una sola compartida). En el meet grupal sí puede.
               hideScreenShare={unaSolaPantalla && !activeMeetId}
+              // Entrar a una sala no lo saca de la vigilancia del Hub.
+              sinLatidoDeLlamada={unaSolaPantalla}
               getToken={getActiveRoomToken}
               leaveLabel={activeMeetId ? t("cowork.host.endMeet") : t("cowork.host.hangUp")}
               // Flechas + lista para moverse entre las SALAS de esta sesión sin

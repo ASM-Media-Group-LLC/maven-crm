@@ -498,10 +498,6 @@ export const cowork = {
   },
   "cowork.host.room.cameraHint": { es: "Comparte tu cámara solo con esta sala.", en: "Share your camera with this room only." },
   "cowork.host.screen": { es: "Pantalla", en: "Screen" },
-  "cowork.host.unaPantalla.faltaHub": {
-    es: "Comparte tu pantalla en el Supervisor Hub: se la mostramos solo a la sala a la que le hablas.",
-    en: "Share your screen in the Supervisor Hub: we show it only to the room you're talking to.",
-  },
   "cowork.host.sharingScreen": { es: "Compartiendo pantalla", en: "Sharing screen" },
   "cowork.host.room.screenOnHint": {
     es: "Tu pantalla se ve en esta sala. Toca para dejar de compartirla aquí.",
