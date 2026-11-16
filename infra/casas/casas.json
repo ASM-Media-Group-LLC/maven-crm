@@ -1,15 +1,15 @@
 {
-  "_nota": "Tren de agencias (15/11/2026). Kash NO está en esta lista a propósito: su base (lsagslbkliprespbyhts) no se toca nunca. Cada casa es una base de Supabase de una sola agencia.",
+  "_nota": "Tren de agencias. Decisión de Alvaro (16/11/2026): UN SOLO EDIFICIO para todas las agencias nuevas (más de 20 esperadas, de 15 a 50 personas, con Cowork, Argos, Messenger y correo). Cada agencia es una fila de `tenants` dentro del edificio y la base separa sus datos. Kash NO está aquí: su base (lsagslbkliprespbyhts) no se toca nunca. La recepción aparte (maven-torre) se borró el 16/11: la lista de agencias vive dentro del edificio.",
   "kash_no_tocar": "lsagslbkliprespbyhts",
-  "torre": { "ref": "wvzzabdkbafaerijklyi", "nombre": "maven-torre" },
   "casas": [
     {
-      "id": "prueba",
+      "id": "agencias",
       "nombre": "Agencia de prueba",
       "ref": "ezeigddgkaemxpshghmu",
+      "proyecto": "maven-agencias",
       "tenant_id": "d7100b28-8629-4f77-b6c6-6c4592c481e9",
       "slug": "agencia-prueba",
-      "es_prueba": true
+      "_tenant": "La agencia de prueba vive dentro del edificio para las pruebas de separación. Las agencias reales se dan de alta desde el panel."
     }
   ]
 }
