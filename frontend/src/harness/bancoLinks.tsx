@@ -2,6 +2,21 @@
 // de drive_links_de_subida() del 10/11/2026 (recortados). No se compila en producción.
 import { MemoryRouter } from "react-router-dom";
 import { LinksDeSubidaVista, type LinkDeModelo } from "@/pages/oficina/LinksDeSubidaPage";
+import { LinksDeCreadorasVista, type FilaCreadora } from "@/components/oficina/LinksDeCreadoras";
+
+const C = (artistico: string, raiz: string | null, carpeta: string | null, telefono: string | null, archivos: number, bytes: number, usado_at: string | null, token: string | null = "tok" + artistico): FilaCreadora =>
+  ({ creator_id: "c-" + artistico, nombre: artistico, artistico, telefono, carpeta_id: carpeta ? "f-" + artistico : null, carpeta,
+    raiz_id: raiz ? "r-" + raiz : null, raiz, token: carpeta ? token : null, archivos, bytes, ultimo: null, usado_at });
+
+const CREADORAS: FilaCreadora[] = [
+  C("Heidygarcia1111", "CONTENIDO PLUS", "HEIDYGARCIA1111", "+57 300 111 2233", 0, 0, null),
+  C("Jacqueenriquez5", "CONTENIDO MASSIVE", "JACQUEENRIQUEZ05", "+57 300 111 2234", 0, 0, null),
+  C("javibelen", "CONTENIDO PLUS", "JAVIBELEN", "+57 300 111 2235", 42, 6_800_000_000, "2026-11-15T20:00:00Z"),
+  C("Javieralaura", "CONTENIDO MASSIVE", "JAVIERALAURA", null, 0, 0, null),
+  C("Jossgaleana", "CONTENIDO MASSIVE", "JOSSGALEANA", "+57 300 111 2236", 128, 31_400_000_000, "2026-11-16T14:10:00Z"),
+  C("Martina Smith", "CONTENIDO PLUS", "MSMARTINASMITH1", "+57 300 111 2237", 0, 0, "2026-11-12T10:00:00Z"),
+  C("orianafitness_", null, null, null, 0, 0, null),
+];
 
 const L = (carpeta: string, padre: string, token: string, creado_por: string, archivos: number, bytes: number, ultimo: string | null): LinkDeModelo =>
   ({ token, carpeta_id: token.slice(0, 8), carpeta, padre, creado_por, creado_at: "2026-11-05T12:00:00Z", archivos, bytes, ultimo });
@@ -22,7 +37,8 @@ const LINKS: LinkDeModelo[] = [
 export default function BancoLinks() {
   return (
     <MemoryRouter>
-      <div className="mx-auto max-w-5xl p-4 sm:p-6">
+      <div className="mx-auto flex max-w-6xl flex-col gap-8 p-4 sm:p-6">
+        <LinksDeCreadorasVista filas={CREADORAS} cargando={false} fallo={false} onReintentar={() => {}} />
         <LinksDeSubidaVista links={LINKS} cargando={false} fallo={false} onReintentar={() => {}} />
       </div>
     </MemoryRouter>

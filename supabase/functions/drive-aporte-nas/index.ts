@@ -316,6 +316,20 @@ async function reclamarAvisos(admin: Admin, notis: Noti[]): Promise<Noti[]> {
   return notis.filter((n) => ganadosSet.has(n.id));
 }
 
+/** Los links de PRUEBA (drive_upload_links.prueba) no le avisan a nadie: ni
+ *  correo al Drive completo ni campana (Alvaro, 16/11/2026: probar una subida
+ *  de 30 GB sin mandarle correos a 14 personas). El aporte igual aterriza. */
+async function sinLosDePrueba(admin: Admin, notis: Noti[]): Promise<Noti[]> {
+  if (!notis.length) return notis;
+  const tokens = [...new Set(notis.map((n) => n.token))];
+  const { data, error } = await admin.from("drive_upload_links").select("token").in("token", tokens).eq("prueba", true);
+  // Si no se pudo mirar, se avisa como siempre (mejor un correo de más que
+  // tragarse el aviso de contenido real).
+  if (error) throw new Error(error.message);
+  const deprueba = new Set(((data ?? []) as Array<{ token: string }>).map((r) => r.token));
+  return notis.filter((n) => !deprueba.has(n.token));
+}
+
 /** CAMPANA (Alvaro, 10/11): cuando el contenido de una modelo ATERRIZA en el
  *  Drive, UN aviso por link y por tanda a:
  *    · quien mandó el link → con el enlace directo a la carpeta;
@@ -554,6 +568,7 @@ Deno.serve(async (req: Request) => {
   let campana = 0;
   let ganados: Noti[] = [];
   try { ganados = await reclamarAvisos(admin, notis); } catch (e) { errores.push(`reclamar: ${(e as Error).message}`); }
+  try { ganados = await sinLosDePrueba(admin, ganados); } catch (e) { errores.push(`prueba: ${(e as Error).message}`); }
   try { avisos = await avisarContenidoNuevo(admin, ganados); } catch (e) { errores.push(`aviso: ${(e as Error).message}`); }
   try { campana = await avisarCampana(admin, ganados); } catch (e) { errores.push(`campana: ${(e as Error).message}`); }
 
