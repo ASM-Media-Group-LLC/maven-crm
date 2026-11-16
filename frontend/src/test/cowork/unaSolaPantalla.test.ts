@@ -9,6 +9,10 @@ const fuentes = (import.meta as unknown as {
   glob: (p: string, o: Record<string, unknown>) => Record<string, string>;
 }).glob("/frontend/src/pages/cowork/CoworkHostDashboard.tsx", { query: "?raw", import: "default", eager: true });
 const tablero = Object.values(fuentes)[0] ?? "";
+const fuentesLlamada = (import.meta as unknown as {
+  glob: (p: string, o: Record<string, unknown>) => Record<string, string>;
+}).glob("/frontend/src/pages/messenger/videocall/LiveKitCallView.tsx", { query: "?raw", import: "default", eager: true });
+const llamada = Object.values(fuentesLlamada)[0] ?? "";
 
 describe("la pantalla del Hub", () => {
   it("avisa a quien escucha y se olvida al soltarla", () => {
@@ -46,5 +50,23 @@ describe("el tablero del supervisor no abre otra pantalla", () => {
   it("sin «Pantalla a todas» y sin segundo compartir dentro de la sala", () => {
     expect(tablero).toMatch(/\{!unaSolaPantalla && \(/);
     expect(tablero).toMatch(/hideScreenShare=\{unaSolaPantalla && !activeMeetId\}/);
+  });
+});
+
+// SIN HUECOS (Alvaro, 16/11/2026: «esto es el monitoreo y punto»).
+describe("el supervisor no se escapa de Argos", () => {
+  it("se leyó la llamada", () => {
+    expect(llamada.length).toBeGreaterThan(1000);
+  });
+  it("en el Hub nadie ve su pantalla: solo la sala donde habla", () => {
+    expect(tablero).toMatch(/pantallaSoloParaMi: vigilarAnfitrion/);
+    expect(llamada).toMatch(/setTrackSubscriptionPermissions\(false,/);
+  });
+  it("entrar a una sala no calla a Argos", () => {
+    expect(tablero).toMatch(/sinLatidoDeLlamada=\{unaSolaPantalla\}/);
+    expect(llamada).toMatch(/if \(supervisorEncuadre \|\| sinLatidoDeLlamada\) return;/);
+  });
+  it("no se le pide pantalla en cada sala", () => {
+    expect(tablero).not.toMatch(/unaPantalla\.faltaHub/);
   });
 });

@@ -92,6 +92,12 @@ interface LiveKitCallViewProps {
   /** La pantalla que esta persona está compartiendo en la llamada (null si no
    *  comparte). El tablero de Cowork la reenvía a una sala sin pedir otra. */
   onLocalScreenTrack?: (track: MediaStreamTrack | null) => void;
+  /** La pantalla que comparto aquí no la ve nadie de esta llamada (Argos sí la
+   *  usa). El Supervisor Hub: su pantalla va solo a la sala donde habla. */
+  pantallaSoloParaMi?: boolean;
+  /** No cuenta como «llamada de Maven» para callar a Argos: la sala en la que
+   *  entra el supervisor no le quita la vigilancia del Hub. */
+  sinLatidoDeLlamada?: boolean;
   // Silenciar TODO el audio entrante de esta llamada SOLO para mí (los demás
   // siguen hablando y escuchándose entre sí; mi micro tampoco se toca). Se hace
   // con setVolume(0) de LiveKit sobre cada participante remoto: cubre tanto los
@@ -140,7 +146,7 @@ function usePunteroGrueso(): boolean {
   return grueso;
 }
 
-export default function LiveKitCallView({ roomName, displayName, callDisplayName, isAdmin = false, onLeave, initialMicOn = true, initialCamOn = true, initialScreenShareOn = false, initialAudioDeviceId, initialVideoDeviceId, initialAudioOutputDeviceId, initialBackgroundEffect = "none", hideShareLink, hideScreenShare, hideLeaveButton, leaveLabel, leaveIcon, suppressLeaveToast, compact, autoPip = true, autoLeaveOnEmpty, getToken, onMediaStateChange, onFaceStateChange, supervisorEncuadre, onLocalScreenTrack, incomingAudioMuted, roomSwitcher, recording, shareLink: shareLinkProp, hideEndForAll, controlesExtra, sinVideoAjeno = false }: LiveKitCallViewProps) {
+export default function LiveKitCallView({ roomName, displayName, callDisplayName, isAdmin = false, onLeave, initialMicOn = true, initialCamOn = true, initialScreenShareOn = false, initialAudioDeviceId, initialVideoDeviceId, initialAudioOutputDeviceId, initialBackgroundEffect = "none", hideShareLink, hideScreenShare, hideLeaveButton, leaveLabel, leaveIcon, suppressLeaveToast, compact, autoPip = true, autoLeaveOnEmpty, getToken, onMediaStateChange, onFaceStateChange, supervisorEncuadre, onLocalScreenTrack, pantallaSoloParaMi, sinLatidoDeLlamada, incomingAudioMuted, roomSwitcher, recording, shareLink: shareLinkProp, hideEndForAll, controlesExtra, sinVideoAjeno = false }: LiveKitCallViewProps) {
   // Lista de salas del navegador (solo Cowork supervisor+): estado del popup.
   const [salasAbiertas, setSalasAbiertas] = useState(false);
   const lk = useLiveKit();
@@ -531,6 +537,33 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
   onLocalScreenTrackRef.current = onLocalScreenTrack;
   useEffect(() => { onLocalScreenTrackRef.current?.(localScreenTrack); }, [localScreenTrack]);
   useEffect(() => () => { onLocalScreenTrackRef.current?.(null); }, []);
+  // UNA SOLA PANTALLA (Alvaro, 16/11/2026): en el Supervisor Hub la pantalla se
+  // publica (Argos la necesita y así se pide pantalla completa) pero nadie del
+  // Hub puede suscribirse a ella; solo la ve la sala donde el supervisor habla,
+  // por el clon que manda el tablero. Se recalcula cuando entra alguien o cambia
+  // lo que publico.
+  const salaLista = lk.connectionState === ConnectionState.Connected;
+  useEffect(() => {
+    if (!pantallaSoloParaMi || !salaLista) return;
+    const room = lk.getRoom();
+    if (!room) return;
+    const aplicar = () => {
+      const lp = room.localParticipant;
+      const permitidas = Array.from(lp.trackPublications.values())
+        .filter((p) => p.source !== Track.Source.ScreenShare && p.source !== Track.Source.ScreenShareAudio)
+        .map((p) => p.trackSid);
+      lp.setTrackSubscriptionPermissions(false, Array.from(room.remoteParticipants.values()).map((rp) => ({
+        participantIdentity: rp.identity, allowAll: false, allowedTrackSids: permitidas,
+      })));
+    };
+    aplicar();
+    const eventos = [RoomEvent.ParticipantConnected, RoomEvent.LocalTrackPublished, RoomEvent.LocalTrackUnpublished] as const;
+    eventos.forEach((e) => room.on(e, aplicar));
+    return () => {
+      eventos.forEach((e) => room.off(e, aplicar));
+      try { room.localParticipant.setTrackSubscriptionPermissions(true); } catch { /* ya colgó */ }
+    };
+  }, [pantallaSoloParaMi, salaLista, lk]);
   // La lista se sigue usando para DIBUJAR (el tile de pantalla), que es su
   // trabajo. Para decidir si se le reclama a alguien, manda el estado real.
   const localScreenShare = compartiendoReal;
@@ -683,7 +716,7 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
   // en una llamada de Maven es trabajo, no una ausencia que reclamar. Cross-
   // pestaña a propósito: /call/... y Meet abren en OTRA pestaña.
   useEffect(() => {
-    if (supervisorEncuadre) return;
+    if (supervisorEncuadre || sinLatidoDeLlamada) return;
     latirEnLlamada();
     const id = window.setInterval(() => latirEnLlamada(), LATIDO_LLAMADA_MS);
     // También en el servidor: el vigía «fuera de Cowork» no cuenta como salida
@@ -691,7 +724,7 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
     latirLlamadaEnServidor(supabase, roomName);
     const idServidor = window.setInterval(() => latirLlamadaEnServidor(supabase, roomName), LATIDO_SERVIDOR_MS);
     return () => { window.clearInterval(id); window.clearInterval(idServidor); salirDeLlamada(); salirLlamadaEnServidor(supabase); };
-  }, [supervisorEncuadre, roomName]);
+  }, [supervisorEncuadre, sinLatidoDeLlamada, roomName]);
   // En Cowork la pantalla compartida es la mitad del trabajo: sin ella se ve la
   // cara pero no QUÉ está haciendo la persona.
   useScreenShareNudge(localScreenShare, !!supervisorEncuadre && conSalaViva);
