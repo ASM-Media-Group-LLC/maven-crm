@@ -31,6 +31,18 @@ imprescindible.
 
 ## Dónde vive
 
+> ⚠️ **16/11/2026 — se mudó.** El servidor `217.216.95.7` dejó de ser de Maven:
+> ahí ahora corre otra cosa (un servidor de juego detrás de Caddy) y el Dokploy
+> ya no existe. Ese día Documentos, Hojas de cálculo y Presentaciones dejaron de
+> abrir. El editor se levantó en el servidor de ASM **`195.26.254.111`** (el de
+> las llamadas), en `/opt/maven-oficina` (docker compose, `cpus: 4`,
+> `mem_limit: 8g`, puerto `127.0.0.1:8085`), detrás del Caddy de
+> `/opt/maven-livekit` con la dirección `https://oficina.195-26-254-111.nip.io`.
+> El `JWT_SECRET` vive en `/opt/maven-oficina/.env` y se lleva a Supabase con
+> `.github/workflows/secretos-oficina.yml`. Lo de abajo es la historia del
+> servidor viejo.
+
+
 La suite es lo único pesado de todo Maven, y la máquina de siempre está **al 62%
 de CPU** con `whisper` llevándose 4 de los 8 núcleos al transcribir los audios
 del bot. Va en otra máquina, con **su propio Dokploy**:
