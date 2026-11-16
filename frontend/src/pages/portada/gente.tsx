@@ -60,6 +60,9 @@ const FOTO: Record<Seed, string> = {
   sofia: "/portada/caras/cara-08.jpg",
 };
 
+/** La ruta de la foto de cada persona (la misma que usa <Cara>). */
+export const FOTO_DE = (seed: Seed): string => `${FOTO[seed]}?v=3`;
+
 /** Una cara: la foto de oficina de esa persona inventada. `alt=""` a propósito:
  *  es decorativa, el nombre va en el texto de al lado. La clase `cara-foto` le
  *  da `object-fit: cover`. Si la foto no carga, cae a la silueta neutra. */

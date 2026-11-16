@@ -6,7 +6,7 @@ import "./portada.css";
 import "./oficinaVirtual.css";
 
 import { Cara, nombreDe, type Seed } from "./gente";
-import Cowork from "./secciones/Cowork";
+import CoworkReal from "./secciones/CoworkReal";
 import PedirDemo from "./secciones/PedirDemo";
 
 // LA PORTADA DE MAVEN · ruta pública `/`.
@@ -175,12 +175,14 @@ export default function Portada() {
         </div>
       </section>
 
-      {/* Cowork como se ve DE VERDAD: el tablero de salas del supervisor (no
-          una grilla de caras, que sería una videollamada). Va con sus azules:
-          los tokens de esta portada pintan --azul de verde para el botón. */}
-      <div className="ov-azul">
-        <Cowork />
-      </div>
+      <section className="ov-sec" id="cowork">
+        <div className="wrap">
+          <span className="ov-etiqueta">Cowork</span>
+          <h2 className="ov-h2">Todo tu equipo, <span className="ov-gris">en una sola vista.</span></h2>
+          {/* Copia del tablero del supervisor de producción (CoworkReal.tsx). */}
+          <CoworkReal />
+        </div>
+      </section>
 
       <section className="ov-sec" id="control">
         <div className="wrap">
