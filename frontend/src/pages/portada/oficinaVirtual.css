@@ -129,3 +129,9 @@
 @media (prefers-reduced-motion: reduce) {
   .pt.ov .ov-punto { animation: none; }
 }
+
+/* El tablero de Cowork (secciones/Cowork.tsx) conserva el azul de Maven. */
+.pt.ov .ov-azul {
+  --azul: #0a84ff; --azul-claro: #4fa8ff;
+  --azul-rgb: 10, 132, 255; --azul-claro-rgb: 79, 168, 255; --sobre-azul: #ffffff;
+}
