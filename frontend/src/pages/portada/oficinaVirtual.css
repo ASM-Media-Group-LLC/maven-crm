@@ -43,7 +43,9 @@
   border: 1px solid rgba(255,255,255,.1); font: 500 12px/1 "JetBrains Mono", monospace; color: #8f9ab0;
 }
 .pt.ov .ov-titulo {
-  margin: 26px 0 0; font-size: clamp(44px, 6vw, 64px); line-height: 1.02; color: #39ff8e; white-space: nowrap;
+  margin: 26px 0 0; font-size: clamp(44px, 6vw, 64px); line-height: 1.02; white-space: nowrap;
+  /* Verde más apagado que el del botón (Alvaro, 16/11: «menos intenso»). */
+  color: #5fd394;
 }
 .pt.ov .ov-remate { margin: 14px 0 0; font: 500 clamp(20px, 2.4vw, 26px)/1.25 Sora, sans-serif; letter-spacing: -.02em; color: #ffffff; }
 .pt.ov .ov-bajada { margin: 22px 0 0; max-width: 440px; font-size: 17px; color: #8f9ab0; }
