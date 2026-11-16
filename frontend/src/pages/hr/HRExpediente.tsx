@@ -21,6 +21,7 @@ import { a12, rango12 } from "@/lib/horaBogota";
 import { ClipsDelDia } from "@/components/hr/ClipsDelDia";
 import { AvisosDeArgos } from "@/components/hr/AvisosDeArgos";
 import { TarjetaArgos } from "@/components/hr/TarjetaArgos";
+import { GraciaDelDia } from "@/components/hr/GraciaDelDia";
 import { useDisenoPulido } from "@/hooks/useDisenoPulido";
 import { Mail } from "lucide-react";
 
@@ -1017,6 +1018,10 @@ export default function HRExpediente() {
       {/* Argos como MANAGER del día: lo PRIMERO, juzga el día con criterio
           (Alvaro, 09/11). Reemplaza las barras abiertas de pantalla/cámara. */}
       <TarjetaArgos nombre={nombre} dia={dia} horario={expediente?.horario ?? { entrada: null, salida: null }} />
+
+      {/* Minutos de gracia del turno (Alvaro, 16/11): cuánto se pagó, cuánto se
+          descontó, y RR. HH. puede devolver minutos. */}
+      {userId && <GraciaDelDia userId={userId} fecha={dia.fecha} />}
 
       {/* TODO EL DÍA, justo debajo de Argos (Alvaro, 13/11/2026: «no puedo ver los
           pantallazos de todo el día»): todas las fotos por hora, sin tope. */}

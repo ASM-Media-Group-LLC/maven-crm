@@ -13,6 +13,7 @@ import { useCoworkMediaPresence, salirDePresencia } from "@/hooks/useCoworkMedia
 import { iniciarLatido, actualizarLatido, detenerLatido, suscribirReloj, leerReloj, alQuedarSinSala } from "@/lib/coworkLatido";
 import type { ConexionSala } from "@/lib/coworkTiempoRegla";
 import RelojCowork from "./RelojCowork";
+import GraciaCowork from "./GraciaCowork";
 import { usePestanaPrincipal } from "@/hooks/usePestanaPrincipal";
 import { esEstadoSupervisor, type EstadoSupervisor } from "@/lib/pausaSupervisor";
 import SupervisorEnPausa from "@/pages/cowork/SupervisorEnPausa";
@@ -905,6 +906,9 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
               vista, corriendo o detenido con el motivo. En el teléfono, solo el número. */}
           <RelojCowork className="hidden md:inline-flex" />
           <RelojCowork compacto className="md:hidden" />
+          {/* Minutos de gracia (15 sin pantalla y 15 sin cámara por turno): cuánto le queda. */}
+          <GraciaCowork className="hidden lg:inline-flex" />
+          <GraciaCowork compacto className="lg:hidden" />
         </div>
 
         {/* Desktop actions */}

@@ -107,6 +107,13 @@ jobs:
         if: steps.cambios.outputs.correr == 'true'
         run: deno test --allow-read supabase/functions/_shared/aporte-y-espacio.test.ts
 
+      # Minutos de gracia (Alvaro, 16/11): el correo del descuento del día dice
+      # cuánto se conectó, cuánto se paga y cuánto se descuenta; en ensayo, que no
+      # se aplica; y la corrección cuando RR. HH. devuelve minutos.
+      - name: Guard — correo del descuento del día
+        if: steps.cambios.outputs.correr == 'true'
+        run: deno test --allow-read supabase/functions/_shared/correo-gracia.test.ts
+
       - name: Tipos — mail-fetch
         if: steps.cambios.outputs.correr == 'true'
         run: deno check supabase/functions/mail-fetch/index.ts supabase/functions/mail-fetch/programados.test.ts supabase/functions/mail-fetch/reacciones.test.ts

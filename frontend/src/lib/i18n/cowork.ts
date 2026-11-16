@@ -732,6 +732,36 @@ export const cowork = {
   "cowork.avisar.sit.generalLlamame": { es: "Escríbeme o llámame cuando puedas", en: "Message or call me when you can" },
   "cowork.avisar.sit.generalBuenTrabajo": { es: "Buen trabajo, sigue así", en: "Good work, keep it up" },
 
+  // ── Minutos de gracia (Alvaro, 16/11): 15 sin pantalla y 15 sin cámara por turno ──
+  "cowork.gracia.quedan": { es: "Quedan {p} min de pantalla · {c} de cámara", en: "{p} min of screen · {c} of camera left" },
+  "cowork.gracia.quedanCorto": { es: "{p} · {c} min", en: "{p} · {c} min" },
+  "cowork.gracia.descuento": { es: "Descuento {d}", en: "Deduction {d}" },
+  "cowork.gracia.descuentoCorto": { es: "−{d}", en: "−{d}" },
+  "cowork.gracia.abrir": { es: "Ver tus minutos de gracia de hoy", en: "See your grace minutes for today" },
+  "cowork.gracia.titulo": { es: "Tus minutos de gracia de hoy", en: "Your grace minutes today" },
+  "cowork.gracia.regla": {
+    es: "Cada turno tiene {gp} min sin compartir pantalla y {gc} min sin cámara. Lo que pasa de ahí no se paga.",
+    en: "Each shift has {gp} min without sharing your screen and {gc} min with the camera off. Anything beyond that is not paid.",
+  },
+  "cowork.gracia.ensayo": { es: "Ensayo: esta semana no se descuenta", en: "Trial: nothing is deducted this week" },
+  "cowork.gracia.sinPantalla": { es: "Sin compartir pantalla", en: "Not sharing screen" },
+  "cowork.gracia.sinCamara": { es: "Sin cámara", en: "Camera off" },
+  "cowork.gracia.deGracia": { es: "{u} de {g} min", en: "{u} of {g} min" },
+  "cowork.gracia.agotada": { es: "Se acabó: cada minuto más se descuenta", en: "Used up: every extra minute is deducted" },
+  "cowork.gracia.conectado": { es: "Conectado", en: "Connected" },
+  "cowork.gracia.pausa": { es: "En pausa", en: "On break" },
+  "cowork.gracia.aPagar": { es: "A pagar", en: "To be paid" },
+  "cowork.gracia.descontado": { es: "Descuento", en: "Deduction" },
+  "cowork.gracia.devueltos": { es: "RR. HH. te devolvió {n} min", en: "HR gave you back {n} min" },
+  "cowork.gracia.correo": {
+    es: "Si hay descuento, al cerrar el turno te llega un correo con el detalle.",
+    en: "If there is a deduction, you get an email with the details when your shift ends.",
+  },
+  "cowork.gracia.ayuda": {
+    es: "Si se te daña la cámara o algo falla, avísale a RR. HH.: puede devolverte minutos.",
+    en: "If your camera breaks or something fails, tell HR: they can give you minutes back.",
+  },
+
   // Monitor de cámara de RRHH: cartelito para la persona monitoreada.
   "cowork.monitorActivo": { es: "Monitor activo", en: "Monitor on" },
 } as const satisfies Record<string, { es: string; en: string }>;
