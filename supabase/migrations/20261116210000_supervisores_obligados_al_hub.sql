@@ -12,6 +12,7 @@
 -- Respaldo de quiénes eran libres, por si hay que volver atrás.
 create table if not exists public.cowork_libres_respaldo_20261116 as
   select * from public.cowork_libres;
+alter table public.cowork_libres_respaldo_20261116 enable row level security;
 
 delete from public.cowork_libres
  where user_id in (
