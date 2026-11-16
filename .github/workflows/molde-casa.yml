@@ -58,7 +58,8 @@ jobs:
           sed -i 's/^major_version = .*/major_version = 17/' supabase/config.toml
           supabase link --project-ref "$PROJECT_REF" </dev/null
           supabase db dump --linked -f "$GITHUB_WORKSPACE/molde/esquema.sql"
-          wc -c "$GITHUB_WORKSPACE/molde/esquema.sql"
+          # Sin las conexiones de Kash a su sistema externo ni sus contraseñas.
+          "$GITHUB_WORKSPACE/infra/casas/sanear-molde.sh" "$GITHUB_WORKSPACE/molde/esquema.sql"
 
       - name: Levantar una base vacía (Postgres 17 de Supabase)
         run: |

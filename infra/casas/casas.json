@@ -1,0 +1,15 @@
+{
+  "_nota": "Tren de agencias (15/11/2026). Kash NO está en esta lista a propósito: su base (lsagslbkliprespbyhts) no se toca nunca. Cada casa es una base de Supabase de una sola agencia.",
+  "kash_no_tocar": "lsagslbkliprespbyhts",
+  "torre": { "ref": "wvzzabdkbafaerijklyi", "nombre": "maven-torre" },
+  "casas": [
+    {
+      "id": "prueba",
+      "nombre": "Agencia de prueba",
+      "ref": "ezeigddgkaemxpshghmu",
+      "tenant_id": "d7100b28-8629-4f77-b6c6-6c4592c481e9",
+      "slug": "agencia-prueba",
+      "es_prueba": true
+    }
+  ]
+}
