@@ -18,7 +18,15 @@ export function useMiGracia(activo = true): { gracia: GraciaTurno | null; fallo:
     if (!activo) return;
     let vivo = true;
     const leer = async () => {
-      const { data, error } = await sinTipar.rpc("mi_gracia_hoy");
+      // Si la consulta revienta (sin red, o una conexión simulada en pruebas),
+      // el contador no rompe Cowork: se marca el fallo y se reintenta al minuto.
+      let data: unknown = null;
+      let error: unknown = null;
+      try {
+        ({ data, error } = await sinTipar.rpc("mi_gracia_hoy"));
+      } catch (e) {
+        error = e;
+      }
       if (!vivo) return;
       if (error) { setFallo(true); return; }
       setFallo(false);
@@ -65,6 +73,7 @@ export function useGraciaDe(userId: string | undefined, fecha: string): EstadoGr
     let vivo = true;
     setCargando(true);
     (async () => {
+     try {
       const { data: sesion } = await supabase.auth.getUser();
       const [g, d, p] = await Promise.all([
         sinTipar.rpc("argos_gracia_de", { _uid: userId, _turno: fecha }),
@@ -79,6 +88,12 @@ export function useGraciaDe(userId: string | undefined, fecha: string): EstadoGr
         .map((x) => ({ ...x, quien: x.quien?.full_name ?? null })));
       setPuedeDar(!p.error && p.data === true);
       setCargando(false);
+     } catch {
+      // Un fallo no es «sin datos»: la tarjeta dice que no cargó y ofrece reintentar.
+      if (!vivo) return;
+      setGracia(null);
+      setCargando(false);
+     }
     })();
     return () => { vivo = false; };
   }, [userId, fecha, vuelta]);
