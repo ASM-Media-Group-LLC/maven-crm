@@ -110,8 +110,9 @@
   background: linear-gradient(180deg, rgba(255,255,255,.035), rgba(255,255,255,.012));
 }
 .pt.ov .ov-ico {
-  width: 40px; height: 40px; border-radius: 12px; display: grid; place-items: center; color: #ffffff;
-  border: 1px solid rgba(255,255,255,.1); background: rgba(255,255,255,.03);
+  width: 40px; height: 40px; border-radius: 12px; display: grid; place-items: center;
+  /* Íconos en el verde suave del título (Alvaro, 16/11). */
+  color: #5fd394; border: 1px solid rgba(95,211,148,.28); background: rgba(95,211,148,.08);
 }
 .pt.ov .ov-modulo h3, .pt.ov .ov-razon h3 { margin: 0; font-size: 19px; }
 .pt.ov .ov-modulo p, .pt.ov .ov-razon p { margin: 0; font-size: 15px; color: #8f9ab0; }
