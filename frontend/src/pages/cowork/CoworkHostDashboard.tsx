@@ -55,6 +55,7 @@ import type { CoworkMeet } from "@/hooks/useCoworkSession";
 import PausaSupervisorBoton from "./PausaSupervisorBoton";
 import { leerPausaSupervisor, suscribirPausaSupervisor, esEstadoSupervisor } from "@/lib/pausaSupervisor";
 import { iniciarLatido, actualizarLatido, detenerLatido } from "@/lib/coworkLatido";
+import { fijarPantallaDelHub, pantallaDelHub, suscribirPantallaDelHub } from "@/lib/pantallaDelHub";
 import { marcarPausa } from "@/lib/coworkPausa";
 import type { useCoworkSession, CoworkRoom } from "@/hooks/useCoworkSession";
 import { useUserRole } from "@/hooks/useUserRole";
@@ -631,6 +632,22 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
   const camArmed = Object.values(roomCam).some(Boolean);
   const screenArmed = Object.values(roomScreen).some(Boolean);
 
+  // UNA SOLA PANTALLA (Alvaro, 16/11/2026): «Luis, Vanessa, Breyner y Daniel,
+  // cuando estén en un cowork, que te haga compartir la pantalla solo en el que
+  // estás hablando o con la persona que estás hablando; solo una compartida de
+  // pantalla, no varias.» Para el anfitrión que no es admin ni dueño:
+  //   · no se pide otra pantalla: se usa la que ya comparte en el Hub (la de
+  //     Argos) y se reenvía un clon;
+  //   · ese clon va a UNA sala: la sala en la que entró, o si no, la última a la
+  //     que le dio «Hablar». Si no le habla a nadie, no va a ninguna;
+  //   · no hay «Pantalla a todas».
+  const unaSolaPantalla = vigilarAnfitrion;
+  const [pantallaHub, setPantallaHub] = useState<MediaStreamTrack | null>(() => pantallaDelHub());
+  useEffect(() => suscribirPantallaDelHub(setPantallaHub), []);
+  // Salas a las que les fue dando «Hablar», en orden; la última manda.
+  const pilaHablar = useRef<string[]>([]);
+  const baseDePantalla = unaSolaPantalla ? pantallaHub : screenBaseTrack;
+
   useEffect(() => {
     supabase.auth.getUser().then(async ({ data }) => {
       if (data.user) {
@@ -803,7 +820,8 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
   // misma pantalla va a todas las salas activadas). "Dejar de compartir" desde
   // el navegador dispara `ended` → se desarma todo, sin botones mintiendo.
   useEffect(() => {
-    if (!screenArmed) return;
+    // El supervisor no captura aparte: su pantalla es la del Hub (ver arriba).
+    if (!screenArmed || unaSolaPantalla) return;
     let cancelled = false;
     let track: MediaStreamTrack | null = null;
     (async () => {
@@ -829,7 +847,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
       setScreenBaseTrack(null);
       try { track?.stop(); } catch { /* noop */ }
     };
-  }, [screenArmed]);
+  }, [screenArmed, unaSolaPantalla]);
 
   const enterRoom = useCallback((roomId: string) => {
     const room = cowork.rooms.find(r => r.id === roomId);
@@ -850,6 +868,20 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
     // Cambiar de sala = moverse: la anterior se cuelga (no se puede estar en dos salas).
     if (switching) toast.info(traducir("cowork.host.movedTo", { room: room.name }));
   }, [cowork.rooms, activeRoomId, activeMeetId, terminarMeetGrupal]);
+
+  // A qué sala va la pantalla del supervisor: la sala en la que entró o, si
+  // está en el tablero, la última a la que le dio «Hablar». Una sola.
+  useEffect(() => {
+    if (!unaSolaPantalla) return;
+    pilaHablar.current = pilaHablar.current.filter((id) => roomMic[id]);
+    const destino = activeRoomId && !activeMeetId
+      ? activeRoomId
+      : pilaHablar.current[pilaHablar.current.length - 1] ?? null;
+    setRoomScreen(destino ? { [destino]: true } : {});
+    if (destino && !pantallaDelHub()) {
+      toast.info(traducir("cowork.host.unaPantalla.faltaHub"), { id: "una-pantalla" });
+    }
+  }, [unaSolaPantalla, roomMic, activeRoomId, activeMeetId]);
 
   // ── Meet grupal ──────────────────────────────────────────────────────────
   // El supervisor entra al meet como a una sala más (misma vista a pantalla
@@ -926,6 +958,8 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
       // Los callbacks van a funciones de módulo: siguen vivos con el Hub flotando
       // en otra sección.
       supervisorEncuadre: vigilarAnfitrion,
+      // Su pantalla del Hub es la única: el tablero la reenvía a la sala donde habla.
+      onLocalScreenTrack: fijarPantallaDelHub,
       onFaceStateChange: (w) => actualizarLatido({ faceState: w.state, faceSince: w.since }),
       onMediaStateChange: (m) =>
         actualizarLatido({ camOn: m.camOn, screenShareOn: m.screenShareOn, conexionSala: m.conexionSala ?? null }),
@@ -1584,7 +1618,10 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
         title={broadcastFor(room.id)
           ? (micCaido ? t("cowork.host.room.micDownHint") : t("cowork.host.room.talkingHint"))
           : t("cowork.host.room.talkHint")}
-        onClick={() => setRoomMic((m) => ({ ...m, [room.id]: !(m[room.id] ?? false) }))}
+        onClick={() => {
+          if (!(roomMic[room.id] ?? false)) pilaHablar.current = [...pilaHablar.current.filter((id) => id !== room.id), room.id];
+          setRoomMic((m) => ({ ...m, [room.id]: !(m[room.id] ?? false) }));
+        }}
       />
       <BotonSala
         grande={grande}
@@ -1600,7 +1637,10 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
         icono={screenFor(room.id) ? ScreenShare : ScreenShareOff}
         etiqueta={grande ? t("cowork.host.screen") : undefined}
         title={screenFor(room.id) ? t("cowork.host.room.screenOnHint") : t("cowork.host.room.screenHint")}
-        onClick={() => setRoomScreen((m) => ({ ...m, [room.id]: !(m[room.id] ?? false) }))}
+        // El supervisor comparte en una sola sala: prenderla aquí la apaga en las demás.
+        onClick={() => setRoomScreen((m) => unaSolaPantalla
+          ? ((m[room.id] ?? false) ? {} : { [room.id]: true })
+          : { ...m, [room.id]: !(m[room.id] ?? false) })}
       />
     </>
   );
@@ -2221,6 +2261,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                   {camaraATodas ? <Video className="h-3.5 w-3.5" /> : <VideoOff className="h-3.5 w-3.5" />}
                   <span className="hidden sm:inline">{t("cowork.host.camera")}</span>
                 </Button>
+                {!unaSolaPantalla && (
                 <Button
                   size="sm"
                   variant={pantallaATodas ? "default" : "outline"}
@@ -2233,6 +2274,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                   {pantallaATodas ? <ScreenShare className="h-3.5 w-3.5" /> : <ScreenShareOff className="h-3.5 w-3.5" />}
                   <span className="hidden sm:inline">{t("cowork.host.screen")}</span>
                 </Button>
+                )}
                 <Button
                   size="sm"
                   variant="outline"
@@ -2337,7 +2379,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                     camOn={camFor(room.id)}
                     camBaseTrack={camBaseTrack}
                     screenOn={screenFor(room.id)}
-                    screenBaseTrack={screenBaseTrack}
+                    screenBaseTrack={baseDePantalla}
                     // Apagado también cuando SU hoja está abierta, sin mirar
                     // isMobile: si el viewport cruza el breakpoint con la hoja
                     // abierta, dos monitores de la misma sala comparten
@@ -2682,6 +2724,9 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
               // sala, como siempre, apagado.
               initialMicOn={!!activeMeetId}
               initialCamOn={!!activeMeetId}
+              // El supervisor no abre otra pantalla dentro de la sala: ahí ya le
+              // llega la del Hub (una sola compartida). En el meet grupal sí puede.
+              hideScreenShare={unaSolaPantalla && !activeMeetId}
               getToken={getActiveRoomToken}
               leaveLabel={activeMeetId ? t("cowork.host.endMeet") : t("cowork.host.hangUp")}
               // Flechas + lista para moverse entre las SALAS de esta sesión sin
@@ -2908,7 +2953,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                       camOn={camFor(room.id)}
                       camBaseTrack={camBaseTrack}
                       screenOn={screenFor(room.id)}
-                      screenBaseTrack={screenBaseTrack}
+                      screenBaseTrack={baseDePantalla}
                       enabled={true}
                     />
                   </div>

@@ -89,6 +89,9 @@ interface LiveKitCallViewProps {
   /** Cowork: avisarle a la propia persona cuando no se le ve. Va acá y no en la
    *  página para que siga funcionando en la ventanita flotante. */
   supervisorEncuadre?: boolean;
+  /** La pantalla que esta persona está compartiendo en la llamada (null si no
+   *  comparte). El tablero de Cowork la reenvía a una sala sin pedir otra. */
+  onLocalScreenTrack?: (track: MediaStreamTrack | null) => void;
   // Silenciar TODO el audio entrante de esta llamada SOLO para mí (los demás
   // siguen hablando y escuchándose entre sí; mi micro tampoco se toca). Se hace
   // con setVolume(0) de LiveKit sobre cada participante remoto: cubre tanto los
@@ -137,7 +140,7 @@ function usePunteroGrueso(): boolean {
   return grueso;
 }
 
-export default function LiveKitCallView({ roomName, displayName, callDisplayName, isAdmin = false, onLeave, initialMicOn = true, initialCamOn = true, initialScreenShareOn = false, initialAudioDeviceId, initialVideoDeviceId, initialAudioOutputDeviceId, initialBackgroundEffect = "none", hideShareLink, hideScreenShare, hideLeaveButton, leaveLabel, leaveIcon, suppressLeaveToast, compact, autoPip = true, autoLeaveOnEmpty, getToken, onMediaStateChange, onFaceStateChange, supervisorEncuadre, incomingAudioMuted, roomSwitcher, recording, shareLink: shareLinkProp, hideEndForAll, controlesExtra, sinVideoAjeno = false }: LiveKitCallViewProps) {
+export default function LiveKitCallView({ roomName, displayName, callDisplayName, isAdmin = false, onLeave, initialMicOn = true, initialCamOn = true, initialScreenShareOn = false, initialAudioDeviceId, initialVideoDeviceId, initialAudioOutputDeviceId, initialBackgroundEffect = "none", hideShareLink, hideScreenShare, hideLeaveButton, leaveLabel, leaveIcon, suppressLeaveToast, compact, autoPip = true, autoLeaveOnEmpty, getToken, onMediaStateChange, onFaceStateChange, supervisorEncuadre, onLocalScreenTrack, incomingAudioMuted, roomSwitcher, recording, shareLink: shareLinkProp, hideEndForAll, controlesExtra, sinVideoAjeno = false }: LiveKitCallViewProps) {
   // Lista de salas del navegador (solo Cowork supervisor+): estado del popup.
   const [salasAbiertas, setSalasAbiertas] = useState(false);
   const lk = useLiveKit();
@@ -524,6 +527,10 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
     const id = window.setInterval(mirar, 1000);
     return () => window.clearInterval(id);
   }, [lk]);
+  const onLocalScreenTrackRef = useRef(onLocalScreenTrack);
+  onLocalScreenTrackRef.current = onLocalScreenTrack;
+  useEffect(() => { onLocalScreenTrackRef.current?.(localScreenTrack); }, [localScreenTrack]);
+  useEffect(() => () => { onLocalScreenTrackRef.current?.(null); }, []);
   // La lista se sigue usando para DIBUJAR (el tile de pantalla), que es su
   // trabajo. Para decidir si se le reclama a alguien, manda el estado real.
   const localScreenShare = compartiendoReal;
