@@ -76,3 +76,42 @@ export const REARME_PCT = 75;
 export function nivelesPorAvisar(pct: number, yaAvisados: number[]): number[] {
   return NIVELES_DE_ALERTA.filter((n) => pct >= n && !yaAvisados.includes(n));
 }
+
+// ── Videos grandes (Alvaro, 16/11/2026: hasta 50 GB por archivo) ─────────────
+
+/** Tamaño de cada parte que viaja de Supabase al NAS. */
+export const TAMANO_PARTE = 32 * 1024 * 1024;
+
+/** Partes que le faltan a un aporte para estar entero en el NAS. */
+export function partesQueFaltan(size: number, hechas: number | null | undefined): number {
+  if (!Number.isFinite(size) || size <= 0) return 1;
+  if (size <= TAMANO_PARTE) return 1;
+  return Math.max(0, Math.ceil(size / TAMANO_PARTE) - Math.max(0, hechas ?? 0));
+}
+
+/** Lo que está por terminar va primero: una foto no espera horas detrás de un
+ *  video de 50 GB que se lleva todas las partes de cada ronda. Empate: el más
+ *  viejo primero (el orden en que llegaron). */
+export function ordenarPorLoQueFalta<T extends { size: number | null; nas_parte: number | null }>(aportes: T[]): T[] {
+  return aportes
+    .map((a, i) => ({ a, i, falta: partesQueFaltan(Number(a.size ?? 0), a.nas_parte) }))
+    .sort((x, y) => x.falta - y.falta || x.i - y.i)
+    .map((x) => x.a);
+}
+
+/** Al juntar las partes el NAS lee y escribe el video entero; uno de 20 GB
+ *  tarda minutos, más de lo que el edge espera la respuesta. El NAS lo termina
+ *  igual, así que mientras tanto no se le vuelve a pedir (dos juntadas del
+ *  mismo video gastan el doble de disco y se pisan). Se cuenta lento a
+ *  propósito (30 MB/s) y nunca menos de 10 minutos. */
+export const JUNTAR_MB_POR_SEG = 30;
+export const JUNTAR_MINIMO_MS = 10 * 60_000;
+export function esperaDeJuntar(size: number): number {
+  const seg = Math.ceil(Math.max(0, size) / (JUNTAR_MB_POR_SEG * 1024 * 1024));
+  return Math.max(JUNTAR_MINIMO_MS, seg * 1000);
+}
+export function tocaPedirJuntar(juntandoISO: string | null | undefined, size: number, ahoraMs: number): boolean {
+  if (!juntandoISO) return true;
+  const t = Date.parse(juntandoISO);
+  return !Number.isFinite(t) || ahoraMs - t >= esperaDeJuntar(size);
+}

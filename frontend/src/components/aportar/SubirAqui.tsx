@@ -5,7 +5,8 @@ import type { TranslationKey } from "@/lib/i18n";
 import { subirConTus } from "@/lib/subirConTus";
 import { invocarAporte } from "@/lib/aportar/api";
 import {
-  ESPERA_RETOMAR_MS, estaPausada, minutosRestantes, pesoLegible, seRetomaSola, tocaReportar, velocidadSuavizada,
+  ESPERA_RETOMAR_MS, estaPausada, minutosRestantes, pasaDelTope, pesoLegible, seRetomaSola, TOPE_ARCHIVO_TEXTO, tocaReportar,
+  velocidadSuavizada,
 } from "@/lib/aportar/subidaLarga";
 
 // SUBIR por link (Alvaro, 04/11; separado de PaginaAportar el 10/11 cuando el
@@ -138,10 +139,11 @@ export function SubirAqui({ token, pedirNombre, alSubir }: {
   }
 
   // La razón del fallo, en palabras de la creadora.
-  function razonVisible(etapa: Etapa, err: unknown): string {
+  function razonVisible(etapa: Etapa, err: unknown, peso?: number): string {
     const e = err as { message?: string; originalResponse?: { getStatus?: () => number } } | undefined;
     const status = e?.originalResponse?.getStatus ? e.originalResponse.getStatus() : null;
     const donde = t(NOMBRE_DE_ETAPA[etapa]);
+    if (status === 413) return t("drive.carpeta.razon.muyGrande", { p: peso ? pesoLegible(peso) : "?", tope: TOPE_ARCHIVO_TEXTO });
     if (status && status >= 400) return t("drive.carpeta.razon.status", { s: status, e: donde });
     const msg = (e?.message ?? String(err)).toLowerCase();
     if (msg.includes("failed to fetch") || msg.includes("network")) return t("drive.carpeta.razon.red", { e: donde });
@@ -198,7 +200,7 @@ export function SubirAqui({ token, pedirNombre, alSubir }: {
           await esperarParaRetomar();
           return subirUno(itemsRef.current.find((x) => x.id === it.id) ?? it);
         }
-        marcar(it.id, { estado: "fallo", razonFallo: razonVisible("subida", err) });
+        marcar(it.id, { estado: "fallo", razonFallo: razonVisible("subida", err, it.file.size) });
         bitacora(it, "fallo", { mensaje: mensajeDe(err) });
         return false;
       }
@@ -226,8 +228,17 @@ export function SubirAqui({ token, pedirNombre, alSubir }: {
   function agregar(files: FileList | File[] | null) {
     const lista = files ? Array.from(files) : [];
     if (lista.length === 0) return;
-    const nuevos: Item[] = lista.map((file) => ({ id: crypto.randomUUID(), file, estado: "pendiente", pct: 0, bytes: 0, kbps: null }));
-    setItems((prev) => [...prev, ...nuevos]);
+    // Lo que pasa del tope ni se intenta: se dice por qué de una (antes
+    // rebotaba al rato con un «Error 413» que nadie entendía).
+    const grandes: Item[] = lista.filter((f) => pasaDelTope(f.size)).map((file) => ({
+      id: crypto.randomUUID(), file, estado: "fallo", pct: 0, bytes: 0, kbps: null,
+      razonFallo: t("drive.carpeta.razon.muyGrande", { p: pesoLegible(file.size), tope: TOPE_ARCHIVO_TEXTO }),
+    }));
+    for (const it of grandes) logError(it, "tope", new Error(`pasa del tope de ${TOPE_ARCHIVO_TEXTO}`));
+    const nuevos: Item[] = lista.filter((f) => !pasaDelTope(f.size))
+      .map((file) => ({ id: crypto.randomUUID(), file, estado: "pendiente", pct: 0, bytes: 0, kbps: null }));
+    setItems((prev) => [...prev, ...grandes, ...nuevos]);
+    if (nuevos.length === 0) return;
     // De a uno, para no ahogar la red del celular.
     void (async () => {
       let alguno = false;
