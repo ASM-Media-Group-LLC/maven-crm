@@ -1,8 +1,8 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import {
-  agruparPorLink, llaveDeModelo, nivelesPorAvisar, REARME_PCT, resumenDelDisco, type RaizDelNas,
-  tamanoLegible, textoDelAviso, tocaMuestra,
+  agruparPorLink, llaveDeModelo, nivelesPorAvisar, ordenarPorLoQueFalta, REARME_PCT, resumenDelDisco, type RaizDelNas,
+  TAMANO_PARTE, tamanoLegible, textoDelAviso, tocaMuestra, tocaPedirJuntar,
 } from "../_shared/aporte-y-espacio.ts";
 
 // drive-aporte-nas — mueve los aportes del link público (bucket drive-aportes de
@@ -39,7 +39,7 @@ const AVISO_FROM = Deno.env.get("DRIVE_NAS_AVISO_FROM") ?? (REMITENTE.includes("
 const APP_URL = (Deno.env.get("APP_URL") ?? "https://app.maven-ai.me").replace(/\/+$/, "");
 
 const BUCKET = "drive-aportes";
-const TAMANO_PARTE = 32 * 1024 * 1024; // el NAS rechaza > 95 MB por pedido
+// TAMANO_PARTE (32 MB) viene de _shared: el NAS rechaza > 95 MB por pedido.
 const PARTES_POR_RONDA = Number(Deno.env.get("APORTE_NAS_PARTES") ?? 16); // ~512 MB/ronda
 const APORTES_POR_RONDA = Number(Deno.env.get("APORTE_NAS_LOTE") ?? 25);
 const AVISO_CADA_MIN = Number(Deno.env.get("APORTE_NAS_AVISO_MIN") ?? 60);
@@ -121,10 +121,26 @@ async function conRecibo(
   return rec && rec.op === "recibo" && rec.k === k ? rec : null;
 }
 
+/** ¿El archivo ya está entero en el NAS? (HEAD con permiso de bajar: no lee el
+ *  archivo). El NAS lo pone en su lugar recién al terminar de juntarlo, así que
+ *  si existe con el tamaño justo, está completo. Ante la duda, false. */
+async function yaEstaEnNas(k: string, size: number): Promise<boolean> {
+  try {
+    const r = await fetch(await permisoNas({ op: "get", k }), { method: "HEAD", signal: AbortSignal.timeout(15_000) });
+    await r.body?.cancel().catch(() => {});
+    if (r.status !== 200) return false;
+    const largo = r.headers.get("content-length");
+    return largo === null || Number(largo) === size;
+  } catch {
+    return false;
+  }
+}
+
 interface Aporte {
   id: string; token: string; item_id: string | null; tenant_id: string;
   nombre_archivo: string; storage_path: string; size: number | null; quien: string | null;
   nas_up: string | null; nas_parte: number | null; nas_item_id: string | null;
+  nas_juntando_at: string | null;
 }
 
 /** Un archivo que ACABA de aterrizar en el Drive (para el correo y la campana por tanda). */
@@ -143,7 +159,7 @@ async function finalizar(admin: Admin, a: Aporte, itemId: string, size: number, 
 }
 
 /** Procesa un aporte. Devuelve cuántas "partes" de presupuesto consumió. */
-async function procesar(admin: Admin, a: Aporte, errores: string[], notis: Noti[]): Promise<number> {
+async function procesar(admin: Admin, a: Aporte, errores: string[], notis: Noti[], maxPartes: number): Promise<number> {
   const size = Number(a.size ?? 0);
   if (!Number.isFinite(size) || size <= 0) { errores.push(`${a.id}: size`); return 1; }
 
@@ -180,11 +196,11 @@ async function procesar(admin: Admin, a: Aporte, errores: string[], notis: Noti[
       return 1;
     }
 
-    // 3b) Grande: partes de 32 MB, resumible, hasta PARTES_POR_RONDA por ronda.
+    // 3b) Grande: partes de 32 MB, resumible, hasta maxPartes en esta ronda.
     const total = Math.ceil(size / TAMANO_PARTE);
     let i = Math.max(0, a.nas_parte ?? 0);
     let consumidas = 0;
-    for (; i < total && consumidas < PARTES_POR_RONDA; i++, consumidas++) {
+    for (; i < total && consumidas < maxPartes; i++, consumidas++) {
       const start = i * TAMANO_PARTE;
       const end = Math.min(start + TAMANO_PARTE, size) - 1;
       const bytes = await bajarRango(fuente, start, end);
@@ -195,9 +211,21 @@ async function procesar(admin: Admin, a: Aporte, errores: string[], notis: Noti[
       await admin.from("drive_aportes").update({ nas_parte: i + 1 }).eq("id", a.id);
     }
     if (i >= total) {
-      const rec = await conRecibo(await permisoNas({ op: "completar", k: storageKey(), up, n: total, max: size }), "POST", null, storageKey());
-      if (!rec) { errores.push(`${a.id}: completar`); return consumidas || 1; }
-      await finalizar(admin, a, itemId, size, rec, notis);
+      // Juntar un video de varios GB tarda más de lo que se espera la
+      // respuesta (antes quedaba «subiendo» para siempre aunque el NAS lo
+      // terminaba). Primero: ¿ya quedó armado por un pedido anterior?
+      if (await yaEstaEnNas(storageKey(), size)) {
+        await finalizar(admin, a, itemId, size, "existe", notis);
+        return consumidas || 1;
+      }
+      // Si ya se pidió y el NAS sigue juntando, no se le pide otra vez.
+      if (!tocaPedirJuntar(a.nas_juntando_at, size, Date.now())) return consumidas || 1;
+      await admin.from("drive_aportes").update({ nas_juntando_at: new Date().toISOString() }).eq("id", a.id);
+      const rec = await conRecibo(await permisoNas({ op: "completar", k: storageKey(), up, n: total, max: size }), "POST", null, storageKey())
+        .catch(() => null);
+      if (rec) await finalizar(admin, a, itemId, size, rec, notis);
+      else if (await yaEstaEnNas(storageKey(), size)) await finalizar(admin, a, itemId, size, "existe", notis);
+      else errores.push(`${a.id}: juntando en el NAS (se mira la próxima ronda)`);
     }
     return consumidas || 1;
   } catch (e) {
@@ -503,18 +531,20 @@ Deno.serve(async (req: Request) => {
   } catch (e) { errores.push(`espacio: ${(e as Error).message}`); }
 
   const { data: filas } = await admin.from("drive_aportes")
-    .select("id, token, item_id, tenant_id, nombre_archivo, storage_path, size, quien, nas_up, nas_parte, nas_item_id")
+    .select("id, token, item_id, tenant_id, nombre_archivo, storage_path, size, quien, nas_up, nas_parte, nas_item_id, nas_juntando_at")
     .eq("en_nas", false)
     .order("created_at", { ascending: true })
     .limit(APORTES_POR_RONDA);
-  const aportes = (filas ?? []) as Aporte[];
+  // Lo que está por terminar va primero (una foto no espera detrás de un
+  // video de 50 GB); el video grande se lleva lo que queda de la ronda.
+  const aportes = ordenarPorLoQueFalta((filas ?? []) as Aporte[]);
 
   const notis: Noti[] = [];
   let presupuesto = PARTES_POR_RONDA;
   let tocados = 0;
   for (const a of aportes) {
     if (presupuesto <= 0) break;
-    presupuesto -= await procesar(admin, a, errores, notis);
+    presupuesto -= await procesar(admin, a, errores, notis, presupuesto);
     tocados++;
   }
 

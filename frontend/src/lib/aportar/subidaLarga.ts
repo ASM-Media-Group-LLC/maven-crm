@@ -35,6 +35,15 @@ export function minutosRestantes(bytesRestantes: number, kbps: number | null): n
   return Math.max(1, Math.ceil(segundos / 60));
 }
 
+/** Lo más grande que acepta el link por archivo (Alvaro, 16/11/2026): un video
+ *  4K de 30 min de cámara profesional pesa ~22 GB. Tiene que coincidir con el
+ *  tope del balde drive-aportes y el global de Storage en Supabase. */
+export const TOPE_ARCHIVO_BYTES = 50 * 1024 ** 3;
+export const TOPE_ARCHIVO_TEXTO = "50 GB";
+export function pasaDelTope(bytes: number): boolean {
+  return bytes > TOPE_ARCHIVO_BYTES;
+}
+
 /** Tamaño legible: 389 MB, 1,2 GB. */
 export function pesoLegible(bytes: number): string {
   if (bytes >= 1024 ** 3) return `${(bytes / 1024 ** 3).toFixed(1).replace(".", ",")} GB`;

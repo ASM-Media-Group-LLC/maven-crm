@@ -3,6 +3,7 @@ import { describe, it, expect } from "vitest";
 import {
   velocidadSuavizada, minutosRestantes, pesoLegible, estaPausada, tocaReportar, seRetomaSola,
   rutaDeUrlTus, sePuedeRetomar, PAUSA_MS, REPORTE_MS, REINTENTOS_SOLOS,
+  pasaDelTope, TOPE_ARCHIVO_BYTES, TOPE_ARCHIVO_TEXTO,
 } from "@/lib/aportar/subidaLarga";
 
 const b64url = (s: string) => btoa(s).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
@@ -76,5 +77,21 @@ describe("la ruta real cuando la subida se retoma", () => {
     expect(sePuedeRetomar({ bucketName: "drive-aportes", objectName: "otro/a.mov" }, "drive-aportes", "tok/")).toBe(false);
     expect(sePuedeRetomar({ bucketName: "chat-files", objectName: "tok/a.mov" }, "drive-aportes", "tok/")).toBe(false);
     expect(sePuedeRetomar(null, "drive-aportes", "tok/")).toBe(false);
+  });
+});
+
+describe("el tope por archivo del link de la modelo", () => {
+  const GB = 1024 ** 3;
+  it("es 50 GB y el texto lo dice igual", () => {
+    expect(TOPE_ARCHIVO_BYTES).toBe(50 * GB);
+    expect(TOPE_ARCHIVO_TEXTO).toBe("50 GB");
+  });
+  it("un video 4K de 30 min entra; uno de cine no", () => {
+    expect(pasaDelTope(5 * GB)).toBe(false); // iPhone 4K a 30 cuadros
+    expect(pasaDelTope(12 * GB)).toBe(false); // iPhone 4K a 60 cuadros
+    expect(pasaDelTope(22 * GB)).toBe(false); // cámara profesional
+    expect(pasaDelTope(50 * GB)).toBe(false);
+    expect(pasaDelTope(50 * GB + 1)).toBe(true);
+    expect(pasaDelTope(180 * GB)).toBe(true); // ProRes
   });
 });
