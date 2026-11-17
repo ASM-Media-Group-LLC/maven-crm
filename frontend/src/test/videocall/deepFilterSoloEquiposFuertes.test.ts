@@ -11,6 +11,7 @@ import { describe, it, expect, afterEach, beforeEach, vi } from "vitest";
 // suite corre sin aislar archivos, y otro test puede dejarlo marcado: cada test
 // importa una copia NUEVA del módulo para no heredar ese estado.
 let NUCLEOS_PARA_DEEPFILTER: number;
+let DEEPFILTER_PRENDIDO: boolean;
 let deepFilterPermitido: () => boolean;
 let marcarDeepFilterPesado: () => void;
 beforeEach(async () => {
@@ -23,7 +24,7 @@ beforeEach(async () => {
   Object.defineProperty(navigator, "deviceMemory", { value: 8, configurable: true });
   if (typeof WebAssembly === "undefined") vi.stubGlobal("WebAssembly", {});
   vi.resetModules();
-  ({ NUCLEOS_PARA_DEEPFILTER, deepFilterPermitido, marcarDeepFilterPesado } = await import("@/lib/deepfilter"));
+  ({ NUCLEOS_PARA_DEEPFILTER, DEEPFILTER_PRENDIDO, deepFilterPermitido, marcarDeepFilterPesado } = await import("@/lib/deepfilter"));
 });
 import { estadoDeNC, ncFunciona } from "@/lib/estadoNC";
 
@@ -59,9 +60,12 @@ describe("¿a quién le toca DeepFilterNet?", () => {
       expect(deepFilterPermitido(), `${n} núcleos`).toBe(false);
       vi.restoreAllMocks();
     }
+    // Con 8 o más, solo si DeepFilterNet está prendido. Hoy está APAGADO para
+    // todos (Alvaro, 17/11 08:50: «no sirve el audio, no se escucha, es lento»):
+    // la regla de los núcleos queda lista para cuando se vuelva a prender.
     for (const n of [8, 12, 16]) {
       nucleos(n);
-      expect(deepFilterPermitido(), `${n} núcleos`).toBe(true);
+      expect(deepFilterPermitido(), `${n} núcleos`).toBe(DEEPFILTER_PRENDIDO);
       vi.restoreAllMocks();
     }
   });
@@ -75,7 +79,7 @@ describe("¿a quién le toca DeepFilterNet?", () => {
 
   it("la regla de los 14 días sigue: un equipo fuerte que no aguantó no lo vuelve a intentar", () => {
     nucleos(16);
-    expect(deepFilterPermitido()).toBe(true);
+    expect(deepFilterPermitido()).toBe(DEEPFILTER_PRENDIDO);
     marcarDeepFilterPesado();
     expect(deepFilterPermitido()).toBe(false);
     expect(df).toContain("const DIAS_SIN_REINTENTAR = 14;");
