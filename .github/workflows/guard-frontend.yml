@@ -45,6 +45,8 @@ on:
       - "tailwind.config.ts"
       - "postcss.config.js"
       - "scripts/ci/**"
+      # El plugin de idiomas (lo importan vite.config.ts y vitest.config.ts).
+      - "scripts/i18n/**"
       - ".github/workflows/guard-frontend.yml"
       # Lo que lee `docker build` además de lo de arriba.
       - "Dockerfile"
