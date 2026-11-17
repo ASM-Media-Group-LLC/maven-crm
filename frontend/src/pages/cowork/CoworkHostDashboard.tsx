@@ -44,7 +44,7 @@ import AvisarDialog from "./AvisarDialog";
 import AvisarGeneralDialog, { type ObjetivoAviso } from "./AvisarGeneralDialog";
 import AvisoChatter from "./AvisoChatter";
 import { useRecepcionAvisos } from "./useRecepcionAvisos";
-import { AVISADORES } from "@/lib/coworkAvisos";
+import { puedeAvisar as puedeAvisarCowork } from "@/lib/coworkAvisos";
 import { cuentaPausa, clasesPausa, nombreYApellido, nombreCorto } from "@/lib/pausaCowork";
 import { normalizarReglas, reglaDeEstado, sonEstandar, type ReglaAviso } from "@/lib/coworkReglas";
 import { armarCadenaNC, loadNCPreference, type CadenaNC } from "@/lib/noise-suppression-processor";
@@ -207,12 +207,11 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
   // fotos y le cuenta el tiempo (Alvaro, 13/11/2026). Mientras el rol carga, no.
   const vigilarAnfitrion = miRol !== null && !isAdmin;
   const puedeFinalizar = !!cowork.session && (cowork.session.created_by === userId || isAdmin);
-  // Avisar: los cuatro designados (lista fija en lib/coworkAvisos, NO el rol
-  // admin — hay admins que Álvaro no nombró) le avisan a un CHATTER; el dueño
-  // (admin) además puede avisarle a un SUPERVISOR. Entre supervisores, no. Se
-  // inserta una fila por persona; la RLS de cowork_avisos vuelve a validar cada
-  // una (host de la sesión + la matriz). Al destinatario le llega por realtime.
-  const puedeAvisar = AVISADORES.has(userId);
+  // Avisar: cualquier anfitrión de la sesión le avisa a un CHATTER (Alvaro,
+  // 17/11/2026); un admin además puede avisarle a otro anfitrión. Se inserta
+  // una fila por persona; la RLS de cowork_avisos vuelve a validar cada una
+  // (anfitrión de la sesión + la matriz). Al destinatario le llega por realtime.
+  const puedeAvisar = puedeAvisarCowork(!!cowork.isHost);
   const puedeAvisarGeneral = puedeAvisar || isAdmin;
   const enviarAviso = useCallback(async (targetIds: string[], slug: string, roomId?: string) => {
     const sid = cowork.session?.id;
