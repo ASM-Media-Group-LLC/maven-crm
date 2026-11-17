@@ -20,7 +20,7 @@ import PedirDemo from "./secciones/PedirDemo";
 //
 // Precios de Alvaro (16/11/2026, segunda vuelta): fijo por empresa y todo
 // incluido, Argos también — Equipo USD 299 hasta 20 personas, Empresa USD 599
-// hasta 50, Corporativo USD 999 hasta 100 — más la instalación a la medida
+// hasta 50, Enterprise USD 999 hasta 100 — más la instalación a la medida
 // desde USD 3.000 (pago único) en la nota de abajo. Cambiar un precio es
 // cambiar PLANES, nada más.
 //
@@ -125,7 +125,7 @@ const PLANES: Plan[] = [
     destacado: true,
   },
   {
-    nombre: "Corporativo",
+    nombre: "Enterprise",
     precio: "USD 999",
     periodo: "/ mes · por empresa",
     tope: "Hasta 100 personas",
