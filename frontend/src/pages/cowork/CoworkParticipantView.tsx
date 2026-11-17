@@ -132,18 +132,24 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
   const autoEntro = useRef<string | null>(null);
   useEffect(() => {
     const sid = cowork.session?.id;
-    if (!sid || myAssignment || lastRoomId === undefined || autoEntro.current === sid) return;
+    // No espera a saber la última sala (17/11/2026, «Cowork se tarda mucho en
+    // entrar»): era un viaje más antes de entrar, y el servidor ya elige la última
+    // sala de esta sesión cuando no se le pasa ninguna.
+    if (!sid || myAssignment || autoEntro.current === sid) return;
     if (cowork.myMembership?.role === "host") return;
     // El participante solo ve SU sala (RLS): sin sala, la lista llega vacía. Por eso
     // la sala la elige el servidor (última de esta sesión o la primera) cuando no se
     // le pasa ninguna.
     autoEntro.current = sid;
     setResuming(true);
+    // Relectura SILENCIOSA: la normal prendía la ruedita, desmontaba esta vista y
+    // repetía todas sus cargas antes de conectar la llamada.
     cowork.joinSession(sid, "participant", undefined, lastRoomId ?? undefined)
-      .then(() => cowork.refetch())
+      .then(() => cowork.refetch(true))
       .catch((e: unknown) => toast.error((e as Error)?.message || t("cowork.participant.resumeError")))
       .finally(() => setResuming(false));
-  }, [cowork.session?.id, myAssignment, lastRoomId, cowork.myMembership?.role, cowork.joinSession, cowork.refetch, t]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- lastRoomId a propósito fuera: no se espera
+  }, [cowork.session?.id, myAssignment, cowork.myMembership?.role, cowork.joinSession, cowork.refetch, t]);
 
   // `persistente`: la presencia del chatter tiene que durar lo que dura su
   // LLAMADA, no lo que dura esta página. Al navegar a otra sección la llamada
