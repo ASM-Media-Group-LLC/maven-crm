@@ -13,12 +13,12 @@
   --pr-gris: #8f9ab0;
   /* El acento es el MISMO verde encendido del botón (Alvaro: «tiene que
      hacer match, el del botón está encendido»). */
-  --pr-acento: #39ff8e;
-  --pr-acento-rgb: 57, 255, 142;
-  --pr-neon: #39ff8e;
-  --pr-neon-hover: #6bffab;
+  --pr-acento: #44e88c;
+  --pr-acento-rgb: 68, 232, 140;
+  --pr-neon: #44e88c;
+  --pr-neon-hover: #66eea3;
   --pr-sobre-neon: #04140b;
-  --pr-borde: rgba(57, 255, 142, .16);
+  --pr-borde: rgba(68, 232, 140, .16);
   --pr-linea: rgba(255, 255, 255, .06);
   --pr-radio: 20px;
   background: var(--pr-bg);

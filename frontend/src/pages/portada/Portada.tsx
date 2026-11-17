@@ -48,9 +48,9 @@ const TOKENS = {
   "--ink-soft": "#c9d0dc",
   "--muted": "#8f9ab0",
   "--faint": "#7d889e",
-  "--azul": "#39ff8e",
-  "--azul-claro": "#6bffab",
-  "--azul-rgb": "57, 255, 142",
+  "--azul": "#44e88c",
+  "--azul-claro": "#66eea3",
+  "--azul-rgb": "68, 232, 140",
   "--azul-claro-rgb": "107, 255, 171",
   "--sobre-azul": "#04140b",
 } as CSSProperties;
