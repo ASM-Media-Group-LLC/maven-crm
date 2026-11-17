@@ -39,7 +39,7 @@ describe("cancelación de ruido obligatoria", () => {
   });
 
   it("cada muestra de la llamada dice si de verdad está corriendo (datos.nc)", () => {
-    expect(liveKit).toMatch(/datos: \{ \.\.\.muestra, ahorro: ahorro\.activo, nc,/);
+    expect(liveKit).toMatch(/datos: \{ \.\.\.muestra, (\.\.\.memoria, )?ahorro: ahorro\.activo, nc,/);
   });
 });
 
