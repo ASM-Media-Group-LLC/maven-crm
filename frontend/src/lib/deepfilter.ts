@@ -106,6 +106,14 @@ export function veredictoCarga(c: CargaDF, seguidasPrevias: number): { seguidas:
   return { seguidas, pesado: seguidas >= 2 };
 }
 
+/**
+ * Alvaro, 17/11: solo en equipos de 8 núcleos o más; en los demás trababa.
+ * Con menos núcleos (o si el navegador no dice cuántos) la llamada se queda con
+ * RNNoise («activa» en datos.nc) y NUNCA baja los ~12 MB del modelo: el relevo
+ * ni se programa (ver armarCadenaNC en noise-suppression-processor.ts).
+ */
+export const NUCLEOS_PARA_DEEPFILTER = 8;
+
 const CLAVE_PESADO = "maven.nc.deepfilter.pesado";
 const DIAS_SIN_REINTENTAR = 14;
 let descartadoEnPestana = false;
@@ -114,7 +122,7 @@ let descartadoEnPestana = false;
 export function deepFilterPermitido(): boolean {
   if (descartadoEnPestana || typeof WebAssembly === "undefined") return false;
   const nav = navigator as Navigator & { deviceMemory?: number };
-  if (nav.hardwareConcurrency && nav.hardwareConcurrency < 4) return false;
+  if (!nav.hardwareConcurrency || nav.hardwareConcurrency < NUCLEOS_PARA_DEEPFILTER) return false;
   if (typeof nav.deviceMemory === "number" && nav.deviceMemory < 4) return false;
   // En el celular, batería y calor pesan más que el ruido: sigue RNNoise.
   if (/Android|iPhone|iPad|iPod|Mobile/i.test(nav.userAgent)) return false;
