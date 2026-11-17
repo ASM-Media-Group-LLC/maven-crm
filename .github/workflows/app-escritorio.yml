@@ -38,11 +38,37 @@ jobs:
           APPLE_API_ISSUER: ${{ secrets.MAC_NOTARIZE_ISSUER }}
           LLAVE_NOTARIZAR: ${{ secrets.MAC_NOTARIZE_API_KEY }}
         run: |
+          set -euo pipefail
           export APPLE_API_KEY="$RUNNER_TEMP/AuthKey.p8"
+          LLAVERO="$RUNNER_TEMP/firma.keychain-db"
+          CLAVE_LLAVERO=$(uuidgen)
           printf '%s' "$LLAVE_NOTARIZAR" > "$APPLE_API_KEY"
-          trap 'rm -f "$APPLE_API_KEY"' EXIT
+          ORIGINALES=$(security list-keychains -d user | tr -d '"')
+          trap 'rm -f "$APPLE_API_KEY" "$RUNNER_TEMP/firma.p12" "$RUNNER_TEMP/g2.cer"; security list-keychains -d user -s $ORIGINALES; security delete-keychain "$LLAVERO" 2>/dev/null || true' EXIT
+          # Llavero propio con el certificado Y el intermedio de Apple (G2):
+          # sin el intermedio, el Mac del CI no lo da por válido y la app salía
+          # SIN firma (17/11/2026).
+          security create-keychain -p "$CLAVE_LLAVERO" "$LLAVERO"
+          security set-keychain-settings -lut 21600 "$LLAVERO"
+          security unlock-keychain -p "$CLAVE_LLAVERO" "$LLAVERO"
+          printf '%s' "$CSC_LINK" | base64 --decode > "$RUNNER_TEMP/firma.p12"
+          curl -fsS -o "$RUNNER_TEMP/g2.cer" https://www.apple.com/certificateauthority/DeveloperIDG2CA.cer
+          security import "$RUNNER_TEMP/g2.cer" -k "$LLAVERO" -T /usr/bin/codesign || true
+          security import "$RUNNER_TEMP/firma.p12" -k "$LLAVERO" -P "$CSC_KEY_PASSWORD" -T /usr/bin/codesign -T /usr/bin/security
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$CLAVE_LLAVERO" "$LLAVERO" >/dev/null
+          security list-keychains -d user -s "$LLAVERO" $ORIGINALES
+          security find-identity -v -p codesigning "$LLAVERO"
+          unset CSC_LINK CSC_KEY_PASSWORD
+          export CSC_KEYCHAIN="$LLAVERO" CSC_NAME="Alvaro Mejia (BPV7M45Q6T)" MAVEN_FIRMA_REAL=1
           npm version "2.0.${{ github.run_number }}" --no-git-tag-version
-          npx electron-builder --mac --publish never -c.directories.output="$RUNNER_TEMP/escritorio"
+          # forceCodeSigning: si no puede firmar, FALLA (antes salía sin firma y se subía igual).
+          npx electron-builder --mac --publish never -c.directories.output="$RUNNER_TEMP/escritorio" -c.mac.forceCodeSigning=true
+          # Antes de subir: firma de Apple y sello de notarización, o no sube nada.
+          for A in "$RUNNER_TEMP"/escritorio/mac-universal/*.app; do
+            codesign --verify --deep --strict "$A"
+            xcrun stapler validate "$A"
+            spctl -a -vv -t exec "$A"
+          done
       - name: Subir a Supabase (balde descargas)
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}

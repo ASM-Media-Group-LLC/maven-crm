@@ -8,8 +8,8 @@ const path = require("node:path");
 
 exports.default = async function (ctx) {
   if (ctx.electronPlatformName !== "darwin") return;
-  // Con el certificado de Apple (CSC_LINK, en el CI) firma electron-builder de verdad.
-  if (process.env.CSC_LINK) return;
+  // Con el certificado de Apple (en el CI) firma electron-builder de verdad.
+  if (process.env.CSC_LINK || process.env.MAVEN_FIRMA_REAL) return;
   // En la versión universal se firma solo la final (las de cada chip son temporales).
   if (/-temp$/.test(ctx.appOutDir)) return;
   const app = path.join(ctx.appOutDir, `${ctx.packager.appInfo.productFilename}.app`);
