@@ -22,6 +22,7 @@ import { ClipsDelDia } from "@/components/hr/ClipsDelDia";
 import { AvisosDeArgos } from "@/components/hr/AvisosDeArgos";
 import { TarjetaArgos } from "@/components/hr/TarjetaArgos";
 import { GraciaDelDia } from "@/components/hr/GraciaDelDia";
+import { AppsDelDia } from "@/components/hr/AppsDelDia";
 import { useDisenoPulido } from "@/hooks/useDisenoPulido";
 import { Mail } from "lucide-react";
 
@@ -1022,6 +1023,9 @@ export default function HRExpediente() {
       {/* Minutos de gracia del turno (Alvaro, 16/11): cuánto se pagó, cuánto se
           descontó, y RR. HH. puede devolver minutos. */}
       {userId && <GraciaDelDia userId={userId} fecha={dia.fecha} />}
+
+      {/* Apps y páginas de la app de computador (Alvaro, 17/11/2026). */}
+      {userId && <AppsDelDia userId={userId} fecha={dia.fecha} />}
 
       {/* TODO EL DÍA, justo debajo de Argos (Alvaro, 13/11/2026: «no puedo ver los
           pantallazos de todo el día»): todas las fotos por hora, sin tope. */}

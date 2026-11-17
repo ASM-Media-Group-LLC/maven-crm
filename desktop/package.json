@@ -1,7 +1,7 @@
 {
   "name": "maven-escritorio",
   "productName": "Maven",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "description": "Maven para el computador (Mac y Windows)",
   "author": "ASM Media Group LLC",
   "private": true,
@@ -20,15 +20,16 @@
       "output": "dist",
       "buildResources": "build"
     },
-    "files": [
-      "src/**/*",
-      "build/bandeja.png",
-      "package.json"
-    ],
     "mac": {
       "target": [
         {
           "target": "dmg",
+          "arch": [
+            "universal"
+          ]
+        },
+        {
+          "target": "zip",
           "arch": [
             "universal"
           ]
@@ -41,11 +42,16 @@
         "NSCameraUsageDescription": "Maven usa la cámara para Cowork y las videollamadas.",
         "NSMicrophoneUsageDescription": "Maven usa el micrófono para Cowork y las videollamadas.",
         "NSScreenCaptureUsageDescription": "Maven comparte tu pantalla en Cowork y en las llamadas."
-      }
+      },
+      "artifactName": "Maven-Mac.${ext}",
+      "files": [
+        "!node_modules/get-windows/lib/binding/**",
+        "!node_modules/get-windows/build/**"
+      ],
+      "x64ArchFiles": "**/get-windows/main"
     },
     "dmg": {
-      "title": "Maven",
-      "artifactName": "Maven-Mac.dmg"
+      "title": "Maven"
     },
     "win": {
       "target": [
@@ -67,10 +73,28 @@
       "createStartMenuShortcut": true,
       "runAfterFinish": true
     },
-    "afterPack": "build/firmar-adhoc.js"
+    "afterPack": "build/firmar-adhoc.js",
+    "files": [
+      "src/**/*",
+      "build/bandeja.png",
+      "package.json"
+    ],
+    "asarUnpack": [
+      "node_modules/get-windows/**"
+    ],
+    "publish": [
+      {
+        "provider": "generic",
+        "url": "https://lsagslbkliprespbyhts.supabase.co/storage/v1/object/public/descargas"
+      }
+    ]
   },
   "devDependencies": {
     "electron": "^45.3.3",
     "electron-builder": "^26.18.0"
+  },
+  "dependencies": {
+    "electron-updater": "^6.8.11",
+    "get-windows": "^10.0.0"
   }
 }

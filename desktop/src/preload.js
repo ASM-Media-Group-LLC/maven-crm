@@ -27,11 +27,39 @@ function dibujar(n) {
   }
 }
 
+const plataforma = process.platform === "darwin" ? "mac" : process.platform === "win32" ? "windows" : "linux";
+
+// La página se entera de que vive en la app por esta clase en <html>: con ella
+// su barra de arriba se vuelve «arrastrable» y deja lugar a los botones del
+// sistema (frontend/src/index.css, «en-escritorio»).
+const marcar = () => document.documentElement.classList.add("en-escritorio", `escritorio-${plataforma}`);
+if (document.documentElement) marcar();
+window.addEventListener("DOMContentLoaded", marcar);
+
 contextBridge.exposeInMainWorld("mavenEscritorio", {
   esApp: true,
+  plataforma,
   insignia: (n) => {
     const v = Math.max(0, Number(n) || 0);
     ipcRenderer.send("maven:insignia", v, v > 0 ? dibujar(v) : null);
+  },
+  /** Ventanita de llamada entrante encima de todo. Resuelve «contestar», «rechazar» o «cerrada». */
+  llamadaEntrante: (datos) => ipcRenderer.invoke("maven:llamada", datos),
+  terminarLlamadaEntrante: (id) => ipcRenderer.send("maven:llamada-fin", id),
+  /** Ventanita flotante: true la achica y la deja encima; false la devuelve. Sin argumento alterna. */
+  flotante: (si) => ipcRenderer.invoke("maven:flotante", si),
+  alCambiarFlotante: (cb) => {
+    const f = (_e, v) => cb(Boolean(v));
+    ipcRenderer.on("maven:flotante", f);
+    return () => ipcRenderer.removeListener("maven:flotante", f);
+  },
+  /** Segundos sin tocar teclado ni mouse en todo el computador. */
+  inactividad: () => ipcRenderer.invoke("maven:inactividad"),
+  /** Cada minuto: los tramos de app/página al frente (ver desktop/src/apps.js). */
+  alUsoDeApps: (cb) => {
+    const f = (_e, lote) => cb(Array.isArray(lote) ? lote : []);
+    ipcRenderer.on("maven:apps", f);
+    return () => ipcRenderer.removeListener("maven:apps", f);
   },
 });
 

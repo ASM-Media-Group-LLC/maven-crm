@@ -1811,3 +1811,23 @@ html[data-blanco]:not(.dark) .avatar-fondo { background: hsl(var(--av-h, 220) 70
 /* En alto contraste los garabatos se quedan: en el hilo el texto va siempre
    dentro de burbujas opacas, así que el dibujo nunca queda detrás de letras.
    Se ocultaban y la cuenta de Jhon (contraste activo) no los veía (16/09). */
+
+/* ── App de computador (desktop/, 17/11/2026) ─────────────────────────────────
+   La ventana no tiene barra de título: la página llega hasta arriba y los
+   botones del sistema quedan encima (Mac: semáforo arriba a la izquierda;
+   Windows: minimizar/maximizar/cerrar arriba a la derecha). El preload pone
+   `en-escritorio` y `escritorio-mac|windows` en <html>; en el navegador nada
+   de esto aplica. La barra de arriba se puede arrastrar para mover la ventana;
+   lo que se toca adentro (botones, buscador) no. */
+html.en-escritorio .barra-arrastrable,
+html.en-escritorio .entrar-barra { -webkit-app-region: drag; }
+html.en-escritorio .barra-arrastrable :is(button, a, input, select, textarea, [role="button"], [role="combobox"], [role="menu"], [tabindex]),
+html.en-escritorio .entrar-barra :is(button, a) { -webkit-app-region: no-drag; }
+/* Mac: el riel baja para dejarle lugar al semáforo, y ese hueco también arrastra. */
+html.escritorio-mac [data-sidebar="sidebar"] { margin-top: 30px; height: calc(100% - 30px); }
+html.escritorio-mac div[data-variant] > div.fixed { -webkit-app-region: drag; }
+html.escritorio-mac [data-sidebar="sidebar"] { -webkit-app-region: no-drag; }
+/* Windows: los tres botones del sistema ocupan ~140 px arriba a la derecha. */
+html.escritorio-windows .barra-arrastrable { padding-right: 150px; }
+/* En la app no hay «Volver al inicio» (la portada es para el navegador). */
+html.en-escritorio .entrar-volver { display: none; }
