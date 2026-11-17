@@ -44,7 +44,7 @@ jobs:
           CLAVE_LLAVERO=$(uuidgen)
           printf '%s' "$LLAVE_NOTARIZAR" > "$APPLE_API_KEY"
           ORIGINALES=$(security list-keychains -d user | tr -d '"')
-          DEFECTO=$(security default-keychain -d user | tr -d ' "')
+          DEFECTO=$(security default-keychain -d user 2>/dev/null | tr -d ' "' || true)
           trap 'rm -f "$APPLE_API_KEY" "$RUNNER_TEMP/firma.p12" "$RUNNER_TEMP/notarizar.zip" "$RUNNER_TEMP/g2.cer" "$RUNNER_TEMP/raiz.cer"; security list-keychains -d user -s $ORIGINALES; [ -n "$DEFECTO" ] && security default-keychain -d user -s "$DEFECTO"; security delete-keychain "$LLAVERO" 2>/dev/null || true' EXIT
           # Llavero propio con el certificado Y el intermedio de Apple (G2):
           # sin el intermedio, el Mac del CI no lo da por válido y la app salía
