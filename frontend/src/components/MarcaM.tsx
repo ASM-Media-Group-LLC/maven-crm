@@ -13,8 +13,9 @@ import { useId } from "react";
 export const M_RATIO = 96 / 56;
 
 /** El verde de la marca y el del pliegue (iguales a los de genera-iconos.py). */
-export const VERDE_MARCA = "#4fd88d";
-export const VERDE_PLIEGUE = "#2a9a5c";
+// El verde de la marca es el VERDE GRANOLA (16/11/2026), luminoso para el azul marino.
+export const VERDE_MARCA = "#bed161";
+export const VERDE_PLIEGUE = "#77862d";
 
 interface MarcaMProps {
   /** Alto de la M como longitud CSS ("11px", "0.48em"). El ancho sale solo. */

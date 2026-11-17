@@ -20,8 +20,8 @@ import numpy as np, sys, os
 AQUI = os.path.dirname(os.path.abspath(__file__))
 DEST = sys.argv[1] if len(sys.argv) > 1 else os.path.join(AQUI, "..", "public")
 
-VERDE = (79, 216, 141)        # #4fd88d, el de los botones de la portada
-HONDO = (42, 154, 92)         # #2a9a5c, el pliegue
+VERDE = (190, 209, 97)        # #bed161, el verde Granola de los botones
+HONDO = (119, 134, 45)        # #77862d, el pliegue
 FONDO0 = (24, 35, 58)         # arriba-izquierda
 FONDO1 = (12, 18, 29)         # abajo-derecha (#0c121d)
 RADIO = 0.22                  # radio de la baldosa del favicon, fracción del lado

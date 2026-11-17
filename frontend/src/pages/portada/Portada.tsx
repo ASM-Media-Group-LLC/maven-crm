@@ -49,11 +49,11 @@ const TOKENS = {
   "--ink-soft": "#c9d0dc",
   "--muted": "#8f9ab0",
   "--faint": "#7d889e",
-  "--azul": "#4fd88d",
-  "--azul-claro": "#6fe0a3",
-  "--azul-rgb": "79, 216, 141",
+  "--azul": "#bed161",
+  "--azul-claro": "#cddc7f",
+  "--azul-rgb": "190, 209, 97",
   "--azul-claro-rgb": "107, 255, 171",
-  "--sobre-azul": "#04140b",
+  "--sobre-azul": "#1c2108",
 } as CSSProperties;
 
 const PASOS: [string, string][] = [
