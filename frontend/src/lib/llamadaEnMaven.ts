@@ -69,6 +69,12 @@ export function latirLlamadaEnServidor(cliente: Rpc, sala: string): void {
   try { void Promise.resolve(cliente.rpc("latir_llamada_maven", { _sala: sala })).catch(() => {}); } catch { /* sin red: el próximo latido */ }
 }
 
-export function salirLlamadaEnServidor(cliente: Rpc): void {
-  try { void Promise.resolve(cliente.rpc("salir_llamada_maven")).catch(() => {}); } catch { /* caduca solo a los 90 s */ }
+/** Con `sala`, el servidor solo borra el latido de ESA llamada: si la persona
+ *  tiene otra abierta (un Meet en otra pestaña), cerrar esta no la saca de
+ *  aquella. Y si era un Meet, cierra el tramo de reloj del anfitrión en él
+ *  (20261117200000_anfitrion_en_meet_cuenta_como_cowork). */
+export function salirLlamadaEnServidor(cliente: Rpc, sala?: string): void {
+  try {
+    void Promise.resolve(cliente.rpc("salir_llamada_maven", sala ? { _sala: sala } : undefined)).catch(() => {});
+  } catch { /* caduca solo a los 90 s */ }
 }

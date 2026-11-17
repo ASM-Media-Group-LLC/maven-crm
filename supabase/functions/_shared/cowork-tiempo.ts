@@ -282,3 +282,29 @@ export function latidoDeCuerpo(body: Record<string, unknown>, base: { enPausa: b
       : null,
   };
 }
+
+// ── El anfitrión en un Meet de Maven (Alvaro, 17/11/2026) ─────────────────
+// Luis (anfitrión) pasaba la mañana en reuniones de Meet y Cowork lo marcaba
+// «fuera»: su Hub no latía y el reloj se detenía. Para quien es ANFITRIÓN de
+// un Cowork, estar conectado en un Meet de Maven (salas `meet_…`) cuenta igual
+// que estar en el Hub. Los chatters no: ellos trabajan en su sala.
+//
+// La señal es `llamada_maven_latido`: la pestaña de la llamada la refresca
+// cada 30 s mientras está montada (lib/llamadaEnMaven.ts), con el nombre de la
+// sala de LiveKit. Los registros de llamadas no sirven (casi nunca marcan fin).
+
+/** ¿Es una sala de Meet de Maven? (las de Cowork son `cowork_…`, las del chat `call-…`). */
+export function esSalaDeMeet(sala: string | null | undefined): boolean {
+  return typeof sala === "string" && sala.startsWith("meet_");
+}
+
+/** ¿El latido de llamada dice que está AHORA en un Meet de Maven? Misma
+ *  tolerancia que el reloj: sin latido en 90 s, ya no está. */
+export function enMeetDeMaven(
+  fila: { sala: string | null; last_seen_at: string } | null | undefined,
+  ahora: number,
+): boolean {
+  if (!fila || !esSalaDeMeet(fila.sala)) return false;
+  const visto = Date.parse(fila.last_seen_at);
+  return Number.isFinite(visto) && ahora - visto <= LATIDO_VENCIDO_MS;
+}

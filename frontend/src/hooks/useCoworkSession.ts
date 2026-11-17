@@ -91,6 +91,8 @@ export interface CoworkAssignment {
   room_id: string;
   is_active: boolean;
   assigned_at: string;
+  /** Quién la creó: la propia persona (eligió sala) o el anfitrión que la movió. */
+  assigned_by?: string | null;
 }
 
 /** Meet grupal (Jhon, 10/09/2026): el supervisor se lleva a la gente de una o
@@ -396,6 +398,10 @@ export function useCoworkSession(sessionId: string | null) {
   const updateRoom = useCallback(async (roomId: string, patch: { name?: string; previewMode?: "video" | "avatars" }) =>
     invokeCowork("updateRoom", { roomId, ...patch }), []);
   const closeRoom = useCallback(async (roomId: string) => invokeCowork("closeRoom", { roomId }), []);
+  // El anfitrión mueve a una persona a otra sala (Alvaro, 17/11/2026). A ella le
+  // llega por Realtime (su fila de asignación) y su vista entra sola a la nueva.
+  const asignarSala = useCallback(async (targetUserId: string, roomId: string) =>
+    invokeCowork("asignarSala", { sessionId, targetUserId, roomId }) as Promise<{ ok: boolean; sinCambio?: boolean; roomId: string; roomName: string }>, [sessionId]);
 
   // Canjea un código de sala. Devuelve { sessionId, roomId, ... } para navegar.
   const joinByCode = useCallback(async (code: string) => invokeCowork("joinByCode", { code }), []);
@@ -577,7 +583,7 @@ export function useCoworkSession(sessionId: string | null) {
   return {
     session, rooms, memberships, assignments, hostRequests, screenShareRequests, meets,
     myMembership, myAssignment, isHost, loading, profiles, avatares, sesionNoVisible, membresiasCargadas,
-    createSession, joinSession, joinByCode, getMyLastRoomId, renameSession, updateAlertRules, addRoom, updateRoom, closeRoom,
+    createSession, joinSession, joinByCode, getMyLastRoomId, renameSession, updateAlertRules, addRoom, updateRoom, closeRoom, asignarSala,
     issueLiveKitToken, requestHost, ackHostRequest, resolveHostRequest, barrerAsignacionesColgadas,
     crearMeetGrupal, terminarMeetGrupal, salirDeMeetGrupal, joinMeetGrupal,
     requestScreenShare, approveScreenShare, claimScreenShareToken, joinOneOnOne, endSession, getHostCode, leaveRoom, setBreak, getPausaAbierta, refetch: fetchData,

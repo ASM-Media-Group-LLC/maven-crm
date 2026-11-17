@@ -11,7 +11,7 @@ import {
   Mic, MicOff, Video, VideoOff, ArrowLeft, Plus, Pencil, Volume2, VolumeX, ScreenShare, ScreenShareOff,
   PanelRightClose, PanelRightOpen, MoreVertical, MessageCircle,
   Pin, PinOff, PhoneOff, PictureInPicture2, KeyRound, Check, Coffee, EyeOff, MonitorOff, Settings2, MoreHorizontal,
-  WifiOff, ChevronRight, Megaphone, type LucideIcon } from "lucide-react";
+  WifiOff, ChevronRight, Megaphone, ArrowRightLeft, type LucideIcon } from "lucide-react";
 import { toast } from "sonner";
 import LiveKitCallView from "@/pages/messenger/videocall/LiveKitCallView";
 import { usePersistentCall, CallOutlet } from "@/components/PersistentCallProvider";
@@ -65,7 +65,7 @@ import { useChatShared } from "@/hooks/ChatProvider";
 import { useMessengerDock } from "@/components/messenger/MessengerDock";
 import { MUELLE_EXTRA_ID } from "@/hooks/useMuelleFlotante";
 import { UserAvatar } from "@/components/UserAvatar";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuSub, DropdownMenuSubContent, DropdownMenuSubTrigger, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { useLanguage } from "@/hooks/useLanguage";
 import { traducir, type TranslationKey } from "@/lib/i18n";
@@ -1512,6 +1512,27 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
   const { createDirectChat } = useChatShared();
   const { abrirChat } = useMessengerDock();
   const escribirA = (uid: string) => { const id = createDirectChat(uid); if (id) abrirChat(id); };
+  // MOVER A OTRA SALA (Alvaro, 17/11/2026): antes cada participante elegía su
+  // sala y el anfitrión no podía moverlo. La edge valida que quien mueve es
+  // anfitrión y que la sala es de esta sesión; a la persona le llega por
+  // Realtime y su vista entra sola a la sala nueva.
+  const [moviendo, setMoviendo] = useState<string | null>(null);
+  const moverASala = async (uid: string, roomId: string) => {
+    if (moviendo) return;
+    setMoviendo(uid);
+    try {
+      const r = await cowork.asignarSala(uid, roomId);
+      toast.success(t("cowork.host.movedToRoom", {
+        name: nombreYApellido(cowork.profiles[uid]) || t("cowork.common.someone"),
+        room: r.roomName,
+      }));
+      void cowork.refetch(true);
+    } catch {
+      toast.error(t("cowork.host.moveToRoomFailed"));
+    } finally {
+      setMoviendo(null);
+    }
+  };
 
   // Dónde colgar el botón «Hub» cuando el hub está minimizado: en la pila del
   // muelle flotante (encima de la nubecita del Messenger), que es lo que la
@@ -2168,6 +2189,34 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                           <DropdownMenuItem onClick={() => escribirA(f.uid)}>
                             <MessageCircle className="mr-2 h-4 w-4" /> {t("cowork.host.messageOnMessenger")}
                           </DropdownMenuItem>
+                          <DropdownMenuSub>
+                            <DropdownMenuSubTrigger disabled={moviendo === f.uid}>
+                              {moviendo === f.uid
+                                ? <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                : <ArrowRightLeft className="mr-2 h-4 w-4" />}
+                              {t("cowork.host.moveToRoom")}
+                            </DropdownMenuSubTrigger>
+                            <DropdownMenuSubContent className="w-52">
+                              {cowork.rooms.length <= 1 && (
+                                <DropdownMenuItem disabled>{t("cowork.host.moveToRoomNoOther")}</DropdownMenuItem>
+                              )}
+                              {cowork.rooms.length > 1 && cowork.rooms.map((r) => (
+                                <DropdownMenuItem
+                                  key={r.id}
+                                  disabled={r.id === f.room.id || !!moviendo}
+                                  onClick={() => void moverASala(f.uid, r.id)}
+                                >
+                                  {r.id === f.room.id
+                                    ? <Check className="mr-2 h-4 w-4 text-primary" />
+                                    : <span className="mr-2 h-4 w-4" />}
+                                  <span className="truncate">{r.name}</span>
+                                  {r.id === f.room.id && (
+                                    <span className="ml-auto pl-2 text-[10px] text-muted-foreground">{t("cowork.host.moveToRoomCurrent")}</span>
+                                  )}
+                                </DropdownMenuItem>
+                              ))}
+                            </DropdownMenuSubContent>
+                          </DropdownMenuSub>
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </div>

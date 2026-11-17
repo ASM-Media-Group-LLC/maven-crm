@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo, useRef, type ReactNode } from "react";
-import { ConnectionState, RoomEvent, Track } from "livekit-client";
+import { ConnectionState, CriticalTimers, RoomEvent, Track } from "livekit-client";
 import { useLiveKit } from "@/hooks/useLiveKit";
 import CallTopBar from "./CallTopBar";
 import CallControls from "./CallControls";
@@ -751,9 +751,14 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
     const id = window.setInterval(() => latirEnLlamada(), LATIDO_LLAMADA_MS);
     // También en el servidor: el vigía «fuera de Cowork» no cuenta como salida
     // estar en otra llamada de Maven (Alvaro, 11/11).
+    // Con el reloj del Worker (lib/relojesFirmes, ya puesto en CriticalTimers al
+    // conectar): la pestaña del Meet suele quedar atrás y Chrome adormece sus
+    // relojes; para un anfitrión este latido es lo que hace que la reunión
+    // cuente como Cowork (Alvaro, 17/11/2026).
     latirLlamadaEnServidor(supabase, roomName);
-    const idServidor = window.setInterval(() => latirLlamadaEnServidor(supabase, roomName), LATIDO_SERVIDOR_MS);
-    return () => { window.clearInterval(id); window.clearInterval(idServidor); salirDeLlamada(); salirLlamadaEnServidor(supabase); };
+    const idServidor = CriticalTimers.setInterval(() => latirLlamadaEnServidor(supabase, roomName), LATIDO_SERVIDOR_MS);
+    // Al salir solo se borra el latido de ESTA sala, no el de otra llamada abierta.
+    return () => { window.clearInterval(id); CriticalTimers.clearInterval(idServidor); salirDeLlamada(); salirLlamadaEnServidor(supabase, roomName); };
   }, [supervisorEncuadre, sinLatidoDeLlamada, roomName]);
   // En Cowork la pantalla compartida es la mitad del trabajo: sin ella se ve la
   // cara pero no QUÉ está haciendo la persona.

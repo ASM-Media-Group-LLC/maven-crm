@@ -66,7 +66,8 @@ describe("el monitor se nota también fuera de Maven", () => {
 
   it("una llamada de Maven que no es Cowork late también en el servidor (no cuenta como salirse)", () => {
     expect(llamada).toContain("latirLlamadaEnServidor(supabase, roomName)");
-    expect(llamada).toContain("salirLlamadaEnServidor(supabase)");
+    // Con la sala: solo borra el latido de ESTA llamada (20261117200000).
+    expect(llamada).toContain("salirLlamadaEnServidor(supabase, roomName)");
   });
 
   it("cada pantallazo guardado se anota y al volver a Maven se avisa", () => {
