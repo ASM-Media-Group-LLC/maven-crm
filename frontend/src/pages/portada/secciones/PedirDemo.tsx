@@ -1,9 +1,8 @@
 import { Link } from "react-router-dom";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Check, Loader2, Send } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import type { Publico } from "../guiones";
-import { INTERESES } from "../publico";
 import { useLanguage } from "@/hooks/useLanguage";
 import { type TranslationKey } from "@/lib/i18n";
 
@@ -33,40 +32,12 @@ const TAMANOS: [string, TranslationKey][] = [
   ["más de 200", "portada.demo.tamano4"],
 ];
 
-/** El nombre de cada interés en el idioma de quien mira (el valor que se manda
- *  sigue siendo el de publico.tsx). */
-const NOMBRE_INTERES: Record<string, TranslationKey> = {
-  "Correo propio": "portada.interes.correo",
-  "Messenger": "portada.interes.messenger",
-  "Cowork y reuniones": "portada.interes.cowork",
-  "Personas y nómina": "portada.interes.personas",
-  "Ventas y pipeline": "portada.interes.ventas",
-  "Tickets": "portada.interes.tickets",
-  "Marca blanca": "portada.interes.marcaBlanca",
-  "Promolog": "portada.interes.promolog",
-  "Otras opciones de agencia": "portada.interes.otras",
-  "Todo": "portada.interes.todo",
-};
-
 type Estado = "escribiendo" | "enviando" | "listo";
 
 export default function PedirDemo({ publico }: { publico: Publico }) {
   const { t } = useLanguage();
   const [estado, setEstado] = useState<Estado>("escribiendo");
   const [error, setError] = useState<string | null>(null);
-  const [interes, setInteres] = useState<string[]>([]);
-  const opciones = INTERESES[publico];
-
-  const alternar = (i: string) =>
-    setInteres((prev) => (prev.includes(i) ? prev.filter((x) => x !== i) : [...prev, i]));
-
-  // Si cambia el público cambian las opciones, y lo que había marcado puede
-  // ya no existir. Se descartan las que no están en la lista nueva en vez de
-  // mandar al correo un interés que la persona no ve en pantalla.
-  useEffect(() => {
-    setInteres((prev) => prev.filter((i) => INTERESES[publico].includes(i)));
-  }, [publico]);
-
   const enviar = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (estado === "enviando") return;
@@ -83,7 +54,6 @@ export default function PedirDemo({ publico }: { publico: Publico }) {
         tamano_equipo: f.get("tamano_equipo"),
         mensaje: f.get("mensaje"),
         web: f.get("web"),
-        interes,
         publico,
       },
     });
@@ -169,22 +139,6 @@ export default function PedirDemo({ publico }: { publico: Publico }) {
                     {TAMANOS.map(([valor, clave]) => <option value={valor} key={valor}>{t(clave)}</option>)}
                   </select>
                 </label>
-
-                <div className="campo">
-                  <span>{t("portada.demo.interes")}</span>
-                  <div className="elige">
-                    {opciones.map((i) => (
-                      <button
-                        type="button"
-                        key={i}
-                        aria-pressed={interes.includes(i)}
-                        onClick={() => alternar(i)}
-                      >
-                        {NOMBRE_INTERES[i] ? t(NOMBRE_INTERES[i]) : i}
-                      </button>
-                    ))}
-                  </div>
-                </div>
 
                 <label className="campo">
                   <span>{t("portada.demo.mensaje")}</span>

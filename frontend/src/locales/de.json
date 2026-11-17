@@ -79,10 +79,6 @@
   "t": "Anfrage erhalten",
   "en": "Request received"
  },
- "portada.demo.interes": {
-  "t": "Was dich interessiert",
-  "en": "What you're interested in"
- },
  "portada.demo.listo1": {
   "t": "Wir antworten per E-Mail — keine Verkaufsanrufe, um die du nicht gebeten hast.",
   "en": "We reply by email — no sales calls you didn't ask for."
@@ -290,46 +286,6 @@
  "portada.idioma": {
   "t": "Sprache",
   "en": "Language"
- },
- "portada.interes.correo": {
-  "t": "Eigene E-Mail",
-  "en": "Own email"
- },
- "portada.interes.cowork": {
-  "t": "Cowork und Meetings",
-  "en": "Cowork and meetings"
- },
- "portada.interes.marcaBlanca": {
-  "t": "White Label",
-  "en": "White label"
- },
- "portada.interes.messenger": {
-  "t": "Messenger",
-  "en": "Messenger"
- },
- "portada.interes.otras": {
-  "t": "Weitere Optionen für Agenturen",
-  "en": "Other agency options"
- },
- "portada.interes.personas": {
-  "t": "Personal und Lohnabrechnung",
-  "en": "People and payroll"
- },
- "portada.interes.promolog": {
-  "t": "Promolog",
-  "en": "Promolog"
- },
- "portada.interes.tickets": {
-  "t": "Tickets",
-  "en": "Tickets"
- },
- "portada.interes.todo": {
-  "t": "Alles",
-  "en": "Everything"
- },
- "portada.interes.ventas": {
-  "t": "Vertrieb und Pipeline",
-  "en": "Sales and pipeline"
  },
  "portada.nav.como": {
   "t": "So funktioniert's",
