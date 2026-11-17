@@ -81,15 +81,15 @@ export default defineConfig(({ mode }) => ({
         // el .ico de 64px con el nombre recortado, y al instalar Maven en el
         // teléfono quedaba borroso.
         icons: [
-          { src: "/icon-192.png?v=3", sizes: "192x192", type: "image/png" },
-          { src: "/icon-512.png?v=3", sizes: "512x512", type: "image/png", purpose: "any maskable" },
+          { src: "/icon-192.png?v=6", sizes: "192x192", type: "image/png" },
+          { src: "/icon-512.png?v=6", sizes: "512x512", type: "image/png", purpose: "any maskable" },
         ],
         shortcuts: [
           {
             name: "Messenger",
             short_name: "Chat",
             url: "/messenger",
-            icons: [{ src: "/icon-192.png?v=3", sizes: "192x192", type: "image/png" }],
+            icons: [{ src: "/icon-192.png?v=6", sizes: "192x192", type: "image/png" }],
           },
         ],
       },

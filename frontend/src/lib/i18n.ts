@@ -48,7 +48,10 @@ export function cargarIdioma(lang: Language): Promise<void> {
   if (catalogos[lang]) return Promise.resolve();
   const ya = enCurso.get(lang);
   if (ya) return ya;
+  // Un segundo intento si la red falla (conexiones flojas): sin el paquete,
+  // toda la pantalla mostraría claves en vez de frases.
   const p = CARGADORES[lang]()
+    .catch(() => new Promise<void>((r) => setTimeout(r, 800)).then(() => CARGADORES[lang]()))
     .then((m) => { catalogos[lang] = m.default; })
     .catch((e) => { console.warn(`[i18n] no se pudo cargar «${lang}»`, e); })
     .finally(() => enCurso.delete(lang));

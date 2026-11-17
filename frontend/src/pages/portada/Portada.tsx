@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type CSSProperties, type MouseEvent } from "react";
-import { MarcaM } from "@/components/MarcaM";
+import { MarcaMaven } from "@/components/MarcaM";
 import {
-  ArrowRight, CheckSquare, Eye, FileText, Globe, HardDrive, Mail, MessageSquare, MonitorUp, UserCheck, Video,
+  ArrowRight, CheckSquare, ChevronDown, Eye, FileText, HardDrive, Mail, MessageSquare, MonitorUp, UserCheck, Video,
   type LucideIcon,
 } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
@@ -55,11 +55,11 @@ const TOKENS = {
   "--ink-soft": "#c9d0dc",
   "--muted": "#8f9ab0",
   "--faint": "#7d889e",
-  "--azul": "#4fd88d",
-  "--azul-claro": "#6fe0a3",
-  "--azul-rgb": "79, 216, 141",
+  "--azul": "#bed161",
+  "--azul-claro": "#cddc7f",
+  "--azul-rgb": "190, 209, 97",
   "--azul-claro-rgb": "107, 255, 171",
-  "--sobre-azul": "#04140b",
+  "--sobre-azul": "#1c2108",
 } as CSSProperties;
 
 type K = TranslationKey;
@@ -134,37 +134,80 @@ const PLANES: Plan[] = [
 
 /** El logo de la portada (Alvaro, 16/11/2026): la M de cinta de la marca
  *  (components/MarcaM, la misma de la app y de los iconos) en el verde de los
- *  botones, y «Maven» en blanco. Sin «Virtual Office»: «nada que ver». */
+ *  y «aven» pegado en blanco: la M hace de «M» (Alvaro, 16/11/2026). Sin
+ *  «Virtual Office»: «nada que ver». */
 function Marca({ chico = false }: { chico?: boolean }) {
   return (
-    <span className={`pr-marca${chico ? " chico" : ""}`}>
-      <MarcaM className="pr-marca-m" alto={chico ? "17px" : "22px"} claro="var(--pr-acento)" oscuro="var(--pr-acento-hondo)" />
-      Maven
-    </span>
+    <MarcaMaven className={`pr-marca${chico ? " chico" : ""}`} />
   );
 }
 
-/** El idioma de la portada: cada uno tiene su dirección (/en, /es…), así
- *  Google muestra la de quien busca. Los nombres van en su propio idioma. */
+/** El selector de idioma, como el de Lumina: una píldora con el código
+ *  («ES ⌄») a la derecha de la barra y la lista con cada idioma escrito en su
+ *  propio idioma. Cada idioma tiene su dirección (/en, /es…), así Google
+ *  muestra la de quien busca. */
 function SelectorIdioma() {
   const { t, language, setLanguage } = useLanguage();
   const ir = useNavigate();
+  const [abierto, setAbierto] = useState(false);
+  const caja = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!abierto) return;
+    const fuera = (e: PointerEvent) => {
+      if (!caja.current?.contains(e.target as Node)) setAbierto(false);
+    };
+    const tecla = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setAbierto(false);
+    };
+    document.addEventListener("pointerdown", fuera);
+    document.addEventListener("keydown", tecla);
+    return () => {
+      document.removeEventListener("pointerdown", fuera);
+      document.removeEventListener("keydown", tecla);
+    };
+  }, [abierto]);
+  const elegir = (lang: Idioma) => {
+    setAbierto(false);
+    if (lang === language) return;
+    setLanguage(lang);
+    ir(`/${lang}${window.location.hash}`);
+  };
   return (
-    <label className="pr-idioma" title={t("portada.idioma")}>
-      <Globe aria-hidden="true" />
-      <span className="sr-only">{t("portada.idioma")}</span>
-      <select
-        value={language}
-        onChange={(e) => {
-          const lang = e.target.value;
-          if (!esIdioma(lang)) return;
-          setLanguage(lang);
-          ir(`/${lang}${window.location.hash}`);
-        }}
+    <div className={`pr-idioma${abierto ? " abierto" : ""}`} ref={caja}>
+      <button
+        type="button"
+        className="pr-idioma-btn"
+        aria-haspopup="listbox"
+        aria-expanded={abierto}
+        aria-label={t("portada.idioma")}
+        onClick={() => setAbierto((a) => !a)}
       >
-        {IDIOMAS.map((l) => <option key={l} value={l}>{NOMBRE_IDIOMA[l]}</option>)}
-      </select>
-    </label>
+        <span>{language.toUpperCase()}</span>
+        <ChevronDown aria-hidden="true" />
+      </button>
+      {abierto && (
+        <ul className="pr-idioma-lista" role="listbox" aria-label={t("portada.idioma")}>
+          {IDIOMAS.map((l) => (
+            <li
+              key={l}
+              role="option"
+              aria-selected={l === language}
+              tabIndex={0}
+              lang={l}
+              onClick={() => elegir(l)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  elegir(l);
+                }
+              }}
+            >
+              {NOMBRE_IDIOMA[l]}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
   );
 }
 
@@ -182,20 +225,97 @@ function useEnlacesDeIdioma(actual: Idioma) {
   }, [actual]);
 }
 
-/** El video de fondo del inicio. Con «reducir movimiento» queda la foto fija. */
+/** Dónde está la persona en cada toma del video (fracción del ancho, 0 a 1) y
+ *  desde qué segundo la cámara va hacia ella. En una pantalla ancha el video se
+ *  ve entero y esto no cambia nada; en el celular el video se recorta a una
+ *  franja angosta del centro y, sin esto, en dos tomas quedaba un librero o una
+ *  pared en vez de la persona. Así se ve como el de Lumina: siempre una cara.
+ *  Los segundos son los del montaje (armar.sh): fundidos en 2,0 · 3,9 · 6,0 s. */
+const FOCOS = [
+  { desde: 0, x: 0.51, dura: 0 }, // la chica en la cocina
+  { desde: 2.0, x: 0.49, dura: 0.5 }, // el chico de noche (durante el fundido)
+  { desde: 3.9, x: 0.35, dura: 0.5 }, // el hombre en el loft
+  { desde: 6.0, x: 0.37, dura: 0.5 }, // el tablero de Cowork en el monitor del dueño
+  { desde: 7.6, x: 0.8, dura: 2.6 }, // paneo lento hasta el dueño, que mira a su equipo
+] as const;
+
+/** El video de fondo del inicio, como el de Lumina: un solo video ancho, a
+ *  pantalla completa, que corre SIEMPRE (también con «reducir movimiento»,
+ *  igual que Lumina: con esa opción del iPhone antes quedaba una foto fija y
+ *  Alvaro veía el video «sin correr»).
+ *
+ *  OJO iPhone: Safari solo reproduce solo un video si `muted` está ESCRITO en
+ *  la etiqueta (Lumina lo tiene en su HTML). React no escribe ese atributo —
+ *  solo cambia la propiedad—, así que se escribe a mano y se le da play; si el
+ *  teléfono igual lo frena (modo de bajo consumo), arranca con el primer toque
+ *  en la página. */
 function VideoDeFondo() {
-  const [quieto] = useState(
-    () => typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches,
-  );
+  const ref = useRef<HTMLVideoElement>(null);
+  useEffect(() => {
+    const v = ref.current;
+    if (!v) return;
+    v.muted = true;
+    v.defaultMuted = true;
+    v.setAttribute("muted", "");
+    v.setAttribute("playsinline", "");
+    v.setAttribute("webkit-playsinline", "");
+    const arrancar = () => {
+      if (v.paused) v.play().catch(() => {});
+    };
+    arrancar();
+    document.addEventListener("touchstart", arrancar, { once: true, passive: true });
+    v.addEventListener("canplay", arrancar);
+
+    // La cámara que sigue a la persona en pantallas angostas.
+    let actual = -1;
+    const enfocar = () => {
+      const t = v.currentTime;
+      let i = 0;
+      for (let k = 0; k < FOCOS.length; k++) if (t >= FOCOS[k].desde) i = k;
+      if (i === actual) return;
+      const volvio = i < actual; // el video volvió a empezar: corte seco
+      actual = i;
+      const ancho = v.clientWidth;
+      const alto = v.clientHeight;
+      const proporcion = v.videoWidth && v.videoHeight ? v.videoWidth / v.videoHeight : 16 / 9;
+      const visible = alto > 0 ? ancho / (alto * proporcion) : 1; // qué parte del ancho se ve
+      if (visible >= 0.98) {
+        v.style.transition = "";
+        v.style.objectPosition = "";
+        return;
+      }
+      const p = Math.min(1, Math.max(0, (FOCOS[i].x - visible / 2) / (1 - visible)));
+      v.style.transition = volvio || FOCOS[i].dura === 0 ? "none" : `object-position ${FOCOS[i].dura}s ease-in-out`;
+      v.style.objectPosition = `${(p * 100).toFixed(1)}% 50%`;
+    };
+    const alCambiarTamano = () => {
+      actual = -1;
+      enfocar();
+    };
+    enfocar();
+    v.addEventListener("timeupdate", enfocar);
+    v.addEventListener("loadedmetadata", alCambiarTamano);
+    window.addEventListener("resize", alCambiarTamano);
+    return () => {
+      document.removeEventListener("touchstart", arrancar);
+      v.removeEventListener("canplay", arrancar);
+      v.removeEventListener("timeupdate", enfocar);
+      v.removeEventListener("loadedmetadata", alCambiarTamano);
+      window.removeEventListener("resize", alCambiarTamano);
+    };
+  }, []);
   return (
     <div className="pr-video" aria-hidden="true">
-      {quieto ? (
-        <img src="/portada/hero-poster.jpg" alt="" />
-      ) : (
-        <video autoPlay muted loop playsInline preload="auto" poster="/portada/hero-poster.jpg">
-          <source src="/portada/hero.mp4" type="video/mp4" />
-        </video>
-      )}
+      <video
+        ref={ref}
+        src="/portada/hero.mp4"
+        poster="/portada/hero-poster.jpg"
+        autoPlay
+        muted
+        loop
+        playsInline
+        preload="auto"
+      />
     </div>
   );
 }
@@ -270,9 +390,9 @@ export default function Portada({ idiomaDeRuta }: { idiomaDeRuta?: Idioma }) {
             <a href="#precios">{t("portada.nav.precios")}</a>
           </nav>
           <div className="pr-nav-cta">
-            <SelectorIdioma />
             <Link className="pr-btn pr-btn-fantasma" to="/login">{t("portada.nav.entrar")}</Link>
             <a className="pr-btn pr-btn-neon" href="#demo" onClick={abrirDemo}>{t("portada.cta.demo")}</a>
+            <SelectorIdioma />
           </div>
         </div>
       </header>

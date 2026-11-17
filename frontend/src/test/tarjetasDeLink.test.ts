@@ -26,7 +26,7 @@ describe("la tarjeta de WhatsApp de cada link", () => {
     const html = conTarjeta(INDEX, TARJETAS.reunion);
     expect(html).toContain(`property="og:title" content="You&#39;re invited to a meeting"`.replace("&#39;", "'"));
     expect(html).toContain("og-reunion.jpg");
-    expect(html).toContain('name="twitter:image" content="https://app.maven-ai.me/og-reunion.jpg?v=3"');
+    expect(html).toContain('name="twitter:image" content="https://app.maven-ai.me/og-reunion.jpg?v=7"');
   });
 
   it("un link de Cowork dice que el equipo te llama", () => {

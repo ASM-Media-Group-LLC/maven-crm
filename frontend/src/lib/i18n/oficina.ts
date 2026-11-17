@@ -559,6 +559,11 @@ export const oficina = {
   "drive.creadoras.copiarMensaje": { es: "Copiar mensaje", en: "Copy message" },
   "drive.creadoras.mensajeCopiado": { es: "¡Mensaje copiado!", en: "Message copied!" },
   "drive.creadoras.whatsapp": { es: "Abrir WhatsApp", en: "Open WhatsApp" },
+  "drive.creadoras.whatsappCorto": { es: "WhatsApp", en: "WhatsApp" },
+  "drive.creadoras.fichaTotal": { es: "creadoras", en: "creators" },
+  "drive.creadoras.fichaConLink": { es: "con link", en: "with a link" },
+  "drive.creadoras.fichaMandaron": { es: "ya mandaron", en: "have sent" },
+  "drive.creadoras.fichaSinCarpeta": { es: "sin carpeta", en: "without a folder" },
   "drive.creadoras.mensaje": {
     es: "Hola, {n} 💜 Este es tu link personal para mandarnos tu contenido (ya no usamos Dropbox):\n{url}\n\nAhí subes fotos y videos sin crear cuenta (hasta 50 GB cada uno), ves todo lo que ya mandaste ordenado por día y encuentras lo que el equipo te deja en «Del equipo». Si tu fotógrafo te ayuda, en «Compartir» sacas un link para que él suba sin ver lo tuyo.\n\nGuárdalo en la pantalla de inicio de tu celular. Es solo tuyo: no lo compartas.",
     en: "Hi, {n} 💜 This is your personal link to send us your content (we no longer use Dropbox):\n{url}\n\nThere you upload photos and videos without an account (up to 50 GB each), see everything you've sent sorted by day and find what the team leaves you in «From the team». If your photographer helps you, in «Share» you can create a link so they can upload without seeing your files.\n\nSave it to your phone's home screen. It's just for you: don't share it.",

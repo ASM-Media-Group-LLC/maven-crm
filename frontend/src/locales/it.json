@@ -1,0 +1,514 @@
+{
+ "portada.cierre.bajada": {
+  "t": "Richiedi la tua demo, allestisci le tue stanze e lascia che Maven faccia il resto.",
+  "en": "Request your demo, set up your rooms and let Maven do the rest."
+ },
+ "portada.cierre.titulo": {
+  "t": "Il tuo team,",
+  "en": "Your team,"
+ },
+ "portada.cierre.tituloAcento": {
+  "t": "al lavoro davvero.",
+  "en": "really working."
+ },
+ "portada.como.bajada": {
+  "t": "Dalla creazione delle tue stanze al report giornaliero, tutto succede dentro Maven.",
+  "en": "From setting up your rooms to the daily report, everything happens inside Maven."
+ },
+ "portada.como.ceja": {
+  "t": "Come funziona",
+  "en": "How it works"
+ },
+ "portada.como.titulo": {
+  "t": "Tre passi. Zero uffici.",
+  "en": "Three steps. Zero office."
+ },
+ "portada.cta.demo": {
+  "t": "Richiedi una demo",
+  "en": "Request a demo"
+ },
+ "portada.demo.avisoPrivacidad": {
+  "t": "Informativa sulla privacy",
+  "en": "Privacy notice"
+ },
+ "portada.demo.bajada": {
+  "t": "Raccontaci del tuo team e ti mostreremo il tuo ufficio virtuale in azione.",
+  "en": "Tell us about your team and we'll show you your virtual office in action."
+ },
+ "portada.demo.correo": {
+  "t": "Email di lavoro",
+  "en": "Work email"
+ },
+ "portada.demo.correoPh": {
+  "t": "tu@azienda.it",
+  "en": "you@company.com"
+ },
+ "portada.demo.elige": {
+  "t": "Scegli un'opzione",
+  "en": "Choose an option"
+ },
+ "portada.demo.empresa": {
+  "t": "Azienda",
+  "en": "Company"
+ },
+ "portada.demo.empresaPh": {
+  "t": "Nome dell'azienda",
+  "en": "Company name"
+ },
+ "portada.demo.enviando": {
+  "t": "Invio in corso…",
+  "en": "Sending…"
+ },
+ "portada.demo.enviar": {
+  "t": "Richiedi la demo",
+  "en": "Request the demo"
+ },
+ "portada.demo.error": {
+  "t": "Non siamo riusciti a inviare la tua richiesta. Riprova tra un momento.",
+  "en": "We couldn't send your request. Please try again in a moment."
+ },
+ "portada.demo.etiqueta": {
+  "t": "richiedi una demo",
+  "en": "request a demo"
+ },
+ "portada.demo.graciasTexto": {
+  "t": "Ti scriveremo all'indirizzo email che hai lasciato. Se è urgente, rispondi a quella stessa email: arriva direttamente a noi.",
+  "en": "We'll write to the email you left. If it's urgent, reply to that same email and it comes straight to us."
+ },
+ "portada.demo.graciasTitulo": {
+  "t": "Richiesta ricevuta",
+  "en": "Request received"
+ },
+ "portada.demo.interes": {
+  "t": "Cosa ti interessa",
+  "en": "What you're interested in"
+ },
+ "portada.demo.listo1": {
+  "t": "Rispondiamo via email — nessuna chiamata commerciale che non hai chiesto.",
+  "en": "We reply by email — no sales calls you didn't ask for."
+ },
+ "portada.demo.listo2": {
+  "t": "La demo usa dati di esempio: non devi preparare nulla.",
+  "en": "The demo runs on sample data: you don't need to bring anything."
+ },
+ "portada.demo.listo3": {
+  "t": "Niente da installare — tutto funziona nel browser.",
+  "en": "Nothing to install — it all runs in the browser."
+ },
+ "portada.demo.mensaje": {
+  "t": "Raccontaci di più",
+  "en": "Tell us more"
+ },
+ "portada.demo.mensajePh": {
+  "t": "Cosa usi oggi, quanto ti costa, quante persone lo useranno…",
+  "en": "What you use today, what it's costing you, how many people will use it…"
+ },
+ "portada.demo.nombre": {
+  "t": "Nome",
+  "en": "Name"
+ },
+ "portada.demo.nombrePh": {
+  "t": "Il tuo nome",
+  "en": "Your name"
+ },
+ "portada.demo.nota": {
+  "t": "Rispondiamo via email. Tutto qui.",
+  "en": "We reply by email. That's it."
+ },
+ "portada.demo.opcional": {
+  "t": "Facoltativo",
+  "en": "Optional"
+ },
+ "portada.demo.privacidad": {
+  "t": "Inviando, accetti che usiamo questi dati solo per risponderti. Non li condividiamo e non ti iscriviamo a nulla.",
+  "en": "By sending, you agree we use this data only to reply to you. We don't share it or subscribe you to anything."
+ },
+ "portada.demo.tamano": {
+  "t": "Dimensione del team",
+  "en": "Team size"
+ },
+ "portada.demo.tamano1": {
+  "t": "Da 1 a 10 persone",
+  "en": "1 to 10 people"
+ },
+ "portada.demo.tamano2": {
+  "t": "Da 11 a 50",
+  "en": "11 to 50"
+ },
+ "portada.demo.tamano3": {
+  "t": "Da 51 a 200",
+  "en": "51 to 200"
+ },
+ "portada.demo.tamano4": {
+  "t": "più di 200",
+  "en": "more than 200"
+ },
+ "portada.demo.telefono": {
+  "t": "Telefono",
+  "en": "Phone"
+ },
+ "portada.demo.titulo": {
+  "t": "Porta la tua attività al livello successivo.",
+  "en": "Take your business to the next level."
+ },
+ "portada.equipo.agencias": {
+  "t": "Agenzie",
+  "en": "Agencies"
+ },
+ "portada.equipo.atencion": {
+  "t": "Assistenza clienti",
+  "en": "Customer service"
+ },
+ "portada.equipo.diseno": {
+  "t": "Design",
+  "en": "Design"
+ },
+ "portada.equipo.operaciones": {
+  "t": "Operazioni",
+  "en": "Operations"
+ },
+ "portada.equipo.otro": {
+  "t": "Quello che serve alla tua azienda",
+  "en": "Whatever your company needs"
+ },
+ "portada.equipo.soporte": {
+  "t": "Supporto",
+  "en": "Support"
+ },
+ "portada.equipo.ventas": {
+  "t": "Vendite",
+  "en": "Sales"
+ },
+ "portada.equipos.bajada": {
+  "t": "Maven non è pensato per un solo settore. Se le tue persone lavorano da casa, qui lavorano insieme.",
+  "en": "Maven isn't for just one industry. If your people work from home, here they work together."
+ },
+ "portada.equipos.ceja": {
+  "t": "Per le aziende",
+  "en": "For companies"
+ },
+ "portada.equipos.titulo": {
+  "t": "Per qualsiasi team da remoto",
+  "en": "For any remote team"
+ },
+ "portada.f.accesos": {
+  "t": "Sei tu ad approvare chi entra",
+  "en": "You approve who gets in"
+ },
+ "portada.f.accesosTexto": {
+  "t": "Nessuno entra senza il tuo permesso e ogni ruolo vede solo ciò che gli spetta.",
+  "en": "No one gets in without your permission, and each role sees only what's theirs."
+ },
+ "portada.f.almacenamiento": {
+  "t": "Archiviazione",
+  "en": "Storage"
+ },
+ "portada.f.almacenamientoTexto": {
+  "t": "I file della tua azienda nel tuo spazio, condivisi per area.",
+  "en": "Your company's files in your own space, shared by area."
+ },
+ "portada.f.argos": {
+  "t": "Argos, l'IA che vigila",
+  "en": "Argos, the AI that keeps watch"
+ },
+ "portada.f.argosTexto": {
+  "t": "Controlla telecamere e schermi, valuta ogni persona e ti avvisa appena qualcosa non va.",
+  "en": "Checks cameras and screens, scores each person and alerts you as soon as something's off."
+ },
+ "portada.f.correo": {
+  "t": "Email dalla A alla Z",
+  "en": "Email from A to Z"
+ },
+ "portada.f.correoTexto": {
+  "t": "Caselle sul tuo dominio, gestite da cima a fondo da Maven.",
+  "en": "Mailboxes on your domain, managed end to end from Maven."
+ },
+ "portada.f.cowork": {
+  "t": "Cowork dal vivo",
+  "en": "Live Cowork"
+ },
+ "portada.f.coworkTexto": {
+  "t": "Le telecamere e gli schermi di tutto il tuo team, stanza per stanza. Vedi chi c'è e su cosa sta lavorando.",
+  "en": "Your whole team's cameras and screens, room by room. See who's there and what they're working on."
+ },
+ "portada.f.documentos": {
+  "t": "Documenti",
+  "en": "Documents"
+ },
+ "portada.f.documentosTexto": {
+  "t": "Fogli, documenti e presentazioni da modificare insieme, con le versioni.",
+  "en": "Sheets, docs and presentations you edit together, with versions."
+ },
+ "portada.f.mensajeria": {
+  "t": "Messaggistica interna",
+  "en": "Internal messaging"
+ },
+ "portada.f.mensajeriaTexto": {
+  "t": "La chat del tuo team, con gruppi per area e sotto il tuo controllo.",
+  "en": "Your team's chat, with groups by area and under your control."
+ },
+ "portada.f.reuniones": {
+  "t": "Riunioni",
+  "en": "Meetings"
+ },
+ "portada.f.reunionesTexto": {
+  "t": "Videochiamate con condivisione dello schermo sui nostri server, senza pagare un altro strumento.",
+  "en": "Video calls with screen sharing on our own servers, without paying for another tool."
+ },
+ "portada.f.tareas": {
+  "t": "Attività",
+  "en": "Tasks"
+ },
+ "portada.f.tareasTexto": {
+  "t": "Ogni attività con un responsabile, una data e uno stato. Niente si perde in una chat.",
+  "en": "Every to-do with an owner, a date and a status. Nothing gets lost in a chat."
+ },
+ "portada.funciones.ceja": {
+  "t": "Cosa include",
+  "en": "What's included"
+ },
+ "portada.funciones.titulo": {
+  "t": "Tutto ciò che serve per lavorare davvero",
+  "en": "Everything you need to get real work done"
+ },
+ "portada.hero.bajada": {
+  "t": "La piattaforma dove il tuo team lavora insieme da qualsiasi casa: telecamere dal vivo, un'IA che vigila e tutta la tua attività in un unico posto — senza pagare un ufficio.",
+  "en": "The platform where your team works together from any home: live cameras, an AI that keeps watch and your whole business in one place — without paying for an office."
+ },
+ "portada.hero.linea1": {
+  "t": "L'ufficio,",
+  "en": "The office,"
+ },
+ "portada.hero.linea2": {
+  "t": "reinventato.",
+  "en": "reinvented."
+ },
+ "portada.hero.verComo": {
+  "t": "Guarda come funziona",
+  "en": "See how it works"
+ },
+ "portada.idioma": {
+  "t": "Lingua",
+  "en": "Language"
+ },
+ "portada.interes.correo": {
+  "t": "Email con il tuo dominio",
+  "en": "Own email"
+ },
+ "portada.interes.cowork": {
+  "t": "Cowork e riunioni",
+  "en": "Cowork and meetings"
+ },
+ "portada.interes.marcaBlanca": {
+  "t": "White label",
+  "en": "White label"
+ },
+ "portada.interes.messenger": {
+  "t": "Messenger",
+  "en": "Messenger"
+ },
+ "portada.interes.otras": {
+  "t": "Altre opzioni per agenzie",
+  "en": "Other agency options"
+ },
+ "portada.interes.personas": {
+  "t": "Personale e buste paga",
+  "en": "People and payroll"
+ },
+ "portada.interes.promolog": {
+  "t": "Promolog",
+  "en": "Promolog"
+ },
+ "portada.interes.tickets": {
+  "t": "Ticket",
+  "en": "Tickets"
+ },
+ "portada.interes.todo": {
+  "t": "Tutto",
+  "en": "Everything"
+ },
+ "portada.interes.ventas": {
+  "t": "Vendite e pipeline",
+  "en": "Sales and pipeline"
+ },
+ "portada.nav.como": {
+  "t": "Come funziona",
+  "en": "How it works"
+ },
+ "portada.nav.empresas": {
+  "t": "Per le aziende",
+  "en": "For companies"
+ },
+ "portada.nav.entrar": {
+  "t": "Accedi",
+  "en": "Sign in"
+ },
+ "portada.nav.precios": {
+  "t": "Prezzi",
+  "en": "Pricing"
+ },
+ "portada.nav.secciones": {
+  "t": "Sezioni",
+  "en": "Sections"
+ },
+ "portada.paso1": {
+  "t": "Allestisci il tuo ufficio",
+  "en": "Set up your office"
+ },
+ "portada.paso1Texto": {
+  "t": "Crea una stanza per ogni team e aggiungi le tue persone. Tutti entrano da casa, dal browser, senza installare nulla.",
+  "en": "Create a room for each team and add your people. Everyone joins from home, in the browser, with nothing to install."
+ },
+ "portada.paso2": {
+  "t": "Il tuo team lavora dal vivo",
+  "en": "Your team works live"
+ },
+ "portada.paso2Texto": {
+  "t": "Telecamera e schermo accesi in Cowork, come nello stesso ufficio. Chat, email e documenti a un clic, senza uscire da Maven.",
+  "en": "Camera and screen on in Cowork, as if in the same office. Chat, email and documents are one click away, without leaving Maven."
+ },
+ "portada.paso3": {
+  "t": "Argos vigila e ti fa rapporto",
+  "en": "Argos watches and reports to you"
+ },
+ "portada.paso3Texto": {
+  "t": "L'IA controlla chi lavora davvero durante tutto il turno, dà a ogni persona un punteggio da 0 a 100 e avvisa subito lei e il suo responsabile. Controllo totale, senza rincorrere nessuno.",
+  "en": "The AI checks who's really working throughout the shift, scores each person from 0 to 100 and instantly alerts them and their manager. Total control, without chasing anyone."
+ },
+ "portada.pie.enlaces": {
+  "t": "Link a piè di pagina",
+  "en": "Footer links"
+ },
+ "portada.pie.lema": {
+  "t": "L'ufficio, reinventato.",
+  "en": "The office, reinvented."
+ },
+ "portada.pie.privacidad": {
+  "t": "Privacy",
+  "en": "Privacy"
+ },
+ "portada.plan.empresa": {
+  "t": "Business",
+  "en": "Business"
+ },
+ "portada.plan.empresa1": {
+  "t": "Tutto quello di Team",
+  "en": "Everything in Team"
+ },
+ "portada.plan.empresa2": {
+  "t": "Un Cowork per area, ognuno con il suo supervisore",
+  "en": "One Cowork per area, each with its own supervisor"
+ },
+ "portada.plan.empresa3": {
+  "t": "Un punteggio da 0 a 100 per persona, giornaliero e settimanale",
+  "en": "A 0–100 score per person, daily and weekly"
+ },
+ "portada.plan.empresa4": {
+  "t": "Avvisi immediati alla persona e al suo responsabile",
+  "en": "Instant alerts to the person and their manager"
+ },
+ "portada.plan.empresa5": {
+  "t": "Una scheda per ogni persona, giorno per giorno",
+  "en": "A record for each person, day by day"
+ },
+ "portada.plan.empresaTope": {
+  "t": "Fino a 50 persone",
+  "en": "Up to 50 people"
+ },
+ "portada.plan.enterprise": {
+  "t": "Enterprise",
+  "en": "Enterprise"
+ },
+ "portada.plan.enterprise1": {
+  "t": "Tutto quello di Business",
+  "en": "Everything in Business"
+ },
+ "portada.plan.enterprise2": {
+  "t": "Per team di oltre 50 persone",
+  "en": "For teams of more than 50 people"
+ },
+ "portada.plan.enterprise3": {
+  "t": "Il tuo marchio e i tuoi colori su tutta la piattaforma",
+  "en": "Your brand and colors across the whole platform"
+ },
+ "portada.plan.enterprise4": {
+  "t": "Installazione e integrazioni su misura",
+  "en": "Custom installation and integrations"
+ },
+ "portada.plan.enterprise5": {
+  "t": "Supporto dedicato",
+  "en": "Dedicated support"
+ },
+ "portada.plan.enterpriseTope": {
+  "t": "Più di 50 persone · grandi aziende",
+  "en": "More than 50 people · large companies"
+ },
+ "portada.plan.equipo": {
+  "t": "Team",
+  "en": "Team"
+ },
+ "portada.plan.equipo1": {
+  "t": "Cowork dal vivo, con telecamera e schermo",
+  "en": "Live Cowork, with camera and screen"
+ },
+ "portada.plan.equipo2": {
+  "t": "Argos, l'IA che sorveglia tutto il turno",
+  "en": "Argos, the AI that watches the whole shift"
+ },
+ "portada.plan.equipo3": {
+  "t": "Riunioni, messaggistica ed email sul tuo dominio",
+  "en": "Meetings, messaging and email on your domain"
+ },
+ "portada.plan.equipo4": {
+  "t": "Documenti, attività e archiviazione",
+  "en": "Documents, tasks and storage"
+ },
+ "portada.plan.equipo5": {
+  "t": "Sei tu ad approvare chi entra",
+  "en": "You approve who gets in"
+ },
+ "portada.plan.equipoTope": {
+  "t": "Fino a 20 persone",
+  "en": "Up to 20 people"
+ },
+ "portada.precios.aLaMedida": {
+  "t": "Su misura",
+  "en": "Custom"
+ },
+ "portada.precios.bajada": {
+  "t": "Ti consegniamo l'ufficio allestito e pronto per il tuo team. Entrano tutti, entro il limite del tuo piano.",
+  "en": "We hand you the office set up and ready for your team. Everyone gets in, within your plan's limit."
+ },
+ "portada.precios.ceja": {
+  "t": "Prezzi",
+  "en": "Pricing"
+ },
+ "portada.precios.contactanos": {
+  "t": "Contattaci",
+  "en": "Contact us"
+ },
+ "portada.precios.nota": {
+  "t": "Un prezzo fisso per azienda, non per persona.",
+  "en": "A fixed price per company, not per person."
+ },
+ "portada.precios.notaInstalacion": {
+  "t": "Installazione e integrazioni su misura per la tua azienda: da 3.000 USD, pagamento unico.",
+  "en": "Custom installation and integrations for your company: from USD 3,000, one-time payment."
+ },
+ "portada.precios.periodo": {
+  "t": "/ mese · per azienda",
+  "en": "/ month · per company"
+ },
+ "portada.precios.recomendado": {
+  "t": "Consigliato",
+  "en": "Recommended"
+ },
+ "portada.precios.titulo": {
+  "t": "Un prezzo fisso per azienda. Nessuna sorpresa.",
+  "en": "One fixed price per company. No surprises."
+ },
+ "portada.tituloDocumento": {
+  "t": "Maven — L'ufficio, reinventato",
+  "en": "Maven — The office, reinvented"
+ }
+}

@@ -84,7 +84,7 @@ export function tonoBajada(mbps: number | null): Tono {
   return mbps < BAJADA_FLOJA_MBPS ? "flojo" : "bien";
 }
 export function tonoNC(nc: string | null): Tono {
-  if (nc === "activa") return "bien";
+  if (nc === "fuerte" || nc === "activa") return "bien";
   if (nc === "solo_puerta" || nc === "fallo" || nc === "no_soportada") return "flojo";
   return "sin_dato";
 }

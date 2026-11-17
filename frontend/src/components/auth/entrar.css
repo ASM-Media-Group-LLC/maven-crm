@@ -1,0 +1,128 @@
+/* ═══════════════════════════════════════════════════════════════════════
+   PANTALLAS DE ENTRAR con la piel de la portada «La oficina, reinventada.»
+   Mismos tokens que portada/reinventada.css: azul marino #101827, tarjeta
+   #141d2e, verde Granola de los botones #bed161, Sora en los títulos. Todo va bajo
+   `.entrar` para no escaparse al resto de la app. Los formularios de cada
+   pantalla traen sus propias clases (Tailwind); acá se pisan con selectores
+   más específicos para que todas queden iguales sin tocar su lógica.
+   ═══════════════════════════════════════════════════════════════════════ */
+@import url("https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600&family=Sora:wght@600;700;800&family=Montserrat:wght@700&display=swap");
+
+.entrar {
+  --en-bg: #101827;
+  --en-caja: #141d2e;
+  --en-campo: #0f1624;
+  --en-texto: #ffffff;
+  --en-gris: #8f9ab0;
+  --en-verde: #bed161;
+  --en-verde-hover: #cddc7f;
+  --en-sobre-verde: #1c2108;
+  --en-linea: rgba(255, 255, 255, .07);
+  position: relative;
+  min-height: 100vh;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--en-bg);
+  color: var(--en-texto);
+  font: 400 16px/1.6 "Instrument Sans", ui-sans-serif, system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+/* El mismo resplandor verde, apenas, que el inicio y el cierre de la portada. */
+.entrar::before {
+  content: ""; position: absolute; inset: 0; pointer-events: none;
+  background:
+    radial-gradient(ellipse 55% 45% at 50% 42%, rgba(190, 209, 97, .07), transparent 70%),
+    radial-gradient(ellipse 80% 60% at 50% -10%, rgba(255, 255, 255, .035), transparent 70%);
+}
+
+/* ── Barra de arriba: igual a la de la portada ───────────────────────── */
+.entrar .entrar-barra {
+  position: relative; z-index: 1;
+  display: flex; align-items: center; justify-content: space-between; gap: 1rem;
+  width: min(1120px, calc(100% - 32px)); margin: 0 auto;
+  padding: 1.1rem 0; padding-top: calc(1.1rem + env(safe-area-inset-top, 0px));
+}
+.entrar .entrar-marca {
+  display: inline-flex; align-items: center; gap: .075em; text-decoration: none;
+  font: 700 22px/1 Montserrat, sans-serif; letter-spacing: 0; color: var(--en-texto);
+}
+.entrar .entrar-volver {
+  display: inline-flex; align-items: center; gap: .45em; text-decoration: none;
+  font-size: .88rem; font-weight: 600; color: var(--en-texto);
+  border: 1px solid rgba(255, 255, 255, .22); border-radius: 999px; padding: .6em 1.2em;
+  transition: border-color .2s ease, color .2s ease;
+}
+.entrar .entrar-volver svg { width: 1em; height: 1em; }
+.entrar .entrar-volver:hover { border-color: var(--en-verde); color: var(--en-verde); }
+
+/* ── La tarjeta: como las de precios ─────────────────────────────────── */
+.entrar .entrar-centro {
+  position: relative; z-index: 1; flex: 1;
+  display: flex; align-items: center; justify-content: center;
+  padding: 1.5rem 16px 4rem;
+}
+.entrar .entrar-caja {
+  width: 100%; max-width: 27rem;
+  background: var(--en-caja);
+  border: 1px solid var(--en-linea);
+  border-radius: 20px;
+  padding: clamp(1.6rem, 5vw, 2.4rem);
+  box-shadow: 0 40px 90px -40px rgba(0, 0, 0, .8);
+}
+
+/* Títulos con la letra de la portada. */
+.entrar .entrar-caja h1,
+.entrar .entrar-caja h2 {
+  font-family: Sora, "Instrument Sans", sans-serif; font-weight: 800;
+  letter-spacing: -.02em; line-height: 1.15; color: var(--en-texto);
+  font-size: clamp(1.6rem, 4vw, 1.9rem);
+}
+.entrar .entrar-caja p { color: var(--en-gris); }
+
+/* Etiquetas y campos. */
+.entrar .entrar-caja label { color: #c9d0dc; font-weight: 500; }
+.entrar .entrar-caja input:not([type="checkbox"]):not([type="radio"]) {
+  height: 3rem; border-radius: 12px;
+  background: var(--en-campo); border: 1px solid rgba(255, 255, 255, .1);
+  color: var(--en-texto); font-size: 1rem;
+  transition: border-color .2s ease, box-shadow .2s ease;
+}
+.entrar .entrar-caja input::placeholder { color: #5f6b82; }
+.entrar .entrar-caja input:focus,
+.entrar .entrar-caja input:focus-visible {
+  outline: none; border-color: var(--en-verde);
+  box-shadow: 0 0 0 3px rgba(190, 209, 97, .18);
+}
+/* El autocompletar de Chrome pinta el campo de amarillo/blanco: se lo tapa. */
+.entrar .entrar-caja input:-webkit-autofill {
+  -webkit-text-fill-color: var(--en-texto);
+  box-shadow: 0 0 0 1000px var(--en-campo) inset;
+  caret-color: var(--en-texto);
+}
+
+/* El botón principal: la píldora verde de «Pedir una demo». */
+.entrar .entrar-caja button[type="submit"] {
+  height: 3rem; border-radius: 999px; border: 0;
+  background: var(--en-verde); color: var(--en-sobre-verde);
+  font-weight: 600; font-size: 1rem;
+  box-shadow: none;
+  transition: background .2s ease, transform .2s ease;
+}
+.entrar .entrar-caja button[type="submit"]:hover:not(:disabled) { background: var(--en-verde-hover); transform: translateY(-1px); }
+.entrar .entrar-caja button[type="submit"]:disabled { opacity: .6; }
+
+/* Los enlaces de abajo (olvidé mi contraseña, pedir una demo). */
+.entrar .entrar-caja a { color: var(--en-gris); text-decoration: none; transition: color .2s ease; }
+.entrar .entrar-caja a:hover { color: var(--en-verde); text-decoration: none; }
+
+@media (max-width: 560px) {
+  .entrar .entrar-volver span { display: none; }
+  .entrar .entrar-volver { padding: .6em .75em; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .entrar .entrar-caja button[type="submit"],
+  .entrar .entrar-volver { transition: none; }
+  .entrar .entrar-caja button[type="submit"]:hover:not(:disabled) { transform: none; }
+}

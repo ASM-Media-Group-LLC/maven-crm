@@ -133,7 +133,7 @@ export function useBrowserNotifications() {
       try {
         await registro.showNotification(title, {
           body,
-          icon: "/icon-192.png?v=3",
+          icon: "/icon-192.png?v=6",
           badge: "/favicon.ico",
           tag: TAG_AVISO_DE_PAGINA,
           data: { url: ruta, kind: KIND_AVISO_DE_PAGINA, marca },

@@ -16,6 +16,7 @@ import BancoTableros from "./bancoTableros";
 import BancoVigilancia from "./bancoVigilancia";
 import BancoConexionEquipo from "./bancoConexionEquipo";
 import BancoCostos from "./bancoCostos";
+import BancoGracia from "./bancoGracia";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import VirtualOfficePage from "@/pages/oficina-ai/VirtualOfficePage";
 import TardanzasPage from "@/pages/admin/TardanzasPage";
@@ -79,6 +80,12 @@ if (params.get("skin")) document.documentElement.setAttribute("data-skin", param
 
 createRoot(document.getElementById("root")!).render(
   // /harness.html?ver=costos[&tema=claro] → el tablero de gasto de Costos con los números del 14/11.
+  // /harness.html?ver=gracia[&tema=claro] → los minutos de gracia (Cowork + Expediente).
+  ver === "gracia" ? (
+    <StrictMode>
+      <LanguageProvider><BancoGracia /></LanguageProvider>
+    </StrictMode>
+  ) :
   ver === "costos" ? (
     <StrictMode>
       <LanguageProvider><BancoCostos /></LanguageProvider>

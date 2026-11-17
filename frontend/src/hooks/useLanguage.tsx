@@ -40,10 +40,16 @@ function huboSesionAqui(): boolean {
  *      (16/11/2026: «tu equipo actual sigue en el idioma que ya eligió»; sin
  *      esto, a quien tiene Chrome en inglés la app le cambiaba de un día al otro);
  *   3. alguien nuevo → el idioma de su navegador, o inglés si Maven no lo habla. */
+/** El idioma de la dirección de la portada (/en, /es, /de…), si la hay. */
+function idiomaDeLaRuta(): Language | null {
+  const enLaRuta = typeof location !== "undefined" ? location.pathname.match(/^\/(en|es|de|fr|it|pt)(\/|$)/)?.[1] : undefined;
+  return esIdioma(enLaRuta) ? enLaRuta : null;
+}
+
 export function idiomaInicial(): Language {
   // La portada en cada idioma tiene su dirección (/en, /es, /de…): manda esa.
-  const enLaRuta = typeof location !== "undefined" ? location.pathname.match(/^\/(en|es|de|fr|it|pt)(\/|$)/)?.[1] : undefined;
-  if (esIdioma(enLaRuta)) return enLaRuta;
+  const enLaRuta = idiomaDeLaRuta();
+  if (enLaRuta) return enLaRuta;
   try {
     const guardado = localStorage.getItem(CLAVE_LOCAL);
     if (esIdioma(guardado)) return guardado;
@@ -149,6 +155,9 @@ const SincroContext = createContext<SincroConPerfil | undefined>(undefined);
 export function LanguageProvider({ children }: { children: ReactNode }) {
   const [language, setLanguageState] = useState<Language>(() => {
     const inicial = idiomaGuardado();
+    // Quien entra por /es (o /de…) se queda en ese idioma al tocar «Entrar»:
+    // la dirección cuenta como su elección en este navegador.
+    if (idiomaDeLaRuta()) guardarIdiomaLocal(inicial);
     // Se fija acá, en el inicializador, y no en un efecto: un toast puede
     // dispararse antes del primer efecto (por ejemplo si la sesión ya venció al
     // cargar) y tiene que salir en el idioma correcto desde el arranque.

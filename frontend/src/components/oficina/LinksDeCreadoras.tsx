@@ -1,13 +1,15 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { Link as LinkRouter } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { formatDistanceToNowStrict } from "date-fns";
 import { es as esLocale } from "date-fns/locale";
-import { AlertTriangle, Check, Copy, FolderOpen, FolderPlus, Link2, Loader2, MessageCircle, RefreshCw, Search } from "lucide-react";
+import { AlertTriangle, Check, Copy, Folder, FolderOpen, FolderPlus, Link2, Loader2, MessageCircle, RefreshCw, Search } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useLanguage } from "@/hooks/useLanguage";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { UserAvatar } from "@/components/UserAvatar";
 import { tamano } from "@/lib/drive/formato";
 import { urlDeAportar, useCopiar } from "@/components/oficina/LinkDeSubida";
 
@@ -136,86 +138,116 @@ export function LinksDeCreadorasVista({ filas, cargando, fallo, onReintentar }: 
   }
   if (!todas.length) return <p className="vidrio p-6 text-sm text-muted-foreground">{t("drive.creadoras.vacio")}</p>;
 
+  const mandaron = todas.filter((f) => f.archivos > 0).length;
+  const numero = (n: number) => n.toLocaleString(language === "es" ? "es-CO" : "en-US");
+
   return (
+    <TooltipProvider delayDuration={250}>
     <div className="flex flex-col gap-3">
-      <div className="flex flex-wrap items-center gap-3">
-        <div className="relative w-full sm:max-w-sm">
-          <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+      {/* Barra: buscador + números en fichas (no una frase larga). */}
+      <div className="vidrio-barra flex flex-wrap items-center gap-2 p-2">
+        <div className="relative min-w-0 flex-1 sm:max-w-sm">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input value={busqueda} onChange={(e) => setBusqueda(e.target.value)} placeholder={t("drive.creadoras.buscar")}
-            aria-label={t("drive.creadoras.buscar")} className="pl-8" />
+            aria-label={t("drive.creadoras.buscar")} className="h-9 rounded-xl border-transparent bg-background/40 pl-9 shadow-none" />
         </div>
-        <span className="text-xs text-muted-foreground tabular-nums">{t("drive.creadoras.resumen", { n: todas.length, c: conLink, s: sinCarpeta })}</span>
+        <div className="flex flex-wrap items-center gap-1.5 sm:ml-auto">
+          <Ficha valor={numero(todas.length)} texto={t("drive.creadoras.fichaTotal")} />
+          <Ficha valor={numero(conLink)} texto={t("drive.creadoras.fichaConLink")} />
+          <Ficha valor={numero(mandaron)} texto={t("drive.creadoras.fichaMandaron")} />
+          {sinCarpeta > 0 && <Ficha valor={numero(sinCarpeta)} texto={t("drive.creadoras.fichaSinCarpeta")} aviso />}
+        </div>
       </div>
       {error && <p role="alert" className="text-xs text-destructive">{error}</p>}
 
       {vistas.length === 0 ? (
         <p className="vidrio p-6 text-sm text-muted-foreground">{t("drive.links.sinResultados", { q: busqueda })}</p>
       ) : (
-        <ul className="vidrio divide-y divide-border/50 overflow-hidden">
+        <ul className="vidrio overflow-hidden p-1.5">
           {vistas.map((f) => {
             const nombre = nombreDeCreadora(f);
             const url = f.token ? urlDeAportar(f.token) : null;
             const mensaje = url ? t("drive.creadoras.mensaje", { n: nombre, url }) : "";
             const wa = url ? enlaceDeWhatsapp(f.telefono, mensaje) : null;
             const ocupada = haciendo === f.creator_id;
+            const sinCarpetaAun = !f.carpeta_id;
             return (
-              <li key={f.creator_id} className="grid gap-3 p-3 sm:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)_auto] sm:items-center sm:gap-4 sm:px-4">
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-semibold">{nombre}</p>
-                  <p className="truncate text-xs text-muted-foreground">
-                    {f.carpeta ? (f.raiz ? `${f.raiz} › ${f.carpeta}` : f.carpeta) : t("drive.creadoras.sinCarpeta")}
-                  </p>
+              <li key={f.creator_id}
+                className="grid gap-3 rounded-xl px-3 py-2.5 transition-colors hover:bg-primary/[0.05] sm:grid-cols-[minmax(0,1fr)_minmax(0,13rem)_15.5rem] sm:items-center sm:gap-4">
+                {/* Quién: avatar + nombre + dónde está su carpeta. */}
+                <div className="flex min-w-0 items-center gap-3">
+                  <UserAvatar name={nombre} size="sm" />
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-semibold">{nombre}</p>
+                    <p className="flex min-w-0 items-center gap-1 text-xs text-muted-foreground">
+                      <Folder className="h-3 w-3 shrink-0 opacity-70" />
+                      <span className="truncate">{f.carpeta ? (f.raiz ? `${f.raiz} › ${f.carpeta}` : f.carpeta) : t("drive.creadoras.sinCarpeta")}</span>
+                    </p>
+                  </div>
                 </div>
-                <div className="min-w-0 text-xs">
-                  {f.carpeta_id && (
-                    <>
-                      <p className="font-medium tabular-nums">
-                        {f.archivos > 0
-                          ? t("drive.links.recibido", { n: f.archivos.toLocaleString(language === "es" ? "es-CO" : "en-US"), tam: tamano(f.bytes) })
-                          : t("drive.creadoras.nadaAun")}
+
+                {/* Qué ha pasado con su link. */}
+                {!sinCarpetaAun && (
+                  <div className="min-w-0 pl-11 text-xs sm:pl-0">
+                    <p className={f.archivos > 0 ? "font-medium tabular-nums" : "text-muted-foreground"}>
+                      {f.archivos > 0
+                        ? t("drive.links.recibido", { n: numero(f.archivos), tam: tamano(f.bytes) })
+                        : t("drive.creadoras.nadaAun")}
+                    </p>
+                    {f.token && (
+                      <p className="mt-0.5 flex items-center gap-1.5 text-muted-foreground">
+                        <span aria-hidden className={`h-1.5 w-1.5 shrink-0 rounded-full ${f.usado_at ? "bg-success" : "bg-muted-foreground/40"}`} />
+                        <span className="truncate">{f.usado_at ? t("drive.creadoras.abierto", { hace: hace(f.usado_at, language) }) : t("drive.creadoras.nuncaAbierto")}</span>
                       </p>
-                      {f.token && (
-                        <p className="text-muted-foreground">
-                          {f.usado_at ? t("drive.creadoras.abierto", { hace: hace(f.usado_at, language) }) : t("drive.creadoras.nuncaAbierto")}
-                        </p>
-                      )}
-                    </>
-                  )}
-                </div>
-                <div className="flex flex-wrap gap-2 sm:justify-end">
+                    )}
+                  </div>
+                )}
+
+                {/* Acciones: UNA con texto (la principal) y el resto en íconos,
+                    en una columna de ancho fijo para que todas las filas
+                    queden alineadas tengan o no WhatsApp. */}
+                <div className={`flex flex-wrap items-center gap-1.5 pl-11 sm:flex-nowrap sm:justify-end sm:pl-0 ${sinCarpetaAun ? "sm:col-span-2 sm:flex-wrap" : ""}`}>
                   {url ? (
                     <>
-                      <Button size="sm" variant="outline" onClick={() => void copiar(mensaje)}>
-                        {copiado === mensaje ? <Check className="mr-1.5 h-3.5 w-3.5" /> : <Copy className="mr-1.5 h-3.5 w-3.5" />}
-                        {t(copiado === mensaje ? "drive.creadoras.mensajeCopiado" : "drive.creadoras.copiarMensaje")}
-                      </Button>
-                      {wa && (
-                        <Button size="sm" variant="outline" asChild>
-                          <a href={wa} target="_blank" rel="noopener noreferrer"><MessageCircle className="mr-1.5 h-3.5 w-3.5" />{t("drive.creadoras.whatsapp")}</a>
+                      {wa ? (
+                        <Button size="sm" variant="outline" asChild className="h-8 rounded-lg px-3">
+                          <a href={wa} target="_blank" rel="noopener noreferrer" aria-label={t("drive.creadoras.whatsapp")}>
+                            <MessageCircle className="mr-1.5 h-3.5 w-3.5" />{t("drive.creadoras.whatsappCorto")}
+                          </a>
+                        </Button>
+                      ) : (
+                        <Button size="sm" variant="outline" className="h-8 rounded-lg px-3" onClick={() => void copiar(mensaje)}>
+                          {copiado === mensaje ? <Check className="mr-1.5 h-3.5 w-3.5" /> : <Copy className="mr-1.5 h-3.5 w-3.5" />}
+                          {t(copiado === mensaje ? "drive.creadoras.mensajeCopiado" : "drive.creadoras.copiarMensaje")}
                         </Button>
                       )}
-                      <Button size="sm" variant="ghost" onClick={() => void copiar(url)}>
-                        {copiado === url ? <Check className="mr-1.5 h-3.5 w-3.5" /> : <Link2 className="mr-1.5 h-3.5 w-3.5" />}
-                        {t(copiado === url ? "drive.links.copiado" : "drive.creadoras.copiarLink")}
-                      </Button>
+                      {wa && (
+                        <Icono etiqueta={t(copiado === mensaje ? "drive.creadoras.mensajeCopiado" : "drive.creadoras.copiarMensaje")}
+                          onClick={() => void copiar(mensaje)}>
+                          {copiado === mensaje ? <Check className="h-4 w-4 text-success" /> : <Copy className="h-4 w-4" />}
+                        </Icono>
+                      )}
+                      <Icono etiqueta={t(copiado === url ? "drive.links.copiado" : "drive.creadoras.copiarLink")} onClick={() => void copiar(url)}>
+                        {copiado === url ? <Check className="h-4 w-4 text-success" /> : <Link2 className="h-4 w-4" />}
+                      </Icono>
                     </>
                   ) : f.carpeta_id ? (
-                    <Button size="sm" onClick={() => void crearLink(f)} disabled={ocupada}>
+                    <Button size="sm" className="h-8 rounded-lg px-3" onClick={() => void crearLink(f)} disabled={ocupada}>
                       {ocupada ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <Link2 className="mr-1.5 h-3.5 w-3.5" />}
                       {t("drive.creadoras.crearLink")}
                     </Button>
                   ) : (
                     raices.map((r) => (
-                      <Button key={r.id} size="sm" variant="outline" onClick={() => void crearCarpeta(f, r.id)} disabled={ocupada}>
+                      <Button key={r.id} size="sm" variant="outline" className="h-8 rounded-lg px-3" onClick={() => void crearCarpeta(f, r.id)} disabled={ocupada}>
                         {ocupada ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <FolderPlus className="mr-1.5 h-3.5 w-3.5" />}
                         {t("drive.creadoras.crearEn", { c: r.nombre })}
                       </Button>
                     ))
                   )}
                   {f.carpeta_id && (
-                    <Button size="sm" variant="ghost" asChild>
-                      <LinkRouter to={`/oficina/drive?carpeta=${f.carpeta_id}`}><FolderOpen className="mr-1.5 h-3.5 w-3.5" />{t("drive.links.abrir")}</LinkRouter>
-                    </Button>
+                    <Icono etiqueta={t("drive.links.abrir")} a={`/oficina/drive?carpeta=${f.carpeta_id}`}>
+                      <FolderOpen className="h-4 w-4" />
+                    </Icono>
                   )}
                 </div>
               </li>
@@ -224,5 +256,35 @@ export function LinksDeCreadorasVista({ filas, cargando, fallo, onReintentar }: 
         </ul>
       )}
     </div>
+    </TooltipProvider>
+  );
+}
+
+/** Un número con su etiqueta, en ficha (regla del sistema: números en tile). */
+function Ficha({ valor, texto, aviso = false }: { valor: string; texto: string; aviso?: boolean }) {
+  return (
+    <span className={`inline-flex items-baseline gap-1 rounded-lg border px-2.5 py-1 text-xs ${aviso ? "border-warning/30 bg-warning/10 text-warning" : "border-border/60 bg-background/30 text-muted-foreground"}`}>
+      <span className={`font-display text-sm font-semibold tabular-nums ${aviso ? "" : "text-foreground"}`}>{valor}</span>
+      {texto}
+    </span>
+  );
+}
+
+/** Botón de solo ícono, con su nombre para el lector de pantalla y el tooltip. */
+function Icono({ etiqueta, onClick, a, children }: { etiqueta: string; onClick?: () => void; a?: string; children: ReactNode }) {
+  const clase = "h-8 w-8 rounded-lg text-muted-foreground hover:text-foreground";
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        {a ? (
+          <Button size="icon" variant="ghost" asChild className={clase}>
+            <LinkRouter to={a} aria-label={etiqueta}>{children}</LinkRouter>
+          </Button>
+        ) : (
+          <Button size="icon" variant="ghost" className={clase} onClick={onClick} aria-label={etiqueta}>{children}</Button>
+        )}
+      </TooltipTrigger>
+      <TooltipContent>{etiqueta}</TooltipContent>
+    </Tooltip>
   );
 }

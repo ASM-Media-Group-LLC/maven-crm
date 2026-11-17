@@ -1,10 +1,11 @@
 """Iconos de Maven (favicon, PWA, iOS): la M de cinta verde sobre azul marino.
 
-La M es la de src/components/MarcaM.tsx (logo nuevo que trajo Alvaro el
-16/11/2026): dos «Λ» de trazo grueso con puntas redondas, en una caja de
-96 x 56. Las SUBIDAS van en el verde de la marca y las BAJADAS, debajo, con un
-pliegue que arranca en un verde más hondo junto a la cima y se aclara hacia el
-pie. Fondo: azul marino oficial con un degradado suave.
+La M es la de src/components/MarcaM.tsx: la «M de cinta» de la imagen que
+trajo Alvaro el 16/11/2026, medida píxel a píxel (caja de 336 x 158, trazo 68).
+Cada «Λ» es una cinta: la SUBIDA, clara, sube desde el pie, pasa por la cima y
+baja un poco; la BAJADA va encima, arranca con su punta redonda en sombra (el
+pliegue) y se aclara hacia el pie. La subida del segundo «Λ» tapa el pie de la
+primera bajada. Fondo: azul marino oficial con un degradado suave.
 
 Se dibuja a 8x y se reduce con LANCZOS, así queda suave a 16 px igual que a 512.
 El favicon lleva baldosa redondeada; los iconos de celular van a sangre (el
@@ -20,17 +21,21 @@ import numpy as np, sys, os
 AQUI = os.path.dirname(os.path.abspath(__file__))
 DEST = sys.argv[1] if len(sys.argv) > 1 else os.path.join(AQUI, "..", "public")
 
-VERDE = (79, 216, 141)        # #4fd88d, el de los botones de la portada
-HONDO = (42, 154, 92)         # #2a9a5c, el pliegue
+VERDE = (190, 209, 97)        # #bed161, el verde Granola de los botones
+HONDO = (114, 126, 52)        # #727e34, el pliegue (la sombra del verde Granola)
+FIN = (171, 188, 87)          # #abbc57, el pie de la bajada
 FONDO0 = (24, 35, 58)         # arriba-izquierda
 FONDO1 = (12, 18, 29)         # abajo-derecha (#0c121d)
 RADIO = 0.22                  # radio de la baldosa del favicon, fracción del lado
 
-# La M en su caja de 96 x 56 (igual que MarcaM.tsx).
-M_W, M_H, M_SW = 96.0, 56.0, 16.0
-SUBIDAS = (((10, 46), (29, 10)), ((48, 46), (67, 10)))
-BAJADAS = (((29, 10), (48, 46)), ((67, 10), (86, 46)))
-PLIEGUE_HASTA = 0.6           # el verde hondo se aclara hasta el 60% de la bajada
+# La M en su caja de 336 x 158 (igual que MarcaM.tsx).
+M_W, M_H, R = 336.0, 158.0, 34.0
+CINTAS = (
+    ((34, 124), (99, 34), (142, 90), (168, 124)),     # pie, cima, punta de la bajada, fin
+    ((168, 124), (233, 34), (276, 90), (302, 124)),
+)
+SOMBRA = np.array([1.0, 0.45]) / np.hypot(1.0, 0.45)   # hacia dónde se aclara el pliegue
+LARGO_SOMBRA = 2.6 * R
 
 
 def fondo(w, h, redondo=False, ss=8):
@@ -49,42 +54,38 @@ def fondo(w, h, redondo=False, ss=8):
     return im
 
 
-def _trazo(size, a, b, w):
+def _cinta(size, puntos, w):
     capa = Image.new("L", size, 0)
     d = ImageDraw.Draw(capa)
-    d.line([a, b], fill=255, width=int(round(w)))
-    for p in (a, b):
+    d.line(puntos, fill=255, width=int(round(w)), joint="curve")
+    for p in puntos:
         d.ellipse([p[0] - w / 2, p[1] - w / 2, p[0] + w / 2, p[1] + w / 2], fill=255)
     return capa
 
 
 def pinta_m(img, cx, cy, alto):
-    """Dibuja la M centrada en (cx, cy) con `alto` = alto de la caja de 96 x 56.
-    `img` es RGBA y ya está a la resolución final de trabajo (sin reducir)."""
+    """Dibuja la M centrada en (cx, cy); `alto` es el alto de la caja de 336 x 158.
+    `img` es RGBA y ya está a la resolución de trabajo (sin reducir)."""
     esc = alto / M_H
     x0, y0 = cx - M_W * esc / 2, cy - alto / 2
     P = lambda p: (x0 + p[0] * esc, y0 + p[1] * esc)
-    w = M_SW * esc
+    w = 2 * R * esc
     W, H = img.size
+    yy, xx = np.mgrid[0:H, 0:W]
+    for pie, cima, punta, fin in CINTAS:
+        subida = _cinta((W, H), [P(pie), P(cima), P(punta)], w)
+        capa = Image.new("RGBA", (W, H), VERDE + (255,))
+        capa.putalpha(subida)
+        img.alpha_composite(capa)
 
-    for a, b in BAJADAS:
-        pa, pb = P(a), P(b)
-        mask = _trazo((W, H), pa, pb, w)
-        yy, xx = np.mgrid[0:H, 0:W]
-        vx, vy = pb[0] - pa[0], pb[1] - pa[1]
-        t = ((xx - pa[0]) * vx + (yy - pa[1]) * vy) / (vx * vx + vy * vy)
-        t = np.clip(t / PLIEGUE_HASTA, 0, 1)
+        bajada = _cinta((W, H), [P(punta), P(fin)], w)
+        g0 = np.array(P(punta)) - R * esc * SOMBRA
+        t = np.clip(((xx - g0[0]) * SOMBRA[0] + (yy - g0[1]) * SOMBRA[1]) / (LARGO_SOMBRA * esc), 0, 1) ** 0.75
         col = np.zeros((H, W, 4), np.uint8)
         for c in range(3):
-            col[:, :, c] = np.clip(HONDO[c] + (VERDE[c] - HONDO[c]) * t, 0, 255)
-        col[:, :, 3] = np.array(mask)
+            col[:, :, c] = np.clip(HONDO[c] + (FIN[c] - HONDO[c]) * t, 0, 255)
+        col[:, :, 3] = np.array(bajada)
         img.alpha_composite(Image.fromarray(col))
-
-    for a, b in SUBIDAS:
-        mask = _trazo((W, H), P(a), P(b), w)
-        capa = Image.new("RGBA", (W, H), VERDE + (255,))
-        capa.putalpha(mask)
-        img.alpha_composite(capa)
     return img
 
 
@@ -98,11 +99,11 @@ def icono(size, redondo, ancho_m, ss=8):
 
 
 if __name__ == "__main__":
-    frames = [icono(s, True, 0.70) for s in (16, 32, 48, 64, 128, 256)]
+    frames = [icono(s, True, 0.78) for s in (16, 32, 48, 64, 128, 256)]
     frames[-1].save(os.path.join(DEST, "favicon.ico"), format="ICO",
                     sizes=[f.size for f in frames], append_images=frames[:-1])
     # A sangre y con margen: Android recorta los «maskable» a un círculo del 80%.
-    icono(192, False, 0.58).save(os.path.join(DEST, "icon-192.png"))
-    icono(512, False, 0.58).save(os.path.join(DEST, "icon-512.png"))
-    icono(180, False, 0.60).save(os.path.join(DEST, "apple-touch-icon.png"))
+    icono(192, False, 0.68).save(os.path.join(DEST, "icon-192.png"))
+    icono(512, False, 0.68).save(os.path.join(DEST, "icon-512.png"))
+    icono(180, False, 0.70).save(os.path.join(DEST, "apple-touch-icon.png"))
     print("iconos escritos en", os.path.abspath(DEST))
