@@ -1405,6 +1405,11 @@
     background: rgba(255,255,255,.04); border: 1px solid var(--line); border-radius: 11px;
     padding: 11px 13px; transition: border-color .2s, background .2s, box-shadow .2s;
   }
+  /* En el iPhone, un campo con letra menor a 16px hace que Safari agrande la
+     pantalla al tocarlo y la deje así. En el celular van a 16px. */
+  @media (max-width: 760px) {
+    .pt .campo input, .pt .campo select, .pt .campo textarea { font-size: 16px; }
+  }
   .pt .campo textarea { resize: vertical; min-height: 92px; }
   .pt .campo select { appearance: none; cursor: pointer; }
   .pt .campo input::placeholder, .pt .campo textarea::placeholder { color: var(--faint); }

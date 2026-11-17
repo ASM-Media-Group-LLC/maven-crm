@@ -236,6 +236,9 @@
 @media (max-width: 700px) {
   .pt.pr .pr-pie-in { flex-direction: column; text-align: center; justify-content: center; }
   .pt.pr .pr-pie-marca, .pt.pr .pr-pie-links { justify-content: center; }
+  /* Que el dedo le atine: cada enlace del pie con 44px de alto. */
+  .pt.pr .pr-pie-links { gap: .6rem; }
+  .pt.pr .pr-pie-links a { display: inline-flex; align-items: center; min-height: 44px; padding: 0 .6rem; }
 }
 
 /* Aparición al bajar */

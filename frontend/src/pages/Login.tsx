@@ -106,7 +106,7 @@ const Login = () => {
                 type="button"
                 variant="ghost"
                 size="icon"
-                className="absolute right-1 top-1/2 -translate-y-1/2 h-8 w-8 text-white/50 hover:text-white hover:bg-white/10"
+                className="absolute right-0.5 top-1/2 -translate-y-1/2 h-10 w-10 text-white/50 hover:text-white hover:bg-white/10"
                 onClick={() => setShowPassword(!showPassword)}
                 tabIndex={-1}
               >
@@ -120,8 +120,8 @@ const Login = () => {
           </Button>
         </form>
 
-        <div className="flex flex-col items-center gap-2 text-sm">
-          <Link to="/forgot-password" className="text-white/60 hover:text-white hover:underline">
+        <div className="flex flex-col items-center text-sm">
+          <Link to="/forgot-password" className="inline-flex min-h-11 items-center px-2 text-white/60 hover:text-white hover:underline">
             {t("auth.forgotPassword")}
           </Link>
           {/* Sin "crear cuenta": las cuentas de Maven las crea un admin desde
@@ -129,8 +129,8 @@ const Login = () => {
               base (guard `bloquear_alta_publica`). Ofrecerlo aquí mandaba a la
               gente a una puerta que no abre. Quien no tiene cuenta y quiere
               probar Maven pide una demo desde la portada. */}
-          <Link to="/#demo" className="text-white/40 hover:text-white hover:underline">
-            ¿Todavía no usas Maven? Pide una demo
+          <Link to="/#demo" className="inline-flex min-h-11 items-center justify-center px-2 text-center text-white/40 hover:text-white hover:underline">
+            {t("auth.pideDemo")}
           </Link>
         </div>
       </div>

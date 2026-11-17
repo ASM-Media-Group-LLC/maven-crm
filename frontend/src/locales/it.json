@@ -1,4 +1,84 @@
 {
+ "auth.backToLogin": {
+  "t": "Torna all'accesso",
+  "en": "Back to sign in"
+ },
+ "auth.email": {
+  "t": "Email",
+  "en": "Email"
+ },
+ "auth.emailPlaceholder": {
+  "t": "tu@email.com",
+  "en": "you@email.com"
+ },
+ "auth.fieldRequired": {
+  "t": "Campo obbligatorio",
+  "en": "Required field"
+ },
+ "auth.fieldRequiredDesc": {
+  "t": "Inserisci la tua email.",
+  "en": "Please enter your email."
+ },
+ "auth.forgotButton": {
+  "t": "Invia il link di recupero",
+  "en": "Send recovery link"
+ },
+ "auth.forgotInstruction": {
+  "t": "Inserisci la tua email e ti invieremo un link per reimpostare la password.",
+  "en": "Enter your email and we'll send you a link to reset your password."
+ },
+ "auth.forgotPassword": {
+  "t": "Password dimenticata?",
+  "en": "Forgot your password?"
+ },
+ "auth.forgotSent": {
+  "t": "Se l'email è registrata, riceverai un link per reimpostare la password. Controlla la tua casella di posta.",
+  "en": "If the email is registered, you'll receive a link to reset your password. Check your inbox."
+ },
+ "auth.forgotTitle": {
+  "t": "Recupera la password",
+  "en": "Recover password"
+ },
+ "auth.invalidEmail": {
+  "t": "Email non valida",
+  "en": "Invalid email"
+ },
+ "auth.invalidEmailDesc": {
+  "t": "Inserisci un'email valida.",
+  "en": "Please enter a valid email."
+ },
+ "auth.loginButton": {
+  "t": "Accedi",
+  "en": "Sign In"
+ },
+ "auth.loginError": {
+  "t": "Errore di accesso",
+  "en": "Sign-in error"
+ },
+ "auth.loginSubtitle": {
+  "t": "Inserisci le tue credenziali per entrare in Maven",
+  "en": "Enter your credentials to access the CRM"
+ },
+ "auth.loginTitle": {
+  "t": "Accedi",
+  "en": "Sign in"
+ },
+ "auth.password": {
+  "t": "Password",
+  "en": "Password"
+ },
+ "auth.pideDemo": {
+  "t": "Non usi ancora Maven? Richiedi una demo",
+  "en": "Not using Maven yet? Request a demo"
+ },
+ "auth.requiredFields": {
+  "t": "Campi obbligatori",
+  "en": "Required fields"
+ },
+ "auth.requiredFieldsDesc": {
+  "t": "Compila tutti i campi.",
+  "en": "Please fill in all the fields."
+ },
  "portada.cierre.bajada": {
   "t": "Richiedi la tua demo, allestisci le tue stanze e lascia che Maven faccia il resto.",
   "en": "Request your demo, set up your rooms and let Maven do the rest."
@@ -466,5 +546,9 @@
  "portada.tituloDocumento": {
   "t": "Maven — L'ufficio, reinventato",
   "en": "Maven — The office, reinvented"
+ },
+ "shared.authLayout.backHome": {
+  "t": "Torna alla home",
+  "en": "Back to home"
  }
 }

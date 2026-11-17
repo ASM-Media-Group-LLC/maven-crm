@@ -13,6 +13,7 @@ export const auth = {
   "auth.password": { es: "Contraseña", en: "Password" },
   "auth.loginButton": { es: "Iniciar Sesión", en: "Sign In" },
   "auth.forgotPassword": { es: "¿Olvidaste tu contraseña?", en: "Forgot your password?" },
+  "auth.pideDemo": { es: "¿Todavía no usas Maven? Pide una demo", en: "Not using Maven yet? Request a demo" },
   "auth.noAccount": { es: "¿No tienes cuenta?", en: "Don't have an account?" },
   "auth.registerLink": { es: "Regístrate", en: "Sign up" },
   "auth.requiredFields": { es: "Campos requeridos", en: "Required fields" },

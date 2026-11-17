@@ -119,7 +119,8 @@
 
 @media (max-width: 560px) {
   .entrar .entrar-volver span { display: none; }
-  .entrar .entrar-volver { padding: .6em .75em; }
+  /* En el celular queda solo la flecha: 44px para que el dedo le atine. */
+  .entrar .entrar-volver { padding: 0; width: 44px; height: 44px; justify-content: center; }
 }
 @media (prefers-reduced-motion: reduce) {
   .entrar .entrar-caja button[type="submit"],
