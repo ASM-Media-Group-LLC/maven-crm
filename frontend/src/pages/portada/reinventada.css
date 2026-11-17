@@ -106,6 +106,9 @@
 @media (max-width: 760px) {
   .pt.pr .pr-nav-links { display: none; }
   .pt.pr .pr-nav-cta .pr-btn-fantasma { display: none; }
+  /* En el celular el «Pedir una demo» de arriba sobra: el grande está justo
+     debajo, en el inicio (Alvaro, 17/11). Arriba queda el logo y el idioma. */
+  .pt.pr .pr-nav-cta .pr-btn-contorno-verde { display: none; }
 }
 
 /* ── Inicio con video de fondo ───────────────────────────────────────── */
