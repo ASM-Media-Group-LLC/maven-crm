@@ -8,6 +8,7 @@ import { instalarTablasMovil } from "@/lib/tablasMovil";
 import DashboardTopbar from "@/components/dashboard/DashboardTopbar";
 import BackToDashboardBar from "@/components/dashboard/BackToDashboardBar";
 import { ChatProvider } from "@/hooks/ChatProvider";
+import { useArgosEscritorio } from "@/hooks/useArgosEscritorio";
 import { TypingInboxProvider } from "@/hooks/useTypingInbox";
 import { MessengerDockProvider } from "@/components/messenger/MessengerDock";
 import AnnouncementPopup from "@/components/dashboard/AnnouncementPopup";
@@ -68,6 +69,8 @@ const AppShell = () => {
   // Los <table> crudos (clase tabla-movil) se vuelven tarjetas en el teléfono;
   // acá se les ponen los rótulos de columna. Ver lib/tablasMovil.ts.
   useEffect(() => instalarTablasMovil(), []);
+  // App de computador: guarda para Argos qué app/página estuvo al frente (17/11/2026).
+  useArgosEscritorio();
 
   const { popups } = useAnnouncementsByChannel();
   // Aviso global de WhatsApp/Telegram entrante (sonido + notificación del navegador),

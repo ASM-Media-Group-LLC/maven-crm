@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import translations from "@/lib/i18n";
 import {
-  AVISADORES,
+  puedeAvisar,
   GRUPOS_AVISO,
   SITUACIONES_AVISO,
   SITUACION_POR_SLUG,
@@ -66,16 +66,10 @@ describe("situaciones de Avisar", () => {
 });
 
 describe("quién puede avisar", () => {
-  it("son exactamente los cuatro designados (Luis, Daniel, Grace y Álvaro)", () => {
-    // Si alguien cambia esta lista, que lo haga a la vez en la policy de
-    // inserción de cowork_avisos (migración 20261022090000): el botón y la base
-    // tienen que decir lo mismo o el aviso se envía desde el front y la base lo
-    // rechaza en silencio.
-    expect([...AVISADORES].sort()).toEqual([
-      "41b35cef-82a8-4991-9234-3514b0064767",
-      "4d502376-eb16-42f6-bda2-4b92582a26e6",
-      "528453bd-f1e1-43d3-85c1-01c5fa5bbcfb",
-      "8b90f141-8546-4cfd-a358-56ff227623df",
-    ]);
+  it("cualquier anfitrión del Cowork, nadie más (Alvaro, 17/11/2026)", () => {
+    // La policy de inserción de cowork_avisos (migración 20261117190000) pide
+    // lo mismo: ser anfitrión de la sesión. Si cambia una, cambia la otra.
+    expect(puedeAvisar(true)).toBe(true);
+    expect(puedeAvisar(false)).toBe(false);
   });
 });

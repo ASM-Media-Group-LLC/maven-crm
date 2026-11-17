@@ -82,3 +82,11 @@ describe("qué se anota en datos.nc", () => {
     expect(ncFunciona("fuerte")).toBe(true);
   });
 });
+
+describe("DeepFilterNet apagado (17/11/2026: el audio se oía lento y cortado)", () => {
+  it("nadie lo arma: todos siguen con RNNoise como antes", async () => {
+    const { deepFilterPermitido, DEEPFILTER_PRENDIDO } = await import("@/lib/deepfilter");
+    expect(DEEPFILTER_PRENDIDO).toBe(false);
+    expect(deepFilterPermitido()).toBe(false);
+  });
+});

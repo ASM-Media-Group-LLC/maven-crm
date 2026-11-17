@@ -6,7 +6,8 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { MemoryRouter } from "react-router-dom";
-import { LanguageProvider } from "@/hooks/useLanguage";
+import { LanguageProvider, idiomaInicial } from "@/hooks/useLanguage";
+import { cargarIdioma } from "@/lib/i18n";
 import UsersTable from "@/pages/admin/UsersTable";
 import UsersGrid from "@/pages/admin/UsersGrid";
 import type { AdminUser } from "@/pages/admin/useAdminUsers";
@@ -17,6 +18,7 @@ import BancoVigilancia from "./bancoVigilancia";
 import BancoConexionEquipo from "./bancoConexionEquipo";
 import BancoCostos from "./bancoCostos";
 import BancoGracia from "./bancoGracia";
+import BancoGuiaConexion from "./bancoGuiaConexion";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import VirtualOfficePage from "@/pages/oficina-ai/VirtualOfficePage";
 import TardanzasPage from "@/pages/admin/TardanzasPage";
@@ -78,9 +80,18 @@ const params = new URLSearchParams(window.location.search);
 if (params.get("tema") === "claro") document.documentElement.classList.remove("dark");
 if (params.get("skin")) document.documentElement.setAttribute("data-skin", params.get("skin")!);
 
-createRoot(document.getElementById("root")!).render(
+// Desde el 16/11/2026 las frases bajan por idioma (lib/i18n.ts → cargarIdioma):
+// sin esperar el paquete, el banco pintaba las claves en vez del texto.
+const raiz = createRoot(document.getElementById("root")!);
+void cargarIdioma(idiomaInicial()).finally(() => raiz.render(
   // /harness.html?ver=costos[&tema=claro] → el tablero de gasto de Costos con los números del 14/11.
   // /harness.html?ver=gracia[&tema=claro] → los minutos de gracia (Cowork + Expediente).
+  // /harness.html?ver=guia-conexion[&estado=bien|justo|malo|error…][&tema=claro] → la Guía de conexión.
+  ver === "guia-conexion" ? (
+    <StrictMode>
+      <LanguageProvider><BancoGuiaConexion estado={params.get("estado") ?? "quieto"} /></LanguageProvider>
+    </StrictMode>
+  ) :
   ver === "gracia" ? (
     <StrictMode>
       <LanguageProvider><BancoGracia /></LanguageProvider>
@@ -156,4 +167,4 @@ createRoot(document.getElementById("root")!).render(
       </MemoryRouter>
     </LanguageProvider>
   </StrictMode>,
-);
+));

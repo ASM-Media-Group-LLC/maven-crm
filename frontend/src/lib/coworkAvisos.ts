@@ -15,16 +15,11 @@ import type { TranslationKey } from "@/lib/i18n";
 
 // ── Quién puede avisar ──────────────────────────────────────────────────────
 //
-// Lista FIJA de los designados (Álvaro, 20/10). NO se usa el rol `admin`: hoy
-// hay varios admin que él no nombró (Jhon entre ellos) y pidió EXACTAMENTE
-// estos cuatro. Se agregan o quitan editando acá Y la policy de inserción de la
-// tabla cowork_avisos (migración 20261022090000) a la vez.
-export const AVISADORES: ReadonlySet<string> = new Set([
-  "41b35cef-82a8-4991-9234-3514b0064767", // Luis Carlos Ortega Roman
-  "4d502376-eb16-42f6-bda2-4b92582a26e6", // Daniel Ospina
-  "8b90f141-8546-4cfd-a358-56ff227623df", // Grace Gelves M.
-  "528453bd-f1e1-43d3-85c1-01c5fa5bbcfb", // Álvaro Stephan Mejía (dueño)
-]);
+// Cualquier anfitrión del Cowork (Alvaro, 17/11/2026). Antes era una lista fija
+// de cuatro personas y los anfitriones nuevos (Breyner, Vanessa) no veían el
+// botón. La policy de inserción de cowork_avisos (migración 20261117190000)
+// pide lo mismo: ser anfitrión de esa sesión.
+export const puedeAvisar = (esAnfitrion: boolean): boolean => esAnfitrion;
 
 export type GrupoAviso = "foco" | "respuesta" | "ventas" | "trato" | "camara" | "pausas" | "general";
 

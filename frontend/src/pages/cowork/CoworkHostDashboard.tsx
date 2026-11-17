@@ -44,7 +44,7 @@ import AvisarDialog from "./AvisarDialog";
 import AvisarGeneralDialog, { type ObjetivoAviso } from "./AvisarGeneralDialog";
 import AvisoChatter from "./AvisoChatter";
 import { useRecepcionAvisos } from "./useRecepcionAvisos";
-import { AVISADORES } from "@/lib/coworkAvisos";
+import { puedeAvisar as puedeAvisarCowork } from "@/lib/coworkAvisos";
 import { cuentaPausa, clasesPausa, nombreYApellido, nombreCorto } from "@/lib/pausaCowork";
 import { normalizarReglas, reglaDeEstado, sonEstandar, type ReglaAviso } from "@/lib/coworkReglas";
 import { armarCadenaNC, loadNCPreference, type CadenaNC } from "@/lib/noise-suppression-processor";
@@ -55,6 +55,7 @@ import type { CoworkMeet } from "@/hooks/useCoworkSession";
 import PausaSupervisorBoton from "./PausaSupervisorBoton";
 import { leerPausaSupervisor, suscribirPausaSupervisor, esEstadoSupervisor } from "@/lib/pausaSupervisor";
 import { iniciarLatido, actualizarLatido, detenerLatido } from "@/lib/coworkLatido";
+import { juntarMedios, type MedioDeLlamada } from "@/lib/latidoDelSupervisor";
 import { fijarPantallaDelHub, pantallaDelHub, suscribirPantallaDelHub } from "@/lib/pantallaDelHub";
 import { marcarPausa } from "@/lib/coworkPausa";
 import type { useCoworkSession, CoworkRoom } from "@/hooks/useCoworkSession";
@@ -206,12 +207,11 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
   // fotos y le cuenta el tiempo (Alvaro, 13/11/2026). Mientras el rol carga, no.
   const vigilarAnfitrion = miRol !== null && !isAdmin;
   const puedeFinalizar = !!cowork.session && (cowork.session.created_by === userId || isAdmin);
-  // Avisar: los cuatro designados (lista fija en lib/coworkAvisos, NO el rol
-  // admin — hay admins que Álvaro no nombró) le avisan a un CHATTER; el dueño
-  // (admin) además puede avisarle a un SUPERVISOR. Entre supervisores, no. Se
-  // inserta una fila por persona; la RLS de cowork_avisos vuelve a validar cada
-  // una (host de la sesión + la matriz). Al destinatario le llega por realtime.
-  const puedeAvisar = AVISADORES.has(userId);
+  // Avisar: cualquier anfitrión de la sesión le avisa a un CHATTER (Alvaro,
+  // 17/11/2026); un admin además puede avisarle a otro anfitrión. Se inserta
+  // una fila por persona; la RLS de cowork_avisos vuelve a validar cada una
+  // (anfitrión de la sesión + la matriz). Al destinatario le llega por realtime.
+  const puedeAvisar = puedeAvisarCowork(!!cowork.isHost);
   const puedeAvisarGeneral = puedeAvisar || isAdmin;
   const enviarAviso = useCallback(async (targetIds: string[], slug: string, roomId?: string) => {
     const sid = cowork.session?.id;
@@ -644,8 +644,6 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
   const unaSolaPantalla = vigilarAnfitrion;
   const [pantallaHub, setPantallaHub] = useState<MediaStreamTrack | null>(() => pantallaDelHub());
   useEffect(() => suscribirPantallaDelHub(setPantallaHub), []);
-  // Salas a las que les fue dando «Hablar», en orden; la última manda.
-  const pilaHablar = useRef<string[]>([]);
   const baseDePantalla = unaSolaPantalla ? pantallaHub : screenBaseTrack;
 
   useEffect(() => {
@@ -869,18 +867,12 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
     if (switching) toast.info(traducir("cowork.host.movedTo", { room: room.name }));
   }, [cowork.rooms, activeRoomId, activeMeetId, terminarMeetGrupal]);
 
-  // A qué sala va la pantalla del supervisor: la sala en la que entró o, si
-  // está en el tablero, la última a la que le dio «Hablar». Una sola.
-  useEffect(() => {
-    if (!unaSolaPantalla) return;
-    pilaHablar.current = pilaHablar.current.filter((id) => roomMic[id]);
-    const destino = activeRoomId && !activeMeetId
-      ? activeRoomId
-      : pilaHablar.current[pilaHablar.current.length - 1] ?? null;
-    // Sin aviso por sala: si no comparte, Argos se lo reclama desde el Hub (voz,
-    // cartel y reporte al 3er llamado). Pedírselo en cada sala era el estorbo.
-    setRoomScreen(destino ? { [destino]: true } : {});
-  }, [unaSolaPantalla, roomMic, activeRoomId, activeMeetId]);
+  // LA PANTALLA DEL SUPERVISOR ES PARA SU TRABAJO (Alvaro, 17/11/2026): «lo
+  // importante es que el supervisor siga compartiendo la pantalla para su
+  // trabajo, no para la persona con la que está hablando». Ya NO se manda sola
+  // a la sala a la que le da «Hablar» ni a la que entra: sigue compartida en el
+  // Hub (Argos la ve). Si él quiere mostrarle algo a una sala, toca el botón de
+  // pantalla de esa sala (una sala a la vez) o comparte desde adentro.
 
   // ── Meet grupal ──────────────────────────────────────────────────────────
   // El supervisor entra al meet como a una sala más (misma vista a pantalla
@@ -922,13 +914,31 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
   // Hub (uno para la ventana del sistema, otro para el panel), así que sacarlo
   // del navegador desmontaba uno y montaba el otro — o sea, reconectaba la
   // llamada. Ahora es el mismo componente movido por portal.
+  // Lo que el supervisor tiene prendido en el Hub y en la sala donde está
+  // (lib/latidoDelSupervisor): el latido cuenta cualquiera de las dos.
+  const medioHubRef = useRef<MedioDeLlamada | null>(null);
+  const medioSalaRef = useRef<MedioDeLlamada | null>(null);
+  const empujarMedios = useCallback(() => {
+    actualizarLatido(juntarMedios(medioHubRef.current, medioSalaRef.current));
+  }, []);
+  const enUnaSalaRef = useRef(false);
+  enUnaSalaRef.current = !!activeRoomLk;
+
   const colgarHub = useCallback(() => {
     setHubMaximized(false);
     endCall();
-    // Colgó el Hub: deja de trabajar en el panel, se cierra su reloj.
+    medioHubRef.current = null;
+    // Si sigue trabajando DENTRO de una sala, sigue en Cowork: el latido sigue
+    // con lo que tiene prendido ahí (Luis, 17/11/2026: se le cayó el Hub
+    // estando en la Sala 1 con cámara y pantalla, y Argos lo reportó «fuera»).
+    if (enUnaSalaRef.current) {
+      empujarMedios();
+      return;
+    }
+    // Colgó el Hub y no está en ninguna sala: deja de trabajar, se cierra su reloj.
     detenerLatido();
     void cowork.leaveRoom?.();
-  }, [endCall, cowork.leaveRoom]);
+  }, [endCall, cowork.leaveRoom, empujarMedios]);
 
   // Refs del navegador de SESIONES. DECLARADOS acá arriba (antes de
   // conectarHub, que los usa) pero SINCRONIZADOS más abajo, donde viven la
@@ -962,8 +972,10 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
       // …y en el Hub no la ve nadie: solo la sala a la que le habla.
       pantallaSoloParaMi: vigilarAnfitrion,
       onFaceStateChange: (w) => actualizarLatido({ faceState: w.state, faceSince: w.since }),
-      onMediaStateChange: (m) =>
-        actualizarLatido({ camOn: m.camOn, screenShareOn: m.screenShareOn, conexionSala: m.conexionSala ?? null }),
+      onMediaStateChange: (m) => {
+        medioHubRef.current = { camOn: m.camOn, screenShareOn: m.screenShareOn, conexionSala: m.conexionSala ?? null };
+        empujarMedios();
+      },
       incomingAudioMuted: hubSilenciado,
       // La tacita: break / almuerzo / ausente. Es un elemento fijo que lee su
       // estado del store, así que no queda viejo aunque esta config se arme
@@ -983,19 +995,23 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
         onSwitch: (id: string) => cambiarDeSesionRef.current(id),
       },
     });
-  }, [hubRoom, hubKey, displayName, colgarHub, getHubToken, startCall, hubSilenciado, fijarHubSilencio, cowork.session?.id, vigilarAnfitrion]);
+  }, [hubRoom, hubKey, displayName, colgarHub, getHubToken, startCall, hubSilenciado, fijarHubSilencio, cowork.session?.id, vigilarAnfitrion, empujarMedios]);
 
   // EL RELOJ DEL SUPERVISOR (Alvaro, 13/11/2026): con el Hub conectado late como
   // cualquiera en su sala, y su tiempo en el panel cuenta como trabajo. No se
   // apaga al desmontar (el Hub sigue en la ventanita flotante); solo al colgar.
+  // También late si está DENTRO de una sala aunque el Hub se haya caído (Luis,
+  // 17/11/2026). Arranca con lo que ya tiene prendido, no con todo apagado.
   const sesionDelHub = cowork.session?.id ?? null;
+  const enUnaSala = !!activeRoomLk;
   useEffect(() => {
-    if (!sesionDelHub || !hubConnected || !vigilarAnfitrion) return;
+    if (!sesionDelHub || !(hubConnected || enUnaSala) || !vigilarAnfitrion) return;
     iniciarLatido(sesionDelHub, {
-      camOn: false, screenShareOn: false, faceState: null, faceSince: null,
-      onBreak: esEstadoSupervisor(leerPausaSupervisor()), conexionSala: null,
+      ...juntarMedios(medioHubRef.current, medioSalaRef.current),
+      faceState: null, faceSince: null,
+      onBreak: esEstadoSupervisor(leerPausaSupervisor()),
     });
-  }, [sesionDelHub, hubConnected, vigilarAnfitrion]);
+  }, [sesionDelHub, hubConnected, enUnaSala, vigilarAnfitrion]);
   // La tacita (break / almuerzo / ausente) es su pausa: el reloj marca pausa y
   // Argos no le reclama mientras tanto.
   useEffect(() => {
@@ -1052,9 +1068,14 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
     setActiveRoomLk(null);
     setActiveRoomId(null);
     setActiveRoomName(null);
+    // Lo de la sala ya no cuenta para el latido. Si el Hub tampoco está, salió
+    // de todo: se cierra su reloj.
+    medioSalaRef.current = null;
+    if (hubConnected) empujarMedios();
+    else detenerLatido();
     // El Hub es independiente: si sigue conectado no hay nada que hacer; si el
     // coordinador lo colgó a mano, solo lo re-abrimos si él toca "Reconectar".
-  }, [activeMeetId, terminarMeetGrupal]);
+  }, [activeMeetId, terminarMeetGrupal, hubConnected, empujarMedios]);
 
   // ── Navegador de salas (flechas + lista dentro de la llamada) ─────────────
   //
@@ -1620,7 +1641,6 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
           ? (micCaido ? t("cowork.host.room.micDownHint") : t("cowork.host.room.talkingHint"))
           : t("cowork.host.room.talkHint")}
         onClick={() => {
-          if (!(roomMic[room.id] ?? false)) pilaHablar.current = [...pilaHablar.current.filter((id) => id !== room.id), room.id];
           setRoomMic((m) => ({ ...m, [room.id]: !(m[room.id] ?? false) }));
         }}
       />
@@ -2173,6 +2193,9 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
               onLeave={() => { leaveOneOnOne(); }}
               hideShareLink
               suppressLeaveToast
+              // Adentro de la sala no se abre una segunda pantalla: si quiere
+              // mostrar la suya, la manda con el botón de la tarjeta.
+              hideScreenShare={unaSolaPantalla && !activeMeetId}
               autoLeaveOnEmpty={3000}
               initialMicOn={false}
               initialCamOn={false}
@@ -2725,11 +2748,13 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
               // sala, como siempre, apagado.
               initialMicOn={!!activeMeetId}
               initialCamOn={!!activeMeetId}
-              // El supervisor no abre otra pantalla dentro de la sala: ahí ya le
-              // llega la del Hub (una sola compartida). En el meet grupal sí puede.
-              hideScreenShare={unaSolaPantalla && !activeMeetId}
               // Entrar a una sala no lo saca de la vigilancia del Hub.
               sinLatidoDeLlamada={unaSolaPantalla}
+              // …y lo que tenga prendido aquí también cuenta para su latido.
+              onMediaStateChange={vigilarAnfitrion ? (m) => {
+                medioSalaRef.current = { camOn: m.camOn, screenShareOn: m.screenShareOn, conexionSala: m.conexionSala ?? null };
+                empujarMedios();
+              } : undefined}
               getToken={getActiveRoomToken}
               leaveLabel={activeMeetId ? t("cowork.host.endMeet") : t("cowork.host.hangUp")}
               // Flechas + lista para moverse entre las SALAS de esta sesión sin

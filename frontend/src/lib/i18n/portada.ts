@@ -12,6 +12,7 @@ export const portada = {
   "portada.nav.como": { es: "Cómo funciona", en: "How it works" },
   "portada.nav.empresas": { es: "Para empresas", en: "For companies" },
   "portada.nav.precios": { es: "Precios", en: "Pricing" },
+  "portada.nav.descargas": { es: "Descargas", en: "Downloads" },
   "portada.nav.entrar": { es: "Entrar", en: "Sign in" },
   "portada.cta.demo": { es: "Pedir una demo", en: "Request a demo" },
 
@@ -128,6 +129,9 @@ export const portada = {
   "portada.demo.avisoPrivacidad": { es: "Aviso de privacidad", en: "Privacy notice" },
   "portada.demo.error": { es: "No pudimos enviar el pedido. Intenta de nuevo en un momento.", en: "We couldn't send your request. Please try again in a moment." },
 
+  "portada.app.titulo": { es: "También en tu computador:", en: "Also on your computer:" },
+  "portada.app.mac": { es: "Descargar para Mac", en: "Download for Mac" },
+  "portada.app.windows": { es: "Descargar para Windows", en: "Download for Windows" },
   "portada.pie.lema": { es: "La oficina, reinventada.", en: "The office, reinvented." },
   "portada.pie.enlaces": { es: "Enlaces del pie", en: "Footer links" },
   "portada.pie.privacidad": { es: "Privacidad", en: "Privacy" },

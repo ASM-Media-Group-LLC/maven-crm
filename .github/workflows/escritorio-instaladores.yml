@@ -1,0 +1,68 @@
+name: Instaladores de escritorio
+
+# Arma los instaladores de la app de escritorio (escritorio/): el .dmg del Mac
+# (Intel y Apple Silicon en uno) y el .exe de Windows, y los deja como artefactos
+# de la corrida. SOLO a mano (Actions → «Instaladores de escritorio» → Run
+# workflow): no corre en PRs ni al subir a main.
+#
+# Sin firma por ahora (escritorio/README.md explica qué ve la gente y cómo se
+# activa la firma). Ojo con los minutos: en un repo privado cada minuto de Mac
+# cuenta como 10 de los gratis del mes.
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: escritorio-instaladores
+  cancel-in-progress: true
+
+jobs:
+  armar:
+    name: ${{ matrix.nombre }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - nombre: Mac (.dmg)
+            maquina: macos-latest
+            destino: --mac
+          - nombre: Windows (.exe)
+            maquina: windows-latest
+            destino: --win
+    runs-on: ${{ matrix.maquina }}
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: escritorio
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: escritorio/package-lock.json
+
+      - name: Dependencias
+        run: npm ci
+
+      - name: Reglas de navegación y permisos
+        run: npm run revisar
+
+      - name: Armar el instalador
+        run: npx electron-builder ${{ matrix.destino }} --publish never
+        env:
+          # Sin certificados todavía: que no busque uno en el llavero de la máquina.
+          CSC_IDENTITY_AUTO_DISCOVERY: "false"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: maven-escritorio-${{ runner.os }}
+          path: |
+            escritorio/dist/*.dmg
+            escritorio/dist/*.exe
+          if-no-files-found: error
+          retention-days: 14

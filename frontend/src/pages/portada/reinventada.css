@@ -39,7 +39,7 @@
 
 .pt.pr .pr-caja { width: min(1120px, calc(100% - 32px)); margin: 0 auto; }
 /* Los enlaces del menú no dejan el título de la sección tapado por la barra fija. */
-.pt.pr section[id] { scroll-margin-top: 72px; }
+.pt.pr section[id], .pt.pr #descargas { scroll-margin-top: 72px; }
 
 /* ── Botones ─────────────────────────────────────────────────────────── */
 .pt.pr .pr-btn {
@@ -76,36 +76,52 @@
    de la barra y una lista en tarjeta. */
 .pt.pr .pr-idioma { position: relative; flex-shrink: 0; }
 .pt.pr .pr-idioma-btn {
-  display: inline-flex; align-items: center; gap: .4rem; min-height: 40px;
-  background: rgba(var(--pr-acento-rgb), .05); color: var(--pr-texto);
-  border: 1px solid rgba(255,255,255,.14); border-radius: 999px; padding: .5em .8em;
-  font: inherit; font-size: .82rem; font-weight: 600; letter-spacing: .02em; cursor: pointer;
+  display: inline-flex; align-items: center; gap: .5rem; min-height: 40px;
+  background: rgba(255,255,255,.04); color: var(--pr-texto);
+  border: 1px solid rgba(255,255,255,.12); border-radius: 999px; padding: .4em .75em .4em .45em;
+  font: inherit; font-size: .82rem; font-weight: 600; letter-spacing: .04em; cursor: pointer;
   transition: background .2s ease, border-color .2s ease, color .2s ease;
 }
-.pt.pr .pr-idioma-btn:hover { background: rgba(var(--pr-acento-rgb), .12); border-color: var(--pr-acento); color: var(--pr-neon-hover); }
+.pt.pr .pr-idioma-btn:hover { background: rgba(var(--pr-acento-rgb), .1); border-color: rgba(var(--pr-acento-rgb), .6); }
 .pt.pr .pr-idioma-btn:focus-visible { outline: none; border-color: var(--pr-acento); }
-.pt.pr .pr-idioma-btn svg { width: .95em; height: .95em; color: var(--pr-acento); transition: transform .2s ease; }
-.pt.pr .pr-idioma.abierto .pr-idioma-btn svg { transform: rotate(180deg); }
+.pt.pr .pr-idioma-btn > svg:last-child { width: .9em; height: .9em; color: var(--pr-gris); transition: transform .2s ease, color .2s ease; }
+.pt.pr .pr-idioma-btn:hover > svg:last-child { color: var(--pr-acento); }
+.pt.pr .pr-idioma.abierto .pr-idioma-btn > svg:last-child { transform: rotate(180deg); color: var(--pr-acento); }
+.pt.pr .pr-idioma-bandera { width: 22px; height: 22px; flex-shrink: 0; border-radius: 50%; box-shadow: 0 1px 4px rgba(0,0,0,.35); }
 .pt.pr .pr-idioma-lista {
-  position: absolute; top: calc(100% + .55rem); right: 0; min-width: 170px; z-index: 60;
-  list-style: none; margin: 0; padding: .4rem;
-  background: #141d2e; border: 1px solid rgba(255,255,255,.1); border-radius: 14px;
+  position: absolute; top: calc(100% + .55rem); right: 0; min-width: 200px; z-index: 60;
+  list-style: none; margin: 0; padding: .35rem;
+  background: rgba(20,29,46,.96); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+  border: 1px solid rgba(255,255,255,.1); border-radius: 16px;
   box-shadow: 0 22px 55px -18px rgba(0,0,0,.75);
+  animation: pr-idioma-entra .16s ease-out;
 }
+@keyframes pr-idioma-entra { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
 .pt.pr .pr-idioma-lista li {
-  display: flex; align-items: center; padding: .6em .75em; border-radius: 10px;
+  display: flex; align-items: center; gap: .7rem; padding: .55em .7em; border-radius: 11px;
   font-size: .9rem; font-weight: 500; color: var(--pr-texto); cursor: pointer;
   transition: background .15s ease, color .15s ease;
 }
-.pt.pr .pr-idioma-lista li:hover, .pt.pr .pr-idioma-lista li:focus-visible { background: rgba(var(--pr-acento-rgb), .12); color: var(--pr-neon-hover); outline: none; }
-.pt.pr .pr-idioma-lista li[aria-selected="true"] { color: var(--pr-acento); background: rgba(var(--pr-acento-rgb), .06); }
+.pt.pr .pr-idioma-lista li span { flex: 1; }
+.pt.pr .pr-idioma-lista li:hover, .pt.pr .pr-idioma-lista li:focus-visible { background: rgba(255,255,255,.06); outline: none; }
+.pt.pr .pr-idioma-lista li[aria-selected="true"] { color: var(--pr-acento); background: rgba(var(--pr-acento-rgb), .08); }
+.pt.pr .pr-idioma-nombre { display: none; }
+.pt.pr .pr-idioma-hecho { width: 1rem; height: 1rem; color: var(--pr-acento); }
 @media (max-width: 760px) {
-  .pt.pr .pr-idioma-btn { padding: .5em .7em; font-size: .8rem; }
+  /* En el celular (Alvaro, 17/11): el botón dice el idioma en palabras
+     («Español ⌄»); las banderitas salen al abrir la lista. */
+  .pt.pr .pr-idioma-btn { padding: .45em .8em; gap: .35rem; font-size: .85rem; }
+  .pt.pr .pr-idioma-btn .pr-idioma-bandera, .pt.pr .pr-idioma-codigo { display: none; }
+  .pt.pr .pr-idioma-nombre { display: inline; }
+  .pt.pr .pr-idioma-lista li { padding: .7em .75em; font-size: .95rem; }
   .pt.pr .pr-nav-cta { gap: .5rem; }
 }
 @media (max-width: 760px) {
   .pt.pr .pr-nav-links { display: none; }
   .pt.pr .pr-nav-cta .pr-btn-fantasma { display: none; }
+  /* En el celular el «Pedir una demo» de arriba sobra: el grande está justo
+     debajo, en el inicio (Alvaro, 17/11). Arriba queda el logo y el idioma. */
+  .pt.pr .pr-nav-cta .pr-btn-contorno-verde { display: none; }
 }
 
 /* ── Inicio con video de fondo ───────────────────────────────────────── */
@@ -223,6 +239,11 @@
 .pt.pr .pr-cierre h2 em { font-style: normal; color: var(--pr-acento); }
 .pt.pr .pr-cierre p { position: relative; margin: 1.2rem auto 0; max-width: 36rem; color: var(--pr-gris); }
 .pt.pr .pr-cierre .pr-btn { position: relative; margin-top: 2.2rem; }
+/* La app de computador: debajo del botón de demo, discreta (contorno). */
+.pt.pr .pr-bajar-app { position: relative; margin-top: 2.6rem; display: flex; flex-direction: column; align-items: center; gap: .9rem; }
+.pt.pr .pr-bajar-app > span { color: var(--pr-gris); font-size: .9rem; }
+.pt.pr .pr-bajar-app-botones { display: flex; gap: .8rem; flex-wrap: wrap; justify-content: center; }
+.pt.pr .pr-cierre .pr-bajar-app .pr-btn { margin-top: 0; font-size: .92rem; padding: .7em 1.5em; }
 
 /* El formulario de la demo se abre debajo del cierre. */
 .pt.pr .demo { background: transparent; }

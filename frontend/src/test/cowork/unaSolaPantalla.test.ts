@@ -70,3 +70,15 @@ describe("el supervisor no se escapa de Argos", () => {
     expect(tablero).not.toMatch(/unaPantalla\.faltaHub/);
   });
 });
+
+// PANTALLA PARA SU TRABAJO (Alvaro, 17/11/2026): al darle «Hablar» o entrar a
+// una sala, la pantalla del supervisor NO se manda sola; solo si él toca el botón.
+describe("la pantalla del supervisor no se manda sola a la sala", () => {
+  it("«Hablar» ya no arrastra la pantalla", () => {
+    expect(tablero).not.toMatch(/setRoomScreen\(destino/);
+    expect(tablero).not.toMatch(/pilaHablar/);
+  });
+  it("el botón de pantalla de la sala sigue (si él quiere)", () => {
+    expect(tablero).toMatch(/\(m\[room\.id\] \?\? false\) \? \{\} : \{ \[room\.id\]: true \}/);
+  });
+});

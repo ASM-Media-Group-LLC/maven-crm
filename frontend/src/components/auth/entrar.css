@@ -38,9 +38,11 @@
 }
 
 /* ── Barra de arriba: igual a la de la portada ───────────────────────── */
+/* La barra flota encima: así el logo y la tarjeta quedan justo en la mitad
+   de la pantalla, sin que la barra los empuje hacia abajo. */
 .entrar .entrar-barra {
-  position: relative; z-index: 1;
-  display: flex; align-items: center; justify-content: flex-end; gap: 1rem;
+  position: absolute; top: 0; left: 0; right: 0; z-index: 2;
+  display: flex; align-items: center; justify-content: flex-start; gap: 1rem;
   width: min(1120px, calc(100% - 32px)); margin: 0 auto;
   padding: 1.1rem 0; padding-top: calc(1.1rem + env(safe-area-inset-top, 0px));
 }
@@ -61,7 +63,8 @@
 .entrar .entrar-centro {
   position: relative; z-index: 1; flex: 1;
   display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1.75rem;
-  padding: 0 16px 4rem;
+  /* Mismo aire arriba y abajo: el bloque queda centrado de verdad. */
+  padding: calc(5.5rem + env(safe-area-inset-top, 0px)) 16px calc(5.5rem + env(safe-area-inset-bottom, 0px));
 }
 .entrar .entrar-caja {
   width: 100%; max-width: 27rem;

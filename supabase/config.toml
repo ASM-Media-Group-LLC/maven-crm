@@ -22,6 +22,9 @@ verify_jwt = true  # el cron manda la llave pública como Bearer + X-Cron-Token 
 [functions.argos-al-nas]
 verify_jwt = true  # solo cron (X-Cron-Token); mueve el buzón al NAS
 
+[functions.argos-cara]
+verify_jwt = true  # la persona con sesión pregunta si se le ve la cara (la IA confirma antes de acusar)
+
 [functions.argos-foto]
 verify_jwt = true  # dueño con sesión, o cron para autoprueba; sirve la foto desde el NAS
 

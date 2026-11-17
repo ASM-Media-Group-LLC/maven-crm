@@ -1,0 +1,104 @@
+{
+  "name": "maven-escritorio",
+  "productName": "Maven",
+  "version": "2.0.0",
+  "description": "Maven para el computador (Mac y Windows)",
+  "author": "ASM Media Group LLC",
+  "private": true,
+  "main": "src/main.js",
+  "scripts": {
+    "iniciar": "electron .",
+    "iconos": "python3 build/genera-icono.py",
+    "mac": "electron-builder --mac --publish never",
+    "windows": "electron-builder --win --publish never"
+  },
+  "build": {
+    "appId": "me.maven-ai.escritorio",
+    "productName": "Maven",
+    "copyright": "ASM Media Group LLC",
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "mac": {
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "universal"
+          ]
+        },
+        {
+          "target": "zip",
+          "arch": [
+            "universal"
+          ]
+        }
+      ],
+      "icon": "build/icon.png",
+      "category": "public.app-category.business",
+      "extendInfo": {
+        "NSCameraUsageDescription": "Maven usa la cámara para Cowork y las videollamadas.",
+        "NSMicrophoneUsageDescription": "Maven usa el micrófono para Cowork y las videollamadas.",
+        "NSScreenCaptureUsageDescription": "Maven comparte tu pantalla en Cowork y en las llamadas."
+      },
+      "artifactName": "Maven-Mac.${ext}",
+      "files": [
+        "!node_modules/get-windows/lib/binding/**",
+        "!node_modules/get-windows/build/**"
+      ],
+      "x64ArchFiles": "**/get-windows/main",
+      "hardenedRuntime": true,
+      "gatekeeperAssess": false,
+      "entitlements": "build/entitlements.mac.plist",
+      "entitlementsInherit": "build/entitlements.mac.plist",
+      "notarize": true
+    },
+    "dmg": {
+      "title": "Maven"
+    },
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "build/icon.ico",
+      "artifactName": "Maven-Windows.exe"
+    },
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false,
+      "shortcutName": "Maven",
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "runAfterFinish": true
+    },
+    "afterPack": "build/firmar-adhoc.js",
+    "files": [
+      "src/**/*",
+      "build/bandeja.png",
+      "package.json"
+    ],
+    "asarUnpack": [
+      "node_modules/get-windows/**"
+    ],
+    "publish": [
+      {
+        "provider": "generic",
+        "url": "https://lsagslbkliprespbyhts.supabase.co/storage/v1/object/public/descargas"
+      }
+    ]
+  },
+  "devDependencies": {
+    "electron": "^45.3.3",
+    "electron-builder": "^26.18.0"
+  },
+  "dependencies": {
+    "electron-updater": "^6.8.11",
+    "get-windows": "^10.0.0"
+  }
+}

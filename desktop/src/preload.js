@@ -1,0 +1,69 @@
+// Puente entre Maven (la página) y la app de computador.
+//
+// Maven ya llama a navigator.setAppBadge(n) con los chats sin leer (lib/
+// insigniaDeLaApp.ts). Acá se reemplaza para que ese número llegue al ícono
+// de la app: el Dock en Mac y la barra de tareas en Windows. Así la página no
+// tiene que saber que vive dentro de la app.
+const { contextBridge, ipcRenderer, webFrame } = require("electron");
+
+// En Windows el número va dibujado en un circulito sobre el ícono.
+function dibujar(n) {
+  try {
+    const c = document.createElement("canvas");
+    c.width = c.height = 32;
+    const g = c.getContext("2d");
+    g.fillStyle = "#e5484d";
+    g.beginPath();
+    g.arc(16, 16, 16, 0, Math.PI * 2);
+    g.fill();
+    g.fillStyle = "#ffffff";
+    g.font = `bold ${n > 9 ? 16 : 20}px Segoe UI, Arial, sans-serif`;
+    g.textAlign = "center";
+    g.textBaseline = "middle";
+    g.fillText(n > 99 ? "99+" : String(n), 16, 17);
+    return c.toDataURL();
+  } catch {
+    return null;
+  }
+}
+
+const plataforma = process.platform === "darwin" ? "mac" : process.platform === "win32" ? "windows" : "linux";
+
+// La página se entera de que vive en la app por esta clase en <html>: con ella
+// su barra de arriba se vuelve «arrastrable» y deja lugar a los botones del
+// sistema (frontend/src/index.css, «en-escritorio»).
+const marcar = () => document.documentElement.classList.add("en-escritorio", `escritorio-${plataforma}`);
+if (document.documentElement) marcar();
+window.addEventListener("DOMContentLoaded", marcar);
+
+contextBridge.exposeInMainWorld("mavenEscritorio", {
+  esApp: true,
+  plataforma,
+  insignia: (n) => {
+    const v = Math.max(0, Number(n) || 0);
+    ipcRenderer.send("maven:insignia", v, v > 0 ? dibujar(v) : null);
+  },
+  /** Ventanita de llamada entrante encima de todo. Resuelve «contestar», «rechazar» o «cerrada». */
+  llamadaEntrante: (datos) => ipcRenderer.invoke("maven:llamada", datos),
+  terminarLlamadaEntrante: (id) => ipcRenderer.send("maven:llamada-fin", id),
+  /** Ventanita flotante: true la achica y la deja encima; false la devuelve. Sin argumento alterna. */
+  flotante: (si) => ipcRenderer.invoke("maven:flotante", si),
+  alCambiarFlotante: (cb) => {
+    const f = (_e, v) => cb(Boolean(v));
+    ipcRenderer.on("maven:flotante", f);
+    return () => ipcRenderer.removeListener("maven:flotante", f);
+  },
+  /** Segundos sin tocar teclado ni mouse en todo el computador. */
+  inactividad: () => ipcRenderer.invoke("maven:inactividad"),
+  /** Cada minuto: los tramos de app/página al frente (ver desktop/src/apps.js). */
+  alUsoDeApps: (cb) => {
+    const f = (_e, lote) => cb(Array.isArray(lote) ? lote : []);
+    ipcRenderer.on("maven:apps", f);
+    return () => ipcRenderer.removeListener("maven:apps", f);
+  },
+});
+
+webFrame.executeJavaScript(`
+  navigator.setAppBadge = (n) => { window.mavenEscritorio.insignia(n ?? 1); return Promise.resolve(); };
+  navigator.clearAppBadge = () => { window.mavenEscritorio.insignia(0); return Promise.resolve(); };
+`).catch(() => {});
