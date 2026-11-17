@@ -2,7 +2,7 @@
 # `descargas` de Supabase, de donde los baja el botón de la portada:
 #   …/storage/v1/object/public/descargas/Maven-Mac.dmg
 #   …/storage/v1/object/public/descargas/Maven-Windows.exe
-# Mac se arma en el Mac mini; Windows en una máquina Windows de GitHub.
+# Windows se arma en una máquina Windows de GitHub; Mac, ver app-escritorio-mac.yml.
 # La llave de servicio se pide al vuelo con SUPABASE_ACCESS_TOKEN y no se guarda.
 name: app-escritorio
 
@@ -17,89 +17,11 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # Mac: en el Mac mini (la firma ad hoc necesita macOS).
-  mac:
-    runs-on: [self-hosted, macOS, ARM64, mini5]
-    timeout-minutes: 180 # la revisión de Apple (notarización) a veces tarda
-    env:
-      PROYECTO: lsagslbkliprespbyhts
-      ARCHIVOS: Maven-Mac.dmg Maven-Mac.zip Maven-Mac.zip.blockmap latest-mac.yml
-    steps:
-      - uses: actions/checkout@v4
-      - name: Instalar
-        working-directory: desktop
-        run: npm ci --no-audit --no-fund && node node_modules/electron/install.js
-      - name: Armar (firmada con el Developer ID y notarizada por Apple)
-        working-directory: desktop
-        env:
-          CSC_LINK: ${{ secrets.MAC_CSC_LINK }}
-          CSC_KEY_PASSWORD: ${{ secrets.MAC_CSC_KEY_PASSWORD }}
-          APPLE_API_KEY_ID: ${{ secrets.MAC_NOTARIZE_KEY_ID }}
-          APPLE_API_ISSUER: ${{ secrets.MAC_NOTARIZE_ISSUER }}
-          LLAVE_NOTARIZAR: ${{ secrets.MAC_NOTARIZE_API_KEY }}
-        run: |
-          set -euo pipefail
-          export APPLE_API_KEY="$RUNNER_TEMP/AuthKey.p8"
-          LLAVERO="$RUNNER_TEMP/firma.keychain-db"
-          CLAVE_LLAVERO=$(uuidgen)
-          printf '%s' "$LLAVE_NOTARIZAR" > "$APPLE_API_KEY"
-          ORIGINALES=$(security list-keychains -d user | tr -d '"')
-          DEFECTO=$(security default-keychain -d user 2>/dev/null | tr -d ' "' || true)
-          trap 'rm -f "$APPLE_API_KEY" "$RUNNER_TEMP/firma.p12" "$RUNNER_TEMP/notarizar.zip" "$RUNNER_TEMP/g2.cer" "$RUNNER_TEMP/raiz.cer"; security list-keychains -d user -s $ORIGINALES; [ -n "$DEFECTO" ] && security default-keychain -d user -s "$DEFECTO"; security delete-keychain "$LLAVERO" 2>/dev/null || true' EXIT
-          # Llavero propio con el certificado Y el intermedio de Apple (G2):
-          # sin el intermedio, el Mac del CI no lo da por válido y la app salía
-          # SIN firma (17/11/2026).
-          security create-keychain -p "$CLAVE_LLAVERO" "$LLAVERO"
-          security set-keychain-settings -lut 21600 "$LLAVERO"
-          security unlock-keychain -p "$CLAVE_LLAVERO" "$LLAVERO"
-          printf '%s' "$CSC_LINK" | base64 --decode > "$RUNNER_TEMP/firma.p12"
-          curl -fsS -o "$RUNNER_TEMP/g2.cer" https://www.apple.com/certificateauthority/DeveloperIDG2CA.cer
-          security import "$RUNNER_TEMP/g2.cer" -k "$LLAVERO" -T /usr/bin/codesign || true
-          # La raíz de Apple también: el runner corre sin sesión y codesign no
-          # llegaba a la raíz del sistema («unable to build chain to self-signed root»).
-          curl -fsS -o "$RUNNER_TEMP/raiz.cer" https://www.apple.com/appleca/AppleIncRootCertificate.cer
-          security import "$RUNNER_TEMP/raiz.cer" -k "$LLAVERO" -T /usr/bin/codesign || true
-          security import "$RUNNER_TEMP/firma.p12" -k "$LLAVERO" -P "$CSC_KEY_PASSWORD" -T /usr/bin/codesign -T /usr/bin/security
-          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$CLAVE_LLAVERO" "$LLAVERO" >/dev/null
-          security list-keychains -d user -s "$LLAVERO" $ORIGINALES /Library/Keychains/System.keychain /System/Library/Keychains/SystemRootCertificates.keychain
-          security default-keychain -d user -s "$LLAVERO"
-          unset CSC_LINK CSC_KEY_PASSWORD
-          # Firma el gancho afterPack (build/firmar-adhoc.js) con la huella del
-          # certificado: electron-builder no lo ve «válido» en este Mac (ver ahí).
-          export CSC_KEYCHAIN="$LLAVERO" MAVEN_IDENTIDAD=2AF90210B577E12F252480047483586DDD8C7379
-          npm version "2.0.${{ github.run_number }}" --no-git-tag-version
-          npx electron-builder --mac --publish never -c.directories.output="$RUNNER_TEMP/escritorio" -c.mac.identity=null -c.mac.notarize=false
-          APP="$RUNNER_TEMP/escritorio/mac-universal/Maven.app"
-          # Sin la firma de Alvaro no se sube nada (antes salía sin firma y se subía igual).
-          codesign --verify --deep --strict "$APP"
-          if ! codesign -dv "$APP" 2>&1 | grep -q 'Authority=Developer ID Application: Alvaro Mejia'; then
-            echo "::warning::Salió con firma ad hoc (sin Developer ID): no se manda a notarizar."
-            exit 0
-          fi
-          # Notarización: se manda a Apple y se espera un rato. Si Apple la
-          # aprueba después, el Mac igual la reconoce al abrirla (lo consulta en
-          # línea), así que no hace falta esperar horas aquí.
-          ditto -c -k --keepParent "$APP" "$RUNNER_TEMP/notarizar.zip"
-          xcrun notarytool submit "$RUNNER_TEMP/notarizar.zip" --key "$APPLE_API_KEY" \
-            --key-id "$APPLE_API_KEY_ID" --issuer "$APPLE_API_ISSUER" --wait --timeout 20m || true
-      - name: Subir a Supabase (balde descargas)
-        env:
-          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-        run: |
-          set -euo pipefail
-          LLAVE=$(curl -fsS "https://api.supabase.com/v1/projects/$PROYECTO/api-keys?reveal=true" \
-            -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
-            | python3 -c 'import json,sys; print(next(k["api_key"] for k in json.load(sys.stdin) if k["name"]=="service_role"))')
-          echo "::add-mask::$LLAVE"
-          # El .yml va al final: anuncia la versión nueva solo cuando ya subió todo.
-          for ARCHIVO in $ARCHIVOS; do
-            curl -fsS -X POST "https://$PROYECTO.supabase.co/storage/v1/object/descargas/$ARCHIVO" \
-              -H "Authorization: Bearer $LLAVE" -H "apikey: $LLAVE" \
-              -H "x-upsert: true" -H "cache-control: max-age=60" \
-              -H "Content-Type: application/octet-stream" \
-              --data-binary "@$RUNNER_TEMP/escritorio/$ARCHIVO" >/dev/null
-            echo "subido $ARCHIVO"
-          done
+  # Mac: ya NO se arma aquí. El Mac mini del CI corre sin sesión de usuario y
+  # no puede firmar con el Developer ID (errSecInternalComponent, 17/11/2026):
+  # la app salía sin firma o con firma ad hoc. Ahora se arma, firma y notariza
+  # en el MacBook de Alvaro con `desktop/publicar-mac.sh`, que la sube a un
+  # release `mac-v*` de GitHub; el workflow app-escritorio-mac la copia al balde.
 
   # Windows: en una máquina Windows de GitHub (el makensis del Mac mini es de
   # Intel sin Rosetta, y en Linux pide wine).
