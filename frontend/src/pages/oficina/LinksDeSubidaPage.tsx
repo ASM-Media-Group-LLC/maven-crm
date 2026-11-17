@@ -3,7 +3,7 @@ import { Link as LinkRouter } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { formatDistanceToNowStrict } from "date-fns";
 import { es as esLocale } from "date-fns/locale";
-import { AlertTriangle, ArrowLeft, Check, Copy, FolderOpen, Link2, Loader2, RefreshCw, Search } from "lucide-react";
+import { AlertTriangle, ArrowLeft, Check, Copy, Folder, FolderOpen, Link2, Loader2, RefreshCw, Search } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useLanguage } from "@/hooks/useLanguage";
 import { Page } from "@/components/ui/page";
@@ -84,16 +84,16 @@ export default function LinksDeSubidaPage() {
       />
       <div className="flex flex-col gap-8">
         <section className="flex flex-col gap-3">
-          <div>
-            <h2 className="text-base font-semibold">{t("drive.creadoras.titulo")}</h2>
-            <p className="text-xs text-muted-foreground">{t("drive.creadoras.desc")}</p>
+          <div className="px-1">
+            <h2 className="font-display text-lg font-semibold tracking-tight">{t("drive.creadoras.titulo")}</h2>
+            <p className="max-w-3xl text-xs text-muted-foreground">{t("drive.creadoras.desc")}</p>
           </div>
           <LinksDeCreadoras />
         </section>
         <section className="flex flex-col gap-3">
-          <div>
-            <h2 className="text-base font-semibold">{t("drive.links.otros")}</h2>
-            <p className="text-xs text-muted-foreground">{t("drive.links.otrosDesc")}</p>
+          <div className="px-1">
+            <h2 className="font-display text-lg font-semibold tracking-tight">{t("drive.links.otros")}</h2>
+            <p className="max-w-3xl text-xs text-muted-foreground">{t("drive.links.otrosDesc")}</p>
           </div>
           <LinksDeSubidaVista links={q.data} cargando={q.isLoading} fallo={q.isError} onReintentar={() => void q.refetch()} />
         </section>
@@ -131,54 +131,61 @@ export function LinksDeSubidaVista({ links, cargando, fallo, onReintentar }: {
     return <p className="vidrio p-6 text-sm text-muted-foreground">{t("drive.links.vacio")}</p>;
   }
 
+  const numero = (n: number) => n.toLocaleString(language === "es" ? "es-CO" : "en-US");
   return (
     <div className="flex flex-col gap-3">
-      <div className="flex flex-wrap items-center gap-3">
-        <div className="relative w-full sm:max-w-sm">
-          <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+      <div className="vidrio-barra flex flex-wrap items-center gap-2 p-2">
+        <div className="relative min-w-0 flex-1 sm:max-w-sm">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input value={busqueda} onChange={(e) => setBusqueda(e.target.value)} placeholder={t("drive.links.buscar")}
-            aria-label={t("drive.links.buscar")} className="pl-8" />
+            aria-label={t("drive.links.buscar")} className="h-9 rounded-xl border-transparent bg-background/40 pl-9 shadow-none" />
         </div>
-        <span className="text-xs text-muted-foreground tabular-nums">{t("drive.links.resumen", { n: links.length, m: nunca })}</span>
+        <span className="text-xs text-muted-foreground tabular-nums sm:ml-auto sm:pr-2">{t("drive.links.resumen", { n: links.length, m: nunca })}</span>
       </div>
 
       {vistos.length === 0 ? (
         <p className="vidrio p-6 text-sm text-muted-foreground">{t("drive.links.sinResultados", { q: busqueda })}</p>
       ) : (
-        <ul className="vidrio divide-y divide-border/50 overflow-hidden">
+        <ul className="vidrio overflow-hidden p-1.5">
           {vistos.map((l) => {
             const url = urlDeAportar(l.token);
             const sinNada = l.archivos === 0;
             return (
-              <li key={l.token} className="grid gap-3 p-3 sm:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_auto] sm:items-center sm:gap-4 sm:px-4">
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-semibold" title={nombreDeLaCarpeta(l)}>{nombreDeLaCarpeta(l)}</p>
-                  <p className="truncate text-xs text-muted-foreground">
-                    {l.padre ? t("drive.links.en", { padre: l.padre }) : null}
-                    {l.padre && l.creado_por ? " · " : null}
-                    {l.creado_por ? t("drive.links.creadoPor", { nombre: l.creado_por }) : null}
-                  </p>
+              <li key={l.token}
+                className="grid gap-3 rounded-xl px-3 py-2.5 transition-colors hover:bg-primary/[0.05] sm:grid-cols-[minmax(0,1fr)_minmax(0,13rem)_15.5rem] sm:items-center sm:gap-4">
+                <div className="flex min-w-0 items-center gap-3">
+                  <span aria-hidden className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-primary/10 text-primary">
+                    <Folder className="h-4 w-4" />
+                  </span>
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-semibold" title={nombreDeLaCarpeta(l)}>{nombreDeLaCarpeta(l)}</p>
+                    <p className="truncate text-xs text-muted-foreground">
+                      {l.padre ? t("drive.links.en", { padre: l.padre }) : null}
+                      {l.padre && l.creado_por ? " · " : null}
+                      {l.creado_por ? t("drive.links.creadoPor", { nombre: l.creado_por }) : null}
+                    </p>
+                  </div>
                 </div>
-                <div className="min-w-0 text-xs">
+                <div className="min-w-0 pl-11 text-xs sm:pl-0">
                   {sinNada ? (
                     <span className="inline-flex items-center gap-1 rounded-full border border-warning/30 bg-warning/10 px-2 py-0.5 font-semibold text-warning/90">
                       {t("drive.links.nunca")}
                     </span>
                   ) : (
                     <>
-                      <p className="font-medium tabular-nums">{t("drive.links.recibido", { n: l.archivos.toLocaleString(language === "es" ? "es-CO" : "en-US"), tam: tamano(l.bytes) })}</p>
-                      {l.ultimo && <p className="text-muted-foreground">{t("drive.links.ultimo", { hace: hace(l.ultimo, language) })}</p>}
+                      <p className="font-medium tabular-nums">{t("drive.links.recibido", { n: numero(l.archivos), tam: tamano(l.bytes) })}</p>
+                      {l.ultimo && <p className="mt-0.5 text-muted-foreground">{t("drive.links.ultimo", { hace: hace(l.ultimo, language) })}</p>}
                     </>
                   )}
                 </div>
-                <div className="flex flex-wrap gap-2 sm:justify-end">
-                  <Button size="sm" variant="outline" onClick={() => void copiar(url)}>
-                    {copiado === url ? <Check className="mr-1.5 h-3.5 w-3.5" /> : <Copy className="mr-1.5 h-3.5 w-3.5" />}
+                <div className="flex items-center gap-1.5 pl-11 sm:justify-end sm:pl-0">
+                  <Button size="sm" variant="outline" className="h-8 rounded-lg px-3" onClick={() => void copiar(url)}>
+                    {copiado === url ? <Check className="mr-1.5 h-3.5 w-3.5 text-success" /> : <Copy className="mr-1.5 h-3.5 w-3.5" />}
                     {t(copiado === url ? "drive.links.copiado" : "drive.links.copiar")}
                   </Button>
-                  <Button size="sm" variant="ghost" asChild>
-                    <LinkRouter to={`/oficina/drive?carpeta=${l.carpeta_id}`}>
-                      <FolderOpen className="mr-1.5 h-3.5 w-3.5" />{t("drive.links.abrir")}
+                  <Button size="icon" variant="ghost" asChild className="h-8 w-8 rounded-lg text-muted-foreground hover:text-foreground">
+                    <LinkRouter to={`/oficina/drive?carpeta=${l.carpeta_id}`} aria-label={t("drive.links.abrir")} title={t("drive.links.abrir")}>
+                      <FolderOpen className="h-4 w-4" />
                     </LinkRouter>
                   </Button>
                 </div>
