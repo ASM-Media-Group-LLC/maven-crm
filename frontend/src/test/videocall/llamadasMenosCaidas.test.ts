@@ -9,16 +9,16 @@
 //     solos durante 15 minutos sin que los admitan otra vez.
 //  4. Cowork más liviano: todo en vivo, a 10 fps la cámara y 5 la pantalla.
 //  5. «Tu internet está débil»: solo un aviso.
-//  6. El aviso de versión nueva con llamada no trae el botón que la cortaba.
+//  6. El aviso de versión nueva con llamada no trae el botón que la cortaba
+//     (y al colgar se recarga sola: test/pwa/recargaAlColgar.test.ts).
 //  7. Mapas de fuente ocultos, que nunca se sirven.
 //
 // Casi nada de esto falla de forma ruidosa si se rompe (una caída de más, un
 // invitado que tiene que volver a golpear): por eso las guardas.
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect } from "vitest";
 import { ESPERAS_DE_REENTRADA_MS, MAX_REENTRADAS, esperaDeReentrada } from "@/lib/conexionSala";
 import { SALTO_DE_SUENO_MS, crearVigiaDelSueno, faseSegunSueno } from "@/lib/equipoDormido";
 import { BIEN_SOSTENIDO_MS, DEBIL_INICIAL, DEBIL_SOSTENIDO_MS, siguienteDebil, type EstadoDebil } from "@/lib/internetDebil";
-import { crearAvisoDeVersion } from "@/lib/avisoDeVersion";
 import { CAMARA_LIVIANA, FPS_DE_COWORK, topesDeCowork, topesLivianos, type TopeDeCodificacion } from "@/lib/perfilDeCamara";
 import {
   CAPTURA_COWORK, PUBLICACION_DE_PANTALLA, PUBLICACION_DE_PANTALLA_COWORK, PUBLICACION_DE_PANTALLA_LIVIANA, opcionesDePantalla,
@@ -314,45 +314,8 @@ describe("5. «Tu internet está débil»: solo un aviso", () => {
   });
 });
 
-describe("6. el aviso de versión nueva con una llamada andando", () => {
-  it("con llamada: el aviso sin botón; al colgar, el de siempre", () => {
-    let enLlamada = true;
-    let tic: (() => void) | null = null;
-    const enLl = vi.fn();
-    const normal = vi.fn();
-    const avisar = crearAvisoDeVersion({
-      enLlamada: () => enLlamada,
-      mostrarEnLlamada: enLl,
-      mostrarNormal: normal,
-      programar: (fn) => { tic = fn; return 7; },
-      cancelar: () => { tic = null; },
-    });
-    avisar();
-    expect(enLl).toHaveBeenCalledTimes(1);
-    expect(normal).not.toHaveBeenCalled();
-    tic!();
-    expect(normal).not.toHaveBeenCalled(); // sigue en la llamada
-    enLlamada = false;
-    tic!();
-    expect(normal).toHaveBeenCalledTimes(1);
-    expect(tic).toBeNull();
-  });
-
-  it("sin llamada: el de siempre, directo", () => {
-    const normal = vi.fn();
-    crearAvisoDeVersion({ enLlamada: () => false, mostrarEnLlamada: vi.fn(), mostrarNormal: normal, programar: () => 1, cancelar: () => {} })();
-    expect(normal).toHaveBeenCalledTimes(1);
-  });
-
-  it("pwa.ts lo usa con hayLlamadaActiva, y el aviso con llamada NO trae acción", () => {
-    const s = leer("src/pwa.ts");
-    expect(s).toContain("crearAvisoDeVersion({");
-    expect(s).toContain("enLlamada: hayLlamadaActiva,");
-    const enLlamada = s.slice(s.indexOf("mostrarEnLlamada: () => {"), s.indexOf("mostrarNormal: () =>"));
-    expect(enLlamada).toContain('"pwa.actualizar.enLlamada"');
-    expect(enLlamada).not.toContain("action");
-  });
-});
+// 6. El aviso de versión nueva con llamada: ahora Maven se recarga solo al
+// colgar; su guarda vive en test/pwa/recargaAlColgar.test.ts.
 
 describe("7. mapas de fuente: se generan ocultos y nunca se sirven", () => {
   it("vite los genera «hidden» (los .js no los nombran)", () => {

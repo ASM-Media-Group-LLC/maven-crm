@@ -5,7 +5,7 @@ import { BUILD_PROPIO, crearVigiaDelMinimo } from "./lib/versionDelBundle";
 import { almacenDeLaPestana, forzarActualizacion, leerUiBuildMinimo } from "./lib/minimoDelBundle";
 import { hayLlamadaActiva } from "./lib/llamadaActiva";
 import { registrarSw } from "./lib/registroDelSw";
-import { crearAvisoDeVersion } from "./lib/avisoDeVersion";
+import { crearRecargaAlColgar, hayAlgoAMedioEscribir, marcarRecarga } from "./lib/recargaAlColgar";
 
 /** El aviso "Nueva versión disponible" como toast del design system (el mismo
  *  vidrio de todos los avisos), con `id` fijo para no duplicarse en el chequeo
@@ -103,10 +103,22 @@ export async function initPWA() {
     // llamada o sin ella, y cada deploy tumbaba llamadas de Cowork (11/11/2026).
     let registro: ServiceWorkerRegistration | undefined;
     const lang: Language = localStorage.getItem("app-language") === "en" ? "en" : "es";
-    // Con llamada, el aviso NO trae botón: tocar «Recargar» cortaba la propia
-    // llamada. Al colgar pasa solo al de siempre (lib/avisoDeVersion.ts).
-    const avisar = crearAvisoDeVersion({
+    // VERSIÓN NUEVA: Maven se recarga solo, pero NUNCA en una llamada ni con
+    // algo a medio escribir (lib/recargaAlColgar.ts, Alvaro 17/11/2026). Con
+    // llamada, un aviso SIN botón (tocar «Recargar» cortaba la propia llamada) y
+    // al colgar se recarga sola. Una vez por versión: no hay bucle.
+    const almacen = almacenDeLaPestana();
+    const build = String(BUILD_PROPIO);
+    const ocupada = () => hayLlamadaActiva() || hayAlgoAMedioEscribir();
+    const recargarUnaVez = () => { marcarRecarga(almacen, build); window.location.reload(); };
+    const avisar = crearRecargaAlColgar({
       enLlamada: hayLlamadaActiva,
+      aMedioEscribir: () => hayAlgoAMedioEscribir(),
+      // Busca el SW nuevo, le da el control y recarga; mira la llamada y lo escrito
+      // otra vez justo antes (en esos segundos alguien puede entrar a una llamada).
+      pasarALaNueva: () => forzarActualizacion(registro, updateSW, recargarUnaVez, ocupada),
+      almacen,
+      build,
       mostrarEnLlamada: () => {
         if (document.querySelector("[data-sonner-toaster]")) {
           toast(getTranslation("pwa.actualizar.enLlamada", lang), { id: "pwa-update", duration: Infinity });
@@ -133,9 +145,11 @@ export async function initPWA() {
       },
       alNecesitarRecarga: avisar,
       enLlamada: hayLlamadaActiva,
-      // Con llamada no se recarga: queda el aviso para recargar al colgar.
+      // Con llamada no se recarga: queda el aviso y se recarga sola al colgar.
       alQuedarPendiente: avisar,
-      recargar: () => window.location.reload(),
+      // El SW nuevo ya tomó el control sin llamada: también por el camino seguro
+      // (nada a medio escribir, una vez por versión).
+      recargar: avisar,
     });
 
     // EL MÍNIMO: si app_flags 'ui_build_minimo' dice que este build es viejo, se
