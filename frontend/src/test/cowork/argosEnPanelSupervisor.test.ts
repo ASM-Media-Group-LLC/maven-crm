@@ -15,11 +15,11 @@ describe("Argos en el panel del supervisor", () => {
   it("el Hub prende a Argos (fotos, encuadre, pantalla) solo si no es admin", () => {
     expect(p).toMatch(/const vigilarAnfitrion = miRol !== null && !isAdmin;/);
     expect(p).toMatch(/supervisorEncuadre: vigilarAnfitrion,/);
-    expect(p).toMatch(/onMediaStateChange: \(m\) =>\s*actualizarLatido/);
+    expect(p).toMatch(/onMediaStateChange: \(m\) => \{\s*medioHubRef\.current = /);
   });
 
   it("el panel late mientras el Hub está conectado y lo cierra al colgar", () => {
-    expect(p).toMatch(/if \(!sesionDelHub \|\| !hubConnected \|\| !vigilarAnfitrion\) return;\s*iniciarLatido\(sesionDelHub/);
+    expect(p).toMatch(/if \(!sesionDelHub \|\| !\(hubConnected \|\| enUnaSala\) \|\| !vigilarAnfitrion\) return;\s*iniciarLatido\(sesionDelHub/);
     expect(p).toMatch(/detenerLatido\(\);\s*void cowork\.leaveRoom\?\.\(\);/);
   });
 
