@@ -33,7 +33,7 @@ export const TARJETAS = {
     url: `${BASE}/`,
     titulo: "Maven · Your whole team, in a virtual office",
     descripcion: "The virtual office for your team: chat, meetings, your own email, docs and tasks.",
-    imagen: `${BASE}/og-plataforma.jpg?v=2`,
+    imagen: `${BASE}/og-plataforma.jpg?v=3`,
     alt: "Maven: your whole team, in a virtual office",
   },
   reunion: {
@@ -43,7 +43,7 @@ export const TARJETAS = {
     descripcion: "Tap the link and join from your browser. No downloads.",
     // v=2: la imagen del botón «Join meeting» (R4), elegida el 11/11. Subir el
     // número al cambiarla, para que WhatsApp no siga mostrando la vieja.
-    imagen: `${BASE}/og-reunion.jpg?v=3`,
+    imagen: `${BASE}/og-reunion.jpg?v=4`,
     alt: "Join meeting on Maven",
   },
   cowork: {
@@ -51,7 +51,7 @@ export const TARJETAS = {
     url: `${BASE}/cowork`,
     titulo: "Your team is calling you",
     descripcion: "Tap the link to join your team's room, right from your browser.",
-    imagen: `${BASE}/og-cowork.jpg?v=2`,
+    imagen: `${BASE}/og-cowork.jpg?v=3`,
     alt: "Your team is calling you on Maven",
   },
 } satisfies Record<string, TarjetaDeLink>;

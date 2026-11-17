@@ -149,7 +149,7 @@ const PLANES: Plan[] = [
 function Marca({ chico = false }: { chico?: boolean }) {
   return (
     <span className={`pr-marca${chico ? " chico" : ""}`}>
-      <MarcaM className="pr-marca-m" alto={chico ? "17px" : "22px"} claro="var(--pr-acento)" oscuro="var(--pr-acento-hondo)" />
+      <MarcaM className="pr-marca-m" alto={chico ? "14px" : "18px"} />
       Maven
     </span>
   );

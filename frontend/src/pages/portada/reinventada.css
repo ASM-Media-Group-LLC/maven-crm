@@ -14,8 +14,6 @@
   /* El acento es el MISMO verde del botón (Alvaro: «tiene que hacer match»),
      después bajado dos veces a pedido («menos encendido»). */
   --pr-acento: #4fd88d;
-  /* El pliegue del logo: el mismo verde, a la sombra. */
-  --pr-acento-hondo: #2a9a5c;
   --pr-acento-rgb: 79, 216, 141;
   --pr-neon: #4fd88d;
   --pr-neon-hover: #6fe0a3;

@@ -16,12 +16,12 @@ interface LogoProps {
 
 /** La marca: la M de cinta del logo nuevo (Alvaro, 16/11/2026), la misma de la
     portada y de los iconos, en el verde de la marca y SIN baldosa — así se ve
-    igual sobre fondo claro u oscuro. Mide 0.72em de alto para acompañar a la
+    igual sobre fondo claro u oscuro. Mide 0.78em de alto para acompañar a la
     tipografía elegida. Ya no sigue al skin: es la marca. El NOMBRE no se toca:
     degradado y tipografía de siempre. */
 const Marca = () => (
   <span aria-hidden className="inline-flex shrink-0 items-center self-center">
-    <MarcaM alto="0.72em" />
+    <MarcaM alto="0.78em" />
   </span>
 );
 
