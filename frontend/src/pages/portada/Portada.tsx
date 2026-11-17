@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState, type CSSProperties, type MouseEvent } from "react";
+import { MarcaM } from "@/components/MarcaM";
 import {
   ArrowRight, CheckSquare, Eye, FileText, HardDrive, Mail, MessageSquare, MonitorUp, UserCheck, Video,
   type LucideIcon,
 } from "lucide-react";
-import { MarcaM } from "@/components/MarcaM";
 import { Link } from "react-router-dom";
 import "./portada.css";
 import "./reinventada.css";
@@ -18,9 +18,12 @@ import PedirDemo from "./secciones/PedirDemo";
 // los colores de Maven. El video muestra un equipo repartido en varias casas
 // trabajando como si estuviera en la misma oficina.
 //
-// Precios decididos por Alvaro el mismo día: fijo por empresa, «Oficina»
-// USD 300 hasta 25 personas, «Con Argos» USD 900 hasta 50, «Empresa» a la
-// medida. Cambiar un precio es cambiar PLANES, nada más.
+// Precios de Alvaro (16/11/2026, segunda vuelta): fijo por empresa y todo
+// incluido, Argos también — Equipo USD 299 hasta 20 personas, Empresa USD 599
+// hasta 50, y Enterprise SIN precio (más de 50 personas: nos contactan), como
+// la tarjeta Enterprise de Lumina — más la instalación a la medida desde
+// USD 3.000 (pago único) en la nota de abajo. Cambiar un precio es cambiar
+// PLANES, nada más.
 //
 // TRES REGLAS DE CONTENIDO que no son opinión, son pedido explícito:
 //  1. Ni una cifra de la agencia (montos, cantidad de personas, uso real).
@@ -46,9 +49,9 @@ const TOKENS = {
   "--ink-soft": "#c9d0dc",
   "--muted": "#8f9ab0",
   "--faint": "#7d889e",
-  "--azul": "#39ff8e",
-  "--azul-claro": "#6bffab",
-  "--azul-rgb": "57, 255, 142",
+  "--azul": "#4fd88d",
+  "--azul-claro": "#6fe0a3",
+  "--azul-rgb": "79, 216, 141",
   "--azul-claro-rgb": "107, 255, 171",
   "--sobre-azul": "#04140b",
 } as CSSProperties;
@@ -90,31 +93,33 @@ type Plan = {
   incluye: string[];
   boton: string;
   destacado?: boolean;
+  /** Botón de contorno (el de «Contáctanos»), como el Enterprise de Lumina. */
+  contacto?: boolean;
 };
 
 const PLANES: Plan[] = [
   {
-    nombre: "Oficina",
-    precio: "USD 300",
+    nombre: "Equipo",
+    precio: "USD 299",
     periodo: "/ mes · por empresa",
-    tope: "Hasta 25 personas",
+    tope: "Hasta 20 personas",
     incluye: [
       "Cowork en vivo, con cámara y pantalla",
-      "Reuniones con pantalla compartida",
-      "Mensajería y correo con tu dominio",
+      "Argos, la IA que vigila todo el turno",
+      "Reuniones, mensajería y correo con tu dominio",
       "Documentos, tareas y almacenamiento",
       "Tú apruebas quién entra",
     ],
     boton: "Pedir una demo",
   },
   {
-    nombre: "Con Argos",
-    precio: "USD 900",
+    nombre: "Empresa",
+    precio: "USD 599",
     periodo: "/ mes · por empresa",
-    tope: "Hasta 50 personas · la IA que vigila",
+    tope: "Hasta 50 personas",
     incluye: [
-      "Todo lo de Oficina",
-      "Argos revisa cámaras y pantallas todo el turno",
+      "Todo lo de Equipo",
+      "Un Cowork por área, cada uno con su supervisor",
       "Nota del 0 al 100 por persona, del día y de la semana",
       "Avisos al momento a la persona y a su jefe",
       "Expediente de cada persona, día por día",
@@ -123,28 +128,28 @@ const PLANES: Plan[] = [
     destacado: true,
   },
   {
-    nombre: "Empresa",
+    nombre: "Enterprise",
     precio: "A la medida",
-    tope: "Más de 50 personas · tu marca",
+    tope: "Más de 50 personas · empresas grandes",
     incluye: [
-      "Todo lo de Con Argos",
-      "Más de 50 personas",
+      "Todo lo de Empresa",
+      "Para equipos de más de 50 personas",
       "Tu marca y tus colores en toda la plataforma",
+      "Instalación e integraciones a tu medida",
       "Acompañamiento dedicado",
     ],
-    boton: "Hablemos",
+    boton: "Contáctanos",
+    contacto: true,
   },
 ];
 
-/** El logo, dibujado a mano: adentro de la app cambia con la paleta de cada
- *  quien, y la portada tiene que verse siempre igual. */
+/** El logo de la portada (Alvaro, 16/11/2026): la M de cinta de la marca
+ *  (components/MarcaM, la misma de la app y de los iconos) en el verde de los
+ *  botones, y «Maven» en blanco. Sin «Virtual Office»: «nada que ver». */
 function Marca({ chico = false }: { chico?: boolean }) {
-  const lado = chico ? 22 : 26;
   return (
-    <span className="marca" style={chico ? { fontSize: 15 } : undefined}>
-      <i style={{ width: lado, height: lado }}>
-        <MarcaM alto={chico ? "10px" : "12px"} />
-      </i>
+    <span className={`pr-marca${chico ? " chico" : ""}`}>
+      <MarcaM className="pr-marca-m" alto={chico ? "17px" : "22px"} claro="var(--pr-acento)" oscuro="var(--pr-acento-hondo)" />
       Maven
     </span>
   );
@@ -326,7 +331,7 @@ export default function Portada() {
                   {p.incluye.map((linea) => <li key={linea}>{linea}</li>)}
                 </ul>
                 <a
-                  className={`pr-btn ${p.destacado || p.nombre === "Oficina" ? "pr-btn-neon" : "pr-btn-fantasma"}`}
+                  className={`pr-btn ${p.contacto ? "pr-btn-fantasma" : "pr-btn-neon"}`}
                   href="#demo"
                   onClick={abrirDemo}
                 >
@@ -336,7 +341,8 @@ export default function Portada() {
             ))}
           </div>
           <p className="pr-precios-nota">
-            Precio fijo por empresa, no por persona. <b>¿Más de 50 personas?</b> Te armamos un plan a la medida.
+            Precio fijo por empresa, no por persona.{" "}
+            <b>Instalación e integraciones a la medida para tu empresa: desde USD&nbsp;3.000, pago único.</b>
           </p>
         </div>
       </section>

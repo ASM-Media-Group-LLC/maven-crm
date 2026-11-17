@@ -59,9 +59,7 @@ export default function Concepto() {
       <nav className={`nav${pegado ? " pegado" : ""}`}>
         <div className="wrap nav-in">
           <Link to="/" className="marca" style={{ textDecoration: "none" }}>
-            <i style={{ width: 26, height: 26 }}>
-              <MarcaM alto="12px" />
-            </i>
+            <MarcaM alto="15px" />
             Maven
           </Link>
           <div className="nav-links">
