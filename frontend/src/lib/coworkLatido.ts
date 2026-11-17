@@ -161,7 +161,9 @@ function afectaAlReloj(a: Latido, b: Latido): boolean {
     || !!a.onBreak !== !!b.onBreak
     || (a.faceState === "no_face") !== (b.faceState === "no_face")
     // Perder la sala y recuperarla: tiene que llegar enseguida, no en 30 s.
-    || (a.conexionSala === "desconectada") !== (b.conexionSala === "desconectada");
+    || (a.conexionSala === "desconectada") !== (b.conexionSala === "desconectada")
+    // Lo mismo con el equipo dormido: ese tiempo deja de pagarse en el acto.
+    || (a.conexionSala === "dormido") !== (b.conexionSala === "dormido");
 }
 
 /** Empieza a latir para esta sesión. Idempotente: si ya late para la misma

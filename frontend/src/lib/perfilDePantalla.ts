@@ -75,6 +75,23 @@ export const CAPTURA_LIVIANA: Pick<ScreenShareCaptureOptions, "resolution"> = {
   resolution: { width: 1280, height: 720, frameRate: 5 },
 };
 
+// ── COWORK: TODO EN VIVO, MÁS LIVIANO (Alvaro, 17/11/2026) ───────────────────
+//
+// En Cowork la pantalla se sigue viendo en vivo y en 1080p (una hoja de cálculo
+// tiene que leerse), pero a 5 cuadros por segundo en vez de 15, con el tope de
+// bitrate en proporción: 1,2 Mbps en vez de 2,5. Lo que se comparte en Cowork es
+// trabajo casi quieto (texto, planillas, chats): 5 fps alcanzan, y es la mitad
+// del internet de subida. La capa chica de las miniaturas sigue igual (720p@5).
+// El perfil liviano ya estaba en 5 fps y 500 kbps: no cambia. Meet no se toca.
+export const PUBLICACION_DE_PANTALLA_COWORK: TrackPublishOptions = {
+  screenShareEncoding: { maxBitrate: 1_200_000, maxFramerate: 5 },
+  screenShareSimulcastLayers: [ScreenSharePresets.h720fps5],
+  degradationPreference: "maintain-framerate",
+};
+export const CAPTURA_COWORK: Pick<ScreenShareCaptureOptions, "resolution"> = {
+  resolution: { width: 1920, height: 1080, frameRate: 5 },
+};
+
 /** Debajo de esto (subida medida de verdad, en Mbps) se comparte con el perfil liviano. */
 export const SUBIDA_PARA_PANTALLA_NORMAL_MBPS = 1.5;
 /** Una prueba de velocidad más vieja que esto ya no dice nada del internet de ahora. */
@@ -113,13 +130,16 @@ export function elegirPerfilDePantalla(s: {
   return "normal";
 }
 
-/** Las opciones de captura y de publicación de cada perfil. */
+/** Las opciones de captura y de publicación de cada perfil. En Cowork, el
+ *  normal va a 5 fps (PUBLICACION_DE_PANTALLA_COWORK); el liviano ya lo estaba. */
 export function opcionesDePantalla(
   perfil: PerfilDePantalla,
   captura: ScreenShareCaptureOptions,
+  enCowork = false,
 ): { captura: ScreenShareCaptureOptions; publicacion: TrackPublishOptions } {
   if (perfil === "liviano") {
     return { captura: { ...captura, ...CAPTURA_LIVIANA }, publicacion: PUBLICACION_DE_PANTALLA_LIVIANA };
   }
+  if (enCowork) return { captura: { ...captura, ...CAPTURA_COWORK }, publicacion: PUBLICACION_DE_PANTALLA_COWORK };
   return { captura, publicacion: PUBLICACION_DE_PANTALLA };
 }
