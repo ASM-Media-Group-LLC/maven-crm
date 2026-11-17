@@ -49,6 +49,7 @@ import { centroOps } from "./i18n/centroOps";
 import { vigilancia } from "./i18n/vigilancia";
 import { conexionEquipo } from "./i18n/conexionEquipo";
 import { portada } from "./i18n/portada";
+import { guiaConexion } from "./i18n/guiaConexion";
 
 // EL DICCIONARIO, PARTIDO POR MÓDULO.
 //
@@ -108,6 +109,7 @@ const translations = {
   ...vigilancia,
   ...conexionEquipo,
   ...portada,
+  ...guiaConexion,
 } as const;
 
 export type TranslationKey = keyof typeof translations;
