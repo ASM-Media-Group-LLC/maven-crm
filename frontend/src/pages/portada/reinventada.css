@@ -53,6 +53,9 @@
 .pt.pr .pr-btn-neon:hover { background: var(--pr-neon-hover); transform: translateY(-1px); }
 .pt.pr .pr-btn-fantasma { background: transparent; color: var(--pr-texto); border-color: rgba(255, 255, 255, .22); }
 .pt.pr .pr-btn-fantasma:hover { border-color: var(--pr-acento); color: var(--pr-acento); }
+/* El «Pedir una demo» de arriba va solo enmarcado en verde; el relleno queda para el de abajo (Alvaro). */
+.pt.pr .pr-btn-contorno-verde { background: transparent; color: var(--pr-neon); border-color: var(--pr-neon); }
+.pt.pr .pr-btn-contorno-verde:hover { background: rgba(var(--pr-acento-rgb), .12); transform: translateY(-1px); }
 .pt.pr .pr-btn-lg { font-size: 1.05rem; padding: 1em 2.2em; }
 .pt.pr .pr-btn svg { width: 1em; height: 1em; }
 

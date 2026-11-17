@@ -391,7 +391,7 @@ export default function Portada({ idiomaDeRuta }: { idiomaDeRuta?: Idioma }) {
           </nav>
           <div className="pr-nav-cta">
             <Link className="pr-btn pr-btn-fantasma" to="/login">{t("portada.nav.entrar")}</Link>
-            <a className="pr-btn pr-btn-neon" href="#demo" onClick={abrirDemo}>{t("portada.cta.demo")}</a>
+            <a className="pr-btn pr-btn-contorno-verde" href="#demo" onClick={abrirDemo}>{t("portada.cta.demo")}</a>
             <SelectorIdioma />
           </div>
         </div>
