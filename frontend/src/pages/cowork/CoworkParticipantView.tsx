@@ -575,6 +575,13 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
   useEffect(() => {
     if (myAssignment?.room_id && prevRoomIdRef.current && myAssignment.room_id !== prevRoomIdRef.current) {
       setManuallyLeft(false);
+      // Lo movió el anfitrión («Mover a otra sala», 17/11/2026): entra solo a la
+      // sala nueva como tenía la anterior (cámara, micro y pantalla), igual que al
+      // volver de un meet grupal, y se le dice a dónde lo pasaron.
+      if (myAssignment.assigned_by && myAssignment.assigned_by !== userId) {
+        if (connectedLkRoom) estadoPrevioRef.current = { ...lastMediaRef.current };
+        toast.info(traducir("cowork.participant.movedByHost", { room: myRoom?.name ?? "" }));
+      }
     }
     prevRoomIdRef.current = myAssignment?.room_id || null;
 

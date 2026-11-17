@@ -2,7 +2,7 @@ import { corsFor } from "../_shared/cors.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import {
-  caidaSePaga, equipoDeCuerpo, estadoDeTiempo, latidoDeCuerpo, latidoDeEquipoAfuera, noCobrabaAlCaerse, sinConexionPagadaMs,
+  caidaSePaga, enMeetDeMaven, equipoDeCuerpo, estadoDeTiempo, latidoDeCuerpo, latidoDeEquipoAfuera, noCobrabaAlCaerse, sinConexionPagadaMs,
   EXIGE_TODO, LATIDO_VENCIDO_MS, TOPE_SIN_CONEXION_MS, VENTANA_SIN_CONEXION_MS, type Exigencias, type TramoGuardado,
 } from "../_shared/cowork-tiempo.ts";
 import { agenciaDePersona, agenciaDeSesion, esUuid, revisarPedido, topeDeLaTabla } from "./agencia.ts";
@@ -641,6 +641,59 @@ serve(async (req) => {
     // (assignToRoom removed — participants self-join via URL ?room=X or a room code)
 
     // ═══════════════════════════════════════════════════════════════
+    // ASIGNAR SALA — el anfitrión mueve a una persona a otra sala
+    //
+    // Alvaro (17/11/2026): cada participante elegía su sala y el anfitrión no
+    // podía moverlo. Ahora, desde el tablero, «Mover a otra sala». Se apaga la
+    // asignación vigente y se crea la nueva (el índice único solo deja UNA
+    // activa por persona y sesión). Al participante le llega por Realtime (su
+    // propia fila de cowork_room_assignments) y su vista se reconecta sola a la
+    // sala nueva: el token de join_room sale de su asignación activa.
+    // ═══════════════════════════════════════════════════════════════
+    if (action === "asignarSala") {
+      const { sessionId, roomId } = body;
+      const target = body.targetUserId;
+      if (!esUuid(sessionId) || !esUuid(roomId) || !esUuid(target)) return err(req, "sessionId, roomId y targetUserId requeridos");
+
+      const { data: hostCheck } = await admin.from("cowork_memberships")
+        .select("role").eq("session_id", sessionId).eq("user_id", userId).maybeSingle();
+      if (hostCheck?.role !== "host") return err(req, "Solo un anfitrión de la sesión puede mover a alguien de sala", 403);
+
+      const { data: sesion } = await admin.from("cowork_sessions")
+        .select("id").eq("id", sessionId).eq("status", "active").maybeSingle();
+      if (!sesion) return err(req, "La sesión ya no está activa", 404);
+
+      const { data: sala } = await admin.from("cowork_rooms")
+        .select("id, name").eq("id", roomId).eq("session_id", sessionId).maybeSingle();
+      if (!sala) return err(req, "Esa sala no es de esta sesión", 404);
+
+      const { data: miembro } = await admin.from("cowork_memberships")
+        .select("role").eq("session_id", sessionId).eq("user_id", target).maybeSingle();
+      if (!miembro) return err(req, "Esa persona no está en esta sesión", 404);
+      // Los anfitriones trabajan desde el Hub, sin sala asignada.
+      if (miembro.role === "host") return err(req, "A un anfitrión no se le asigna sala", 400);
+
+      const { data: actual } = await admin.from("cowork_room_assignments")
+        .select("id, room_id").eq("session_id", sessionId).eq("user_id", target).eq("is_active", true).maybeSingle();
+      if (actual?.room_id === roomId) return json(req, { ok: true, sinCambio: true, roomId, roomName: sala.name });
+
+      if (actual) {
+        const { error: offErr } = await admin.from("cowork_room_assignments").update({ is_active: false }).eq("id", actual.id);
+        if (offErr) return err(req, offErr.message, 500);
+      }
+      const { error: insErr } = await admin.from("cowork_room_assignments").insert({
+        session_id: sessionId, user_id: target, room_id: roomId, assigned_by: userId,
+      });
+      if (insErr) {
+        // Si no se pudo crear la nueva, se le devuelve la que tenía: nunca queda sin sala por esto.
+        if (actual) await admin.from("cowork_room_assignments").update({ is_active: true }).eq("id", actual.id);
+        return err(req, insErr.message, 500);
+      }
+      console.log(`[cowork] ${userId} movió a ${target} a la sala ${roomId} (${sessionId})`);
+      return json(req, { ok: true, roomId, roomName: sala.name });
+    }
+
+    // ═══════════════════════════════════════════════════════════════
     // LEAVE ROOM (deactivate caller's active assignment)
     // ═══════════════════════════════════════════════════════════════
     // ═══════════════════════════════════════════════════════════════
@@ -685,6 +738,16 @@ serve(async (req) => {
       // pantalla; sin esto se detendría por "sin pantalla").
       const { data: enMeet } = await admin.from("cowork_meet_participants")
         .select("id").eq("user_id", userId).is("left_at", null).limit(1).maybeSingle();
+      // El ANFITRIÓN en un Meet de Maven (salas meet_…) también está en reunión
+      // de trabajo (Alvaro, 17/11/2026: Luis salía «fuera» mientras daba un Meet):
+      // su cámara y su pantalla se van a la reunión, y el Hub no puede pedirle
+      // las dos. Solo anfitriones: el chatter trabaja en su sala.
+      let enMeetMaven = false;
+      if (esAnfitrion) {
+        const { data: llamada } = await admin.from("llamada_maven_latido")
+          .select("sala, last_seen_at").eq("user_id", userId).maybeSingle();
+        enMeetMaven = enMeetDeMaven(llamada, ahora);
+      }
 
       // La tolerancia del "no hay nadie" la fija la sesión (reglas del
       // supervisor); sin reglas propias, 60 s.
@@ -707,7 +770,7 @@ serve(async (req) => {
         && (abierto.room_id ?? null) === salaId && abierto.session_id === sessionId
         && ahora - new Date(abierto.last_seen_at).getTime() <= LATIDO_VENCIDO_MS;
 
-      const latido = latidoDeCuerpo(body, { enPausa: !!pausa, enMeet: !!enMeet });
+      const latido = latidoDeCuerpo(body, { enPausa: !!pausa, enMeet: !!enMeet || enMeetMaven });
       const equipo = equipoDeCuerpo(body);
 
       // Lo que lleva HOY (día de Bogotá) con el reloj corriendo. Va en cada
