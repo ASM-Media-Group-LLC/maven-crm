@@ -79,3 +79,46 @@ export function rangoDeParte(i: number, size: number): { desde: number; hasta: n
   const desde = i * TAMANO_PARTE;
   return { desde, hasta: Math.min(desde + TAMANO_PARTE, size) - 1 };
 }
+
+// ── Cuánto queda en el Drive (Alvaro, 17/11/2026) ───────────────────────────
+// La copia del Drive dura 30 días desde que se copia (también las viejas: los
+// 30 días cuentan desde la copia, no desde la grabación). Quien grabó puede
+// pedir 30 días más las veces que quiera; 3 días antes de vencer se le avisa.
+// La extensión la hace la base (grabacion_drive_extender) con la misma suma.
+
+export const DIAS_EN_DRIVE = 30;
+export const AVISO_ANTES_DIAS = 3;
+const DIA_MS = 24 * 3600 * 1000;
+
+/** Hasta cuándo queda en el Drive una copia hecha en `desde`. */
+export function venceEnElDrive(desde: Date | string | number): string {
+  return new Date(new Date(desde).getTime() + DIAS_EN_DRIVE * DIA_MS).toISOString();
+}
+
+/** ¿Ya toca avisar que vence? (dentro de los últimos AVISO_ANTES_DIAS días). */
+export function tocaAvisarVencimiento(vence: string, ahora: number = Date.now()): boolean {
+  const t = new Date(vence).getTime();
+  return t > ahora && t - ahora <= AVISO_ANTES_DIAS * DIA_MS;
+}
+
+/** «17 de dic de 2026» en hora de Colombia, para los avisos. */
+export function fechaLegible(iso: string, zona = ZONA): string {
+  return new Intl.DateTimeFormat("es-CO", { timeZone: zona, day: "numeric", month: "short", year: "numeric" }).format(new Date(iso));
+}
+
+/** El enlace del aviso: abre /grabaciones con la pregunta de extender. */
+export const enlaceParaExtender = (recordingId: string) => `/grabaciones?extender=${recordingId}`;
+
+/** Los textos de los dos avisos (campana y correo). */
+export function textoDelAviso(clase: "copiada" | "por_vencer", archivo: string, vence: string): { titulo: string; mensaje: string } {
+  const fecha = fechaLegible(vence);
+  return clase === "copiada"
+    ? {
+      titulo: "Tu grabación quedó en el Drive por 30 días",
+      mensaje: `«${archivo}» está en tu Drive (carpeta Grabaciones) hasta el ${fecha}. Si la necesitas más tiempo, toca «Guardar 30 días más».`,
+    }
+    : {
+      titulo: "Tu grabación se borra del Drive pronto",
+      mensaje: `«${archivo}» se borra del Drive el ${fecha}. Toca «Guardar 30 días más» si todavía la necesitas.`,
+    };
+}

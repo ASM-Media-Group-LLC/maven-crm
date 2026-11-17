@@ -2,7 +2,8 @@ import { describe, it, expect } from "vitest";
 // La edge es Deno; la lógica pura sí se puede probar desde aquí (mismo patrón
 // que correo/bodystructure.test.ts).
 import {
-  carpetaDelMes, conQuienCompartir, limpiarNombre, nombreDelArchivo, partesDe, rangoDeParte, TAMANO_PARTE, usuarioDeIdentidad,
+  carpetaDelMes, conQuienCompartir, enlaceParaExtender, limpiarNombre, nombreDelArchivo, partesDe, rangoDeParte, TAMANO_PARTE,
+  textoDelAviso, tocaAvisarVencimiento, usuarioDeIdentidad, venceEnElDrive,
 } from "../../../../supabase/functions/_shared/grabacion-al-drive";
 
 const migracion = Object.values(import.meta.glob("../../../../supabase/migrations/20261117230000_grabaciones_al_drive.sql", { query: "?raw", import: "default", eager: true }))[0] as string;
@@ -56,6 +57,53 @@ describe("partes de 32 MB", () => {
     expect(partesDe(TAMANO_PARTE + 1)).toBe(2);
     expect(rangoDeParte(1, TAMANO_PARTE + 10)).toEqual({ desde: TAMANO_PARTE, hasta: TAMANO_PARTE + 9 });
     expect(() => partesDe(0)).toThrow();
+  });
+});
+
+const viejas = Object.values(import.meta.glob("../../../../supabase/migrations/20261117230100_grabaciones_viejas_al_drive.sql", { query: "?raw", import: "default", eager: true }))[0] as string;
+const pagina = Object.values(import.meta.glob("../../pages/grabaciones/GrabacionesPage.tsx", { query: "?raw", import: "default", eager: true }))[0] as string;
+const DIA = 24 * 3600 * 1000;
+
+describe("30 días en el Drive (Alvaro, 17/11/2026)", () => {
+  it("vence 30 días después de COPIARSE", () => {
+    expect(venceEnElDrive("2026-11-17T12:00:00Z")).toBe("2026-12-17T12:00:00.000Z");
+  });
+  it("se avisa solo en los últimos 3 días, no antes ni ya vencida", () => {
+    const ahora = Date.parse("2026-11-17T12:00:00Z");
+    expect(tocaAvisarVencimiento(new Date(ahora + 2 * DIA).toISOString(), ahora)).toBe(true);
+    expect(tocaAvisarVencimiento(new Date(ahora + 4 * DIA).toISOString(), ahora)).toBe(false);
+    expect(tocaAvisarVencimiento(new Date(ahora - 1000).toISOString(), ahora)).toBe(false);
+  });
+  it("los avisos dicen la fecha, los 30 días y llevan a extender", () => {
+    const a = textoDelAviso("copiada", "PLUS 3 2026-11-17 16.05.mp4", "2026-12-17T12:00:00Z");
+    expect(a.titulo).toMatch(/30 días/);
+    expect(a.mensaje).toMatch(/17 (de )?dic/);
+    expect(a.mensaje).toMatch(/Guardar 30 días más/);
+    expect(textoDelAviso("por_vencer", "x.mp4", "2026-12-17T12:00:00Z").titulo).toMatch(/se borra/);
+    expect(enlaceParaExtender(U)).toBe(`/grabaciones?extender=${U}`);
+  });
+  it("guarda: extender suma 30 días, solo quien grabó o un admin, y rearma el aviso", () => {
+    expect(migracion).toMatch(/function public\.grabacion_drive_extender[\s\S]*greatest\(coalesce\(vence_drive_at, now\(\)\), now\(\)\) \+ interval '30 days'/);
+    expect(migracion).toMatch(/started_by is distinct from v_yo and not public\.has_role\(v_yo, 'admin'::text\)/);
+    expect(migracion).toMatch(/avisado_vence_at = null/);
+    expect(migracion).toMatch(/grant execute on function public\.grabacion_drive_extender\(uuid\) to authenticated/);
+  });
+  it("guarda: la edge pone el vencimiento al copiar, avisa y borra las vencidas del NAS y del Drive", () => {
+    expect(edge).toMatch(/vence_drive_at: vence/);
+    expect(edge).toMatch(/avisar\(admin, g\.started_by!, g\.id, "copiada"/);
+    expect(edge).toMatch(/op: "borrar"/);
+    expect(edge).toMatch(/estado: "vencido"/);
+    // El tic también despierta para avisar y para borrar, no solo para copiar.
+    expect(migracion).toMatch(/vence_drive_at <= now\(\) \+ interval '3 days'/);
+  });
+  it("guarda: las viejas también se copian, y sus 30 días cuentan desde la copia", () => {
+    expect(viejas).toMatch(/insert into public\.grabaciones_al_drive/);
+    expect(viejas).not.toMatch(/vence_drive_at/);
+  });
+  it("guarda: /grabaciones muestra hasta cuándo y el botón, y abre la pregunta desde el aviso", () => {
+    expect(pagina).toMatch(/grab\.drive\.until/);
+    expect(pagina).toMatch(/grab\.drive\.extend/);
+    expect(pagina).toMatch(/params\.get\("extender"\)/);
   });
 });
 

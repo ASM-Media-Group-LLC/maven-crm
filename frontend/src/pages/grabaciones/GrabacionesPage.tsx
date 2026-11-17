@@ -1,4 +1,6 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useSearchParams } from "react-router-dom";
+import { useCopiasDelDrive } from "@/hooks/useCopiasDelDrive";
 import { useRecordings, RecordingRow, FILTROS_VACIOS } from "@/hooks/useRecordings";
 import { Input } from "@/components/ui/input";
 import { UserAvatar } from "@/components/UserAvatar";
@@ -13,7 +15,7 @@ import { EmptyState } from "@/components/EmptyState";
 import { PageHeader } from "@/components/ui/page-header";
 import {
   Clapperboard, Download, Loader2, Trash2, Users2, Video, AlertTriangle, HardDrive, Clock, Play,
-  Search, X, Share2, Square,
+  Search, X, Share2, Square, CalendarPlus,
 } from "lucide-react";
 import { CompartirGrabacionDialog } from "./CompartirGrabacionDialog";
 import { invokeRecordings } from "@/hooks/useRecordings";
@@ -58,6 +60,9 @@ function diasHasta(iso: string | null): number | null {
   return Math.ceil((new Date(iso).getTime() - Date.now()) / (24 * 3600 * 1000));
 }
 
+const fechaDia = (iso: string, f: Formato) =>
+  new Date(iso).toLocaleDateString(f.intl("es-CO"), { day: "numeric", month: "short", year: "numeric" });
+
 const fechaCorta = (iso: string, f: Formato) =>
   new Date(iso).toLocaleDateString(f.intl("es-CO"), { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
 
@@ -84,6 +89,36 @@ export default function GrabacionesPage() {
   // corre al confirmar.
   const [porDetener, setPorDetener] = useState<RecordingRow | null>(null);
   const [porBorrar, setPorBorrar] = useState<RecordingRow | null>(null);
+
+  // La copia en el Drive dura 30 días desde que se copia (Alvaro, 17/11/2026):
+  // cada fila dice hasta cuándo y quien grabó puede pedir 30 días más. El
+  // aviso de la campana y el correo llegan con ?extender=<id>, que abre la
+  // pregunta directo.
+  const { copias, extender } = useCopiasDelDrive(rows.filter((r) => r.status === "ready").map((r) => r.id));
+  const [params, setParams] = useSearchParams();
+  const [porExtender, setPorExtender] = useState<string | null>(null);
+  useEffect(() => {
+    const id = params.get("extender");
+    if (!id) return;
+    setPorExtender(id);
+    const resto = new URLSearchParams(params);
+    resto.delete("extender");
+    setParams(resto, { replace: true });
+  }, [params, setParams]);
+
+  const handleExtender = async (id: string) => {
+    setTrabajando(id);
+    try {
+      const vence = await extender(id);
+      toast.success(t("grab.drive.extended", { fecha: fechaDia(vence, f) }));
+    } catch (e) {
+      toast.error((e as Error).message || t("grab.drive.extendError"));
+    } finally {
+      setTrabajando(null);
+    }
+  };
+  const grabacionPorExtender = porExtender ? rows.find((r) => r.id === porExtender) : undefined;
+  const copiaPorExtender = porExtender ? copias.get(porExtender) : undefined;
 
   const handleDetener = async (r: RecordingRow) => {
     setTrabajando(r.id);
@@ -176,7 +211,7 @@ export default function GrabacionesPage() {
       <div className="flex items-start gap-2 rounded-2xl border border-warning/25 bg-warning/10 px-4 py-3 text-[13px] leading-snug text-warning">
         <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
         <span>
-          {t("grab.warnBefore")}<b>{t("grab.warnBold")}</b>{t("grab.warnAfter")}
+          {t("grab.warnBefore")}<b>{t("grab.warnBold")}</b>{t("grab.warnAfterDrive")}
         </span>
       </div>
 
@@ -277,6 +312,9 @@ export default function GrabacionesPage() {
             const ocupado = trabajando === r.id;
             const grabador = grabadores[r.started_by];
             const nombreGrabador = mia ? t("grab.you") : (grabador?.full_name || t("grab.someoneFromTeam"));
+            const copia = copias.get(r.id);
+            const enElDrive = copia?.estado === "listo" && !!copia.vence_drive_at;
+            const copiando = copia?.estado === "pendiente" || copia?.estado === "subiendo" || copia?.estado === "juntando";
             return (
               <div key={r.id} className="flex items-center gap-3 rounded-2xl border border-border bg-card px-4 py-3">
                 <div className={cn(
@@ -314,6 +352,12 @@ export default function GrabacionesPage() {
                           {dias <= 0 ? t("grab.expiresToday") : t(dias === 1 ? "grab.expiresInOne" : "grab.expiresInMany", { n: dias })}
                         </span>
                       </>
+                    )}
+                    {r.status === "ready" && enElDrive && (
+                      <><span>·</span><span data-testid="en-el-drive">{t("grab.drive.until", { fecha: fechaDia(copia!.vence_drive_at!, f) })}</span></>
+                    )}
+                    {r.status === "ready" && copiando && (
+                      <><span>·</span><span>{t("grab.drive.copying")}</span></>
                     )}
                   </div>
                   {/* Quién grabó, con su cara: pedido de Jhon (05/09) — la
@@ -371,6 +415,18 @@ export default function GrabacionesPage() {
                       onClick={() => setCompartiendo(r)}
                     >
                       <Share2 className="h-4 w-4" />
+                    </button>
+                  )}
+                  {r.status === "ready" && enElDrive && (mia || isAdmin) && (
+                    <button
+                      type="button"
+                      className="grid h-8 w-8 place-items-center rounded-full text-muted-foreground transition hover:bg-muted hover:text-foreground disabled:opacity-50"
+                      title={t("grab.drive.extend")}
+                      aria-label={t("grab.drive.extend")}
+                      disabled={ocupado}
+                      onClick={() => void handleExtender(r.id)}
+                    >
+                      <CalendarPlus className="h-4 w-4" />
                     </button>
                   )}
                   {r.status === "recording" && (mia || isAdmin) && (
@@ -439,6 +495,26 @@ export default function GrabacionesPage() {
               onClick={() => { const r = porBorrar; setPorBorrar(null); if (r) void handleDelete(r); }}
             >
               {t("grab.delete")}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={!!porExtender} onOpenChange={(o) => { if (!o) setPorExtender(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t("grab.drive.askTitle")}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {grabacionPorExtender && <b className="text-foreground">{grabacionPorExtender.title || grabacionPorExtender.room_name} </b>}
+              {copiaPorExtender?.vence_drive_at
+                ? t("grab.drive.askDesc", { fecha: fechaDia(copiaPorExtender.vence_drive_at, f) })
+                : t("grab.drive.askDescSinFecha")}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel />
+            <AlertDialogAction onClick={() => { const id = porExtender; setPorExtender(null); if (id) void handleExtender(id); }}>
+              {t("grab.drive.extend")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

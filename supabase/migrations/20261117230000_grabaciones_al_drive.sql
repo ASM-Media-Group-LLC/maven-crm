@@ -13,6 +13,11 @@
 --   3. Al terminar, la comparte como lectura (drive_shares) con quien estuvo en
 --      la llamada y con quien la recibió al pararla, siempre de la misma
 --      agencia (lo exige el trigger drive_shares_misma_agencia).
+--   4. En el Drive dura 30 DÍAS desde que se copia (Alvaro, 17/11/2026). A quien
+--      grabó se le avisa (campana + correo) al copiarse y 3 días antes de
+--      vencer; puede pedir «Guardar 30 días más» (grabacion_drive_extender),
+--      las veces que quiera. Al vencer, la misma edge la borra del NAS y del
+--      Drive (estado 'vencido').
 --
 -- Quién estuvo en la llamada: `meeting_recording_participantes`, que se llena
 -- al empezar a grabar, al parar, en el barrido y con cada `participant_joined`
@@ -65,7 +70,7 @@ grant execute on function public.grabacion_anotar_participantes(text, uuid[]) to
 create table if not exists public.grabaciones_al_drive (
   recording_id  uuid primary key references public.meeting_recordings(id) on delete cascade,
   estado        text not null default 'pendiente'
-                check (estado in ('pendiente', 'subiendo', 'juntando', 'listo', 'fallo', 'cancelado')),
+                check (estado in ('pendiente', 'subiendo', 'juntando', 'listo', 'fallo', 'cancelado', 'vencido')),
   drive_item_id uuid references public.drive_items(id) on delete set null,
   nas_up        uuid,
   nas_parte     integer not null default 0,
@@ -73,6 +78,10 @@ create table if not exists public.grabaciones_al_drive (
   intentos      integer not null default 0,
   error         text,
   juntando_at   timestamptz,
+  -- Hasta cuándo queda en el Drive (30 días desde la copia; +30 por extensión).
+  vence_drive_at   timestamptz,
+  avisado_vence_at timestamptz,   -- ya se avisó que vence (se limpia al extender)
+  extensiones      integer not null default 0,
   -- Una sola ronda a la vez (ver grabaciones_al_drive_tomar).
   tomado_hasta  timestamptz,
   creado        timestamptz not null default now(),
@@ -83,8 +92,62 @@ create index if not exists grabaciones_al_drive_pendientes
   on public.grabaciones_al_drive (creado)
   where estado in ('pendiente', 'subiendo', 'juntando');
 
+create index if not exists grabaciones_al_drive_por_vencer
+  on public.grabaciones_al_drive (vence_drive_at)
+  where estado = 'listo';
+
 alter table public.grabaciones_al_drive enable row level security;
 revoke all on public.grabaciones_al_drive from anon, authenticated;
+-- /grabaciones muestra «En el Drive hasta…»: cada uno ve la copia de las
+-- grabaciones que ya puede ver (la RLS de meeting_recordings decide adentro de
+-- la subconsulta). Solo lectura y solo estas columnas; escribir, por la edge
+-- o por grabacion_drive_extender.
+grant select (recording_id, estado, drive_item_id, vence_drive_at, extensiones) on public.grabaciones_al_drive to authenticated;
+drop policy if exists grabaciones_al_drive_ver on public.grabaciones_al_drive;
+create policy grabaciones_al_drive_ver on public.grabaciones_al_drive
+  for select to authenticated
+  using (exists (select 1 from public.meeting_recordings m where m.id = grabaciones_al_drive.recording_id));
+
+/** «Guardar 30 días más»: quien grabó (o un admin de la misma agencia). Suma
+ *  30 días a lo que le quedaba —o a hoy, si ya venció y aún no se borró— y
+ *  vuelve a armar el aviso de vencimiento. Devuelve el nuevo vencimiento. */
+create or replace function public.grabacion_drive_extender(p_recording uuid)
+returns timestamptz
+language plpgsql
+security definer
+set search_path to 'public'
+as $$
+declare
+  v_yo uuid := (select auth.uid());
+  v_rec public.meeting_recordings%rowtype;
+  v_vence timestamptz;
+begin
+  if v_yo is null then
+    raise exception 'Sin sesión' using errcode = '42501';
+  end if;
+  select * into v_rec from public.meeting_recordings where id = p_recording;
+  if not found or v_rec.tenant_id is distinct from public.current_tenant_id() then
+    raise exception 'Grabación no encontrada' using errcode = 'P0002';
+  end if;
+  if v_rec.started_by is distinct from v_yo and not public.has_role(v_yo, 'admin'::text) then
+    raise exception 'Solo quien grabó puede guardarla más tiempo' using errcode = '42501';
+  end if;
+  update public.grabaciones_al_drive
+     set vence_drive_at = greatest(coalesce(vence_drive_at, now()), now()) + interval '30 days',
+         avisado_vence_at = null,
+         extensiones = extensiones + 1,
+         actualizado = now()
+   where recording_id = p_recording and estado = 'listo'
+  returning vence_drive_at into v_vence;
+  if v_vence is null then
+    raise exception 'La grabación no está en el Drive' using errcode = 'P0002';
+  end if;
+  return v_vence;
+end;
+$$;
+
+revoke all on function public.grabacion_drive_extender(uuid) from public, anon;
+grant execute on function public.grabacion_drive_extender(uuid) to authenticated;
 
 -- Toda grabación que queda lista entra a la fila, venga de donde venga.
 create or replace function public.grabacion_a_la_fila_del_drive()
@@ -158,10 +221,16 @@ as $$
 declare
   v_token text;
 begin
+  -- Algo que copiar, o una copia por vencer (aviso) o vencida (borrar).
   if not exists (
     select 1 from public.grabaciones_al_drive
     where estado in ('pendiente', 'subiendo', 'juntando')
       and (tomado_hasta is null or tomado_hasta < now())
+  ) and not exists (
+    select 1 from public.grabaciones_al_drive
+    where estado = 'listo'
+      and (vence_drive_at <= now()
+           or (avisado_vence_at is null and vence_drive_at <= now() + interval '3 days'))
   ) then
     return jsonb_build_object('despertada', false);
   end if;

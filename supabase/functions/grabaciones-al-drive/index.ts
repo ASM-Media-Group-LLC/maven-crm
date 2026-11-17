@@ -17,6 +17,11 @@
 //   3. Con el recibo firmado del NAS (prueba que llegó entero), la ficha queda
 //      «listo» y se comparte como lectura con quien estuvo en la llamada y con
 //      quien la recibió al pararla — solo gente de la misma agencia.
+//   4. Queda en el Drive 30 DÍAS desde la copia (Alvaro, 17/11/2026). A quien
+//      grabó se le avisa por la campana y por correo al copiarse, y otra vez 3
+//      días antes de vencer; «Guardar 30 días más» (en /grabaciones o desde el
+//      aviso) llama a grabacion_drive_extender. Vencida, esta misma edge la
+//      borra del NAS y del Drive.
 //
 // Las dos puertas del Drive se respetan solas: la ficha es del que grabó y los
 // demás la ven por drive_shares (la RLS de drive_items), y la pantalla del
@@ -24,19 +29,25 @@
 //
 // Sin sesión: solo cron, X-Cron-Token contra CRON_INTERNAL_TOKEN.
 // Variables: DRIVE_NAS_URL, DRIVE_SECRETO, CRON_INTERNAL_TOKEN, y las de las
-// grabaciones (R2_*, RECORDINGS_SIGNING_SECRET, RECORDINGS_BASE_URL).
+// grabaciones (R2_*, RECORDINGS_SIGNING_SECRET, RECORDINGS_BASE_URL). Correo:
+// RESEND_API_KEY + NOTIFICATION_FROM_EMAIL (sin Resend, solo la campana).
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.4";
 import { tokenDeCronValido } from "../_shared/cron-token.ts";
 import { ahoraMas, firmar, verificar } from "../_shared/drive-firma.ts";
 import { tamanoDelArchivo, urlDelArchivo } from "../_shared/grabacion-archivo.ts";
 import {
-  CARPETA_RAIZ, carpetaDelMes, conQuienCompartir, MAX_INTENTOS, nombreDelArchivo, partesDe, rangoDeParte, TAMANO_PARTE,
+  AVISO_ANTES_DIAS, CARPETA_RAIZ, carpetaDelMes, conQuienCompartir, enlaceParaExtender, MAX_INTENTOS, nombreDelArchivo,
+  partesDe, rangoDeParte, TAMANO_PARTE, textoDelAviso, venceEnElDrive,
 } from "../_shared/grabacion-al-drive.ts";
 import { deLaAgencia } from "../_shared/livekit-agencia.ts";
 import { tocaPedirJuntar } from "../_shared/aporte-y-espacio.ts";
 
 const NAS = (Deno.env.get("DRIVE_NAS_URL") ?? "").replace(/\/+$/, "");
+const RESEND = Deno.env.get("RESEND_API_KEY") ?? "";
+const REMITENTE = Deno.env.get("NOTIFICATION_FROM_EMAIL") || "noreply@mail.maven-ai.me";
+const DE = REMITENTE.includes("<") ? REMITENTE : `Maven <${REMITENTE}>`;
+const APP_URL = (Deno.env.get("APP_URL") ?? "https://app.maven-ai.me").replace(/\/+$/, "");
 const SECRETO = Deno.env.get("DRIVE_SECRETO") ?? "";
 /** Los permisos del NAS valen 12 h, como los de una subida del Drive. */
 const VENCE_PERMISO = 12 * 3600;
@@ -158,7 +169,98 @@ async function terminar(admin: Admin, c: Copia, g: Grabacion, itemId: string, si
     );
     if (eS) throw new Error(`compartir: ${eS.message}`);
   }
-  await anotar(admin, c.recording_id, { estado: "listo", size: tam, error: null, tomado_hasta: null });
+  // 30 días desde HOY, también para las viejas (desde la copia, no desde la grabación).
+  const vence = venceEnElDrive(Date.now());
+  await anotar(admin, c.recording_id, { estado: "listo", size: tam, error: null, tomado_hasta: null, vence_drive_at: vence });
+  const { data: ficha } = await admin.from("drive_items").select("nombre").eq("id", itemId).maybeSingle();
+  await avisar(admin, g.started_by!, g.id, "copiada", (ficha?.nombre as string | undefined) ?? "Grabación", vence);
+}
+
+/** El aviso a quien grabó: campana (notifications, dispara su push) y correo
+ *  si hay Resend. Mejor esfuerzo: un aviso que falla no deshace la copia. */
+async function avisar(admin: Admin, dueno: string, recordingId: string, clase: "copiada" | "por_vencer", archivo: string, vence: string) {
+  const { titulo, mensaje } = textoDelAviso(clase, archivo, vence);
+  const enlace = enlaceParaExtender(recordingId);
+  const { error } = await admin.from("notifications").insert({
+    user_id: dueno, type: clase === "copiada" ? "grabacion_en_drive" : "grabacion_drive_vence",
+    title: titulo, message: mensaje, reference_id: recordingId, reference_type: "meeting_recording",
+    module_origin: "Grabaciones", priority: clase === "copiada" ? "medium" : "high", status: "new",
+    visibility_scope: "personal", deep_link_url: enlace,
+  });
+  if (error) console.warn("[grabaciones-al-drive] campana:", error.message);
+  if (!RESEND) return;
+  try {
+    const { data } = await admin.auth.admin.getUserById(dueno);
+    const correo = data?.user?.email as string | undefined;
+    if (!correo) return;
+    const esc = (x: string) => x.replace(/[&<>"]/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[ch] as string));
+    const r = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${RESEND}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        from: DE, to: correo, subject: titulo,
+        html: `<div style="font-family:system-ui,Arial,sans-serif;font-size:15px;color:#111;line-height:1.5;max-width:520px">
+<p>${esc(mensaje)}</p>
+<p><a href="${APP_URL}${enlace}">Guardar 30 días más</a></p>
+<p style="color:#666;font-size:13px">Si no la extiendes, se borra del Drive ese día. La puedes extender las veces que quieras.</p>
+</div>`,
+        text: `${mensaje}\n\nGuardar 30 días más: ${APP_URL}${enlace}`,
+        tags: [{ name: "type", value: clase === "copiada" ? "grabacion-en-drive" : "grabacion-drive-vence" }],
+      }),
+    });
+    if (!r.ok) console.warn("[grabaciones-al-drive] correo:", r.status);
+  } catch (e) {
+    console.warn("[grabaciones-al-drive] correo:", (e as Error).message);
+  }
+}
+
+/** Avisa las que vencen en 3 días y borra del Drive las vencidas. */
+async function vencimientos(admin: Admin): Promise<{ avisadas: number; borradas: number; errores: string[] }> {
+  const errores: string[] = [];
+  let avisadas = 0;
+  let borradas = 0;
+  const ahora = new Date();
+
+  // Aviso: se «reclama» con avisado_vence_at (de null a ahora) para no mandarlo
+  // dos veces si dos rondas se cruzan. Extender lo vuelve a null.
+  const limite = new Date(ahora.getTime() + AVISO_ANTES_DIAS * 24 * 3600 * 1000).toISOString();
+  const { data: porVencer } = await admin.from("grabaciones_al_drive")
+    .update({ avisado_vence_at: ahora.toISOString() })
+    .eq("estado", "listo").is("avisado_vence_at", null).gt("vence_drive_at", ahora.toISOString()).lte("vence_drive_at", limite)
+    .select("recording_id, drive_item_id, vence_drive_at");
+  for (const v of (porVencer ?? []) as { recording_id: string; drive_item_id: string | null; vence_drive_at: string }[]) {
+    const { data: rec } = await admin.from("meeting_recordings").select("started_by").eq("id", v.recording_id).maybeSingle();
+    const { data: ficha } = v.drive_item_id
+      ? await admin.from("drive_items").select("nombre").eq("id", v.drive_item_id).maybeSingle()
+      : { data: null };
+    if (!rec?.started_by || !ficha) continue; // ya no está en el Drive: nada que avisar
+    await avisar(admin, rec.started_by as string, v.recording_id, "por_vencer", ficha.nombre as string, v.vence_drive_at);
+    avisadas++;
+  }
+
+  // Vencidas: primero el archivo del NAS, después la ficha (como «borrar para
+  // siempre» del Drive). Si el NAS no borra, la ficha se queda y se reintenta.
+  const { data: vencidas } = await admin.from("grabaciones_al_drive")
+    .select("recording_id, drive_item_id").eq("estado", "listo").lte("vence_drive_at", ahora.toISOString()).limit(20);
+  for (const v of (vencidas ?? []) as { recording_id: string; drive_item_id: string | null }[]) {
+    try {
+      if (v.drive_item_id) {
+        const { data: ficha } = await admin.from("drive_items").select("storage_key").eq("id", v.drive_item_id).maybeSingle();
+        if (ficha?.storage_key) {
+          const r = await fetch(await permisoNas({ op: "borrar", k: ficha.storage_key }), { method: "DELETE", signal: AbortSignal.timeout(30_000) });
+          await r.body?.cancel().catch(() => {});
+          if (!r.ok && r.status !== 404) { errores.push(`${v.recording_id}: el NAS no borró (${r.status})`); continue; }
+        }
+        const { error } = await admin.from("drive_items").delete().eq("id", v.drive_item_id);
+        if (error) { errores.push(`${v.recording_id}: borrar la ficha: ${error.message}`); continue; }
+      }
+      await anotar(admin, v.recording_id, { estado: "vencido" });
+      borradas++;
+    } catch (e) {
+      errores.push(`${v.recording_id}: ${(e as Error).message}`);
+    }
+  }
+  return { avisadas, borradas, errores };
 }
 
 /** Avanza una grabación lo que dé el presupuesto. Devuelve un error o null. */
@@ -276,11 +378,15 @@ Deno.serve(async (req) => {
     }
   }
 
+  // Los 30 días: avisar las que están por vencer y borrar las vencidas.
+  const venc = await vencimientos(admin).catch((e) => ({ avisadas: 0, borradas: 0, errores: [(e as Error).message] }));
+  errores.push(...venc.errores);
+
   // Se suelta el turno: la próxima ronda puede seguir sin esperar a que venza.
   if (copias.length) {
     await admin.from("grabaciones_al_drive").update({ tomado_hasta: null })
       .in("recording_id", copias.map((c) => c.recording_id));
   }
   if (errores.length) console.warn("[grabaciones-al-drive]", errores.join(" · "));
-  return json({ ok: true, tomadas: copias.length, listas, errores });
+  return json({ ok: true, tomadas: copias.length, listas, avisadas: venc.avisadas, borradas: venc.borradas, errores });
 });
