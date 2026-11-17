@@ -1,0 +1,80 @@
+{
+  "name": "maven-escritorio",
+  "productName": "Maven",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Maven como app de escritorio para Windows y Mac: abre la Maven de producción sin que el sistema la duerma en segundo plano.",
+  "author": "ASM Media Group LLC",
+  "license": "UNLICENSED",
+  "main": "src/principal.js",
+  "scripts": {
+    "iniciar": "electron .",
+    "revisar": "node --test \"test/*.test.js\"",
+    "humo": "electron scripts/humo.js",
+    "instalador:mac": "electron-builder --mac --publish never",
+    "instalador:win": "electron-builder --win --publish never",
+    "instaladores": "electron-builder --mac --win --publish never"
+  },
+  "devDependencies": {
+    "electron": "44.11.3",
+    "electron-builder": "26.18.0"
+  },
+  "build": {
+    "appId": "me.maven-ai.escritorio",
+    "productName": "Maven",
+    "copyright": "© ASM Media Group LLC",
+    "directories": {
+      "output": "dist",
+      "buildResources": "recursos"
+    },
+    "files": [
+      "src/**/*",
+      "recursos/icono.png",
+      "package.json"
+    ],
+    "artifactName": "Maven-${version}-${os}-${arch}.${ext}",
+    "mac": {
+      "target": [
+        {
+          "target": "dmg",
+          "arch": ["universal"]
+        }
+      ],
+      "icon": "recursos/icono.png",
+      "category": "public.app-category.business",
+      "identity": "-",
+      "hardenedRuntime": true,
+      "entitlements": "recursos/entitlements.mac.plist",
+      "entitlementsInherit": "recursos/entitlements.mac.plist",
+      "extendInfo": {
+        "NSCameraUsageDescription": "Maven usa la cámara en las llamadas y en Cowork.",
+        "NSMicrophoneUsageDescription": "Maven usa el micrófono en las llamadas y en Cowork.",
+        "NSScreenCaptureUsageDescription": "Maven comparte tu pantalla en las llamadas y en Cowork.",
+        "LSMultipleInstancesProhibited": true,
+        "NSSupportsAppNap": false
+      }
+    },
+    "dmg": {
+      "title": "Maven ${version}"
+    },
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": ["x64"]
+        }
+      ],
+      "icon": "recursos/icono.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Maven",
+      "language": "3082",
+      "installerLanguages": ["es_ES"]
+    }
+  }
+}
