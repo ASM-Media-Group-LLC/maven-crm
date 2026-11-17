@@ -196,3 +196,43 @@ export function recargaConLlamada(): { sala: string; hace_s: number; nav: string
     return null;
   }
 }
+
+// QUÉ CONGELA LA PÁGINA (17/11/2026). `lag_ms` dice CUÁNTO se trabó la pestaña,
+// pero no QUÉ la trabó. Chrome avisa de cada cuadro lento (long-animation-frame)
+// y de qué código lo ocupó. Cada minuto se anota el código que más tiempo tomó
+// (archivo y función), para atacar al culpable con nombre propio.
+export interface Traba { ms: number; quien: string }
+
+export function quienTraba(guion: { sourceURL?: string; sourceFunctionName?: string; invoker?: string }): string {
+  const archivo = (guion.sourceURL || "").split("/").pop()?.replace(/-[\w-]{8}\.js$/, ".js") || "?";
+  const fn = guion.sourceFunctionName || guion.invoker || "?";
+  return `${archivo}:${fn}`.slice(0, 80);
+}
+
+export function medirTrabas(): { leer: () => Traba[]; parar: () => void } {
+  const suma = new Map<string, number>();
+  let obs: PerformanceObserver | null = null;
+  try {
+    if (PerformanceObserver.supportedEntryTypes?.includes("long-animation-frame")) {
+      obs = new PerformanceObserver((lista) => {
+        for (const cuadro of lista.getEntries() as Array<PerformanceEntry & { scripts?: Array<{ duration: number; sourceURL?: string; sourceFunctionName?: string; invoker?: string }> }>) {
+          if (cuadro.duration < 100) continue;
+          for (const g of cuadro.scripts ?? []) {
+            if (g.duration < 30) continue;
+            const k = quienTraba(g);
+            suma.set(k, (suma.get(k) ?? 0) + g.duration);
+          }
+        }
+      });
+      obs.observe({ type: "long-animation-frame", buffered: false });
+    }
+  } catch { obs = null; }
+  return {
+    leer: () => {
+      const top = [...suma.entries()].sort((a, b) => b[1] - a[1]).slice(0, 3).map(([quien, ms]) => ({ quien, ms: Math.round(ms) }));
+      suma.clear();
+      return top;
+    },
+    parar: () => { try { obs?.disconnect(); } catch { /* noop */ } },
+  };
+}

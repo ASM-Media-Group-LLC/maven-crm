@@ -19,6 +19,7 @@ import { CLAVES_OTRA_PESTANA } from "@/lib/sesionDuplicada";
 import { caidaEnCurso, conexionDeSala, marcarCaida, olvidarCaida } from "@/lib/conexionSala";
 import type { ConexionSala } from "@/lib/coworkTiempoRegla";
 import { cn } from "@/lib/utils";
+import { aplicaCalidadPorVoz, calidadDeCamara } from "@/lib/calidadPorVoz";
 import { puedeCompartirPantalla } from "@/lib/compartirPantalla";
 import { toast } from "sonner";
 import { useFaceWatch, faceStateLabel, type FaceWatch } from "@/hooks/useFaceWatch";
@@ -483,6 +484,35 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
       setPinnedSid(null);
     }
   }, [lk.participants, pinnedSid]);
+
+  // En Cowork, la cámara de quien no habla llega en calidad baja (lib/calidadPorVoz.ts).
+  const conectada = lk.connectionState === ConnectionState.Connected;
+  const getRoomLk = lk.getRoom;
+  useEffect(() => {
+    const room = getRoomLk();
+    if (!room || !conectada || !aplicaCalidadPorVoz(room.name)) return;
+    const ultimaVez = new Map<string, number>();
+    const ajustar = () => {
+      const ahora = Date.now();
+      room.remoteParticipants.forEach((p) => {
+        if (p.isSpeaking) ultimaVez.set(p.sid, ahora);
+        const pub = p.getTrackPublication(Track.Source.Camera);
+        if (!pub?.isSubscribed) return;
+        try {
+          pub.setVideoQuality(calidadDeCamara({ fijado: p.sid === pinnedSid, hablando: p.isSpeaking, ultimaVezHablo: ultimaVez.get(p.sid), ahora }));
+        } catch { /* la calidad nunca rompe la llamada */ }
+      });
+    };
+    ajustar();
+    room.on(RoomEvent.ActiveSpeakersChanged, ajustar);
+    room.on(RoomEvent.TrackSubscribed, ajustar);
+    const repaso = window.setInterval(ajustar, 3_000);
+    return () => {
+      room.off(RoomEvent.ActiveSpeakersChanged, ajustar);
+      room.off(RoomEvent.TrackSubscribed, ajustar);
+      window.clearInterval(repaso);
+    };
+  }, [getRoomLk, conectada, pinnedSid]);
 
   // Auto-leave when remote participants reach 0 for autoLeaveOnEmpty ms
   // Only triggers after at least one remote participant has been seen (room was populated)

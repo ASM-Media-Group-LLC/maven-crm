@@ -1,3 +1,4 @@
+import { afirmarRelojesDeLiveKit } from "@/lib/relojesFirmes";
 import { memo, useCallback, useEffect, useRef, useState } from "react";
 import AudioSink from "./AudioSink";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -339,6 +340,7 @@ function CoworkRoomMonitor({ roomId, roomName, issueToken, showVideo, hearOn, br
       }, esperaMs);
     };
 
+    afirmarRelojesDeLiveKit();
     const room = new Room({ adaptiveStream: true, dynacast: true });
     roomRef.current = room;
 

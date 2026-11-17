@@ -1,3 +1,4 @@
+import { afirmarRelojesDeLiveKit } from "@/lib/relojesFirmes";
 import { useState, useCallback, useRef, useEffect } from "react";
 import {
   Room,
@@ -39,7 +40,7 @@ import { elegirPerfilDePantalla, opcionesDePantalla } from "@/lib/perfilDePantal
 import { medirRed, salaConPrueba, tocaProbar, PRUEBA_CADA_MS, REINTENTO_TRAS_FALLO_MS, type PruebaDeRed } from "@/lib/pruebaDeRed";
 import { marcarConexionEnCurso, marcarLlamadaActiva, quitarLlamadaActiva } from "@/lib/llamadaActiva";
 import {
-  armarMuestra, borrarLlamadaEnCurso, leerReporte, marcarLlamadaEnCurso, medirRetraso, recargaConLlamada,
+  armarMuestra, borrarLlamadaEnCurso, leerReporte, marcarLlamadaEnCurso, medirRetraso, medirTrabas, type Traba, recargaConLlamada,
   type LecturaDePista, type MuestraDeLlamada,
 } from "@/lib/saludDeLlamada";
 import { AHORRO_INICIAL, PANTALLA_AHORRO, ahorroPorPrueba, siguienteAhorro, type EstadoAhorro } from "@/lib/modoAhorro";
@@ -497,7 +498,7 @@ export function useLiveKit() {
   }, []);
 
   type InsertaSalud = (tabla: "llamada_salud") => {
-    insert: (fila: { sala: string; datos: MuestraDeLlamada & { ahorro: boolean; nc: EstadoNC; prueba?: PruebaDeRed; perfil_cam: PerfilDeCamara } }) =>
+    insert: (fila: { sala: string; datos: MuestraDeLlamada & { ahorro: boolean; nc: EstadoNC; prueba?: PruebaDeRed; perfil_cam: PerfilDeCamara; trabas?: Traba[] } }) =>
       PromiseLike<{ error: { message: string } | null }>;
   };
   // Si el componente se desmonta sin colgar, el reloj de muestras no queda vivo.
@@ -547,6 +548,7 @@ export function useLiveKit() {
   const iniciarMuestreo = useCallback((room: Room) => {
     pararMuestreoRef.current?.();
     const retraso = medirRetraso();
+    const trabas = medirTrabas();
     // Modo ahorro (lib/modoAhorro.ts): con la subida lenta, cámara en calidad
     // media y pantalla a 5 cuadros por segundo, solo para esta persona.
     ahorroRef.current = AHORRO_INICIAL;
@@ -638,6 +640,7 @@ export function useLiveKit() {
           calidad: mapConnectionQuality(room.localParticipant.connectionQuality),
           cam, pant, mic, lag_ms: retraso.leer(),
         });
+        const trabasDelMinuto = trabas.leer();
         ultimaMuestraRef.current = muestra;
         marcarLlamadaEnCurso(room.name); // la marca de «sigue viva» se renueva
         // Si la cancelación de ruido está corriendo de verdad (lib/estadoNC.ts).
@@ -688,7 +691,7 @@ export function useLiveKit() {
         if (perfilCam !== perfilCamAntes) console.info(`[LiveKit] cámara: perfil ${perfilCam}`);
         if (perfilCam === "liviano" || perfilCamAntes === "liviano") void aplicarCamara();
         void (supabase.from as unknown as InsertaSalud)("llamada_salud")
-          .insert({ sala: room.name, datos: { ...muestra, ahorro: ahorro.activo, nc, perfil_cam: perfilCam, ...(prueba ? { prueba } : {}) } })
+          .insert({ sala: room.name, datos: { ...muestra, ahorro: ahorro.activo, nc, perfil_cam: perfilCam, ...(prueba ? { prueba } : {}), ...(trabasDelMinuto.length ? { trabas: trabasDelMinuto } : {}) } })
           .then(({ error }) => { if (error) console.warn("[llamada_salud]", error.message); });
       } catch { /* medir jamás rompe la llamada */ }
     };
@@ -698,6 +701,7 @@ export function useLiveKit() {
       window.clearTimeout(primera);
       window.clearInterval(cada);
       retraso.parar();
+      trabas.parar();
       if (aplicarCamaraRef.current === aplicarCamara) aplicarCamaraRef.current = null;
       pararMuestreoRef.current = null;
     };
@@ -1521,6 +1525,7 @@ export function useLiveKit() {
       // `ajustarVideoAjeno` se suscribe a lo que sí se recibe.
       const soloAudio = soloAudioDeLosCompaneros({ sala: roomName, sinVideoAjeno: options.sinVideoAjeno, isAdmin });
       soloAudioRef.current = soloAudio;
+      afirmarRelojesDeLiveKit();
       const room = new Room(ROOM_OPTIONS);
       roomRef.current = room;
       // Idempotente (solo toca lo que está distinto): se llama en cada evento que
