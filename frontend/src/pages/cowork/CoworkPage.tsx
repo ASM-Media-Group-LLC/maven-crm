@@ -336,7 +336,8 @@ export default function CoworkPage() {
           const ultimaSala = await cowork.getMyLastRoomId(sessionId);
           await cowork.joinSession(sessionId, "participant", undefined, salaParaAutoUnir(roomId, ultimaSala));
         }
-        cowork.refetch();
+        // Silenciosa: sin ruedita ni desmontar la vista (17/11/2026).
+        cowork.refetch(true);
       } catch (e) {
         console.error("Auto-join failed:", e);
         setAutoJoinFailed(true);
@@ -721,7 +722,7 @@ export default function CoworkPage() {
         session={cowork.session}
         onJoin={async (role, hostCode, roomId) => {
           await cowork.joinSession(sessionId, role, hostCode, roomId);
-          cowork.refetch();
+          cowork.refetch(true);
         }}
       />
     );

@@ -210,7 +210,11 @@ export function useCoworkSession(sessionId: string | null) {
     try {
       // En qué paso va la carga: si se traba, lib/coworkAtascado.ts lo anota.
       pasoRef.current = "usuario";
-      const { data: { user } } = await supabase.auth.getUser();
+      // La sesión se lee del navegador (getSession), no del servidor: getUser()
+      // era un viaje más antes de empezar (Alvaro, 17/11/2026: «Cowork se tarda
+      // mucho en entrar»). Quién es la persona ya lo valida cada consulta (RLS).
+      const { data: { session: sesionAuth } } = await supabase.auth.getSession();
+      const user = sesionAuth?.user ?? (await supabase.auth.getUser()).data.user;
       if (!user || !vigente()) return;
 
       // REGLA (CLAUDE.md): "un fallo no es vacío". PostgREST devuelve
@@ -219,20 +223,44 @@ export function useCoworkSession(sessionId: string | null) {
       // antes, en cada reconexión (p.ej. tras un reinicio de la base), una
       // consulta fallida vaciaba la sesión/membresías y sacaba al host o al
       // chatter a la pantalla de "Unirse" en medio del turno (el parpadeo).
-      pasoRef.current = "sesion";
-      const { data: sess, error: eSess } = await supabase.from("cowork_sessions").select("*").eq("id", sessionId).single();
+      //
+      // LAS 7 CONSULTAS VAN A LA VEZ (17/11/2026). Antes iban una detrás de otra:
+      // 7 viajes de ida y vuelta seguidos (~0,3 s cada uno desde Colombia) antes de
+      // quitar la ruedita, y se pagaban 2 a 4 veces por entrada. Ninguna depende de
+      // otra; solo los perfiles necesitan la lista de miembros.
+      // La tabla de meets es nueva: los types generados se regeneran al aplicar la
+      // migración, hasta entonces se consulta sin tipar la tabla.
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const sinTipar = supabase as unknown as { from: (tabla: string) => any };
+      pasoRef.current = "sesion+salas+miembros+asignaciones+pedidos+meets";
+      const [
+        { data: sess, error: eSess },
+        { data: rms, error: eRms },
+        { data: mems, error: eMems },
+        { data: assigns, error: eAss },
+        { data: hReqs, error: eH },
+        { data: ssReqs, error: eSS },
+        { data: ms, error: eMs },
+      ] = await Promise.all([
+        supabase.from("cowork_sessions").select("*").eq("id", sessionId).single(),
+        supabase.from("cowork_rooms").select("*").eq("session_id", sessionId).order("sort_order"),
+        supabase.from("cowork_memberships").select("*").eq("session_id", sessionId),
+        supabase.from("cowork_room_assignments").select("*").eq("session_id", sessionId).eq("is_active", true),
+        supabase.from("cowork_host_requests").select("*").eq("session_id", sessionId).neq("status", "resolved").order("created_at", { ascending: false }),
+        supabase.from("cowork_screenshare_requests").select("*").eq("session_id", sessionId).in("status", ["pending", "approved"]).order("created_at", { ascending: false }),
+        // Meets grupales ABIERTOS con su gente. Los cerrados son historia: los ven
+        // los reportes, no el tablero.
+        sinTipar.from("cowork_meets")
+          .select("*, participantes:cowork_meet_participants(*)")
+          .eq("session_id", sessionId).is("ended_at", null).order("started_at", { ascending: false }),
+      ]);
       if (!vigente()) return;
+
       if (!eSess && sess) { setSession(sess); setSesionNoVisible(false); }
       else if ((eSess as { code?: string } | null)?.code === "PGRST116") setSesionNoVisible(true);
 
-      pasoRef.current = "salas";
-      const { data: rms, error: eRms } = await supabase.from("cowork_rooms").select("*").eq("session_id", sessionId).order("sort_order");
-      if (!vigente()) return;
       if (!eRms && rms) setRooms(rms as CoworkRoom[]);
 
-      pasoRef.current = "miembros";
-      const { data: mems, error: eMems } = await supabase.from("cowork_memberships").select("*").eq("session_id", sessionId);
-      if (!vigente()) return;
       const memsOk = !eMems && mems ? (mems as CoworkMembership[]) : null;
       if (memsOk) {
         setMembresiasCargadas(true);
@@ -240,35 +268,15 @@ export function useCoworkSession(sessionId: string | null) {
         setMyMembership(memsOk.find(m => m.user_id === user.id) || null);
       }
 
-      pasoRef.current = "asignaciones";
-      const { data: assigns, error: eAss } = await supabase.from("cowork_room_assignments").select("*").eq("session_id", sessionId).eq("is_active", true);
-      if (!vigente()) return;
       if (!eAss && assigns) {
         const arr = assigns as CoworkAssignment[];
         setAssignments(arr);
         setMyAssignment(arr.find(a => a.user_id === user.id && a.is_active) || null);
       }
 
-      pasoRef.current = "pedidos";
-      const { data: hReqs, error: eH } = await supabase.from("cowork_host_requests").select("*").eq("session_id", sessionId).neq("status", "resolved").order("created_at", { ascending: false });
-      if (!vigente()) return;
       if (!eH && hReqs) setHostRequests(hReqs as HostRequest[]);
-
-      const { data: ssReqs, error: eSS } = await supabase.from("cowork_screenshare_requests").select("*").eq("session_id", sessionId).in("status", ["pending", "approved"]).order("created_at", { ascending: false });
-      if (!vigente()) return;
       if (!eSS && ssReqs) setScreenShareRequests(ssReqs as ScreenShareRequest[]);
 
-      // Meets grupales ABIERTOS con su gente. Los cerrados son historia: los ven
-      // los reportes, no el tablero.
-      // La tabla es nueva: los types generados se regeneran al aplicar la
-      // migración, hasta entonces se consulta sin tipar la tabla.
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const sinTipar = supabase as unknown as { from: (tabla: string) => any };
-      pasoRef.current = "meets";
-      const { data: ms, error: eMs } = await sinTipar.from("cowork_meets")
-        .select("*, participantes:cowork_meet_participants(*)")
-        .eq("session_id", sessionId).is("ended_at", null).order("started_at", { ascending: false });
-      if (!vigente()) return;
       if (!eMs && ms) {
         const filas = ms as Array<Omit<CoworkMeet, "participantes"> & { participantes?: CoworkMeetParticipant[] }>;
         setMeets(filas.map((m) => ({ ...m, participantes: m.participantes ?? [] })));
