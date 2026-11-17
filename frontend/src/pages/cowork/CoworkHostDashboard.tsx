@@ -644,8 +644,6 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
   const unaSolaPantalla = vigilarAnfitrion;
   const [pantallaHub, setPantallaHub] = useState<MediaStreamTrack | null>(() => pantallaDelHub());
   useEffect(() => suscribirPantallaDelHub(setPantallaHub), []);
-  // Salas a las que les fue dando «Hablar», en orden; la última manda.
-  const pilaHablar = useRef<string[]>([]);
   const baseDePantalla = unaSolaPantalla ? pantallaHub : screenBaseTrack;
 
   useEffect(() => {
@@ -869,18 +867,12 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
     if (switching) toast.info(traducir("cowork.host.movedTo", { room: room.name }));
   }, [cowork.rooms, activeRoomId, activeMeetId, terminarMeetGrupal]);
 
-  // A qué sala va la pantalla del supervisor: la sala en la que entró o, si
-  // está en el tablero, la última a la que le dio «Hablar». Una sola.
-  useEffect(() => {
-    if (!unaSolaPantalla) return;
-    pilaHablar.current = pilaHablar.current.filter((id) => roomMic[id]);
-    const destino = activeRoomId && !activeMeetId
-      ? activeRoomId
-      : pilaHablar.current[pilaHablar.current.length - 1] ?? null;
-    // Sin aviso por sala: si no comparte, Argos se lo reclama desde el Hub (voz,
-    // cartel y reporte al 3er llamado). Pedírselo en cada sala era el estorbo.
-    setRoomScreen(destino ? { [destino]: true } : {});
-  }, [unaSolaPantalla, roomMic, activeRoomId, activeMeetId]);
+  // LA PANTALLA DEL SUPERVISOR ES PARA SU TRABAJO (Alvaro, 17/11/2026): «lo
+  // importante es que el supervisor siga compartiendo la pantalla para su
+  // trabajo, no para la persona con la que está hablando». Ya NO se manda sola
+  // a la sala a la que le da «Hablar» ni a la que entra: sigue compartida en el
+  // Hub (Argos la ve). Si él quiere mostrarle algo a una sala, toca el botón de
+  // pantalla de esa sala (una sala a la vez) o comparte desde adentro.
 
   // ── Meet grupal ──────────────────────────────────────────────────────────
   // El supervisor entra al meet como a una sala más (misma vista a pantalla
@@ -1620,7 +1612,6 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
           ? (micCaido ? t("cowork.host.room.micDownHint") : t("cowork.host.room.talkingHint"))
           : t("cowork.host.room.talkHint")}
         onClick={() => {
-          if (!(roomMic[room.id] ?? false)) pilaHablar.current = [...pilaHablar.current.filter((id) => id !== room.id), room.id];
           setRoomMic((m) => ({ ...m, [room.id]: !(m[room.id] ?? false) }));
         }}
       />
@@ -2173,6 +2164,9 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
               onLeave={() => { leaveOneOnOne(); }}
               hideShareLink
               suppressLeaveToast
+              // Adentro de la sala no se abre una segunda pantalla: si quiere
+              // mostrar la suya, la manda con el botón de la tarjeta.
+              hideScreenShare={unaSolaPantalla && !activeMeetId}
               autoLeaveOnEmpty={3000}
               initialMicOn={false}
               initialCamOn={false}
@@ -2725,9 +2719,6 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
               // sala, como siempre, apagado.
               initialMicOn={!!activeMeetId}
               initialCamOn={!!activeMeetId}
-              // El supervisor no abre otra pantalla dentro de la sala: ahí ya le
-              // llega la del Hub (una sola compartida). En el meet grupal sí puede.
-              hideScreenShare={unaSolaPantalla && !activeMeetId}
               // Entrar a una sala no lo saca de la vigilancia del Hub.
               sinLatidoDeLlamada={unaSolaPantalla}
               getToken={getActiveRoomToken}
