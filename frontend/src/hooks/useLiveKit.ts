@@ -780,7 +780,7 @@ export function useLiveKit() {
       ? Array.from(room.localParticipant.audioTrackPublications.values()).find((p) => p.source === Track.Source.Microphone)
       : undefined;
     const t = micPub?.track as (LocalAudioTrack & { getProcessor?: () => unknown }) | undefined;
-    const proc = t?.getProcessor?.() as { motor?: "rnnoise+puerta" | "puerta" | null } | undefined;
+    const proc = t?.getProcessor?.() as { motor?: "deepfilter+puerta" | "rnnoise+puerta" | "puerta" | null } | undefined;
     return estadoDeNC({ soportada: supportsNoiseSuppression(), hayMicro: !!t, motor: proc?.motor ?? null });
   }, []);
   const refrescarEstadoNC = useCallback(() => {

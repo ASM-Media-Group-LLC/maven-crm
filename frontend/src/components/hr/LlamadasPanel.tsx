@@ -35,6 +35,7 @@ const CONSEJO: Record<string, TranslationKey> = {
   sin_causa_clara: "hr.llamadas.consejo.sin_causa_clara",
 };
 const NC: Record<string, TranslationKey> = {
+  fuerte: "hr.llamadas.nc.fuerte",
   activa: "hr.llamadas.nc.activa",
   solo_puerta: "hr.llamadas.nc.solo_puerta",
   fallo: "hr.llamadas.nc.fallo",
