@@ -8,6 +8,7 @@ import { periodLabel } from "@/pages/agency-qa/chatters-qa/useChatterScorecards"
 import { useLanguage } from "@/hooks/useLanguage";
 import type { TranslationKey } from "@/lib/i18n";
 import { periodoDelMes, TURNO_ASISTENCIA } from "./etiquetasRrhh";
+import { idiomaFuente } from "@/lib/idiomas";
 
 type T = (key: TranslationKey, params?: Record<string, string | number>) => string;
 
@@ -81,7 +82,7 @@ export default function HrAttendanceAuto() {
             <CalendarClock className="h-4 w-4 text-success" /> {t("hr.att.title")}
           </h3>
           <p className="text-sm text-muted-foreground">
-            {t("hr.att.subtitle", { period: stats ? periodoDelMes(stats.period, language, periodLabel) : "" })}
+            {t("hr.att.subtitle", { period: stats ? periodoDelMes(stats.period, idiomaFuente(language), periodLabel) : "" })}
           </p>
         </div>
         <span className="text-xs text-muted-foreground">{t("hr.att.synced", { when: relativeTime(sync?.last_sync_at ?? null, t) })}</span>

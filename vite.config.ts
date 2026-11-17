@@ -5,6 +5,7 @@ import { VitePWA } from "vite-plugin-pwa";
 import { pluginMarcaDeBuild } from "./frontend/src/lib/marcaDeBuild";
 import { TARJETAS, conTarjeta } from "./frontend/src/lib/tarjetasDeLink";
 import fs from "node:fs";
+import { pluginIdiomas } from "./scripts/i18n/vitePluginIdiomas";
 
 // https://vitejs.dev/config/
 //
@@ -51,6 +52,8 @@ export default defineConfig(({ mode }) => ({
   },
   plugins: [
     react(),
+    // Un paquete de traducciones por idioma (lib/i18n.ts → cargarIdioma).
+    pluginIdiomas(),
     // La hora del build va como <meta> en index.html, NO en el JavaScript: así dos
     // builds del mismo código dan los mismos chunks y el mismo sw.js (ver
     // lib/marcaDeBuild.ts). En `npm run dev` es la hora en que arrancó el servidor.

@@ -4,6 +4,8 @@ import { Check, Loader2, Send } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import type { Publico } from "../guiones";
 import { INTERESES } from "../publico";
+import { useLanguage } from "@/hooks/useLanguage";
+import { type TranslationKey } from "@/lib/i18n";
 
 // PEDIR UNA DEMO.
 //
@@ -22,11 +24,34 @@ import { INTERESES } from "../publico";
 // son los únicos obligatorios. Cada campo extra en un formulario de contacto
 // es gente que lo abandona a mitad de camino.
 
-const TAMANOS = ["1 a 10 personas", "11 a 50", "51 a 200", "más de 200"];
+// El valor que llega a ventas va siempre en español (así lo lee el equipo);
+// lo que ve la persona sale del diccionario en su idioma.
+const TAMANOS: [string, TranslationKey][] = [
+  ["1 a 10 personas", "portada.demo.tamano1"],
+  ["11 a 50", "portada.demo.tamano2"],
+  ["51 a 200", "portada.demo.tamano3"],
+  ["más de 200", "portada.demo.tamano4"],
+];
+
+/** El nombre de cada interés en el idioma de quien mira (el valor que se manda
+ *  sigue siendo el de publico.tsx). */
+const NOMBRE_INTERES: Record<string, TranslationKey> = {
+  "Correo propio": "portada.interes.correo",
+  "Messenger": "portada.interes.messenger",
+  "Cowork y reuniones": "portada.interes.cowork",
+  "Personas y nómina": "portada.interes.personas",
+  "Ventas y pipeline": "portada.interes.ventas",
+  "Tickets": "portada.interes.tickets",
+  "Marca blanca": "portada.interes.marcaBlanca",
+  "Promolog": "portada.interes.promolog",
+  "Otras opciones de agencia": "portada.interes.otras",
+  "Todo": "portada.interes.todo",
+};
 
 type Estado = "escribiendo" | "enviando" | "listo";
 
 export default function PedirDemo({ publico }: { publico: Publico }) {
+  const { t } = useLanguage();
   const [estado, setEstado] = useState<Estado>("escribiendo");
   const [error, setError] = useState<string | null>(null);
   const [interes, setInteres] = useState<string[]>([]);
@@ -76,7 +101,7 @@ export default function PedirDemo({ publico }: { publico: Publico }) {
       return;
     }
     if (errFn) {
-      setError("No pudimos enviar el pedido. Intenta de nuevo en un momento.");
+      setError(t("portada.demo.error"));
       setEstado("escribiendo");
       return;
     }
@@ -87,23 +112,21 @@ export default function PedirDemo({ publico }: { publico: Publico }) {
     <section className="demo" id="demo">
       <div className="wrap demo-grid">
         <div>
-          <span className="eyebrow">pedir una demo</span>
-          <h2>Lleva tu negocio al siguiente nivel.</h2>
-          <p className="bajada">
-            Cuéntanos de tu equipo y te mostramos tu oficina virtual funcionando.
-          </p>
+          <span className="eyebrow">{t("portada.demo.etiqueta")}</span>
+          <h2>{t("portada.demo.titulo")}</h2>
+          <p className="bajada">{t("portada.demo.bajada")}</p>
           <div className="demo-listo">
             <div>
               <Check strokeWidth={3} aria-hidden="true" />
-              <span>Te contestamos por correo, sin llamadas de venta que no pediste.</span>
+              <span>{t("portada.demo.listo1")}</span>
             </div>
             <div>
               <Check strokeWidth={3} aria-hidden="true" />
-              <span>La demo se da sobre datos de prueba: no hace falta traer nada.</span>
+              <span>{t("portada.demo.listo2")}</span>
             </div>
             <div>
               <Check strokeWidth={3} aria-hidden="true" />
-              <span>Sin instalar programas — todo pasa en el navegador.</span>
+              <span>{t("portada.demo.listo3")}</span>
             </div>
           </div>
         </div>
@@ -114,44 +137,41 @@ export default function PedirDemo({ publico }: { publico: Publico }) {
               <span className="tic-grande">
                 <Check strokeWidth={3} aria-hidden="true" />
               </span>
-              <h3>Pedido recibido</h3>
-              <p>
-                Te escribimos al correo que dejaste. Si es urgente, responde ese mismo correo y
-                nos llega directo.
-              </p>
+              <h3>{t("portada.demo.graciasTitulo")}</h3>
+              <p>{t("portada.demo.graciasTexto")}</p>
             </div>
           ) : (
             <form onSubmit={enviar} noValidate>
               <div className="campos dos">
                 <label className="campo">
-                  <span>Nombre <em>*</em></span>
-                  <input name="nombre" required maxLength={80} autoComplete="name" placeholder="Tu nombre" />
+                  <span>{t("portada.demo.nombre")} <em>*</em></span>
+                  <input name="nombre" required maxLength={80} autoComplete="name" placeholder={t("portada.demo.nombrePh")} />
                 </label>
                 <label className="campo">
-                  <span>Empresa</span>
-                  <input name="empresa" maxLength={120} autoComplete="organization" placeholder="Nombre de la empresa" />
+                  <span>{t("portada.demo.empresa")}</span>
+                  <input name="empresa" maxLength={120} autoComplete="organization" placeholder={t("portada.demo.empresaPh")} />
                 </label>
                 <label className="campo">
-                  <span>Correo de trabajo <em>*</em></span>
-                  <input name="email" type="email" required maxLength={160} autoComplete="email" placeholder="tu@empresa.com" />
+                  <span>{t("portada.demo.correo")} <em>*</em></span>
+                  <input name="email" type="email" required maxLength={160} autoComplete="email" placeholder={t("portada.demo.correoPh")} />
                 </label>
                 <label className="campo">
-                  <span>Teléfono</span>
-                  <input name="telefono" maxLength={40} autoComplete="tel" placeholder="Opcional" />
+                  <span>{t("portada.demo.telefono")}</span>
+                  <input name="telefono" maxLength={40} autoComplete="tel" placeholder={t("portada.demo.opcional")} />
                 </label>
               </div>
 
               <div className="campos" style={{ marginTop: 14 }}>
                 <label className="campo">
-                  <span>Tamaño del equipo</span>
+                  <span>{t("portada.demo.tamano")}</span>
                   <select name="tamano_equipo" defaultValue="">
-                    <option value="">Elige una opción</option>
-                    {TAMANOS.map((t) => <option value={t} key={t}>{t}</option>)}
+                    <option value="">{t("portada.demo.elige")}</option>
+                    {TAMANOS.map(([valor, clave]) => <option value={valor} key={valor}>{t(clave)}</option>)}
                   </select>
                 </label>
 
                 <div className="campo">
-                  <span>Qué te interesa</span>
+                  <span>{t("portada.demo.interes")}</span>
                   <div className="elige">
                     {opciones.map((i) => (
                       <button
@@ -160,15 +180,15 @@ export default function PedirDemo({ publico }: { publico: Publico }) {
                         aria-pressed={interes.includes(i)}
                         onClick={() => alternar(i)}
                       >
-                        {i}
+                        {NOMBRE_INTERES[i] ? t(NOMBRE_INTERES[i]) : i}
                       </button>
                     ))}
                   </div>
                 </div>
 
                 <label className="campo">
-                  <span>Cuéntanos algo más</span>
-                  <textarea name="mensaje" maxLength={2000} placeholder="Qué usas hoy, qué te está costando, cuánta gente lo va a usar…" />
+                  <span>{t("portada.demo.mensaje")}</span>
+                  <textarea name="mensaje" maxLength={2000} placeholder={t("portada.demo.mensajePh")} />
                 </label>
               </div>
 
@@ -183,15 +203,14 @@ export default function PedirDemo({ publico }: { publico: Publico }) {
               <div className="form-pie">
                 <button className="btn btn-primario btn-lg" type="submit" disabled={estado === "enviando"}>
                   {estado === "enviando"
-                    ? <><Loader2 className="girando" width={16} height={16} aria-hidden="true" /> Enviando…</>
-                    : <><Send width={16} height={16} aria-hidden="true" /> Pedir la demo</>}
+                    ? <><Loader2 className="girando" width={16} height={16} aria-hidden="true" /> {t("portada.demo.enviando")}</>
+                    : <><Send width={16} height={16} aria-hidden="true" /> {t("portada.demo.enviar")}</>}
                 </button>
-                <span className="nota">Te contestamos al correo. Nada más.</span>
+                <span className="nota">{t("portada.demo.nota")}</span>
               </div>
               <p className="form-priv">
-                Al enviar aceptas que usemos estos datos solo para contestarte. No los
-                compartimos ni te suscribimos a nada.{" "}
-                <Link to="/privacidad">Aviso de privacidad</Link>
+                {t("portada.demo.privacidad")}{" "}
+                <Link to="/privacidad">{t("portada.demo.avisoPrivacidad")}</Link>
               </p>
 
               {error ? <p className="form-error" role="alert">{error}</p> : null}

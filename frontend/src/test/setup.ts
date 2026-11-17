@@ -1,4 +1,15 @@
 import "@testing-library/jest-dom";
+import diccionario from "@/lib/diccionario";
+import { registrarDiccionario } from "@/lib/i18n";
+
+// Las pruebas leen el diccionario fuente ENTERO (español + inglés) en vez de
+// bajar un paquete por idioma como la app (ver lib/i18n.ts).
+registrarDiccionario(diccionario as unknown as Record<string, { es: string; en: string }>);
+
+// jsdom dice que el navegador está en inglés (en-US). Las pruebas se escribieron
+// con la app arrancando en español: se mantiene así.
+Object.defineProperty(window.navigator, "languages", { value: ["es-CO", "es"], configurable: true });
+Object.defineProperty(window.navigator, "language", { value: "es-CO", configurable: true });
 
 Object.defineProperty(window, "matchMedia", {
   writable: true,

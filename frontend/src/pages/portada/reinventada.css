@@ -60,6 +60,13 @@
 .pt.pr .pr-nav-links a:hover { color: var(--pr-texto); }
 .pt.pr .pr-nav-cta { display: flex; align-items: center; gap: .7rem; }
 .pt.pr .pr-nav-cta .pr-btn { font-size: .88rem; padding: .65em 1.4em; }
+/* Selector de idioma (6 idiomas): discreto, como un enlace más de la barra. */
+.pt.pr .pr-idioma { position: relative; display: inline-flex; align-items: center; gap: .35rem; color: var(--pr-texto); opacity: .78; min-height: 44px; }
+.pt.pr .pr-idioma:hover, .pt.pr .pr-idioma:focus-within { opacity: 1; }
+.pt.pr .pr-idioma svg { width: 16px; height: 16px; flex: none; }
+.pt.pr .pr-idioma select { appearance: none; background: transparent; border: 0; color: inherit; font: inherit; font-size: .88rem; cursor: pointer; padding: .4em .2em; }
+.pt.pr .pr-idioma select:focus-visible { outline: 2px solid rgba(255,255,255,.5); outline-offset: 2px; border-radius: 6px; }
+.pt.pr .pr-idioma option { color: #0e1522; }
 @media (max-width: 760px) {
   .pt.pr .pr-nav-links { display: none; }
   .pt.pr .pr-nav-cta .pr-btn-fantasma { display: none; }

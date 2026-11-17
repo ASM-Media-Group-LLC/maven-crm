@@ -176,7 +176,7 @@ describe("al abrir la sesión, el idioma del perfil", () => {
 
   it("con ui_prefs vacío (NULL) o con un idioma que no existe, también queda el local", async () => {
     localStorage.setItem("app-language", "en");
-    db.fila = { ui_skin: "maven", ui_prefs: { language: "fr" } };
+    db.fila = { ui_skin: "maven", ui_prefs: { language: "ru" } }; // un idioma que Maven no habla (desde el 16/11 el francés sí)
 
     montar(true);
     await waitFor(() => expect(db.lecturas).toBeGreaterThan(0));

@@ -27,7 +27,8 @@
 // tienen su propio idioma, que NO es el de quien apretó el botón. Siguen con su
 // locale fijo, a propósito.
 
-import { enUS, es, type Locale } from "date-fns/locale";
+import { de, enUS, es, fr, it, ptBR, type Locale } from "date-fns/locale";
+import { LOCALE_INTL } from "@/lib/idiomas";
 import { idioma, type Language } from "@/lib/i18n";
 
 /** Las variantes de español que ya usaba la app. Cada lugar conserva la suya. */
@@ -36,7 +37,7 @@ export type LocaleEspanol = "es-CO" | "es-ES" | "es-AR" | "es-CL" | "es-MX";
 export interface Formato {
   idioma: Language;
   /** Locale para `Intl.*` y `toLocaleString`. En español devuelve el que se le pasa
-   *  (el que ese lugar ya usaba); en inglés, siempre "en-US". */
+   *  (el que ese lugar ya usaba); en los demás, el de lib/idiomas.ts. */
   intl: (espanol?: LocaleEspanol) => string;
   /** Locale para date-fns: `format(d, patron, { locale: f.fechas })`.
    *  ⚠️ Si el patrón tiene palabras en español adentro ("d 'de' MMMM"), cambiar el
@@ -44,12 +45,14 @@ export interface Formato {
   fechas: Locale;
 }
 
+const FECHAS: Record<Language, Locale> = { en: enUS, es, de, fr, it, pt: ptBR };
+
 export function formato(lang: Language): Formato {
-  const enIngles = lang === "en";
   return {
     idioma: lang,
-    intl: (espanol: LocaleEspanol = "es-CO") => (enIngles ? "en-US" : espanol),
-    fechas: enIngles ? enUS : es,
+    // En español, la variante que ese lugar ya usaba; en los demás, la del idioma.
+    intl: (espanol: LocaleEspanol = "es-CO") => (lang === "es" ? espanol : LOCALE_INTL[lang]),
+    fechas: FECHAS[lang],
   };
 }
 

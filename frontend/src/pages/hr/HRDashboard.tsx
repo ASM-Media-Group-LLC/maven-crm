@@ -29,6 +29,7 @@ import { useHrAttendance } from "./useHrAttendance";
 import { useLanguage } from "@/hooks/useLanguage";
 import type { TranslationKey } from "@/lib/i18n";
 import { etiqueta, deSiempreSalvoEnIngles, CUALQUIER_AUSENCIA, ESTADO_AUSENCIA, ESTADO_EMPLEADO, TIPO_PENDIENTE_DASHBOARD } from "./etiquetasRrhh";
+import { idiomaFuente } from "@/lib/idiomas";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 interface QuickAction {
@@ -414,7 +415,7 @@ export default function HRDashboard() {
                         {absence.employees?.first_name} {absence.employees?.last_name}
                       </p>
                       <p className="text-xs text-muted-foreground">
-                        {tipoPendiente(t, f.idioma, absence.absence_type)} ·{" "}
+                        {tipoPendiente(t, idiomaFuente(f.idioma), absence.absence_type)} ·{" "}
                         {format(new Date(absence.start_date), "dd MMM", { locale: f.fechas })} →{" "}
                         {format(new Date(absence.end_date), "dd MMM yyyy", { locale: f.fechas })}
                       </p>
@@ -563,15 +564,15 @@ export default function HRDashboard() {
             return employees.slice(0, 100).map((e: any): KpiRow => ({
               primary: `${e.first_name ?? ""} ${e.last_name ?? ""}`.trim() || e.full_name || t("hr.noName"),
               secondary: e.position ?? e.department_name ?? undefined,
-              right: deSiempreSalvoEnIngles(f.idioma, t, ESTADO_EMPLEADO, e.status, e.status ?? "—"),
+              right: deSiempreSalvoEnIngles(idiomaFuente(f.idioma), t, ESTADO_EMPLEADO, e.status, e.status ?? "—"),
               rightTone: e.status === "activo" ? "success" : "default",
             }));
           }
           if (kpiPopup === "ausencias") {
             return pendingAbsences.slice(0, 100).map((a: any): KpiRow => ({
               primary: a.employee_name ?? a.full_name ?? t("hr.employeeWithId", { id: a.employee_id?.slice?.(0, 8) ?? "—" }),
-              secondary: a.absence_type ? `${deSiempreSalvoEnIngles(f.idioma, t, CUALQUIER_AUSENCIA, a.absence_type, a.absence_type)} · ${a.start_date ? new Date(a.start_date).toLocaleDateString(f.intl("es-ES")) : "—"}` : a.start_date ? new Date(a.start_date).toLocaleDateString(f.intl("es-ES")) : undefined,
-              right: deSiempreSalvoEnIngles(f.idioma, t, ESTADO_AUSENCIA, a.status, a.status ?? t("common.pending")),
+              secondary: a.absence_type ? `${deSiempreSalvoEnIngles(idiomaFuente(f.idioma), t, CUALQUIER_AUSENCIA, a.absence_type, a.absence_type)} · ${a.start_date ? new Date(a.start_date).toLocaleDateString(f.intl("es-ES")) : "—"}` : a.start_date ? new Date(a.start_date).toLocaleDateString(f.intl("es-ES")) : undefined,
+              right: deSiempreSalvoEnIngles(idiomaFuente(f.idioma), t, ESTADO_AUSENCIA, a.status, a.status ?? t("common.pending")),
               rightTone: "warning",
             }));
           }

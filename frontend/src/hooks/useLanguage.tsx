@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useCallback, useEffect, useMemo, useRef, type ReactNode } from "react";
-import { type Language, type TranslationKey, getTranslation, fijarIdioma } from "@/lib/i18n";
+import { type Language, type TranslationKey, getTranslation, fijarIdioma, cargarIdioma, idiomaCargado } from "@/lib/i18n";
+import { esIdioma as esIdiomaDeMaven, idiomaDelNavegador } from "@/lib/idiomas";
 import { supabase } from "@/integrations/supabase/client";
 import type { Json } from "@/integrations/supabase/types";
 
@@ -16,16 +17,43 @@ import type { Json } from "@/integrations/supabase/types";
 
 const CLAVE_LOCAL = "app-language";
 
-const esIdioma = (v: unknown): v is Language => v === "es" || v === "en";
+const esIdioma = (v: unknown): v is Language => esIdiomaDeMaven(v);
 
-function idiomaGuardado(): Language {
+/** ¿Ya hubo una sesión de Maven en este navegador? (Supabase guarda su token
+ *  como `sb-<proyecto>-auth-token`.) */
+function huboSesionAqui(): boolean {
+  try {
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i) ?? "";
+      if (k.startsWith("sb-") && k.endsWith("-auth-token")) return true;
+    }
+  } catch {
+    // Bloqueado: se trata como alguien nuevo.
+  }
+  return false;
+}
+
+/** El idioma con que arranca la app (lo usa también main.tsx para bajar ese
+ *  paquete antes de pintar):
+ *   1. el que la persona eligió en este navegador;
+ *   2. si ya trabajaba en Maven aquí y nunca eligió → español, como siempre
+ *      (16/11/2026: «tu equipo actual sigue en el idioma que ya eligió»; sin
+ *      esto, a quien tiene Chrome en inglés la app le cambiaba de un día al otro);
+ *   3. alguien nuevo → el idioma de su navegador, o inglés si Maven no lo habla. */
+export function idiomaInicial(): Language {
+  // La portada en cada idioma tiene su dirección (/en, /es, /de…): manda esa.
+  const enLaRuta = typeof location !== "undefined" ? location.pathname.match(/^\/(en|es|de|fr|it|pt)(\/|$)/)?.[1] : undefined;
+  if (esIdioma(enLaRuta)) return enLaRuta;
   try {
     const guardado = localStorage.getItem(CLAVE_LOCAL);
-    return esIdioma(guardado) ? guardado : "es";
+    if (esIdioma(guardado)) return guardado;
   } catch {
     return "es"; // localStorage bloqueado: sin él igual se puede usar la app
   }
+  return huboSesionAqui() ? "es" : idiomaDelNavegador();
 }
+
+const idiomaGuardado = idiomaInicial;
 
 function guardarIdiomaLocal(lang: Language): void {
   try {
@@ -130,9 +158,15 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
   const elecciones = useRef(0);
 
   const aplicar = useCallback((lang: Language) => {
-    setLanguageState(lang);
-    fijarIdioma(lang);
-    guardarIdiomaLocal(lang);
+    const poner = () => {
+      setLanguageState(lang);
+      fijarIdioma(lang);
+      guardarIdiomaLocal(lang);
+    };
+    // Si el paquete de ese idioma ya está, el cambio es inmediato; si no, se
+    // baja primero (unos 100 KB) para no mostrar la pantalla a medio traducir.
+    if (idiomaCargado(lang)) poner();
+    else void cargarIdioma(lang).then(poner);
   }, []);
 
   const setLanguage = useCallback(

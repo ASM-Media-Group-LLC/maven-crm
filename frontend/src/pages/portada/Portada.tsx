@@ -1,16 +1,22 @@
 import { useEffect, useRef, useState, type CSSProperties, type MouseEvent } from "react";
 import {
-  ArrowRight, CheckSquare, Eye, FileText, HardDrive, Mail, MessageSquare, MonitorUp, UserCheck, Video,
+  ArrowRight, CheckSquare, Eye, FileText, Globe, HardDrive, Mail, MessageSquare, MonitorUp, UserCheck, Video,
   type LucideIcon,
 } from "lucide-react";
 import { MarcaM } from "@/components/MarcaM";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
+import { useLanguage } from "@/hooks/useLanguage";
+import { type TranslationKey } from "@/lib/i18n";
+import { IDIOMAS, NOMBRE_IDIOMA, esIdioma, type Idioma } from "@/lib/idiomas";
 import "./portada.css";
 import "./reinventada.css";
 
 import PedirDemo from "./secciones/PedirDemo";
 
-// LA PORTADA DE MAVEN · ruta pública `/`.
+// LA PORTADA DE MAVEN · rutas públicas /en, /es, /de, /fr, /it, /pt (y `/`,
+// que manda a la del idioma de quien entra). Todo el texto sale del
+// diccionario (lib/i18n/portada.ts): se escribe en español e inglés y el
+// traductor llena los otros cuatro.
 //
 // «La oficina, reinventada.» (Alvaro, 16/11/2026): el esquema de la portada
 // de Lumina, calcado a pedido —video de fondo, tres pasos, qué trae, para
@@ -53,86 +59,71 @@ const TOKENS = {
   "--sobre-azul": "#04140b",
 } as CSSProperties;
 
-const PASOS: [string, string][] = [
-  [
-    "Arma tu oficina",
-    "Crea una sala por área y suma a tu gente. Cada uno entra desde su casa, en el navegador, sin instalar nada.",
-  ],
-  [
-    "Tu equipo trabaja en vivo",
-    "Cámara y pantalla encendidas en Cowork, como en la misma oficina. El chat, el correo y los documentos están a un clic, sin salir de Maven.",
-  ],
-  [
-    "Argos vigila y te reporta",
-    "La IA revisa todo el turno quién trabaja de verdad, le pone una nota del 0 al 100 y avisa al momento a la persona y a su jefe. Control total, sin perseguir a nadie.",
-  ],
+type K = TranslationKey;
+
+const PASOS: [K, K][] = [
+  ["portada.paso1", "portada.paso1Texto"],
+  ["portada.paso2", "portada.paso2Texto"],
+  ["portada.paso3", "portada.paso3Texto"],
 ];
 
-const FUNCIONES: { Icono: LucideIcon; nombre: string; texto: string }[] = [
-  { Icono: Video, nombre: "Cowork en vivo", texto: "Las cámaras y pantallas de todo tu equipo, sala por sala. Ves quién está y en qué anda." },
-  { Icono: MonitorUp, nombre: "Reuniones", texto: "Videollamadas con pantalla compartida en servidor propio, sin pagar otra herramienta." },
-  { Icono: Eye, nombre: "Argos, la IA que vigila", texto: "Revisa cámaras y pantallas, le pone nota a cada persona y te avisa apenas algo falla." },
-  { Icono: MessageSquare, nombre: "Mensajería interna", texto: "El chat de tu equipo, con grupos por área y bajo tu control." },
-  { Icono: Mail, nombre: "Correo de la A a la Z", texto: "Las casillas con tu dominio, controladas de punta a punta desde Maven." },
-  { Icono: FileText, nombre: "Documentos", texto: "Hojas, textos y presentaciones que editan juntos, con versiones." },
-  { Icono: CheckSquare, nombre: "Tareas", texto: "Cada pendiente con dueño, fecha y estado. Nada se pierde en un chat." },
-  { Icono: HardDrive, nombre: "Almacenamiento", texto: "Los archivos de tu empresa en tu propio espacio, compartidos por área." },
-  { Icono: UserCheck, nombre: "Tú apruebas quién entra", texto: "Nadie entra sin tu permiso, y cada rol ve solo lo suyo." },
+const FUNCIONES: { Icono: LucideIcon; nombre: K; texto: K }[] = [
+  { Icono: Video, nombre: "portada.f.cowork", texto: "portada.f.coworkTexto" },
+  { Icono: MonitorUp, nombre: "portada.f.reuniones", texto: "portada.f.reunionesTexto" },
+  { Icono: Eye, nombre: "portada.f.argos", texto: "portada.f.argosTexto" },
+  { Icono: MessageSquare, nombre: "portada.f.mensajeria", texto: "portada.f.mensajeriaTexto" },
+  { Icono: Mail, nombre: "portada.f.correo", texto: "portada.f.correoTexto" },
+  { Icono: FileText, nombre: "portada.f.documentos", texto: "portada.f.documentosTexto" },
+  { Icono: CheckSquare, nombre: "portada.f.tareas", texto: "portada.f.tareasTexto" },
+  { Icono: HardDrive, nombre: "portada.f.almacenamiento", texto: "portada.f.almacenamientoTexto" },
+  { Icono: UserCheck, nombre: "portada.f.accesos", texto: "portada.f.accesosTexto" },
 ];
 
-const EQUIPOS = ["Ventas", "Soporte", "Atención al cliente", "Operaciones", "Diseño", "Agencias", "Lo que tu empresa necesite"];
+const EQUIPOS: K[] = [
+  "portada.equipo.ventas", "portada.equipo.soporte", "portada.equipo.atencion", "portada.equipo.operaciones",
+  "portada.equipo.diseno", "portada.equipo.agencias", "portada.equipo.otro",
+];
 
 type Plan = {
-  nombre: string;
-  precio: string;
-  periodo?: string;
-  tope: string;
-  incluye: string[];
-  boton: string;
+  id: "oficina" | "argos" | "empresa";
+  nombre: K;
+  /** Precio con su moneda (no se traduce) o la clave de «A la medida». */
+  precio: string | { clave: K };
+  conPeriodo?: boolean;
+  tope: K;
+  incluye: K[];
+  boton: K;
   destacado?: boolean;
 };
 
+// Precios decididos por Alvaro (16/11/2026). Cambiar un precio es cambiar PLANES.
 const PLANES: Plan[] = [
   {
-    nombre: "Oficina",
+    id: "oficina",
+    nombre: "portada.plan.oficina",
     precio: "USD 300",
-    periodo: "/ mes · por empresa",
-    tope: "Hasta 25 personas",
-    incluye: [
-      "Cowork en vivo, con cámara y pantalla",
-      "Reuniones con pantalla compartida",
-      "Mensajería y correo con tu dominio",
-      "Documentos, tareas y almacenamiento",
-      "Tú apruebas quién entra",
-    ],
-    boton: "Pedir una demo",
+    conPeriodo: true,
+    tope: "portada.plan.oficinaTope",
+    incluye: ["portada.plan.oficina1", "portada.plan.oficina2", "portada.plan.oficina3", "portada.plan.oficina4", "portada.plan.oficina5"],
+    boton: "portada.cta.demo",
   },
   {
-    nombre: "Con Argos",
+    id: "argos",
+    nombre: "portada.plan.argos",
     precio: "USD 900",
-    periodo: "/ mes · por empresa",
-    tope: "Hasta 50 personas · la IA que vigila",
-    incluye: [
-      "Todo lo de Oficina",
-      "Argos revisa cámaras y pantallas todo el turno",
-      "Nota del 0 al 100 por persona, del día y de la semana",
-      "Avisos al momento a la persona y a su jefe",
-      "Expediente de cada persona, día por día",
-    ],
-    boton: "Pedir una demo",
+    conPeriodo: true,
+    tope: "portada.plan.argosTope",
+    incluye: ["portada.plan.argos1", "portada.plan.argos2", "portada.plan.argos3", "portada.plan.argos4", "portada.plan.argos5"],
+    boton: "portada.cta.demo",
     destacado: true,
   },
   {
-    nombre: "Empresa",
-    precio: "A la medida",
-    tope: "Más de 50 personas · tu marca",
-    incluye: [
-      "Todo lo de Con Argos",
-      "Más de 50 personas",
-      "Tu marca y tus colores en toda la plataforma",
-      "Acompañamiento dedicado",
-    ],
-    boton: "Hablemos",
+    id: "empresa",
+    nombre: "portada.plan.empresa",
+    precio: { clave: "portada.precios.aLaMedida" },
+    tope: "portada.plan.empresaTope",
+    incluye: ["portada.plan.empresa1", "portada.plan.empresa2", "portada.plan.empresa3", "portada.plan.empresa4"],
+    boton: "portada.precios.hablemos",
   },
 ];
 
@@ -148,6 +139,44 @@ function Marca({ chico = false }: { chico?: boolean }) {
       Maven
     </span>
   );
+}
+
+/** El idioma de la portada: cada uno tiene su dirección (/en, /es…), así
+ *  Google muestra la de quien busca. Los nombres van en su propio idioma. */
+function SelectorIdioma() {
+  const { t, language, setLanguage } = useLanguage();
+  const ir = useNavigate();
+  return (
+    <label className="pr-idioma" title={t("portada.idioma")}>
+      <Globe aria-hidden="true" />
+      <span className="sr-only">{t("portada.idioma")}</span>
+      <select
+        value={language}
+        onChange={(e) => {
+          const lang = e.target.value;
+          if (!esIdioma(lang)) return;
+          setLanguage(lang);
+          ir(`/${lang}${window.location.hash}`);
+        }}
+      >
+        {IDIOMAS.map((l) => <option key={l} value={l}>{NOMBRE_IDIOMA[l]}</option>)}
+      </select>
+    </label>
+  );
+}
+
+/** Le dice a Google que la portada existe en los 6 idiomas (hreflang). */
+function useEnlacesDeIdioma(actual: Idioma) {
+  useEffect(() => {
+    const base = window.location.origin;
+    const nodos = [
+      ...IDIOMAS.map((l) => Object.assign(document.createElement("link"), { rel: "alternate", hreflang: l, href: `${base}/${l}` })),
+      Object.assign(document.createElement("link"), { rel: "alternate", hreflang: "x-default", href: `${base}/en` }),
+      Object.assign(document.createElement("link"), { rel: "canonical", href: `${base}/${actual}` }),
+    ];
+    nodos.forEach((n) => document.head.appendChild(n));
+    return () => nodos.forEach((n) => n.remove());
+  }, [actual]);
 }
 
 /** El video de fondo del inicio. Con «reducir movimiento» queda la foto fija. */
@@ -168,8 +197,17 @@ function VideoDeFondo() {
   );
 }
 
-export default function Portada() {
+export default function Portada({ idiomaDeRuta }: { idiomaDeRuta?: Idioma }) {
   const raiz = useRef<HTMLDivElement>(null);
+  const { t, language, setLanguage } = useLanguage();
+
+  // /de, /fr…: la dirección manda el idioma (y queda como el de esta persona).
+  useEffect(() => {
+    if (idiomaDeRuta && idiomaDeRuta !== language) setLanguage(idiomaDeRuta);
+    // Solo cuando cambia la dirección.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [idiomaDeRuta]);
+  useEnlacesDeIdioma(idiomaDeRuta ?? language);
   // El formulario de demo queda guardado hasta que alguien lo pide: así la
   // página cierra limpia, como la de referencia, y no con un formulario largo.
   const [demoAbierta, setDemoAbierta] = useState(
@@ -177,8 +215,8 @@ export default function Portada() {
   );
 
   useEffect(() => {
-    document.title = "Maven — La oficina, reinventada";
-  }, []);
+    document.title = t("portada.tituloDocumento");
+  }, [t]);
 
   // Si se entra con /#demo, el formulario ya está abierto: se lleva la vista.
   useEffect(() => {
@@ -223,14 +261,15 @@ export default function Portada() {
       <header className="pr-nav">
         <div className="pr-caja pr-nav-in">
           <Link to="/" aria-label="Maven" style={{ textDecoration: "none" }}><Marca /></Link>
-          <nav className="pr-nav-links" aria-label="Secciones">
-            <a href="#como-funciona">Cómo funciona</a>
-            <a href="#empresas">Para empresas</a>
-            <a href="#precios">Precios</a>
+          <nav className="pr-nav-links" aria-label={t("portada.nav.secciones")}>
+            <a href="#como-funciona">{t("portada.nav.como")}</a>
+            <a href="#empresas">{t("portada.nav.empresas")}</a>
+            <a href="#precios">{t("portada.nav.precios")}</a>
           </nav>
           <div className="pr-nav-cta">
-            <Link className="pr-btn pr-btn-fantasma" to="/login">Entrar</Link>
-            <a className="pr-btn pr-btn-neon" href="#demo" onClick={abrirDemo}>Pedir una demo</a>
+            <SelectorIdioma />
+            <Link className="pr-btn pr-btn-fantasma" to="/login">{t("portada.nav.entrar")}</Link>
+            <a className="pr-btn pr-btn-neon" href="#demo" onClick={abrirDemo}>{t("portada.cta.demo")}</a>
           </div>
         </div>
       </header>
@@ -239,18 +278,15 @@ export default function Portada() {
         <VideoDeFondo />
         <div className="pr-caja">
           <h1>
-            <span>La oficina,</span>
-            <span className="pr-linea-acento">reinventada.</span>
+            <span>{t("portada.hero.linea1")}</span>
+            <span className="pr-linea-acento">{t("portada.hero.linea2")}</span>
           </h1>
-          <p className="pr-bajada">
-            La plataforma donde tu equipo trabaja junto desde cualquier casa: cámaras en vivo, una IA que vigila y
-            todo tu negocio en un solo lugar — sin pagar oficina.
-          </p>
+          <p className="pr-bajada">{t("portada.hero.bajada")}</p>
           <div className="pr-hero-cta">
             <a className="pr-btn pr-btn-neon pr-btn-lg" href="#demo" onClick={abrirDemo}>
-              Pedir una demo <ArrowRight aria-hidden="true" />
+              {t("portada.cta.demo")} <ArrowRight aria-hidden="true" />
             </a>
-            <a className="pr-btn pr-btn-fantasma pr-btn-lg" href="#como-funciona">Ver cómo funciona</a>
+            <a className="pr-btn pr-btn-fantasma pr-btn-lg" href="#como-funciona">{t("portada.hero.verComo")}</a>
           </div>
         </div>
       </section>
@@ -258,16 +294,16 @@ export default function Portada() {
       <section className="pr-sec" id="como-funciona">
         <div className="pr-caja">
           <div className="pr-cabeza pr-aparece">
-            <p className="pr-ceja">Cómo funciona</p>
-            <h2>Tres pasos. Cero oficina.</h2>
-            <p>Desde que armas tus salas hasta el reporte del día, todo pasa dentro de Maven.</p>
+            <p className="pr-ceja">{t("portada.como.ceja")}</p>
+            <h2>{t("portada.como.titulo")}</h2>
+            <p>{t("portada.como.bajada")}</p>
           </div>
           <div className="pr-pasos">
             {PASOS.map(([titulo, texto], i) => (
               <article className="pr-tarjeta pr-paso pr-aparece" key={titulo}>
                 <div className="pr-paso-num">{String(i + 1).padStart(2, "0")}</div>
-                <h3>{titulo}</h3>
-                <p>{texto}</p>
+                <h3>{t(titulo)}</h3>
+                <p>{t(texto)}</p>
               </article>
             ))}
           </div>
@@ -277,15 +313,15 @@ export default function Portada() {
       <section className="pr-sec" id="funciones">
         <div className="pr-caja">
           <div className="pr-cabeza pr-aparece">
-            <p className="pr-ceja">Qué trae</p>
-            <h2>Todo lo que necesitas para trabajar de verdad</h2>
+            <p className="pr-ceja">{t("portada.funciones.ceja")}</p>
+            <h2>{t("portada.funciones.titulo")}</h2>
           </div>
           <div className="pr-funciones">
             {FUNCIONES.map(({ Icono, nombre, texto }) => (
               <article className="pr-tarjeta pr-funcion pr-aparece" key={nombre}>
                 <span className="pr-icono"><Icono strokeWidth={1.6} aria-hidden="true" /></span>
-                <h3>{nombre}</h3>
-                <p>{texto}</p>
+                <h3>{t(nombre)}</h3>
+                <p>{t(texto)}</p>
               </article>
             ))}
           </div>
@@ -295,12 +331,12 @@ export default function Portada() {
       <section className="pr-sec pr-equipos" id="empresas">
         <div className="pr-caja">
           <div className="pr-cabeza pr-aparece">
-            <p className="pr-ceja">Para empresas</p>
-            <h2>Para cualquier equipo remoto</h2>
-            <p>Maven no es de un solo rubro. Si tu gente trabaja desde casa, aquí trabaja junta.</p>
+            <p className="pr-ceja">{t("portada.equipos.ceja")}</p>
+            <h2>{t("portada.equipos.titulo")}</h2>
+            <p>{t("portada.equipos.bajada")}</p>
           </div>
           <ul className="pr-chips pr-aparece">
-            {EQUIPOS.map((e) => <li className="pr-chip" key={e}>{e}</li>)}
+            {EQUIPOS.map((e) => <li className="pr-chip" key={e}>{t(e)}</li>)}
           </ul>
         </div>
       </section>
@@ -308,45 +344,45 @@ export default function Portada() {
       <section className="pr-sec" id="precios">
         <div className="pr-caja">
           <div className="pr-cabeza pr-aparece">
-            <p className="pr-ceja">Precios</p>
-            <h2>Un precio fijo por empresa. Sin sorpresas.</h2>
-            <p>Te dejamos la oficina armada y lista para tu equipo. Todos entran, dentro del tope de tu plan.</p>
+            <p className="pr-ceja">{t("portada.precios.ceja")}</p>
+            <h2>{t("portada.precios.titulo")}</h2>
+            <p>{t("portada.precios.bajada")}</p>
           </div>
           <div className="pr-precios">
             {PLANES.map((p) => (
-              <article className={`pr-plan pr-aparece${p.destacado ? " destacado" : ""}`} key={p.nombre}>
-                {p.destacado ? <span className="pr-plan-sello">Recomendado</span> : null}
-                <h3 className="pr-plan-nombre">{p.nombre}</h3>
+              <article className={`pr-plan pr-aparece${p.destacado ? " destacado" : ""}`} key={p.id}>
+                {p.destacado ? <span className="pr-plan-sello">{t("portada.precios.recomendado")}</span> : null}
+                <h3 className="pr-plan-nombre">{t(p.nombre)}</h3>
                 <p className="pr-plan-precio">
-                  {p.precio}
-                  {p.periodo ? <small> {p.periodo}</small> : null}
+                  {typeof p.precio === "string" ? p.precio : t(p.precio.clave)}
+                  {p.conPeriodo ? <small> {t("portada.precios.periodo")}</small> : null}
                 </p>
-                <p className="pr-plan-tope">{p.tope}</p>
+                <p className="pr-plan-tope">{t(p.tope)}</p>
                 <ul>
-                  {p.incluye.map((linea) => <li key={linea}>{linea}</li>)}
+                  {p.incluye.map((linea) => <li key={linea}>{t(linea)}</li>)}
                 </ul>
                 <a
-                  className={`pr-btn ${p.destacado || p.nombre === "Oficina" ? "pr-btn-neon" : "pr-btn-fantasma"}`}
+                  className={`pr-btn ${p.destacado || p.id === "oficina" ? "pr-btn-neon" : "pr-btn-fantasma"}`}
                   href="#demo"
                   onClick={abrirDemo}
                 >
-                  {p.boton}
+                  {t(p.boton)}
                 </a>
               </article>
             ))}
           </div>
           <p className="pr-precios-nota">
-            Precio fijo por empresa, no por persona. <b>¿Más de 50 personas?</b> Te armamos un plan a la medida.
+            {t("portada.precios.nota")} <b>{t("portada.precios.notaPregunta")}</b> {t("portada.precios.notaFinal")}
           </p>
         </div>
       </section>
 
       <section className="pr-sec pr-cierre">
         <div className="pr-caja pr-aparece">
-          <h2>Tu equipo, <em>trabajando de verdad.</em></h2>
-          <p>Pide tu demo, arma tus salas y deja que Maven haga el resto.</p>
+          <h2>{t("portada.cierre.titulo")} <em>{t("portada.cierre.tituloAcento")}</em></h2>
+          <p>{t("portada.cierre.bajada")}</p>
           {demoAbierta ? null : (
-            <a className="pr-btn pr-btn-neon pr-btn-lg" href="#demo" onClick={abrirDemo}>Pedir una demo</a>
+            <a className="pr-btn pr-btn-neon pr-btn-lg" href="#demo" onClick={abrirDemo}>{t("portada.cta.demo")}</a>
           )}
         </div>
       </section>
@@ -357,12 +393,12 @@ export default function Portada() {
         <div className="pr-caja pr-pie-in">
           <div className="pr-pie-marca">
             <Marca chico />
-            <span className="pr-pie-lema">La oficina, reinventada.</span>
+            <span className="pr-pie-lema">{t("portada.pie.lema")}</span>
           </div>
-          <nav className="pr-pie-links" aria-label="Enlaces del pie">
-            <Link to="/login">Entrar</Link>
-            <a href="#demo" onClick={abrirDemo}>Pedir una demo</a>
-            <Link to="/privacidad">Privacidad</Link>
+          <nav className="pr-pie-links" aria-label={t("portada.pie.enlaces")}>
+            <Link to="/login">{t("portada.nav.entrar")}</Link>
+            <a href="#demo" onClick={abrirDemo}>{t("portada.cta.demo")}</a>
+            <Link to="/privacidad">{t("portada.pie.privacidad")}</Link>
           </nav>
           <span className="pr-pie-copia">© {new Date().getFullYear()} Maven</span>
         </div>

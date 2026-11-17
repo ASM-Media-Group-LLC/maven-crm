@@ -12,6 +12,7 @@ import { cn } from "@/lib/utils";
 import { tamano } from "@/lib/drive/formato";
 import { hayQueMirarAdentro, TOPE_OFFICE, TOPE_TEXTO, vistaConFirma, vistaDeArchivo } from "@/lib/drive/tipoDeArchivo";
 import type { DriveItem } from "@/hooks/useDrive";
+import { idiomaFuente } from "@/lib/idiomas";
 
 // Lo que se ve en el medio del visor, según el tipo de archivo. Cada vista se
 // monta con `key` = id del archivo (ver VisorArchivo): pasar al siguiente
@@ -226,7 +227,7 @@ function VistaOffice({ archivo, onDescargar }: { archivo: DriveItem; onDescargar
   const { t, language } = useLanguage();
   // `resolvedTheme` y no `theme`: con "system", `theme` vale "system".
   const { resolvedTheme } = useTheme();
-  const apertura = useVistaEnOffice(archivo.id, resolvedTheme === "dark" ? "dark" : "light", language, true);
+  const apertura = useVistaEnOffice(archivo.id, resolvedTheme === "dark" ? "dark" : "light", idiomaFuente(language), true);
   // El id lleva el archivo: ONLYOFFICE se monta en un contenedor LIMPIO por
   // documento (reusar el mismo dejaba el anterior dibujado debajo, visto en
   // el visor del correo).

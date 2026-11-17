@@ -34,6 +34,7 @@ import KpiDetailDialog, { type KpiRow } from "@/components/dashboard/KpiDetailDi
 import { useLanguage } from "@/hooks/useLanguage";
 import type { TranslationKey } from "@/lib/i18n";
 import { etiqueta, deSiempreSalvoEnIngles, ESTADO_PERMISO, TIPO_PERMISO } from "./etiquetasRrhh";
+import { idiomaFuente } from "@/lib/idiomas";
 
 type T = (key: TranslationKey, params?: Record<string, string | number>) => string;
 
@@ -784,8 +785,8 @@ export default function HRPermisos() {
             status === "approved" ? "success" : status === "rejected" ? "destructive" : "warning";
           return list.slice(0, 100).map((p: any): KpiRow => ({
             primary: p.employee_name ?? t("hr.employeeWithId", { id: p.employee_id?.slice?.(0, 8) ?? "—" }),
-            secondary: `${deSiempreSalvoEnIngles(f.idioma, t, TIPO_PERMISO, p.permission_type, p.permission_type ?? "")} · ${p.permission_date ? format(new Date(p.permission_date), "dd MMM yyyy") : "—"}`,
-            right: deSiempreSalvoEnIngles(f.idioma, t, ESTADO_PERMISO, p.status, p.status ?? "—"),
+            secondary: `${deSiempreSalvoEnIngles(idiomaFuente(f.idioma), t, TIPO_PERMISO, p.permission_type, p.permission_type ?? "")} · ${p.permission_date ? format(new Date(p.permission_date), "dd MMM yyyy") : "—"}`,
+            right: deSiempreSalvoEnIngles(idiomaFuente(f.idioma), t, ESTADO_PERMISO, p.status, p.status ?? "—"),
             rightTone: tone(p.status ?? ""),
           }));
         })()}

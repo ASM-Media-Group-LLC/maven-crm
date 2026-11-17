@@ -1,0 +1,69 @@
+name: Traducir idiomas
+
+# MAVEN EN 6 IDIOMAS (16/11/2026). Las frases se escriben en español e inglés
+# (frontend/src/lib/i18n/*.ts). Cuando un push a main toca el diccionario, esto
+# traduce con IA lo que falte —o quedó viejo porque cambió el inglés— al alemán,
+# francés, italiano y portugués, y lo sube a main en un commit aparte. Mientras
+# tanto la app muestra esas frases en inglés: nunca queda texto vacío.
+#
+# Necesita el secreto GEMINI_API_KEY en el repositorio (Settings → Secrets and
+# variables → Actions). Sin él, avisa y no hace nada.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "frontend/src/lib/i18n/**"
+      - "frontend/src/lib/diccionario.ts"
+      - "scripts/i18n/**"
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+# Si llegan varios pushes seguidos, solo corre el último (traduce lo que falte de todos).
+concurrency:
+  group: traducir-idiomas
+  cancel-in-progress: true
+
+jobs:
+  traducir:
+    name: traducir lo que falte (de, fr, it, pt)
+    runs-on: [self-hosted, macOS, ARM64, mini5]
+    timeout-minutes: 60
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+        with:
+          ref: main
+
+      - name: Setup Node
+        uses: actions/setup-node@v5
+        with:
+          node-version: 24
+
+      - name: npm ci
+        run: npm ci --no-audit --no-fund
+
+      - name: Traducir
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: |
+          if [ -z "$GEMINI_API_KEY" ]; then
+            echo "::warning::Falta el secreto GEMINI_API_KEY: no se tradujo nada (la app muestra inglés en lo nuevo)."
+            exit 0
+          fi
+          node scripts/i18n/traducir.mjs
+
+      - name: Subir las traducciones
+        run: |
+          if git diff --quiet -- frontend/src/locales; then
+            echo "Nada nuevo para traducir."
+            exit 0
+          fi
+          git config user.name "maven-traductor"
+          git config user.email "maven-traductor@users.noreply.github.com"
+          git add frontend/src/locales
+          git commit -m "chore(i18n): traducciones automáticas (de, fr, it, pt)"
+          git pull --rebase origin main
+          git push origin HEAD:main
