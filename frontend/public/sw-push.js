@@ -151,7 +151,7 @@ function mostrarAviso(data) {
         }
         return self.registration.showNotification(data.title, {
           body: body,
-          icon: "/icon-192.png",
+          icon: "/icon-192.png?v=3",
           badge: "/favicon.ico",
           tag: tag,
           renotify: true,

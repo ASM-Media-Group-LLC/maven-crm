@@ -11,14 +11,16 @@
   --pr-surface: #141d2e;
   --pr-texto: #ffffff;
   --pr-gris: #8f9ab0;
-  /* El acento es el MISMO verde encendido del botón (Alvaro: «tiene que
-     hacer match, el del botón está encendido»). */
-  --pr-acento: #39ff8e;
-  --pr-acento-rgb: 57, 255, 142;
-  --pr-neon: #39ff8e;
-  --pr-neon-hover: #6bffab;
+  /* El acento es el MISMO verde del botón (Alvaro: «tiene que hacer match»),
+     después bajado dos veces a pedido («menos encendido»). */
+  --pr-acento: #4fd88d;
+  /* El pliegue del logo: el mismo verde, a la sombra. */
+  --pr-acento-hondo: #2a9a5c;
+  --pr-acento-rgb: 79, 216, 141;
+  --pr-neon: #4fd88d;
+  --pr-neon-hover: #6fe0a3;
   --pr-sobre-neon: #04140b;
-  --pr-borde: rgba(57, 255, 142, .16);
+  --pr-borde: rgba(79, 216, 141, .16);
   --pr-linea: rgba(255, 255, 255, .06);
   --pr-radio: 20px;
   background: var(--pr-bg);
@@ -26,7 +28,13 @@
 }
 /* Los títulos en blanco explícito: los estilos globales de la app los teñían de gris. */
 .pt.pr h1, .pt.pr h2, .pt.pr h3 { color: var(--pr-texto); }
-.pt.pr .marca i { background: #0a84ff; box-shadow: 0 0 22px -6px rgba(10, 132, 255, .8); }
+/* El logo: la M de cinta en el verde de los botones y «Maven» en blanco. */
+.pt.pr .pr-marca {
+  display: inline-flex; align-items: center; gap: 10px;
+  font: 800 21px/1 Sora, sans-serif; letter-spacing: -.02em; color: var(--pr-texto);
+}
+.pt.pr .pr-marca.chico { gap: 8px; font-size: 16px; }
+.pt.pr .pr-marca-m { display: block; flex: none; overflow: visible; }
 
 .pt.pr .pr-caja { width: min(1120px, calc(100% - 32px)); margin: 0 auto; }
 /* Los enlaces del menú no dejan el título de la sección tapado por la barra fija. */
@@ -88,9 +96,9 @@
 .pt.pr .pr-video video, .pt.pr .pr-video img { width: 100%; height: 100%; object-fit: cover; display: block; max-width: none; }
 .pt.pr .pr-video::after {
   content: ""; position: absolute; inset: 0; pointer-events: none;
-  /* «Menos tela, más transparente» (Alvaro): capa más liviana y menos azul;
-     solo el borde de abajo funde con el fondo marino. */
-  background: linear-gradient(180deg, rgba(10,13,20,.62) 0%, rgba(10,13,20,.32) 42%, rgba(10,13,20,.48) 72%, var(--pr-bg) 100%);
+  /* La «telita» azul marino, en el punto medio que pidió Alvaro: más que la
+     versión transparente, menos que la primera (que tapaba demasiado). */
+  background: linear-gradient(180deg, rgba(16,24,39,.70) 0%, rgba(16,24,39,.42) 42%, rgba(16,24,39,.57) 72%, var(--pr-bg) 100%);
 }
 .pt.pr .pr-hero h1 {
   margin: 0; font-size: clamp(2.6rem, 7.5vw, 5rem); font-weight: 800; line-height: 1.06; letter-spacing: -.02em;

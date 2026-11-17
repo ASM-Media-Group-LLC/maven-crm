@@ -243,8 +243,8 @@ function MenuDelPortal({ activa, selectorDeAgencia, pedidosPorHacer }: { activa:
           aria-label={t("portal.nav.inicio")}
           className="flex min-w-0 items-center gap-2.5 rounded-control transition-opacity hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
         >
-          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-panel bg-primary">
-            <MarcaM alto="13px" />
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-panel bg-[#101827]">
+            <MarcaM alto="12px" />
           </span>
           {!plegado && <span className="truncate font-semibold">{t("portal.shell.espacio")}</span>}
         </Link>

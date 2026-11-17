@@ -18,9 +18,7 @@ export default function Privacidad() {
       <nav className="nav pegado">
         <div className="wrap nav-in">
           <Link to="/" className="marca" style={{ textDecoration: "none", color: "inherit" }}>
-            <i style={{ width: 22, height: 22 }}>
-              <MarcaM alto="10px" />
-            </i>
+            <MarcaM alto="13px" />
             Maven
           </Link>
           <div style={{ display: "flex", gap: 10, alignItems: "center" }}>

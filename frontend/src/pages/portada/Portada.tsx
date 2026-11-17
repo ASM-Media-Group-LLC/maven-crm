@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState, type CSSProperties, type MouseEvent } from "react";
+import { MarcaM } from "@/components/MarcaM";
 import {
   ArrowRight, CheckSquare, Eye, FileText, Globe, HardDrive, Mail, MessageSquare, MonitorUp, UserCheck, Video,
   type LucideIcon,
 } from "lucide-react";
-import { MarcaM } from "@/components/MarcaM";
 import { Link, useNavigate } from "react-router-dom";
 import { useLanguage } from "@/hooks/useLanguage";
 import { type TranslationKey } from "@/lib/i18n";
@@ -24,9 +24,12 @@ import PedirDemo from "./secciones/PedirDemo";
 // los colores de Maven. El video muestra un equipo repartido en varias casas
 // trabajando como si estuviera en la misma oficina.
 //
-// Precios decididos por Alvaro el mismo día: fijo por empresa, «Oficina»
-// USD 300 hasta 25 personas, «Con Argos» USD 900 hasta 50, «Empresa» a la
-// medida. Cambiar un precio es cambiar PLANES, nada más.
+// Precios de Alvaro (16/11/2026, segunda vuelta): fijo por empresa y todo
+// incluido, Argos también — Equipo USD 299 hasta 20 personas, Empresa USD 599
+// hasta 50, y Enterprise SIN precio (más de 50 personas: nos contactan), como
+// la tarjeta Enterprise de Lumina — más la instalación a la medida desde
+// USD 3.000 (pago único) en la nota de abajo. Cambiar un precio es cambiar
+// PLANES, nada más.
 //
 // TRES REGLAS DE CONTENIDO que no son opinión, son pedido explícito:
 //  1. Ni una cifra de la agencia (montos, cantidad de personas, uso real).
@@ -52,9 +55,9 @@ const TOKENS = {
   "--ink-soft": "#c9d0dc",
   "--muted": "#8f9ab0",
   "--faint": "#7d889e",
-  "--azul": "#39ff8e",
-  "--azul-claro": "#6bffab",
-  "--azul-rgb": "57, 255, 142",
+  "--azul": "#4fd88d",
+  "--azul-claro": "#6fe0a3",
+  "--azul-rgb": "79, 216, 141",
   "--azul-claro-rgb": "107, 255, 171",
   "--sobre-azul": "#04140b",
 } as CSSProperties;
@@ -85,7 +88,7 @@ const EQUIPOS: K[] = [
 ];
 
 type Plan = {
-  id: "oficina" | "argos" | "empresa";
+  id: "equipo" | "empresa" | "enterprise";
   nombre: K;
   /** Precio con su moneda (no se traduce) o la clave de «A la medida». */
   precio: string | { clave: K };
@@ -94,48 +97,48 @@ type Plan = {
   incluye: K[];
   boton: K;
   destacado?: boolean;
+  /** Botón de contorno (el de «Contáctanos»), como el Enterprise de Lumina. */
+  contacto?: boolean;
 };
 
-// Precios decididos por Alvaro (16/11/2026). Cambiar un precio es cambiar PLANES.
 const PLANES: Plan[] = [
   {
-    id: "oficina",
-    nombre: "portada.plan.oficina",
-    precio: "USD 300",
+    id: "equipo",
+    nombre: "portada.plan.equipo",
+    precio: "USD 299",
     conPeriodo: true,
-    tope: "portada.plan.oficinaTope",
-    incluye: ["portada.plan.oficina1", "portada.plan.oficina2", "portada.plan.oficina3", "portada.plan.oficina4", "portada.plan.oficina5"],
+    tope: "portada.plan.equipoTope",
+    incluye: ["portada.plan.equipo1", "portada.plan.equipo2", "portada.plan.equipo3", "portada.plan.equipo4", "portada.plan.equipo5"],
     boton: "portada.cta.demo",
-  },
-  {
-    id: "argos",
-    nombre: "portada.plan.argos",
-    precio: "USD 900",
-    conPeriodo: true,
-    tope: "portada.plan.argosTope",
-    incluye: ["portada.plan.argos1", "portada.plan.argos2", "portada.plan.argos3", "portada.plan.argos4", "portada.plan.argos5"],
-    boton: "portada.cta.demo",
-    destacado: true,
   },
   {
     id: "empresa",
     nombre: "portada.plan.empresa",
-    precio: { clave: "portada.precios.aLaMedida" },
+    precio: "USD 599",
+    conPeriodo: true,
     tope: "portada.plan.empresaTope",
-    incluye: ["portada.plan.empresa1", "portada.plan.empresa2", "portada.plan.empresa3", "portada.plan.empresa4"],
-    boton: "portada.precios.hablemos",
+    incluye: ["portada.plan.empresa1", "portada.plan.empresa2", "portada.plan.empresa3", "portada.plan.empresa4", "portada.plan.empresa5"],
+    boton: "portada.cta.demo",
+    destacado: true,
+  },
+  {
+    id: "enterprise",
+    nombre: "portada.plan.enterprise",
+    precio: { clave: "portada.precios.aLaMedida" },
+    tope: "portada.plan.enterpriseTope",
+    incluye: ["portada.plan.enterprise1", "portada.plan.enterprise2", "portada.plan.enterprise3", "portada.plan.enterprise4", "portada.plan.enterprise5"],
+    boton: "portada.precios.contactanos",
+    contacto: true,
   },
 ];
 
-/** El logo, dibujado a mano: adentro de la app cambia con la paleta de cada
- *  quien, y la portada tiene que verse siempre igual. */
+/** El logo de la portada (Alvaro, 16/11/2026): la M de cinta de la marca
+ *  (components/MarcaM, la misma de la app y de los iconos) en el verde de los
+ *  botones, y «Maven» en blanco. Sin «Virtual Office»: «nada que ver». */
 function Marca({ chico = false }: { chico?: boolean }) {
-  const lado = chico ? 22 : 26;
   return (
-    <span className="marca" style={chico ? { fontSize: 15 } : undefined}>
-      <i style={{ width: lado, height: lado }}>
-        <MarcaM alto={chico ? "10px" : "12px"} />
-      </i>
+    <span className={`pr-marca${chico ? " chico" : ""}`}>
+      <MarcaM className="pr-marca-m" alto={chico ? "17px" : "22px"} claro="var(--pr-acento)" oscuro="var(--pr-acento-hondo)" />
       Maven
     </span>
   );
@@ -362,7 +365,7 @@ export default function Portada({ idiomaDeRuta }: { idiomaDeRuta?: Idioma }) {
                   {p.incluye.map((linea) => <li key={linea}>{t(linea)}</li>)}
                 </ul>
                 <a
-                  className={`pr-btn ${p.destacado || p.id === "oficina" ? "pr-btn-neon" : "pr-btn-fantasma"}`}
+                  className={`pr-btn ${p.contacto ? "pr-btn-fantasma" : "pr-btn-neon"}`}
                   href="#demo"
                   onClick={abrirDemo}
                 >
@@ -372,7 +375,8 @@ export default function Portada({ idiomaDeRuta }: { idiomaDeRuta?: Idioma }) {
             ))}
           </div>
           <p className="pr-precios-nota">
-            {t("portada.precios.nota")} <b>{t("portada.precios.notaPregunta")}</b> {t("portada.precios.notaFinal")}
+            {t("portada.precios.nota")}{" "}
+            <b>{t("portada.precios.notaInstalacion")}</b>
           </p>
         </div>
       </section>

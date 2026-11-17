@@ -1,46 +1,67 @@
-/** La M de Maven.
+import { useId } from "react";
+
+/** La M de Maven: la «M de cinta» del logo nuevo (Alvaro, 16/11/2026).
  *
- *  Caja de 53 × 33 (apaisada, 1,6 veces más ancha que alta) con cuatro cintas
- *  de ancho 10 y puntas redondas: las dos patas de AFUERA van apagadas y la V
- *  del medio, CLARA, pasa por encima. Es el dibujo del mock que aprobó Jhon el
- *  10/09/2026, medido píxel a píxel sobre su recorte (cimas en x 14,5 y 38,5;
- *  pies en x 5 y 48; vértice del medio en x 26,5).
- *
- *  Va dentro de la baldosa de la marca, así que por defecto se pinta en blanco
- *  sobre el color de la baldosa. El mismo dibujo sirve para el menú, la portada
- *  y los iconos (ver frontend/scripts/genera-iconos.py). */
+ *  Caja de 96 × 56 con dos «Λ» de trazo 16 y puntas redondas. Las SUBIDAS van
+ *  en el verde de la marca y las BAJADAS, por debajo, con un pliegue: arrancan
+ *  en un verde más hondo junto a la cima y se aclaran hacia el pie. Es la misma
+ *  M en todos lados —menú de la app, portada, portal— y la de los iconos
+ *  (favicon, celular), que salen de frontend/scripts/genera-iconos.py con esta
+ *  misma geometría. Va en verde fijo a propósito: es la marca, no sigue al skin. */
 
 /** Cuánto más ancha que alta es la M. Para calcular el ancho a partir del alto. */
-export const M_RATIO = 53 / 33;
+export const M_RATIO = 96 / 56;
+
+/** El verde de la marca y el del pliegue (iguales a los de genera-iconos.py). */
+export const VERDE_MARCA = "#4fd88d";
+export const VERDE_PLIEGUE = "#2a9a5c";
 
 interface MarcaMProps {
   /** Alto de la M como longitud CSS ("11px", "0.48em"). El ancho sale solo. */
   alto: string;
-  /** La V del medio. */
+  /** El verde de las subidas (y del pie de las bajadas). */
   claro?: string;
-  /** Las dos patas de afuera. */
+  /** El verde hondo del pliegue, junto a la cima de cada bajada. */
   oscuro?: string;
   className?: string;
 }
 
 export function MarcaM({
   alto,
-  claro = "#fff",
-  oscuro = "rgba(255,255,255,.55)",
+  claro = VERDE_MARCA,
+  oscuro = VERDE_PLIEGUE,
   className,
 }: MarcaMProps) {
+  // Dos degradados por M; el id único evita que dos logos en la misma página
+  // (barra y pie) se pisen los degradados.
+  const id = useId().replace(/:/g, "");
+  const p1 = `marca-pliegue1-${id}`;
+  const p2 = `marca-pliegue2-${id}`;
   return (
     <svg
-      viewBox="0 0 53 33"
+      viewBox="0 0 96 56"
       fill="none"
       aria-hidden="true"
+      focusable="false"
       className={className}
-      style={{ height: alto, width: `calc(${alto} * ${M_RATIO})`, display: "block" }}
+      style={{ height: alto, width: `calc(${alto} * ${M_RATIO})`, display: "block", overflow: "visible" }}
     >
-      <g strokeWidth="10" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M14.5 5.5 5 27" stroke={oscuro} />
-        <path d="M38.5 5.5 48 27" stroke={oscuro} />
-        <path d="M14.5 5.5 26.5 27.5 38.5 5.5" stroke={claro} />
+      <defs>
+        <linearGradient id={p1} gradientUnits="userSpaceOnUse" x1="29" y1="10" x2="48" y2="46">
+          <stop offset="0" stopColor={oscuro} />
+          <stop offset=".6" stopColor={claro} />
+        </linearGradient>
+        <linearGradient id={p2} gradientUnits="userSpaceOnUse" x1="67" y1="10" x2="86" y2="46">
+          <stop offset="0" stopColor={oscuro} />
+          <stop offset=".6" stopColor={claro} />
+        </linearGradient>
+      </defs>
+      <g strokeWidth="16" strokeLinecap="round">
+        {/* Las bajadas van debajo: el pliegue asoma bajo cada subida. */}
+        <line x1="29" y1="10" x2="48" y2="46" stroke={`url(#${p1})`} />
+        <line x1="67" y1="10" x2="86" y2="46" stroke={`url(#${p2})`} />
+        <line x1="10" y1="46" x2="29" y2="10" stroke={claro} />
+        <line x1="48" y1="46" x2="67" y2="10" stroke={claro} />
       </g>
     </svg>
   );
