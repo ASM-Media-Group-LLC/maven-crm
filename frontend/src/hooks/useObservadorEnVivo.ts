@@ -1,3 +1,4 @@
+import { afirmarRelojesDeLiveKit } from "@/lib/relojesFirmes";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Room, RoomEvent, Track, type RemoteParticipant, type RemoteTrack, type RemoteTrackPublication } from "livekit-client";
 import { supabase, SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY } from "@/integrations/supabase/client";
@@ -115,6 +116,7 @@ export function useObservadorEnVivo(targetUserId: string | null, activo: boolean
     setEstado("conectando");
     limpiarPistas();
 
+    afirmarRelojesDeLiveKit();
     const room = new Room({ adaptiveStream: true, dynacast: false });
     roomRef.current = room;
 

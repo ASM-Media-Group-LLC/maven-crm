@@ -45,9 +45,34 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABL
   global: {
     fetch: conSesionRenovada((input, init) => fetch(input, init), (viejo) => renovarSesion(viejo)),
   },
+  // 17/11/2026 («se sale»): el latido de la conexión en vivo (mensajes, avisos,
+  // Cowork) corre en un hilo aparte. Con Maven en segundo plano, Chrome adormece
+  // los relojes de la pestaña, el latido no salía y el servidor cortaba la
+  // conexión: llegaban tarde los mensajes y los avisos.
+  // Solo si el navegador tiene Workers: si no, realtime-js tira y Maven no abriría.
+  realtime: { worker: typeof window !== "undefined" && typeof Worker !== "undefined" },
 });
 
 const renovarSesion = crearRenovador(supabase.auth);
+
+// 17/11/2026 («la plataforma se laguea»): Maven le preguntaba al servidor
+// «¿quién soy?» (auth.getUser) 77.759 veces al día, unas 2.000 por persona,
+// desde 80+ lugares del código. Cada vez es un viaje por internet que frena lo
+// que viene detrás. La sesión guardada ya dice quién es: si está vigente, se
+// contesta con ella sin salir del computador. Quién puede ver qué lo sigue
+// decidiendo el servidor en cada consulta (RLS), así que nada se afloja.
+const getUserDelServidor = supabase.auth.getUser.bind(supabase.auth);
+supabase.auth.getUser = (async (jwt?: string) => {
+  if (jwt) return getUserDelServidor(jwt);
+  try {
+    const { data } = await supabase.auth.getSession();
+    const s = data.session;
+    if (s?.user && s.expires_at && s.expires_at * 1000 > Date.now() + 10_000) {
+      return { data: { user: s.user }, error: null };
+    }
+  } catch { /* se pregunta al servidor */ }
+  return getUserDelServidor();
+}) as typeof supabase.auth.getUser;
 
 // Cliente paralelo, SIN sesión, para páginas públicas (link de chatter,
 // invitaciones, etc) que deben consultar la DB como anon aunque el
