@@ -6,6 +6,14 @@ export const PREFIJOS_PWA = ["pwa.", "push."] as const;
 
 export const pwa = {
   // PWA: instalar Maven en el teléfono y avisos push en este dispositivo
+  // Abrir los links de Maven en la app de computador (17/11/2026)
+  "pwa.app.titulo": { es: "Abrir en la app de Maven", en: "Open in the Maven app" },
+  "pwa.app.descripcion": { es: "Se abre en la app de tu computador, no en el navegador.", en: "It opens in the app on your computer, not in the browser." },
+  "pwa.app.abrir": { es: "Abrir en la app", en: "Open in the app" },
+  "pwa.app.quedarme": { es: "Seguir en el navegador", en: "Stay in the browser" },
+  "pwa.app.siempre": { es: "Abrir siempre en la app", en: "Always open in the app" },
+  "pwa.app.abriendo": { es: "Abriendo en la app de Maven…", en: "Opening in the Maven app…" },
+  "pwa.app.noSeAbrio": { es: "¿No se abrió? Descarga la app", en: "Didn't open? Download the app" },
   "pwa.instalar.titulo": { es: "Instala Maven en tu teléfono", en: "Install Maven on your phone" },
   "pwa.instalar.descripcion": { es: "Abre más rápido y recibe avisos de mensajes aunque esté cerrada.", en: "Opens faster and gets message alerts even when it's closed." },
   "pwa.instalar.boton": { es: "Instalar Maven", en: "Install Maven" },

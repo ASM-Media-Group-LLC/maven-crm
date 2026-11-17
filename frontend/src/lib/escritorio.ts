@@ -25,6 +25,8 @@ export type MavenEscritorio = {
   alCambiarFlotante: (cb: (flotando: boolean) => void) => () => void;
   inactividad: () => Promise<number | null>;
   alUsoDeApps: (cb: (lote: TramoDeApp[]) => void) => () => void;
+  /** Un link maven:// pidió abrir esta ruta (versiones de la app desde el 17/11/2026). */
+  alAbrirRuta?: (cb: (ruta: string) => void) => () => void;
 };
 
 /** La app de computador, o null en el navegador (o en una versión vieja de la app sin esa función). */

@@ -16,6 +16,7 @@
     "appId": "me.maven-ai.escritorio",
     "productName": "Maven",
     "copyright": "ASM Media Group LLC",
+    "protocols": [{ "name": "Maven", "schemes": ["maven"] }],
     "electronLanguages": ["en-US", "es", "es-419", "de", "fr", "it", "pt-BR"],
     "directories": {
       "output": "dist",
