@@ -10,22 +10,24 @@
 // a quién le está funcionando y a quién no.
 
 /**
- *  · activa       RNNoise + puerta de ruido, como debe ser.
+ *  · fuerte       DeepFilterNet3 + puerta (desde el 16/11/2026, lo mejor).
+ *  · activa       RNNoise + puerta de ruido (equipos que no aguantan DeepFilterNet).
  *  · solo_puerta  el WASM de RNNoise no cargó: solo la puerta de antes.
  *  · fallo        hay micrófono pero el filtro no arrancó o se trabó (sale crudo).
  *  · no_soportada el navegador no tiene AudioWorklet.
  *  · sin_micro    todavía no hay micrófono publicado (en Cowork se entra silenciado).
  */
-export type EstadoNC = "activa" | "solo_puerta" | "fallo" | "no_soportada" | "sin_micro";
+export type EstadoNC = "fuerte" | "activa" | "solo_puerta" | "fallo" | "no_soportada" | "sin_micro";
 
 export function estadoDeNC(p: {
   soportada: boolean;
   hayMicro: boolean;
   /** El motor del procesador enganchado al micrófono, o null si no hay ninguno funcionando. */
-  motor: "rnnoise+puerta" | "puerta" | null;
+  motor: "deepfilter+puerta" | "rnnoise+puerta" | "puerta" | null;
 }): EstadoNC {
   if (!p.soportada) return "no_soportada";
   if (!p.hayMicro) return "sin_micro";
+  if (p.motor === "deepfilter+puerta") return "fuerte";
   if (p.motor === "rnnoise+puerta") return "activa";
   if (p.motor === "puerta") return "solo_puerta";
   return "fallo";
@@ -33,5 +35,5 @@ export function estadoDeNC(p: {
 
 /** ¿El filtro está haciendo su trabajo (aunque sea a medias)? Para el aviso de la llamada. */
 export function ncFunciona(e: EstadoNC): boolean {
-  return e === "activa" || e === "solo_puerta" || e === "sin_micro";
+  return e === "fuerte" || e === "activa" || e === "solo_puerta" || e === "sin_micro";
 }
