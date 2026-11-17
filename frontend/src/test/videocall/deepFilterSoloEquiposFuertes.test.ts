@@ -6,8 +6,25 @@
 // («activa» en llamada_salud.datos.nc) y nunca baja el modelo: el relevo ni se
 // programa. En los fuertes sigue igual: arranca con RNNoise, DeepFilterNet toma
 // el relevo, y si no da abasto vuelve solo a RNNoise y no se reintenta en 14 días.
-import { describe, it, expect, afterEach, vi } from "vitest";
-import { NUCLEOS_PARA_DEEPFILTER, deepFilterPermitido, marcarDeepFilterPesado } from "@/lib/deepfilter";
+import { describe, it, expect, afterEach, beforeEach, vi } from "vitest";
+// El módulo guarda «descartado en esta pestaña» en una variable suya. En CI la
+// suite corre sin aislar archivos, y otro test puede dejarlo marcado: cada test
+// importa una copia NUEVA del módulo para no heredar ese estado.
+let NUCLEOS_PARA_DEEPFILTER: number;
+let deepFilterPermitido: () => boolean;
+let marcarDeepFilterPesado: () => void;
+beforeEach(async () => {
+  // Un computador de escritorio con memoria de sobra y nada guardado: así el test
+  // solo mide los núcleos, sin depender del navegador simulado de CI.
+  try { localStorage.clear(); } catch { /* noop */ }
+  vi.spyOn(navigator, "userAgent", "get").mockReturnValue(
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36",
+  );
+  Object.defineProperty(navigator, "deviceMemory", { value: 8, configurable: true });
+  if (typeof WebAssembly === "undefined") vi.stubGlobal("WebAssembly", {});
+  vi.resetModules();
+  ({ NUCLEOS_PARA_DEEPFILTER, deepFilterPermitido, marcarDeepFilterPesado } = await import("@/lib/deepfilter"));
+});
 import { estadoDeNC, ncFunciona } from "@/lib/estadoNC";
 
 const fuentes = import.meta.glob(
@@ -17,11 +34,16 @@ const fuentes = import.meta.glob(
 const cadena = fuentes["/frontend/src/lib/noise-suppression-processor.ts"];
 const df = fuentes["/frontend/src/lib/deepfilter.ts"];
 
-const nucleos = (n: number | undefined) =>
-  vi.spyOn(navigator, "hardwareConcurrency", "get").mockReturnValue(n as unknown as number);
+const nucleos = (n: number | undefined) => {
+  vi.spyOn(navigator, "userAgent", "get").mockReturnValue(
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36",
+  );
+  return vi.spyOn(navigator, "hardwareConcurrency", "get").mockReturnValue(n as unknown as number);
+};
 
 afterEach(() => {
   vi.restoreAllMocks();
+  vi.unstubAllGlobals();
   try { localStorage.clear(); } catch { /* noop */ }
 });
 
