@@ -2,7 +2,7 @@
 # `descargas` de Supabase, de donde los baja el botón de la portada:
 #   …/storage/v1/object/public/descargas/Maven-Mac.dmg
 #   …/storage/v1/object/public/descargas/Maven-Windows.exe
-# Mac se arma en el Mac mini; Windows en una máquina Windows de GitHub.
+# Windows se arma en una máquina Windows de GitHub; Mac, ver app-escritorio-mac.yml.
 # La llave de servicio se pide al vuelo con SUPABASE_ACCESS_TOKEN y no se guarda.
 name: app-escritorio
 
@@ -17,50 +17,11 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # Mac: en el Mac mini (la firma ad hoc necesita macOS).
-  mac:
-    runs-on: [self-hosted, macOS, ARM64, mini5]
-    timeout-minutes: 180 # la revisión de Apple (notarización) a veces tarda
-    env:
-      PROYECTO: lsagslbkliprespbyhts
-      ARCHIVOS: Maven-Mac.dmg Maven-Mac.zip Maven-Mac.zip.blockmap latest-mac.yml
-    steps:
-      - uses: actions/checkout@v4
-      - name: Instalar
-        working-directory: desktop
-        run: npm ci --no-audit --no-fund && node node_modules/electron/install.js
-      - name: Armar (firmada con el Developer ID y notarizada por Apple)
-        working-directory: desktop
-        env:
-          CSC_LINK: ${{ secrets.MAC_CSC_LINK }}
-          CSC_KEY_PASSWORD: ${{ secrets.MAC_CSC_KEY_PASSWORD }}
-          APPLE_API_KEY_ID: ${{ secrets.MAC_NOTARIZE_KEY_ID }}
-          APPLE_API_ISSUER: ${{ secrets.MAC_NOTARIZE_ISSUER }}
-          LLAVE_NOTARIZAR: ${{ secrets.MAC_NOTARIZE_API_KEY }}
-        run: |
-          export APPLE_API_KEY="$RUNNER_TEMP/AuthKey.p8"
-          printf '%s' "$LLAVE_NOTARIZAR" > "$APPLE_API_KEY"
-          trap 'rm -f "$APPLE_API_KEY"' EXIT
-          npm version "2.0.${{ github.run_number }}" --no-git-tag-version
-          npx electron-builder --mac --publish never -c.directories.output="$RUNNER_TEMP/escritorio"
-      - name: Subir a Supabase (balde descargas)
-        env:
-          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-        run: |
-          set -euo pipefail
-          LLAVE=$(curl -fsS "https://api.supabase.com/v1/projects/$PROYECTO/api-keys?reveal=true" \
-            -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
-            | python3 -c 'import json,sys; print(next(k["api_key"] for k in json.load(sys.stdin) if k["name"]=="service_role"))')
-          echo "::add-mask::$LLAVE"
-          # El .yml va al final: anuncia la versión nueva solo cuando ya subió todo.
-          for ARCHIVO in $ARCHIVOS; do
-            curl -fsS -X POST "https://$PROYECTO.supabase.co/storage/v1/object/descargas/$ARCHIVO" \
-              -H "Authorization: Bearer $LLAVE" -H "apikey: $LLAVE" \
-              -H "x-upsert: true" -H "cache-control: max-age=60" \
-              -H "Content-Type: application/octet-stream" \
-              --data-binary "@$RUNNER_TEMP/escritorio/$ARCHIVO" >/dev/null
-            echo "subido $ARCHIVO"
-          done
+  # Mac: ya NO se arma aquí. El Mac mini del CI corre sin sesión de usuario y
+  # no puede firmar con el Developer ID (errSecInternalComponent, 17/11/2026):
+  # la app salía sin firma o con firma ad hoc. Ahora se arma, firma y notariza
+  # en el MacBook de Alvaro con `desktop/publicar-mac.sh`, que la sube a un
+  # release `mac-v*` de GitHub; el workflow app-escritorio-mac la copia al balde.
 
   # Windows: en una máquina Windows de GitHub (el makensis del Mac mini es de
   # Intel sin Rosetta, y en Linux pide wine).
