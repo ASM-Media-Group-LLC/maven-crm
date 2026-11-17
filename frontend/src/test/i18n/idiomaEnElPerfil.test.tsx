@@ -161,6 +161,22 @@ describe("al abrir la sesión, el idioma del perfil", () => {
     expect(db.escrituras).toEqual([]);
   });
 
+  it("en la portada de un idioma (/es) manda la dirección, no el perfil", async () => {
+    window.history.pushState({}, "", "/es");
+    try {
+      db.fila = { ui_skin: "maven", ui_prefs: { language: "en" } };
+      montar(true);
+      await waitFor(() => expect(db.lecturas).toBeGreaterThan(0));
+      await asentar();
+      expect(screen.getByTestId("idioma").textContent).toBe("es");
+      expect(screen.getByTestId("texto").textContent).toBe("Guardar");
+      expect(localStorage.getItem("app-language")).toBe("es");
+      expect(db.escrituras).toEqual([]);
+    } finally {
+      window.history.pushState({}, "", "/");
+    }
+  });
+
   it("si el perfil no tiene idioma, queda el local y no se escribe nada", async () => {
     localStorage.setItem("app-language", "en");
     db.fila = { ui_skin: "maven", ui_prefs: { oled: true } };

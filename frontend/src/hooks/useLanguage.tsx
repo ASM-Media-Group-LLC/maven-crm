@@ -249,6 +249,10 @@ export function useIdiomaDelPerfil(): () => (uiPrefs: unknown) => void {
     const eleccionesAlPedir = sincro.elecciones();
     return (uiPrefs: unknown) => {
       if (sincro.elecciones() !== eleccionesAlPedir) return;
+      // En la portada (/es, /en, /de…) manda la dirección, no el perfil: quien
+      // tiene sesión abierta y entra a /es tiene que ver la portada en español
+      // aunque su perfil diga otro idioma (17/11/2026: salía en inglés).
+      if (idiomaDeLaRuta()) return;
       const delPerfil = idiomaDeUiPrefs(uiPrefs);
       if (delPerfil) sincro.adoptar(delPerfil);
     };
