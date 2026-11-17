@@ -76,31 +76,41 @@
    de la barra y una lista en tarjeta. */
 .pt.pr .pr-idioma { position: relative; flex-shrink: 0; }
 .pt.pr .pr-idioma-btn {
-  display: inline-flex; align-items: center; gap: .4rem; min-height: 40px;
-  background: rgba(var(--pr-acento-rgb), .05); color: var(--pr-texto);
-  border: 1px solid rgba(255,255,255,.14); border-radius: 999px; padding: .5em .8em;
-  font: inherit; font-size: .82rem; font-weight: 600; letter-spacing: .02em; cursor: pointer;
+  display: inline-flex; align-items: center; gap: .5rem; min-height: 40px;
+  background: rgba(255,255,255,.04); color: var(--pr-texto);
+  border: 1px solid rgba(255,255,255,.12); border-radius: 999px; padding: .4em .75em .4em .45em;
+  font: inherit; font-size: .82rem; font-weight: 600; letter-spacing: .04em; cursor: pointer;
   transition: background .2s ease, border-color .2s ease, color .2s ease;
 }
-.pt.pr .pr-idioma-btn:hover { background: rgba(var(--pr-acento-rgb), .12); border-color: var(--pr-acento); color: var(--pr-neon-hover); }
+.pt.pr .pr-idioma-btn:hover { background: rgba(var(--pr-acento-rgb), .1); border-color: rgba(var(--pr-acento-rgb), .6); }
 .pt.pr .pr-idioma-btn:focus-visible { outline: none; border-color: var(--pr-acento); }
-.pt.pr .pr-idioma-btn svg { width: .95em; height: .95em; color: var(--pr-acento); transition: transform .2s ease; }
-.pt.pr .pr-idioma.abierto .pr-idioma-btn svg { transform: rotate(180deg); }
+.pt.pr .pr-idioma-btn > svg:last-child { width: .9em; height: .9em; color: var(--pr-gris); transition: transform .2s ease, color .2s ease; }
+.pt.pr .pr-idioma-btn:hover > svg:last-child { color: var(--pr-acento); }
+.pt.pr .pr-idioma.abierto .pr-idioma-btn > svg:last-child { transform: rotate(180deg); color: var(--pr-acento); }
+.pt.pr .pr-idioma-bandera { width: 22px; height: 22px; flex-shrink: 0; border-radius: 50%; box-shadow: 0 1px 4px rgba(0,0,0,.35); }
 .pt.pr .pr-idioma-lista {
-  position: absolute; top: calc(100% + .55rem); right: 0; min-width: 170px; z-index: 60;
-  list-style: none; margin: 0; padding: .4rem;
-  background: #141d2e; border: 1px solid rgba(255,255,255,.1); border-radius: 14px;
+  position: absolute; top: calc(100% + .55rem); right: 0; min-width: 200px; z-index: 60;
+  list-style: none; margin: 0; padding: .35rem;
+  background: rgba(20,29,46,.96); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+  border: 1px solid rgba(255,255,255,.1); border-radius: 16px;
   box-shadow: 0 22px 55px -18px rgba(0,0,0,.75);
+  animation: pr-idioma-entra .16s ease-out;
 }
+@keyframes pr-idioma-entra { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
 .pt.pr .pr-idioma-lista li {
-  display: flex; align-items: center; padding: .6em .75em; border-radius: 10px;
+  display: flex; align-items: center; gap: .7rem; padding: .55em .7em; border-radius: 11px;
   font-size: .9rem; font-weight: 500; color: var(--pr-texto); cursor: pointer;
   transition: background .15s ease, color .15s ease;
 }
-.pt.pr .pr-idioma-lista li:hover, .pt.pr .pr-idioma-lista li:focus-visible { background: rgba(var(--pr-acento-rgb), .12); color: var(--pr-neon-hover); outline: none; }
-.pt.pr .pr-idioma-lista li[aria-selected="true"] { color: var(--pr-acento); background: rgba(var(--pr-acento-rgb), .06); }
+.pt.pr .pr-idioma-lista li span { flex: 1; }
+.pt.pr .pr-idioma-lista li:hover, .pt.pr .pr-idioma-lista li:focus-visible { background: rgba(255,255,255,.06); outline: none; }
+.pt.pr .pr-idioma-lista li[aria-selected="true"] { color: var(--pr-acento); background: rgba(var(--pr-acento-rgb), .08); }
+.pt.pr .pr-idioma-hecho { width: 1rem; height: 1rem; color: var(--pr-acento); }
 @media (max-width: 760px) {
-  .pt.pr .pr-idioma-btn { padding: .5em .7em; font-size: .8rem; }
+  /* En el celular, solo la bandera y la flechita: más limpio y no aprieta la barra. */
+  .pt.pr .pr-idioma-btn { padding: .35em .55em .35em .35em; gap: .35rem; }
+  .pt.pr .pr-idioma-codigo { display: none; }
+  .pt.pr .pr-idioma-lista li { padding: .7em .75em; font-size: .95rem; }
   .pt.pr .pr-nav-cta { gap: .5rem; }
 }
 @media (max-width: 760px) {
