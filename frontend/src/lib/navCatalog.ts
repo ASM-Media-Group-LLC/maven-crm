@@ -33,7 +33,7 @@ import {
   Mail, Clapperboard, Gauge, UserCog, UserCheck, Clock, Eye, GraduationCap,
   Wallet, Calculator, DollarSign, Shield, Sparkles, Database, ListChecks,
   CalendarDays, Building2, Briefcase, History, CalendarRange, Gift,
-  FileSpreadsheet, Presentation, HardDrive } from "lucide-react";
+  FileSpreadsheet, Presentation, HardDrive, Wifi } from "lucide-react";
 import WhatsAppIcon from "@/components/icons/WhatsAppIcon";
 import TelegramIcon from "@/components/icons/TelegramIcon";
 
@@ -85,6 +85,8 @@ export const NAV_CATALOG: NavCatalogEntry[] = [
   { title: "Espacio del NAS", i18nKey: "nav.office.nas", url: "/oficina/espacio-nas", icon: Gauge, soloDueno: true, section: "Oficina", keywords: ["nas", "espacio", "discos", "almacenamiento", "lleno", "terabytes", "tb", "storage", "oficina"] },
   { title: "Contactos", i18nKey: "nav.contacts", url: "/contactos", icon: UserPlus, module: "Contactos", section: "Menú", keywords: ["directorio"] },
   { title: "Panel de control", i18nKey: "nav.controlPanel", url: "/panel-de-control", icon: Gauge, module: "Panel de control", section: "Menú", keywords: ["control", "kpis"] },
+  // Guía de conexión: sin módulo, la ve todo el que entra (como en el menú).
+  { title: "Guía de conexión", i18nKey: "nav.connectionGuide", url: "/conexion", icon: Wifi, section: "Menú", keywords: ["internet", "wifi", "velocidad", "prueba de velocidad", "llamada", "se cae", "se corta", "cable", "router", "speed test"] },
 
   // ── Creadoras ─────────────────────────────────────────────────────────
   { title: "Creadoras · Dashboard", i18nKey: "nav.cat.creatorsDashboard", url: "/creadores/dashboard", icon: Users, module: "Creadores", submodule: "Dashboard", section: "Creadoras" },

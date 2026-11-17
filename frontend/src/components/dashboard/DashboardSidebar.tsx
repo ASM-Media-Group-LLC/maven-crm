@@ -1,5 +1,5 @@
 import {
-  Activity, AlertTriangle, BarChart3, Bell, BookOpen, Bot, Briefcase, Calculator, CalendarDays, CalendarRange, ChevronRight, Clapperboard, ClipboardCheck, Clock, DollarSign, Eye, FileSpreadsheet, FileText, Gauge, Gift, GraduationCap, HardDrive, Headphones, Home, Inbox, LayoutDashboard, Mail, Map, Megaphone, MessageCircle, Moon, Palette, Phone, Presentation, RefreshCw, Rocket, Search, Settings, Shield, Smartphone, Sun, Ticket, UserCheck, UserCog, UserPlus, Users, Users2, Video, Wallet,
+  Activity, AlertTriangle, BarChart3, Bell, BookOpen, Bot, Briefcase, Calculator, CalendarDays, CalendarRange, ChevronRight, Clapperboard, ClipboardCheck, Clock, DollarSign, Eye, FileSpreadsheet, FileText, Gauge, Gift, GraduationCap, HardDrive, Headphones, Home, Inbox, LayoutDashboard, Mail, Map, Megaphone, MessageCircle, Moon, Palette, Phone, Presentation, RefreshCw, Rocket, Search, Settings, Shield, Smartphone, Sun, Ticket, UserCheck, UserCog, UserPlus, Users, Users2, Video, Wallet, Wifi,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useIncidentesSalud } from "@/hooks/useIncidentesSalud";
@@ -13,6 +13,7 @@ import { useSidebarBadges } from "@/hooks/useSidebarBadges";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { NavLink } from "@/components/NavLink";
 import { precargarRuta, precargarEnOcio } from "@/lib/prefetchRutas";
+import { RUTA_GUIA_CONEXION } from "@/lib/guiaConexion";
 import Logo from "@/components/Logo";
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from "@/components/ui/collapsible";
 import {
@@ -97,7 +98,8 @@ const DashboardSidebar = () => {
   const unreadChatCount = useUnreadChatCount();
   const { promologCount, leadgenCount, closersCount, waInboxCount, tgInboxCount, coworkRequestsCount, correoUnreadCount } = useSidebarBadges();
 
-  const mainMenuAll: { title: string; url: string; icon: any; module: string; submodule?: string; badge?: number }[] = [
+  // Sin `module` = para todo el que entra (no pasa por canAccess).
+  const mainMenuAll: { title: string; url: string; icon: any; module?: string; submodule?: string; badge?: number }[] = [
     { title: t("nav.dashboard"), url: "/dashboard", icon: LayoutDashboard, module: "Dashboard" },
     { title: t("nav.mail"), url: "/correo", icon: Mail, module: "Correo", badge: correoUnreadCount || undefined },
     // El mute del Messenger vive en la cabecera de su lista de chats, al lado
@@ -107,8 +109,11 @@ const DashboardSidebar = () => {
     { title: t("nav.meet"), url: "/meet", icon: Video, module: "Meet" },
     { title: t("nav.recordings"), url: "/grabaciones", icon: Clapperboard, module: "Grabaciones" },
     { title: t("nav.contacts"), url: "/contactos", icon: UserPlus, module: "Contactos" },
+    // Guía de conexión (Alvaro, 17/11/2026): la gente se cae de las llamadas por
+    // el Wi-Fi; aquí prueba su internet y ve qué hacer. Para todos.
+    { title: t("nav.connectionGuide"), url: RUTA_GUIA_CONEXION, icon: Wifi },
   ];
-  const mainMenu = mainMenuAll.filter((item) => canAccess(item.module, item.submodule));
+  const mainMenu = mainMenuAll.filter((item) => !item.module || canAccess(item.module, item.submodule));
 
   const creadoresSubItems = [
     { title: t("nav.creators.dashboard"), url: "/creadores/dashboard", submodule: "Dashboard" },

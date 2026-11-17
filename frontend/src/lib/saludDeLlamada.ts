@@ -24,6 +24,30 @@
 // y, en Cowork, al entrar y cada 30 min, `prueba` = la velocidad MEDIDA
 // (lib/pruebaDeRed.ts). Argos › Llamadas muestra la prueba, no la estimación.
 
+// ── Invitados de afuera (17/11/2026) ─────────────────────────────────────────
+// llamada_cortes y llamada_salud solo aceptan filas de alguien CON sesión
+// (user_id = auth.uid()). Un invitado de Meet no tiene sesión: lo que mandaba se
+// rechazaba en silencio y sus caídas no existían en ningún lado. Para él la
+// llamada recibe este destino (useMeetGuest), que manda todo por la edge
+// `meet-guest` con su secreto de invitado a llamada_cortes_invitados y
+// llamada_salud_invitados. Fuego y olvido, como el resto: medir jamás corta.
+export interface FilaDeCorte {
+  sala: string | null;
+  fase: string;
+  motivo: string | null;
+  contexto: Record<string, unknown> | null;
+}
+
+export interface FilaDeSalud {
+  sala: string;
+  datos: Record<string, unknown>;
+}
+
+export interface DestinoDeTelemetria {
+  corte: (fila: FilaDeCorte) => void;
+  salud: (fila: FilaDeSalud) => void;
+}
+
 export interface MuestraDeLlamada {
   vis: "visible" | "hidden" | string;
   calidad: string | null;

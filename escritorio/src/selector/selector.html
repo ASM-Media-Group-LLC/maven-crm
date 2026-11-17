@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'none'; script-src 'self'; style-src 'self'; img-src data:"
+    />
+    <title>Maven</title>
+    <link rel="stylesheet" href="selector.css" />
+  </head>
+  <body>
+    <header class="cabecera">
+      <h1 id="titulo"></h1>
+      <nav class="pestanas" role="tablist">
+        <button type="button" role="tab" id="tab-pantalla" data-tipo="pantalla"></button>
+        <button type="button" role="tab" id="tab-ventana" data-tipo="ventana"></button>
+      </nav>
+    </header>
+
+    <div id="permiso" class="permiso" hidden>
+      <p id="permiso-texto"></p>
+      <button type="button" id="permiso-boton" class="boton boton-suave"></button>
+    </div>
+
+    <main id="lista" class="lista" role="listbox"></main>
+    <p id="vacio" class="vacio" hidden></p>
+
+    <footer class="pie">
+      <label id="audio" class="audio" hidden>
+        <input type="checkbox" id="audio-casilla" />
+        <span id="audio-texto"></span>
+      </label>
+      <div class="acciones">
+        <button type="button" id="cancelar" class="boton boton-suave"></button>
+        <button type="button" id="compartir" class="boton boton-principal" disabled></button>
+      </div>
+    </footer>
+
+    <script src="selector.js"></script>
+  </body>
+</html>

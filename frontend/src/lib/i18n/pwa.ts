@@ -22,6 +22,7 @@ export const pwa = {
   "pwa.instalar.soloTelefono": { es: "Disponible en el teléfono: abre app.maven-ai.me desde el celular.", en: "Available on the phone: open app.maven-ai.me from your mobile." },
   "pwa.actualizar.titulo": { es: "Nueva versión disponible", en: "New version available" },
   "pwa.actualizar.boton": { es: "Recargar", en: "Reload" },
+  "pwa.actualizar.enLlamada": { es: "Hay una versión nueva de Maven: se actualiza sola cuando termines la llamada.", en: "There's a new version of Maven: it updates itself when you finish the call." },
   "push.dispositivo.titulo": { es: "Notificaciones en este dispositivo", en: "Notifications on this device" },
   "push.dispositivo.descripcion": { es: "Mensajes, correos nuevos, llamados y asignaciones aunque Maven esté cerrada. Se activa por dispositivo.", en: "Messages, new emails, call-outs and assignments even when Maven is closed. Enabled per device." },
   "push.dispositivo.activas": { es: "Activas", en: "On" },

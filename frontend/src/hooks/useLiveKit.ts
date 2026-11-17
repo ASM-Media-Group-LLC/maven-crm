@@ -15,7 +15,9 @@ import {
 } from "livekit-client";
 import type { ScreenShareCaptureOptions } from "livekit-client";
 import { esOtraPestana } from "@/lib/sesionDuplicada";
-import { fueUnaCaida } from "@/lib/conexionSala";
+import { esperaDeReentrada, fueUnaCaida, MAX_REENTRADAS } from "@/lib/conexionSala";
+import { faseSegunSueno, vigiaDelSueno } from "@/lib/equipoDormido";
+import { DEBIL_INICIAL, MIRAR_DEBIL_CADA_MS, siguienteDebil } from "@/lib/internetDebil";
 import {
   reproducirAudiosPausados, reanudarAudioConGesto, dejarDeEsperarGesto, registrarDesbloqueo,
   decidirSiRepararElMicro, MEMORIA_VIGILANTE_VACIA, type MemoriaDelVigilante,
@@ -41,11 +43,11 @@ import { medirRed, salaConPrueba, tocaProbar, PRUEBA_CADA_MS, REINTENTO_TRAS_FAL
 import { marcarConexionEnCurso, marcarLlamadaActiva, quitarLlamadaActiva } from "@/lib/llamadaActiva";
 import {
   armarMuestra, borrarLlamadaEnCurso, leerReporte, marcarLlamadaEnCurso, medirRetraso, medirTrabas, type Traba, recargaConLlamada,
-  type LecturaDePista, type MuestraDeLlamada,
+  type DestinoDeTelemetria, type LecturaDePista, type MuestraDeLlamada,
 } from "@/lib/saludDeLlamada";
 import { AHORRO_INICIAL, PANTALLA_AHORRO, ahorroPorPrueba, siguienteAhorro, type EstadoAhorro } from "@/lib/modoAhorro";
 import {
-  CAMARA_INICIAL, copiarTopes, elegirPerfilDeCamara, escribirTopes, siguientePerfilDeCamara, topesLivianos,
+  CAMARA_INICIAL, copiarTopes, elegirPerfilDeCamara, escribirTopes, siguientePerfilDeCamara, topesDeCowork, topesLivianos,
   type EstadoCamara, type PerfilDeCamara, type SenalesDeSubida, type TopeDeCodificacion,
 } from "@/lib/perfilDeCamara";
 import { ajustarSuscripciones, esSupervisorEnLaSala, soloAudioDeLosCompaneros } from "@/lib/videoAjeno";
@@ -55,6 +57,20 @@ import { ajustarSuscripciones, esSupervisorEnLaSala, soloAudioDeLosCompaneros } 
 let recargaRevisada = false;
 // Una muestra por minuto mientras dura la llamada (saludDeLlamada.ts).
 const MUESTRA_CADA_MS = 60_000;
+
+/** Suelta la escucha del evento `online` de una re-entrada que esperaba red. */
+function soltarEsperaDeRed(ref: { current: (() => void) | null }): void {
+  if (!ref.current) return;
+  window.removeEventListener("online", ref.current);
+  ref.current = null;
+}
+
+/** Suelta las escuchas de «la persona volvió» de un equipo que se durmió. */
+function soltarEsperaDeLaPersona(ref: { current: (() => void) | null }): void {
+  const soltar = ref.current;
+  ref.current = null;
+  soltar?.();
+}
 
 export type ConnectionQualityLevel = "excellent" | "good" | "poor" | "lost" | "unknown";
 
@@ -125,6 +141,10 @@ export interface ConnectOptions {
    *  solo su audio (lib/videoAjeno.ts). Solo vale en una sala de trabajo de
    *  Cowork y sin admin; en cualquier otra llamada no hace nada. */
   sinVideoAjeno?: boolean;
+  /** Adónde mandar los cortes y la salud de la llamada cuando NO hay sesión
+   *  (invitado de afuera, por la edge meet-guest). Sin esto van a las tablas
+   *  del equipo, que exigen sesión. Ver saludDeLlamada.ts. */
+  telemetria?: DestinoDeTelemetria;
 }
 
 function getDeviceConstraint(deviceId?: string) {
@@ -468,18 +488,29 @@ export function useLiveKit() {
   const [activeSpeaker, setActiveSpeaker] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isReconnecting, setIsReconnecting] = useState(false);
+  // El equipo se durmió (lib/equipoDormido.ts): no se vuelve solo a la sala, se
+  // espera a la persona. La vista lo usa para el cartel y para el reloj.
+  const [equipoDormido, setEquipoDormido] = useState(false);
+  // «Tu internet está débil» (lib/internetDebil.ts): solo un aviso, no apaga nada.
+  const [internetDebil, setInternetDebil] = useState(false);
 
   // ── Re-entrada automática tras una caída (ver conexionSala.ts) ───────────
   // La decisión del 29/09 dejó, tras la caída, un cartel con un botón manual
   // para volver. La queja del equipo (14/10: «estás hablando y se cae») es que
   // ese botón lo aprieta un humano. Ahora, si fueUnaCaida(razón) —ni salir a
   // propósito, ni otra pestaña, ni expulsión—, se vuelve a entrar solo con
-  // token nuevo: hasta 4 intentos (2 s, 4 s, 8 s, 8 s). El cartel sigue
+  // token nuevo: hasta 10 intentos en unos 2 minutos (conexionSala.ts,
+  // ESPERAS_DE_REENTRADA_MS), en el acto si vuelve la red. El cartel sigue
   // existiendo: se ve durante el intento y se queda, con su botón, solo si
-  // los cuatro fallan.
+  // todos fallan.
   const ultimaConexionRef = useRef<{ roomName: string; participantName: string; isAdmin: boolean; options: ConnectOptions } | null>(null);
   const reentradasRef = useRef(0);
   const reentradaTimerRef = useRef<number | null>(null);
+  // La escucha del evento `online` de la re-entrada que espera (ver abajo).
+  const esperaDeRedRef = useRef<(() => void) | null>(null);
+  // Las escuchas de «la persona volvió» tras dormirse el equipo, y quién las pone.
+  const esperaDeLaPersonaRef = useRef<(() => void) | null>(null);
+  const esperarALaPersonaRef = useRef<(razon?: DisconnectReason | null) => void>(() => {});
   const programarReentradaRef = useRef<(razon?: DisconnectReason | null) => void>(() => {});
 
   // Telemetría de cortes (tabla llamada_cortes): cada parpadeo y cada caída
@@ -496,14 +527,28 @@ export function useLiveKit() {
   // la pestaña estaba dormida.
   const ultimaMuestraRef = useRef<MuestraDeLlamada | null>(null);
   const pararMuestreoRef = useRef<(() => void) | null>(null);
+  // El destino de la telemetría de la ÚLTIMA conexión (invitado de afuera: por
+  // meet-guest). No se borra al colgar: el corte de la salida llega después.
+  const telemetriaRef = useRef<DestinoDeTelemetria | null>(null);
   const anotarCorte = useCallback((fase: string, sala?: string | null, razon?: DisconnectReason | number | null, extra?: Record<string, unknown>) => {
     try {
       const motivo = razon == null
         ? null
         : ((DisconnectReason as unknown as Record<number, string>)[razon as number] ?? String(razon));
-      const contexto = { ...(ultimaMuestraRef.current ?? {}), vis_ahora: document.visibilityState, en_linea: navigator.onLine, ...(extra ?? {}) };
+      // Un corte con el equipo recién despierto no es una caída de la llamada:
+      // va con su propia fase, que las métricas de caídas no cuentan.
+      const sueno = vigiaDelSueno().durmioHacePoco();
+      const contexto = {
+        ...(ultimaMuestraRef.current ?? {}), vis_ahora: document.visibilityState, en_linea: navigator.onLine,
+        ...(sueno ? { dormido_s: Math.round(sueno.ms / 1000) } : {}), ...(extra ?? {}),
+      };
+      const fila = { sala: sala ?? null, fase: faseSegunSueno(fase, !!sueno), motivo, contexto };
+      if (telemetriaRef.current) {
+        telemetriaRef.current.corte(fila);
+        return;
+      }
       void (supabase.from as unknown as InsertaCorte)("llamada_cortes")
-        .insert({ sala: sala ?? null, fase, motivo, contexto })
+        .insert(fila)
         .then(({ error }) => { if (error) console.warn("[llamada_cortes]", error.message); });
     } catch { /* sin telemetría, pero con llamada */ }
   }, []);
@@ -611,7 +656,10 @@ export function useLiveKit() {
         if (!pista || !sender) return;
         const params = sender.getParameters();
         if (!params.encodings?.length) return;
-        if (perfilCamaraRef.current.perfil === "liviano") {
+        const liviano = perfilCamaraRef.current.perfil === "liviano";
+        // En Cowork también el normal va topado: todo en vivo, a 10 fps
+        // (perfilDeCamara.ts, CAMARA_COWORK). Fuera de Cowork, el normal es el de siempre.
+        if (liviano || conPrueba) {
           let antes = originalesCam.get(sender);
           if (!antes) {
             antes = params.encodings.map(copiarTopes);
@@ -623,7 +671,8 @@ export function useLiveKit() {
           const ladoCorto = ajustes?.width && ajustes?.height
             ? Math.min(ajustes.width, ajustes.height)
             : pista.dimensions ? Math.min(pista.dimensions.width, pista.dimensions.height) : null;
-          if (!escribirTopes(params.encodings, topesLivianos(antes, ladoCorto))) return;
+          const topes = liviano ? topesLivianos(antes, ladoCorto, conPrueba) : topesDeCowork(antes);
+          if (!escribirTopes(params.encodings, topes)) return;
         } else {
           const antes = originalesCam.get(sender);
           if (!antes) return;
@@ -700,17 +749,43 @@ export function useLiveKit() {
         perfilCamaraRef.current = siguientePerfilDeCamara(perfilCamaraRef.current, senalesDeSubida(muestra));
         const perfilCam = perfilCamaraRef.current.perfil;
         if (perfilCam !== perfilCamAntes) console.info(`[LiveKit] cámara: perfil ${perfilCam}`);
-        if (perfilCam === "liviano" || perfilCamAntes === "liviano") void aplicarCamara();
-        void (supabase.from as unknown as InsertaSalud)("llamada_salud")
-          .insert({ sala: room.name, datos: { ...muestra, ahorro: ahorro.activo, nc, perfil_cam: perfilCam, ...(prueba ? { prueba } : {}), ...(trabasDelMinuto.length ? { trabas: trabasDelMinuto } : {}) } })
+        if (conPrueba || perfilCam === "liviano" || perfilCamAntes === "liviano") void aplicarCamara();
+        const filaDeSalud = { sala: room.name, datos: { ...muestra, ahorro: ahorro.activo, nc, perfil_cam: perfilCam, ...(prueba ? { prueba } : {}), ...(trabasDelMinuto.length ? { trabas: trabasDelMinuto } : {}) } };
+        if (telemetriaRef.current) telemetriaRef.current.salud(filaDeSalud);
+        else void (supabase.from as unknown as InsertaSalud)("llamada_salud")
+          .insert(filaDeSalud)
           .then(({ error }) => { if (error) console.warn("[llamada_salud]", error.message); });
       } catch { /* medir jamás rompe la llamada */ }
     };
     const primera = window.setTimeout(() => { void tomar(); }, 15_000);
     const cada = window.setInterval(() => { void tomar(); }, MUESTRA_CADA_MS);
+    // «Tu internet está débil» (lib/internetDebil.ts). Cada 2 s la calidad que
+    // mide LiveKit; cada 6 s, además, si el codificador está limitado por ancho
+    // de banda. Solo un aviso: no se apaga nada.
+    let debil = DEBIL_INICIAL;
+    let limitadoPorRed = false;
+    let vueltas = 0;
+    setInternetDebil(false);
+    const vigiaDebil = window.setInterval(() => {
+      void (async () => {
+        try {
+          if (roomRef.current !== room || room.state !== ConnectionState.Connected) return;
+          const q = room.localParticipant.connectionQuality;
+          if (++vueltas % 3 === 0) {
+            const [cam, pant] = await Promise.all([leer(Track.Source.Camera), leer(Track.Source.ScreenShare)]);
+            limitadoPorRed = cam?.limite === "bandwidth" || pant?.limite === "bandwidth";
+          }
+          const mala = q === ConnectionQuality.Poor || q === ConnectionQuality.Lost || limitadoPorRed;
+          debil = siguienteDebil(debil, mala, Date.now());
+          setInternetDebil(debil.mostrando);
+        } catch { /* avisar jamás rompe la llamada */ }
+      })();
+    }, MIRAR_DEBIL_CADA_MS);
     pararMuestreoRef.current = () => {
       window.clearTimeout(primera);
       window.clearInterval(cada);
+      window.clearInterval(vigiaDebil);
+      setInternetDebil(false);
       retraso.parar();
       trabas.parar();
       if (aplicarCamaraRef.current === aplicarCamara) aplicarCamaraRef.current = null;
@@ -1422,7 +1497,14 @@ export function useLiveKit() {
       clearTimeout(reentradaTimerRef.current);
       reentradaTimerRef.current = null;
     }
+    soltarEsperaDeRed(esperaDeRedRef);
+    soltarEsperaDeLaPersona(esperaDeLaPersonaRef);
+    setEquipoDormido(false);
+    // El vigía del sueño arranca con la primera llamada: tiene que estar mirando
+    // ANTES de que el equipo se duerma para darse cuenta al despertar.
+    vigiaDelSueno();
     ultimaConexionRef.current = { roomName, participantName, isAdmin, options };
+    telemetriaRef.current = options.telemetria ?? null;
     const intento = ++intentoRef.current;
     const vigente = () => intento === intentoRef.current;
     // Mientras ENTRA también es una llamada: una recarga ahora (un deploy, o el
@@ -1691,7 +1773,8 @@ export function useLiveKit() {
           if (elegirPerfilDeCamara(senalesDeSubida(ultimaMuestraRef.current)) === "liviano") {
             perfilCamaraRef.current = { perfil: "liviano", buenas: 0 };
           }
-          if (perfilCamaraRef.current.perfil === "liviano") void aplicarCamaraRef.current?.();
+          // En Cowork, también el normal: todo en vivo a 10 fps (perfilDeCamara.ts).
+          if (perfilCamaraRef.current.perfil === "liviano" || salaConPrueba(room.name)) void aplicarCamaraRef.current?.();
         }
         debouncedRefresh();
         // NOTE: Background is handled by scheduleBackgroundApply on connect
@@ -1872,11 +1955,17 @@ export function useLiveKit() {
         setIsReconnecting(false);
         setParticipants([]);
         setActiveSpeaker(null);
+        // Se mira ANTES de anotar: anotarCorte también lo consulta (la fase).
+        const durmio = fueUnaCaida(razon) ? vigiaDelSueno().durmioHacePoco() : null;
         anotarCorte(fueUnaCaida(razon) ? "caida" : "salida", room.name, razon);
         pararMuestreoRef.current?.();
         if (!fueUnaCaida(razon)) borrarLlamadaEnCurso();
-        // La caída de verdad no se queda esperando un clic: se vuelve solo.
-        if (fueUnaCaida(razon)) programarReentradaRef.current(razon);
+        // La caída de verdad no se queda esperando un clic: se vuelve solo. Pero
+        // si el equipo se durmió, no: se espera a que la persona esté.
+        if (fueUnaCaida(razon)) {
+          if (durmio) esperarALaPersonaRef.current(razon);
+          else programarReentradaRef.current(razon);
+        }
       });
 
       // ── Connect & publish tracks ────────────────────────────
@@ -2009,21 +2098,76 @@ export function useLiveKit() {
   programarReentradaRef.current = (razon?: DisconnectReason | null) => {
     const datos = ultimaConexionRef.current;
     if (!datos) return; // salió a propósito: no hay a dónde volver
-    if (reentradasRef.current >= 4) {
+    soltarEsperaDeRed(esperaDeRedRef);
+    if (reentradasRef.current >= MAX_REENTRADAS) {
       anotarCorte("reentrada_agotada", datos.roomName, razon);
       return; // se queda el cartel con su botón, como hasta hoy
     }
     const n = ++reentradasRef.current;
-    const espera = Math.min(2000 * Math.pow(2, n - 1), 8000); // 2 s, 4 s, 8 s, 8 s
-    console.info(`[LiveKit] Caída (razón ${String(razon)}): volviendo solo, intento ${n}/4 en ${espera} ms`);
+    const espera = esperaDeReentrada(n) ?? 20_000; // 2 s, 4 s, 6 s… 25 s: ~2 min en total
+    console.info(`[LiveKit] Caída (razón ${String(razon)}): volviendo solo, intento ${n}/${MAX_REENTRADAS} en ${espera} ms`);
     setIsReconnecting(true);
-    reentradaTimerRef.current = window.setTimeout(() => {
+    const intentar = () => {
+      if (reentradaTimerRef.current != null) {
+        clearTimeout(reentradaTimerRef.current);
+        reentradaTimerRef.current = null;
+      }
+      const d = ultimaConexionRef.current;
+      if (!d) { soltarEsperaDeRed(esperaDeRedRef); return; }
+      // El equipo se durmió mientras esperaba: no se vuelve solo (equipoDormido.ts).
+      if (vigiaDelSueno().durmioHacePoco()) { esperarALaPersonaRef.current(razon); return; }
+      // El navegador dice que no hay red: intentar ahora es gastar un intento
+      // contra la pared. Se devuelve y se espera el `online` (la escucha queda).
+      if (navigator.onLine === false) {
+        reentradasRef.current = Math.max(0, reentradasRef.current - 1);
+        return;
+      }
+      soltarEsperaDeRed(esperaDeRedRef);
+      connect(d.roomName, d.participantName, d.isAdmin, d.options)
+        .catch(() => programarReentradaRef.current(razon));
+    };
+    // Volvió la red: no se espera el resto de la pausa, se intenta en el acto.
+    esperaDeRedRef.current = intentar;
+    window.addEventListener("online", intentar);
+    reentradaTimerRef.current = window.setTimeout(intentar, espera);
+  };
+
+  // EL EQUIPO SE DURMIÓ (lib/equipoDormido.ts): no se vuelve solo. Un equipo
+  // dormido que despierta un minuto (Power Nap) entraba solo a la sala, sin nadie
+  // delante, y volvía a caerse: decenas de «caídas» por noche y minutos pagados
+  // como caída. Ahora se vuelve cuando la persona toca el mouse, el teclado o la
+  // pantalla, o vuelve a la pestaña. El cartel de la sala caída sigue con su
+  // botón, y al reloj de Cowork va «dormido» (no se paga).
+  esperarALaPersonaRef.current = (razon?: DisconnectReason | null) => {
+    if (!ultimaConexionRef.current) return; // salió a propósito
+    if (reentradaTimerRef.current != null) {
+      clearTimeout(reentradaTimerRef.current);
       reentradaTimerRef.current = null;
+    }
+    soltarEsperaDeRed(esperaDeRedRef);
+    soltarEsperaDeLaPersona(esperaDeLaPersonaRef);
+    reentradasRef.current = 0;
+    setIsReconnecting(false);
+    setEquipoDormido(true);
+    console.info("[LiveKit] El equipo se durmió: no se vuelve solo, se espera a la persona");
+    const volver = () => {
+      soltarEsperaDeLaPersona(esperaDeLaPersonaRef);
+      setEquipoDormido(false);
       const d = ultimaConexionRef.current;
       if (!d) return;
       connect(d.roomName, d.participantName, d.isAdmin, d.options)
         .catch(() => programarReentradaRef.current(razon));
-    }, espera);
+    };
+    const alVolverALaPestana = () => { if (document.visibilityState === "visible") volver(); };
+    // Sin «focus»: al despertar, el navegador puede devolverle el foco a la
+    // ventana sin que nadie la toque.
+    const gestos = ["pointerdown", "pointermove", "keydown", "touchstart", "wheel"] as const;
+    for (const g of gestos) window.addEventListener(g, volver, { passive: true });
+    document.addEventListener("visibilitychange", alVolverALaPestana);
+    esperaDeLaPersonaRef.current = () => {
+      for (const g of gestos) window.removeEventListener(g, volver);
+      document.removeEventListener("visibilitychange", alVolverALaPestana);
+    };
   };
 
   // ── Disconnect ─────────────────────────────────────────────────
@@ -2033,6 +2177,9 @@ export function useLiveKit() {
       clearTimeout(reentradaTimerRef.current);
       reentradaTimerRef.current = null;
     }
+    soltarEsperaDeRed(esperaDeRedRef);
+    soltarEsperaDeLaPersona(esperaDeLaPersonaRef);
+    setEquipoDormido(false);
     ultimaConexionRef.current = null;
     reentradasRef.current = 0;
     pararMuestreoRef.current?.();
@@ -2463,7 +2610,8 @@ export function useLiveKit() {
         limiteCam: ultimaMuestraRef.current?.limite_cam ?? null,
         limitePant: ultimaMuestraRef.current?.limite_pant ?? null,
       });
-      const pantalla = opcionesDePantalla(perfil, captura);
+      // En Cowork, la pantalla a 5 fps (perfilDePantalla.ts, PUBLICACION_DE_PANTALLA_COWORK).
+      const pantalla = opcionesDePantalla(perfil, captura, salaConPrueba(room.name));
       if (newState) console.info(`[LiveKit] compartiendo pantalla con el perfil ${perfil}`);
       await room.localParticipant.setScreenShareEnabled(newState, pantalla.captura, pantalla.publicacion);
       if (exigir) {
@@ -2846,6 +2994,8 @@ export function useLiveKit() {
     activeSpeaker,
     error,
     isReconnecting,
+    equipoDormido,
+    internetDebil,
     otraPestanaTomoLaSesion,
     razonDeSalida,
     connect,

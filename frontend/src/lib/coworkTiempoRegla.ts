@@ -21,9 +21,9 @@ export const ESTADOS_TIEMPO: readonly EstadoTiempo[] = [
 ];
 
 /** Cómo está la persona respecto de la sala de LiveKit. Ver la edge. */
-export type ConexionSala = "conectada" | "reconectando" | "desconectada" | "reemplazada";
+export type ConexionSala = "conectada" | "reconectando" | "desconectada" | "reemplazada" | "dormido";
 
-export const CONEXIONES_SALA: readonly ConexionSala[] = ["conectada", "reconectando", "desconectada", "reemplazada"];
+export const CONEXIONES_SALA: readonly ConexionSala[] = ["conectada", "reconectando", "desconectada", "reemplazada", "dormido"];
 
 export const TOPE_SIN_CONEXION_MS = 10 * 60_000;
 export const VENTANA_SIN_CONEXION_MS = 60 * 60_000;
@@ -72,6 +72,11 @@ export function estadoDeTiempo(
 ): Veredicto {
   if (l.onBreak) return { estado: "pausa", detalle: null };
   if (l.enMeet) return { estado: "meet", detalle: null };
+  // El equipo se durmió (Alvaro, 17/11/2026; frontend/src/lib/equipoDormido.ts):
+  // no es una caída de la sala ni se paga, exija lo que exija la sesión. Un
+  // equipo dormido que despierta un minuto latía «desconectada» y se le pagaba
+  // como caída.
+  if (l.conexionSala === "dormido") return { estado: "sin_conexion_larga", detalle: "equipo_dormido" };
   if ((exige.camara || exige.pantalla) && l.conexionSala === "desconectada") {
     return { estado: caidaPagada ? "sin_conexion" : "sin_conexion_larga", detalle: null };
   }

@@ -25,7 +25,7 @@ export default function MeetGuestPage() {
   const { code: rawCode } = useParams<{ code: string }>();
   const navigate = useNavigate();
   const code = normalizeRoomCode(rawCode || "");
-  const { status, error, roomName, guestName, call, knock, getToken, leave } = useMeetGuest(code);
+  const { status, error, roomName, guestName, call, knock, getToken, leave, telemetria } = useMeetGuest(code);
   const [name, setName] = useState("");
   const [checkingSession, setCheckingSession] = useState(true);
   // El invitado colgó. Antes esto era `window.location.reload()`: la página se
@@ -116,6 +116,10 @@ export default function MeetGuestPage() {
             getToken={getToken}
             initialMicOn={false}
             initialCamOn={false}
+            // Sus cortes se miden por meet-guest, y si la conexión falla solo
+            // ve «Reintentar»: «Volver» le gastaba la admisión.
+            telemetria={telemetria}
+            sinVolverEnError
             onLeave={() => { setSali(true); void leave(); }}
           />
         </LlamadaEnVentanaFlotante>

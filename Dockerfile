@@ -28,6 +28,12 @@ ENV VITE_DOCS_SYNC_URL=__RUNTIME_VITE_DOCS_SYNC_URL__
 
 RUN npm run build
 
+# Los mapas de fuente (build.sourcemap "hidden" en vite.config.ts) NO van a la
+# imagen: servirlos sería publicar el código. Se sacan de dist; para leerlos se
+# rearma el mismo build con scripts/mapas-de-produccion.sh (mismos marcadores de
+# arriba = mismos archivos y mismos nombres que producción).
+RUN find dist -name '*.map' -type f -delete
+
 # ─────────────────────────────────────────────────────────────────────────────
 # Stage 2: serve with nginx, substituting placeholders at startup.
 # ─────────────────────────────────────────────────────────────────────────────

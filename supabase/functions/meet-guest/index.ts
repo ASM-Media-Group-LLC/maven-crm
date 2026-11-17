@@ -91,6 +91,61 @@ function normalizeCode(raw: unknown): string {
 const MAX_ATTEMPTS_PER_10MIN = 8;   // intentos (acertados o no) por IP
 const MAX_DENIALS_PER_ROOM = 2;     // rechazos antes de cerrarle la puerta
 
+// VOLVER SOLO TRAS UNA CAÍDA. Alvaro, 17/11/2026: 15 min.
+// Un invitado al que se le cae la llamada (cerró la pestaña sin querer, recargó,
+// se le fue el internet) vuelve a entrar SOLO, desde el mismo navegador, sin que
+// nadie de adentro lo admita otra vez, durante este tiempo desde que salió.
+// Pasado eso, o si colgó a propósito, golpea de nuevo (la regla de Jhon del
+// 09/09: colgar termina la admisión). Antes cada caída lo mandaba a pedir
+// entrada otra vez: 13 invitados tuvieron que pedirla de 2 a 4 veces en la misma
+// reunión.
+const REENTRADA_DEL_INVITADO_MS = 15 * 60 * 1000;
+
+// Telemetría de la llamada del invitado (cortes y salud, como la del equipo en
+// llamada_cortes / llamada_salud, que exigen sesión). Topes por invitado y por
+// 10 minutos para que el endpoint público no sea un balde sin fondo.
+const FASES_DE_CORTE = new Set([
+  "recarga", "parpadeo", "parpadeo_ok", "caida", "salida", "reentrada_ok", "reentrada_agotada",
+  "equipo_dormido", "parpadeo_tras_dormir", "parpadeo_ok_tras_dormir", "reentrada_ok_tras_dormir", "reentrada_agotada_tras_dormir",
+]);
+const MAX_CORTES_POR_10MIN = 60;
+const MAX_SALUD_POR_10MIN = 15;
+const MAX_JSON_TELEMETRIA = 6000; // caracteres del contexto o de la muestra
+
+/** Un objeto JSON plano y chico, o null. Lo que manda el navegador no se cree. */
+function objetoChico(v: unknown): Record<string, unknown> | null {
+  if (!v || typeof v !== "object" || Array.isArray(v)) return null;
+  try {
+    return JSON.stringify(v).length <= MAX_JSON_TELEMETRIA ? v as Record<string, unknown> : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Texto corto o null. */
+function textoCorto(v: unknown, max: number): string | null {
+  return typeof v === "string" && v.length > 0 ? v.slice(0, max) : null;
+}
+
+interface PedidoDeInvitado {
+  id: string;
+  meet_room_id: string;
+  guest_name: string;
+  status: string;
+  left_at: string | null;
+  decided_by: string | null;
+  /** Ausente mientras la base no tenga la migración 20261117150000: cuenta como
+   *  salida a propósito (la regla de antes). */
+  salio_a_proposito?: boolean | null;
+}
+
+/** ¿Salió por una CAÍDA hace menos de REENTRADA_DEL_INVITADO_MS? */
+function puedeVolverSolo(p: PedidoDeInvitado, ahora: number): boolean {
+  if (!p.left_at) return false;
+  const fuera = ahora - Date.parse(p.left_at);
+  return p.salio_a_proposito === false && Number.isFinite(fuera) && fuera <= REENTRADA_DEL_INVITADO_MS;
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders(req) });
 
@@ -267,16 +322,76 @@ serve(async (req) => {
       });
     }
 
-    // El invitado colgó. Cierra SU admisión: nadie más puede hacerlo porque
-    // hace falta su token, que solo tiene su navegador.
+    // El invitado salió. Nadie más puede marcarlo porque hace falta su token,
+    // que solo tiene su navegador.
+    //  · Colgó (sin `caida`): la admisión se termina; volver es pedir de nuevo.
+    //  · `caida: true`: se le cerró o recargó la página en medio de la llamada.
+    //    Cuenta la ÚLTIMA salida: desde ahí corren los 15 minutos para volver
+    //    solo (REENTRADA_DEL_INVITADO_MS).
+    // Una salida a propósito no se vuelve caída después. Un cliente viejo no
+    // manda `caida`: queda como antes, a propósito.
     if (action === "leave") {
       const guestToken = String(body.guestToken ?? "");
       if (guestToken.length < 32) return err(req, "Solicitud inválida", 400);
-      // `is("left_at", null)` para no correr la marca si vuelve a llamar: la
-      // hora que importa es la de la primera salida.
-      await admin.from("meet_guest_requests")
-        .update({ left_at: new Date().toISOString() })
-        .eq("guest_token", guestToken).is("left_at", null);
+      const porCaida = body.caida === true;
+      const { error: errSalida } = await admin.from("meet_guest_requests")
+        .update({ left_at: new Date().toISOString(), salio_a_proposito: !porCaida })
+        .eq("guest_token", guestToken).or("left_at.is.null,salio_a_proposito.eq.false");
+      if (errSalida) {
+        // La base todavía sin la columna (migración 20261117150000): la regla de
+        // antes, la hora que importa es la de la primera salida.
+        await admin.from("meet_guest_requests")
+          .update({ left_at: new Date().toISOString() })
+          .eq("guest_token", guestToken).is("left_at", null);
+      }
+      return json(req, { ok: true });
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // TELEMETRIA — los cortes y la salud de la llamada del invitado.
+    // ═══════════════════════════════════════════════════════════════
+    // Solo con un pedido ADMITIDO que siga en la llamada o se haya caído hace
+    // poco. La fila sale del pedido, no de lo que diga el navegador: el invitado
+    // no puede escribir a nombre de otro ni de otra reunión.
+    if (action === "telemetria") {
+      const guestToken = String(body.guestToken ?? "");
+      if (guestToken.length < 32) return err(req, "Solicitud inválida", 400);
+      const tipo = body.tipo === "corte" || body.tipo === "salud" ? body.tipo : null;
+      if (!tipo) return err(req, "Tipo inválido", 400);
+
+      const { data: pedido } = await admin.from("meet_guest_requests")
+        .select("*").eq("guest_token", guestToken).maybeSingle();
+      const p = pedido as PedidoDeInvitado | null;
+      if (!p || p.status !== "admitted") return err(req, "Solicitud no encontrada", 404);
+      // Colgó a propósito, o se cayó hace más de 15 minutos: ya no está.
+      if (p.left_at && !puedeVolverSolo(p, Date.now())) return json(req, { ok: false, motivo: "salio" });
+
+      const tabla = tipo === "corte" ? "llamada_cortes_invitados" : "llamada_salud_invitados";
+      const tope = tipo === "corte" ? MAX_CORTES_POR_10MIN : MAX_SALUD_POR_10MIN;
+      const { count, error: errCuenta } = await admin.from(tabla)
+        .select("*", { count: "exact", head: true })
+        .eq("guest_request_id", p.id).gte("creado", new Date(Date.now() - 10 * 60 * 1000).toISOString());
+      // Un fallo no es «cero»: sin saber cuántas van, no se anota.
+      if (errCuenta || count === null) return err(req, "No se pudo anotar", 503);
+      if (count >= tope) return json(req, { ok: false, motivo: "tope" }, 429);
+
+      const sala = textoCorto(body.sala, 120);
+      if (tipo === "corte") {
+        const fase = textoCorto(body.fase, 40);
+        if (!fase || !FASES_DE_CORTE.has(fase)) return err(req, "Fase inválida", 400);
+        const { error: insErr } = await admin.from("llamada_cortes_invitados").insert({
+          guest_request_id: p.id, meet_room_id: p.meet_room_id, sala, fase,
+          motivo: textoCorto(body.motivo, 60), contexto: objetoChico(body.contexto),
+        });
+        if (insErr) return err(req, insErr.message, 500);
+      } else {
+        const datos = objetoChico(body.datos);
+        if (!datos) return err(req, "Muestra inválida", 400);
+        const { error: insErr } = await admin.from("llamada_salud_invitados").insert({
+          guest_request_id: p.id, meet_room_id: p.meet_room_id, sala, datos,
+        });
+        if (insErr) return err(req, insErr.message, 500);
+      }
       return json(req, { ok: true });
     }
 
@@ -284,16 +399,21 @@ serve(async (req) => {
       const guestToken = String(body.guestToken ?? "");
       if (guestToken.length < 32) return err(req, "Solicitud inválida", 400);
 
-      const { data: request } = await admin.from("meet_guest_requests")
-        .select("id, meet_room_id, guest_name, status, left_at, decided_by")
+      // `*` y no la lista de columnas: mientras la base no tenga
+      // `salio_a_proposito`, nombrarla rompería TODOS los claim.
+      const { data: pedido } = await admin.from("meet_guest_requests")
+        .select("*")
         .eq("guest_token", guestToken).maybeSingle();
+      const request = pedido as PedidoDeInvitado | null;
       if (!request) return err(req, "Solicitud no encontrada", 404);
 
       // Ya colgó una vez: esa entrada se consumió. Volver exige pedir de nuevo
       // y que alguien de adentro apruebe otra vez (Jhon, 09/09/2026). Antes la
       // admisión era para siempre y el token guardado lo devolvía derecho a la
       // llamada, así que con el enlace un externo entraba y salía todo el día.
-      if (request.left_at) return json(req, { status: "left" });
+      // Salvo una CAÍDA de hace menos de 15 minutos (Alvaro, 17/11/2026): ahí
+      // vuelve solo, con la misma admisión.
+      if (request.left_at && !puedeVolverSolo(request, Date.now())) return json(req, { status: "left" });
 
       if (request.status === "denied") return json(req, { status: "denied" });
       if (request.status === "pending") return json(req, { status: "pending" });
@@ -311,6 +431,12 @@ serve(async (req) => {
       const agenciaDeLaReunion = await agenciaDeReunion(admin, room);
       if (!agenciaDeLaReunion || await agenciaDePersona(admin, request.decided_by) !== agenciaDeLaReunion) {
         return json(req, { status: "denied" });
+      }
+
+      // Vuelve solo tras una caída: la admisión sigue abierta (si se vuelve a
+      // caer, esa salida cuenta otros 15 minutos; si cuelga, se termina).
+      if (request.left_at) {
+        await admin.from("meet_guest_requests").update({ left_at: null }).eq("id", request.id);
       }
 
       // Identidad propia y marcada, para que en la sala se vea que es un invitado

@@ -70,6 +70,9 @@ const EspacioNasPage = lazy(() => import("./pages/oficina/EspacioNasPage"));
 const CostosPage = lazy(() => import("./pages/oficina/CostosPage"));
 const ArchivoDelDrivePage = lazy(() => import("./pages/oficina/ArchivoDelDrivePage"));
 const LinksDeSubidaPage = lazy(() => import("./pages/oficina/LinksDeSubidaPage"));
+// Guía de conexión (17/11/2026): probar el internet y consejos para que la
+// llamada no se caiga. Para todos, sin permiso de módulo (lib/guiaConexion.ts).
+const GuiaConexionPage = lazy(() => import("./pages/conexion/GuiaConexionPage"));
 // Correo (Zoho detrás). Ya está en UNIVERSAL_MODULES (usePermissions), o sea que
 // se ve por default como Messenger/Cowork/Meet; un admin puede apagárselo a un rol
 // desde Administración → Roles, donde ahora figura (MODULES_CONFIG en useRoles.ts).
@@ -449,6 +452,7 @@ const App = () => (
                 <Route path="/oficina/:id" element={<PermissionRoute module="Oficina"><DocumentoPage /></PermissionRoute>} />
                 <Route path="/settings" element={<Settings />} />
                 <Route path="/notificaciones" element={<Notificaciones />} />
+                <Route path="/conexion" element={<GuiaConexionPage />} />
                 <Route path="/ajustes/notificaciones" element={<NotificacionesSettings />} />
                 {/* HR routes */}
                 <Route path="/hr" element={<PermissionRoute module="HR" submodule="Dashboard"><HRLayout><HRDashboard /></HRLayout></PermissionRoute>} />

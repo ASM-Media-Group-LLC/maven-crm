@@ -18,6 +18,8 @@ export const navegacion = {
   // Sidebar items - Menu
   "nav.dashboard": { es: "Dashboard", en: "Dashboard" },
   "nav.contacts": { es: "Contactos", en: "Contacts" },
+  // Guía de conexión (/conexion, 17/11/2026): para todos, sin permiso de módulo.
+  "nav.connectionGuide": { es: "Guía de conexión", en: "Connection guide" },
   "nav.creators": { es: "Creadores", en: "Creators" },
   "nav.creatorSales": { es: "Ventas de Creadores", en: "Creator Sales" },
   "nav.salesReport": { es: "Reporte de Ventas", en: "Sales Report" },
