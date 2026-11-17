@@ -1,5 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import { estaEnLlamadaDeMaven } from "@/lib/llamadaEnMaven";
+import { supabase } from "@/integrations/supabase/client";
+import {
+  MUESTRAS_PARA_SOSPECHAR, tocaPreguntar, estadoConfirmado, type RespuestaIA,
+} from "@/lib/caraConfirmada";
 
 // Vigilancia de encuadre: ¿se le ve la cara a quien está en la llamada?
 //
@@ -75,7 +79,9 @@ async function getDetector(): Promise<any | null> {
         return await vision.FaceDetector.createFromOptions(fileset, {
           baseOptions: { modelAssetPath: MODEL_URL, delegate: "CPU" },
           runningMode: "IMAGE",
-          minDetectionConfidence: 0.5,
+          // 0.35 y no 0.5 (17/11/2026): con audífonos, de lado o con luz detrás la
+          // confianza baja y se perdían caras de gente que estaba ahí.
+          minDetectionConfidence: 0.35,
         });
       } catch (e) {
         // NO se traga el error en silencio. La versión anterior hacía
@@ -156,6 +162,29 @@ export function useFaceWatch(track: MediaStreamTrack | null, enabled: boolean): 
     // Cuántos muestreos seguidos sin poder ver un cuadro antes de admitir que
     // no se puede supervisar. 5 x 3 s = 15 s de gracia.
     let sinCuadros = 0;
+    // Muestras seguidas sin cara, y lo último que dijo la IA (lib/caraConfirmada).
+    let seguidasSinCara = 0;
+    let ultimaIA: RespuestaIA | null = null;
+    let iaEnVuelo = false;
+    const preguntarIA = async () => {
+      iaEnVuelo = true;
+      try {
+        const foto = document.createElement("canvas");
+        const fw = Math.min(640, video.videoWidth);
+        foto.width = fw;
+        foto.height = Math.max(1, Math.round((video.videoHeight / video.videoWidth) * fw));
+        foto.getContext("2d")?.drawImage(video, 0, 0, foto.width, foto.height);
+        const imagen = foto.toDataURL("image/jpeg", 0.6).split(",")[1] ?? "";
+        const { data, error } = await supabase.functions.invoke("argos-cara", { body: { imagen } });
+        const persona = !error && typeof (data as { persona?: unknown } | null)?.persona === "boolean"
+          ? (data as { persona: boolean }).persona : null;
+        ultimaIA = { persona, en: Date.now() };
+      } catch {
+        ultimaIA = { persona: null, en: Date.now() };
+      } finally {
+        iaEnVuelo = false;
+      }
+    };
     const video = document.createElement("video");
     video.muted = true;
     video.playsInline = true;
@@ -213,8 +242,16 @@ export function useFaceWatch(track: MediaStreamTrack | null, enabled: boolean): 
         // mala luz —alerta de encuadre, el reloj sigue— y la imagen es negra y
         // no se ve a NADIE —es "fuera de cámara", el reloj se detiene—. Ahora
         // la cara se busca siempre; la oscuridad solo califica el resultado.
-        const res = detector.detect(canvas);
-        const caras = res?.detections ?? [];
+        let caras = detector.detect(canvas)?.detections ?? [];
+        // Segunda pasada con ZOOM al centro: el modelo es de distancia corta y
+        // una persona un poco lejos le queda chica en el cuadro entero.
+        if (!caras.length) {
+          const zoom = document.createElement("canvas");
+          zoom.width = w; zoom.height = h;
+          const sx = video.videoWidth * 0.2, sy = video.videoHeight * 0.1;
+          zoom.getContext("2d")?.drawImage(video, sx, sy, video.videoWidth * 0.6, video.videoHeight * 0.6, 0, 0, w, h);
+          caras = detector.detect(zoom)?.detections ?? [];
+        }
         const mayor = caras.length ? caras.reduce((best: any, d: any) => {
           const area = (d.boundingBox?.width ?? 0) * (d.boundingBox?.height ?? 0);
           const bestArea = (best?.boundingBox?.width ?? 0) * (best?.boundingBox?.height ?? 0);
@@ -222,7 +259,13 @@ export function useFaceWatch(track: MediaStreamTrack | null, enabled: boolean): 
         }, caras[0]) : null;
         const bb = mayor?.boundingBox;
         const ratio = mayor ? ((bb?.width ?? 0) * (bb?.height ?? 0)) / (w * h) : 0;
-        setState(clasificarCuadro({ oscuro, hayCara: !!mayor, ratio }));
+        const local = clasificarCuadro({ oscuro, hayCara: !!mayor, ratio });
+        // El detector solo SOSPECHA; «no_face» sale si la IA lo confirma.
+        seguidasSinCara = local === "no_face" ? seguidasSinCara + 1 : 0;
+        if (local !== "no_face") ultimaIA = null;
+        const sospecha = seguidasSinCara >= MUESTRAS_PARA_SOSPECHAR;
+        if (tocaPreguntar(sospecha, ultimaIA, iaEnVuelo, Date.now())) void preguntarIA();
+        setState(estadoConfirmado(sospecha ? local : (local === "no_face" ? "ok" : local), ultimaIA, Date.now()));
       } catch {
         /* un frame que falla no cambia el estado: se reintenta al siguiente */
       }
