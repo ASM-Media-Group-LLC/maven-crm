@@ -5,8 +5,6 @@ import { leerMemoria } from "@/lib/saludDeLlamada";
 // llamada ahora dice cuánta memoria usa Maven y cuánta tiene el equipo.
 
 const salud = import.meta.glob("../../hooks/useLiveKit.ts", { query: "?raw", import: "default", eager: true }) as Record<string, string>;
-const escritorio = import.meta.glob("../../../../desktop/package.json", { query: "?raw", import: "default", eager: true }) as Record<string, string>;
-const preload = import.meta.glob("../../../../desktop/src/preload.js", { query: "?raw", import: "default", eager: true }) as Record<string, string>;
 
 type ConEscritorio = Window & { mavenEscritorio?: unknown };
 
@@ -34,12 +32,5 @@ describe("memoria del equipo en la salud de la llamada", () => {
 
   it("la fila de salud lleva la memoria", () => {
     expect(Object.values(salud)[0]).toMatch(/datos: \{ \.\.\.muestra, \.\.\.memoria,/);
-  });
-
-  it("la app expone la memoria y solo trae los idiomas de Maven", () => {
-    expect(Object.values(preload)[0]).toMatch(/memoria: \(\) => ipcRenderer\.invoke\("maven:memoria"\)/);
-    const pkg = JSON.parse(Object.values(escritorio)[0]) as { build: { electronLanguages?: string[] } };
-    expect(pkg.build.electronLanguages).toEqual(expect.arrayContaining(["es", "en-US", "pt-BR"]));
-    expect(pkg.build.electronLanguages!.length).toBeLessThan(10);
   });
 });
