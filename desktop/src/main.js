@@ -1,0 +1,329 @@
+// MAVEN PARA EL COMPUTADOR (Mac y Windows).
+//
+// Es una «cáscara»: la ventana abre app.maven-ai.me tal cual. Todo lo que se
+// sube a producción le llega solo, sin publicar versión nueva de la app. Lo
+// que la cáscara agrega (Alvaro, 17/11/2026):
+//   - Abre sola al prender el computador.
+//   - La X no la cierra: queda en la barra junto al reloj y sigue en Cowork y
+//     recibiendo avisos. Para salir: menú de la barra → Salir.
+//   - El número de chats sin leer en el ícono (Dock en Mac, barra en Windows).
+//   - Un atajo para traerla al frente desde cualquier lado: Ctrl+Alt+M.
+//   - Compartir pantalla con selector propio (pantallas y ventanas).
+//   - Sigue corriendo a toda velocidad aunque esté escondida (llamadas, Argos).
+
+const {
+  app, BrowserWindow, Tray, Menu, nativeImage, shell, ipcMain, session,
+  globalShortcut, desktopCapturer, systemPreferences,
+} = require("electron");
+const path = require("node:path");
+const fs = require("node:fs");
+
+const URL_MAVEN = process.env.MAVEN_URL || "https://app.maven-ai.me/login";
+const ORIGENES_MAVEN = new Set(["https://app.maven-ai.me", "https://maven-ai.me", "https://www.maven-ai.me"]);
+const ATAJO = "Control+Alt+M";
+const esMac = process.platform === "darwin";
+
+let ventana = null;
+let bandeja = null;
+let saliendo = false;
+let sinLeer = 0;
+
+const esDeMaven = (url) => {
+  try {
+    const u = new URL(url);
+    return ORIGENES_MAVEN.has(u.origin) || new URL(URL_MAVEN).origin === u.origin;
+  } catch {
+    return false;
+  }
+};
+
+// ── Preferencias (un json en la carpeta de datos de la app) ─────────────────
+const archivoAjustes = () => path.join(app.getPath("userData"), "ajustes.json");
+function leerAjustes() {
+  try { return JSON.parse(fs.readFileSync(archivoAjustes(), "utf8")); } catch { return {}; }
+}
+function guardarAjustes(a) {
+  try { fs.writeFileSync(archivoAjustes(), JSON.stringify(a, null, 2)); } catch { /* sin disco: se pierde y ya */ }
+}
+
+function abrirAlPrender(si) {
+  app.setLoginItemSettings({ openAtLogin: si });
+  guardarAjustes({ ...leerAjustes(), abrirAlPrender: si });
+}
+
+// ── Una sola copia abierta ───────────────────────────────────────────────────
+if (!app.requestSingleInstanceLock()) {
+  app.quit();
+} else {
+  app.on("second-instance", () => mostrar());
+}
+
+function mostrar() {
+  if (!ventana) return crearVentana();
+  if (ventana.isMinimized()) ventana.restore();
+  ventana.show();
+  ventana.focus();
+}
+
+// ── La ventana ───────────────────────────────────────────────────────────────
+function crearVentana() {
+  ventana = new BrowserWindow({
+    width: 1400,
+    height: 900,
+    minWidth: 960,
+    minHeight: 620,
+    title: "Maven",
+    backgroundColor: "#101827",
+    icon: path.join(__dirname, "..", "build", "bandeja.png"),
+    show: false,
+    webPreferences: {
+      preload: path.join(__dirname, "preload.js"),
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: true,
+      spellcheck: true,
+      // Escondida en la barra tiene que seguir igual de viva: llamadas, Cowork,
+      // Argos y avisos. Sin esto Chromium la frena al minimizarla.
+      backgroundThrottling: false,
+    },
+  });
+
+  ventana.once("ready-to-show", () => ventana.show());
+
+  // La X esconde; solo «Salir» (o Cmd+Q) cierra de verdad.
+  ventana.on("close", (e) => {
+    if (saliendo) return;
+    e.preventDefault();
+    ventana.hide();
+  });
+  ventana.on("closed", () => { ventana = null; });
+
+  // Lo de Maven se queda adentro; cualquier otro link abre en el navegador.
+  ventana.webContents.setWindowOpenHandler(({ url }) => {
+    if (esDeMaven(url)) {
+      return {
+        action: "allow",
+        overrideBrowserWindowOptions: {
+          backgroundColor: "#101827",
+          webPreferences: { preload: path.join(__dirname, "preload.js"), contextIsolation: true, sandbox: true, backgroundThrottling: false },
+        },
+      };
+    }
+    if (/^https?:|^mailto:|^tel:/.test(url)) shell.openExternal(url);
+    return { action: "deny" };
+  });
+  ventana.webContents.on("will-navigate", (e, url) => {
+    if (!esDeMaven(url)) {
+      e.preventDefault();
+      shell.openExternal(url);
+    }
+  });
+
+  // Clic derecho: cortar, copiar, pegar y la ortografía.
+  ventana.webContents.on("context-menu", (_e, p) => {
+    const items = [];
+    for (const s of p.dictionarySuggestions.slice(0, 5)) {
+      items.push({ label: s, click: () => ventana.webContents.replaceMisspelling(s) });
+    }
+    if (p.misspelledWord) items.push({ type: "separator" });
+    if (p.linkURL) {
+      items.push({ label: "Copiar enlace", click: () => require("electron").clipboard.writeText(p.linkURL) });
+      items.push({ type: "separator" });
+    }
+    if (p.isEditable) items.push({ role: "cut", label: "Cortar" });
+    if (p.selectionText || p.isEditable) items.push({ role: "copy", label: "Copiar" });
+    if (p.isEditable) items.push({ role: "paste", label: "Pegar" }, { role: "selectAll", label: "Seleccionar todo" });
+    if (p.mediaType === "image") items.push({ label: "Copiar imagen", click: () => ventana.webContents.copyImageAt(p.x, p.y) });
+    if (items.length) Menu.buildFromTemplate(items).popup();
+  });
+
+  ventana.webContents.setUserAgent(`${ventana.webContents.getUserAgent()} MavenEscritorio/${app.getVersion()}`);
+  ventana.loadURL(URL_MAVEN);
+
+  // Prueba desde el código: MAVEN_CAPTURA=/ruta.png guarda cómo se ve y cierra.
+  if (!app.isPackaged && process.env.MAVEN_CAPTURA) {
+    ventana.webContents.once("did-finish-load", () => setTimeout(async () => {
+      fs.writeFileSync(process.env.MAVEN_CAPTURA, (await ventana.capturePage()).toPNG());
+      saliendo = true;
+      app.quit();
+    }, 6000));
+  }
+}
+
+// ── Permisos: cámara, micrófono, avisos, pantalla completa… solo para Maven ──
+function configurarPermisos() {
+  const s = session.defaultSession;
+  s.setPermissionRequestHandler((wc, permiso, responder) => {
+    responder(esDeMaven(wc.getURL()));
+  });
+  s.setPermissionCheckHandler((_wc, _permiso, origen) => esDeMaven(origen || ""));
+  s.setSpellCheckerLanguages(["es", "en-US"].filter((l) => s.availableSpellCheckerLanguages.includes(l)));
+
+  // Compartir pantalla: Maven pide getDisplayMedia y acá se elige qué compartir.
+  s.setDisplayMediaRequestHandler(async (pedido, responder) => {
+    try {
+      const fuentes = await desktopCapturer.getSources({
+        types: ["screen", "window"],
+        thumbnailSize: { width: 320, height: 200 },
+        fetchWindowIcons: false,
+      });
+      const elegida = await elegirFuente(fuentes);
+      if (!elegida) return responder({});
+      // En Windows se puede mandar también el sonido del computador.
+      responder({ video: elegida, ...(pedido.audioRequested && !esMac ? { audio: "loopback" } : {}) });
+    } catch {
+      responder({});
+    }
+  });
+}
+
+// Ventanita para elegir pantalla o ventana (como la de Chrome).
+function elegirFuente(fuentes) {
+  return new Promise((resolver) => {
+    const selector = new BrowserWindow({
+      parent: ventana ?? undefined,
+      modal: true,
+      width: 760,
+      height: 560,
+      resizable: false,
+      minimizable: false,
+      maximizable: false,
+      title: "Compartir pantalla",
+      backgroundColor: "#101827",
+      show: false,
+      webPreferences: { preload: path.join(__dirname, "selector-preload.js"), contextIsolation: true, sandbox: true },
+    });
+    let listo = false;
+    const terminar = (id) => {
+      if (listo) return;
+      listo = true;
+      ipcMain.removeHandler("selector:fuentes");
+      ipcMain.removeAllListeners("selector:elegir");
+      resolver(id ? fuentes.find((f) => f.id === id) : null);
+      if (!selector.isDestroyed()) selector.close();
+    };
+    ipcMain.handle("selector:fuentes", () =>
+      fuentes.map((f) => ({ id: f.id, nombre: f.name, pantalla: f.id.startsWith("screen:"), imagen: f.thumbnail.toDataURL() })),
+    );
+    ipcMain.on("selector:elegir", (_e, id) => terminar(id));
+    selector.on("closed", () => terminar(null));
+    selector.once("ready-to-show", () => selector.show());
+    selector.setMenuBarVisibility(false);
+    selector.loadFile(path.join(__dirname, "selector.html"));
+  });
+}
+
+// ── El número de chats sin leer ──────────────────────────────────────────────
+ipcMain.on("maven:insignia", (_e, n, dibujo) => {
+  sinLeer = Math.max(0, Number(n) || 0);
+  if (esMac) {
+    app.dock?.setBadge(sinLeer > 0 ? String(sinLeer > 99 ? "99+" : sinLeer) : "");
+  } else if (ventana) {
+    ventana.setOverlayIcon(sinLeer > 0 && dibujo ? nativeImage.createFromDataURL(dibujo) : null, sinLeer > 0 ? `${sinLeer} sin leer` : "");
+  }
+  if (!esMac) app.setBadgeCount(sinLeer); // Linux/Unity; en Windows no hace nada
+  if (bandeja) bandeja.setToolTip(sinLeer > 0 ? `Maven — ${sinLeer} sin leer` : "Maven");
+  armarMenuBandeja();
+});
+
+// ── La barra junto al reloj ──────────────────────────────────────────────────
+function crearBandeja() {
+  let img = nativeImage.createFromPath(path.join(__dirname, "..", "build", "bandeja.png"));
+  img = img.resize({ width: esMac ? 18 : 16, height: esMac ? 18 : 16 });
+  bandeja = new Tray(img);
+  bandeja.setToolTip("Maven");
+  bandeja.on("click", () => mostrar());
+  armarMenuBandeja();
+}
+
+function armarMenuBandeja() {
+  if (!bandeja) return;
+  const ajustes = leerAjustes();
+  bandeja.setContextMenu(Menu.buildFromTemplate([
+    { label: sinLeer > 0 ? `Abrir Maven (${sinLeer} sin leer)` : "Abrir Maven", click: () => mostrar() },
+    { label: `Atajo: ${esMac ? "Control+Option+M" : "Ctrl+Alt+M"}`, enabled: false },
+    { type: "separator" },
+    {
+      label: "Abrir al prender el computador",
+      type: "checkbox",
+      checked: ajustes.abrirAlPrender !== false,
+      click: (item) => abrirAlPrender(item.checked),
+    },
+    { type: "separator" },
+    { label: "Salir de Maven", click: () => { saliendo = true; app.quit(); } },
+  ]));
+}
+
+// ── Menú de arriba (en Mac hace falta para que Cmd+C / Cmd+V funcionen) ────
+function crearMenu() {
+  const plantilla = [
+    ...(esMac ? [{
+      label: "Maven",
+      submenu: [
+        { role: "about", label: "Acerca de Maven" },
+        { type: "separator" },
+        { role: "hide", label: "Ocultar Maven" },
+        { role: "hideOthers", label: "Ocultar otros" },
+        { type: "separator" },
+        { label: "Salir de Maven", accelerator: "Cmd+Q", click: () => { saliendo = true; app.quit(); } },
+      ],
+    }] : []),
+    {
+      label: "Edición",
+      submenu: [
+        { role: "undo", label: "Deshacer" },
+        { role: "redo", label: "Rehacer" },
+        { type: "separator" },
+        { role: "cut", label: "Cortar" },
+        { role: "copy", label: "Copiar" },
+        { role: "paste", label: "Pegar" },
+        { role: "selectAll", label: "Seleccionar todo" },
+      ],
+    },
+    {
+      label: "Ver",
+      submenu: [
+        { role: "reload", label: "Recargar" },
+        { type: "separator" },
+        { role: "resetZoom", label: "Tamaño real" },
+        { role: "zoomIn", label: "Acercar" },
+        { role: "zoomOut", label: "Alejar" },
+        { type: "separator" },
+        { role: "togglefullscreen", label: "Pantalla completa" },
+        { role: "toggleDevTools", label: "Herramientas de desarrollo", visible: false },
+      ],
+    },
+    { role: "windowMenu", label: "Ventana" },
+  ];
+  Menu.setApplicationMenu(Menu.buildFromTemplate(plantilla));
+}
+
+// ── Arranque ─────────────────────────────────────────────────────────────────
+app.whenReady().then(() => {
+  app.setAppUserModelId("me.maven-ai.escritorio"); // avisos con nombre en Windows
+
+  // La primera vez queda puesta para abrir al prender (Alvaro lo pidió así).
+  // (Solo en la app instalada: probarla desde el código no toca el computador.)
+  const ajustes = leerAjustes();
+  if (app.isPackaged && ajustes.abrirAlPrender === undefined) abrirAlPrender(true);
+
+  // En Mac, pedir cámara y micrófono de entrada (si no, Cowork pregunta tarde).
+  if (esMac) {
+    systemPreferences.askForMediaAccess("camera").catch(() => {});
+    systemPreferences.askForMediaAccess("microphone").catch(() => {});
+  }
+
+  configurarPermisos();
+  crearMenu();
+  crearVentana();
+  crearBandeja();
+  globalShortcut.register(ATAJO, () => {
+    if (ventana && ventana.isVisible() && ventana.isFocused()) ventana.hide();
+    else mostrar();
+  });
+});
+
+app.on("activate", () => mostrar()); // clic en el Dock
+app.on("before-quit", () => { saliendo = true; });
+app.on("will-quit", () => globalShortcut.unregisterAll());
+app.on("window-all-closed", () => { /* sigue viva en la barra */ });

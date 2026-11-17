@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src data:; style-src 'unsafe-inline'; script-src 'unsafe-inline'">
+<title>Compartir pantalla</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 14px/1.4 -apple-system, "Segoe UI", system-ui, sans-serif; background: #101827; color: #fff; display: flex; flex-direction: column; height: 100vh; }
+  header { padding: 18px 22px 8px; }
+  h1 { font-size: 17px; margin: 0 0 4px; }
+  p { margin: 0; color: #8f9ab0; font-size: 13px; }
+  nav { display: flex; gap: 6px; padding: 10px 22px 0; }
+  nav button { background: transparent; color: #8f9ab0; border: 1px solid rgba(255,255,255,.12); border-radius: 999px; padding: 6px 14px; font: inherit; cursor: pointer; }
+  nav button.activo { color: #101827; background: #bed161; border-color: #bed161; }
+  main { flex: 1; overflow: auto; padding: 14px 22px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; align-content: start; }
+  .fuente { background: rgba(255,255,255,.04); border: 2px solid transparent; border-radius: 12px; padding: 8px; cursor: pointer; text-align: left; color: inherit; font: inherit; }
+  .fuente:hover { background: rgba(255,255,255,.08); }
+  .fuente.elegida { border-color: #bed161; }
+  .fuente img { width: 100%; aspect-ratio: 16/10; object-fit: contain; background: #0a0f1a; border-radius: 8px; display: block; }
+  .fuente span { display: block; margin-top: 6px; font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: #cfd5e1; }
+  footer { display: flex; justify-content: flex-end; gap: 10px; padding: 14px 22px 18px; border-top: 1px solid rgba(255,255,255,.06); }
+  footer button { font: inherit; border-radius: 999px; padding: 9px 22px; cursor: pointer; border: 1px solid rgba(255,255,255,.22); background: transparent; color: #fff; }
+  footer button.ok { background: #bed161; color: #1c2108; border-color: #bed161; font-weight: 600; }
+  footer button.ok:disabled { opacity: .4; cursor: default; }
+  .vacio { grid-column: 1 / -1; color: #8f9ab0; text-align: center; padding: 40px 0; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Elige qué compartir</h1>
+  <p>Toda la pantalla o una sola ventana.</p>
+</header>
+<nav>
+  <button data-tipo="pantalla" class="activo">Pantalla completa</button>
+  <button data-tipo="ventana">Ventanas</button>
+</nav>
+<main id="lista"></main>
+<footer>
+  <button id="cancelar">Cancelar</button>
+  <button id="compartir" class="ok" disabled>Compartir</button>
+</footer>
+<script>
+  let fuentes = [], tipo = "pantalla", elegida = null;
+  const lista = document.getElementById("lista");
+  const btn = document.getElementById("compartir");
+  function pintar() {
+    lista.textContent = "";
+    const visibles = fuentes.filter((f) => f.pantalla === (tipo === "pantalla"));
+    if (!visibles.length) {
+      const v = document.createElement("div");
+      v.className = "vacio";
+      v.textContent = tipo === "pantalla"
+        ? "No se ve ninguna pantalla. En Mac, da permiso en Ajustes del Sistema → Privacidad y seguridad → Grabación de pantalla, y vuelve a abrir Maven."
+        : "No hay ventanas para compartir.";
+      lista.appendChild(v);
+    }
+    visibles.forEach((f, i) => {
+      const b = document.createElement("button");
+      b.className = "fuente" + (f.id === elegida ? " elegida" : "");
+      const img = document.createElement("img"); img.src = f.imagen; img.alt = "";
+      const s = document.createElement("span");
+      s.textContent = f.pantalla ? (visibles.length > 1 ? "Pantalla " + (i + 1) : "Toda la pantalla") : f.nombre;
+      b.append(img, s);
+      b.onclick = () => { elegida = f.id; btn.disabled = false; pintar(); };
+      b.ondblclick = () => window.selector.elegir(f.id);
+      lista.appendChild(b);
+    });
+  }
+  document.querySelectorAll("nav button").forEach((b) => b.onclick = () => {
+    tipo = b.dataset.tipo; elegida = null; btn.disabled = true;
+    document.querySelectorAll("nav button").forEach((x) => x.classList.toggle("activo", x === b));
+    pintar();
+  });
+  document.getElementById("cancelar").onclick = () => window.selector.elegir(null);
+  btn.onclick = () => elegida && window.selector.elegir(elegida);
+  addEventListener("keydown", (e) => { if (e.key === "Escape") window.selector.elegir(null); });
+  window.selector.fuentes().then((f) => { fuentes = f; pintar(); });
+</script>
+</body>
+</html>

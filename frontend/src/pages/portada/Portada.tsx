@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type CSSProperties, type MouseEvent } from "react";
 import { MarcaMaven } from "@/components/MarcaM";
 import {
-  ArrowRight, Check, CheckSquare, ChevronDown, Eye, FileText, HardDrive, Mail, MessageSquare, MonitorUp, UserCheck, Video,
+  ArrowRight, Check, CheckSquare, ChevronDown, Eye, FileText, HardDrive, Laptop, Mail, MessageSquare, Monitor, MonitorUp, UserCheck, Video,
   type LucideIcon,
 } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
@@ -324,6 +324,29 @@ function VideoDeFondo() {
   );
 }
 
+// La app de computador (desktop/): los instaladores los sube el CI
+// (.github/workflows/app-escritorio.yml) al balde público `descargas`.
+const DESCARGAS = `${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/descargas`;
+const DESCARGA_MAC = `${DESCARGAS}/Maven-Mac.dmg`;
+const DESCARGA_WINDOWS = `${DESCARGAS}/Maven-Windows.exe`;
+
+function BajarApp() {
+  const { t } = useLanguage();
+  return (
+    <div className="pr-bajar-app">
+      <span>{t("portada.app.titulo")}</span>
+      <div className="pr-bajar-app-botones">
+        <a className="pr-btn pr-btn-fantasma" href={DESCARGA_MAC} download>
+          <Laptop aria-hidden="true" /> {t("portada.app.mac")}
+        </a>
+        <a className="pr-btn pr-btn-fantasma" href={DESCARGA_WINDOWS} download>
+          <Monitor aria-hidden="true" /> {t("portada.app.windows")}
+        </a>
+      </div>
+    </div>
+  );
+}
+
 export default function Portada({ idiomaDeRuta }: { idiomaDeRuta?: Idioma }) {
   const raiz = useRef<HTMLDivElement>(null);
   const { t, language, setLanguage } = useLanguage();
@@ -512,6 +535,7 @@ export default function Portada({ idiomaDeRuta }: { idiomaDeRuta?: Idioma }) {
           {demoAbierta ? null : (
             <a className="pr-btn pr-btn-neon pr-btn-lg" href="#demo" onClick={abrirDemo}>{t("portada.cta.demo")}</a>
           )}
+          <BajarApp />
         </div>
       </section>
 
@@ -526,6 +550,8 @@ export default function Portada({ idiomaDeRuta }: { idiomaDeRuta?: Idioma }) {
           <nav className="pr-pie-links" aria-label={t("portada.pie.enlaces")}>
             <Link to="/login">{t("portada.nav.entrar")}</Link>
             <a href="#demo" onClick={abrirDemo}>{t("portada.cta.demo")}</a>
+            <a href={DESCARGA_MAC} download>{t("portada.app.mac")}</a>
+            <a href={DESCARGA_WINDOWS} download>{t("portada.app.windows")}</a>
             <Link to="/privacidad">{t("portada.pie.privacidad")}</Link>
           </nav>
           <span className="pr-pie-copia">© {new Date().getFullYear()} Maven</span>
