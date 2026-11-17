@@ -185,6 +185,7 @@ function SelectorIdioma() {
       >
         <BanderaIdioma idioma={language} className="pr-idioma-bandera" />
         <span className="pr-idioma-codigo">{language.toUpperCase()}</span>
+        <span className="pr-idioma-nombre">{NOMBRE_IDIOMA[language]}</span>
         <ChevronDown aria-hidden="true" />
       </button>
       {abierto && (
