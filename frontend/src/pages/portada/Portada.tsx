@@ -153,18 +153,26 @@ function Marca({ chico = false }: { chico?: boolean }) {
   );
 }
 
-/** El video de fondo del inicio. Con «reducir movimiento» queda la foto fija. */
+/** El video de fondo del inicio. Con «reducir movimiento» queda la foto fija.
+ *  En el celular va la versión VERTICAL (hero-movil, 720 × 1280): cada escena
+ *  encuadrada en la cara o en el tablero de Cowork, porque el recorte al
+ *  centro del video ancho dejaba al dueño y a su tablero fuera del cuadro. */
 function VideoDeFondo() {
   const [quieto] = useState(
     () => typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches,
   );
+  const [movil] = useState(
+    () => typeof window !== "undefined" && !!window.matchMedia?.("(max-width: 700px)").matches,
+  );
+  const video = movil ? "/portada/hero-movil.mp4" : "/portada/hero.mp4";
+  const foto = movil ? "/portada/hero-movil-poster.jpg" : "/portada/hero-poster.jpg";
   return (
     <div className="pr-video" aria-hidden="true">
       {quieto ? (
-        <img src="/portada/hero-poster.jpg" alt="" />
+        <img src={foto} alt="" />
       ) : (
-        <video autoPlay muted loop playsInline preload="auto" poster="/portada/hero-poster.jpg">
-          <source src="/portada/hero.mp4" type="video/mp4" />
+        <video autoPlay muted loop playsInline preload="auto" poster={foto}>
+          <source src={video} type="video/mp4" />
         </video>
       )}
     </div>
