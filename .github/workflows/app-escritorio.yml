@@ -2,7 +2,7 @@
 # `descargas` de Supabase, de donde los baja el botón de la portada:
 #   …/storage/v1/object/public/descargas/Maven-Mac.dmg
 #   …/storage/v1/object/public/descargas/Maven-Windows.exe
-# Mac se arma en el Mac mini; Windows en Linux (ver cada job).
+# Mac se arma en el Mac mini; Windows en una máquina Windows de GitHub.
 # La llave de servicio se pide al vuelo con SUPABASE_ACCESS_TOKEN y no se guarda.
 name: app-escritorio
 
@@ -48,9 +48,13 @@ jobs:
             --data-binary "@$RUNNER_TEMP/escritorio/$ARCHIVO" >/dev/null
           curl -fsSI "https://$PROYECTO.supabase.co/storage/v1/object/public/descargas/$ARCHIVO" | grep -i content-length
 
-  # Windows: en Linux (el makensis del Mac mini es de Intel y ese Mac no tiene Rosetta).
+  # Windows: en una máquina Windows de GitHub (el makensis del Mac mini es de
+  # Intel sin Rosetta, y en Linux pide wine).
   windows:
-    runs-on: ubuntu-latest
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: bash
     timeout-minutes: 40
     env:
       PROYECTO: lsagslbkliprespbyhts
@@ -64,7 +68,7 @@ jobs:
         run: npm ci --no-audit --no-fund
       - name: Armar
         working-directory: desktop
-        run: npx electron-builder --win --publish never -c.directories.output="$RUNNER_TEMP/escritorio"
+        run: npx electron-builder --win --publish never -c.directories.output=dist
       - name: Subir a Supabase (balde descargas)
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
@@ -72,11 +76,11 @@ jobs:
           set -euo pipefail
           LLAVE=$(curl -fsS "https://api.supabase.com/v1/projects/$PROYECTO/api-keys?reveal=true" \
             -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
-            | python3 -c 'import json,sys; print(next(k["api_key"] for k in json.load(sys.stdin) if k["name"]=="service_role"))')
+            | node -e 'let d="";process.stdin.on("data",c=>d+=c).on("end",()=>console.log(JSON.parse(d).find(k=>k.name==="service_role").api_key))')
           echo "::add-mask::$LLAVE"
           curl -fsS -X POST "https://$PROYECTO.supabase.co/storage/v1/object/descargas/$ARCHIVO" \
             -H "Authorization: Bearer $LLAVE" -H "apikey: $LLAVE" \
             -H "x-upsert: true" -H "cache-control: max-age=300" \
             -H "Content-Type: application/octet-stream" \
-            --data-binary "@$RUNNER_TEMP/escritorio/$ARCHIVO" >/dev/null
+            --data-binary "@desktop/dist/$ARCHIVO" >/dev/null
           curl -fsSI "https://$PROYECTO.supabase.co/storage/v1/object/public/descargas/$ARCHIVO" | grep -i content-length
