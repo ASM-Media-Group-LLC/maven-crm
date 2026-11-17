@@ -1,13 +1,14 @@
 import { useEffect, useRef, useState, type CSSProperties, type MouseEvent } from "react";
 import { MarcaMaven } from "@/components/MarcaM";
 import {
-  ArrowRight, CheckSquare, ChevronDown, Eye, FileText, HardDrive, Mail, MessageSquare, MonitorUp, UserCheck, Video,
+  ArrowRight, Check, CheckSquare, ChevronDown, Eye, FileText, HardDrive, Mail, MessageSquare, MonitorUp, UserCheck, Video,
   type LucideIcon,
 } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { useLanguage } from "@/hooks/useLanguage";
 import { type TranslationKey } from "@/lib/i18n";
 import { IDIOMAS, NOMBRE_IDIOMA, esIdioma, type Idioma } from "@/lib/idiomas";
+import { BanderaIdioma } from "@/components/BanderaIdioma";
 import "./portada.css";
 import "./reinventada.css";
 
@@ -182,7 +183,8 @@ function SelectorIdioma() {
         aria-label={t("portada.idioma")}
         onClick={() => setAbierto((a) => !a)}
       >
-        <span>{language.toUpperCase()}</span>
+        <BanderaIdioma idioma={language} className="pr-idioma-bandera" />
+        <span className="pr-idioma-codigo">{language.toUpperCase()}</span>
         <ChevronDown aria-hidden="true" />
       </button>
       {abierto && (
@@ -202,7 +204,9 @@ function SelectorIdioma() {
                 }
               }}
             >
-              {NOMBRE_IDIOMA[l]}
+              <BanderaIdioma idioma={l} className="pr-idioma-bandera" />
+              <span>{NOMBRE_IDIOMA[l]}</span>
+              {l === language && <Check className="pr-idioma-hecho" aria-hidden="true" />}
             </li>
           ))}
         </ul>
