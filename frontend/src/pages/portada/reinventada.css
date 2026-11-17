@@ -81,9 +81,9 @@
 .pt.pr .pr-video video, .pt.pr .pr-video img { width: 100%; height: 100%; object-fit: cover; display: block; max-width: none; }
 .pt.pr .pr-video::after {
   content: ""; position: absolute; inset: 0; pointer-events: none;
-  /* «Menos tela, más transparente» (Alvaro): capa más liviana y menos azul;
-     solo el borde de abajo funde con el fondo marino. */
-  background: linear-gradient(180deg, rgba(10,13,20,.62) 0%, rgba(10,13,20,.32) 42%, rgba(10,13,20,.48) 72%, var(--pr-bg) 100%);
+  /* La «telita» azul marino, en el punto medio que pidió Alvaro: más que la
+     versión transparente, menos que la primera (que tapaba demasiado). */
+  background: linear-gradient(180deg, rgba(16,24,39,.70) 0%, rgba(16,24,39,.42) 42%, rgba(16,24,39,.57) 72%, var(--pr-bg) 100%);
 }
 .pt.pr .pr-hero h1 {
   margin: 0; font-size: clamp(2.6rem, 7.5vw, 5rem); font-weight: 800; line-height: 1.06; letter-spacing: -.02em;

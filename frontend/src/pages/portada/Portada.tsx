@@ -18,9 +18,11 @@ import PedirDemo from "./secciones/PedirDemo";
 // los colores de Maven. El video muestra un equipo repartido en varias casas
 // trabajando como si estuviera en la misma oficina.
 //
-// Precios decididos por Alvaro el mismo día: fijo por empresa, «Oficina»
-// USD 300 hasta 25 personas, «Con Argos» USD 900 hasta 50, «Empresa» a la
-// medida. Cambiar un precio es cambiar PLANES, nada más.
+// Precios de Alvaro (16/11/2026, segunda vuelta): fijo por empresa y todo
+// incluido, Argos también — Equipo USD 299 hasta 20 personas, Empresa USD 599
+// hasta 50, Corporativo USD 999 hasta 100 — más la instalación a la medida
+// desde USD 3.000 (pago único) en la nota de abajo. Cambiar un precio es
+// cambiar PLANES, nada más.
 //
 // TRES REGLAS DE CONTENIDO que no son opinión, son pedido explícito:
 //  1. Ni una cifra de la agencia (montos, cantidad de personas, uso real).
@@ -94,27 +96,27 @@ type Plan = {
 
 const PLANES: Plan[] = [
   {
-    nombre: "Oficina",
-    precio: "USD 300",
+    nombre: "Equipo",
+    precio: "USD 299",
     periodo: "/ mes · por empresa",
-    tope: "Hasta 25 personas",
+    tope: "Hasta 20 personas",
     incluye: [
       "Cowork en vivo, con cámara y pantalla",
-      "Reuniones con pantalla compartida",
-      "Mensajería y correo con tu dominio",
+      "Argos, la IA que vigila todo el turno",
+      "Reuniones, mensajería y correo con tu dominio",
       "Documentos, tareas y almacenamiento",
       "Tú apruebas quién entra",
     ],
     boton: "Pedir una demo",
   },
   {
-    nombre: "Con Argos",
-    precio: "USD 900",
+    nombre: "Empresa",
+    precio: "USD 599",
     periodo: "/ mes · por empresa",
-    tope: "Hasta 50 personas · la IA que vigila",
+    tope: "Hasta 50 personas",
     incluye: [
-      "Todo lo de Oficina",
-      "Argos revisa cámaras y pantallas todo el turno",
+      "Todo lo de Equipo",
+      "Un Cowork por área, cada uno con su supervisor",
       "Nota del 0 al 100 por persona, del día y de la semana",
       "Avisos al momento a la persona y a su jefe",
       "Expediente de cada persona, día por día",
@@ -123,16 +125,17 @@ const PLANES: Plan[] = [
     destacado: true,
   },
   {
-    nombre: "Empresa",
-    precio: "A la medida",
-    tope: "Más de 50 personas · tu marca",
+    nombre: "Corporativo",
+    precio: "USD 999",
+    periodo: "/ mes · por empresa",
+    tope: "Hasta 100 personas",
     incluye: [
-      "Todo lo de Con Argos",
-      "Más de 50 personas",
+      "Todo lo de Empresa",
+      "Hasta 100 personas en tu oficina",
       "Tu marca y tus colores en toda la plataforma",
       "Acompañamiento dedicado",
     ],
-    boton: "Hablemos",
+    boton: "Pedir una demo",
   },
 ];
 
@@ -326,7 +329,7 @@ export default function Portada() {
                   {p.incluye.map((linea) => <li key={linea}>{linea}</li>)}
                 </ul>
                 <a
-                  className={`pr-btn ${p.destacado || p.nombre === "Oficina" ? "pr-btn-neon" : "pr-btn-fantasma"}`}
+                  className="pr-btn pr-btn-neon"
                   href="#demo"
                   onClick={abrirDemo}
                 >
@@ -336,7 +339,9 @@ export default function Portada() {
             ))}
           </div>
           <p className="pr-precios-nota">
-            Precio fijo por empresa, no por persona. <b>¿Más de 50 personas?</b> Te armamos un plan a la medida.
+            Precio fijo por empresa, no por persona.{" "}
+            <b>Instalación e integraciones a la medida para tu empresa: desde USD&nbsp;3.000, pago único.</b>{" "}
+            ¿Más de 100 personas? Te armamos un plan a la medida.
           </p>
         </div>
       </section>
