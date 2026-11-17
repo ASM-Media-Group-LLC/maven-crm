@@ -153,27 +153,51 @@ function Marca({ chico = false }: { chico?: boolean }) {
   );
 }
 
-/** El video de fondo del inicio. Con «reducir movimiento» queda la foto fija.
- *  En el celular va la versión VERTICAL (hero-movil, 720 × 1280): cada escena
- *  encuadrada en la cara o en el tablero de Cowork, porque el recorte al
- *  centro del video ancho dejaba al dueño y a su tablero fuera del cuadro. */
+/** El video de fondo del inicio, IGUAL que el de Lumina en todos los tamaños:
+ *  un solo video ancho, a pantalla completa y centrado (en el celular se ve
+ *  recortado al centro, como el de Lumina). Con «reducir movimiento» queda la
+ *  foto fija.
+ *
+ *  OJO iPhone: Safari solo reproduce solo un video si `muted` está ESCRITO en
+ *  la etiqueta (Lumina lo tiene en su HTML). React no escribe ese atributo —
+ *  solo cambia la propiedad—, así que en el iPhone el video se quedaba quieto.
+ *  Se escribe a mano y se le da play; si el teléfono igual lo frena (modo de
+ *  bajo consumo), arranca con el primer toque en la página. */
 function VideoDeFondo() {
   const [quieto] = useState(
     () => typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches,
   );
-  const [movil] = useState(
-    () => typeof window !== "undefined" && !!window.matchMedia?.("(max-width: 700px)").matches,
-  );
-  const video = movil ? "/portada/hero-movil.mp4" : "/portada/hero.mp4";
-  const foto = movil ? "/portada/hero-movil-poster.jpg" : "/portada/hero-poster.jpg";
+  const ref = useRef<HTMLVideoElement>(null);
+  useEffect(() => {
+    const v = ref.current;
+    if (!v) return;
+    v.muted = true;
+    v.defaultMuted = true;
+    v.setAttribute("muted", "");
+    v.setAttribute("playsinline", "");
+    v.setAttribute("webkit-playsinline", "");
+    const arrancar = () => {
+      if (v.paused) v.play().catch(() => {});
+    };
+    arrancar();
+    document.addEventListener("touchstart", arrancar, { once: true, passive: true });
+    return () => document.removeEventListener("touchstart", arrancar);
+  }, []);
   return (
     <div className="pr-video" aria-hidden="true">
       {quieto ? (
-        <img src={foto} alt="" />
+        <img src="/portada/hero-poster.jpg" alt="" />
       ) : (
-        <video autoPlay muted loop playsInline preload="auto" poster={foto}>
-          <source src={video} type="video/mp4" />
-        </video>
+        <video
+          ref={ref}
+          src="/portada/hero.mp4"
+          poster="/portada/hero-poster.jpg"
+          autoPlay
+          muted
+          loop
+          playsInline
+          preload="auto"
+        />
       )}
     </div>
   );
