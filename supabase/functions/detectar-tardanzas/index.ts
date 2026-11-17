@@ -8,6 +8,10 @@
 //      cámara encendida en los primeros 15 min del turno. Correo aparte. Tabla
 //      camara_inicio_registro. No aplica a exonerados de cámara.
 //
+//   3) DESCUENTO DEL DÍA (Alvaro, 16/11): al cerrar el turno, si la persona pasó
+//      de sus minutos de gracia (15 sin pantalla, 15 sin cámara), correo a ella, a
+//      su jefe y a RR. HH. La cuenta la hace la base (argos_gracia_por_correo).
+//
 // Ambas son sanción aparte: no tocan la nota. Destinatarios: el empleado + el
 // dueño + los jefes (nivel admin/manager/supervisor) del mismo tenant.
 //
@@ -16,6 +20,7 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.4";
+import { asuntoGracia, correoGraciaHTML, type CierreGracia } from "../_shared/correo-gracia.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -94,6 +99,34 @@ function envoltura(cuerpo: string): string {
 </div></body></html>`;
 }
 
+// ── 3) DESCUENTO DEL DÍA ──
+// La base cierra los turnos, recalcula lo que RR. HH. tocó y dice qué correos
+// faltan. Aquí solo se buscan los correos y se manda: persona + jefe + RR. HH.
+async function correrGracia(admin: Admin): Promise<{ pendientes: number; enviados: number; errores: number }> {
+  const { data, error } = await admin.rpc("argos_gracia_por_correo");
+  if (error) throw new Error(error.message);
+  const filas = (data ?? []) as CierreGracia[];
+  if (filas.length === 0) return { pendientes: 0, enviados: 0, errores: 0 };
+
+  const emailPor = new Map<string, string>();
+  const { data: lista, error: errLista } = await admin.auth.admin.listUsers({ page: 1, perPage: 1000 });
+  if (errLista) throw new Error(errLista.message); // sin correos no se marca nada: se reintenta en 2 min
+  for (const u of (lista?.users ?? []) as Array<{ id: string; email?: string }>) if (u.email) emailPor.set(u.id, u.email);
+
+  let enviados = 0, errores = 0;
+  for (const f of filas) {
+    const to = [...new Set([f.user_id, ...(f.destinatarios ?? [])].map((id) => emailPor.get(id)).filter((e): e is string => !!e))];
+    if (to.length === 0) { errores++; continue; }
+    const { error: errEnvio } = await admin.functions.invoke("send-notification-email", {
+      body: { to, subject: asuntoGracia(f), html: correoGraciaHTML(f), tag: f.es_correccion ? "gracia-correccion" : "gracia-descuento" },
+    });
+    if (errEnvio) { errores++; continue; } // queda pendiente: se reintenta en la próxima vuelta
+    const { error: errMarca } = await admin.rpc("argos_gracia_marcar_correo", { _uid: f.user_id, _turno: f.turno, _correo_a: to });
+    if (errMarca) errores++; else enviados++;
+  }
+  return { pendientes: filas.length, enviados, errores };
+}
+
 interface Persona {
   user_id: string; tenant_id: string;
   entrada: string; entradaMin: number; tolerancia: number;
@@ -109,6 +142,8 @@ serve(async (req) => {
   }
 
   const admin: Admin = createClient(SUPABASE_URL, SERVICE_KEY, { auth: { persistSession: false, autoRefreshToken: false } });
+  // El descuento del día va primero y aparte: no depende de quién tiene hora de entrada.
+  const gracia = await correrGracia(admin).catch((e) => ({ error: (e as Error).message }));
   const ahora = new Date();
   const hoy = diaBogota(ahora);
   const nowMin = minBogota(ahora);
@@ -163,7 +198,7 @@ serve(async (req) => {
     });
   }
   if (candidatos.length === 0) {
-    return new Response(JSON.stringify({ ok: true, candidatos: 0 }), { headers: { ...CORS, "Content-Type": "application/json" } });
+    return new Response(JSON.stringify({ ok: true, candidatos: 0, gracia }), { headers: { ...CORS, "Content-Type": "application/json" } });
   }
 
   // Ya avisados hoy (cada tipo su tabla).
@@ -266,5 +301,5 @@ serve(async (req) => {
     }
   }
 
-  return new Response(JSON.stringify({ ok: true, candidatos: candidatos.length, tardNuevas, camNuevas }), { headers: { ...CORS, "Content-Type": "application/json" } });
+  return new Response(JSON.stringify({ ok: true, candidatos: candidatos.length, tardNuevas, camNuevas, gracia }), { headers: { ...CORS, "Content-Type": "application/json" } });
 });
