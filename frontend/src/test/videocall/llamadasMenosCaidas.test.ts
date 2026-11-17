@@ -356,7 +356,7 @@ describe("6. el aviso de versión nueva con una llamada andando", () => {
 
 describe("7. mapas de fuente: se generan ocultos y nunca se sirven", () => {
   it("vite los genera «hidden» (los .js no los nombran)", () => {
-    expect(leer("/vite.config.ts")).toContain('sourcemap: "hidden"');
+    expect(leer("/vite.config.ts")).toContain('sourcemap: process.env.MAVEN_MAPAS === "1" ? "hidden" : false');
   });
 
   it("el Dockerfile los saca de la imagen después del build", () => {

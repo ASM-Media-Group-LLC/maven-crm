@@ -22,5 +22,9 @@ export VITE_PUBLIC_URL=__RUNTIME_VITE_PUBLIC_URL__
 export VITE_GIPHY_API_KEY=__RUNTIME_VITE_GIPHY_API_KEY__
 export VITE_DOCS_SYNC_URL=__RUNTIME_VITE_DOCS_SYNC_URL__
 
+# Los mapas solo se generan con esta variable (en la imagen no: se quedaba sin memoria).
+export MAVEN_MAPAS=1
+export NODE_OPTIONS="--max-old-space-size=6144"
+
 npx vite build --outDir "$SALIDA" --emptyOutDir
 echo "Mapas de fuente en $SALIDA/assets/*.js.map"

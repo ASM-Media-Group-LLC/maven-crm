@@ -184,7 +184,9 @@ export default defineConfig(({ mode }) => ({
     // qué código corresponden. «hidden»: se generan, pero los .js no los
     // nombran (el navegador no los pide) y el Dockerfile los saca de la imagen,
     // así que nunca se sirven. Para leerlos: scripts/mapas-de-produccion.sh.
-    sourcemap: "hidden",
+    // ⚠️ Solo con MAVEN_MAPAS=1: generarlos en el build de la imagen se quedaba
+    // sin memoria (heap de 2 GB, CI del 17/11) y habría tumbado el deploy.
+    sourcemap: process.env.MAVEN_MAPAS === "1" ? "hidden" : false,
     // The eager-loaded sidebar pages push the main chunk over Vite's
     // default 500 KB warning threshold. We don't care about the warning
     // since manualChunks below splits it into reasonable vendor pieces.
