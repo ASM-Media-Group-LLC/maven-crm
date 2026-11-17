@@ -625,6 +625,12 @@ export const messenger = {
   // Llamada: chat de la llamada (CallChatSidebar).
   "messenger.callChat.titulo": { es: "Chat de la llamada", en: "Call chat" },
   "messenger.callChat.vacio": { es: "Los mensajes del chat aparecerán aquí", en: "Chat messages will show up here" },
+  "messenger.callChat.adjuntar": { es: "Adjuntar archivo", en: "Attach file" },
+  "messenger.callChat.archivoGrande": { es: "El archivo pesa más de {mb} MB", en: "The file is larger than {mb} MB" },
+  "messenger.callChat.enviando": { es: "Enviando {name}… {pct}%", en: "Sending {name}… {pct}%" },
+  "messenger.callChat.noSeEnvio": { es: "No se pudo enviar el archivo", en: "Couldn't send the file" },
+  "messenger.callChat.descargar": { es: "Descargar", en: "Download" },
+  "messenger.callChat.archivoAntes": { es: "Archivo compartido antes de que entraras", en: "File shared before you joined" },
 
   // Llamada: participantes (CallParticipantsSidebar).
   "messenger.participants.titulo": { es: "Participantes ({n})", en: "Participants ({n})" },

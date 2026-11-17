@@ -10,6 +10,9 @@ import { docPipSupported } from "@/pages/cowork/usePipWindow";
 import PreJoinLobby from "./messenger/videocall/PreJoinLobby";
 import { useQuienesEstanEnLaSala } from "@/hooks/useQuienesEstanEnLaSala";
 import MeetGuestGate from "./meet/MeetGuestGate";
+import InvitarDeAfuera from "./meet/InvitarDeAfuera";
+import { salaAdmiteInvitados } from "@/lib/meetLinkInvitado";
+import { useRoleTier } from "@/hooks/useRoleTier";
 import type { BackgroundEffect } from "./messenger/videocall/BackgroundSelector";
 import { Loader2 } from "lucide-react";
 import { useLanguage } from "@/hooks/useLanguage";
@@ -23,6 +26,9 @@ export default function VideoCallPage() {
   // Viaja como título de la grabación (se guarda): no se traduce.
   const callDisplayName = searchParams.get("name") || roomName || "Videollamada";
   const { user } = useAuth();
+  // Invitar gente de afuera (link directo, sin sala de espera): supervisores y
+  // arriba, en un Meet o en una llamada del Messenger (Alvaro, 17/11/2026).
+  const { isSupervisorOrAbove } = useRoleTier();
   const [joined, setJoined] = useState(false);
   const [coworkRedirecting, setCoworkRedirecting] = useState(() => {
     // Synchronously detect cowork rooms to block rendering from the start
@@ -215,6 +221,7 @@ export default function VideoCallPage() {
               : undefined
           }
           shareLink={meetShareLink ?? undefined}
+          accionesBarra={isSupervisorOrAbove && salaAdmiteInvitados(roomName) ? <InvitarDeAfuera livekitRoom={roomName} /> : undefined}
         />
         {/* Sala de espera: si es una reunión de Meet, quien está adentro (con
             cuenta) ve a los invitados sin cuenta que piden entrar y los admite.
@@ -228,7 +235,9 @@ export default function VideoCallPage() {
 
             Es un hueco que abre esta misma función: antes no había motivo para
             estar fuera de la pestaña. */}
-        {roomName.startsWith("meet_") && <MeetGuestGate livekitRoom={roomName} />}
+        {/* Admitir a alguien de afuera es invitarlo: solo supervisores y
+            arriba (la edge decideGuest lo exige igual). */}
+        {roomName.startsWith("meet_") && isSupervisorOrAbove && <MeetGuestGate livekitRoom={roomName} />}
       </LlamadaEnVentanaFlotante>
     </div>
   );

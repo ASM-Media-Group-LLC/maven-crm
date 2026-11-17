@@ -10,7 +10,8 @@ import { corsFor } from "../_shared/cors.ts";
 // necesita poder leer la tabla (ni enumerarla), igual que el join de Cowork.
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { agenciaDePersona, agenciaDeReunion, SIN_AGENCIA } from "../_shared/livekit-agencia.ts";
+import { agenciaDePersona, agenciaDeReunion, revisarSala, SIN_AGENCIA } from "../_shared/livekit-agencia.ts";
+import { correosDeInvitacion, firmarLink, sirveParaReusar, vencimientoDelLink } from "../_shared/meet-link.ts";
 
 const corsHeaders = (req: Request) => corsFor(req, { "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version" });
 
@@ -34,6 +35,59 @@ function normalizeCode(raw: unknown): string {
 async function rememberMembership(admin: any, meetRoomId: string, userId: string) {
   await admin.from("meet_room_members")
     .upsert({ meet_room_id: meetRoomId, user_id: userId }, { onConflict: "meet_room_id,user_id", ignoreDuplicates: true });
+}
+
+// Supervisores y arriba (Alvaro, 17/11): crean Meets, reparten links para gente
+// de afuera y admiten invitados. Los chatters no. Si la consulta falla NO se
+// concluye «no puede»: se corta con error (un fallo no es un «no»).
+// deno-lint-ignore no-explicit-any
+async function esSupervisorOMas(admin: any, userId: string): Promise<boolean> {
+  const { data, error } = await admin.rpc("is_in_role_group", { _user_id: userId, _group: "supervisor_or_above" });
+  if (error) throw new Error(`No se pudo revisar tu rol: ${error.message}`);
+  return data === true;
+}
+
+const SOLO_SUPERVISORES = "Solo supervisores y arriba pueden invitar gente de afuera";
+
+const secretoDeLinks = () =>
+  Deno.env.get("MEET_LINK_SECRET") || Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+
+const urlDeLaApp = () => (Deno.env.get("APP_URL") || "https://app.maven-ai.me").replace(/\/$/, "");
+
+function escapar(s: string): string {
+  return s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]!));
+}
+
+// El link de invitado de una sala para esta persona: reusa uno vivo suyo (con
+// al menos una hora por delante) o crea uno nuevo. Devuelve el texto del link
+// (id.firma), que nunca se guarda en la base.
+// deno-lint-ignore no-explicit-any
+async function linkDeInvitado(admin: any, opts: {
+  sala: string; familia: "meet" | "llamada"; agencia: string; userId: string;
+  meetRoomId: string | null; agendadaPara: Date | null;
+}): Promise<{ link: string; expiresAt: string }> {
+  const ahora = new Date();
+  const { data: vivos, error: leerErr } = await admin.from("meet_invite_links")
+    .select("id, expires_at")
+    .eq("livekit_room_name", opts.sala).eq("created_by", opts.userId)
+    .is("revoked_at", null).gt("expires_at", ahora.toISOString())
+    .order("expires_at", { ascending: false }).limit(1);
+  if (leerErr) throw new Error(leerErr.message);
+  const vivo = (vivos ?? [])[0];
+  if (vivo && sirveParaReusar(vivo.expires_at, ahora)) {
+    return { link: await firmarLink(vivo.id, secretoDeLinks()), expiresAt: vivo.expires_at };
+  }
+  const { data: nuevo, error: insErr } = await admin.from("meet_invite_links")
+    .insert({
+      livekit_room_name: opts.sala,
+      meet_room_id: opts.meetRoomId,
+      tenant_id: opts.agencia,
+      created_by: opts.userId,
+      expires_at: vencimientoDelLink(opts.familia, ahora, opts.agendadaPara).toISOString(),
+    })
+    .select("id, expires_at").single();
+  if (insErr) throw new Error(insErr.message);
+  return { link: await firmarLink(nuevo.id, secretoDeLinks()), expiresAt: nuevo.expires_at };
 }
 
 serve(async (req) => {
@@ -72,14 +126,19 @@ serve(async (req) => {
     // CREATE
     // ═══════════════════════════════════════════════════════════════
     if (action === "create") {
-      // Crear un Meet lo puede hacer CUALQUIERA (fallback 'member'), a diferencia
-      // de Cowork que exige supervisor+. Igual pasa por can_use_module_function
-      // para que un admin pueda quitarle el permiso a un rol desde la UI.
+      // Crear un Meet: supervisores y arriba (Alvaro, 17/11/2026; antes lo
+      // podía cualquiera). Es un piso duro: aunque Administración → Roles le
+      // marque el permiso a un rol de chatter, no crea. Arriba del piso sigue
+      // pasando por can_use_module_function para que un admin se lo pueda quitar
+      // a un rol de supervisor.
+      if (!(await esSupervisorOMas(admin, userId))) {
+        return err(req, "Solo supervisores y arriba pueden crear reuniones", 403);
+      }
       const { data: canCreate, error: permErr } = await admin.rpc("can_use_module_function", {
         _user_id: userId,
         _module: "Meet",
         _submodule: "Crear reunión",
-        _fallback_group: "member",
+        _fallback_group: "supervisor_or_above",
       });
       if (permErr) return err(req, permErr.message, 500);
       if (!canCreate) return err(req, "Tu rol no permite crear reuniones", 403);
@@ -218,6 +277,8 @@ serve(async (req) => {
       const requestId = String(body.requestId ?? "");
       const admit = body.admit === true;
       if (!requestId) return err(req, "requestId required");
+      // Dejar entrar a alguien de afuera es invitarlo: supervisores y arriba.
+      if (!(await esSupervisorOMas(admin, userId))) return err(req, SOLO_SUPERVISORES, 403);
 
       const { data: request } = await admin.from("meet_guest_requests")
         .select("id, status, meet_room_id").eq("id", requestId).maybeSingle();
@@ -241,6 +302,162 @@ serve(async (req) => {
       if (upErr) return err(req, upErr.message, 500);
 
       return json(req, { ok: true, status: admit ? "admitted" : "denied" });
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // INVITE LINK — link directo para alguien de afuera (sin cuenta, sin
+    // sala de espera). Sirve para un Meet (meet_…) y para una llamada del
+    // Messenger (call-<conversación>). Solo supervisores y arriba.
+    // ═══════════════════════════════════════════════════════════════
+    if (action === "inviteLink") {
+      if (!(await esSupervisorOMas(admin, userId))) return err(req, SOLO_SUPERVISORES, 403);
+      const sala = await revisarSala(admin, miAgencia, body.livekitRoom);
+      if (!sala.ok) return err(req, sala.error, sala.status);
+      const livekitRoom = String(body.livekitRoom);
+
+      let meetRoomId: string | null = null;
+      let agendadaPara: Date | null = null;
+      if (sala.familia === "meet") {
+        const { data: room } = await admin.from("meet_rooms").select("*")
+          .eq("livekit_room_name", livekitRoom).maybeSingle();
+        if (!room || !(await esDeMiAgencia(room))) return err(req, "Reunión no encontrada", 404);
+        if (room.status !== "active") return err(req, "Esa reunión ya terminó", 410);
+        meetRoomId = room.id;
+        agendadaPara = room.scheduled_for ? new Date(room.scheduled_for) : null;
+      } else if (sala.familia === "llamada") {
+        // Solo quien es de ESA conversación reparte links a su llamada.
+        const conversacion = livekitRoom.slice("call-".length);
+        const { data: soyParte, error: pErr } = await admin.from("chat_participants")
+          .select("user_id").eq("conversation_id", conversacion).eq("user_id", userId).limit(1);
+        if (pErr) return err(req, pErr.message, 500);
+        if (!soyParte?.length) return err(req, "Sala no encontrada", 404);
+      } else {
+        return err(req, "Las salas de Cowork no tienen link de invitado", 403);
+      }
+
+      const { link, expiresAt } = await linkDeInvitado(admin, {
+        sala: livekitRoom, familia: sala.familia, agencia: sala.agencia, userId, meetRoomId, agendadaPara,
+      });
+      return json(req, { link, expiresAt });
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // REVOKE INVITE LINKS — anular los links de invitado de una sala (si un
+    // link se compartió de más). Quien modera la sala anula todos; los demás,
+    // solo los suyos. Los que ya están adentro siguen; nadie más entra con esos.
+    // ═══════════════════════════════════════════════════════════════
+    if (action === "revokeInviteLinks") {
+      const sala = await revisarSala(admin, miAgencia, body.livekitRoom);
+      if (!sala.ok) return err(req, sala.error, sala.status);
+      const livekitRoom = String(body.livekitRoom);
+      const { data: modera } = await admin.rpc("can_moderate_livekit_room", { _user_id: userId, _room: livekitRoom });
+      let q = admin.from("meet_invite_links")
+        .update({ revoked_at: new Date().toISOString(), revoked_by: userId })
+        .eq("livekit_room_name", livekitRoom).is("revoked_at", null);
+      if (modera !== true) q = q.eq("created_by", userId);
+      const { error: upErr } = await q;
+      if (upErr) return err(req, upErr.message, 500);
+      return json(req, { ok: true });
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // SCHEDULE — agendar un Meet para una hora y mandar la invitación por
+    // correo con el link de invitado. Supervisores y arriba.
+    //
+    // El correo lo arma ESTE servidor (asunto y cuerpo fijos, con el nombre,
+    // la hora y el link): el navegador solo manda nombre, hora y direcciones.
+    // send-call-invitation se apagó justamente por aceptar HTML del cliente
+    // (relevo de phishing). Tope de 25 direcciones por reunión.
+    // ═══════════════════════════════════════════════════════════════
+    if (action === "schedule") {
+      if (!(await esSupervisorOMas(admin, userId))) return err(req, "Solo supervisores y arriba pueden agendar reuniones", 403);
+      const { data: canCreate, error: permErr } = await admin.rpc("can_use_module_function", {
+        _user_id: userId, _module: "Meet", _submodule: "Crear reunión", _fallback_group: "supervisor_or_above",
+      });
+      if (permErr) return err(req, permErr.message, 500);
+      if (!canCreate) return err(req, "Tu rol no permite crear reuniones", 403);
+
+      const cuando = new Date(String(body.startsAt ?? ""));
+      if (isNaN(cuando.getTime())) return err(req, "Elige el día y la hora de la reunión");
+      if (cuando.getTime() < Date.now() - 5 * 60 * 1000) return err(req, "Esa hora ya pasó");
+      if (cuando.getTime() > Date.now() + 90 * 24 * 60 * 60 * 1000) return err(req, "Agenda con menos de 90 días de anticipación");
+      const correos = correosDeInvitacion(body.emails);
+      const zona = String(body.timeZone ?? "").slice(0, 60) || "America/Bogota";
+
+      const { count: activeCount } = await admin.from("meet_rooms")
+        .select("*", { count: "exact", head: true })
+        .eq("created_by", userId).eq("status", "active");
+      if (activeCount !== null && activeCount >= 10) {
+        return err(req, "Tienes 10 reuniones abiertas. Termina alguna para crear otra.");
+      }
+
+      const name = (String(body.name ?? "").trim() || "Reunión").slice(0, 80);
+      const livekitRoom = `meet_${crypto.randomUUID().replace(/-/g, "").slice(0, 12)}`;
+      const { data: room, error: insErr } = await admin.from("meet_rooms")
+        .insert({ name, livekit_room_name: livekitRoom, created_by: userId, scheduled_for: cuando.toISOString() })
+        .select("*")
+        .single();
+      if (insErr) return err(req, insErr.message, 500);
+      // La base ya la pone en mi agencia (trigger meet_rooms_agencia); se
+      // confirma igual antes de repartir un link que la abre a gente de afuera.
+      if (!(await esDeMiAgencia(room))) return err(req, "Reunión no encontrada", 404);
+      await rememberMembership(admin, room.id, userId);
+
+      const { link, expiresAt } = await linkDeInvitado(admin, {
+        sala: livekitRoom, familia: "meet", agencia: miAgencia, userId, meetRoomId: room.id, agendadaPara: cuando,
+      });
+      const url = `${urlDeLaApp()}/unirse/${link}`;
+
+      // Correo: con Resend si hay llave. Sin llave la reunión igual queda
+      // agendada y el link vuelve para copiarlo a mano (la UI lo avisa).
+      const llave = Deno.env.get("RESEND_API_KEY");
+      let enviados = 0;
+      const fallidos: string[] = [];
+      if (correos.length && llave) {
+        const { data: perfil } = await admin.from("profiles").select("full_name").eq("id", userId).maybeSingle();
+        const quien = String(perfil?.full_name || "Maven").slice(0, 80);
+        let hora: string;
+        try {
+          hora = new Intl.DateTimeFormat("es", { dateStyle: "full", timeStyle: "short", timeZone: zona }).format(cuando);
+        } catch {
+          hora = new Intl.DateTimeFormat("es", { dateStyle: "full", timeStyle: "short", timeZone: "UTC" }).format(cuando) + " (UTC)";
+        }
+        const remitenteRaw = Deno.env.get("NOTIFICATION_FROM_EMAIL") || "noreply@mail.maven-ai.me";
+        const from = remitenteRaw.includes("<") ? remitenteRaw : `Maven <${remitenteRaw}>`;
+        const html = `<div style="font-family:system-ui,-apple-system,Segoe UI,sans-serif;max-width:520px;margin:0 auto;padding:24px;color:#0f172a">
+  <p style="font-size:14px;color:#64748b;margin:0 0 6px">${escapar(quien)} te invitó a una reunión</p>
+  <h1 style="font-size:22px;margin:0 0 12px">${escapar(name)}</h1>
+  <p style="font-size:15px;margin:0 0 20px">${escapar(hora)}</p>
+  <a href="${escapar(url)}" style="display:inline-block;background:#0f172a;color:#fff;text-decoration:none;padding:12px 22px;border-radius:999px;font-weight:600">Entrar a la reunión</a>
+  <p style="font-size:12px;color:#64748b;margin:20px 0 0">No necesitas cuenta: abre el link, escribe tu nombre y entras.<br>${escapar(url)}</p>
+</div>`;
+        for (const para of correos) {
+          try {
+            const r = await fetch("https://api.resend.com/emails", {
+              method: "POST",
+              headers: { Authorization: `Bearer ${llave}`, "Content-Type": "application/json" },
+              body: JSON.stringify({
+                from, to: [para],
+                subject: `Invitación: ${name} · ${hora}`,
+                html,
+                tags: [{ name: "type", value: "meet_invitacion" }],
+              }),
+            });
+            if (r.ok) enviados++; else fallidos.push(para);
+          } catch {
+            fallidos.push(para);
+          }
+        }
+      }
+
+      return json(req, {
+        room: {
+          id: room.id, code: room.code, name: room.name, livekit_room_name: room.livekit_room_name,
+          created_at: room.created_at, scheduled_for: room.scheduled_for,
+        },
+        link, expiresAt,
+        correo: { pedidos: correos.length, enviados, fallidos, configurado: !!llave },
+      });
     }
 
     // ═══════════════════════════════════════════════════════════════

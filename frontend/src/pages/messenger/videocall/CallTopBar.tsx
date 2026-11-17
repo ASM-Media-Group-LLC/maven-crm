@@ -19,10 +19,12 @@ interface CallTopBarProps {
   /** Algo más al lado del nombre (Cowork pone acá el selector de sesión: sobre
    *  el video tapaba el nombre de la gente). */
   extra?: ReactNode;
+  /** Botones extra a la derecha (antes de «Copiar enlace»). */
+  acciones?: ReactNode;
 }
 
 export default function CallTopBar({
-  roomName, participantCount, isEncrypted, onOpenAdjustView, shareLink, hideShareLink, compact, tactil, extra,
+  roomName, participantCount, isEncrypted, onOpenAdjustView, shareLink, hideShareLink, compact, tactil, extra, acciones,
 }: CallTopBarProps) {
   const { t } = useLanguage();
   const [elapsed, setElapsed] = useState(0);
@@ -78,6 +80,7 @@ export default function CallTopBar({
         <span className={cn("text-muted-foreground mr-1", compact ? "text-[10px]" : "text-xs mr-2")}>
           {participantCount === 1 ? t("messenger.topbar.unParticipante") : t("messenger.metrics.nParticipantes", { n: participantCount })}
         </span>
+        {acciones}
         {!hideShareLink && !compact && (
           <button
             onClick={copyLink}

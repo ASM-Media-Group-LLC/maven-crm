@@ -42,7 +42,7 @@ const FUERA_DEL_SHELL = new Set([
   "Portada", "Concepto", "Privacidad", "Login", "NotFound", "ForgotPassword", "ResetPassword",
   // Documentación pública del producto (/documentation): fuera del shell, como la portada.
   "Documentacion",
-  "VideoCallPage", "MeetGuestPage", "ChatterPublicSession", "ChatterPublicView", "DiagnosticoPantalla",
+  "VideoCallPage", "MeetGuestPage", "MeetLinkPage", "ChatterPublicSession", "ChatterPublicView", "DiagnosticoPantalla",
   "DesignSystem", "Docs", 
   // Portal de creadoras: entrar y elegir contraseña son públicas (como Login y
   // ResetPassword), y PortalLayout es su marco (monta un <Outlet>). Sus páginas

@@ -23,7 +23,7 @@ import { useLanguage } from "@/hooks/useLanguage";
 //    es un aviso que nadie leyó.
 
 /** Rutas de gente ajena a la empresa: ahí el aviso no va nunca. */
-const RUTAS_PUBLICAS = ["/chatter/", "/entrar/", "/reset-password", "/forgot-password"];
+const RUTAS_PUBLICAS = ["/chatter/", "/entrar/", "/unirse/", "/reset-password", "/forgot-password"];
 
 const MARCA = "maven.aviso-mudanza-cerrado";
 const VOLVER_A_MOSTRAR_MS = 10 * 60 * 1000;

@@ -12,6 +12,9 @@ import { usePermissions } from "@/hooks/usePermissions";
 import { isCompleteRoomCode } from "@/lib/coworkRoomCode";
 import { parseJoinInput } from "@/lib/meetJoinInput";
 import { useLanguage } from "@/hooks/useLanguage";
+import { useRoleTier } from "@/hooks/useRoleTier";
+import { invocarMeetRoom } from "@/lib/meetLinkInvitado";
+import AgendarMeet from "./AgendarMeet";
 
 // El link que se COMPARTE es /entrar/<código>, no /call/<sala>: esa página manda
 // a la llamada a quien tiene cuenta en Maven y le pide entrada a quien no la
@@ -36,7 +39,7 @@ function openCall(room: MeetRoom) {
 export default function MeetPage() {
   const {
     myRooms, setMyRooms, loading,
-    createRoom, joinByCode, resolveByLivekitRoom, renameRoom, setPinned, reorder, endRoom,
+    createRoom, joinByCode, resolveByLivekitRoom, renameRoom, setPinned, reorder, endRoom, refresh,
   } = useMeetRooms();
   const { t } = useLanguage();
   const [renameTarget, setRenameTarget] = useState<MeetRoom | null>(null);
@@ -47,10 +50,25 @@ export default function MeetPage() {
   const [joinInput, setJoinInput] = useState("");
   const [joining, setJoining] = useState(false);
 
-  // Crear una reunión lo puede hacer cualquiera; un admin puede quitar el permiso
-  // por rol desde Administración → Roles y acá se respeta (misma precedencia que
-  // aplica la edge: fila explícita ?? default, que para Meet es "todos").
-  const canCreate = explicitPermission("Meet", "Crear reunión") ?? true;
+  // Crear una reunión: supervisores y arriba (Alvaro, 17/11/2026; los chatters
+  // no). Arriba de ese piso, un admin puede quitar el permiso por rol desde
+  // Administración → Roles (misma regla que aplica la edge meet-room).
+  const { isSupervisorOrAbove } = useRoleTier();
+  const canCreate = isSupervisorOrAbove && (explicitPermission("Meet", "Crear reunión") ?? true);
+
+  // El link que se comparte: para supervisores y arriba, el DIRECTO de invitado
+  // (/unirse/…: escribe su nombre y entra, sin sala de espera). Para el resto,
+  // /entrar/<código>: los de Maven entran y alguien de afuera tiene que esperar
+  // a que un supervisor lo admita. Si pedir el directo falla, cae al de código.
+  const linkParaCompartir = async (room: MeetRoom): Promise<string> => {
+    if (!isSupervisorOrAbove) return shareLink(room);
+    try {
+      const r = await invocarMeetRoom("inviteLink", { livekitRoom: room.livekit_room_name });
+      return `${getPublicBaseUrl()}/unirse/${r.link}`;
+    } catch {
+      return shareLink(room);
+    }
+  };
 
   const handleCreate = async () => {
     setCreating(true);
@@ -58,7 +76,7 @@ export default function MeetPage() {
       const room = await createRoom();
       openCall(room);
       await navigator.clipboard
-        .writeText(shareLink(room))
+        .writeText(await linkParaCompartir(room))
         .catch(() => { /* sin permiso de portapapeles: el link igual está en la lista */ });
       toast.success(t("meet.created", { code: room.code }), {
         description: t("meet.createdDesc"),
@@ -87,8 +105,8 @@ export default function MeetPage() {
     }
   };
 
-  const copyLink = (room: MeetRoom) => {
-    navigator.clipboard.writeText(shareLink(room));
+  const copyLink = async (room: MeetRoom) => {
+    await navigator.clipboard.writeText(await linkParaCompartir(room)).catch(() => {});
     toast.success(t("meet.linkCopied"));
   };
 
@@ -170,6 +188,7 @@ export default function MeetPage() {
                 : t("meet.subtitleNew")}
             </p>
           </div>
+          {canCreate && <AgendarMeet onAgendada={() => void refresh()} />}
           {canCreate && (
             <Button
               onClick={handleCreate}
@@ -285,7 +304,7 @@ export default function MeetPage() {
                             className="h-8 w-8 tactil:h-10 tactil:w-10 rounded-full text-muted-foreground hover:text-primary"
                             title={t("meet.copyLink")}
                             aria-label={t("meet.copyLink")}
-                            onClick={() => copyLink(room)}
+                            onClick={() => void copyLink(room)}
                           >
                             <Link2 className="h-4 w-4" />
                           </Button>

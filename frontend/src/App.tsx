@@ -51,6 +51,7 @@ const VideoCallPage = lazy(() => import("./pages/VideoCallPage"));
 const CoworkPage = lazy(() => import("./pages/cowork/CoworkPage"));
 const MeetPage = lazy(() => import("./pages/meet/MeetPage"));
 const MeetGuestPage = lazy(() => import("./pages/meet/MeetGuestPage"));
+const MeetLinkPage = lazy(() => import("./pages/meet/MeetLinkPage"));
 // Portal de creadoras: su espacio, fuera del AppShell del equipo.
 const PortalLayout = lazy(() => import("./pages/portal/PortalLayout"));
 const PortalInicio = lazy(() => import("./pages/portal/PortalInicio"));
@@ -325,6 +326,9 @@ const App = () => (
               {/* Invitado a un Meet sin cuenta en Maven: pide entrada y espera que
                   alguien de adentro lo admita. Pública a propósito. */}
               <Route path="/entrar/:code" element={<MeetGuestPage />} />
+              {/* Link directo de invitado (Meet o llamada del Messenger): escribe
+                  su nombre y entra, sin cuenta y sin sala de espera. Pública. */}
+              <Route path="/unirse/:link" element={<MeetLinkPage />} />
 
               {/* Portal de creadoras: entrar y elegir contraseña son públicas; su
                   espacio lo cuida PortalLayout (solo cuentas de creadora). */}

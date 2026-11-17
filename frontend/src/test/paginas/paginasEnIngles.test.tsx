@@ -96,6 +96,9 @@ vi.mock("@/hooks/usePermissions", () => ({
   }),
 }));
 vi.mock("@/hooks/useUserRole", () => ({ useUserRole: () => ({ isAdmin: true, role: "admin", isLoading: false }) }));
+// Crear y agendar reuniones es de supervisores y arriba (Alvaro, 17/11/2026):
+// el usuario de la prueba es admin, así que ve «New meeting» y «Schedule».
+vi.mock("@/hooks/useRoleTier", () => ({ useRoleTier: () => ({ tier: "admin", isLoading: false, isSupervisorOrAbove: true }) }));
 vi.mock("sonner", () => ({ toast: Object.assign(vi.fn(), { success: vi.fn(), error: vi.fn() }) }));
 
 // ── Meet ────────────────────────────────────────────────────────────────────
@@ -295,6 +298,7 @@ describe("Meet en inglés", () => {
     montar(<MeetPage />);
     await screen.findByText("Weekly sync");
     expect(screen.getByText("New meeting")).toBeTruthy();
+    expect(screen.getByText("Schedule")).toBeTruthy();
     expect(enEspanol()).toEqual([]);
     fireEvent.click(screen.getByRole("button", { name: "Rename" }));
     const dialogo = await screen.findByRole("dialog");
