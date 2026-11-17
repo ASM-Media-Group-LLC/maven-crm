@@ -1,7 +1,7 @@
 /* ═══════════════════════════════════════════════════════════════════════
    PANTALLAS DE ENTRAR con la piel de la portada «La oficina, reinventada.»
    Mismos tokens que portada/reinventada.css: azul marino #101827, tarjeta
-   #141d2e, verde de los botones #4fd88d, Sora en los títulos. Todo va bajo
+   #141d2e, verde de los botones #60dc9c, Sora en los títulos. Todo va bajo
    `.entrar` para no escaparse al resto de la app. Los formularios de cada
    pantalla traen sus propias clases (Tailwind); acá se pisan con selectores
    más específicos para que todas queden iguales sin tocar su lógica.
@@ -14,8 +14,8 @@
   --en-campo: #0f1624;
   --en-texto: #ffffff;
   --en-gris: #8f9ab0;
-  --en-verde: #4fd88d;
-  --en-verde-hover: #6fe0a3;
+  --en-verde: #60dc9c;
+  --en-verde-hover: #7fe4b0;
   --en-sobre-verde: #04140b;
   --en-linea: rgba(255, 255, 255, .07);
   position: relative;
@@ -33,7 +33,7 @@
 .entrar::before {
   content: ""; position: absolute; inset: 0; pointer-events: none;
   background:
-    radial-gradient(ellipse 55% 45% at 50% 42%, rgba(79, 216, 141, .07), transparent 70%),
+    radial-gradient(ellipse 55% 45% at 50% 42%, rgba(96, 220, 156, .07), transparent 70%),
     radial-gradient(ellipse 80% 60% at 50% -10%, rgba(255, 255, 255, .035), transparent 70%);
 }
 
@@ -93,7 +93,7 @@
 .entrar .entrar-caja input:focus,
 .entrar .entrar-caja input:focus-visible {
   outline: none; border-color: var(--en-verde);
-  box-shadow: 0 0 0 3px rgba(79, 216, 141, .18);
+  box-shadow: 0 0 0 3px rgba(96, 220, 156, .18);
 }
 /* El autocompletar de Chrome pinta el campo de amarillo/blanco: se lo tapa. */
 .entrar .entrar-caja input:-webkit-autofill {

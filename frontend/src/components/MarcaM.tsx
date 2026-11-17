@@ -14,7 +14,8 @@ import { useId } from "react";
 export const M_RATIO = 336 / 158;
 
 /** El verde de la marca, el del pliegue y el del pie de la bajada. */
-export const VERDE_MARCA = "#4fd88d";
+// El verde del logo de Alvaro, medido en su imagen (16/11/2026).
+export const VERDE_MARCA = "#60dc9c";
 const PLIEGUE = ["#247c4f", "#309560", "#39a66c", "#40b476", "#47c27f"];
 
 /** Los dos «Λ»: pie, cima, comienzo de la bajada (su punta redonda) y pie. */
