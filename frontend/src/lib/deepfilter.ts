@@ -111,7 +111,13 @@ const DIAS_SIN_REINTENTAR = 14;
 let descartadoEnPestana = false;
 
 /** ¿Vale la pena intentar DeepFilterNet en este equipo? */
+// APAGADO (Alvaro, 17/11/2026): «no sirve el audio, no se escucha, es lento,
+// que larga». Se vuelve a RNNoise como antes. Para volver a probar
+// DeepFilterNet, poner esto en true.
+export const DEEPFILTER_PRENDIDO = false;
+
 export function deepFilterPermitido(): boolean {
+  if (!DEEPFILTER_PRENDIDO) return false;
   if (descartadoEnPestana || typeof WebAssembly === "undefined") return false;
   const nav = navigator as Navigator & { deviceMemory?: number };
   if (nav.hardwareConcurrency && nav.hardwareConcurrency < 4) return false;
