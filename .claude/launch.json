@@ -4,16 +4,22 @@
     {
       "name": "Frontend (Vite dev)",
       "runtimeExecutable": "sh",
-      "runtimeArgs": ["-c", "git fetch -q origin main && git merge -q --ff-only origin/main 2>/dev/null; npm run dev"],
+      "runtimeArgs": [
+        "-c",
+        "git fetch -q origin main && git merge -q --ff-only origin/main 2>/dev/null; npm run dev -- --port 8080 --strictPort"
+      ],
       "port": 8080,
-      "autoPort": true
+      "autoPort": false
     },
     {
       "name": "Frontend (Vite preview)",
       "runtimeExecutable": "sh",
-      "runtimeArgs": ["-c", "git fetch -q origin main && git merge -q --ff-only origin/main 2>/dev/null; npm run build && npm run preview"],
-      "port": 4173,
-      "autoPort": true
+      "runtimeArgs": [
+        "-c",
+        "git fetch -q origin main && git merge -q --ff-only origin/main 2>/dev/null; npm run build && npm run preview -- --port 8080 --strictPort"
+      ],
+      "port": 8080,
+      "autoPort": false
     }
   ]
 }
