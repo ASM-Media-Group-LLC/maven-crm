@@ -40,13 +40,13 @@
 /* ── Barra de arriba: igual a la de la portada ───────────────────────── */
 .entrar .entrar-barra {
   position: relative; z-index: 1;
-  display: flex; align-items: center; justify-content: space-between; gap: 1rem;
+  display: flex; align-items: center; justify-content: flex-end; gap: 1rem;
   width: min(1120px, calc(100% - 32px)); margin: 0 auto;
   padding: 1.1rem 0; padding-top: calc(1.1rem + env(safe-area-inset-top, 0px));
 }
 .entrar .entrar-marca {
   display: inline-flex; align-items: center; gap: .075em; text-decoration: none;
-  font: 700 22px/1 Montserrat, sans-serif; letter-spacing: 0; color: var(--en-texto);
+  font: 700 30px/1 Montserrat, sans-serif; letter-spacing: 0; color: var(--en-texto);
 }
 .entrar .entrar-volver {
   display: inline-flex; align-items: center; gap: .45em; text-decoration: none;
@@ -60,8 +60,8 @@
 /* ── La tarjeta: como las de precios ─────────────────────────────────── */
 .entrar .entrar-centro {
   position: relative; z-index: 1; flex: 1;
-  display: flex; align-items: center; justify-content: center;
-  padding: 1.5rem 16px 4rem;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1.75rem;
+  padding: 0 16px 4rem;
 }
 .entrar .entrar-caja {
   width: 100%; max-width: 27rem;

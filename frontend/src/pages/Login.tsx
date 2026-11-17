@@ -74,7 +74,7 @@ const Login = () => {
       <div className="space-y-6">
         <div className="flex flex-col items-center gap-2">
           <h2 className="text-2xl font-bold text-white">{t("auth.loginTitle")}</h2>
-          <p className="text-sm text-white/50">{t("auth.loginSubtitle")}</p>
+          <p className="text-center text-sm text-white/50">{t("auth.loginSubtitle")}</p>
         </div>
 
         <form onSubmit={handleLogin} className="space-y-5">
