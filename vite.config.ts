@@ -94,6 +94,10 @@ export default defineConfig(({ mode }) => ({
         ],
       },
       workbox: {
+        // Sin mapas para el service worker: con build.sourcemap prendido (abajo),
+        // workbox los generaba y sw.js los nombraba; el Dockerfile los borra y
+        // quedaba un pedido a un archivo que no existe.
+        sourcemap: false,
         skipWaiting: true,
         clientsClaim: true,
         // Handlers de Web Push (llamada entrante con Maven cerrado). Se importan
@@ -174,6 +178,15 @@ export default defineConfig(({ mode }) => ({
     // the static files at the same path they used before the split.
     outDir: path.resolve(__dirname, "./dist"),
     emptyOutDir: true,
+    // QUÉ CONGELA LA PÁGINA (17/11/2026). llamada_salud.datos.trabas dice el
+    // archivo y la función que trabaron la página («vendor-radix.js:B»,
+    // «index.js:m»), pero con nombres minificados. Los mapas de fuente dicen a
+    // qué código corresponden. «hidden»: se generan, pero los .js no los
+    // nombran (el navegador no los pide) y el Dockerfile los saca de la imagen,
+    // así que nunca se sirven. Para leerlos: scripts/mapas-de-produccion.sh.
+    // ⚠️ Solo con MAVEN_MAPAS=1: generarlos en el build de la imagen se quedaba
+    // sin memoria (heap de 2 GB, CI del 17/11) y habría tumbado el deploy.
+    sourcemap: process.env.MAVEN_MAPAS === "1" ? "hidden" : false,
     // The eager-loaded sidebar pages push the main chunk over Vite's
     // default 500 KB warning threshold. We don't care about the warning
     // since manualChunks below splits it into reasonable vendor pieces.

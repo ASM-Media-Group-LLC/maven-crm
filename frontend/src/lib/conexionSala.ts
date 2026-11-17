@@ -36,6 +36,21 @@ export function fueUnaCaida(razon?: DisconnectReason | number | null): boolean {
   return razon == null || !SALIDAS_A_PROPOSITO.has(razon);
 }
 
+// ── Volver solo tras una caída: cuántas veces y cada cuánto (17/11/2026) ────
+// Antes eran 4 intentos en ~22 s (2, 4, 8 y 8 s): un corte de internet de medio
+// minuto dejaba a la persona afuera, con el cartel y su botón, y a un invitado de
+// afuera el botón «Volver» le gastaba la admisión. Ahora son 10 intentos en unos
+// 2 minutos, con espera creciente. Además, si el navegador avisa que volvió la
+// red (evento `online`) se intenta en el acto, y mientras dice que NO hay red no
+// se gasta ningún intento (ver programarReentrada en useLiveKit.ts).
+export const ESPERAS_DE_REENTRADA_MS = [2000, 4000, 6000, 8000, 10000, 12000, 15000, 18000, 20000, 25000] as const;
+export const MAX_REENTRADAS = ESPERAS_DE_REENTRADA_MS.length;
+
+/** Cuánto esperar antes del intento `n` (desde 1). Null si ya no quedan. */
+export function esperaDeReentrada(n: number): number | null {
+  return Number.isInteger(n) && n >= 1 && n <= MAX_REENTRADAS ? ESPERAS_DE_REENTRADA_MS[n - 1] : null;
+}
+
 /** Lo que se le informa al reloj.
  *
  *  `yaEstuvoConectada`: si en esta sala ya se conectó alguna vez. Mientras entra

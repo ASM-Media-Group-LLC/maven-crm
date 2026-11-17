@@ -65,6 +65,33 @@ export const CAMARA_LIVIANA: { alta: TopeDeCapa; media: TopeDeCapa; baja: TopeDe
   baja: { alto: 180, maxBitrate: 80_000, maxFramerate: 10 },
 };
 
+// ── COWORK: TODO EN VIVO, MÁS LIVIANO (Alvaro, 17/11/2026) ────────────────────
+//
+// En las salas de Cowork (cowork_*) todos se siguen viendo EN VIVO, pero con
+// menos cuadros por segundo: una cara en Cowork no necesita 20 o 30 cuadros, y
+// cada cuadro de más es internet de subida que el equipo no tiene (la mayoría
+// sube con ~1 Mbps). Cada capa queda a 10 fps y su tope de bitrate baja en la
+// misma proporción (si no, el codificador gasta lo mismo en menos cuadros):
+//
+//   · normal:  720p@10 / 700 kbps · 360p@10 / 250 kbps · 180p@10 / 90 kbps
+//     (eran 720p@30 / 1,7 Mbps · 360p@20 / 450 kbps · 180p@20 / 160 kbps)
+//   · liviano: 360p@10 / 250 kbps · 360p@10 / 220 kbps · 180p@10 / 80 kbps
+//
+// La RESOLUCIÓN no baja: quien habla o está fijado se sigue viendo nítido
+// (lib/calidadPorVoz.ts le pide la capa de arriba). Meet con invitados no se toca:
+// ahí la cara importa más y la gente de afuera no es la del problema de subida.
+export const FPS_DE_COWORK = 10;
+export const CAMARA_COWORK: { alta: Omit<TopeDeCapa, "alto">; media: Omit<TopeDeCapa, "alto">; baja: Omit<TopeDeCapa, "alto"> } = {
+  alta: { maxBitrate: 700_000, maxFramerate: FPS_DE_COWORK },
+  media: { maxBitrate: 250_000, maxFramerate: FPS_DE_COWORK },
+  baja: { maxBitrate: 90_000, maxFramerate: FPS_DE_COWORK },
+};
+export const CAMARA_LIVIANA_COWORK: { alta: TopeDeCapa; media: TopeDeCapa; baja: TopeDeCapa } = {
+  alta: { alto: 360, maxBitrate: 250_000, maxFramerate: FPS_DE_COWORK },
+  media: { alto: 360, maxBitrate: 220_000, maxFramerate: FPS_DE_COWORK },
+  baja: { alto: 180, maxBitrate: 80_000, maxFramerate: FPS_DE_COWORK },
+};
+
 export type PerfilDeCamara = "normal" | "liviano";
 
 export interface SenalesDeSubida {
@@ -140,13 +167,31 @@ export function copiarTopes(e: TopeDeCodificacion): TopeDeCodificacion {
  * virtual). La escala sale de ahí, nunca menor a la que ya tenía la capa: una
  * capa jamás se agranda.
  */
-export function topesLivianos(originales: TopeDeCodificacion[], ladoCorto: number | null): TopeDeCodificacion[] {
+export function topesLivianos(originales: TopeDeCodificacion[], ladoCorto: number | null, enCowork = false): TopeDeCodificacion[] {
   const lado = ladoCorto && ladoCorto > 0 ? ladoCorto : 720;
   const n = originales.length;
+  const capas = enCowork ? CAMARA_LIVIANA_COWORK : CAMARA_LIVIANA;
   return originales.map((o, i) => {
-    const capa = i === n - 1 ? CAMARA_LIVIANA.alta : i === 0 ? CAMARA_LIVIANA.baja : CAMARA_LIVIANA.media;
+    const capa = i === n - 1 ? capas.alta : i === 0 ? capas.baja : capas.media;
     return {
       scaleResolutionDownBy: Math.max(o.scaleResolutionDownBy ?? 1, lado / capa.alto),
+      maxBitrate: Math.min(o.maxBitrate ?? capa.maxBitrate, capa.maxBitrate),
+      maxFramerate: Math.min(o.maxFramerate ?? capa.maxFramerate, capa.maxFramerate),
+    };
+  });
+}
+
+/**
+ * Los topes del perfil NORMAL en Cowork: la misma resolución de cada capa, a
+ * 10 fps y con el bitrate bajado en proporción (ver CAMARA_COWORK). Nunca sube
+ * nada: si una capa ya tenía menos, se queda con lo suyo.
+ */
+export function topesDeCowork(originales: TopeDeCodificacion[]): TopeDeCodificacion[] {
+  const n = originales.length;
+  return originales.map((o, i) => {
+    const capa = i === n - 1 ? CAMARA_COWORK.alta : i === 0 ? CAMARA_COWORK.baja : CAMARA_COWORK.media;
+    return {
+      scaleResolutionDownBy: o.scaleResolutionDownBy,
       maxBitrate: Math.min(o.maxBitrate ?? capa.maxBitrate, capa.maxBitrate),
       maxFramerate: Math.min(o.maxFramerate ?? capa.maxFramerate, capa.maxFramerate),
     };

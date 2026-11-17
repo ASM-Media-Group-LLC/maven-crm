@@ -155,7 +155,8 @@ describe("sin conexión a la sala", () => {
               casos++;
             }
     // Que PUEDA fallar: si un bucle quedara vacío, esto no probaría nada.
-    expect(casos).toBe(2 * 2 * 3 * 3 * 6 * 2 * 4);
+    // 7 de conexión: las cinco (con «dormido», 17/11/2026), null y undefined.
+    expect(casos).toBe(2 * 2 * 3 * 3 * 7 * 2 * 4);
     for (const e of ESTADOS_TIEMPO) expect(cuentaComoTrabajo(e)).toBe(edge.cuentaComoTrabajo(e));
   });
 });

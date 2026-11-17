@@ -14,10 +14,11 @@ import RoomAudioSink from "./RoomAudioSink";
 import { useAutoPiP } from "./useAutoPiP";
 import { suscribirOrdenesDePausa } from "@/lib/ordenesDePausa";
 
-import { Loader2, WifiOff, Copy, ChevronLeft, ChevronRight, DoorOpen, Check } from "lucide-react";
+import { Loader2, Wifi, WifiOff, Copy, ChevronLeft, ChevronRight, DoorOpen, Check } from "lucide-react";
 import { CLAVES_OTRA_PESTANA } from "@/lib/sesionDuplicada";
 import { caidaEnCurso, conexionDeSala, marcarCaida, olvidarCaida } from "@/lib/conexionSala";
 import type { ConexionSala } from "@/lib/coworkTiempoRegla";
+import type { DestinoDeTelemetria } from "@/lib/saludDeLlamada";
 import { cn } from "@/lib/utils";
 import { aplicaCalidadPorVoz, calidadDeCamara } from "@/lib/calidadPorVoz";
 import { puedeCompartirPantalla } from "@/lib/compartirPantalla";
@@ -136,6 +137,12 @@ interface LiveKitCallViewProps {
    *  sus compañeros (lib/videoAjeno.ts). Solo lo pasa CoworkParticipantView
    *  para su sala; el tablero, el Hub, los meets y las 1:1 no lo pasan. */
   sinVideoAjeno?: boolean;
+  /** Adónde va la telemetría de la llamada cuando no hay sesión (invitado de
+   *  afuera, por meet-guest). Ver saludDeLlamada.ts. */
+  telemetria?: DestinoDeTelemetria;
+  /** En la pantalla de error, solo «Reintentar». Para el invitado de afuera:
+   *  «Volver» le gastaba la admisión y tenía que pedir entrada otra vez. */
+  sinVolverEnError?: boolean;
 }
 
 /** ¿Este dispositivo se maneja con el dedo? Se mide una sola vez: nadie cambia
@@ -147,7 +154,7 @@ function usePunteroGrueso(): boolean {
   return grueso;
 }
 
-export default function LiveKitCallView({ roomName, displayName, callDisplayName, isAdmin = false, onLeave, initialMicOn = true, initialCamOn = true, initialScreenShareOn = false, initialAudioDeviceId, initialVideoDeviceId, initialAudioOutputDeviceId, initialBackgroundEffect = "none", hideShareLink, hideScreenShare, hideLeaveButton, leaveLabel, leaveIcon, suppressLeaveToast, compact, autoPip = true, autoLeaveOnEmpty, getToken, onMediaStateChange, onFaceStateChange, supervisorEncuadre, onLocalScreenTrack, pantallaSoloParaMi, sinLatidoDeLlamada, incomingAudioMuted, roomSwitcher, recording, shareLink: shareLinkProp, hideEndForAll, controlesExtra, sinVideoAjeno = false }: LiveKitCallViewProps) {
+export default function LiveKitCallView({ roomName, displayName, callDisplayName, isAdmin = false, onLeave, initialMicOn = true, initialCamOn = true, initialScreenShareOn = false, initialAudioDeviceId, initialVideoDeviceId, initialAudioOutputDeviceId, initialBackgroundEffect = "none", hideShareLink, hideScreenShare, hideLeaveButton, leaveLabel, leaveIcon, suppressLeaveToast, compact, autoPip = true, autoLeaveOnEmpty, getToken, onMediaStateChange, onFaceStateChange, supervisorEncuadre, onLocalScreenTrack, pantallaSoloParaMi, sinLatidoDeLlamada, incomingAudioMuted, roomSwitcher, recording, shareLink: shareLinkProp, hideEndForAll, controlesExtra, sinVideoAjeno = false, telemetria, sinVolverEnError = false }: LiveKitCallViewProps) {
   // Lista de salas del navegador (solo Cowork supervisor+): estado del popup.
   const [salasAbiertas, setSalasAbiertas] = useState(false);
   const lk = useLiveKit();
@@ -350,6 +357,8 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
   // las dependencias del efecto de conexión, cualquier cambio la reconectaría.
   const sinVideoAjenoRef = useRef(sinVideoAjeno);
   sinVideoAjenoRef.current = sinVideoAjeno;
+  const telemetriaRef = useRef(telemetria);
+  telemetriaRef.current = telemetria;
 
   useEffect(() => {
     let cancelled = false;
@@ -373,6 +382,7 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
           backgroundEffect: bgInicialRef.current,
           tokenProvider: getTokenRef.current ? () => getTokenRef.current!() : undefined,
           sinVideoAjeno: sinVideoAjenoRef.current,
+          telemetria: telemetriaRef.current,
         });
       } catch (err: any) {
         if (cancelled) return;
@@ -631,8 +641,12 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
     volviendoDeCaidaRef.current = false;
     if (intentoApagadoRef.current) { intentoApagadoRef.current = false; setVolvioDeCaida(true); }
   }, [lk.connectionState, roomName]);
-  const conexionActual = conexionDeSala(lk.connectionState, lk.razonDeSalida, yaEstuvoConectada);
-  const salaCaida = conexionActual === "desconectada";
+  const conexionDeLaSala = conexionDeSala(lk.connectionState, lk.razonDeSalida, yaEstuvoConectada);
+  // El equipo se durmió (lib/equipoDormido.ts): para la vista es una sala caída
+  // (cartel y botón), pero al reloj de Cowork va «dormido», que no se paga.
+  const conexionActual: ConexionSala | null =
+    lk.equipoDormido && conexionDeLaSala === "desconectada" ? "dormido" : conexionDeLaSala;
+  const salaCaida = conexionDeLaSala === "desconectada";
   const salaConectada = lk.connectionState === ConnectionState.Connected;
 
   useEffect(() => {
@@ -896,7 +910,9 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
             entrar a mano. */}
         <div className="mt-4 flex items-center gap-3">
           <button onClick={() => setReintentoManual((n) => n + 1)} className="px-4 py-2 rounded-full bg-primary text-primary-foreground text-sm hover:bg-primary/90">{t("messenger.callView.reintentar")}</button>
-          <button onClick={handleLeave} className="px-4 py-2 rounded-full border border-border text-sm text-muted-foreground hover:bg-muted hover:text-foreground">{t("common.back")}</button>
+          {!sinVolverEnError && (
+            <button onClick={handleLeave} className="px-4 py-2 rounded-full border border-border text-sm text-muted-foreground hover:bg-muted hover:text-foreground">{t("common.back")}</button>
+          )}
         </div>
       </div>
     );
@@ -956,12 +972,20 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
           <WifiOff className="h-3.5 w-3.5 animate-pulse" /> {t("messenger.callView.reconectando")}
         </div>
       )}
+      {/* «Solo avisarle» (Alvaro, 17/11/2026): con la conexión mala sostenida,
+          un aviso discreto que se va solo cuando mejora. No apaga nada
+          (lib/internetDebil.ts). */}
+      {lk.internetDebil && salaConectada && !lk.isReconnecting && (
+        <div role="status" className="shrink-0 flex items-center justify-center gap-2 py-1 px-3 bg-warning/10 text-warning text-xs font-medium text-center">
+          <Wifi className="h-3.5 w-3.5 shrink-0" aria-hidden="true" /> {t("messenger.callView.internetDebil")}
+        </div>
+      )}
       {salaCaida && (
         <div role="status" className="shrink-0 flex flex-wrap items-center justify-center gap-x-3 gap-y-1 py-2 px-3 bg-warning/15 text-warning text-xs font-medium text-center">
           <WifiOff className="h-3.5 w-3.5 shrink-0 animate-pulse" />
           {puedeReconectar ? (
             <>
-              <span>{t("messenger.callView.salaCaida")}</span>
+              <span>{t(lk.equipoDormido ? "messenger.callView.equipoDormido" : "messenger.callView.salaCaida")}</span>
               <button
                 type="button"
                 onClick={() => setReintentoManual((n) => n + 1)}

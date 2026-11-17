@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { DestinoDeTelemetria, FilaDeCorte, FilaDeSalud } from "@/lib/saludDeLlamada";
 
 // Invitado SIN cuenta en Maven: golpea, espera que alguien de adentro lo admita,
 // y recién entonces recibe el token de LiveKit.
@@ -33,6 +34,19 @@ async function callMeetGuest(action: string, payload: Record<string, unknown>) {
   const json = await res.json();
   if (!res.ok) throw new Error(json.error || "Request failed");
   return json;
+}
+
+/** Fuego y olvido, con `keepalive`: sale aunque la página se esté cerrando (la
+ *  salida por caída se manda justo al cerrarse). Nunca tira. */
+function enviarSinEsperar(action: string, payload: Record<string, unknown>): void {
+  try {
+    void fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/meet-guest`, {
+      method: "POST",
+      keepalive: true,
+      headers: { "Content-Type": "application/json", apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY },
+      body: JSON.stringify({ action, ...payload }),
+    }).catch(() => {});
+  } catch { /* sin aviso, pero sin romper nada */ }
 }
 
 // El secreto del invitado vive en el navegador: si recarga la página mientras
@@ -150,7 +164,35 @@ export function useMeetGuest(code: string) {
     if (token) await callMeetGuest("leave", { guestToken: token }).catch(() => {});
   }, [code, stopPolling]);
 
+  // SE LE CAYÓ, NO COLGÓ (Alvaro, 17/11/2026). Cerrar la pestaña o recargar en
+  // medio de la llamada se avisa como CAÍDA: el secreto queda guardado y durante
+  // 15 minutos vuelve a entrar solo, sin que lo admitan otra vez (meet-guest,
+  // REENTRADA_DEL_INVITADO_MS). Colgar con el botón sigue siendo `leave()`, que
+  // termina la admisión.
+  useEffect(() => {
+    if (status !== "admitted" || !call) return;
+    const alIrse = () => {
+      const g = guestTokenRef.current;
+      if (g) enviarSinEsperar("leave", { guestToken: g, caida: true });
+    };
+    window.addEventListener("pagehide", alIrse);
+    return () => window.removeEventListener("pagehide", alIrse);
+  }, [status, call]);
+
+  // Los cortes y la salud de su llamada (saludDeLlamada.ts): sin sesión, las
+  // tablas del equipo los rechazan; van por meet-guest con su secreto.
+  const telemetria = useMemo<DestinoDeTelemetria>(() => ({
+    corte: (fila: FilaDeCorte) => {
+      const g = guestTokenRef.current;
+      if (g) enviarSinEsperar("telemetria", { guestToken: g, tipo: "corte", ...fila });
+    },
+    salud: (fila: FilaDeSalud) => {
+      const g = guestTokenRef.current;
+      if (g) enviarSinEsperar("telemetria", { guestToken: g, tipo: "salud", ...fila });
+    },
+  }), []);
+
   useEffect(() => stopPolling, [stopPolling]);
 
-  return { status, error, roomName, guestName, call, knock, getToken, leave };
+  return { status, error, roomName, guestName, call, knock, getToken, leave, telemetria };
 }

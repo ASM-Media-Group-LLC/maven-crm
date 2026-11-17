@@ -5,6 +5,7 @@ import { BUILD_PROPIO, crearVigiaDelMinimo } from "./lib/versionDelBundle";
 import { almacenDeLaPestana, forzarActualizacion, leerUiBuildMinimo } from "./lib/minimoDelBundle";
 import { hayLlamadaActiva } from "./lib/llamadaActiva";
 import { registrarSw } from "./lib/registroDelSw";
+import { crearAvisoDeVersion } from "./lib/avisoDeVersion";
 
 /** El aviso "Nueva versión disponible" como toast del design system (el mismo
  *  vidrio de todos los avisos), con `id` fijo para no duplicarse en el chequeo
@@ -102,16 +103,26 @@ export async function initPWA() {
     // llamada o sin ella, y cada deploy tumbaba llamadas de Cowork (11/11/2026).
     let registro: ServiceWorkerRegistration | undefined;
     const lang: Language = localStorage.getItem("app-language") === "en" ? "en" : "es";
-    const avisar = () => mostrarAvisoDeActualizacion(
-      getTranslation("pwa.actualizar.titulo", lang),
-      getTranslation("pwa.actualizar.boton", lang),
-      // updateSW(true) manda skipWaiting al SW en espera y recarga cuando toma
-      // control. El window.location.reload() pelado NO alcanzaba: el SW nuevo
-      // quedaba "waiting", la página recargaba y seguía sirviendo el bundle VIEJO
-      // → el equipo quedaba clavado en versiones de días atrás aunque clickeara
-      // "Recargar" (así Fabiana no veía el aviso "Ya registrado hoy" de Promolog).
-      () => { updateSW(true).catch(() => window.location.reload()); },
-    );
+    // Con llamada, el aviso NO trae botón: tocar «Recargar» cortaba la propia
+    // llamada. Al colgar pasa solo al de siempre (lib/avisoDeVersion.ts).
+    const avisar = crearAvisoDeVersion({
+      enLlamada: hayLlamadaActiva,
+      mostrarEnLlamada: () => {
+        if (document.querySelector("[data-sonner-toaster]")) {
+          toast(getTranslation("pwa.actualizar.enLlamada", lang), { id: "pwa-update", duration: Infinity });
+        }
+      },
+      mostrarNormal: () => mostrarAvisoDeActualizacion(
+        getTranslation("pwa.actualizar.titulo", lang),
+        getTranslation("pwa.actualizar.boton", lang),
+        // updateSW(true) manda skipWaiting al SW en espera y recarga cuando toma
+        // control. El window.location.reload() pelado NO alcanzaba: el SW nuevo
+        // quedaba "waiting", la página recargaba y seguía sirviendo el bundle VIEJO
+        // → el equipo quedaba clavado en versiones de días atrás aunque clickeara
+        // "Recargar" (así Fabiana no veía el aviso "Ya registrado hoy" de Promolog).
+        () => { updateSW(true).catch(() => window.location.reload()); },
+      ),
+    });
     const updateSW = registrarSw({
       // Las pestañas de Maven viven abiertas por DÍAS (SPA, sin navegaciones) y el
       // navegador solo chequea el SW al navegar → el banner de update no aparecía

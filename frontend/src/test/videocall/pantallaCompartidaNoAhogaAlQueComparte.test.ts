@@ -53,7 +53,8 @@ describe("la pantalla compartida se publica con su propio perfil", () => {
   it("⚠️ setScreenShareEnabled recibe un TERCER argumento: la publicación del perfil elegido", () => {
     // Sin el tercer argumento hereda el simulcast de cámaras, que es el bug.
     expect(s).toMatch(/setScreenShareEnabled\(\s*newState,\s*pantalla\.captura,\s*pantalla\.publicacion\s*\)/);
-    expect(s).toMatch(/const pantalla = opcionesDePantalla\(perfil, captura\)/);
+    // En Cowork, con el tercer argumento va a 5 fps (Alvaro, 17/11/2026: «todo en vivo, más liviano»).
+    expect(s).toMatch(/const pantalla = opcionesDePantalla\(perfil, captura, salaConPrueba\(room\.name\)\)/);
   });
 
   it("el perfil se elige al EMPEZAR a compartir, con la prueba real, el modo ahorro y la última muestra", () => {

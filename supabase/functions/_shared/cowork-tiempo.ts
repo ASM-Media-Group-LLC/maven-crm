@@ -48,10 +48,12 @@ export const ESTADOS_TIEMPO: readonly EstadoTiempo[] = [
  *  · desconectada: fuera de la sala (se cayó, o todavía está entrando). Lo que
  *    diga la cámara ya no vale: con la sala caída se ve apagada.
  *  · reemplazada: otra pestaña u otro equipo tomó su lugar en la sala. Esa
- *    pestaña deja de latir (coworkLatido): manda la que de verdad está adentro. */
-export type ConexionSala = "conectada" | "reconectando" | "desconectada" | "reemplazada";
+ *    pestaña deja de latir (coworkLatido): manda la que de verdad está adentro.
+ *  · dormido: el equipo se durmió y la sala se cayó por eso. No se vuelve solo
+ *    (espera a la persona) y ese tiempo no se paga. */
+export type ConexionSala = "conectada" | "reconectando" | "desconectada" | "reemplazada" | "dormido";
 
-export const CONEXIONES_SALA: readonly ConexionSala[] = ["conectada", "reconectando", "desconectada", "reemplazada"];
+export const CONEXIONES_SALA: readonly ConexionSala[] = ["conectada", "reconectando", "desconectada", "reemplazada", "dormido"];
 
 /** Cuánto tiempo de caídas de la sala se paga por ventana. */
 export const TOPE_SIN_CONEXION_MS = 10 * 60_000;
@@ -115,6 +117,11 @@ export function estadoDeTiempo(
 ): Veredicto {
   if (l.onBreak) return { estado: "pausa", detalle: null };
   if (l.enMeet) return { estado: "meet", detalle: null };
+  // El equipo se durmió (Alvaro, 17/11/2026; frontend/src/lib/equipoDormido.ts):
+  // no es una caída de la sala ni se paga, exija lo que exija la sesión. Un
+  // equipo dormido que despierta un minuto latía «desconectada» y se le pagaba
+  // como caída.
+  if (l.conexionSala === "dormido") return { estado: "sin_conexion_larga", detalle: "equipo_dormido" };
   // La sala se cayó. Va DESPUÉS del meet: en el meet la sala no reporta, y un
   // "desconectada" que quedó pegado no puede ganarle.
   // Solo si la sesión exige cámara o pantalla: si no exige ninguna, el reloj
