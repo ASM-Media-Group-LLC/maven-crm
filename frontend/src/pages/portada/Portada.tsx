@@ -1,4 +1,5 @@
-import { useEffect, useId, useRef, useState, type CSSProperties, type MouseEvent } from "react";
+import { useEffect, useRef, useState, type CSSProperties, type MouseEvent } from "react";
+import { MarcaM } from "@/components/MarcaM";
 import {
   ArrowRight, CheckSquare, Eye, FileText, HardDrive, Mail, MessageSquare, MonitorUp, UserCheck, Video,
   type LucideIcon,
@@ -142,49 +143,13 @@ const PLANES: Plan[] = [
   },
 ];
 
-/** El logo de la portada (Alvaro, 16/11/2026): la M de cinta —dos «Λ» de
- *  trazo grueso y puntas redondas, con un pliegue más oscuro en cada bajada—
- *  y «Maven» en blanco. Va en el verde de los botones, no en el menta de la
- *  imagen original, y dibujado en vector para que se vea nítido en cualquier
- *  tamaño. Adentro de la app el logo sigue siendo el de siempre. */
-function MarcaCinta({ alto }: { alto: number }) {
-  const id = useId().replace(/:/g, "");
-  const p1 = `pliegue1-${id}`;
-  const p2 = `pliegue2-${id}`;
-  return (
-    <svg
-      className="pr-marca-m"
-      viewBox="0 0 96 56"
-      height={alto}
-      width={(alto * 96) / 56}
-      aria-hidden="true"
-      focusable="false"
-    >
-      <defs>
-        <linearGradient id={p1} gradientUnits="userSpaceOnUse" x1="29" y1="10" x2="48" y2="46">
-          <stop offset="0" stopColor="var(--pr-acento-hondo)" />
-          <stop offset=".6" stopColor="var(--pr-acento)" />
-        </linearGradient>
-        <linearGradient id={p2} gradientUnits="userSpaceOnUse" x1="67" y1="10" x2="86" y2="46">
-          <stop offset="0" stopColor="var(--pr-acento-hondo)" />
-          <stop offset=".6" stopColor="var(--pr-acento)" />
-        </linearGradient>
-      </defs>
-      <g fill="none" strokeWidth="16" strokeLinecap="round">
-        {/* Las bajadas van debajo: el pliegue oscuro asoma bajo cada subida. */}
-        <line x1="29" y1="10" x2="48" y2="46" stroke={`url(#${p1})`} />
-        <line x1="67" y1="10" x2="86" y2="46" stroke={`url(#${p2})`} />
-        <line x1="10" y1="46" x2="29" y2="10" stroke="var(--pr-acento)" />
-        <line x1="48" y1="46" x2="67" y2="10" stroke="var(--pr-acento)" />
-      </g>
-    </svg>
-  );
-}
-
+/** El logo de la portada (Alvaro, 16/11/2026): la M de cinta de la marca
+ *  (components/MarcaM, la misma de la app y de los iconos) en el verde de los
+ *  botones, y «Maven» en blanco. Sin «Virtual Office»: «nada que ver». */
 function Marca({ chico = false }: { chico?: boolean }) {
   return (
     <span className={`pr-marca${chico ? " chico" : ""}`}>
-      <MarcaCinta alto={chico ? 17 : 22} />
+      <MarcaM className="pr-marca-m" alto={chico ? "17px" : "22px"} claro="var(--pr-acento)" oscuro="var(--pr-acento-hondo)" />
       Maven
     </span>
   );
