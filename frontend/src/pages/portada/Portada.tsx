@@ -153,20 +153,31 @@ function Marca({ chico = false }: { chico?: boolean }) {
   );
 }
 
-/** El video de fondo del inicio, IGUAL que el de Lumina en todos los tamaños:
- *  un solo video ancho, a pantalla completa y centrado (en el celular se ve
- *  recortado al centro, como el de Lumina). Con «reducir movimiento» queda la
- *  foto fija.
+/** Dónde está la persona en cada toma del video (fracción del ancho, 0 a 1) y
+ *  desde qué segundo la cámara va hacia ella. En una pantalla ancha el video se
+ *  ve entero y esto no cambia nada; en el celular el video se recorta a una
+ *  franja angosta del centro y, sin esto, en dos tomas quedaba un librero o una
+ *  pared en vez de la persona. Así se ve como el de Lumina: siempre una cara.
+ *  Los segundos son los del montaje (armar.sh): fundidos en 2,0 · 3,9 · 6,0 s. */
+const FOCOS = [
+  { desde: 0, x: 0.51, dura: 0 }, // la chica en la cocina
+  { desde: 2.0, x: 0.49, dura: 0.5 }, // el chico de noche (durante el fundido)
+  { desde: 3.9, x: 0.35, dura: 0.5 }, // el hombre en el loft
+  { desde: 6.0, x: 0.37, dura: 0.5 }, // el tablero de Cowork en el monitor del dueño
+  { desde: 7.6, x: 0.8, dura: 2.6 }, // paneo lento hasta el dueño, que mira a su equipo
+] as const;
+
+/** El video de fondo del inicio, como el de Lumina: un solo video ancho, a
+ *  pantalla completa, que corre SIEMPRE (también con «reducir movimiento»,
+ *  igual que Lumina: con esa opción del iPhone antes quedaba una foto fija y
+ *  Alvaro veía el video «sin correr»).
  *
  *  OJO iPhone: Safari solo reproduce solo un video si `muted` está ESCRITO en
  *  la etiqueta (Lumina lo tiene en su HTML). React no escribe ese atributo —
- *  solo cambia la propiedad—, así que en el iPhone el video se quedaba quieto.
- *  Se escribe a mano y se le da play; si el teléfono igual lo frena (modo de
- *  bajo consumo), arranca con el primer toque en la página. */
+ *  solo cambia la propiedad—, así que se escribe a mano y se le da play; si el
+ *  teléfono igual lo frena (modo de bajo consumo), arranca con el primer toque
+ *  en la página. */
 function VideoDeFondo() {
-  const [quieto] = useState(
-    () => typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches,
-  );
   const ref = useRef<HTMLVideoElement>(null);
   useEffect(() => {
     const v = ref.current;
@@ -181,24 +192,58 @@ function VideoDeFondo() {
     };
     arrancar();
     document.addEventListener("touchstart", arrancar, { once: true, passive: true });
-    return () => document.removeEventListener("touchstart", arrancar);
+    v.addEventListener("canplay", arrancar);
+
+    // La cámara que sigue a la persona en pantallas angostas.
+    let actual = -1;
+    const enfocar = () => {
+      const t = v.currentTime;
+      let i = 0;
+      for (let k = 0; k < FOCOS.length; k++) if (t >= FOCOS[k].desde) i = k;
+      if (i === actual) return;
+      const volvio = i < actual; // el video volvió a empezar: corte seco
+      actual = i;
+      const ancho = v.clientWidth;
+      const alto = v.clientHeight;
+      const proporcion = v.videoWidth && v.videoHeight ? v.videoWidth / v.videoHeight : 16 / 9;
+      const visible = alto > 0 ? ancho / (alto * proporcion) : 1; // qué parte del ancho se ve
+      if (visible >= 0.98) {
+        v.style.transition = "";
+        v.style.objectPosition = "";
+        return;
+      }
+      const p = Math.min(1, Math.max(0, (FOCOS[i].x - visible / 2) / (1 - visible)));
+      v.style.transition = volvio || FOCOS[i].dura === 0 ? "none" : `object-position ${FOCOS[i].dura}s ease-in-out`;
+      v.style.objectPosition = `${(p * 100).toFixed(1)}% 50%`;
+    };
+    const alCambiarTamano = () => {
+      actual = -1;
+      enfocar();
+    };
+    enfocar();
+    v.addEventListener("timeupdate", enfocar);
+    v.addEventListener("loadedmetadata", alCambiarTamano);
+    window.addEventListener("resize", alCambiarTamano);
+    return () => {
+      document.removeEventListener("touchstart", arrancar);
+      v.removeEventListener("canplay", arrancar);
+      v.removeEventListener("timeupdate", enfocar);
+      v.removeEventListener("loadedmetadata", alCambiarTamano);
+      window.removeEventListener("resize", alCambiarTamano);
+    };
   }, []);
   return (
     <div className="pr-video" aria-hidden="true">
-      {quieto ? (
-        <img src="/portada/hero-poster.jpg" alt="" />
-      ) : (
-        <video
-          ref={ref}
-          src="/portada/hero.mp4"
-          poster="/portada/hero-poster.jpg"
-          autoPlay
-          muted
-          loop
-          playsInline
-          preload="auto"
-        />
-      )}
+      <video
+        ref={ref}
+        src="/portada/hero.mp4"
+        poster="/portada/hero-poster.jpg"
+        autoPlay
+        muted
+        loop
+        playsInline
+        preload="auto"
+      />
     </div>
   );
 }
