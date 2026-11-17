@@ -7,7 +7,7 @@
 # Necesita, en ~/.config/maven/firma-mac/ (nunca en el repo):
 #   AuthKey_J4M84HWF78.p8  (llave de App Store Connect para notarizar)
 #   issuer                 (el Issuer ID de esa llave)
-# y el certificado «Developer ID Application: Alvaro Mejia» en el llavero.
+#   maven-developer-id-cadena.p12 + p12.pass  (el Developer ID con el intermedio G2)
 set -euo pipefail
 cd "$(dirname "$0")"
 D="$HOME/.config/maven/firma-mac"
@@ -17,8 +17,11 @@ SALIDA="${TMPDIR:-/tmp}/maven-mac-$VERSION"
 export APPLE_API_KEY="$D/AuthKey_J4M84HWF78.p8"
 export APPLE_API_KEY_ID="J4M84HWF78"
 APPLE_API_ISSUER="$(cat "$D/issuer")"; export APPLE_API_ISSUER
-export CSC_NAME="Alvaro Mejia (BPV7M45Q6T)"
-unset CSC_LINK MAVEN_IDENTIDAD
+# El certificado va por el .p12 (electron-builder lo mete en un llavero temporal):
+# no depende de que esté en el llavero del Mac.
+export CSC_LINK="$D/maven-developer-id-cadena.p12"
+CSC_KEY_PASSWORD="$(cat "$D/p12.pass")"; export CSC_KEY_PASSWORD
+unset CSC_NAME MAVEN_IDENTIDAD
 
 npm version "$VERSION" --no-git-tag-version --allow-same-version >/dev/null
 trap 'git checkout -q -- package.json package-lock.json 2>/dev/null || true' EXIT
