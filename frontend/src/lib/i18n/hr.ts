@@ -1619,6 +1619,14 @@ export const hr = {
   "hr.llamadas.nc.sinDato": { es: "Cancelación de ruido sin dato", en: "Noise cancellation: no data" },
 
   // ── Minutos de gracia (Alvaro, 16/11): 15 sin pantalla y 15 sin cámara por turno ──
+  "hr.apps.titulo": { es: "Apps y páginas (app de computador)", en: "Apps and pages (desktop app)" },
+  "hr.apps.errorCarga": { es: "No se pudieron cargar las apps del día.", en: "Couldn't load the day's apps." },
+  "hr.apps.reintentar": { es: "Reintentar", en: "Retry" },
+  "hr.apps.vacio": { es: "Sin datos este día. Solo se registra cuando la persona usa la app de computador de Maven.", en: "No data for this day. It's only recorded when the person uses the Maven desktop app." },
+  "hr.apps.enElComputador": { es: "En el computador", en: "On the computer" },
+  "hr.apps.activo": { es: "Activo", en: "Active" },
+  "hr.apps.sinTocar": { es: "Sin tocar nada", en: "Idle" },
+  "hr.apps.quieto": { es: "{tiempo} sin tocar", en: "{tiempo} idle" },
   "hr.gracia.titulo": { es: "Minutos de gracia", en: "Grace minutes" },
   "hr.gracia.regla": {
     es: "{gp} min sin compartir pantalla y {gc} min sin cámara por turno. Lo que pasa de ahí no se paga.",

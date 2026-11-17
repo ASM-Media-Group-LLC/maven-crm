@@ -1,4 +1,6 @@
-import { createContext, useContext, useEffect } from "react";
+import { createContext, useContext, useEffect, useRef } from "react";
+import { escritorio } from "@/lib/escritorio";
+import { traducir } from "@/lib/i18n";
 import { useVideoCall } from "@/hooks/useVideoCall";
 import { usePushSubscription } from "@/hooks/usePushSubscription";
 import IncomingCallModal from "@/pages/messenger/components/IncomingCallModal";
@@ -110,6 +112,42 @@ function Ringtone() {
   return null;
 }
 
+/** En la app de computador, la llamada entrante sale además en una ventanita
+ *  encima de todo (desktop/src/llamada.js), aunque Maven esté escondido o la
+ *  persona esté en otra app. Contestar/Rechazar desde ahí hace lo mismo que el
+ *  modal. Si la llamada se corta o se contesta en otro lado, la ventanita se cierra. */
+function useLlamadaEnLaApp(
+  entrante: ReturnType<typeof useVideoCall>["incomingCall"],
+  contestar: () => unknown,
+  rechazar: () => unknown,
+) {
+  const acciones = useRef({ contestar, rechazar });
+  acciones.current = { contestar, rechazar };
+  const id = entrante?.id ?? null;
+  useEffect(() => {
+    const app = escritorio();
+    if (!app || !entrante || !id || typeof app.llamadaEntrante !== "function") return;
+    const audio = entrante.call_type === "audio";
+    const clave = entrante.is_group
+      ? (audio ? "messenger.incoming.entranteGrupoAudio" : "messenger.incoming.entranteGrupoVideo")
+      : (audio ? "messenger.incoming.entranteAudio" : "messenger.incoming.entranteVideo");
+    let vigente = true;
+    void app
+      .llamadaEntrante({ id, nombre: entrante.caller_name ?? traducir("messenger.incoming.desconocido"), detalle: traducir(clave) })
+      .then((r) => {
+        if (!vigente) return;
+        if (r === "contestar") void acciones.current.contestar();
+        else if (r === "rechazar") void acciones.current.rechazar();
+      })
+      .catch(() => {});
+    return () => {
+      vigente = false;
+      app.terminarLlamadaEntrante(id);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- solo cuando cambia la llamada
+  }, [id]);
+}
+
 export function CallProvider({ children }: { children: React.ReactNode }) {
   const call = useVideoCall();
   // Suscribe el navegador a Web Push (llamada entrante con Maven cerrado).
@@ -117,6 +155,7 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
   // Pre-desbloquea el audio del timbre con el primer gesto, así suena aunque la
   // pestaña de Maven quede de fondo cuando llega la llamada.
   useEffect(() => installRingAudioUnlock(), []);
+  useLlamadaEnLaApp(call.incomingCall, call.acceptCall, call.declineCall);
   return (
     <CallContext.Provider value={call}>
       {children}

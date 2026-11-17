@@ -20,18 +20,29 @@ jobs:
   # Mac: en el Mac mini (la firma ad hoc necesita macOS).
   mac:
     runs-on: [self-hosted, macOS, ARM64, mini5]
-    timeout-minutes: 40
+    timeout-minutes: 180 # la revisión de Apple (notarización) a veces tarda
     env:
       PROYECTO: lsagslbkliprespbyhts
-      ARCHIVO: Maven-Mac.dmg
+      ARCHIVOS: Maven-Mac.dmg Maven-Mac.zip Maven-Mac.zip.blockmap latest-mac.yml
     steps:
       - uses: actions/checkout@v4
       - name: Instalar
         working-directory: desktop
         run: npm ci --no-audit --no-fund && node node_modules/electron/install.js
-      - name: Armar
+      - name: Armar (firmada con el Developer ID y notarizada por Apple)
         working-directory: desktop
-        run: npx electron-builder --mac --publish never -c.directories.output="$RUNNER_TEMP/escritorio"
+        env:
+          CSC_LINK: ${{ secrets.MAC_CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.MAC_CSC_KEY_PASSWORD }}
+          APPLE_API_KEY_ID: ${{ secrets.MAC_NOTARIZE_KEY_ID }}
+          APPLE_API_ISSUER: ${{ secrets.MAC_NOTARIZE_ISSUER }}
+          LLAVE_NOTARIZAR: ${{ secrets.MAC_NOTARIZE_API_KEY }}
+        run: |
+          export APPLE_API_KEY="$RUNNER_TEMP/AuthKey.p8"
+          printf '%s' "$LLAVE_NOTARIZAR" > "$APPLE_API_KEY"
+          trap 'rm -f "$APPLE_API_KEY"' EXIT
+          npm version "2.0.${{ github.run_number }}" --no-git-tag-version
+          npx electron-builder --mac --publish never -c.directories.output="$RUNNER_TEMP/escritorio"
       - name: Subir a Supabase (balde descargas)
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
@@ -41,12 +52,15 @@ jobs:
             -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
             | python3 -c 'import json,sys; print(next(k["api_key"] for k in json.load(sys.stdin) if k["name"]=="service_role"))')
           echo "::add-mask::$LLAVE"
-          curl -fsS -X POST "https://$PROYECTO.supabase.co/storage/v1/object/descargas/$ARCHIVO" \
-            -H "Authorization: Bearer $LLAVE" -H "apikey: $LLAVE" \
-            -H "x-upsert: true" -H "cache-control: max-age=300" \
-            -H "Content-Type: application/octet-stream" \
-            --data-binary "@$RUNNER_TEMP/escritorio/$ARCHIVO" >/dev/null
-          curl -fsSI "https://$PROYECTO.supabase.co/storage/v1/object/public/descargas/$ARCHIVO" | grep -i content-length
+          # El .yml va al final: anuncia la versión nueva solo cuando ya subió todo.
+          for ARCHIVO in $ARCHIVOS; do
+            curl -fsS -X POST "https://$PROYECTO.supabase.co/storage/v1/object/descargas/$ARCHIVO" \
+              -H "Authorization: Bearer $LLAVE" -H "apikey: $LLAVE" \
+              -H "x-upsert: true" -H "cache-control: max-age=60" \
+              -H "Content-Type: application/octet-stream" \
+              --data-binary "@$RUNNER_TEMP/escritorio/$ARCHIVO" >/dev/null
+            echo "subido $ARCHIVO"
+          done
 
   # Windows: en una máquina Windows de GitHub (el makensis del Mac mini es de
   # Intel sin Rosetta, y en Linux pide wine).
@@ -58,7 +72,7 @@ jobs:
     timeout-minutes: 40
     env:
       PROYECTO: lsagslbkliprespbyhts
-      ARCHIVO: Maven-Windows.exe
+      ARCHIVOS: Maven-Windows.exe Maven-Windows.exe.blockmap latest.yml
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -68,7 +82,9 @@ jobs:
         run: npm ci --no-audit --no-fund
       - name: Armar
         working-directory: desktop
-        run: npx electron-builder --win --publish never -c.directories.output=dist
+        run: |
+          npm version "2.0.${{ github.run_number }}" --no-git-tag-version
+          npx electron-builder --win --publish never -c.directories.output=dist
       - name: Subir a Supabase (balde descargas)
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
@@ -78,9 +94,12 @@ jobs:
             -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
             | node -e 'let d="";process.stdin.on("data",c=>d+=c).on("end",()=>console.log(JSON.parse(d).find(k=>k.name==="service_role").api_key))')
           echo "::add-mask::$LLAVE"
-          curl -fsS -X POST "https://$PROYECTO.supabase.co/storage/v1/object/descargas/$ARCHIVO" \
-            -H "Authorization: Bearer $LLAVE" -H "apikey: $LLAVE" \
-            -H "x-upsert: true" -H "cache-control: max-age=300" \
-            -H "Content-Type: application/octet-stream" \
-            --data-binary "@desktop/dist/$ARCHIVO" >/dev/null
-          curl -fsSI "https://$PROYECTO.supabase.co/storage/v1/object/public/descargas/$ARCHIVO" | grep -i content-length
+          # El .yml va al final: anuncia la versión nueva solo cuando ya subió todo.
+          for ARCHIVO in $ARCHIVOS; do
+            curl -fsS -X POST "https://$PROYECTO.supabase.co/storage/v1/object/descargas/$ARCHIVO" \
+              -H "Authorization: Bearer $LLAVE" -H "apikey: $LLAVE" \
+              -H "x-upsert: true" -H "cache-control: max-age=60" \
+              -H "Content-Type: application/octet-stream" \
+              --data-binary "@desktop/dist/$ARCHIVO" >/dev/null
+            echo "subido $ARCHIVO"
+          done

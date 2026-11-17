@@ -1,13 +1,15 @@
 // Firma «ad hoc» (sin certificado) antes de armar el .dmg. Sin ninguna firma,
 // un Mac con chip Apple dice que la app «está dañada»; con esta, macOS solo
 // pide permiso la primera vez (Ajustes → Privacidad y seguridad → Abrir igual).
-// Cuando Alvaro pase el certificado Developer ID, esto se reemplaza por la
-// firma real + notarización.
+// En el CI la app sale firmada con el Developer ID de Alvaro y notarizada por
+// Apple (17/11/2026); esto queda solo para armarla a mano sin el certificado.
 const { execFileSync } = require("node:child_process");
 const path = require("node:path");
 
 exports.default = async function (ctx) {
   if (ctx.electronPlatformName !== "darwin") return;
+  // Con el certificado de Apple (CSC_LINK, en el CI) firma electron-builder de verdad.
+  if (process.env.CSC_LINK) return;
   // En la versión universal se firma solo la final (las de cada chip son temporales).
   if (/-temp$/.test(ctx.appOutDir)) return;
   const app = path.join(ctx.appOutDir, `${ctx.packager.appInfo.productFilename}.app`);
