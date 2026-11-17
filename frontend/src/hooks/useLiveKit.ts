@@ -42,8 +42,8 @@ import { elegirPerfilDePantalla, opcionesDePantalla } from "@/lib/perfilDePantal
 import { medirRed, salaConPrueba, tocaProbar, PRUEBA_CADA_MS, REINTENTO_TRAS_FALLO_MS, type PruebaDeRed } from "@/lib/pruebaDeRed";
 import { marcarConexionEnCurso, marcarLlamadaActiva, quitarLlamadaActiva } from "@/lib/llamadaActiva";
 import {
-  armarMuestra, borrarLlamadaEnCurso, leerReporte, marcarLlamadaEnCurso, medirRetraso, medirTrabas, type Traba, recargaConLlamada,
-  type DestinoDeTelemetria, type LecturaDePista, type MuestraDeLlamada,
+  armarMuestra, borrarLlamadaEnCurso, leerMemoria, leerReporte, marcarLlamadaEnCurso, medirRetraso, medirTrabas, type Traba, recargaConLlamada,
+  type DestinoDeTelemetria, type LecturaDePista, type MemoriaDelEquipo, type MuestraDeLlamada,
 } from "@/lib/saludDeLlamada";
 import { AHORRO_INICIAL, PANTALLA_AHORRO, ahorroPorPrueba, siguienteAhorro, type EstadoAhorro } from "@/lib/modoAhorro";
 import {
@@ -543,7 +543,7 @@ export function useLiveKit() {
   }, []);
 
   type InsertaSalud = (tabla: "llamada_salud") => {
-    insert: (fila: { sala: string; datos: MuestraDeLlamada & { ahorro: boolean; nc: EstadoNC; prueba?: PruebaDeRed; perfil_cam: PerfilDeCamara; trabas?: Traba[] } }) =>
+    insert: (fila: { sala: string; datos: MuestraDeLlamada & MemoriaDelEquipo & { ahorro: boolean; nc: EstadoNC; prueba?: PruebaDeRed; perfil_cam: PerfilDeCamara; trabas?: Traba[] } }) =>
       PromiseLike<{ error: { message: string } | null }>;
   };
   // Si el componente se desmonta sin colgar, el reloj de muestras no queda vivo.
@@ -739,7 +739,8 @@ export function useLiveKit() {
         const perfilCam = perfilCamaraRef.current.perfil;
         if (perfilCam !== perfilCamAntes) console.info(`[LiveKit] cámara: perfil ${perfilCam}`);
         if (conPrueba || perfilCam === "liviano" || perfilCamAntes === "liviano") void aplicarCamara();
-        const filaDeSalud = { sala: room.name, datos: { ...muestra, ahorro: ahorro.activo, nc, perfil_cam: perfilCam, ...(prueba ? { prueba } : {}), ...(trabasDelMinuto.length ? { trabas: trabasDelMinuto } : {}) } };
+        const memoria = await leerMemoria();
+        const filaDeSalud = { sala: room.name, datos: { ...muestra, ...memoria, ahorro: ahorro.activo, nc, perfil_cam: perfilCam, ...(prueba ? { prueba } : {}), ...(trabasDelMinuto.length ? { trabas: trabasDelMinuto } : {}) } };
         if (telemetriaRef.current) telemetriaRef.current.salud(filaDeSalud);
         else void (supabase.from as unknown as InsertaSalud)("llamada_salud")
           .insert(filaDeSalud)

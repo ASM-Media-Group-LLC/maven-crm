@@ -270,6 +270,14 @@ function flotante(si = !antesDeFlotar) {
 const deLaVentana = (e) => ventana && e.sender === ventana.webContents;
 ipcMain.handle("maven:flotante", (e, si) => (deLaVentana(e) ? flotante(si === undefined ? undefined : Boolean(si)) : false));
 ipcMain.handle("maven:inactividad", (e) => (deLaVentana(e) ? segundosInactivo() : null));
+// Cuánta memoria usa la app y cuánta tiene el equipo (17/11/2026: el equipo usa
+// Windows de 8 GB o menos). Va en la salud de las llamadas para ver quién sufre.
+ipcMain.handle("maven:memoria", (e) => {
+  if (!deLaVentana(e)) return null;
+  const kb = app.getAppMetrics().reduce((t, m) => t + (m.memory?.workingSetSize ?? 0), 0);
+  const gb = (b) => Math.round((b / 1024 ** 3) * 10) / 10;
+  return { app_mb: Math.round(kb / 1024), equipo_gb: gb(require("os").totalmem()), libre_gb: gb(require("os").freemem()) };
+});
 ipcMain.handle("maven:llamada", (e, datos) => (deLaVentana(e) ? avisarLlamada(datos, () => mostrar()) : "cerrada"));
 ipcMain.on("maven:llamada-fin", (e, id) => { if (deLaVentana(e)) cerrarAvisoLlamada(id); });
 

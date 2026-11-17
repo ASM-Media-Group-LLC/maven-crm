@@ -154,6 +154,33 @@ export function datosDelEquipo(): Pick<MuestraDeLlamada, "nucleos" | "memoria_gb
   };
 }
 
+/** La memoria (17/11/2026: el equipo usa Windows de 8 GB o menos y hay que ver
+ *  quién sufre). `heap_mb` sale de la página (Chrome y la app); lo demás solo de
+ *  la app de computador, que sabe la memoria real del equipo y de toda la app.
+ *  Nunca falla: si no se puede leer, no agrega nada. */
+export interface MemoriaDelEquipo {
+  heap_mb?: number;
+  ram_app_mb?: number;
+  ram_equipo_gb?: number;
+  ram_libre_gb?: number;
+}
+
+export async function leerMemoria(): Promise<MemoriaDelEquipo> {
+  const salida: MemoriaDelEquipo = {};
+  try {
+    const heap = num((performance as Performance & { memory?: { usedJSHeapSize?: number } }).memory?.usedJSHeapSize);
+    if (heap !== null) salida.heap_mb = Math.round(heap / 1024 / 1024);
+    const esc = (window as Window & { mavenEscritorio?: { memoria?: () => Promise<unknown> } }).mavenEscritorio;
+    const m = esc?.memoria ? (await esc.memoria()) as Record<string, unknown> | null : null;
+    if (m) {
+      if (num(m.app_mb) !== null) salida.ram_app_mb = m.app_mb as number;
+      if (num(m.equipo_gb) !== null) salida.ram_equipo_gb = m.equipo_gb as number;
+      if (num(m.libre_gb) !== null) salida.ram_libre_gb = m.libre_gb as number;
+    }
+  } catch { /* medir jamás rompe nada */ }
+  return salida;
+}
+
 /** Junta las lecturas de cámara, pantalla y micrófono en una sola muestra. */
 export function armarMuestra(p: {
   vis: string;

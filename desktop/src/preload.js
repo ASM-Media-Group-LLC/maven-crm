@@ -55,6 +55,8 @@ contextBridge.exposeInMainWorld("mavenEscritorio", {
   },
   /** Segundos sin tocar teclado ni mouse en todo el computador. */
   inactividad: () => ipcRenderer.invoke("maven:inactividad"),
+  /** Memoria: { app_mb, equipo_gb, libre_gb }. */
+  memoria: () => ipcRenderer.invoke("maven:memoria"),
   /** Cada minuto: los tramos de app/página al frente (ver desktop/src/apps.js). */
   alUsoDeApps: (cb) => {
     const f = (_e, lote) => cb(Array.isArray(lote) ? lote : []);
