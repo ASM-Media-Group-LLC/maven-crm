@@ -105,11 +105,14 @@
 .pt.pr .pr-idioma-lista li span { flex: 1; }
 .pt.pr .pr-idioma-lista li:hover, .pt.pr .pr-idioma-lista li:focus-visible { background: rgba(255,255,255,.06); outline: none; }
 .pt.pr .pr-idioma-lista li[aria-selected="true"] { color: var(--pr-acento); background: rgba(var(--pr-acento-rgb), .08); }
+.pt.pr .pr-idioma-nombre { display: none; }
 .pt.pr .pr-idioma-hecho { width: 1rem; height: 1rem; color: var(--pr-acento); }
 @media (max-width: 760px) {
-  /* En el celular, solo la bandera y la flechita: más limpio y no aprieta la barra. */
-  .pt.pr .pr-idioma-btn { padding: .35em .55em .35em .35em; gap: .35rem; }
-  .pt.pr .pr-idioma-codigo { display: none; }
+  /* En el celular (Alvaro, 17/11): el botón dice el idioma en palabras
+     («Español ⌄»); las banderitas salen al abrir la lista. */
+  .pt.pr .pr-idioma-btn { padding: .45em .8em; gap: .35rem; font-size: .85rem; }
+  .pt.pr .pr-idioma-btn .pr-idioma-bandera, .pt.pr .pr-idioma-codigo { display: none; }
+  .pt.pr .pr-idioma-nombre { display: inline; }
   .pt.pr .pr-idioma-lista li { padding: .7em .75em; font-size: .95rem; }
   .pt.pr .pr-nav-cta { gap: .5rem; }
 }
