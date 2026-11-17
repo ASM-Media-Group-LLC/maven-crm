@@ -19,7 +19,8 @@ import { corsFor } from "../_shared/cors.ts";
 // puede mutear ni echar a nadie.
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { agenciaDePersona, agenciaDeReunion } from "../_shared/livekit-agencia.ts";
+import { agenciaDePersona, agenciaDeReunion, agenciaDeSala } from "../_shared/livekit-agencia.ts";
+import { nombreDeInvitado, verificarLink } from "../_shared/meet-link.ts";
 
 const corsHeaders = (req: Request) => corsFor(req, { "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version" });
 
@@ -60,6 +61,9 @@ async function createGuestToken(
     video: {
       roomJoin: true, room, canPublish: true, canSubscribe: true, canPublishData: true,
       roomAdmin: false, // un invitado nunca modera
+      // Micrófono, cámara y compartir pantalla (con su audio), como en Google
+      // Meet. Nada más: un invitado no publica otras fuentes.
+      canPublishSources: ["microphone", "camera", "screen_share", "screen_share_audio"],
     },
     metadata: JSON.stringify({ name, isGuest: true }),
   };
@@ -102,6 +106,8 @@ serve(async (req) => {
     // nunca sale de acá y el hash solo tiene que ser estable e imposible de
     // revertir a la IP.
     const ipSalt = Deno.env.get("MEET_GUEST_IP_SALT") || Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    // El mismo secreto con el que meet-room firma los links de invitado.
+    const secretoDeLinks = Deno.env.get("MEET_LINK_SECRET") || Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
     // ═══════════════════════════════════════════════════════════════
     // KNOCK — "quiero entrar". NO devuelve token de LiveKit.
@@ -158,6 +164,109 @@ serve(async (req) => {
     // ═══════════════════════════════════════════════════════════════
     // CLAIM — "¿ya me admitieron?". Devuelve el token SOLO si sí.
     // ═══════════════════════════════════════════════════════════════
+    // ═══════════════════════════════════════════════════════════════
+    // LINK DIRECTO (Alvaro, 17/11/2026): «el invitado abre un link, escribe
+    // su nombre y entra», sin sala de espera. La sala de espera de arriba
+    // (knock/claim) sigue para quien llega solo con el código de 6 letras.
+    //
+    //   · linkInfo: ¿este link sirve? Devuelve SOLO el nombre visible de la
+    //     reunión (para el «Vas a entrar a…»; en una llamada de uno a uno,
+    //     «Llamada con <quien invitó>»), nunca el nombre de la sala.
+    //   · joinLink: con nombre, entra. El token de LiveKit es de la sala que
+    //     dice la fila del link (nunca una que mande el navegador), sin
+    //     roomAdmin y solo con micrófono, cámara y pantalla.
+    // ═══════════════════════════════════════════════════════════════
+    if (action === "linkInfo" || action === "joinLink") {
+      const ipHash = await hashIp(clientIp(req), ipSalt);
+      const since = new Date(Date.now() - 10 * 60 * 1000).toISOString();
+      const { count: recentAttempts } = await admin.from("meet_guest_attempts")
+        .select("*", { count: "exact", head: true })
+        .eq("ip_hash", ipHash).gte("created_at", since);
+      if (recentAttempts !== null && recentAttempts >= MAX_ATTEMPTS_PER_10MIN * 2) {
+        return err(req, "Demasiados intentos. Espera unos minutos.", 429);
+      }
+
+      const linkId = await verificarLink(body.link, secretoDeLinks);
+      const { data: link } = linkId
+        ? await admin.from("meet_invite_links").select("*").eq("id", linkId).maybeSingle()
+        : { data: null };
+      // Solo los intentos FALLIDOS cuentan para el tope: un invitado de verdad
+      // que recarga la página no se queda afuera por eso.
+      if (!link) {
+        await admin.from("meet_guest_attempts").insert({ ip_hash: ipHash, ok: false });
+        return err(req, "Este link no es válido", 404);
+      }
+      if (link.revoked_at) return err(req, "Este link fue anulado. Pide uno nuevo a quien te invitó.", 410);
+      if (new Date(link.expires_at).getTime() <= Date.now()) {
+        return err(req, "Este link venció. Pide uno nuevo a quien te invitó.", 410);
+      }
+
+      // La sala tiene que seguir siendo de la agencia del link, y quien lo
+      // repartió seguir siendo de esa agencia y supervisor o más: si lo bajaron
+      // de rol o se fue, sus links se apagan solos.
+      const agenciaSala = await agenciaDeSala(admin, link.livekit_room_name);
+      if (!agenciaSala || agenciaSala !== link.tenant_id
+          || await agenciaDePersona(admin, link.created_by) !== link.tenant_id) {
+        return err(req, "Este link ya no sirve. Pide uno nuevo a quien te invitó.", 410);
+      }
+      const { data: sigueSupervisor, error: rolErr } = await admin.rpc("is_in_role_group", {
+        _user_id: link.created_by, _group: "supervisor_or_above",
+      });
+      if (rolErr) return err(req, "No se pudo revisar el link. Intenta de nuevo.", 503);
+      if (sigueSupervisor !== true) return err(req, "Este link ya no sirve. Pide uno nuevo a quien te invitó.", 410);
+
+      // El nombre visible: el de la reunión de Meet, o el de la conversación
+      // del Messenger (si es un grupo con nombre). Nada más.
+      let nombreVisible = "Reunión";
+      let reunion: { id: string; status: string; scheduled_for?: string | null } | null = null;
+      if (link.livekit_room_name.startsWith("meet_")) {
+        const { data: room } = await admin.from("meet_rooms")
+          .select("id, name, status, scheduled_for").eq("livekit_room_name", link.livekit_room_name).maybeSingle();
+        if (!room || room.status !== "active") return err(req, "Esa reunión ya terminó", 410);
+        reunion = room;
+        nombreVisible = room.name || nombreVisible;
+      } else {
+        const { data: conv } = await admin.from("chat_conversations")
+          .select("name").eq("id", link.livekit_room_name.slice("call-".length)).maybeSingle();
+        if (conv?.name) {
+          nombreVisible = String(conv.name);
+        } else {
+          // Llamada de uno a uno: se muestra quién te invitó, como en Skype.
+          const { data: quien } = await admin.from("profiles").select("full_name").eq("id", link.created_by).maybeSingle();
+          nombreVisible = quien?.full_name ? `Llamada con ${quien.full_name}` : "Llamada";
+        }
+      }
+
+      if (action === "linkInfo") {
+        return json(req, { ok: true, roomName: nombreVisible, scheduledFor: reunion?.scheduled_for ?? null });
+      }
+
+      const guestName = nombreDeInvitado(body.name);
+      if (!guestName) return err(req, "Escribe tu nombre para entrar");
+
+      // Para un Meet queda anotado como admitido por quien repartió el link:
+      // el historial dice quién dejó entrar a quién, y «Salir» (leave) funciona
+      // igual que con la sala de espera.
+      const guestToken = `${crypto.randomUUID()}${crypto.randomUUID()}`.replace(/-/g, "");
+      let identidad = `guest_${crypto.randomUUID()}`;
+      if (reunion) {
+        const { data: fila, error: insErr } = await admin.from("meet_guest_requests").insert({
+          meet_room_id: reunion.id, guest_name: guestName, guest_token: guestToken, ip_hash: ipHash,
+          status: "admitted", decided_at: new Date().toISOString(), decided_by: link.created_by,
+          invite_link_id: link.id,
+        }).select("id").single();
+        if (insErr) return err(req, "No se pudo entrar. Intenta de nuevo.", 500);
+        identidad = `guest_${fila.id}`;
+      }
+      await admin.from("meet_invite_links").update({ uses: (link.uses ?? 0) + 1 }).eq("id", link.id);
+
+      const token = await createGuestToken(lkKey, lkSecret, identidad, guestName, link.livekit_room_name);
+      return json(req, {
+        status: "admitted", token, url: lkUrl, room: link.livekit_room_name,
+        roomName: nombreVisible, guestName, guestToken: reunion ? guestToken : null,
+      });
+    }
+
     // El invitado colgó. Cierra SU admisión: nadie más puede hacerlo porque
     // hace falta su token, que solo tiene su navegador.
     if (action === "leave") {

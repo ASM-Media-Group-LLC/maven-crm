@@ -94,7 +94,18 @@ export interface LKChatMessage {
   senderName: string;
   content: string;
   timestamp: number;
+  /** Archivo compartido en el chat de la llamada. Viaja por LiveKit (byte
+   *  stream), de persona a persona: no se sube a ningún lado y sirve igual para
+   *  los invitados sin cuenta. `url` es local (blob:); en el historial que se le
+   *  pasa a quien entra tarde va SIN url: el archivo no se reenvía. */
+  archivo?: { nombre: string; tipo: string; tamano: number; url?: string };
 }
+
+/** Tema del byte stream de archivos del chat de la llamada. */
+export const TEMA_ARCHIVO_CHAT = "maven-chat-archivo";
+/** Tope de un archivo en el chat de la llamada: va por la conexión de la
+ *  llamada, y uno muy grande le roba ancho de banda al video de todos. */
+export const MAX_ARCHIVO_CHAT_MB = 25;
 
 interface DataMessage {
   type: "chat" | "hand" | "reaction" | "moderation" | "chat-history" | "aviso";
@@ -1596,7 +1607,10 @@ export function useLiveKit() {
             room.localParticipant.publishData(
               new TextEncoder().encode(JSON.stringify({
                 type: "chat-history",
-                payload: { messages: historia.slice(-MAX_CHAT_MESSAGES) },
+                // Los archivos van sin su url local (blob: no sirve en otra
+                // máquina): quien entra tarde ve que se compartió, no el archivo.
+                payload: { messages: historia.slice(-MAX_CHAT_MESSAGES).map((m) =>
+                  m.archivo ? { ...m, archivo: { ...m.archivo, url: undefined } } : m) },
               })),
               { reliable: true, destinationIdentities: [p.identity] },
             );
@@ -1732,6 +1746,37 @@ export function useLiveKit() {
           reanudarAudioConGesto("el navegador bloqueo la reproduccion");
         }
       });
+
+      // ── Archivos del chat (byte streams de LiveKit) ─────────────
+      // Llegan de persona a persona por la conexión de la llamada. Se arma un
+      // blob local; nada se guarda en el servidor.
+      try {
+        room.registerByteStreamHandler(TEMA_ARCHIVO_CHAT, (reader, quien) => {
+          void (async () => {
+            try {
+              const partes = await reader.readAll();
+              const info = reader.info;
+              const blob = new Blob(partes as BlobPart[], { type: info.mimeType || "application/octet-stream" });
+              const remoto = room.remoteParticipants.get(quien.identity);
+              setChatMessages((prev) => {
+                const nuevos = [...prev, {
+                  id: info.id,
+                  sender: quien.identity,
+                  senderName: remoto?.name || quien.identity,
+                  content: "",
+                  timestamp: info.timestamp || Date.now(),
+                  archivo: { nombre: info.name, tipo: info.mimeType, tamano: blob.size, url: URL.createObjectURL(blob) },
+                }];
+                return nuevos.length > MAX_CHAT_MESSAGES ? nuevos.slice(nuevos.length - MAX_CHAT_MESSAGES) : nuevos;
+              });
+              setUnreadChatCount((c) => c + 1);
+              playChatMessageSound();
+            } catch (e) {
+              console.warn("[LiveKit] archivo del chat no llegó:", e);
+            }
+          })();
+        });
+      } catch { /* ya registrado en esta sala */ }
 
       // ── Data messages ────────────────────────────────────────
       room.on(RoomEvent.DataReceived, (payload, participant) => {
@@ -2518,6 +2563,30 @@ export function useLiveKit() {
     });
   }, []);
 
+  // Mandar un archivo al chat de la llamada (también lo pueden los invitados
+  // sin cuenta: su token tiene canPublishData). Va por LiveKit, no se sube.
+  const sendChatFile = useCallback(async (file: File, onProgress?: (p: number) => void) => {
+    const room = roomRef.current;
+    if (!room) throw new Error(traducir("shared.call.notInCall"));
+    if (file.size > MAX_ARCHIVO_CHAT_MB * 1024 * 1024) throw new Error("too-big");
+    const { id } = await room.localParticipant.sendFile(file, {
+      topic: TEMA_ARCHIVO_CHAT,
+      mimeType: file.type || "application/octet-stream",
+      onProgress,
+    });
+    setChatMessages((prev) => {
+      const nuevos = [...prev, {
+        id,
+        sender: room.localParticipant.identity,
+        senderName: room.localParticipant.name || traducir("shared.call.you"),
+        content: "",
+        timestamp: Date.now(),
+        archivo: { nombre: file.name, tipo: file.type, tamano: file.size, url: URL.createObjectURL(file) },
+      }];
+      return nuevos.length > MAX_CHAT_MESSAGES ? nuevos.slice(nuevos.length - MAX_CHAT_MESSAGES) : nuevos;
+    });
+  }, []);
+
   // ── Moderation ────────────────────────────────────────────────
   // ── Moderación ────────────────────────────────────────────────────────
   // ANTES esto publicaba un mensaje por el canal de datos y esperaba que el
@@ -2788,6 +2857,7 @@ export function useLiveKit() {
     toggleHand,
     sendReaction,
     sendChatMessage,
+    sendChatFile,
     muteParticipant,
     removeParticipant,
     muteAllParticipants,

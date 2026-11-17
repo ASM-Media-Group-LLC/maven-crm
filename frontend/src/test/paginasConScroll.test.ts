@@ -38,7 +38,7 @@ const FUERA_DEL_SHELL = new Set([
   "Portada", "Privacidad", "Concepto", "Login", "NotFound", "ForgotPassword", "ResetPassword",
   // Documentación pública del producto (/documentation): fuera del shell, la ventana scrollea sola.
   "Documentacion",
-  "VideoCallPage", "MeetGuestPage", "ChatterPublicSession", "DesignSystem", "Docs", "Roadmap",
+  "VideoCallPage", "MeetGuestPage", "MeetLinkPage", "ChatterPublicSession", "DesignSystem", "Docs", "Roadmap",
   // Medidas del dispositivo para depurar la PWA: pública, fuera del shell, scroll del documento.
   "DiagnosticoPantalla",
   // Portal de creadoras: entrar y elegir contraseña, públicas como Login y ResetPassword.
