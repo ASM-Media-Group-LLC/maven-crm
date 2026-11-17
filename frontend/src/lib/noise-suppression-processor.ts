@@ -1,6 +1,9 @@
 import rnnoiseWorkletUrl from "@sapphi-red/web-noise-suppressor/rnnoiseWorklet.js?url";
 import rnnoiseWasmUrl from "@sapphi-red/web-noise-suppressor/rnnoise.wasm?url";
 import rnnoiseSimdWasmUrl from "@sapphi-red/web-noise-suppressor/rnnoise_simd.wasm?url";
+import {
+  crearNodoDF, deepFilterPermitido, descartarDeepFilterEnPestana, marcarDeepFilterPesado, soltarNodoDF, veredictoCarga,
+} from "@/lib/deepfilter";
 
 // Cancelación de ruido de las llamadas (Meet, Cowork y videollamadas).
 //
@@ -21,14 +24,26 @@ import rnnoiseSimdWasmUrl from "@sapphi-red/web-noise-suppressor/rnnoise_simd.wa
 //
 // Desde el 13/11/2026 es OBLIGATORIA: no hay botón para apagarla (ver
 // loadNCPreference abajo) y lib/estadoNC.ts mide si de verdad está corriendo.
+//
+// NIVEL 3 (16/11/2026): DeepFilterNet3 (lib/deepfilter.ts), más fuerte que
+// RNNoise. Toma el relevo a los pocos segundos, cuando terminó de cargar, y si
+// el equipo no da abasto se vuelve solo a RNNoise:
+//
+//   Micro → DeepFilterNet3 (o RNNoise) → puerta adaptativa → pista procesada
 
 /** Qué motor de cancelación de ruido quedó armado en esta pestaña. */
-export type MotorNC = "rnnoise+puerta" | "puerta";
+export type MotorNC = "deepfilter+puerta" | "rnnoise+puerta" | "puerta";
 
 /** El último motor que se armó. Para el aviso al usuario y para depurar. */
 let motorVigente: MotorNC | null = null;
 export function motorNCVigente(): MotorNC | null {
   return motorVigente;
+}
+
+/** Fracción del hilo de audio que gasta DeepFilterNet (0–1), según su último reporte. */
+let cargaDFVigente: number | null = null;
+export function cargaDeepFilter(): number | null {
+  return cargaDFVigente;
 }
 
 // La librería se importa PEREZOSA, dentro de la cadena, por dos motivos: su
@@ -75,7 +90,8 @@ async function cargarWasmRnnoise(): Promise<ArrayBuffer> {
 export interface CadenaNC {
   /** La pista limpia, lista para publicar (o para clonar por sala). */
   salida: MediaStreamTrack;
-  motor: MotorNC;
+  /** Cambia en vivo: RNNoise al armar, DeepFilterNet cuando toma el relevo. */
+  readonly motor: MotorNC;
   destruir(): Promise<void>;
 }
 
@@ -94,6 +110,9 @@ export const VIGILANCIA_NC_MS = 2_000;
 export const REVISIONES_MUDAS_PARA_FALLAR = 8;
 export const RMS_VOZ = 0.05;
 export const RMS_NADA = 0.0002;
+
+/** Cuánto se espera después de armar antes de montar DeepFilterNet. */
+export const ESPERA_ANTES_DE_DF_MS = 3_000;
 
 /** RMS de la señal en el analizador (dominio del tiempo). Exportado para probarlo. */
 export function rmsDe(muestras: Float32Array): number {
@@ -222,11 +241,77 @@ export async function armarCadenaNC(entrada: MediaStreamTrack, alFallar?: (motiv
   motorVigente = motor;
   console.info(`[NC] cancelación de ruido armada: ${motor}`);
 
+  // RELEVO A DEEPFILTERNET. Unos segundos después de armar (que la entrada a
+  // la llamada no compita con la descarga) se monta DeepFilterNet en lugar de
+  // RNNoise, en caliente y en el mismo contexto: la pista de salida no cambia,
+  // LiveKit no se entera. Si no carga, sigue RNNoise; si el equipo no da
+  // abasto, se vuelve a RNNoise.
+  let cerrada = false;
+  let nodoDF: AudioWorkletNode | null = null;
+  const conectarAnterior = () => {
+    if (rnnoise) { fuente.connect(rnnoise); rnnoise.connect(puerta); }
+    else fuente.connect(puerta);
+  };
+  const desconectarAnterior = () => {
+    if (rnnoise) {
+      try { fuente.disconnect(rnnoise); } catch { /* noop */ }
+      try { rnnoise.disconnect(puerta); } catch { /* noop */ }
+    } else {
+      try { fuente.disconnect(puerta); } catch { /* noop */ }
+    }
+  };
+  const bajarDeDeepFilter = (motivo: string) => {
+    const nodo = nodoDF;
+    if (!nodo) return;
+    nodoDF = null;
+    conectarAnterior();
+    try { fuente.disconnect(nodo); } catch { /* noop */ }
+    soltarNodoDF(nodo);
+    motor = rnnoise ? "rnnoise+puerta" : "puerta";
+    motorVigente = motor;
+    console.warn(`[NC] DeepFilterNet apagado (${motivo}); sigue ${motor}`);
+  };
+  const subirADeepFilter = async () => {
+    let nodo: AudioWorkletNode | null = null;
+    try {
+      nodo = await crearNodoDF(ctx);
+      if (cerrada || ctx.state === "closed") { soltarNodoDF(nodo); return; }
+      fuente.connect(nodo);
+      nodo.connect(puerta);
+      desconectarAnterior();
+      nodoDF = nodo;
+      motor = "deepfilter+puerta";
+      motorVigente = motor;
+      let malas = 0;
+      nodo.port.onmessage = (e: MessageEvent) => {
+        if (e.data?.tipo !== "carga") return;
+        cargaDFVigente = e.data.ventanaMs > 0 ? e.data.gastoMs / e.data.ventanaMs : null;
+        const v = veredictoCarga(e.data, malas);
+        malas = v.seguidas;
+        if (v.pesado) {
+          marcarDeepFilterPesado();
+          bajarDeDeepFilter("el computador no da abasto");
+        }
+      };
+      console.info("[NC] cancelación de ruido fuerte armada: deepfilter+puerta");
+    } catch (e) {
+      if (nodo) soltarNodoDF(nodo);
+      descartarDeepFilterEnPestana();
+      console.warn("[NC] DeepFilterNet no disponible, sigue", motor, "·", (e as Error)?.message ?? e);
+    }
+  };
+  const relevoDF = deepFilterPermitido()
+    ? window.setTimeout(() => { void subirADeepFilter(); }, ESPERA_ANTES_DE_DF_MS)
+    : 0;
+
   const salida = destino.stream.getAudioTracks()[0];
   return {
     salida,
-    motor,
+    get motor() { return motor; },
     async destruir() {
+      cerrada = true;
+      window.clearTimeout(relevoDF);
+      if (nodoDF) { soltarNodoDF(nodoDF); nodoDF = null; }
       window.clearInterval(vigilante);
       ctx.onstatechange = null;
       for (const n of nodos) { try { n.disconnect(); } catch { /* noop */ } }
@@ -240,13 +325,15 @@ export async function armarCadenaNC(entrada: MediaStreamTrack, alFallar?: (motiv
 /**
  * LiveKit TrackProcessor: envuelve la cadena para el micro de la llamada.
  *
- * Architecture: Mic → RNNoise → puerta → Processed Track → LiveKit
+ * Architecture: Mic → DeepFilterNet3 (o RNNoise) → puerta → Processed Track → LiveKit
  */
 export class NoiseSuppresionTrackProcessor {
   name = "noise-suppression";
   processedTrack?: MediaStreamTrack;
-  /** Con qué motor quedó armado este procesador. */
-  motor: MotorNC | null = null;
+  /** Con qué motor está corriendo ahora (cambia cuando DeepFilterNet toma el relevo). */
+  get motor(): MotorNC | null {
+    return this.cadena?.motor ?? null;
+  }
 
   private cadena?: CadenaNC;
 
@@ -293,12 +380,10 @@ export class NoiseSuppresionTrackProcessor {
       const nueva = await armarCadenaNC(track, this.alFallar);
       this.cadena = nueva;
       this.processedTrack = nueva.salida;
-      this.motor = nueva.motor;
     } catch (e) {
       // Mejor ruido que silencio: sin pista procesada, LiveKit publica la cruda.
       this.cadena = undefined;
       this.processedTrack = undefined;
-      this.motor = null;
       const motivo = e instanceof Error ? e.message : String(e);
       console.warn("[NC] no se pudo armar; se sigue con el micrófono crudo:", motivo);
       // ⚠️ Diferido a propósito: `alFallar` termina llamando a `stopProcessor()`,
@@ -313,7 +398,6 @@ export class NoiseSuppresionTrackProcessor {
     const c = this.cadena;
     this.cadena = undefined;
     this.processedTrack = undefined;
-    this.motor = null;
     if (c) await c.destruir();
   }
 }
