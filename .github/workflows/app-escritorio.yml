@@ -1,0 +1,58 @@
+# Arma la app de computador (desktop/) y sube los instaladores al balde público
+# `descargas` de Supabase, de donde los baja el botón de la portada:
+#   …/storage/v1/object/public/descargas/Maven-Mac.dmg
+#   …/storage/v1/object/public/descargas/Maven-Windows.exe
+# Corre en el Mac mini (la firma de Mac necesita macOS; Windows también sale de ahí).
+# La llave de servicio se pide al vuelo con SUPABASE_ACCESS_TOKEN y no se guarda.
+name: app-escritorio
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ["desktop/**", ".github/workflows/app-escritorio.yml"]
+
+concurrency:
+  group: app-escritorio
+  cancel-in-progress: true
+
+jobs:
+  armar-y-subir:
+    runs-on: [self-hosted, macOS, ARM64, mini5]
+    timeout-minutes: 40
+    env:
+      PROYECTO: lsagslbkliprespbyhts
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Instalar
+        working-directory: desktop
+        run: npm ci --no-audit --no-fund && node node_modules/electron/install.js
+
+      - name: Armar Mac y Windows
+        working-directory: desktop
+        run: |
+          npx electron-builder --mac --publish never -c.directories.output="$RUNNER_TEMP/escritorio"
+          npx electron-builder --win --publish never -c.directories.output="$RUNNER_TEMP/escritorio"
+          ls -la "$RUNNER_TEMP/escritorio"
+
+      - name: Subir a Supabase (balde descargas)
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: |
+          set -euo pipefail
+          LLAVE=$(curl -fsS "https://api.supabase.com/v1/projects/$PROYECTO/api-keys?reveal=true" \
+            -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
+            | python3 -c 'import json,sys; print(next(k["api_key"] for k in json.load(sys.stdin) if k["name"]=="service_role"))')
+          echo "::add-mask::$LLAVE"
+          for f in Maven-Mac.dmg Maven-Windows.exe; do
+            curl -fsS -X POST "https://$PROYECTO.supabase.co/storage/v1/object/descargas/$f" \
+              -H "Authorization: Bearer $LLAVE" -H "apikey: $LLAVE" \
+              -H "x-upsert: true" -H "cache-control: max-age=300" \
+              -H "Content-Type: application/octet-stream" \
+              --data-binary "@$RUNNER_TEMP/escritorio/$f" >/dev/null
+            echo "subido $f"
+          done
+          for f in Maven-Mac.dmg Maven-Windows.exe; do
+            curl -fsSI "https://$PROYECTO.supabase.co/storage/v1/object/public/descargas/$f" | grep -i content-length
+          done

@@ -236,6 +236,11 @@
 .pt.pr .pr-cierre h2 em { font-style: normal; color: var(--pr-acento); }
 .pt.pr .pr-cierre p { position: relative; margin: 1.2rem auto 0; max-width: 36rem; color: var(--pr-gris); }
 .pt.pr .pr-cierre .pr-btn { position: relative; margin-top: 2.2rem; }
+/* La app de computador: debajo del botón de demo, discreta (contorno). */
+.pt.pr .pr-bajar-app { position: relative; margin-top: 2.6rem; display: flex; flex-direction: column; align-items: center; gap: .9rem; }
+.pt.pr .pr-bajar-app > span { color: var(--pr-gris); font-size: .9rem; }
+.pt.pr .pr-bajar-app-botones { display: flex; gap: .8rem; flex-wrap: wrap; justify-content: center; }
+.pt.pr .pr-cierre .pr-bajar-app .pr-btn { margin-top: 0; font-size: .92rem; padding: .7em 1.5em; }
 
 /* El formulario de la demo se abre debajo del cierre. */
 .pt.pr .demo { background: transparent; }
