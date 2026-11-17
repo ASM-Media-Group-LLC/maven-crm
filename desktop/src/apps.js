@@ -17,10 +17,19 @@ const ENVIO_MS = 60 * 1000;
 const INACTIVO_S = 60; // más de 1 min sin tocar nada = ese rato cuenta como inactivo
 
 let leerVentana = null;
+let conTitulos = true; // si falta el permiso de Grabación de pantalla, sigue solo con el nombre de la app
 async function ventanaAlFrente() {
   try {
     if (!leerVentana) leerVentana = (await import("get-windows")).activeWindow;
-    const w = await leerVentana({ accessibilityPermission: false });
+    let w;
+    try {
+      w = await leerVentana({ accessibilityPermission: false, screenRecordingPermission: conTitulos });
+    } catch (e) {
+      if (!conTitulos) throw e;
+      conTitulos = false;
+      setTimeout(() => { conTitulos = true; }, 10 * 60 * 1000); // vuelve a probar: quizá ya dio el permiso
+      w = await leerVentana({ accessibilityPermission: false, screenRecordingPermission: false });
+    }
     if (!w) return null;
     return {
       app: String(w.owner?.name ?? "").slice(0, 120) || "Desconocida",

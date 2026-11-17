@@ -64,6 +64,8 @@ function abrirAlPrender(si) {
 }
 
 // ── Una sola copia abierta ───────────────────────────────────────────────────
+// Probándola desde el código usa su propia carpeta: no choca con la app instalada.
+if (!app.isPackaged) app.setPath("userData", path.join(app.getPath("appData"), "Maven (pruebas)"));
 if (!app.requestSingleInstanceLock()) {
   app.quit();
 } else {
