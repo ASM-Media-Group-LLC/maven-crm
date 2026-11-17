@@ -20,7 +20,7 @@ jobs:
   # Mac: en el Mac mini (la firma ad hoc necesita macOS).
   mac:
     runs-on: [self-hosted, macOS, ARM64, mini5]
-    timeout-minutes: 40
+    timeout-minutes: 180 # la revisión de Apple (notarización) a veces tarda
     env:
       PROYECTO: lsagslbkliprespbyhts
       ARCHIVOS: Maven-Mac.dmg Maven-Mac.zip Maven-Mac.zip.blockmap latest-mac.yml
@@ -29,9 +29,18 @@ jobs:
       - name: Instalar
         working-directory: desktop
         run: npm ci --no-audit --no-fund && node node_modules/electron/install.js
-      - name: Armar
+      - name: Armar (firmada con el Developer ID y notarizada por Apple)
         working-directory: desktop
+        env:
+          CSC_LINK: ${{ secrets.MAC_CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.MAC_CSC_KEY_PASSWORD }}
+          APPLE_API_KEY_ID: ${{ secrets.MAC_NOTARIZE_KEY_ID }}
+          APPLE_API_ISSUER: ${{ secrets.MAC_NOTARIZE_ISSUER }}
+          LLAVE_NOTARIZAR: ${{ secrets.MAC_NOTARIZE_API_KEY }}
         run: |
+          export APPLE_API_KEY="$RUNNER_TEMP/AuthKey.p8"
+          printf '%s' "$LLAVE_NOTARIZAR" > "$APPLE_API_KEY"
+          trap 'rm -f "$APPLE_API_KEY"' EXIT
           npm version "2.0.${{ github.run_number }}" --no-git-tag-version
           npx electron-builder --mac --publish never -c.directories.output="$RUNNER_TEMP/escritorio"
       - name: Subir a Supabase (balde descargas)

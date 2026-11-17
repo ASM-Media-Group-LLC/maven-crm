@@ -37,7 +37,6 @@
       ],
       "icon": "build/icon.png",
       "category": "public.app-category.business",
-      "identity": null,
       "extendInfo": {
         "NSCameraUsageDescription": "Maven usa la cámara para Cowork y las videollamadas.",
         "NSMicrophoneUsageDescription": "Maven usa el micrófono para Cowork y las videollamadas.",
@@ -48,7 +47,12 @@
         "!node_modules/get-windows/lib/binding/**",
         "!node_modules/get-windows/build/**"
       ],
-      "x64ArchFiles": "**/get-windows/main"
+      "x64ArchFiles": "**/get-windows/main",
+      "hardenedRuntime": true,
+      "gatekeeperAssess": false,
+      "entitlements": "build/entitlements.mac.plist",
+      "entitlementsInherit": "build/entitlements.mac.plist",
+      "notarize": true
     },
     "dmg": {
       "title": "Maven"
