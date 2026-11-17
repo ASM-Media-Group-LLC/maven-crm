@@ -320,7 +320,7 @@ serve(async (req) => {
       if (sala.familia === "meet") {
         const { data: room } = await admin.from("meet_rooms").select("*")
           .eq("livekit_room_name", livekitRoom).maybeSingle();
-        if (!room) return err(req, "Reunión no encontrada", 404);
+        if (!room || !(await esDeMiAgencia(room))) return err(req, "Reunión no encontrada", 404);
         if (room.status !== "active") return err(req, "Esa reunión ya terminó", 410);
         meetRoomId = room.id;
         agendadaPara = room.scheduled_for ? new Date(room.scheduled_for) : null;
@@ -395,9 +395,12 @@ serve(async (req) => {
       const livekitRoom = `meet_${crypto.randomUUID().replace(/-/g, "").slice(0, 12)}`;
       const { data: room, error: insErr } = await admin.from("meet_rooms")
         .insert({ name, livekit_room_name: livekitRoom, created_by: userId, scheduled_for: cuando.toISOString() })
-        .select("id, code, name, livekit_room_name, created_at, scheduled_for")
+        .select("*")
         .single();
       if (insErr) return err(req, insErr.message, 500);
+      // La base ya la pone en mi agencia (trigger meet_rooms_agencia); se
+      // confirma igual antes de repartir un link que la abre a gente de afuera.
+      if (!(await esDeMiAgencia(room))) return err(req, "Reunión no encontrada", 404);
       await rememberMembership(admin, room.id, userId);
 
       const { link, expiresAt } = await linkDeInvitado(admin, {
@@ -448,7 +451,11 @@ serve(async (req) => {
       }
 
       return json(req, {
-        room, link, expiresAt,
+        room: {
+          id: room.id, code: room.code, name: room.name, livekit_room_name: room.livekit_room_name,
+          created_at: room.created_at, scheduled_for: room.scheduled_for,
+        },
+        link, expiresAt,
         correo: { pedidos: correos.length, enviados, fallidos, configurado: !!llave },
       });
     }
