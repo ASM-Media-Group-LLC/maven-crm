@@ -35,6 +35,7 @@ import KpiDetailDialog, { type KpiRow } from "@/components/dashboard/KpiDetailDi
 import { PageHeader } from "@/components/ui/page-header";
 import { useLanguage } from "@/hooks/useLanguage";
 import { etiqueta, deSiempreSalvoEnIngles, CUALQUIER_AUSENCIA, ESTADO_AUSENCIA } from "./etiquetasRrhh";
+import { idiomaFuente } from "@/lib/idiomas";
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 interface AbsenceRecord {
@@ -208,7 +209,7 @@ function RegisterAbsenceModal({ open, onOpenChange }: RegisterModalProps) {
               <SelectTrigger><SelectValue placeholder={t("hr.selectType")} /></SelectTrigger>
               <SelectContent>
                 {ABSENCE_TYPES.map((o) => (
-                  <SelectItem key={o.value} value={o.value}>{getAbsenceTypeLabel(o.value, t, f.idioma)}</SelectItem>
+                  <SelectItem key={o.value} value={o.value}>{getAbsenceTypeLabel(o.value, t, idiomaFuente(f.idioma))}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -315,7 +316,7 @@ function EditAbsenceModal({ absence, onClose }: { absence: AbsenceRecord | null;
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
                 {ABSENCE_TYPES.map((o) => (
-                  <SelectItem key={o.value} value={o.value}>{getAbsenceTypeLabel(o.value, t, f.idioma)}</SelectItem>
+                  <SelectItem key={o.value} value={o.value}>{getAbsenceTypeLabel(o.value, t, idiomaFuente(f.idioma))}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -393,7 +394,7 @@ function ViewAbsenceModal({ absence, onClose }: { absence: AbsenceRecord | null;
           <div className="grid grid-cols-2 gap-3 text-sm">
             <div>
               <p className="text-muted-foreground text-xs mb-0.5">{t("hr.abs.type")}</p>
-              <Badge variant="outline">{getAbsenceTypeLabel(absence.absence_type, t, f.idioma)}</Badge>
+              <Badge variant="outline">{getAbsenceTypeLabel(absence.absence_type, t, idiomaFuente(f.idioma))}</Badge>
             </div>
             <div>
               <p className="text-muted-foreground text-xs mb-0.5">{t("common.status")}</p>
@@ -542,7 +543,7 @@ export default function HRAbsences() {
             <SelectContent>
               <SelectItem value="__all__">{t("common.allTypes")}</SelectItem>
               {ABSENCE_TYPES.map((o) => (
-                <SelectItem key={o.value} value={o.value}>{getAbsenceTypeLabel(o.value, t, f.idioma)}</SelectItem>
+                <SelectItem key={o.value} value={o.value}>{getAbsenceTypeLabel(o.value, t, idiomaFuente(f.idioma))}</SelectItem>
               ))}
             </SelectContent>
           </Select>
@@ -607,7 +608,7 @@ export default function HRAbsences() {
                               </div>
                             </div>
                           </TableCell>
-                          <TableCell><Badge variant="outline" className="text-xs">{getAbsenceTypeLabel(a.absence_type, t, f.idioma)}</Badge></TableCell>
+                          <TableCell><Badge variant="outline" className="text-xs">{getAbsenceTypeLabel(a.absence_type, t, idiomaFuente(f.idioma))}</Badge></TableCell>
                           <TableCell className="text-sm text-muted-foreground whitespace-nowrap">{formatDateRange(a.start_date, a.end_date, f)}</TableCell>
                           <TableCell>
                             <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-muted text-xs font-semibold">{a.total_days ?? "—"}</span>
@@ -668,7 +669,7 @@ export default function HRAbsences() {
                       </div>
                     </div>
                     <div className="flex flex-wrap gap-1.5">
-                      <Badge variant="outline" className="text-xs">{getAbsenceTypeLabel(a.absence_type, t, f.idioma)}</Badge>
+                      <Badge variant="outline" className="text-xs">{getAbsenceTypeLabel(a.absence_type, t, idiomaFuente(f.idioma))}</Badge>
                       <Badge variant={getStatusVariant(a.status)} className={cn("text-xs", a.status === "pending" && "border-warning/50 bg-warning/10 text-warning", a.status === "approved" && "border-primary/50 bg-primary/10 text-primary")}>
                         {getStatusLabel(a.status, t)}
                       </Badge>
@@ -743,8 +744,8 @@ export default function HRAbsences() {
             status === "approved" ? "success" : status === "rejected" ? "destructive" : "warning";
           return list.slice(0, 100).map((a: any): KpiRow => ({
             primary: a.employee_name ?? t("hr.employeeWithId", { id: a.employee_id?.slice?.(0, 8) ?? "—" }),
-            secondary: `${deSiempreSalvoEnIngles(f.idioma, t, CUALQUIER_AUSENCIA, a.absence_type, a.absence_type ?? "")} · ${a.start_date ? new Date(a.start_date).toLocaleDateString(f.idioma === "en" ? "en-US" : "es") : "—"}`,
-            right: deSiempreSalvoEnIngles(f.idioma, t, ESTADO_AUSENCIA, a.status, a.status ?? "—"),
+            secondary: `${deSiempreSalvoEnIngles(idiomaFuente(f.idioma), t, CUALQUIER_AUSENCIA, a.absence_type, a.absence_type ?? "")} · ${a.start_date ? new Date(a.start_date).toLocaleDateString(f.idioma === "en" ? "en-US" : "es") : "—"}`,
+            right: deSiempreSalvoEnIngles(idiomaFuente(f.idioma), t, ESTADO_AUSENCIA, a.status, a.status ?? "—"),
             rightTone: tone(a.status ?? ""),
           }));
         })()}

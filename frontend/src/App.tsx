@@ -9,7 +9,8 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { ThemeProvider } from "next-themes";
 import { AuthProvider } from "@/hooks/useAuth";
 import { useSkinSync } from "@/hooks/useSkin";
-import { LanguageProvider } from "@/hooks/useLanguage";
+import { LanguageProvider, idiomaInicial } from "@/hooks/useLanguage";
+import { IDIOMAS } from "@/lib/idiomas";
 import { OnlinePresenceProvider } from "@/hooks/useOnlinePresence";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import PermissionRoute from "@/components/PermissionRoute";
@@ -288,7 +289,12 @@ const App = () => (
             <Suspense fallback={<LoadingFallback />}>
             <Routes>
               {/* Public routes */}
-              <Route path="/" element={<Portada />} />
+              {/* La portada en cada idioma tiene su dirección; `/` manda a la de
+                  quien entra (su elección, o el idioma de su navegador). */}
+              <Route path="/" element={<Navigate to={`/${idiomaInicial()}${window.location.hash}`} replace />} />
+              {IDIOMAS.map((l) => (
+                <Route key={l} path={`/${l}`} element={<Portada idiomaDeRuta={l} />} />
+              ))}
               <Route path="/privacidad" element={<Privacidad />} />
               <Route path="/documentation" element={<Documentacion />} />
               {/* Medidas del dispositivo para depurar la PWA en teléfonos (pública). */}

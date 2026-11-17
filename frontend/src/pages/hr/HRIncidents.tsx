@@ -34,6 +34,7 @@ import { format } from "date-fns";
 import { useLanguage } from "@/hooks/useLanguage";
 import { useFormato } from "@/hooks/useFormato";
 import { etiqueta, deSiempreSalvoEnIngles, ESTADO_INCIDENTE, SEVERIDAD, TIPO_INCIDENTE } from "./etiquetasRrhh";
+import { idiomaFuente } from "@/lib/idiomas";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface IncidentRecord {
@@ -537,10 +538,10 @@ export default function HRIncidents() {
             severity === "critical" ? "destructive" : severity === "high" ? "warning" : "default";
           return list.slice(0, 100).map((i: any): KpiRow => ({
             primary: i.title ?? i.description ?? t("hr.noTitle"),
-            secondary: i.employee_name ?? (i.incident_type != null ? deSiempreSalvoEnIngles(f.idioma, t, TIPO_INCIDENTE, i.incident_type, i.incident_type) : undefined),
+            secondary: i.employee_name ?? (i.incident_type != null ? deSiempreSalvoEnIngles(idiomaFuente(f.idioma), t, TIPO_INCIDENTE, i.incident_type, i.incident_type) : undefined),
             right: i.severity != null
-              ? deSiempreSalvoEnIngles(f.idioma, t, SEVERIDAD, i.severity, i.severity)
-              : i.status != null ? deSiempreSalvoEnIngles(f.idioma, t, ESTADO_INCIDENTE, i.status, i.status) : "—",
+              ? deSiempreSalvoEnIngles(idiomaFuente(f.idioma), t, SEVERIDAD, i.severity, i.severity)
+              : i.status != null ? deSiempreSalvoEnIngles(idiomaFuente(f.idioma), t, ESTADO_INCIDENTE, i.status, i.status) : "—",
             rightTone: tone(i.severity ?? ""),
           }));
         })()}

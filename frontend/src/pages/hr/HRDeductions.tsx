@@ -34,6 +34,7 @@ import type { Formato } from "@/lib/formato";
 import { useLanguage } from "@/hooks/useLanguage";
 import type { TranslationKey } from "@/lib/i18n";
 import { etiqueta, deSiempreSalvoEnIngles, CATEGORIA_INFRACCION, ESTADO_DEDUCCION, TIPO_DEDUCCION } from "./etiquetasRrhh";
+import { idiomaFuente } from "@/lib/idiomas";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface DeductionRecord {
@@ -480,7 +481,7 @@ export default function HRDeductions() {
             status === "applied" ? "success" : status === "pending" ? "warning" : "default";
           return list.slice(0, 100).map((d: any): KpiRow => ({
             primary: d.employee_name ?? d.reason ?? t("hr.ded.noConcept"),
-            secondary: d.month_year ?? (d.deduction_type != null ? deSiempreSalvoEnIngles(f.idioma, t, TIPO_DEDUCCION, d.deduction_type, d.deduction_type) : undefined),
+            secondary: d.month_year ?? (d.deduction_type != null ? deSiempreSalvoEnIngles(idiomaFuente(f.idioma), t, TIPO_DEDUCCION, d.deduction_type, d.deduction_type) : undefined),
             right: formatAmount(f, d.amount || 0),
             rightTone: tone(d.status ?? ""),
           }));

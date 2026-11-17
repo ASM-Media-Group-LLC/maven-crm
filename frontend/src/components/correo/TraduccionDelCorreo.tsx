@@ -2,6 +2,7 @@ import { useState, type ReactNode } from "react";
 import { Languages, Loader2 } from "lucide-react";
 import { useLanguage } from "@/hooks/useLanguage";
 import { useTraduccionCorreo, type MailMessage, type MailSummary } from "@/hooks/useMailbox";
+import { idiomaFuente } from "@/lib/idiomas";
 
 /** «Traducir» del ⋮ de un mensaje: la traducción va ARRIBA, en su recuadro, y
  *  el original queda plegado debajo con «Ver original» (Keila, 02/10).
@@ -22,7 +23,7 @@ export default function TraduccionDelCorreo({
 }) {
   const { t, language } = useLanguage();
   const [verOriginal, setVerOriginal] = useState(false);
-  const traduccion = useTraduccionCorreo({ correo, mensaje, idioma: language, habilitada: true });
+  const traduccion = useTraduccionCorreo({ correo, mensaje, idioma: idiomaFuente(language), habilitada: true });
 
   const motivo = (() => {
     const m = (traduccion.error as Error | null)?.message ?? "";

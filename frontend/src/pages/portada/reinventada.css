@@ -69,6 +69,37 @@
 .pt.pr .pr-nav-links a:hover { color: var(--pr-texto); }
 .pt.pr .pr-nav-cta { display: flex; align-items: center; gap: .7rem; }
 .pt.pr .pr-nav-cta .pr-btn { font-size: .88rem; padding: .65em 1.4em; }
+/* Selector de idioma (6 idiomas), como el de Lumina: píldora «ES ⌄» al final
+   de la barra y una lista en tarjeta. */
+.pt.pr .pr-idioma { position: relative; flex-shrink: 0; }
+.pt.pr .pr-idioma-btn {
+  display: inline-flex; align-items: center; gap: .4rem; min-height: 40px;
+  background: rgba(var(--pr-acento-rgb), .05); color: var(--pr-texto);
+  border: 1px solid rgba(255,255,255,.14); border-radius: 999px; padding: .5em .8em;
+  font: inherit; font-size: .82rem; font-weight: 600; letter-spacing: .02em; cursor: pointer;
+  transition: background .2s ease, border-color .2s ease, color .2s ease;
+}
+.pt.pr .pr-idioma-btn:hover { background: rgba(var(--pr-acento-rgb), .12); border-color: var(--pr-acento); color: var(--pr-neon-hover); }
+.pt.pr .pr-idioma-btn:focus-visible { outline: none; border-color: var(--pr-acento); }
+.pt.pr .pr-idioma-btn svg { width: .95em; height: .95em; color: var(--pr-acento); transition: transform .2s ease; }
+.pt.pr .pr-idioma.abierto .pr-idioma-btn svg { transform: rotate(180deg); }
+.pt.pr .pr-idioma-lista {
+  position: absolute; top: calc(100% + .55rem); right: 0; min-width: 170px; z-index: 60;
+  list-style: none; margin: 0; padding: .4rem;
+  background: #141d2e; border: 1px solid rgba(255,255,255,.1); border-radius: 14px;
+  box-shadow: 0 22px 55px -18px rgba(0,0,0,.75);
+}
+.pt.pr .pr-idioma-lista li {
+  display: flex; align-items: center; padding: .6em .75em; border-radius: 10px;
+  font-size: .9rem; font-weight: 500; color: var(--pr-texto); cursor: pointer;
+  transition: background .15s ease, color .15s ease;
+}
+.pt.pr .pr-idioma-lista li:hover, .pt.pr .pr-idioma-lista li:focus-visible { background: rgba(var(--pr-acento-rgb), .12); color: var(--pr-neon-hover); outline: none; }
+.pt.pr .pr-idioma-lista li[aria-selected="true"] { color: var(--pr-acento); background: rgba(var(--pr-acento-rgb), .06); }
+@media (max-width: 760px) {
+  .pt.pr .pr-idioma-btn { padding: .5em .7em; font-size: .8rem; }
+  .pt.pr .pr-nav-cta { gap: .5rem; }
+}
 @media (max-width: 760px) {
   .pt.pr .pr-nav-links { display: none; }
   .pt.pr .pr-nav-cta .pr-btn-fantasma { display: none; }

@@ -1,128 +1,90 @@
-import { navegacion } from "./i18n/navegacion";
-import { comun } from "./i18n/comun";
-import { chatCompartido } from "./i18n/chatCompartido";
-import { permisos } from "./i18n/permisos";
-import { telegram } from "./i18n/telegram";
-import { whatsapp } from "./i18n/whatsapp";
-import { creadoras } from "./i18n/creadoras";
-import { dashboard } from "./i18n/dashboard";
-import { ajustes } from "./i18n/ajustes";
-import { auth } from "./i18n/auth";
-import { pwa } from "./i18n/pwa";
-import { calendario } from "./i18n/calendario";
-import { correo } from "./i18n/correo";
-import { oficina } from "./i18n/oficina";
-import { messenger } from "./i18n/messenger";
-import { contactos } from "./i18n/contactos";
-import { closers } from "./i18n/closers";
-import { promolog } from "./i18n/promolog";
-import { tickets } from "./i18n/tickets";
-import { chatters } from "./i18n/chatters";
-import { leadgen } from "./i18n/leadgen";
-import { hr } from "./i18n/hr";
-import { finanzas } from "./i18n/finanzas";
-import { agencyQa } from "./i18n/agencyQa";
-import { admin } from "./i18n/admin";
-import { creadoresFicha } from "./i18n/creadoresFicha";
-import { cowork } from "./i18n/cowork";
-import { scouter } from "./i18n/scouter";
-import { apiKeys } from "./i18n/apiKeys";
-import { compartido } from "./i18n/compartido";
-import { hrGestion } from "./i18n/hrGestion";
-import { internos } from "./i18n/internos";
-import { paginas } from "./i18n/paginas";
-import { ventas } from "./i18n/ventas";
-import { portal } from "./i18n/portal";
-import { centroOps } from "./i18n/centroOps";
-import { vigilancia } from "./i18n/vigilancia";
-import { conexionEquipo } from "./i18n/conexionEquipo";
+import type Diccionario from "./diccionario";
+import type { TranslationKey as ClaveDelDiccionario } from "./diccionario";
+import { type Idioma } from "./idiomas";
 
-export type Language = "es" | "en";
+// LAS TRADUCCIONES, MIENTRAS LA APP CORRE.
+//
+// El diccionario se ESCRIBE en lib/diccionario.ts (+ lib/i18n/<módulo>.ts), en
+// español e inglés. Al compilar, el plugin scripts/i18n/vitePluginIdiomas.ts
+// arma un paquete por idioma —completo: lo que a un idioma traducido le falta,
+// lo rellena con inglés— y la app baja SOLO el de la persona (`cargarIdioma`).
+// Antes las 13.000+ frases de los dos idiomas viajaban dentro del archivo
+// principal y se bajaban siempre (medido el 16/11/2026: era lo más pesado).
+//
+// Antes de pintar, main.tsx espera `cargarIdioma(idioma inicial)`, así que `t()`
+// y `traducir()` siempre encuentran su texto. Cambiar de idioma también espera
+// la carga (useLanguage → setLanguage).
+//
+// `useLanguage()` solo se puede llamar dentro de un componente de React. Para
+// lo que no lo es (toasts en callbacks, mensajes de lib/), `traducir()` lee el
+// idioma que fija el LanguageProvider con `fijarIdioma()`.
+//
+// ⚠️ Para texto que se RENDERIZA usa siempre el hook. `traducir()` lee el idioma
+// en el momento de la llamada y no vuelve a correr solo.
 
-// EL DICCIONARIO, PARTIDO POR MÓDULO.
-//
-// Hasta sep 2026 era un solo objeto de 1.400 líneas en este archivo. Con varios
-// módulos traduciéndose a la vez, todos los PR tocaban el mismo archivo y
-// chocaban entre sí. Ahora cada módulo tiene el suyo en lib/i18n/ y acá solo se
-// arma la unión. Las claves no cambiaron: `t("common.save")` sigue igual.
-//
-//  - Clave nueva: va en el archivo de su módulo y empieza con uno de los
-//    prefijos que ese archivo declara en su PREFIJOS_… ("promolog.x" →
-//    lib/i18n/promolog.ts). Antes de inventarla, buscá en comun.ts: lo que se
-//    repite entre módulos vive ahí.
-//  - Módulo nuevo: archivo nuevo en lib/i18n/ con su objeto y su PREFIJOS_…, y
-//    sumarlo a la lista de abajo. Si no se suma, sus claves no existen para t().
-//
-// Lo vigila test/i18n/diccionarioPorModulo.test.ts: ninguna clave en dos
-// archivos, cada una con un prefijo de su archivo y con `es` y `en` escritos.
-// Una clave repetida entre dos archivos NO la ve tsc (la segunda pisa a la
-// primera en silencio); la ve ese test.
-const translations = {
-  ...navegacion,
-  ...comun,
-  ...chatCompartido,
-  ...permisos,
-  ...telegram,
-  ...whatsapp,
-  ...creadoras,
-  ...dashboard,
-  ...ajustes,
-  ...auth,
-  ...pwa,
-  ...calendario,
-  ...correo,
-  ...oficina,
-  ...messenger,
-  ...contactos,
-  ...closers,
-  ...promolog,
-  ...tickets,
-  ...chatters,
-  ...leadgen,
-  ...hr,
-  ...finanzas,
-  ...agencyQa,
-  ...admin,
-  ...creadoresFicha,
-  ...cowork,
-  ...scouter,
-  ...apiKeys,
-  ...compartido,
-  ...hrGestion,
-  ...internos,
-  ...paginas,
-  ...ventas,
-  ...portal,
-  ...centroOps,
-  ...vigilancia,
-  ...conexionEquipo,
-} as const;
+export type Language = Idioma;
+export type TranslationKey = ClaveDelDiccionario;
 
-export type TranslationKey = keyof typeof translations;
+type Catalogo = Record<string, string>;
 
-// EL IDIOMA, PARA EL CÓDIGO QUE NO ES UN COMPONENTE.
-//
-// `useLanguage()` solo se puede llamar dentro de un componente de React. Pero
-// buena parte del texto que ve el usuario NO se escribe ahí: los 1.147 avisos
-// `toast()` de la app viven en callbacks, en mutaciones de react-query y en
-// hooks sueltos, y los mensajes de validación viven en módulos de `lib/`.
-//
-// `traducir()` es el mismo diccionario para esos lugares. Lo mantiene al día el
-// LanguageProvider, que llama a `fijarIdioma()` cuando cambia el idioma.
-//
-// ⚠️ Para texto que se RENDERIZA usá siempre el hook. `traducir()` lee el idioma
-// en el momento de la llamada y no vuelve a correr solo: si lo usás dentro del
-// JSX, el texto se queda en el idioma que había cuando se montó el componente.
-// Para un toast eso es exactamente lo que querés (se arma y se muestra); para
-// una etiqueta en pantalla, es un bug.
+const catalogos: Partial<Record<Language, Catalogo>> = {};
+
+// Un import() por idioma, escrito a mano: así Vite parte un archivo por cada
+// uno y nadie baja los seis.
+const CARGADORES: Record<Language, () => Promise<{ default: Catalogo }>> = {
+  en: () => import("virtual:maven-i18n/en"),
+  es: () => import("virtual:maven-i18n/es"),
+  de: () => import("virtual:maven-i18n/de"),
+  fr: () => import("virtual:maven-i18n/fr"),
+  it: () => import("virtual:maven-i18n/it"),
+  pt: () => import("virtual:maven-i18n/pt"),
+};
+
+const enCurso = new Map<Language, Promise<void>>();
+
+/** Baja (una vez) el paquete de un idioma. Si falla la red, no rompe: `t()`
+ *  cae en el idioma que ya esté cargado y, en último caso, muestra la clave. */
+export function cargarIdioma(lang: Language): Promise<void> {
+  if (catalogos[lang]) return Promise.resolve();
+  const ya = enCurso.get(lang);
+  if (ya) return ya;
+  // Un segundo intento si la red falla (conexiones flojas): sin el paquete,
+  // toda la pantalla mostraría claves en vez de frases.
+  const p = CARGADORES[lang]()
+    .catch(() => new Promise<void>((r) => setTimeout(r, 800)).then(() => CARGADORES[lang]()))
+    .then((m) => { catalogos[lang] = m.default; })
+    .catch((e) => { console.warn(`[i18n] no se pudo cargar «${lang}»`, e); })
+    .finally(() => enCurso.delete(lang));
+  enCurso.set(lang, p);
+  return p;
+}
+
+export const idiomaCargado = (lang: Language): boolean => !!catalogos[lang];
+
+/** Carga un catálogo ya armado (lo usan las pruebas y el servidor de desarrollo). */
+export function registrarCatalogo(lang: Language, catalogo: Catalogo): void {
+  catalogos[lang] = catalogo;
+}
+
+// El diccionario fuente completo ({ es, en } por clave). En la app queda VACÍO:
+// solo lo llenan las pruebas (test/setup.ts), que lo leen entero.
+const diccionarioRegistrado: Record<string, { es: string; en: string }> = {};
+
+export function registrarDiccionario(d: Record<string, { es: string; en: string }>): void {
+  Object.assign(diccionarioRegistrado, d);
+  const es: Catalogo = {}, en: Catalogo = {};
+  for (const [k, v] of Object.entries(d)) { es[k] = v.es; en[k] = v.en; }
+  catalogos.es = { ...(catalogos.es ?? {}), ...es };
+  catalogos.en = { ...(catalogos.en ?? {}), ...en };
+}
+
 let idiomaActual: Language = "es";
 
 export function fijarIdioma(lang: Language): void {
   idiomaActual = lang;
 }
 
-/** El idioma de la interfaz, para código que no es un componente. Mismas reglas
- *  que `traducir()`: se lee en el momento de la llamada y no vuelve a correr. */
+/** El idioma de la interfaz, para código que no es un componente. */
 export function idioma(): Language {
   return idiomaActual;
 }
@@ -134,19 +96,19 @@ export function traducir(
   return getTranslation(key, idiomaActual, params);
 }
 
-// Interpolación: t("wa.replyingTo", { name }) reemplaza {name} en el texto. Necesaria para la
-// migración i18n completa (casi todos los textos reales tienen partes dinámicas). Si falta la
-// clave, devuelve la key tal cual (útil para detectar textos sin traducir en QA).
+// Si falta la clave en el idioma pedido, cae en inglés y luego en español; si
+// no está en ninguno, devuelve la clave tal cual (así se nota en QA).
 export function getTranslation(
   key: TranslationKey,
   lang: Language,
   params?: Record<string, string | number>,
 ): string {
-  let s: string = translations[key]?.[lang] ?? key;
+  let s: string = catalogos[lang]?.[key] ?? catalogos.en?.[key] ?? catalogos.es?.[key] ?? key;
   if (params) {
     for (const [k, v] of Object.entries(params)) s = s.replaceAll(`{${k}}`, String(v));
   }
   return s;
 }
 
-export default translations;
+/** El diccionario fuente. Solo tiene contenido en las pruebas. */
+export default diccionarioRegistrado as unknown as typeof Diccionario;

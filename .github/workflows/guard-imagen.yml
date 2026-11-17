@@ -18,6 +18,7 @@ on:
       - "package.json"
       - "package-lock.json"
       - "vite.config.ts"
+      - "scripts/i18n/**"
       - ".github/workflows/guard-imagen.yml"
 
 permissions:

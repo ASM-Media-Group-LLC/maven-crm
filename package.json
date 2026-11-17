@@ -11,7 +11,9 @@
     "preview": "vite preview",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "traducir": "node scripts/i18n/traducir.mjs",
+    "traducir:revisar": "node scripts/i18n/traducir.mjs --seco"
   },
   "dependencies": {
     "@breezystack/lamejs": "^1.2.7",

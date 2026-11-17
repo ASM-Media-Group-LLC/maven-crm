@@ -16,7 +16,8 @@ Maven es el CRM interno de la agencia: Messenger, Cowork y Meet, Correo (Zoho), 
 ## Idioma
 
 - Español neutro en todo: interfaz, comentarios, commits, PRs y respuestas. **Sin voseo**: se conjuga con «tú» (tienes, quieres, mira), nunca con «vos». Sin palabras en inglés cuando hay una en español.
-- Texto nuevo de interfaz va por `t()` de `useLanguage()`, con la clave en `frontend/src/lib/i18n.ts` como `"clave": { es, en }`. Hay un freno (`sinEspanolNuevo.test.ts`) que rechaza español a mano en archivos nuevos.
+- Texto nuevo de interfaz va por `t()` de `useLanguage()`, con la clave en el archivo de su módulo en `frontend/src/lib/i18n/` como `"clave": { es, en }`. Hay un freno (`sinEspanolNuevo.test.ts`) que rechaza español a mano en archivos nuevos.
+- **Maven va en 6 idiomas** (inglés principal, español, alemán, francés, italiano, portugués; `frontend/src/lib/idiomas.ts`). Solo se escriben `es` y `en`; los otros cuatro los llena `npm run traducir` (Gemini) en `frontend/src/locales/<idioma>.json`, y en CI lo hace solo el workflow `traducir-idiomas` al subir a `main`. Lo que falte se muestra en inglés. La app baja solo el paquete de su idioma (`lib/i18n.ts` → `cargarIdioma`); el diccionario completo vive en `lib/diccionario.ts` y solo lo leen las pruebas.
 
 ## Git y despliegue (flujo rápido)
 

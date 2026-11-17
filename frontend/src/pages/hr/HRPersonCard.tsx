@@ -16,6 +16,7 @@ import { PageHeader } from "@/components/ui/page-header";
 import { useLanguage } from "@/hooks/useLanguage";
 import type { TranslationKey } from "@/lib/i18n";
 import { periodoDelMes, TURNO_ASISTENCIA } from "./etiquetasRrhh";
+import { idiomaFuente } from "@/lib/idiomas";
 
 // Roles de useHrPeople cuya etiqueta es una palabra en español.
 const ROL_EN_ESPANOL: Record<string, TranslationKey> = {
@@ -51,7 +52,7 @@ function Section({ icon: Icon, title, period, children }: { icon: any; title: st
         <CardTitle className="flex items-center gap-2 text-sm font-medium">
           <Icon className="h-4 w-4 text-muted-foreground" />
           {title}
-          {period && <span className="text-xs font-normal text-muted-foreground">· {periodoDelMes(period, language, periodLabel)}</span>}
+          {period && <span className="text-xs font-normal text-muted-foreground">· {periodoDelMes(period, idiomaFuente(language), periodLabel)}</span>}
         </CardTitle>
       </CardHeader>
       <CardContent>{children}</CardContent>

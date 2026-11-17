@@ -1,3 +1,4 @@
+import { LOCALE_INTL } from "@/lib/idiomas";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { idioma, type Language } from "@/lib/i18n";
@@ -182,11 +183,10 @@ export const useDeleteScorecard = () => {
 // correo del QA de chatters pasa "es" (lo lee el chatter, no quien apretó el botón).
 // Sin idioma usa el de la interfaz en ese momento: lo usan también pantallas de RRHH
 // (HRPersonCard, HrAttendanceAuto) que todavía no lo pasan.
-const MONTHS: Record<Language, string[]> = {
-  es: ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"],
-  en: ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"],
-};
 export const periodLabel = (period: string, lang: Language = idioma()) => {
   const [y, m] = period.split("-").map(Number);
-  return `${MONTHS[lang][(m ?? 1) - 1] ?? ""} ${y ?? ""}`.trim();
+  if (!y || !m) return `${y ?? ""}`.trim();
+  // El nombre del mes en el idioma de la interfaz (6 idiomas), con mayúscula como antes.
+  const mes = new Intl.DateTimeFormat(LOCALE_INTL[lang], { month: "long", timeZone: "UTC" }).format(new Date(Date.UTC(y, m - 1, 15)));
+  return `${mes.charAt(0).toLocaleUpperCase(LOCALE_INTL[lang]) + mes.slice(1)} ${y}`;
 };
