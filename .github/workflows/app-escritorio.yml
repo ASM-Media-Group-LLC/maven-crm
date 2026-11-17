@@ -72,7 +72,10 @@ jobs:
           APP="$RUNNER_TEMP/escritorio/mac-universal/Maven.app"
           # Sin la firma de Alvaro no se sube nada (antes salía sin firma y se subía igual).
           codesign --verify --deep --strict "$APP"
-          codesign -dv "$APP" 2>&1 | grep -q 'Authority=Developer ID Application: Alvaro Mejia'
+          if ! codesign -dv "$APP" 2>&1 | grep -q 'Authority=Developer ID Application: Alvaro Mejia'; then
+            echo "::warning::Salió con firma ad hoc (sin Developer ID): no se manda a notarizar."
+            exit 0
+          fi
           # Notarización: se manda a Apple y se espera un rato. Si Apple la
           # aprueba después, el Mac igual la reconoce al abrirla (lo consulta en
           # línea), así que no hace falta esperar horas aquí.

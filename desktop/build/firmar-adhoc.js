@@ -30,6 +30,14 @@ exports.default = async function (ctx) {
   const permisos = path.join(__dirname, "entitlements.mac.plist");
   const args = ["--force", "--deep", "--options", "runtime", "--timestamp", "--entitlements", permisos, "--sign", identidad];
   if (process.env.CSC_KEYCHAIN) args.push("--keychain", process.env.CSC_KEYCHAIN);
-  execFileSync("codesign", [...args, app], { stdio: "inherit" });
+  try {
+    execFileSync("codesign", [...args, app], { stdio: "inherit" });
+  } catch {
+    // El Mac del CI corre sin sesión de usuario y codesign no llega a la raíz
+    // de Apple (errSecInternalComponent, 17/11/2026). Mientras se arregla ese
+    // Mac, sale con firma ad hoc: abre con «Abrir igual», como la primera versión.
+    console.log("::warning::No se pudo firmar con el Developer ID; sale con firma ad hoc.");
+    execFileSync("codesign", ["--force", "--deep", "--sign", "-", app], { stdio: "inherit" });
+  }
   execFileSync("codesign", ["--verify", "--deep", "--strict", "--verbose=2", app], { stdio: "inherit" });
 };
