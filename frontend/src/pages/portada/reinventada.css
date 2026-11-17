@@ -27,6 +27,8 @@
 .pt.pr .marca i { background: #0a84ff; box-shadow: 0 0 22px -6px rgba(10, 132, 255, .8); }
 
 .pt.pr .pr-caja { width: min(1120px, calc(100% - 32px)); margin: 0 auto; }
+/* Los enlaces del menú no dejan el título de la sección tapado por la barra fija. */
+.pt.pr section[id] { scroll-margin-top: 72px; }
 
 /* ── Botones ─────────────────────────────────────────────────────────── */
 .pt.pr .pr-btn {
@@ -101,7 +103,7 @@
   margin: 0 0 .9rem; font-size: .78rem; font-weight: 600; letter-spacing: .22em; text-transform: uppercase; color: var(--pr-acento);
 }
 .pt.pr .pr-cabeza h2 { margin: 0; font-size: clamp(1.7rem, 4.5vw, 2.5rem); font-weight: 700; letter-spacing: -.01em; line-height: 1.2; }
-.pt.pr .pr-cabeza p { margin: 1rem 0 0; color: var(--pr-gris); }
+.pt.pr .pr-cabeza p:not(.pr-ceja) { margin: 1rem 0 0; color: var(--pr-gris); }
 
 .pt.pr .pr-tarjeta {
   background: var(--pr-surface); border: 1px solid var(--pr-linea); border-radius: var(--pr-radio);
