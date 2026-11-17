@@ -334,7 +334,7 @@ const DESCARGA_WINDOWS = `${DESCARGAS}/Maven-Windows.exe`;
 function BajarApp() {
   const { t } = useLanguage();
   return (
-    <div className="pr-bajar-app">
+    <div className="pr-bajar-app" id="descargas">
       <span>{t("portada.app.titulo")}</span>
       <div className="pr-bajar-app-botones">
         <a className="pr-btn pr-btn-fantasma" href={DESCARGA_MAC} download>
@@ -416,6 +416,7 @@ export default function Portada({ idiomaDeRuta }: { idiomaDeRuta?: Idioma }) {
             <a href="#como-funciona">{t("portada.nav.como")}</a>
             <a href="#empresas">{t("portada.nav.empresas")}</a>
             <a href="#precios">{t("portada.nav.precios")}</a>
+            <a href="#descargas">{t("portada.nav.descargas")}</a>
           </nav>
           <div className="pr-nav-cta">
             <Link className="pr-btn pr-btn-fantasma" to="/login">{t("portada.nav.entrar")}</Link>

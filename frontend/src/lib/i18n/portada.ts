@@ -12,6 +12,7 @@ export const portada = {
   "portada.nav.como": { es: "Cómo funciona", en: "How it works" },
   "portada.nav.empresas": { es: "Para empresas", en: "For companies" },
   "portada.nav.precios": { es: "Precios", en: "Pricing" },
+  "portada.nav.descargas": { es: "Descargas", en: "Downloads" },
   "portada.nav.entrar": { es: "Entrar", en: "Sign in" },
   "portada.cta.demo": { es: "Pedir una demo", en: "Request a demo" },
 

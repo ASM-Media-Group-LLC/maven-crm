@@ -39,7 +39,7 @@
 
 .pt.pr .pr-caja { width: min(1120px, calc(100% - 32px)); margin: 0 auto; }
 /* Los enlaces del menú no dejan el título de la sección tapado por la barra fija. */
-.pt.pr section[id] { scroll-margin-top: 72px; }
+.pt.pr section[id], .pt.pr #descargas { scroll-margin-top: 72px; }
 
 /* ── Botones ─────────────────────────────────────────────────────────── */
 .pt.pr .pr-btn {
