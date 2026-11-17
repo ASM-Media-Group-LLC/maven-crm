@@ -37,7 +37,7 @@ jobs:
           hdiutil attach -nobrowse -readonly -mountpoint "$RUNNER_TEMP/m" Maven-Mac.dmg >/dev/null
           trap 'hdiutil detach "$RUNNER_TEMP/m" >/dev/null || true' EXIT
           codesign --verify --deep --strict "$RUNNER_TEMP/m/Maven.app"
-          codesign -dv "$RUNNER_TEMP/m/Maven.app" 2>&1 | grep -q 'Authority=Developer ID Application: Alvaro Mejia'
+          codesign -dvv "$RUNNER_TEMP/m/Maven.app" 2>&1 | grep -q 'Authority=Developer ID Application: Alvaro Mejia'
           xcrun stapler validate "$RUNNER_TEMP/m/Maven.app"
       - name: Subir a Supabase (balde descargas)
         env:
