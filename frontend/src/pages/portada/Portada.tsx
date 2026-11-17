@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type CSSProperties, type MouseEvent } from "react";
-import { MarcaM } from "@/components/MarcaM";
+import { MarcaMaven } from "@/components/MarcaM";
 import {
   ArrowRight, CheckSquare, Eye, FileText, HardDrive, Mail, MessageSquare, MonitorUp, UserCheck, Video,
   type LucideIcon,
@@ -49,11 +49,11 @@ const TOKENS = {
   "--ink-soft": "#c9d0dc",
   "--muted": "#8f9ab0",
   "--faint": "#7d889e",
-  "--azul": "#60dc9c",
-  "--azul-claro": "#7fe4b0",
-  "--azul-rgb": "96, 220, 156",
+  "--azul": "#bed161",
+  "--azul-claro": "#cddc7f",
+  "--azul-rgb": "190, 209, 97",
   "--azul-claro-rgb": "107, 255, 171",
-  "--sobre-azul": "#04140b",
+  "--sobre-azul": "#1c2108",
 } as CSSProperties;
 
 const PASOS: [string, string][] = [
@@ -145,13 +145,11 @@ const PLANES: Plan[] = [
 
 /** El logo de la portada (Alvaro, 16/11/2026): la M de cinta de la marca
  *  (components/MarcaM, la misma de la app y de los iconos) en el verde de los
- *  botones, y «Maven» en blanco. Sin «Virtual Office»: «nada que ver». */
+ *  y «aven» pegado en blanco: la M hace de «M» (Alvaro, 16/11/2026). Sin
+ *  «Virtual Office»: «nada que ver». */
 function Marca({ chico = false }: { chico?: boolean }) {
   return (
-    <span className={`pr-marca${chico ? " chico" : ""}`}>
-      <MarcaM className="pr-marca-m" alto={chico ? "14px" : "18px"} />
-      Maven
-    </span>
+    <MarcaMaven className={`pr-marca${chico ? " chico" : ""}`} />
   );
 }
 

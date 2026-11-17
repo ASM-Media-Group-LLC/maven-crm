@@ -1,7 +1,7 @@
 import { ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
-import { MarcaM } from "@/components/MarcaM";
+import { MarcaMaven } from "@/components/MarcaM";
 import { useLanguage } from "@/hooks/useLanguage";
 import "./entrar.css";
 
@@ -22,8 +22,7 @@ const AuthLayout = ({ children }: AuthLayoutProps) => {
     <div className="entrar">
       <header className="entrar-barra">
         <Link to="/" className="entrar-marca" aria-label="Maven">
-          <MarcaM alto="18px" />
-          Maven
+          <MarcaMaven />
         </Link>
         <Link to="/" className="entrar-volver">
           <ArrowLeft aria-hidden="true" />

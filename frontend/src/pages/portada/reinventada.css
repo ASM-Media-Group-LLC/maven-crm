@@ -11,14 +11,15 @@
   --pr-surface: #141d2e;
   --pr-texto: #ffffff;
   --pr-gris: #8f9ab0;
-  /* El acento es el MISMO verde del botón (Alvaro: «tiene que hacer match»),
-     después bajado dos veces a pedido («menos encendido»). */
-  --pr-acento: #60dc9c;
-  --pr-acento-rgb: 96, 220, 156;
-  --pr-neon: #60dc9c;
-  --pr-neon-hover: #7fe4b0;
-  --pr-sobre-neon: #04140b;
-  --pr-borde: rgba(96, 220, 156, .16);
+  /* El acento es el MISMO verde del botón (Alvaro: «tiene que hacer match»):
+     el VERDE GRANOLA (#bed161, el oliva de la app Granola en versión luminosa
+     para el azul marino). El logo NO: la M va en su propio verde (MarcaM). */
+  --pr-acento: #bed161;
+  --pr-acento-rgb: 190, 209, 97;
+  --pr-neon: #bed161;
+  --pr-neon-hover: #cddc7f;
+  --pr-sobre-neon: #1c2108;
+  --pr-borde: rgba(190, 209, 97, .16);
   --pr-linea: rgba(255, 255, 255, .06);
   --pr-radio: 20px;
   background: var(--pr-bg);
@@ -27,11 +28,13 @@
 /* Los títulos en blanco explícito: los estilos globales de la app los teñían de gris. */
 .pt.pr h1, .pt.pr h2, .pt.pr h3 { color: var(--pr-texto); }
 /* El logo: la M de cinta en el verde de los botones y «Maven» en blanco. */
+/* Proporciones de la imagen de Alvaro: la M mide 0,8 del cuerpo de la letra
+   (1,15 veces la mayúscula), centrada con ella y casi pegada a «Maven». */
 .pt.pr .pr-marca {
-  display: inline-flex; align-items: center; gap: 10px;
-  font: 800 21px/1 Sora, sans-serif; letter-spacing: -.02em; color: var(--pr-texto);
+  display: inline-flex; align-items: center; gap: .075em;
+  font: 700 22px/1 Montserrat, sans-serif; letter-spacing: 0; color: var(--pr-texto);
 }
-.pt.pr .pr-marca.chico { gap: 8px; font-size: 16px; }
+.pt.pr .pr-marca.chico { font-size: 17px; }
 .pt.pr .pr-marca-m { display: block; flex: none; overflow: visible; }
 
 .pt.pr .pr-caja { width: min(1120px, calc(100% - 32px)); margin: 0 auto; }

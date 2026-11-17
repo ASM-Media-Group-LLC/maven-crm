@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { MarcaM } from "@/components/MarcaM";
+import { MarcaMaven } from "@/components/MarcaM";
 import { Link } from "react-router-dom";
 import "./portada.css";
 import { SKINS, tokensDe } from "./skins";
@@ -18,8 +18,7 @@ export default function Privacidad() {
       <nav className="nav pegado">
         <div className="wrap nav-in">
           <Link to="/" className="marca" style={{ textDecoration: "none", color: "inherit" }}>
-            <MarcaM alto="13px" />
-            Maven
+            <MarcaMaven />
           </Link>
           <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
             <Link className="btn btn-fantasma" to="/">Volver a la portada</Link>

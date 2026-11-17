@@ -1,4 +1,4 @@
-import { useId } from "react";
+import { useId, type CSSProperties } from "react";
 
 /** La M de Maven: la «M de cinta» de la imagen que trajo Alvaro (16/11/2026),
  *  medida píxel a píxel sobre su original (caja de 336 × 158, trazo 68).
@@ -14,9 +14,10 @@ import { useId } from "react";
 export const M_RATIO = 336 / 158;
 
 /** El verde de la marca, el del pliegue y el del pie de la bajada. */
-// El verde del logo de Alvaro, medido en su imagen (16/11/2026).
-export const VERDE_MARCA = "#60dc9c";
-const PLIEGUE = ["#247c4f", "#309560", "#39a66c", "#40b476", "#47c27f"];
+// El VERDE GRANOLA (Alvaro, 16/11/2026: «la M tiene que ser con el color de
+// Granola»), el mismo de los botones de la portada; el pliegue va en su sombra.
+export const VERDE_MARCA = "#bed161";
+const PLIEGUE = ["#727e34", "#869440", "#94a349", "#a0b050", "#abbc57"];
 
 /** Los dos «Λ»: pie, cima, comienzo de la bajada (su punta redonda) y pie. */
 const CINTAS = [
@@ -82,6 +83,38 @@ export function MarcaM({ alto, className }: MarcaMProps) {
         ))}
       </g>
     </svg>
+  );
+}
+
+/** El logo completo, como lo pidió Alvaro (16/11/2026): la M de cinta HACE de
+ *  «M» y le sigue «aven» pegado, así se lee «Maven» sin repetir la M. La M va
+ *  como una mayúscula: mide 1,15 veces la altura de la mayúscula de Montserrat
+ *  (0,8em), apoyada en la línea de base y apenas por debajo (sus puntas
+ *  redondas), y la «a» casi tocándola. La letra hereda tamaño y color de quien
+ *  lo usa; para lectores de pantalla es una sola palabra: «Maven». */
+export function MarcaMaven({ className, style }: { className?: string; style?: CSSProperties }) {
+  return (
+    <span
+      role="img"
+      aria-label="Maven"
+      className={className}
+      style={{
+        display: "inline-flex",
+        alignItems: "baseline",
+        gap: "0.03em",
+        fontFamily: "Montserrat, sans-serif",
+        fontWeight: 700,
+        letterSpacing: 0,
+        lineHeight: 1,
+        whiteSpace: "nowrap",
+        ...style,
+      }}
+    >
+      <span aria-hidden="true" style={{ display: "inline-block", transform: "translateY(0.05em)" }}>
+        <MarcaM alto="0.8em" />
+      </span>
+      <span aria-hidden="true">aven</span>
+    </span>
   );
 }
 

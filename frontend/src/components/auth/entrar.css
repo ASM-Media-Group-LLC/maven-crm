@@ -1,12 +1,12 @@
 /* ═══════════════════════════════════════════════════════════════════════
    PANTALLAS DE ENTRAR con la piel de la portada «La oficina, reinventada.»
    Mismos tokens que portada/reinventada.css: azul marino #101827, tarjeta
-   #141d2e, verde de los botones #60dc9c, Sora en los títulos. Todo va bajo
+   #141d2e, verde Granola de los botones #bed161, Sora en los títulos. Todo va bajo
    `.entrar` para no escaparse al resto de la app. Los formularios de cada
    pantalla traen sus propias clases (Tailwind); acá se pisan con selectores
    más específicos para que todas queden iguales sin tocar su lógica.
    ═══════════════════════════════════════════════════════════════════════ */
-@import url("https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600&family=Sora:wght@600;700;800&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600&family=Sora:wght@600;700;800&family=Montserrat:wght@700&display=swap");
 
 .entrar {
   --en-bg: #101827;
@@ -14,9 +14,9 @@
   --en-campo: #0f1624;
   --en-texto: #ffffff;
   --en-gris: #8f9ab0;
-  --en-verde: #60dc9c;
-  --en-verde-hover: #7fe4b0;
-  --en-sobre-verde: #04140b;
+  --en-verde: #bed161;
+  --en-verde-hover: #cddc7f;
+  --en-sobre-verde: #1c2108;
   --en-linea: rgba(255, 255, 255, .07);
   position: relative;
   min-height: 100vh;
@@ -33,7 +33,7 @@
 .entrar::before {
   content: ""; position: absolute; inset: 0; pointer-events: none;
   background:
-    radial-gradient(ellipse 55% 45% at 50% 42%, rgba(96, 220, 156, .07), transparent 70%),
+    radial-gradient(ellipse 55% 45% at 50% 42%, rgba(190, 209, 97, .07), transparent 70%),
     radial-gradient(ellipse 80% 60% at 50% -10%, rgba(255, 255, 255, .035), transparent 70%);
 }
 
@@ -45,8 +45,8 @@
   padding: 1.1rem 0; padding-top: calc(1.1rem + env(safe-area-inset-top, 0px));
 }
 .entrar .entrar-marca {
-  display: inline-flex; align-items: center; gap: 10px; text-decoration: none;
-  font: 800 21px/1 Sora, sans-serif; letter-spacing: -.02em; color: var(--en-texto);
+  display: inline-flex; align-items: center; gap: .075em; text-decoration: none;
+  font: 700 22px/1 Montserrat, sans-serif; letter-spacing: 0; color: var(--en-texto);
 }
 .entrar .entrar-volver {
   display: inline-flex; align-items: center; gap: .45em; text-decoration: none;
@@ -93,7 +93,7 @@
 .entrar .entrar-caja input:focus,
 .entrar .entrar-caja input:focus-visible {
   outline: none; border-color: var(--en-verde);
-  box-shadow: 0 0 0 3px rgba(96, 220, 156, .18);
+  box-shadow: 0 0 0 3px rgba(190, 209, 97, .18);
 }
 /* El autocompletar de Chrome pinta el campo de amarillo/blanco: se lo tapa. */
 .entrar .entrar-caja input:-webkit-autofill {

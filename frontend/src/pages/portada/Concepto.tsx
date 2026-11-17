@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { MarcaM } from "@/components/MarcaM";
+import { MarcaMaven } from "@/components/MarcaM";
 import { Link } from "react-router-dom";
 import { BookOpen, Brain, Check, ChevronRight, Clock, Plug, Settings, Star, Zap } from "lucide-react";
 import "./portada.css";
@@ -59,8 +59,7 @@ export default function Concepto() {
       <nav className={`nav${pegado ? " pegado" : ""}`}>
         <div className="wrap nav-in">
           <Link to="/" className="marca" style={{ textDecoration: "none" }}>
-            <MarcaM alto="15px" />
-            Maven
+            <MarcaMaven />
           </Link>
           <div className="nav-links">
             {LINKS.map(([href, texto]) => <a href={href} key={href}>{texto}</a>)}

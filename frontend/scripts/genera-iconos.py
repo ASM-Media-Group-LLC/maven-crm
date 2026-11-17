@@ -21,9 +21,9 @@ import numpy as np, sys, os
 AQUI = os.path.dirname(os.path.abspath(__file__))
 DEST = sys.argv[1] if len(sys.argv) > 1 else os.path.join(AQUI, "..", "public")
 
-VERDE = (96, 220, 156)        # #60dc9c, el de los botones
-HONDO = (36, 124, 79)         # #247c4f, el pliegue (misma proporción que la imagen original)
-FIN = (71, 194, 127)          # #47c27f, el pie de la bajada
+VERDE = (190, 209, 97)        # #bed161, el verde Granola de los botones
+HONDO = (114, 126, 52)        # #727e34, el pliegue (la sombra del verde Granola)
+FIN = (171, 188, 87)          # #abbc57, el pie de la bajada
 FONDO0 = (24, 35, 58)         # arriba-izquierda
 FONDO1 = (12, 18, 29)         # abajo-derecha (#0c121d)
 RADIO = 0.22                  # radio de la baldosa del favicon, fracción del lado
