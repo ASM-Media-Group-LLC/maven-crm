@@ -2,6 +2,8 @@ import { useEffect, useState, useCallback, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { esEstadoSupervisor, type EstadoSupervisor, leerDesdePausaSupervisor } from "@/lib/pausaSupervisor";
 import type { ConexionSala } from "@/lib/coworkTiempoRegla";
+import { escritorio } from "@/lib/escritorio";
+import { equipoDeTrabajo, type EquipoDeTrabajo } from "@/lib/coworkSoloApp";
 
 export interface MediaState {
   micOn: boolean;
@@ -42,6 +44,12 @@ export interface MediaState {
    *  aunque la página de Cowork esté desmontada (la llamada sigue en la
    *  ventanita), a diferencia del reloj. null en los bundles viejos. */
   conexionSala?: ConexionSala | null;
+  /** ¿Trabaja en la app de Maven para computador? (18/11/2026: desde el viernes
+   *  Cowork en el computador va solo en la app). Lo pone `enviar` solo, sin que
+   *  nadie lo pase; null = un Maven de antes que no lo dice (lib/coworkSoloApp). */
+  enApp?: boolean | null;
+  /** Mac, Windows, celular…: la app o el navegador de quien publica. */
+  equipo?: EquipoDeTrabajo | null;
 }
 
 interface UseCoworkMediaPresenceResult {
@@ -216,9 +224,30 @@ function leerEstados(canal: CanalRealtime) {
       relojSegundosHoy: ultima.relojSegundosHoy ?? null,
       relojEn: ultima.relojEn ?? null,
       conexionSala: ultima.conexionSala ?? null,
+      ...leerEquipo(ultima),
     };
   });
   return resultado;
+}
+
+/** Lo que dijo de su equipo, sin confiar en la forma: un Maven viejo no manda
+ *  nada y eso queda en null («sin dato»), nunca en «navegador». Exportada para probarla. */
+export function leerEquipo(p: { enApp?: unknown; equipo?: unknown }): { enApp: boolean | null; equipo: EquipoDeTrabajo | null } {
+  const equipos: readonly string[] = ["mac", "windows", "linux", "celular", "otro"];
+  return {
+    enApp: typeof p.enApp === "boolean" ? p.enApp : null,
+    equipo: typeof p.equipo === "string" && equipos.includes(p.equipo) ? (p.equipo as EquipoDeTrabajo) : null,
+  };
+}
+
+/** Lo que ESTE Maven dice de sí mismo. Se calcula al publicar: es barato. */
+function miEquipo(): { enApp: boolean; equipo: EquipoDeTrabajo } {
+  const nav = typeof navigator !== "undefined" ? navigator : null;
+  return equipoDeTrabajo({
+    ua: nav?.userAgent || "",
+    tactil: (nav?.maxTouchPoints ?? 0) > 1,
+    plataformaApp: escritorio()?.plataforma ?? null,
+  });
 }
 
 // Desde cuándo está (o no está) compartiendo pantalla.
@@ -351,6 +380,9 @@ function enviar(entrada: CanalVivo, state: MediaState, screenShareSince: number)
     relojSegundosHoy: state.relojSegundosHoy ?? null,
     relojEn: state.relojEn ?? null,
     conexionSala: state.conexionSala ?? null,
+    // App o navegador: va en CADA publicación (presence reemplaza el payload
+    // entero), así nadie que llame a trackMediaState tiene que acordarse.
+    ...miEquipo(),
   });
   // `track()` devuelve una promesa y hasta ahora nadie la miraba. Cuando el
   // servidor rechaza la publicación —justamente el caso del corte por límite—

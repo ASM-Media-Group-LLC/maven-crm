@@ -46,6 +46,7 @@ import { type PausaDeSala } from "./SalaEnPausa";
 import AvisarDialog from "./AvisarDialog";
 import AvisarGeneralDialog, { type ObjetivoAviso } from "./AvisarGeneralDialog";
 import AvisoChatter from "./AvisoChatter";
+import { MarcaApp, ResumenAppDelEquipo } from "./AppDelEquipo";
 import { useRecepcionAvisos } from "./useRecepcionAvisos";
 import { puedeAvisar as puedeAvisarCowork } from "@/lib/coworkAvisos";
 import { cuentaPausa, clasesPausa, nombreYApellido, nombreCorto } from "@/lib/pausaCowork";
@@ -2156,6 +2157,17 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
             );
           })()}
 
+          {/* ¿Quién ya tiene la app? (Alvaro, 18/11/2026): desde el viernes
+              Cowork en el computador va solo en la app; aquí se ve quién falta
+              para empujarlo uno por uno (AppDelEquipo.tsx). */}
+          <ResumenAppDelEquipo
+            uids={fichas.flatMap((f) => f.participants.map((a) => a.user_id))}
+            mediaStates={mediaStates}
+            nombreDe={(uid) => nombreYApellido(cowork.profiles[uid]) || t("cowork.common.someone")}
+            avatares={cowork.avatares}
+            onEscribir={escribirA}
+          />
+
           {/* Quién está EN las salas ahora (los asignados que el monitor ve), con
               su estado —verde trabajando, naranja en baño o break, violeta en meet
               grupal— y el monitorcito si comparte pantalla. Antes la lista era solo
@@ -2195,6 +2207,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                             title={f.kindPausa ? t(f.kindPausa === "break" ? "cowork.host.status.onBreak" : f.kindPausa === "almuerzo" ? "cowork.host.status.atLunch" : "cowork.host.status.inBathroom") : f.enMeet ? t("cowork.pauseTile.inMeet") : t("cowork.host.status.working")}
                           />
                           <span className="truncate text-xs text-foreground/90">{f.nombre}</span>
+                          <MarcaApp estado={mediaStates[f.uid]} />
                         </div>
                         <span className="block truncate text-[10px] text-primary/80">
                           {f.room.name}{f.kindPausa ? ` · ${t(NOMBRE_PAUSA[f.kindPausa])}` : f.enMeet ? ` · ${t("cowork.meet.title")}` : ""}

@@ -12,6 +12,10 @@ export type Preferencia = "siempre" | "nunca" | null;
 const RUTAS_PUBLICAS = [
   /^\/$/, /^\/(es|en|de|fr|it|pt)(\/|$)/, /^\/(login|register|forgot-password|reset-password|privacidad|documentation|diagnostico-pantalla|concept|credentials)(\/|$)/,
   /^\/(entrar|unirse|aportar|subir|chatter|hoja)\//, /^\/portal(\/|$)/,
+  // La guía para instalar la app (/app, lib/guiaApp.ts): quien la abre todavía
+  // no la tiene, y con «Siempre» elegido lo mandaría a una app que no existe.
+  // Ella misma trae su «Ya la tengo: abrir en la app».
+  /^\/app(\/|$)/,
 ];
 
 /** ¿Hay que ofrecer abrir en la app? Solo en un navegador de computador, con sesión. */

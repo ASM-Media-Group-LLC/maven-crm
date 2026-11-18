@@ -33,7 +33,7 @@ import {
   Mail, Clapperboard, Gauge, UserCog, UserCheck, Clock, Eye, GraduationCap,
   Wallet, Calculator, DollarSign, Shield, Sparkles, Database, ListChecks,
   CalendarDays, Building2, Briefcase, History, CalendarRange, Gift,
-  FileSpreadsheet, Presentation, HardDrive, Wifi } from "lucide-react";
+  FileSpreadsheet, Presentation, HardDrive, Wifi, MonitorDown } from "lucide-react";
 import WhatsAppIcon from "@/components/icons/WhatsAppIcon";
 import TelegramIcon from "@/components/icons/TelegramIcon";
 
@@ -87,6 +87,8 @@ export const NAV_CATALOG: NavCatalogEntry[] = [
   { title: "Panel de control", i18nKey: "nav.controlPanel", url: "/panel-de-control", icon: Gauge, module: "Panel de control", section: "Menú", keywords: ["control", "kpis"] },
   // Guía de conexión: sin módulo, la ve todo el que entra (como en el menú).
   { title: "Guía de conexión", i18nKey: "nav.connectionGuide", url: "/conexion", icon: Wifi, section: "Menú", keywords: ["internet", "wifi", "velocidad", "prueba de velocidad", "llamada", "se cae", "se corta", "cable", "router", "speed test"] },
+  // Instalar la app de Maven (18/11/2026): sin módulo, para todos (como en el menú).
+  { title: "Instalar la app de Maven", i18nKey: "nav.appGuide", url: "/app", icon: MonitorDown, section: "Menú", keywords: ["app", "aplicación", "descargar", "instalar", "escritorio", "computador", "mac", "windows", "dmg", "exe", "cowork", "download", "desktop"] },
 
   // ── Creadoras ─────────────────────────────────────────────────────────
   { title: "Creadoras · Dashboard", i18nKey: "nav.cat.creatorsDashboard", url: "/creadores/dashboard", icon: Users, module: "Creadores", submodule: "Dashboard", section: "Creadoras" },

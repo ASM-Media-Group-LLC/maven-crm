@@ -50,6 +50,7 @@ const IMPORTADORES: Record<string, () => Promise<unknown>> = {
   "/scouter-assist": () => import("@/pages/scouter/ScouterAssist"),
   "/agency-qa": () => import("@/pages/agency-qa/AgencyQA"),
   "/conexion": () => import("@/pages/conexion/GuiaConexionPage"),
+  "/app": () => import("@/pages/guiaApp/GuiaAppPage"),
 };
 
 /** Segundos entre dos chunks en la precarga de ocio: que sea un goteo, no una

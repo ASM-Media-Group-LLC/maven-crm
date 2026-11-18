@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { latidoActivo } from "@/lib/coworkLatido";
 import { RUTA_GUIA_CONEXION } from "@/lib/guiaConexion";
+import { RUTA_GUIA_APP } from "@/lib/guiaApp";
 
 // TODOS ADENTRO DE COWORK (Alvaro, 13/11/2026): «Nadie puede estar fuera de un
 // cowork… y si no, que no puedan entrar». Abrir Maven es estar trabajando (y
@@ -11,12 +12,15 @@ import { RUTA_GUIA_CONEXION } from "@/lib/guiaConexion";
 // Maven mientras está en su sala. Si no, Maven lo manda a Cowork. Ya en la sala usa
 // todo: la llamada sigue en la ventanita.
 
-/** Rutas que siempre se pueden abrir: entrar a Cowork, las llamadas de Maven y
+/** Rutas que siempre se pueden abrir: entrar a Cowork, las llamadas de Maven,
  *  la guía de conexión (a quien se le cayó la llamada es justo a quien le sirve;
- *  el cartel de Argos «fuera de Cowork» le sigue saliendo ahí). */
+ *  el cartel de Argos «fuera de Cowork» le sigue saliendo ahí) y la guía para
+ *  instalar la app (desde el 20/11 Cowork en el computador manda a la app: sin
+ *  esto, quien no la tiene quedaba rebotando entre Cowork y la guía). */
 export function rutaLibreDeCowork(ruta: string): boolean {
+  const guia = (r: string) => ruta === r || ruta.startsWith(`${r}/`) || ruta.startsWith(`${r}?`);
   return ruta.startsWith("/cowork") || ruta.startsWith("/meet") || ruta.startsWith("/call/") ||
-    ruta === RUTA_GUIA_CONEXION || ruta.startsWith(`${RUTA_GUIA_CONEXION}/`);
+    guia(RUTA_GUIA_CONEXION) || guia(RUTA_GUIA_APP);
 }
 
 export interface EstadoCowork { debe: boolean; presente: boolean }
