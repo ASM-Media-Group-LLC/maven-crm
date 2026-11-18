@@ -32,10 +32,18 @@ describe("niveles de difuminado", () => {
     expect(radioDeBlur("blur-strong")).toBeGreaterThanOrEqual(2.5 * radioDeBlur("blur"));
   });
 
-  it("el fuerte cabe en el bucle del shader (sin recorte silencioso)", async () => {
-    const { muestrasPorLado, sigmaEnTextura, MUESTRAS_MAX_POR_LADO } = await import("@/lib/fondoFino/parametros");
-    // Hasta con una cámara de 1080p el gaussiano entra entero en las muestras.
-    expect(muestrasPorLado(sigmaEnTextura(RADIO_DE_BLUR["blur-strong"], 1080))).toBeLessThan(MUESTRAS_MAX_POR_LADO);
+  it("el fuerte cabe en el bucle del shader (sin recorte silencioso) y con costo topado", async () => {
+    const { muestrasPorLado, pasoDeMuestreo, sigmaEnTextura, MUESTRAS_MAX_POR_LADO } = await import("@/lib/fondoFino/parametros");
+    // Hasta con una cámara de 1080p las muestras cubren 3 sigmas enteras…
+    const sigma = sigmaEnTextura(RADIO_DE_BLUR["blur-strong"], 1080);
+    expect(muestrasPorLado(sigma) * pasoDeMuestreo(sigma)).toBeGreaterThanOrEqual(3 * sigma);
+    // …sin pasar el tope del bucle, y saltando como mucho de a 3 texeles.
+    expect(muestrasPorLado(sigma)).toBeLessThanOrEqual(MUESTRAS_MAX_POR_LADO);
+    expect(pasoDeMuestreo(sigma)).toBeLessThanOrEqual(3);
+  });
+
+  it("«un poco» ya esconde el detalle: más de 3 veces el viejo (~11 px)", () => {
+    expect(radioDeBlur("blur")).toBeGreaterThanOrEqual(30);
   });
 
   it("un valor desconocido cae al blur normal, no a un radio raro", () => {

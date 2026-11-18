@@ -52,22 +52,22 @@ export const BACKGROUND_TEMPLATES = [
 // los equipos). Para tener una idea: una gaussiana de sigma s se parece a
 // promediar una ventana de ~2,5·s píxeles.
 //
-//   · «blur» (un poco): sigma 22 ≈ ventana de ~55 px a 720p. El fondo queda
-//     claramente borroso pero se adivina dónde estás (el «difuminar un poco»
-//     de Meet).
-//   · «blur-strong» (fuerte): sigma 56 ≈ ventana de ~140 px. Ya no se reconoce
-//     nada del cuarto: ni letras, ni marcos, ni objetos; solo manchas de color.
+//   · «blur» (un poco): sigma 34 ≈ ventana de ~85 px a 720p. Ya no se leen
+//     ventanas, luces ni objetos del cuarto, pero quedan las formas grandes
+//     (dónde está la pared, la ventana) — el «difuminar un poco» de Meet.
+//   · «blur-strong» (fuerte): sigma 90 ≈ ventana de ~225 px. Solo quedan
+//     campos de color suaves, como el difuminado completo de Meet.
 //
 // Para comparar: el shader viejo cortaba el gaussiano en 1 sigma (ventana de
 // ±radio/4 a 1/4 de resolución), así que su «20» desenfocaba como una sigma de
 // ~11 px y su «64» como una de ~35 px. Medido lado a lado con capturas.
 //
-// Costo: el desenfoque corre a 1/4 de resolución con dos pasadas separables;
-// el fuerte lee 3·sigma/4 = 42 muestras por lado y por pasada sobre 320×180
-// píxeles: una fracción de milisegundo en la GPU.
+// Costo: el desenfoque corre a 1/4 de resolución con dos pasadas separables y
+// a lo sumo 48 muestras por lado (con sigmas grandes se muestrea de a 2-3
+// texeles; ver pasoDeMuestreo): una fracción de milisegundo en la GPU.
 export const RADIO_DE_BLUR: Record<string, number> = {
-  blur: 22,
-  "blur-strong": 56,
+  blur: 34,
+  "blur-strong": 90,
 };
 
 // ── Cámara con fondo: HD en equipos fuertes ──────────────────────────────────

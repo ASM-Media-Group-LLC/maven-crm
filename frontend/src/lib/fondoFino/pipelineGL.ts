@@ -31,7 +31,7 @@
 import {
   CURVA_BORDE_BLUR, CURVA_BORDE_IMAGEN, MUESTRAS_MAX_POR_LADO, REDUCCION_DE_LA_MASCARA,
   REDUCCION_DEL_DESENFOQUE, SUAVIZADO_MAX, SUAVIZADO_MIN, CAMBIO_CHICO, CAMBIO_GRANDE,
-  muestrasPorLado, sigmaEnTextura, uvParaCubrir,
+  muestrasPorLado, pasoDeMuestreo, sigmaEnTextura, uvParaCubrir,
 } from "./parametros";
 
 const VERTICES = `#version 300 es
@@ -132,6 +132,7 @@ uniform sampler2D fuente;
 uniform vec2 direccion;
 uniform float sigma;
 uniform int muestras;
+uniform float paso;
 out vec4 color;
 void main() {
   vec4 suma = texture(fuente, uv);
@@ -139,8 +140,9 @@ void main() {
   float k = -1.0 / (2.0 * sigma * sigma);
   for (int i = 1; i <= ${MUESTRAS_MAX_POR_LADO}; i++) {
     if (i > muestras) break;
-    float w = exp(float(i * i) * k);
-    vec2 o = direccion * float(i);
+    float d = float(i) * paso;
+    float w = exp(d * d * k);
+    vec2 o = direccion * d;
     suma += w * (texture(fuente, uv + o) + texture(fuente, uv - o));
     pesos += 2.0 * w;
   }
@@ -247,7 +249,7 @@ export function crearPipelineFondo(canvas: OffscreenCanvas | HTMLCanvasElement):
   const pSuav = programa(gl, vs, SUAVIZADO, ["mascaraMP", "previa", "invertir", "primera", "suavMin"]);
   const pRefinar = programa(gl, vs, REFINAR, ["mascara", "cuadro", "paso"]);
   const pReducir = programa(gl, vs, REDUCIR, ["cuadro", "mascara", "pasoFuente"]);
-  const pGauss = programa(gl, vs, GAUSS, ["fuente", "direccion", "sigma", "muestras"]);
+  const pGauss = programa(gl, vs, GAUSS, ["fuente", "direccion", "sigma", "muestras", "paso"]);
   const pComponer = programa(gl, vs, COMPONER, ["cuadro", "mascara", "fondo", "modo", "cubrir", "curva"]);
   gl.deleteShader(vs);
 
@@ -401,17 +403,20 @@ export function crearPipelineFondo(canvas: OffscreenCanvas | HTMLCanvasElement):
       // 4. Gaussiano: horizontal a red2, vertical de vuelta a red1.
       const sigma = sigmaEnTextura(sigma720, h);
       const n = muestrasPorLado(sigma);
+      const paso = pasoDeMuestreo(sigma);
       prepararPasada(red2, pGauss, false);
       unir(0, red1.tex, pGauss.u.fuente);
       gl!.uniform2f(pGauss.u.direccion, 1 / red1.w, 0);
       gl!.uniform1f(pGauss.u.sigma, sigma);
       gl!.uniform1i(pGauss.u.muestras, n);
+      gl!.uniform1f(pGauss.u.paso, paso);
       dibujarQuad();
       prepararPasada(red1, pGauss, false);
       unir(0, red2.tex, pGauss.u.fuente);
       gl!.uniform2f(pGauss.u.direccion, 0, 1 / red2.h);
       gl!.uniform1f(pGauss.u.sigma, sigma);
       gl!.uniform1i(pGauss.u.muestras, n);
+      gl!.uniform1f(pGauss.u.paso, paso);
       dibujarQuad();
       texFondo = red1.tex;
     }

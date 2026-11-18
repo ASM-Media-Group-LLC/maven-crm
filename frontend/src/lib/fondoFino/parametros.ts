@@ -7,7 +7,7 @@ export const REDUCCION_DEL_DESENFOQUE = 4;
 /** Alto de referencia de `blurRadius` (ver RADIO_DE_BLUR en fondoDeLlamada.ts). */
 export const ALTO_DE_REFERENCIA = 720;
 /** Tope de muestras por lado en cada pasada del gaussiano (el bucle del shader). */
-export const MUESTRAS_MAX_POR_LADO = 64;
+export const MUESTRAS_MAX_POR_LADO = 48;
 
 /** La máscara se suaviza en el tiempo a esta fracción del tamaño de la cámara. */
 export const REDUCCION_DE_LA_MASCARA = 2;
@@ -21,15 +21,25 @@ export function sigmaEnTextura(sigma720: number, altoCamara: number): number {
   return Math.max(0.5, (sigma720 * alto) / ALTO_DE_REFERENCIA / REDUCCION_DEL_DESENFOQUE);
 }
 
+/**
+ * Cada cuántos texeles se toma una muestra. Con sigmas grandes (el nivel
+ * fuerte) se saltea de a 2 o 3: la textura ya está reducida a 1/4 y promediada,
+ * así que no aparecen rayas, y el costo queda topado en MUESTRAS_MAX_POR_LADO.
+ */
+export function pasoDeMuestreo(sigma: number): number {
+  return Math.max(1, Math.ceil((sigma * 3) / MUESTRAS_MAX_POR_LADO));
+}
+
 /** Muestras por lado: 3 sigmas (más allá el peso es < 1 %), con tope. */
 export function muestrasPorLado(sigma: number): number {
-  return Math.min(MUESTRAS_MAX_POR_LADO, Math.max(1, Math.ceil(sigma * 3)));
+  return Math.min(MUESTRAS_MAX_POR_LADO, Math.max(1, Math.ceil((sigma * 3) / pasoDeMuestreo(sigma))));
 }
 
 /** Los pesos normalizados del gaussiano, del centro hacia afuera (el shader los calcula igual). */
 export function pesosGaussianos(sigma: number): number[] {
   const n = muestrasPorLado(sigma);
-  const crudos = Array.from({ length: n + 1 }, (_, i) => Math.exp(-(i * i) / (2 * sigma * sigma)));
+  const paso = pasoDeMuestreo(sigma);
+  const crudos = Array.from({ length: n + 1 }, (_, i) => Math.exp(-((i * paso) ** 2) / (2 * sigma * sigma)));
   const total = crudos[0] + 2 * crudos.slice(1).reduce((a, b) => a + b, 0);
   return crudos.map((p) => p / total);
 }
