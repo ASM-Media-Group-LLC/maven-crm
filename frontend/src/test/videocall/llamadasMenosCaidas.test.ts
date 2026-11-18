@@ -259,7 +259,8 @@ describe("4. Cowork más liviano: todo en vivo, menos cuadros", () => {
     expect(cowork.publicacion).toBe(PUBLICACION_DE_PANTALLA_COWORK);
     expect(PUBLICACION_DE_PANTALLA_COWORK.screenShareEncoding?.maxFramerate).toBeLessThanOrEqual(5);
     expect(PUBLICACION_DE_PANTALLA_COWORK.screenShareEncoding?.maxBitrate).toBeLessThanOrEqual(1_500_000);
-    expect(PUBLICACION_DE_PANTALLA_COWORK.degradationPreference).toBe("maintain-framerate");
+    // Desde el 18/11/2026 la de Cowork cuida la nitidez (texto legible).
+    expect(PUBLICACION_DE_PANTALLA_COWORK.degradationPreference).toBe("maintain-resolution");
     expect(cowork.captura).toEqual({ ...base, ...CAPTURA_COWORK });
     expect(opcionesDePantalla("liviano", base, true).publicacion).toBe(PUBLICACION_DE_PANTALLA_LIVIANA);
     expect(opcionesDePantalla("normal", base).publicacion).toBe(PUBLICACION_DE_PANTALLA);

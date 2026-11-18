@@ -69,10 +69,12 @@ export const PUBLICACION_DE_PANTALLA: TrackPublishOptions = {
 export const PUBLICACION_DE_PANTALLA_LIVIANA: TrackPublishOptions = {
   simulcast: false,
   screenShareEncoding: { maxBitrate: 500_000, maxFramerate: 5 },
-  degradationPreference: "maintain-framerate",
+  // A 5 cuadros por segundo, cuidar la NITIDEZ (18/11/2026, ver abajo).
+  degradationPreference: "maintain-resolution",
 };
-export const CAPTURA_LIVIANA: Pick<ScreenShareCaptureOptions, "resolution"> = {
+export const CAPTURA_LIVIANA: Pick<ScreenShareCaptureOptions, "resolution" | "contentHint"> = {
   resolution: { width: 1280, height: 720, frameRate: 5 },
+  contentHint: "text",
 };
 
 // ── COWORK: TODO EN VIVO, MÁS LIVIANO (Alvaro, 17/11/2026) ───────────────────
@@ -83,13 +85,25 @@ export const CAPTURA_LIVIANA: Pick<ScreenShareCaptureOptions, "resolution"> = {
 // trabajo casi quieto (texto, planillas, chats): 5 fps alcanzan, y es la mitad
 // del internet de subida. La capa chica de las miniaturas sigue igual (720p@5).
 // El perfil liviano ya estaba en 5 fps y 500 kbps: no cambia. Meet no se toca.
+//
+// 18/11/2026 (Alvaro: «cuando me comparten pantalla se mira muy pixeleado,
+// mejorarlo inmediatamente»). A 5 fps, «maintain-framerate» era lo contrario de
+// lo que sirve: cuando el codificador se apuraba (al hacer scroll en un chat)
+// ACHICABA la imagen para no perder cuadros, y el texto llegaba pixeleado.
+// Ahora, en los perfiles de 5 fps (Cowork y liviano), «maintain-resolution»:
+// si se apura, baja cuadros pero NO resolución, así el texto siempre se lee; y
+// la captura va marcada como texto (contentHint «text»), que en Chrome activa el
+// modo de pantalla del codificador (nítido en letras, barato en lo quieto). Las
+// llamadas comunes (15 fps) siguen como estaban: ahí una pantalla congelada es
+// peor (el fallo medido del 18/09).
 export const PUBLICACION_DE_PANTALLA_COWORK: TrackPublishOptions = {
   screenShareEncoding: { maxBitrate: 1_200_000, maxFramerate: 5 },
   screenShareSimulcastLayers: [ScreenSharePresets.h720fps5],
-  degradationPreference: "maintain-framerate",
+  degradationPreference: "maintain-resolution",
 };
-export const CAPTURA_COWORK: Pick<ScreenShareCaptureOptions, "resolution"> = {
+export const CAPTURA_COWORK: Pick<ScreenShareCaptureOptions, "resolution" | "contentHint"> = {
   resolution: { width: 1920, height: 1080, frameRate: 5 },
+  contentHint: "text",
 };
 
 /** Debajo de esto (subida medida de verdad, en Mbps) se comparte con el perfil liviano. */

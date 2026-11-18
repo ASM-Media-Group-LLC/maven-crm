@@ -116,8 +116,10 @@ export function useObservadorEnVivo(targetUserId: string | null, activo: boolean
     setEstado("conectando");
     limpiarPistas();
 
+    // Píxeles reales de la pantalla (retina): si no, la pantalla compartida
+    // llegaba en 720p estirada y pixeleada (18/11/2026).
     afirmarRelojesDeLiveKit();
-    const room = new Room({ adaptiveStream: true, dynacast: false });
+    const room = new Room({ adaptiveStream: { pixelDensity: "screen" }, dynacast: false });
     roomRef.current = room;
 
     const esElla = (p: RemoteParticipant | undefined | null) => !!p && p.identity === identidadRef.current;

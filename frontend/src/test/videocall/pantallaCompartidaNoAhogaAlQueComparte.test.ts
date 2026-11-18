@@ -92,11 +92,17 @@ describe("la pantalla compartida se publica con su propio perfil", () => {
     expect(CAPTURA_LIVIANA.resolution?.height).toBeLessThanOrEqual(720);
   });
 
-  it("los dos perfiles, cuando no dan abasto, achican la imagen en vez de congelarla", () => {
+  it("la llamada común (15 fps), cuando no da abasto, achica la imagen en vez de congelarla", () => {
     // Es el fallo exacto que se midió: se aferró a los 540p y se desplomó a
     // 2,5 fps. Una pantalla que se achica se sigue leyendo; una congelada, no.
     expect(PUBLICACION_DE_PANTALLA.degradationPreference).toBe("maintain-framerate");
-    expect(PUBLICACION_DE_PANTALLA_LIVIANA.degradationPreference).toBe("maintain-framerate");
+  });
+
+  it("a 5 fps (liviano y Cowork) cuida la nitidez: baja cuadros, no resolución, y va como texto", () => {
+    // Alvaro, 18/11/2026: «se mira muy pixeleado». Achicar la imagen a 5 fps
+    // dejaba el texto ilegible.
+    expect(PUBLICACION_DE_PANTALLA_LIVIANA.degradationPreference).toBe("maintain-resolution");
+    expect(CAPTURA_LIVIANA.contentHint).toBe("text");
   });
 });
 

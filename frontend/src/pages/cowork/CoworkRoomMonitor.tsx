@@ -340,8 +340,10 @@ function CoworkRoomMonitor({ roomId, roomName, issueToken, showVideo, hearOn, br
       }, esperaMs);
     };
 
+    // Píxeles reales de la pantalla (retina): la pantalla del chatter se pedía
+    // en 720p y se estiraba, pixeleada (Alvaro, 18/11/2026).
     afirmarRelojesDeLiveKit();
-    const room = new Room({ adaptiveStream: true, dynacast: true });
+    const room = new Room({ adaptiveStream: { pixelDensity: "screen" }, dynacast: true });
     roomRef.current = room;
 
     // Guarda la cámara o la pantalla de un participante en su casillero.
