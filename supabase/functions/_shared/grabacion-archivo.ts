@@ -64,6 +64,21 @@ async function firmarR2(metodo: "GET" | "DELETE", llave: string, segundos: numbe
  *  quedaba ni una línea en los logs. Un error de configuración con forma de
  *  pérdida de datos.
  */
+/** El tamaño pidiendo un solo byte: el total viene en Content-Range. 0 si no se pudo. */
+async function tamanoPorRango(c: { cliente: AwsClient; base: string }, llave: string): Promise<number> {
+  try {
+    const firmada = await c.cliente.sign(
+      new Request(`${c.base}/${llave}`, { method: "GET" }), { aws: { signQuery: true } },
+    );
+    const r = await fetch(firmada.url, { headers: { Range: "bytes=0-0" } });
+    await r.body?.cancel();
+    const total = Number((r.headers.get("content-range") ?? "").split("/")[1]);
+    return Number.isFinite(total) && total > 0 ? total : 0;
+  } catch {
+    return 0;
+  }
+}
+
 async function buscarEnR2(
   archivo: string,
 ): Promise<{ hallado: { llave: string; size: number } | null; concluyente: boolean }> {
@@ -76,7 +91,15 @@ async function buscarEnR2(
         new Request(`${c.base}/${llave}`, { method: "HEAD" }), { aws: { signQuery: true } },
       );
       const r = await fetch(firmada.url, { method: "HEAD" });
-      if (r.ok) return { hallado: { llave, size: Number(r.headers.get("content-length")) || 0 }, concluyente: true };
+      if (r.ok) {
+        // En las edges de Supabase el HEAD llega SIN content-length (17/11/2026:
+        // las 153 grabaciones viejas «no aparecían» al copiarlas al Drive, y
+        // desde el VPS el mismo HEAD sí traía el tamaño). Si falta, se pide el
+        // primer byte y se lee el total de Content-Range: «bytes 0-0/<total>».
+        let size = Number(r.headers.get("content-length")) || 0;
+        if (!size) size = await tamanoPorRango(c, llave);
+        return { hallado: { llave, size }, concluyente: true };
+      }
       if (r.status !== 404) {
         // 403 = el token no alcanza este bucket. Hay que poder verlo en los logs.
         concluyente = false;
