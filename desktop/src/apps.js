@@ -56,11 +56,34 @@ function iniciarVigiaDeApps(enviar) {
     tramo = null;
   };
 
+  // Una lectura a la vez (18/11/2026): en Mac cada lectura es un proceso aparte.
+  // Si el Mac está cargado y una tarda más de 5 s, antes se apilaban sin tope;
+  // ahora se salta la vuelta. Una lectura que tarda más de 4 s no frena la
+  // muestra, pero no se lanza otra hasta que esa termine.
+  let leyendo = false;
+  let lectura = null;
   setInterval(async () => {
+    if (leyendo) return;
+    leyendo = true;
+    try {
+      await muestra();
+    } finally {
+      leyendo = false;
+    }
+  }, MUESTRA_MS);
+
+  async function muestra() {
     const ahora = Date.now();
     const inactivo = powerMonitor.getSystemIdleTime();
     const bloqueada = powerMonitor.getSystemIdleState(INACTIVO_S) === "locked";
-    const w = bloqueada ? { app: "Pantalla bloqueada", titulo: "", url: null } : await ventanaAlFrente();
+    const w = bloqueada
+      ? { app: "Pantalla bloqueada", titulo: "", url: null }
+      : lectura
+        ? null
+        : await Promise.race([
+            (lectura = ventanaAlFrente().finally(() => { lectura = null; })),
+            new Promise((r) => setTimeout(() => r(null), 4000)),
+          ]);
     if (!w) return;
     const paso = MUESTRA_MS / 1000;
     if (!tramo || tramo.app !== w.app || tramo.titulo !== w.titulo) {
@@ -70,7 +93,7 @@ function iniciarVigiaDeApps(enviar) {
     tramo.segundos += paso;
     if (inactivo >= INACTIVO_S || bloqueada) tramo.inactivos += paso;
     tramo.hasta = new Date(ahora).toISOString();
-  }, MUESTRA_MS);
+  }
 
   setInterval(() => {
     // El tramo abierto se manda partido: lo que va hasta ahora sale y sigue uno nuevo igual.
