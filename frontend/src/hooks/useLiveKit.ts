@@ -22,6 +22,7 @@ import { escritorio } from "@/lib/escritorio";
 import { esperaDeReentrada, fueUnaCaida, MAX_REENTRADAS } from "@/lib/conexionSala";
 import { faseSegunSueno, vigiaDelSueno } from "@/lib/equipoDormido";
 import { DEBIL_INICIAL, MIRAR_DEBIL_CADA_MS, siguienteDebil } from "@/lib/internetDebil";
+import { registrarCorteParaElAviso } from "@/lib/caidasSeguidas";
 import {
   reproducirAudiosPausados, reanudarAudioConGesto, dejarDeEsperarGesto, registrarDesbloqueo,
   decidirSiRepararElMicro, MEMORIA_VIGILANTE_VACIA, type MemoriaDelVigilante,
@@ -571,6 +572,10 @@ export function useLiveKit() {
         telemetriaRef.current.corte(fila);
         return;
       }
+      // «Tu internet se está cortando seguido» (lib/caidasSeguidas.ts): la cuenta
+      // la lleva el navegador, así sirve aunque el insert de abajo no llegue.
+      // Al invitado de afuera (rama de arriba) no: la guía pide cuenta de Maven.
+      registrarCorteParaElAviso(fila.fase);
       void (supabase.from as unknown as InsertaCorte)("llamada_cortes")
         .insert(fila)
         .then(({ error }) => { if (error) console.warn("[llamada_cortes]", error.message); });

@@ -480,6 +480,7 @@ export const cowork = {
   "cowork.host.chip.noScreen": { es: "Sin pantalla", en: "No screen" },
   "cowork.host.chip.noConnection": { es: "Sin conexión con la sala", en: "Not connected to the room" },
   "cowork.host.chip.noConnectionLong": { es: "Sin conexión · el reloj no cuenta", en: "Disconnected · clock stopped" },
+  "cowork.host.chip.unstableInternet": { es: "Internet inestable · {n} caídas", en: "Unstable internet · {n} drops" },
   "cowork.host.room.listening": { es: "Escuchando", en: "Listening" },
   "cowork.host.room.muted": { es: "Silenciada", en: "Muted" },
   "cowork.host.room.listeningHint": {

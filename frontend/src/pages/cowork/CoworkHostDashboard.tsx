@@ -12,7 +12,7 @@ import {
   Mic, MicOff, Video, VideoOff, ArrowLeft, Plus, Pencil, Volume2, VolumeX, ScreenShare, ScreenShareOff,
   PanelRightClose, PanelRightOpen, MoreVertical, MessageCircle,
   Pin, PinOff, PhoneOff, PictureInPicture2, KeyRound, Check, Coffee, EyeOff, MonitorOff, Settings2, MoreHorizontal,
-  WifiOff, ChevronRight, Megaphone, ArrowRightLeft, type LucideIcon } from "lucide-react";
+  WifiOff, WifiLow, ChevronRight, Megaphone, ArrowRightLeft, type LucideIcon } from "lucide-react";
 import { toast } from "sonner";
 import LiveKitCallView from "@/pages/messenger/videocall/LiveKitCallView";
 import { usePersistentCall, CallOutlet } from "@/components/PersistentCallProvider";
@@ -31,6 +31,8 @@ import { playCoordinatorRequestSound } from "@/lib/coordinatorRequestSound";
 import { encolarVoz, alFallarLaVoz } from "@/lib/colaDeVoz";
 import { debeAvisarSinPantalla } from "@/hooks/useFaceNudge";
 import { olvidarAusentes, tocaAvisar, type MarcasAviso } from "@/lib/avisosSupervisor";
+import { useCaidasDelEquipo } from "@/hooks/useCaidasDelEquipo";
+import { hayChipDeCaidas } from "@/lib/caidasSeguidas";
 import { useOnlinePresence } from "@/hooks/useOnlinePresence";
 import { useCoworkMediaPresence, type MediaState } from "@/hooks/useCoworkMediaPresence";
 import { cn } from "@/lib/utils";
@@ -1561,6 +1563,9 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
   // sirve: una es la hora del navegador y la otra la del servidor.)
   // Va antes de las etiquetas y de las tarjetas, que lo usan.
   const relojDe = (uid: string) => relojDesdePresencia(mediaStates[uid]) ?? relojDeRespaldo(relojRespaldo[uid], now);
+  // Caídas de llamada de la última hora por persona (lib/caidasSeguidas.ts).
+  // null = no se sabe (cargando o falló): sin chip, nunca «0 caídas».
+  const caidasDelEquipo = useCaidasDelEquipo();
   type Etiqueta = { key: string; texto: string; tono: "warning" | "destructive" | "muted"; icono: LucideIcon };
   /** Los llamados de atención de una sala: lo que el supervisor tiene que ver
    *  sin leer. Con dos personas en la sala, cada etiqueta dice de quién es. */
@@ -1587,6 +1592,17 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
           icono: WifiOff,
           texto: `${quien}${t(larga ? "cowork.host.chip.noConnectionLong" : "cowork.host.chip.noConnection")}`,
           tono: larga ? "destructive" : "warning",
+        });
+      }
+      // Su internet se le corta seguido: 3 caídas o más en la última hora.
+      // Solo visibilidad, sin voz ni push (Alvaro, 17/11/2026).
+      const caidas = caidasDelEquipo?.[a.user_id];
+      if (hayChipDeCaidas(caidas)) {
+        out.push({
+          key: `${a.user_id}-caidas`,
+          icono: WifiLow,
+          texto: `${quien}${t("cowork.host.chip.unstableInternet", { n: caidas })}`,
+          tono: "warning",
         });
       }
       const problema = faceIssue(ms);
