@@ -20,8 +20,11 @@ describe("abrir los links de Maven en la app", () => {
     expect(debeOfrecerApp({ ua: CEL, enApp: false, conSesion: true, ruta: "/cowork" })).toBe(false);
     expect(debeOfrecerApp({ ua: MAC, enApp: true, conSesion: true, ruta: "/cowork" })).toBe(false);
     expect(debeOfrecerApp({ ua: MAC, enApp: false, conSesion: false, ruta: "/cowork" })).toBe(false);
-    expect(debeOfrecerApp({ ua: MAC, enApp: false, conSesion: true, ruta: "/entrar/abc123" })).toBe(false);
-    expect(debeOfrecerApp({ ua: MAC, enApp: false, conSesion: true, ruta: "/unirse/xyz" })).toBe(false);
+    // El link de reunión: al invitado de afuera (sin sesión) nunca; a alguien del
+    // equipo con sesión SÍ se le ofrece la app (Alvaro, 18/11/2026).
+    expect(debeOfrecerApp({ ua: MAC, enApp: false, conSesion: false, ruta: "/entrar/abc123" })).toBe(false);
+    expect(debeOfrecerApp({ ua: MAC, enApp: false, conSesion: true, ruta: "/entrar/abc123" })).toBe(true);
+    expect(debeOfrecerApp({ ua: MAC, enApp: false, conSesion: true, ruta: "/unirse/xyz" })).toBe(true);
     expect(debeOfrecerApp({ ua: MAC, enApp: false, conSesion: true, ruta: "/" })).toBe(false);
     expect(debeOfrecerApp({ ua: MAC, enApp: false, conSesion: true, ruta: "/login" })).toBe(false);
   });

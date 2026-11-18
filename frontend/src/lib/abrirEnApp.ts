@@ -11,7 +11,10 @@ export type Preferencia = "siempre" | "nunca" | null;
 /** Rutas públicas o de invitados: ahí no se ofrece la app (quien entra puede no tenerla). */
 const RUTAS_PUBLICAS = [
   /^\/$/, /^\/(es|en|de|fr|it|pt)(\/|$)/, /^\/(login|register|forgot-password|reset-password|privacidad|documentation|diagnostico-pantalla|concept|credentials)(\/|$)/,
-  /^\/(entrar|unirse|aportar|subir|chatter|hoja)\//, /^\/portal(\/|$)/,
+  // Los links de reunión (/entrar, /unirse) SÍ se ofrecen a quien tiene sesión
+  // (Alvaro, 18/11/2026: «me mandan un meeting por WhatsApp y no me lleva a la
+  // app»). El invitado de afuera no tiene sesión: a él nunca se le ofrece.
+  /^\/(aportar|subir|chatter|hoja)\//, /^\/portal(\/|$)/,
   // La guía para instalar la app (/app, lib/guiaApp.ts): quien la abre todavía
   // no la tiene, y con «Siempre» elegido lo mandaría a una app que no existe.
   // Ella misma trae su «Ya la tengo: abrir en la app».
