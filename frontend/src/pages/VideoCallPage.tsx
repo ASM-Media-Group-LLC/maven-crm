@@ -22,6 +22,7 @@ import { useInvitadosDeLaLlamada } from "@/hooks/useInvitadosDeLaLlamada";
 import AgregarALaLlamada from "./messenger/videocall/AgregarALaLlamada";
 import AvisoDeInvitados from "./messenger/videocall/AvisoDeInvitados";
 import { useLanguage } from "@/hooks/useLanguage";
+import { useAnunciarLlamada } from "@/hooks/useAnunciarLlamada";
 
 export default function VideoCallPage() {
   const { t } = useLanguage();
@@ -186,6 +187,8 @@ export default function VideoCallPage() {
       window.location.href = "/messenger";
     }, 300);
   };
+  // Maven muestra «En llamada con… · Volver · Colgar» mientras esta pestaña vive.
+  useAnunciarLlamada({ sala: roomName, nombre: callDisplayName, activa: joined, alColgar: handleLeave });
 
   if (!roomName) {
     return (

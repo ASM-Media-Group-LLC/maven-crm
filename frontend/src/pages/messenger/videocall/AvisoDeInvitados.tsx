@@ -1,7 +1,7 @@
 // Lo que quien llama necesita saber (Alvaro, 18/11/2026): a quién le está
 // sonando, quién rechazó y quién no contestó. Antes la pestaña no escuchaba
 // nada de eso y uno se quedaba solo en la sala, esperando.
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Phone, PhoneMissed, PhoneOff, RotateCcw, Video } from "lucide-react";
 import { UserAvatar } from "@/components/UserAvatar";
 import { ESPERA, sonar } from "@/lib/tonosDeLlamada";
@@ -9,6 +9,22 @@ import { toast } from "sonner";
 import { useLanguage } from "@/hooks/useLanguage";
 import type { Invitado } from "@/hooks/useInvitadosDeLaLlamada";
 import { asegurarLlamada, estaViva, invitarALaLlamada, type LlamadaViva } from "@/lib/llamadaInvitar";
+
+/** Cuánto se espera a que el Maven del otro diga «me está sonando». */
+export const ESPERA_ACUSE_MS = 4_000;
+
+type Traducir = (clave: string, vars?: Record<string, string | number>) => string;
+
+/** La línea de abajo del nombre: dónde le está sonando. */
+export function dondeSuena(sonando: Invitado[], yaEsperamos: boolean, t: Traducir): string {
+  const enMaven = sonando.filter((i) => i.enMaven).length;
+  if (sonando.length === 1) {
+    if (enMaven === 1) return t("messenger.enLlamada.llamando.enSuMaven");
+    return yaEsperamos ? t("messenger.enLlamada.llamando.soloNotificacion") : t("messenger.enLlamada.llamando.sonando");
+  }
+  if (!yaEsperamos && enMaven === 0) return t("messenger.enLlamada.llamando.sonando");
+  return t("messenger.enLlamada.llamando.grupoEnMaven", { n: enMaven, total: sonando.length });
+}
 
 interface Props {
   roomName: string;
@@ -35,6 +51,15 @@ export default function AvisoDeInvitados({ roomName, uid, llamada, invitados, al
   useEffect(() => {
     if (!llamando) return;
     return sonar(ESPERA);
+  }, [llamando]);
+  // ¿Dónde le suena? (Alvaro, 18/11/2026: «no sé si le suena o no»). Si su Maven
+  // mostró el cartel, lo anota (sonando_en_maven_at). Si a los pocos segundos
+  // no lo anotó, no tiene Maven abierto: solo le llegó la notificación.
+  const [sinRespuestaDeMaven, setSinRespuestaDeMaven] = useState(false);
+  useEffect(() => {
+    if (!llamando) { setSinRespuestaDeMaven(false); return; }
+    const id = window.setTimeout(() => setSinRespuestaDeMaven(true), ESPERA_ACUSE_MS);
+    return () => window.clearTimeout(id);
   }, [llamando]);
 
   // Un aviso corto por cada «rechazó» / «no contestó», una sola vez.
@@ -120,7 +145,9 @@ export default function AvisoDeInvitados({ roomName, uid, llamada, invitados, al
               ? t("messenger.enLlamada.llamando.varios", { name: primero.nombre || "?", n: sonando.length - 1 })
               : t("messenger.enLlamada.llamando.uno", { name: primero.nombre || "?" })}
           </p>
-          <p className="mt-1.5 text-sm text-muted-foreground">{t("messenger.enLlamada.llamando.sonando")}</p>
+          <p className="mt-1.5 text-sm text-muted-foreground" aria-live="polite">
+            {dondeSuena(sonando, sinRespuestaDeMaven, t)}
+          </p>
           {sonando.length > 1 && (
             <div className="mt-4 flex -space-x-2">
               {sonando.slice(1, 6).map((i) => (

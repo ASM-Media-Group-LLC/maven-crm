@@ -57,6 +57,9 @@ export const compartido = {
     en: "Couldn't connect to the video server ({host}). Check that LiveKit is running and that HTTPS/WSS on port 443 is reachable.",
   },
   "shared.call.micStopped": { es: "Tu micrófono dejó de enviar audio", en: "Your microphone stopped sending audio" },
+  "shared.barraLlamada.enLlamadaCon": { es: "En llamada con {name}", en: "On a call with {name}" },
+  "shared.barraLlamada.volver": { es: "Volver a la llamada", en: "Back to the call" },
+  "shared.barraLlamada.colgar": { es: "Colgar", en: "Hang up" },
   "shared.call.micStoppedDesc": {
     es: "El sistema lo silenció o lo tomó otro programa (pasa al compartir pantalla con audio o al cambiar de dispositivo). Apaga y vuelve a prender el micrófono.",
     en: "The system muted it or another app took it (this happens when you share your screen with audio or switch devices). Turn your microphone off and on again.",

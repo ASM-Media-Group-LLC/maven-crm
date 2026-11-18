@@ -107,8 +107,8 @@ export function useVideoCall() {
       // ── Anti-"glare" ────────────────────────────────────────────────
       // Si los dos se llaman casi a la vez, NO creamos dos llamadas para la
       // misma sala (room_id es determinístico por conversación). Buscamos una
-      // llamada viva (últimos 40s) en esta conversación.
-      const since = new Date(Date.now() - 40_000).toISOString();
+      // llamada viva (lo que dura el timbre) en esta conversación.
+      const since = new Date(Date.now() - SUENA_MS - 10_000).toISOString();
       const { data: liveRows } = await (supabase.from("calls") as any)
         .select("*")
         .eq("conversation_id", conversationId)
@@ -327,10 +327,11 @@ export function useVideoCall() {
   // Dos caminos, a proposito:
   //   1. El evento en vivo, que cierra al instante.
   //   2. Un plazo maximo, por si el evento no llega. La llamada se auto-corta a
-  //      los 30 s del lado de quien llama, asi que a los 40 ya no hay nada que
-  //      contestar: seguir sonando es puro ruido. Esta red NO depende de
-  //      realtime, que es justo lo que fallo toda la noche.
-  const MAX_TIMBRE_MS = 40_000;
+  //      SUENA_MS (45 s desde el 18/11/2026) del lado de quien llama, asi que
+  //      10 s despues ya no hay nada que contestar: seguir sonando es puro
+  //      ruido. Esta red NO depende de realtime, que es justo lo que fallo toda
+  //      la noche.
+  const MAX_TIMBRE_MS = SUENA_MS + 10_000;
   useEffect(() => {
     if (!incomingCall || !uid) return;
     const id = incomingCall.id;
@@ -473,7 +474,7 @@ export function useVideoCall() {
 
     checkIncoming();
     void (async () => {
-      const desde = new Date(Date.now() - 45_000).toISOString();
+      const desde = new Date(Date.now() - SUENA_MS - 10_000).toISOString();
       const { data: filas } = await (supabase.from("call_participants") as any)
         .select("call_id, invitado_por, actualizado")
         .eq("user_id", uid)
