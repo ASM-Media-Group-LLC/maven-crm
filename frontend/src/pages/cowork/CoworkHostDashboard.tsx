@@ -1665,10 +1665,14 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
     type LeeFijas = (tabla: "cowork_sala_fija") => {
       select: (c: string) => { eq: (c: string, v: string) => PromiseLike<{ data: { user_id: string; room_id: string }[] | null; error: unknown }> };
     };
-    const { data, error } = await (supabase.from as unknown as LeeFijas)("cowork_sala_fija")
-      .select("user_id, room_id").eq("session_id", sesionDelTablero);
-    if (error || !data) { setSalasFijas(null); return; }
-    setSalasFijas(Object.fromEntries(data.map((f) => [f.user_id, f.room_id])));
+    try {
+      const { data, error } = await (supabase.from as unknown as LeeFijas)("cowork_sala_fija")
+        .select("user_id, room_id").eq("session_id", sesionDelTablero);
+      if (error || !Array.isArray(data)) { setSalasFijas(null); return; }
+      setSalasFijas(Object.fromEntries(data.map((f) => [f.user_id, f.room_id])));
+    } catch {
+      setSalasFijas(null);
+    }
   }, [sesionDelTablero]);
   useEffect(() => { void leerSalasFijas(); }, [leerSalasFijas]);
   const moverASala = async (uid: string, roomId: string) => {
