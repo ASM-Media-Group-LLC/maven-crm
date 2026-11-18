@@ -5,7 +5,7 @@ import {
   ChevronDown, Monitor, Volume2, Loader2, Settings,
 } from "lucide-react";
 import { createLocalTracks, LocalAudioTrack, LocalVideoTrack } from "livekit-client";
-import { ProcesadorDeFondo, soportaProcesadorDeFondo } from "@/lib/fondoFino/procesador";
+import { ProcesadorDeFondo, precalentarFondo, soportaProcesadorDeFondo } from "@/lib/fondoFino/procesador";
 import { UserAvatar } from "@/components/UserAvatar";
 import { cn } from "@/lib/utils";
 import BackgroundSelector from "./BackgroundSelector";
@@ -248,6 +248,10 @@ export default function PreJoinLobby({ roomName, displayName, callDisplayName, o
         bgProcessorRef.current = processor;
       }
       if (bgAttachedTrackRef.current !== track) {
+        // La sala de espera NO alarga el tope (la persona se tiene que ver a los pocos
+        // segundos, ver salaDeEsperaTrabada.test). Si es la primera vez, el
+        // detector se sigue bajando de fondo y en la llamada ya está listo.
+        void precalentarFondo();
         await withTimeout(Promise.resolve(track.setProcessor(processor, true)), PREJOIN_BG_ATTACH_TIMEOUT_MS, "prejoin-bg-attach");
         bgAttachedTrackRef.current = track;
       }

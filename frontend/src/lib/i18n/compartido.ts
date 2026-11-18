@@ -79,6 +79,7 @@ export const compartido = {
   },
   "shared.call.bgFailed": { es: "No se pudo poner tu fondo", en: "Couldn't set your background" },
   "shared.call.bgApplyFailed": { es: "No se pudo aplicar tu fondo", en: "Couldn't apply your background" },
+  "shared.call.bgPreparando": { es: "Preparando el fondo… (solo tarda la primera vez)", en: "Getting your background ready… (only slow the first time)" },
   "shared.call.bgFailedDesc": {
     es: "Tu cámara está saliendo sin fondo. Vuelve a elegirlo para reintentar.",
     en: "Your camera is on without a background. Pick it again to retry.",

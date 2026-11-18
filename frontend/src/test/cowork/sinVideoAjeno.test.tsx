@@ -47,6 +47,9 @@ vi.mock("livekit-client", () => ({
 vi.mock("@/lib/fondoFino/procesador", () => ({
   ProcesadorDeFondo: vi.fn(),
   soportaProcesadorDeFondo: vi.fn().mockReturnValue(false),
+  precalentarFondo: vi.fn(async () => true),
+  fondoPrecalentado: vi.fn(() => true),
+  topeParaPonerFondo: vi.fn((ms: number) => ms),
 }));
 
 vi.mock("@/integrations/supabase/client", () => ({

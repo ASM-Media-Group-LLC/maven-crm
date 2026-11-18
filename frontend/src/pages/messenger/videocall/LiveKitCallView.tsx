@@ -32,6 +32,8 @@ import { useArgosEscaleraClip } from "@/hooks/useArgosEscaleraClip";
 import { latirEnLlamada, salirDeLlamada, LATIDO_LLAMADA_MS, LATIDO_SERVIDOR_MS, latirLlamadaEnServidor, salirLlamadaEnServidor } from "@/lib/llamadaEnMaven";
 import { useRegistrarLlamados } from "@/hooks/useRegistrarLlamados";
 import { esBlur, alternarBlur, leerFondoGuardado, guardarFondo, type BackgroundEffect } from "@/lib/fondoDeLlamada";
+import { precalentarFondo, soportaProcesadorDeFondo } from "@/lib/fondoFino/procesador";
+import { escritorio } from "@/lib/escritorio";
 import { useLanguage } from "@/hooks/useLanguage";
 
 const DEFAULT_VIEW_SETTINGS: ViewSettings = { layout: "auto", maxTiles: 49, hideNoVideo: false };
@@ -343,6 +345,16 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
   // prender como normal, sin decir nada.
   const ultimoBlurRef = useRef<BackgroundEffect>("blur");
   if (esBlur(bgEffect)) ultimoBlurRef.current = bgEffect;
+
+  // El detector del fondo baja ~9,4 MB la primera vez (lib/fondoFino/procesador.ts).
+  // Se baja de antemano a quien lo va a usar —ya tiene un fondo elegido— o en la
+  // app de computador (caché nueva): así el desenfoque se pone al instante.
+  useEffect(() => {
+    if (!soportaProcesadorDeFondo()) return;
+    if (leerFondoGuardado() === "none" && !escritorio()) return;
+    const id = window.setTimeout(() => { void precalentarFondo(); }, 3000);
+    return () => window.clearTimeout(id);
+  }, []);
 
   const handleBgChange = useCallback((effect: BackgroundEffect) => {
     setBgEffect(effect);

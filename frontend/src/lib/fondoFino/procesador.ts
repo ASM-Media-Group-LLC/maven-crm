@@ -324,6 +324,49 @@ export class ProcesadorFondoFino extends ProcessorWrapper<OpcionesFondoFino, Tra
 }
 
 /** ¿Este navegador puede poner fondos? (WebGL2 + VideoFrame + un camino de pistas). */
+// ── La primera vez (17/11/2026) ─────────────────────────────────────────────
+// El detector baja ~9,4 MB de WASM (jsdelivr) + el modelo (~250 KB) la PRIMERA
+// vez en cada navegador o app. Con 5–10 Mbps eso son 8–15 s, y poner el fondo
+// tenía un tope de 6 s: en la app de computador (caché nueva) el desenfoque
+// fallaba SIEMPRE («no me deja poner el blur», Alvaro). Ahora:
+//  · precalentarFondo() baja esos archivos una vez (quedan en la caché HTTP) y
+//    avisa cuando están;
+//  · mientras no estén, el tope para poner el fondo es largo (TOPE_PRIMERA_CARGA_MS).
+export const TOPE_PRIMERA_CARGA_MS = 45_000;
+const ARCHIVOS_DEL_DETECTOR = [
+  `${WASM_MEDIAPIPE}/vision_wasm_internal.js`,
+  `${WASM_MEDIAPIPE}/vision_wasm_internal.wasm`,
+];
+let precalentado: Promise<boolean> | null = null;
+let listo = false;
+
+/** Baja (una vez) el WASM y el modelo del detector. Nunca falla: si no puede, dice false y se vuelve a intentar la próxima vez. */
+export function precalentarFondo(modelo: ModeloDeFondo = MODELO_POR_DEFECTO): Promise<boolean> {
+  if (listo) return Promise.resolve(true);
+  if (precalentado) return precalentado;
+  precalentado = Promise.all(
+    [...ARCHIVOS_DEL_DETECTOR, MODELOS[modelo].url].map(async (url) => {
+      const r = await fetch(url, { cache: "force-cache" });
+      if (!r.ok) throw new Error(`fondo-fino: ${r.status} ${url}`);
+      await r.arrayBuffer();
+    }),
+  ).then(
+    () => { listo = true; return true; },
+    (e) => { console.warn("[fondo] no se pudo precalentar:", e); precalentado = null; return false; },
+  );
+  return precalentado;
+}
+
+/** ¿Ya están en la caché el WASM y el modelo? */
+export function fondoPrecalentado(): boolean {
+  return listo;
+}
+
+/** El tope para poner el fondo: el de siempre si ya está todo bajado; largo si es la primera vez. */
+export function topeParaPonerFondo(normalMs: number): number {
+  return listo ? normalMs : Math.max(normalMs, TOPE_PRIMERA_CARGA_MS);
+}
+
 export function soportaProcesadorDeFondo(): boolean {
   return TransformadorFondoFino.isSupported && ProcessorWrapper.isSupported;
 }

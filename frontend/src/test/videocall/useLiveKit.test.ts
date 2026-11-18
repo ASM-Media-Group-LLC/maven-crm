@@ -69,6 +69,9 @@ vi.mock("@/lib/fondoFino/procesador", () => ({
     destroy: vi.fn().mockResolvedValue(undefined),
   }),
   soportaProcesadorDeFondo: vi.fn().mockReturnValue(true),
+  precalentarFondo: vi.fn(async () => true),
+  fondoPrecalentado: vi.fn(() => true),
+  topeParaPonerFondo: vi.fn((ms: number) => ms),
 }));
 
 vi.mock("@/integrations/supabase/client", () => ({
