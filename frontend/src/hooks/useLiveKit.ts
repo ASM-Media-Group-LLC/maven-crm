@@ -47,7 +47,7 @@ import {
 } from "@/lib/saludDeLlamada";
 import { AHORRO_INICIAL, PANTALLA_AHORRO, ahorroPorPrueba, siguienteAhorro, type EstadoAhorro } from "@/lib/modoAhorro";
 import {
-  CAMARA_INICIAL, copiarTopes, elegirPerfilDeCamara, escribirTopes, siguientePerfilDeCamara, topesDeCowork, topesLivianos,
+  CAMARA_INICIAL, camaraEnHD, copiarTopes, elegirPerfilDeCamara, escribirTopes, siguientePerfilDeCamara, topesDeCowork, topesLivianos,
   type EstadoCamara, type PerfilDeCamara, type SenalesDeSubida, type TopeDeCodificacion,
 } from "@/lib/perfilDeCamara";
 import { ajustarSuscripciones, esSupervisorEnLaSala, soloAudioDeLosCompaneros } from "@/lib/videoAjeno";
@@ -364,6 +364,25 @@ const ROOM_OPTIONS: RoomOptions = {
   },
 };
 
+// CÁMARA EN HD FUERA DE COWORK (Alvaro, 17/11/2026: «la cámara se ve de muy
+// baja calidad» en Meet por link y en las llamadas de Maven; eligió «calidad
+// alta en Meet»). Ahí la cámara se captura a 1080p y la capa de arriba va a
+// 1080p@30 (3 Mbps); las de abajo, 360p y 720p, para quien la mire chica o con
+// internet flojo (adaptiveStream + dynacast). Cowork sigue en 720p y liviano:
+// son muchas cámaras a la vez y ahí es donde se trababa (Grace y Jackeline).
+function opcionesDeSala(sala: string | null | undefined): RoomOptions {
+  if (!camaraEnHD(sala)) return ROOM_OPTIONS;
+  return {
+    ...ROOM_OPTIONS,
+    videoCaptureDefaults: { ...ROOM_OPTIONS.videoCaptureDefaults, resolution: VideoPresets.h1080.resolution },
+    publishDefaults: {
+      ...ROOM_OPTIONS.publishDefaults,
+      videoEncoding: VideoPresets.h1080.encoding,
+      videoSimulcastLayers: [VideoPresets.h360, VideoPresets.h720],
+    },
+  };
+}
+
 // ── Cómo se publica la PANTALLA COMPARTIDA ────────────────────────
 //
 // MEDIDO en una llamada real (18/09/2026, Jhon ↔ Juan Pachas, getStats sobre la
@@ -656,7 +675,9 @@ export function useLiveKit() {
         if (!pista || !sender) return;
         const params = sender.getParameters();
         if (!params.encodings?.length) return;
-        const liviano = perfilCamaraRef.current.perfil === "liviano";
+        // En Meet y en las llamadas de Maven la cámara va en HD y NO se recorta a
+        // 360p por la subida (Alvaro, 17/11/2026: «calidad alta en Meet»).
+        const liviano = perfilCamaraRef.current.perfil === "liviano" && !camaraEnHD(room.name);
         // En Cowork también el normal va topado: todo en vivo, a 10 fps
         // (perfilDeCamara.ts, CAMARA_COWORK). Fuera de Cowork, el normal es el de siempre.
         if (liviano || conPrueba) {
@@ -1620,7 +1641,7 @@ export function useLiveKit() {
       const soloAudio = soloAudioDeLosCompaneros({ sala: roomName, sinVideoAjeno: options.sinVideoAjeno, isAdmin });
       soloAudioRef.current = soloAudio;
       afirmarRelojesDeLiveKit();
-      const room = new Room(ROOM_OPTIONS);
+      const room = new Room(opcionesDeSala(roomName));
       roomRef.current = room;
       // Idempotente (solo toca lo que está distinto): se llama en cada evento que
       // puede traer una pista nueva y en el repaso de cada 3 s.
