@@ -573,6 +573,34 @@ describe("LiveKitCallView", () => {
       expect(avisoFinal(avisos)).toMatchObject({ conexionSala: "reemplazada" });
       expect(screen.queryByText(CARTEL)).not.toBeInTheDocument();
     });
+
+    // LA APP MANDA (Alvaro, 17/11/2026): la pestaña que soltó la sala a la app
+    // dice que la persona sigue desde la app, no vuelve sola, y SOLO su botón la
+    // vuelve a tomar (con `tomarLaSala`). Ver test/videocall/laAppManda.test.ts.
+    it("la tomó la app: «Sigues en la llamada desde la app de Maven» y solo el botón la retoma", () => {
+      const avisos = vi.fn();
+      lkState = conectadoCon();
+      const { rerender } = render(<LiveKitCallView {...defaultProps} onMediaStateChange={avisos} />);
+      const antes = llamadasAConnect().length;
+      expect(ultimo(llamadasAConnect())?.[3]).toMatchObject({ tomarLaSala: false });
+      lkState = cayo({ razonDeSalida: DisconnectReason.DUPLICATE_IDENTITY, otraPestanaTomoLaSesion: true, quienTieneLaSala: "app" });
+      rerender(<LiveKitCallView {...defaultProps} onMediaStateChange={avisos} />);
+      expect(screen.getByText("Sigues en la llamada desde la app de Maven.")).toBeInTheDocument();
+      expect(screen.getByText("Esta pestaña soltó la llamada.")).toBeInTheDocument();
+      expect(avisoFinal(avisos)).toMatchObject({ conexionSala: "reemplazada" });
+      // Nada la reconecta sola.
+      expect(llamadasAConnect().length).toBe(antes);
+      fireEvent.click(screen.getByText("Usar esta pestaña"));
+      expect(llamadasAConnect().length).toBe(antes + 1);
+      expect(ultimo(llamadasAConnect())?.[3]).toMatchObject({ tomarLaSala: true });
+    });
+
+    it("la soltó la app: «Sigues en la llamada desde otra ventana o el navegador» y «Usar esta ventana»", () => {
+      lkState = cayo({ razonDeSalida: DisconnectReason.DUPLICATE_IDENTITY, otraPestanaTomoLaSesion: true, quienTieneLaSala: "otroLado" });
+      render(<LiveKitCallView {...defaultProps} />);
+      expect(screen.getByText("Sigues en la llamada desde otra ventana o el navegador.")).toBeInTheDocument();
+      expect(screen.getByText("Usar esta ventana")).toBeInTheDocument();
+    });
   });
 
   // ── LA PAUSA Y EL MICRÓFONO DE QUIEN SILENCIARON ───────────────────────

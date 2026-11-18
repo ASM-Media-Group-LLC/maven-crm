@@ -15,7 +15,7 @@ import { useAutoPiP } from "./useAutoPiP";
 import { suscribirOrdenesDePausa } from "@/lib/ordenesDePausa";
 
 import { Loader2, Wifi, WifiOff, Copy, ChevronLeft, ChevronRight, DoorOpen, Check } from "lucide-react";
-import { CLAVES_OTRA_PESTANA } from "@/lib/sesionDuplicada";
+import { CLAVES_SALA_TOMADA, olvidarSalaSoltada } from "@/lib/sesionDuplicada";
 import { caidaEnCurso, conexionDeSala, marcarCaida, olvidarCaida } from "@/lib/conexionSala";
 import type { ConexionSala } from "@/lib/coworkTiempoRegla";
 import type { DestinoDeTelemetria } from "@/lib/saludDeLlamada";
@@ -296,6 +296,10 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
   // es LO QUE hace que se vuelva a conectar. Un reintento a pedido, nunca
   // automático — el automático es el que arma la pelea entre las pestañas.
   const [reintentoManual, setReintentoManual] = useState(0);
+  // «Usar esta pestaña»: el próximo intento entra aunque esta pestaña haya
+  // soltado la sala a la app u otro lado (lib/sesionDuplicada.ts). Lo consume
+  // el efecto de conexión; cualquier otro intento sigue sin tomarla solo.
+  const tomarLaSalaRef = useRef(false);
   const [videoSettingsOpen, setVideoSettingsOpen] = useState(false);
   const [metricsOpen, setMetricsOpen] = useState(false);
   const [chatOpen, setChatOpen] = useState(false);
@@ -386,9 +390,14 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
     // Volviendo de una caída: todo apagado (ver volviendoDeCaidaRef).
     const deCaida = volviendoDeCaidaRef.current;
     intentoApagadoRef.current = deCaida;
+    // Se lee UNA vez por corrida del efecto: los reintentos de abajo (los de la
+    // conexión inicial) siguen siendo el mismo pedido de la persona.
+    const tomarLaSala = tomarLaSalaRef.current;
+    tomarLaSalaRef.current = false;
     const tryConnect = async () => {
       try {
         await lk.connect(roomName, displayNameRef.current, isAdmin, {
+          tomarLaSala,
           initialMicOn: deCaida ? false : initialMicOn,
           initialCamOn: deCaida ? false : initialCamOn,
           audioDeviceId: initialAudioDeviceId,
@@ -463,6 +472,9 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
       void detenerAlSalir(roomName, mia.id);
     }
     olvidarCaida(roomName);
+    // Salir a propósito: la próxima vez que entre aquí, entra (no queda el
+    // «la tiene otro lado» de un corte anterior).
+    olvidarSalaSoltada(roomName);
     lk.disconnect(); onLeave(); if (!suppressLeaveToast) toast.info(t("messenger.callView.llamadaFinalizada"));
   }, [lk, onLeave, suppressLeaveToast, roomName, t]);
 
@@ -663,6 +675,8 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
     lk.equipoDormido && conexionDeLaSala === "desconectada" ? "dormido" : conexionDeLaSala;
   const salaCaida = conexionDeLaSala === "desconectada";
   const salaConectada = lk.connectionState === ConnectionState.Connected;
+  // El cartel de «la sala la tiene otro lado», según desde dónde sigue.
+  const textosSalaTomada = CLAVES_SALA_TOMADA[lk.quienTieneLaSala ?? "pestana"];
 
   useEffect(() => {
     if (!salaCaida) return;
@@ -1061,17 +1075,21 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
           </button>
         </div>
       )}
+      {/* La sala la tomó otro lado. El texto dice DESDE DÓNDE sigue la persona
+          (la app de Maven, otra ventana, otra pestaña: lib/sesionDuplicada.ts) y
+          el botón es lo ÚNICO que la vuelve a tomar aquí: le marca al intento
+          `tomarLaSala`, que deja afuera al otro lado. */}
       {lk.otraPestanaTomoLaSesion && (
-        <div className="shrink-0 flex flex-wrap items-center justify-center gap-x-2 gap-y-1 py-2 px-3 bg-warning/15 text-warning text-xs font-medium text-center">
+        <div role="status" className="shrink-0 flex flex-wrap items-center justify-center gap-x-2 gap-y-1 py-2 px-3 bg-warning/15 text-warning text-xs font-medium text-center">
           <Copy className="h-3.5 w-3.5 shrink-0" />
-          <span>{t(CLAVES_OTRA_PESTANA.titulo)}.</span>
-          <span className="font-normal opacity-80">{t(CLAVES_OTRA_PESTANA.detalle)}</span>
+          <span>{t(textosSalaTomada.titulo)}.</span>
+          <span className="font-normal opacity-80">{t(textosSalaTomada.detalle)}</span>
           <button
             type="button"
-            onClick={() => setReintentoManual((n) => n + 1)}
+            onClick={() => { tomarLaSalaRef.current = true; setReintentoManual((n) => n + 1); }}
             className="underline underline-offset-2 hover:opacity-80"
           >
-            {t(CLAVES_OTRA_PESTANA.usarAqui)}
+            {t(textosSalaTomada.usarAqui)}
           </button>
         </div>
       )}
