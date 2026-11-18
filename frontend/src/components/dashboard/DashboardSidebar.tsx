@@ -2,7 +2,7 @@ import {
   Activity, AlertTriangle, BarChart3, Bell, BookOpen, Bot, Briefcase, Calculator, CalendarDays, CalendarRange, ChevronRight, Clapperboard, ClipboardCheck, Clock, DollarSign, Eye, FileSpreadsheet, FileText, Gauge, Gift, GraduationCap, HardDrive, Headphones, Home, Inbox, LayoutDashboard, Mail, Map, Megaphone, MessageCircle, Moon, Palette, Phone, Presentation, RefreshCw, Rocket, Search, Settings, Shield, Smartphone, Sun, Ticket, UserCheck, UserCog, UserPlus, Users, Users2, Video, Wallet, Wifi, MonitorDown,
  MoreHorizontal,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import { useIncidentesSalud } from "@/hooks/useIncidentesSalud";
 import { useTheme } from "next-themes";
 import { useAuth } from "@/hooks/useAuth";
@@ -552,7 +552,8 @@ const DashboardSidebar = () => {
             rojo de salud que tenía «Menú» queda en el icono del Dashboard. */}
         <SidebarMenu>
           {principales.map((item) => (
-            <SidebarMenuItem key={item.url}>
+            <Fragment key={item.url}>
+            <SidebarMenuItem>
               <SidebarMenuButton asChild tooltip={item.title}>
                 <NavLink to={item.url} end={item.url === "/dashboard"} className={LINK_CLASS} activeClassName={ACTIVE_CLASS} onMouseEnter={() => precargarRuta(item.url)} onFocus={() => precargarRuta(item.url)}>
                   {item.url === "/dashboard" ? <IconoConPuntito icono={item.icon} className="h-4 w-4 shrink-0" /> : <item.icon className="h-4 w-4 shrink-0" />}
@@ -565,24 +566,23 @@ const DashboardSidebar = () => {
                 </NavLink>
               </SidebarMenuButton>
             </SidebarMenuItem>
+            {/* Argos, justo debajo del Dashboard (Alvaro, 18/11/2026). Lo ven
+                dueño, admins, RR. HH. y supervisores (ve_argos). */}
+            {item.url === "/dashboard" && veArgos && (
+            <SidebarMenuItem>
+                <SidebarMenuButton asChild tooltip={t("nav.argos")}>
+                  <NavLink to="/hr/monitor-ia" className={LINK_CLASS} activeClassName={ACTIVE_CLASS} onMouseEnter={() => precargarRuta("/hr/monitor-ia")} onFocus={() => precargarRuta("/hr/monitor-ia")}>
+                    <Eye className="h-4 w-4 shrink-0" />
+                    <span>{t("nav.argos")}</span>
+                  </NavLink>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            )}
+            </Fragment>
           ))}
         </SidebarMenu>
         <div className="mx-3 my-1.5 h-px bg-border/50 group-data-[collapsible=icon]:mx-2" aria-hidden />
 
-        {/* Argos: su PROPIO botón en el riel (Alvaro), no dentro del flyout de
-            Menú. Lo ven dueño, admins, RR. HH. y supervisores (ve_argos). */}
-        {veArgos && (
-          <SidebarMenu>
-            <SidebarMenuItem>
-              <SidebarMenuButton asChild tooltip={t("nav.argos")}>
-                <NavLink to="/hr/monitor-ia" className={LINK_CLASS} activeClassName={ACTIVE_CLASS} onMouseEnter={() => precargarRuta("/hr/monitor-ia")} onFocus={() => precargarRuta("/hr/monitor-ia")}>
-                  <Eye className="h-4 w-4 shrink-0" />
-                  <span>{t("nav.argos")}</span>
-                </NavLink>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-          </SidebarMenu>
-        )}
 
         {/* ── Finanzas ────────────────────────────────────────────── */}
         {/* Finanzas y Recursos Humanos fuera del menú del dueño (Alvaro, 18/11/2026:
@@ -885,15 +885,16 @@ const DashboardSidebar = () => {
         </CollapsibleSidebarGroup>
         )}
 
-        {/* Operaciones, la última (Alvaro, 18/11/2026: «Menú, Argos, Office y de
-            último Operations»). */}
-        {operationsMenu.length > 0 && (
+        {/* «Más»: lo que se usa de vez en cuando (Alvaro, 18/11/2026), con
+            Operaciones adentro (Contenido, Ventas, Bandejas, Chatters…): «métela
+            dentro de More también». */}
+        {(masMenu.length > 0 || operationsMenu.length > 0 || canAccess("Creadores")) && (
         <CollapsibleSidebarGroup
-          label={t("sidebar.operations")}
-          storageKey="operations"
-          icon={Briefcase}
-          active={isOperationsActive}
-          collapsedItems={operationsCollapsedItems}
+          label={t("sidebar.mas")}
+          storageKey="mas"
+          icon={MoreHorizontal}
+          active={isMenuActive || isOperationsActive}
+          collapsedItems={[...operationsCollapsedItems, ...(operationsCollapsedItems.length > 0 && menuCollapsedItems.length > 0 ? [{ kind: "separator" } as const] : []), ...menuCollapsedItems]}
         >
             <SidebarMenu>
               {/* Ítems fuera de todo subgrupo (red de seguridad del mapa de arriba). */}
@@ -957,20 +958,6 @@ const DashboardSidebar = () => {
                   </Collapsible>
                 );
               })}
-            </SidebarMenu>
-        </CollapsibleSidebarGroup>
-        )}
-
-        {/* «Más»: lo que se usa de vez en cuando (Alvaro, 18/11/2026). */}
-        {(masMenu.length > 0 || canAccess("Creadores")) && (
-        <CollapsibleSidebarGroup
-          label={t("sidebar.mas")}
-          storageKey="mas"
-          icon={MoreHorizontal}
-          active={isMenuActive}
-          collapsedItems={menuCollapsedItems}
-        >
-            <SidebarMenu>
               {masMenu.map((item) => (
                 <SidebarMenuItem key={item.url}>
                   <SidebarMenuButton asChild tooltip={item.title}>
