@@ -69,7 +69,63 @@ if (!app.isPackaged) app.setPath("userData", path.join(app.getPath("appData"), "
 if (!app.requestSingleInstanceLock()) {
   app.quit();
 } else {
-  app.on("second-instance", () => mostrar());
+  // En Windows un link maven:// abre otra copia con el link en argv: esta lo recibe.
+  app.on("second-instance", (_e, argv) => {
+    const enlace = (argv || []).find((a) => typeof a === "string" && a.startsWith(`${PROTOCOLO}://`));
+    if (enlace) abrirEnlace(enlace);
+    else mostrar();
+  });
+}
+
+// ── Los links de Maven abren en la app (Alvaro, 17/11/2026: «que me abran la
+// aplicación cuando lo quiero abrir, no en el navegador») ─────────────────────
+// La página, en el navegador, ofrece «Abrir en la app» con maven://abrir?ruta=/…
+// El sistema se lo pasa a la app: en Mac por «open-url», en Windows por argv.
+const PROTOCOLO = "maven";
+let enlacePendiente = null;
+
+/** maven://abrir?ruta=/call/x → https://app.maven-ai.me/call/x. Solo rutas de Maven. */
+function destinoDeEnlace(enlace) {
+  try {
+    const u = new URL(enlace);
+    if (u.protocol !== `${PROTOCOLO}:`) return null;
+    const ruta = u.searchParams.get("ruta") || "/";
+    if (!ruta.startsWith("/") || ruta.startsWith("//")) return null;
+    const destino = new URL(ruta, "https://app.maven-ai.me");
+    return destino.origin === "https://app.maven-ai.me" ? destino : null;
+  } catch {
+    return null;
+  }
+}
+
+function abrirEnlace(enlace) {
+  const destino = destinoDeEnlace(enlace);
+  if (!destino) return mostrar();
+  if (!ventana) {
+    enlacePendiente = destino.href;
+    if (app.isReady()) crearVentana();
+    return;
+  }
+  // Si Maven ya está cargado, la ruta se abre ADENTRO (sin recargar): una
+  // llamada o un Cowork en curso no se cortan.
+  const actual = ventana.webContents.getURL();
+  if (actual.startsWith("https://app.maven-ai.me/")) {
+    ventana.webContents.send("maven:abrir-ruta", destino.pathname + destino.search + destino.hash);
+  } else {
+    ventana.loadURL(destino.href);
+  }
+  mostrar();
+}
+
+app.on("open-url", (e, enlace) => {
+  e.preventDefault();
+  if (app.isReady()) abrirEnlace(enlace);
+  else { const d = destinoDeEnlace(enlace); if (d) enlacePendiente = d.href; }
+});
+if (process.platform === "win32") {
+  const enlace = process.argv.find((a) => typeof a === "string" && a.startsWith(`${PROTOCOLO}://`));
+  const d = enlace ? destinoDeEnlace(enlace) : null;
+  if (d) enlacePendiente = d.href;
 }
 
 function mostrar() {
@@ -158,7 +214,8 @@ function crearVentana() {
   });
 
   ventana.webContents.setUserAgent(`${ventana.webContents.getUserAgent()} MavenEscritorio/${app.getVersion()}`);
-  ventana.loadURL(URL_MAVEN);
+  ventana.loadURL(enlacePendiente || URL_MAVEN);
+  enlacePendiente = null;
 
   // Prueba desde el código: MAVEN_CAPTURA=/ruta.png guarda cómo se ve y cierra.
   if (!app.isPackaged && process.env.MAVEN_CAPTURA) {
@@ -370,6 +427,8 @@ function crearMenu() {
 // ── Arranque ─────────────────────────────────────────────────────────────────
 app.whenReady().then(() => {
   app.setAppUserModelId("me.maven-ai.escritorio"); // avisos con nombre en Windows
+  // maven:// abre esta app (solo la instalada: probando desde el código no se registra).
+  if (app.isPackaged) app.setAsDefaultProtocolClient(PROTOCOLO);
 
   // La primera vez queda puesta para abrir al prender (Alvaro lo pidió así).
   // (Solo en la app instalada: probarla desde el código no toca el computador.)

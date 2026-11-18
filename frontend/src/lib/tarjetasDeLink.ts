@@ -39,12 +39,13 @@ export const TARJETAS = {
   reunion: {
     archivo: "og-reunion.html",
     url: `${BASE}/`,
-    titulo: "You're invited to a meeting",
-    descripcion: "Tap the link and join from your browser. No downloads.",
-    // v=2: la imagen del botón «Join meeting» (R4), elegida el 11/11. Subir el
-    // número al cambiarla, para que WhatsApp no siga mostrando la vieja.
-    imagen: `${BASE}/og-reunion.jpg?v=7`,
-    alt: "Join meeting on Maven",
+    titulo: "Maven Meeting",
+    descripcion: "Tap the link to join the meeting.",
+    // v=8 (Alvaro, 17/11/2026): «que diga Maven y abajito Meeting, bonito, para
+    // compartir en WhatsApp y Telegram». Subir el número al cambiar la imagen,
+    // para que WhatsApp no siga mostrando la vieja.
+    imagen: `${BASE}/og-reunion.jpg?v=8`,
+    alt: "Maven Meeting",
   },
   cowork: {
     archivo: "og-cowork.html",

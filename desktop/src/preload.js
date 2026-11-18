@@ -55,6 +55,12 @@ contextBridge.exposeInMainWorld("mavenEscritorio", {
   },
   /** Segundos sin tocar teclado ni mouse en todo el computador. */
   inactividad: () => ipcRenderer.invoke("maven:inactividad"),
+  /** Un link maven:// pidió abrir esta ruta de Maven (sin recargar la página). */
+  alAbrirRuta: (cb) => {
+    const f = (_e, ruta) => { if (typeof ruta === "string" && ruta.startsWith("/")) cb(ruta); };
+    ipcRenderer.on("maven:abrir-ruta", f);
+    return () => ipcRenderer.removeListener("maven:abrir-ruta", f);
+  },
   /** Memoria: { app_mb, equipo_gb, libre_gb }. */
   memoria: () => ipcRenderer.invoke("maven:memoria"),
   /** Cada minuto: los tramos de app/página al frente (ver desktop/src/apps.js). */
