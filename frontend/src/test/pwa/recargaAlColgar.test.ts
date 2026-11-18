@@ -191,3 +191,52 @@ describe("pwa.ts y registroDelSw lo usan así", () => {
     expect(s).toMatch(/if \(o\.enLlamada\(\)\) \{\s*o\.alQuedarPendiente\(\);\s*return;\s*\}/);
   });
 });
+
+// EL CARTEL DEL CENTRO (Alvaro, 18/11/2026: «que cada cambio que se vaya a
+// producción salga el botón en el medio para que lo actualicen»).
+describe("versión nueva → cartel en el centro con «Actualizar»", () => {
+  const conCartel = (o: Parameters<typeof escenario>[0] = {}) => {
+    const e = escenario(o);
+    const mostrarCartel = vi.fn();
+    const pedir = crearRecargaAlColgar({ ...e.opciones, mostrarCartel });
+    return { ...e, pedir, mostrarCartel };
+  };
+
+  it("sin llamada: abre el cartel y NO recarga sola", async () => {
+    const e = conCartel();
+    e.pedir();
+    await esperarMicro();
+    expect(e.mostrarCartel).toHaveBeenCalledTimes(1);
+    expect(e.pasarALaNueva).not.toHaveBeenCalled();
+  });
+
+  it("en llamada: avisito y espera; al colgar, cartel", async () => {
+    const e = conCartel({ enLlamada: true });
+    e.pedir();
+    await esperarMicro();
+    expect(e.mostrarCartel).not.toHaveBeenCalled();
+    expect(e.opciones.mostrarEnLlamada).toHaveBeenCalledTimes(1);
+    e.estado.enLlamada = false;
+    await e.tocar();
+    expect(e.mostrarCartel).toHaveBeenCalledTimes(1);
+    expect(e.pasarALaNueva).not.toHaveBeenCalled();
+  });
+
+  it("si ya actualizó desde este build y sigue en él, no insiste con el cartel (sin bucle)", async () => {
+    const almacen = almacenDePrueba();
+    marcarRecarga(almacen, "100");
+    const e = conCartel({ almacen });
+    e.pedir();
+    await esperarMicro();
+    expect(e.mostrarCartel).not.toHaveBeenCalled();
+    expect(e.opciones.mostrarNormal).toHaveBeenCalledTimes(1);
+  });
+
+  it("pwa.ts abre el cartel, revisa cada 10 minutos y el botón solo mira la llamada", () => {
+    const s = leer("src/pwa.ts");
+    expect(s).toContain("mostrarCartel: () => abrirCartelVersionNueva(");
+    expect(s).toContain("forzarActualizacion(registro, updateSW, recargarUnaVez, hayLlamadaActiva)");
+    expect(s).toContain("10 * 60 * 1000");
+    expect(s).not.toContain("60 * 60 * 1000");
+  });
+});

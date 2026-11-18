@@ -5,6 +5,7 @@ import { escritorio } from "@/lib/escritorio";
 import { hayLlamadaActiva } from "@/lib/llamadaActiva";
 import { estadoDelAviso, tocaActualizarAlColgar } from "@/lib/avisoActualizacionApp";
 import { alCambiarTarjeta } from "@/lib/novedadesApp";
+import { CartelCentral } from "@/components/CartelVersionNueva";
 
 // VERSIÓN NUEVA DE LA APP, SIEMPRE A LA VISTA (Alvaro, 18/11/2026: «que la
 // plataforma te lo ponga enfrente con un botón para que se actualice»).
@@ -51,6 +52,20 @@ export function AvisoActualizacionApp() {
 
   const estado = estadoDelAviso(version, enLlamada);
   if (estado === "nada" || tarjeta) return null;
+  // Sin llamada: el cartel en el centro, igual que el de la página (18/11/2026).
+  if (estado !== "ofrecerEnLlamada") {
+    return (
+      <CartelCentral
+        titulo={t("pwa.app.titulo2")}
+        detalle={t("pwa.app.nuevaDetalle")}
+        version={version}
+        boton={t("pwa.app.actualizar")}
+        ocupado={actualizando}
+        ocupadoTexto={t("pwa.app.actualizando")}
+        onActualizar={actualizar}
+      />
+    );
+  }
   return (
     <div className="pointer-events-none fixed inset-x-0 top-16 z-[170] flex justify-center px-4">
     <div
