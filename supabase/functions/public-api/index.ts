@@ -461,6 +461,7 @@ Deno.serve(async (req) => {
         idempotencia,
         supabaseUrl: Deno.env.get("SUPABASE_URL") ?? "",
         anonKey: Deno.env.get("SUPABASE_ANON_KEY") ?? "",
+        nas: { url: Deno.env.get("DRIVE_NAS_URL") ?? "", secreto: Deno.env.get("DRIVE_SECRETO") ?? "" },
         servicio: { key: Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "", cronToken: Deno.env.get("CRON_INTERNAL_TOKEN") ?? "" },
       });
       return json(req, r.cuerpo, r.estado, r.permitidos ? { "Allow": r.permitidos.join(", ") } : {});
