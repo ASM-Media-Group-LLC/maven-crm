@@ -1,7 +1,11 @@
 # Publica la app de Mac: copia los archivos de un release `mac-v*` (armado,
 # firmado con el Developer ID y notarizado por Apple en el MacBook de Alvaro con
 # desktop/publicar-mac.sh) al balde público `descargas` de Supabase.
-# Antes de subir revisa que el .dmg traiga la app firmada por Alvaro.
+# La firma (Developer ID de Alvaro + notarización) se revisa en el Mac antes de
+# crear el release (publicar-mac.sh: codesign, spctl y stapler). Aquí corre en
+# Linux (18/11/2026: tres veces seguidas GitHub no tuvo Macs libres y la versión
+# nunca llegó a la descarga) y revisa que los archivos coincidan con el
+# latest-mac.yml y con la versión del release.
 name: app-escritorio-mac
 
 on:
@@ -16,7 +20,7 @@ on:
 jobs:
   publicar:
     if: github.event_name == 'workflow_dispatch' || startsWith(github.event.release.tag_name, 'mac-v')
-    runs-on: macos-latest
+    runs-on: ubuntu-latest
     timeout-minutes: 30
     env:
       PROYECTO: lsagslbkliprespbyhts
@@ -30,15 +34,17 @@ jobs:
           mkdir -p "$RUNNER_TEMP/mac" && cd "$RUNNER_TEMP/mac"
           gh release download "$TAG" --repo "$GITHUB_REPOSITORY"
           ls -la
-      - name: Revisar firma y notarización
+      - name: Revisar que los archivos coincidan
         run: |
           set -euo pipefail
           cd "$RUNNER_TEMP/mac"
-          hdiutil attach -nobrowse -readonly -mountpoint "$RUNNER_TEMP/m" Maven-Mac.dmg >/dev/null
-          trap 'hdiutil detach "$RUNNER_TEMP/m" >/dev/null || true' EXIT
-          codesign --verify --deep --strict "$RUNNER_TEMP/m/Maven.app"
-          codesign -dvv "$RUNNER_TEMP/m/Maven.app" 2>&1 | grep -q 'Authority=Developer ID Application: Alvaro Mejia'
-          xcrun stapler validate "$RUNNER_TEMP/m/Maven.app"
+          VERSION="${TAG#mac-v}"
+          grep -q "^version: $VERSION$" latest-mac.yml || { echo "latest-mac.yml no es de $VERSION"; exit 1; }
+          ESPERADO=$(awk '/- url: Maven-Mac.zip/{f=1} f && /sha512:/{print $2; exit}' latest-mac.yml)
+          REAL=$(openssl dgst -sha512 -binary Maven-Mac.zip | base64 -w0)
+          [ "$ESPERADO" = "$REAL" ] || { echo "el zip no coincide con latest-mac.yml"; exit 1; }
+          unzip -l Maven-Mac.zip | grep -q "Maven.app/Contents/_CodeSignature/CodeResources" || { echo "el zip no trae la app firmada"; exit 1; }
+          echo "ok: $VERSION"
       - name: Subir a Supabase (balde descargas)
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
