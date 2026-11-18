@@ -157,7 +157,9 @@ describe("los avisos del equipo (RPC propias, no los webhooks del Messenger)", (
   });
 
   it("los tres eventos van como null (lo que la base toma por defecto); menos, como lista", () => {
-    expect(eventosParaCrear([...EVENTOS_EQUIPO])).toBeNull();
+    expect(eventosParaCrear(["equipo.persona_entro", "equipo.persona_salio", "equipo.rol_cambio"])).toBeNull();
+    // El «ya subió» de los pedidos (18/11/2026) siempre va en la lista.
+    expect(eventosParaCrear([...EVENTOS_EQUIPO])).toEqual([...EVENTOS_EQUIPO]);
     expect(eventosParaCrear(["equipo.rol_cambio", "otro"])).toEqual(["equipo.rol_cambio"]);
   });
 

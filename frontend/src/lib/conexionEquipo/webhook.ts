@@ -18,7 +18,9 @@ import type { TranslationKey } from "@/lib/i18n";
 
 export const SCOPE_EQUIPO = "equipo:write";
 
-export const EVENTOS_EQUIPO = ["equipo.persona_entro", "equipo.persona_salio", "equipo.rol_cambio"] as const;
+export const EVENTOS_EQUIPO = ["equipo.persona_entro", "equipo.persona_salio", "equipo.rol_cambio", "contenido.pedido_subido"] as const;
+/** Los que la base toma por defecto si no se manda la lista (los del equipo). */
+const EVENTOS_POR_DEFECTO: readonly string[] = ["equipo.persona_entro", "equipo.persona_salio", "equipo.rol_cambio"];
 export type EventoEquipo = (typeof EVENTOS_EQUIPO)[number];
 /** El de «Enviar prueba»: solo aparece en las entregas. */
 export const EVENTO_PRUEBA = "webhook.test";
@@ -28,6 +30,7 @@ export const TEXTO_EVENTO: Record<EventoEquipo | typeof EVENTO_PRUEBA, Translati
   "equipo.persona_entro": "conexionEquipo.evento.persona_entro",
   "equipo.persona_salio": "conexionEquipo.evento.persona_salio",
   "equipo.rol_cambio": "conexionEquipo.evento.rol_cambio",
+  "contenido.pedido_subido": "conexionEquipo.evento.pedido_subido",
   "webhook.test": "conexionEquipo.evento.prueba",
 };
 
@@ -86,10 +89,18 @@ export function normalizarUrl(x: string): string | null {
   }
 }
 
-/** Los eventos para crear: null = los tres (lo que la base toma por defecto). */
+/** Los avisos que puede pedir una llave: «contenido.pedido_subido» solo si
+ *  también tiene contenido:write (la base lo vuelve a exigir). */
+export function eventosDeLaLlave(scopes: readonly string[]): EventoEquipo[] {
+  return EVENTOS_EQUIPO.filter((e) => e !== "contenido.pedido_subido" || scopes.includes("contenido:write"));
+}
+
+/** Los eventos para crear: null = los tres del equipo (lo que la base toma por
+ *  defecto). «contenido.pedido_subido» (18/11/2026) siempre va en la lista. */
 export function eventosParaCrear(elegidos: readonly string[]): string[] | null {
   const validos = EVENTOS_EQUIPO.filter((e) => elegidos.includes(e));
-  return validos.length === EVENTOS_EQUIPO.length ? null : validos;
+  const sonLosDeSiempre = validos.length === EVENTOS_POR_DEFECTO.length && validos.every((e) => EVENTOS_POR_DEFECTO.includes(e));
+  return sonLosDeSiempre ? null : validos;
 }
 
 // ── Cómo está ───────────────────────────────────────────────────────────────

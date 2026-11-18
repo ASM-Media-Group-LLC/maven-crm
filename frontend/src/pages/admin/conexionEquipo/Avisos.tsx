@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { useFormato } from "@/hooks/useFormato";
 import { useLanguage } from "@/hooks/useLanguage";
 import {
-  EVENTOS_EQUIPO, PRUEBA_CADA_MS, TEXTO_EVENTO, accionesDe, eventosParaCrear, llaveDelEquipo, normalizarUrl,
+  EVENTOS_EQUIPO, PRUEBA_CADA_MS, eventosDeLaLlave, TEXTO_EVENTO, accionesDe, eventosParaCrear, llaveDelEquipo, normalizarUrl,
   semaforoDe, textoDeLaEntrega, textoDelDetenido,
   type EntregaEquipo, type Semaforo, type WebhookEquipo,
 } from "@/lib/conexionEquipo/webhook";
@@ -67,7 +67,8 @@ function Alta({ llave, onCreado }: { llave: LlaveApi; onCreado: (secreto: string
   const { t } = useLanguage();
   const qc = useQueryClient();
   const [url, setUrl] = useState("");
-  const [eventos, setEventos] = useState<string[]>([...EVENTOS_EQUIPO]);
+  const posibles = eventosDeLaLlave(llave.scopes);
+  const [eventos, setEventos] = useState<string[]>(() => [...posibles]);
   const [creando, setCreando] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const href = normalizarUrl(url);
@@ -113,7 +114,7 @@ function Alta({ llave, onCreado }: { llave: LlaveApi; onCreado: (secreto: string
       </div>
       <fieldset className="flex flex-col gap-2">
         <legend className="mb-1.5 text-sm font-medium">{t("conexionEquipo.wh.alta.eventos")}</legend>
-        {EVENTOS_EQUIPO.map((e) => (
+        {posibles.map((e) => (
           <label key={e} className="flex cursor-pointer items-start gap-2.5 text-sm">
             <input type="checkbox" className="mt-0.5 h-4 w-4 accent-primary" checked={eventos.includes(e)} disabled={creando}
               onChange={() => alternar(e)} />
@@ -339,7 +340,7 @@ export function Avisos() {
 
   return (
     <Bloque id="avisos" icono={BellRing} titulo={t("conexionEquipo.avisos.titulo")} para={t("conexionEquipo.avisos.para")}>
-      <ul className="grid gap-2 md:grid-cols-3">
+      <ul className="grid gap-2 md:grid-cols-2">
         {EVENTOS_EQUIPO.map((e) => (
           <li key={e} className="flex min-w-0 flex-col gap-1 rounded-panel border border-border/50 bg-background/30 p-3">
             <code className="w-fit max-w-full truncate rounded-control bg-muted px-1.5 py-0.5 text-[11px]">{e}</code>
