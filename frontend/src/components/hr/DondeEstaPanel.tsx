@@ -7,6 +7,8 @@ import type { TranslationKey } from "@/lib/i18n";
 import { Button } from "@/components/ui/button";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { urlCaptura } from "@/hooks/useMonitorEventos";
 import { UserAvatar } from "@/components/UserAvatar";
 import { supabase } from "@/integrations/supabase/client";
 import { type FilaDondeEsta, separarPantalla, type Tono, tonoDe, useDondeEsta } from "@/hooks/useDondeEsta";
@@ -47,8 +49,6 @@ const PUNTO: Record<Tono, string> = {
   gris: "bg-muted-foreground/50",
 };
 
-// En el teléfono las fichas corren de lado (una sola fila); en computador se acomodan.
-const FILA_DE_FICHAS = "-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-0.5 [scrollbar-width:none] sm:flex-wrap sm:overflow-visible sm:pb-0";
 
 type Filtro = "enTurno" | "rojo" | "naranja" | "enCowork" | "gris";
 const FILTROS: { k: Filtro; label: TranslationKey; punto: string }[] = [
@@ -94,10 +94,53 @@ function useFotos(ids: string[]) {
   });
 }
 
+/** Su ÚLTIMO pantallazo y cámara de HOY, para quien no tiene uno de los últimos
+ *  minutos (Alvaro, 18/11/2026: «aquí debería estar viendo pantallazos de todo
+ *  el mundo»). Una consulta chica por persona (limit 1), cada minuto. */
+function useUltimasDelDia(ids: string[]) {
+  const clave = [...ids].sort().join(",");
+  return useQuery<Record<string, { pantallaUrl: string | null; camaraUrl: string | null; ultima: string }>>({
+    queryKey: ["presencia-ultimas", clave],
+    enabled: ids.length > 0,
+    staleTime: 50_000,
+    refetchInterval: 60_000,
+    queryFn: async () => {
+      const hoy = new Date().toLocaleDateString("en-CA", { timeZone: "America/Bogota" });
+      const desde = new Date(`${hoy}T00:00:00-05:00`).toISOString();
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const sinTipar = supabase as unknown as { from: (t: string) => any };
+      const una = async (id: string, tipo: "pantalla" | "camara") => {
+        const { data } = await sinTipar.from("monitor_capturas")
+          .select("path, nas_path, en_nas, created_at")
+          .eq("user_id", id).eq("tipo", tipo).gte("created_at", desde)
+          .order("created_at", { ascending: false }).limit(1);
+        const f = (data ?? [])[0] as { path: string | null; nas_path: string | null; en_nas: boolean; created_at: string } | undefined;
+        if (!f) return null;
+        const ruta = f.en_nas ? f.nas_path : f.path;
+        return { url: ruta ? await urlCaptura(ruta) : null, at: f.created_at };
+      };
+      const m: Record<string, { pantallaUrl: string | null; camaraUrl: string | null; ultima: string }> = {};
+      await Promise.all(ids.map(async (id) => {
+        const [p, c] = await Promise.all([una(id, "pantalla"), una(id, "camara")]);
+        if (!p && !c) return;
+        m[id] = { pantallaUrl: p?.url ?? null, camaraUrl: c?.url ?? null, ultima: [p?.at, c?.at].filter(Boolean).sort().pop()! };
+      }));
+      return m;
+    },
+  });
+}
+
+type FiltroSituacion = Filtro | "todos";
+const SITUACIONES: { k: FiltroSituacion; label: TranslationKey; punto: string }[] = [
+  { k: "todos", label: "hr.donde.filtro.all", punto: "" },
+  ...FILTROS,
+];
+
 export function DondeEstaPanel() {
   const { t } = useLanguage();
   const q = useDondeEsta();
-  const [filtro, setFiltro] = useState<Filtro>("enTurno");
+  // Entra viendo a TODOS (Alvaro, 18/11/2026); los menús solo achican.
+  const [filtro, setFiltro] = useState<FiltroSituacion>("todos");
   const [equipo, setEquipo] = useState<string | null>(null);
   // El buscador es un desplegable con todos, en orden alfabético (Alvaro,
   // 18/11/2026: «ahí debería haber un drop down con nombre alfabético»). Elegir
@@ -121,6 +164,9 @@ export function DondeEstaPanel() {
   // Su pantalla y su cámara de AHORA (últimos 12 min). Si no hay, la tarjeta lo dice.
   const vivo = useCapturasVivo();
   const enVivo = useMemo(() => new Map(vivo.personas.map((p) => [p.userId, p])), [vivo.personas]);
+  // …y, si no hay, la última de hoy (Alvaro, 18/11/2026: «pantallazos de todo el mundo»).
+  const sinVivo = useMemo(() => filas.filter((f) => !enVivo.get(f.user_id)?.pantallaUrl).map((f) => f.user_id), [filas, enVivo]);
+  const ultimas = useUltimasDelDia(sinVivo).data ?? {};
 
   // Los equipos, con cuánta gente tiene cada uno (el más grande primero).
   const equipos = useMemo(() => {
@@ -130,8 +176,8 @@ export function DondeEstaPanel() {
   }, [filas]);
   const delEquipo = useMemo(() => filas.filter((f) => !equipo || (f.equipo ?? "Otros") === equipo), [filas, equipo]);
   const conteo = useMemo(() => {
-    const c = { enTurno: 0, rojo: 0, naranja: 0, enCowork: 0, gris: 0 } as Record<Filtro, number>;
-    for (const f of delEquipo) for (const k of Object.keys(c) as Filtro[]) if (pasaFiltro(f, k)) c[k]++;
+    const c = { todos: 0, enTurno: 0, rojo: 0, naranja: 0, enCowork: 0, gris: 0 } as Record<FiltroSituacion, number>;
+    for (const f of delEquipo) for (const k of Object.keys(c) as FiltroSituacion[]) if (pasaFiltro(f, k)) c[k]++;
     return c;
   }, [delEquipo]);
   const vistas = useMemo(() => {
@@ -167,10 +213,6 @@ export function DondeEstaPanel() {
         : "",
     };
   };
-  // Con pantalla en vivo (últimos 12 min) arriba y en grande; el resto, abajo en lista.
-  const tienePantalla = (f: FilaDondeEsta) => tonoDe(f.estado) !== "gris" && !!enVivo.get(f.user_id)?.pantallaUrl;
-  const conPantalla = vistas.filter(tienePantalla);
-  const sinPantalla = vistas.filter((f) => !tienePantalla(f));
 
   if (q.isLoading) {
     return <div className="flex items-center justify-center py-16"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>;
@@ -188,11 +230,6 @@ export function DondeEstaPanel() {
   if (!filas.length) return <p className="vidrio p-6 text-sm text-muted-foreground">{t("hr.donde.vacio")}</p>;
 
   const enCoworkTotal = filas.filter((f) => pasaFiltro(f, "enCowork")).length;
-  const ficha = (activa: boolean) =>
-    `inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border px-2.5 py-1 text-xs font-medium transition-colors ${
-      activa ? "border-foreground/30 bg-foreground/10 text-foreground" : "border-border/40 bg-card/30 text-muted-foreground hover:bg-card/50"
-    }`;
-
   return (
     <section className="vidrio sube p-4 lg:p-5">
       <div className="v-cont flex flex-col gap-3">
@@ -280,31 +317,40 @@ export function DondeEstaPanel() {
           </div>
         </div>
 
-        {/* Por estado. */}
-        <div className={FILA_DE_FICHAS} role="group" aria-label={t("hr.donde.porEstado")}>
-          {FILTROS.map((x) => (
-            <button key={x.k} type="button" onClick={() => { setFiltro(x.k); setElegido(null); }} aria-pressed={!elegido && filtro === x.k} className={ficha(!elegido && filtro === x.k)}>
-              {x.punto && <span className={`h-1.5 w-1.5 rounded-full ${x.punto}`} />}
-              {t(x.label)}
-              <span className="tabular-nums opacity-70">{conteo[x.k]}</span>
-            </button>
-          ))}
+        {/* Situación y equipo en dos menús (Alvaro, 18/11/2026). */}
+        <div className="flex gap-2">
+          <Select value={elegido ? "" : filtro} onValueChange={(v) => { setFiltro(v as FiltroSituacion); setElegido(null); }}>
+            <SelectTrigger className="h-9 w-full text-sm sm:w-56" aria-label={t("hr.donde.porEstado")}>
+              <SelectValue placeholder={t("hr.donde.porEstado")} />
+            </SelectTrigger>
+            <SelectContent>
+              {SITUACIONES.map((x) => (
+                <SelectItem key={x.k} value={x.k}>
+                  <span className="flex items-center gap-2">
+                    {x.punto ? <span className={`h-1.5 w-1.5 rounded-full ${x.punto}`} /> : <span className="h-1.5 w-1.5" />}
+                    {t(x.label)}
+                    <span className="tabular-nums text-muted-foreground">{conteo[x.k]}</span>
+                  </span>
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          {equipos.length > 1 && (
+            <Select value={equipo ?? "__todos"} onValueChange={(v) => { setEquipo(v === "__todos" ? null : v); setElegido(null); }}>
+              <SelectTrigger className="h-9 w-full text-sm sm:w-56" aria-label={t("hr.donde.porEquipo")}>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__todos">{t("hr.donde.todosLosEquipos")}</SelectItem>
+                {equipos.map(([nombre, n]) => (
+                  <SelectItem key={nombre} value={nombre}>
+                    <span className="flex items-center gap-2">{nombre}<span className="tabular-nums text-muted-foreground">{n}</span></span>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
         </div>
-
-        {/* Por equipo. */}
-        {equipos.length > 1 && (
-          <div className={FILA_DE_FICHAS} role="group" aria-label={t("hr.donde.porEquipo")}>
-            <button type="button" onClick={() => { setEquipo(null); setElegido(null); }} aria-pressed={!elegido && !equipo} className={ficha(!elegido && !equipo)}>
-              {t("hr.donde.todosLosEquipos")}
-            </button>
-            {equipos.map(([nombre, n]) => (
-              <button key={nombre} type="button" onClick={() => { setEquipo(nombre); setElegido(null); }} aria-pressed={!elegido && equipo === nombre} className={ficha(!elegido && equipo === nombre)}>
-                {nombre}
-                <span className="tabular-nums opacity-70">{n}</span>
-              </button>
-            ))}
-          </div>
-        )}
 
         {vistas.length === 0 ? (
           <div className="flex flex-col items-center gap-2 py-10 text-center text-muted-foreground">
@@ -312,72 +358,53 @@ export function DondeEstaPanel() {
             <p className="text-sm">{t("hr.donde.nadie")}</p>
           </div>
         ) : (
-          <>
-            {/* Arriba, quien tiene pantalla en vivo: su pantalla en grande. */}
-            {conPantalla.length > 0 && (
-              <div className="flex flex-col gap-2.5 pt-1">
-                <Encabezado texto={t("hr.donde.enPantalla")} n={conPantalla.length} vivo />
-                <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
-                  {conPantalla.map((f) => {
-                    const d = datos(f);
-                    const vivoDe = enVivo.get(f.user_id)!;
-                    return (
-                      <li key={f.user_id}>
-                        <Link
-                          to={`/hr/expediente/${f.user_id}`}
-                          state={{ volverA: "/hr/monitor-ia?t=donde" }}
-                          title={[d.nombre, d.estado, d.pantalla].filter(Boolean).join(" · ")}
-                          className={`group flex h-full flex-col overflow-hidden rounded-2xl border bg-card/20 transition-colors hover:border-foreground/25 hover:bg-card/40 ${
-                            f.pantalla_fuera_de_lugar ? "border-destructive/40" : "border-border/40"
-                          }`}
-                        >
-                          {/* Su pantalla de ahora, con su cámara en la esquina. */}
-                          <div className="relative aspect-video w-full overflow-hidden bg-foreground/[0.04]">
-                            <img src={vivoDe.pantallaUrl!} alt="" loading="lazy" className="h-full w-full object-cover object-top" />
-                            {vivoDe.camaraUrl && (
-                              <img src={vivoDe.camaraUrl} alt="" loading="lazy" className="absolute right-2 top-2 h-12 w-16 rounded-lg object-cover ring-1 ring-black/40" />
-                            )}
-                            <span className="absolute left-2 top-2 rounded-full bg-black/60 px-2 py-0.5 text-[10px] font-medium tabular-nums text-white backdrop-blur">
-                              {horaBogota(vivoDe.ultima)}
-                            </span>
-                          </div>
-                          <Quien f={f} d={d} />
-                          <Detalles f={f} d={d} />
-                        </Link>
-                      </li>
-                    );
-                  })}
-                </ul>
-              </div>
-            )}
-
-            {/* Abajo, quien no tiene pantalla ahora: una lista compacta, lo urgente primero. */}
-            {sinPantalla.length > 0 && (
-              <div className={`flex flex-col gap-2.5 ${conPantalla.length > 0 ? "border-t border-border/30 pt-4" : "pt-1"}`}>
-                <Encabezado texto={t("hr.donde.sinPantallaTitulo")} n={sinPantalla.length} />
-                <ul className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
-                  {sinPantalla.map((f) => {
-                    const d = datos(f);
-                    return (
-                      <li key={f.user_id}>
-                        <Link
-                          to={`/hr/expediente/${f.user_id}`}
-                          state={{ volverA: "/hr/monitor-ia?t=donde" }}
-                          title={[d.nombre, d.estado, d.pantalla].filter(Boolean).join(" · ")}
-                          className={`flex h-full flex-col rounded-xl border border-border/40 bg-card/20 transition-colors hover:border-foreground/25 hover:bg-card/40 ${
-                            d.tono === "gris" ? "opacity-60" : ""
-                          }`}
-                        >
-                          <Quien f={f} d={d} />
-                          <Detalles f={f} d={d} />
-                        </Link>
-                      </li>
-                    );
-                  })}
-                </ul>
-              </div>
-            )}
-          </>
+          <ul className="grid grid-cols-1 gap-3 pt-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
+            {vistas.map((f) => {
+              const d = datos(f);
+              const v = enVivo.get(f.user_id);
+              const enVivoAhora = !!v?.pantallaUrl;
+              const u = enVivoAhora ? null : ultimas[f.user_id];
+              const pantallaUrl = enVivoAhora ? v!.pantallaUrl : u?.pantallaUrl ?? null;
+              const camaraUrl = enVivoAhora ? v!.camaraUrl : u?.camaraUrl ?? null;
+              const cuando = enVivoAhora ? v!.ultima : u?.ultima ?? null;
+              return (
+                <li key={f.user_id}>
+                  <Link
+                    to={`/hr/expediente/${f.user_id}`}
+                    state={{ volverA: "/hr/monitor-ia?t=donde" }}
+                    title={[d.nombre, d.estado, d.pantalla].filter(Boolean).join(" · ")}
+                    className={`group flex h-full flex-col overflow-hidden rounded-2xl border bg-card/20 transition-colors hover:border-foreground/25 hover:bg-card/40 ${
+                      f.pantalla_fuera_de_lugar && d.tono !== "gris" ? "border-destructive/40" : "border-border/40"
+                    }`}
+                  >
+                    {/* Su pantalla (de ahora o la última de hoy), con su cámara en la esquina. */}
+                    <div className="relative aspect-video w-full overflow-hidden bg-foreground/[0.04]">
+                      {pantallaUrl || camaraUrl ? (
+                        <img src={(pantallaUrl ?? camaraUrl)!} alt="" loading="lazy"
+                          className={`h-full w-full object-cover object-top ${enVivoAhora ? "" : "opacity-70 grayscale-[35%]"}`} />
+                      ) : (
+                        <div className="flex h-full w-full flex-col items-center justify-center gap-2 text-muted-foreground">
+                          <UserAvatar name={d.nombre} src={d.foto?.foto} seed={d.foto?.seed} size="lg" />
+                          <span className="text-[11px]">{t("hr.donde.sinPantallazos")}</span>
+                        </div>
+                      )}
+                      {pantallaUrl && camaraUrl && (
+                        <img src={camaraUrl} alt="" loading="lazy" className="absolute right-2 top-2 h-12 w-16 rounded-lg object-cover ring-1 ring-black/40" />
+                      )}
+                      {cuando && (
+                        <span className="absolute left-2 top-2 inline-flex items-center gap-1 rounded-full bg-black/60 px-2 py-0.5 text-[10px] font-medium tabular-nums text-white backdrop-blur">
+                          {enVivoAhora && <span className="h-1.5 w-1.5 rounded-full bg-success" aria-hidden />}
+                          {enVivoAhora ? horaBogota(cuando) : t("hr.donde.ultimaHace", { h: horaBogota(cuando), d: duracion(cuando) })}
+                        </span>
+                      )}
+                    </div>
+                    <Quien f={f} d={d} />
+                    <Detalles f={f} d={d} />
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
         )}
       </div>
     </section>
@@ -393,21 +420,6 @@ type Datos = {
   linea: string;
   fueraHoy: string;
 };
-
-function Encabezado({ texto, n, vivo }: { texto: string; n: number; vivo?: boolean }) {
-  return (
-    <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
-      {vivo && (
-        <span className="relative flex h-2 w-2" aria-hidden>
-          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-success opacity-60" />
-          <span className="relative inline-flex h-2 w-2 rounded-full bg-success" />
-        </span>
-      )}
-      <span>{texto}</span>
-      <span className="tabular-nums text-muted-foreground/70">{n}</span>
-    </div>
-  );
-}
 
 /** Su cara con el puntito del estado, su nombre y en qué anda. */
 function Quien({ f, d }: { f: FilaDondeEsta; d: Datos }) {

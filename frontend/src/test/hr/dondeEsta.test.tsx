@@ -76,26 +76,17 @@ describe("el tablero", () => {
     expect(within(filas[0]).getByRole("link")).toHaveAttribute("href", "/hr/expediente/u-Karem");
   });
 
-  it("por defecto solo quien está en turno; las fichas filtran por estado y por equipo", async () => {
+  it("entra viendo a TODOS, también fuera de turno (Alvaro, 18/11/2026)", async () => {
     respuesta = { error: null, data: [
       fila("Ana", "activo"),
       fila("Beto", "fuera_de_turno"),
       fila("Caro", "sin_pantalla", { equipo: "Freelance" }),
     ] };
     render(<DondeEstaPanel />, { wrapper: envolver });
-    expect(await screen.findAllByRole("listitem")).toHaveLength(2); // Beto, fuera de turno, no
-    fireEvent.click(screen.getByRole("button", { name: /hr\.donde\.filtro\.fueraTurno/ }));
-    expect(screen.getAllByRole("listitem")).toHaveLength(1);
-    expect(screen.getByRole("listitem")).toHaveTextContent("Beto");
-    fireEvent.click(screen.getByRole("button", { name: /hr\.donde\.filtro\.enTurno/ }));
-    fireEvent.click(screen.getByRole("button", { name: /^Freelance/ }));
-    expect(screen.getAllByRole("listitem")).toHaveLength(1);
-    expect(screen.getByRole("listitem")).toHaveTextContent("Caro");
+    expect(await screen.findAllByRole("listitem")).toHaveLength(3);
   });
 
-  it("arriba y en grande quien tiene pantalla en vivo; abajo, en lista, el resto", async () => {
-    // Alvaro, 18/11/2026: «me prometiste que iba a poder ver en vivo a cada
-    // empleado dónde está ahorita y su pantalla» — sin filas de cajas vacías.
+  it("cada uno con su pantalla: la de ahora si hay; si no, su cara y «sin pantallazos»", async () => {
     vivos = [{ userId: "u-Ana", pantallaUrl: "https://x/pantalla.jpg", camaraUrl: null, ultima: new Date().toISOString() }];
     respuesta = { error: null, data: [
       fila("Karem", "fuera_de_cowork"),
@@ -103,11 +94,10 @@ describe("el tablero", () => {
     ] };
     const { container } = render(<DondeEstaPanel />, { wrapper: envolver });
     const filas = await screen.findAllByRole("listitem");
-    expect(screen.getByText("hr.donde.enPantalla")).toBeInTheDocument();
-    expect(screen.getByText("hr.donde.sinPantallaTitulo")).toBeInTheDocument();
-    expect(filas[0]).toHaveTextContent("Ana");
-    expect(filas[0].querySelector("img[src='https://x/pantalla.jpg']")).not.toBeNull();
-    expect(filas[1]).toHaveTextContent("Karem");
+    const ana = filas.find((f) => f.textContent?.includes("Ana"))!;
+    const karem = filas.find((f) => f.textContent?.includes("Karem"))!;
+    expect(ana.querySelector("img[src='https://x/pantalla.jpg']")).not.toBeNull();
+    expect(within(karem).getByText("hr.donde.sinPantallazos")).toBeInTheDocument();
     expect(container.querySelectorAll("img[src='https://x/pantalla.jpg']")).toHaveLength(1);
     vivos = [];
   });

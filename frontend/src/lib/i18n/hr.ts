@@ -1064,6 +1064,7 @@ export const hr = {
   "hr.donde.sinPantallaTitulo": { es: "Sin pantalla ahora", en: "No screen right now" },
   "hr.donde.sub": { es: "Cada empleado ahora: si está en Cowork, qué tiene en pantalla según la última captura y cuántas veces se salió hoy. Se actualiza solo.", en: "Every employee right now: whether they're in Cowork, what's on their screen per the last capture and how many times they left today. Updates on its own." },
   "hr.donde.buscar": { es: "Buscar empleado", en: "Search employee" },
+  "hr.donde.ultimaHace": { es: "Última {h} · {d}", en: "Last {h} · {d}" },
   "hr.donde.escribeNombre": { es: "Escribe un nombre…", en: "Type a name…" },
   "hr.donde.nadieConEseNombre": { es: "Nadie con ese nombre.", en: "No one with that name." },
   "hr.donde.todosAZ": { es: "Todos, de la A a la Z · {n}", en: "Everyone, A to Z · {n}" },
