@@ -1651,17 +1651,37 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
   // sala y el anfitrión no podía moverlo. La edge valida que quien mueve es
   // anfitrión y que la sala es de esta sesión; a la persona le llega por
   // Realtime y su vista entra sola a la sala nueva.
+  //
+  // SALA FIJA (Alvaro, 18/11/2026): mover a alguien lo deja FIJO en esa sala:
+  // cada vez que abra Cowork entra ahí. Sirve también con quien no está
+  // conectado (queda fija y entra ahí la próxima vez).
   const [moviendo, setMoviendo] = useState<string | null>(null);
+  // Sala fija de cada persona (uid → room_id). null = no se pudo leer (o la
+  // tabla aún no existe): entonces no se muestra, sin inventar «sin sala fija».
+  const [salasFijas, setSalasFijas] = useState<Record<string, string> | null>(null);
+  const sesionDelTablero = cowork.session?.id;
+  const leerSalasFijas = useCallback(async () => {
+    if (!sesionDelTablero) return;
+    type LeeFijas = (tabla: "cowork_sala_fija") => {
+      select: (c: string) => { eq: (c: string, v: string) => PromiseLike<{ data: { user_id: string; room_id: string }[] | null; error: unknown }> };
+    };
+    const { data, error } = await (supabase.from as unknown as LeeFijas)("cowork_sala_fija")
+      .select("user_id, room_id").eq("session_id", sesionDelTablero);
+    if (error || !data) { setSalasFijas(null); return; }
+    setSalasFijas(Object.fromEntries(data.map((f) => [f.user_id, f.room_id])));
+  }, [sesionDelTablero]);
+  useEffect(() => { void leerSalasFijas(); }, [leerSalasFijas]);
   const moverASala = async (uid: string, roomId: string) => {
     if (moviendo) return;
     setMoviendo(uid);
     try {
       const r = await cowork.asignarSala(uid, roomId);
-      toast.success(t("cowork.host.movedToRoom", {
+      toast.success(t(r.soloFija ? "cowork.host.fixedRoomOffline" : "cowork.host.fixedRoom", {
         name: nombreYApellido(cowork.profiles[uid]) || t("cowork.common.someone"),
         room: r.roomName,
       }));
       void cowork.refetch(true);
+      void leerSalasFijas();
     } catch {
       toast.error(t("cowork.host.moveToRoomFailed"));
     } finally {
@@ -2383,6 +2403,60 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
               );
             })()}
           </section>
+
+          {/* SALA FIJA DE QUIEN NO ESTÁ CONECTADO (Alvaro, 18/11/2026): el
+              supervisor deja a cada persona del Cowork fija en su sala aunque
+              todavía no haya entrado; al abrir Cowork entra directo ahí. */}
+          {(() => {
+            const enSala = new Set(fichas.flatMap((f) => f.participants.map((a) => a.user_id)));
+            const sinConectar = cowork.memberships
+              .filter((m) => m.role !== "host" && !enSala.has(m.user_id))
+              .map((m) => ({ uid: m.user_id, nombre: nombreYApellido(cowork.profiles[m.user_id]) || t("cowork.common.someone") }))
+              .sort((a, b) => a.nombre.localeCompare(b.nombre));
+            if (sinConectar.length === 0 || cowork.rooms.length === 0) return null;
+            const nombreSala = (id: string | undefined) => cowork.rooms.find((r) => r.id === id)?.name;
+            return (
+              <section className="mx-3 my-3 space-y-2 rounded-2xl border border-border/60 bg-background/50 p-3">
+                <div className="flex items-center gap-2">
+                  <span className="grid h-6 w-6 place-items-center rounded-full bg-muted text-muted-foreground"><Pin className="h-3.5 w-3.5" /></span>
+                  <h3 className="text-xs font-semibold text-foreground">{t("cowork.host.notConnected")}</h3>
+                  <span className="ml-auto rounded-full bg-muted px-2 py-0.5 text-[10px] font-semibold tabular-nums text-muted-foreground">{sinConectar.length}</span>
+                </div>
+                {sinConectar.map((p) => {
+                  const fija = salasFijas?.[p.uid];
+                  return (
+                    <div key={p.uid} className="flex items-center gap-2 rounded-xl px-2 py-1.5 bg-muted/30">
+                      <UserAvatar name={cowork.profiles[p.uid]} src={cowork.avatares[p.uid]?.src} seed={cowork.avatares[p.uid]?.seed} size="sm" />
+                      <div className="min-w-0 flex-1">
+                        <span className="block truncate text-xs text-foreground/80">{p.nombre}</span>
+                        {salasFijas && (
+                          <span className="block truncate text-[10px] text-muted-foreground">
+                            {nombreSala(fija) ? t("cowork.host.fixedIn", { room: nombreSala(fija)! }) : t("cowork.host.noFixedRoom")}
+                          </span>
+                        )}
+                      </div>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="sm" disabled={moviendo === p.uid} className="h-7 shrink-0 gap-1 rounded-lg px-2 text-[11px] text-muted-foreground hover:text-foreground">
+                            {moviendo === p.uid ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ArrowRightLeft className="h-3.5 w-3.5" />}
+                            {t("cowork.host.setFixedRoom")}
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-52">
+                          {cowork.rooms.map((r) => (
+                            <DropdownMenuItem key={r.id} disabled={r.id === fija || !!moviendo} onClick={() => void moverASala(p.uid, r.id)}>
+                              {r.id === fija ? <Check className="mr-2 h-4 w-4 text-primary" /> : <span className="mr-2 h-4 w-4" />}
+                              <span className="truncate">{r.name}</span>
+                            </DropdownMenuItem>
+                          ))}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
+                  );
+                })}
+              </section>
+            );
+          })()}
         </ScrollArea>
       </div>
 

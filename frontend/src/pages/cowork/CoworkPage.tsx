@@ -268,7 +268,9 @@ export default function CoworkPage() {
     try {
       const res = await cowork.joinByCode(code);
       setRoomCode("");
-      setSearchParams({ session: res.sessionId, room: res.roomId });
+      // Sin `room`: el código ya la dejó en su sala (y fija). Un `room` que se
+      // quedara en la URL la devolvería ahí si luego el supervisor la mueve.
+      setSearchParams({ session: res.sessionId });
     } catch (e: any) {
       toast.error(e.message || t("cowork.common.codeError"));
     } finally {
@@ -324,14 +326,32 @@ export default function CoworkPage() {
       role, code, roomId,
       membresia: cowork.myMembership ? { role: cowork.myMembership.role } : null,
       tieneAsignacion: !!cowork.myAssignment,
+      salaActual: cowork.myAssignment?.room_id ?? null,
     });
-    if (decision === "nada") return;
+    // El enlace de sala se atiende UNA vez y se quita de la URL (sala fija,
+    // 18/11/2026): si se quedara, cuando el supervisor la mueva de sala este
+    // efecto la devolvería a la del enlace.
+    const soltarSalaDelEnlace = () => {
+      if (!roomId || cowork.myMembership?.role === "host") return;
+      const resto = new URLSearchParams(searchParams);
+      resto.delete("room");
+      setSearchParams(resto, { replace: true });
+    };
+    if (decision === "nada") {
+      if (roomId && cowork.myMembership && cowork.myAssignment) soltarSalaDelEnlace();
+      return;
+    }
 
     setAutoJoining(true);
     const doJoin = async () => {
       try {
         if (decision === "unirse-como-host") {
           await cowork.joinSession(sessionId, "host", code ?? undefined);
+        } else if (decision === "mover-de-sala" && roomId) {
+          // SALA FIJA (Alvaro, 18/11/2026): el enlace que dio el supervisor la
+          // mueve aunque ya tenga sala, y la deja fija ahí.
+          const res = await cowork.joinSession(sessionId, "participant", undefined, roomId, { porEnlace: true }) as { roomName?: string };
+          if (res?.roomName) toast.success(t("cowork.participant.salaFijaDelEnlace", { room: res.roomName }));
         } else if (roomId) {
           // El link (`?room=`) es la orden del coordinador: es LA sala a la que
           // quiere mandar a la persona, así que MANDA. Tu última sala solo se usa
@@ -340,8 +360,10 @@ export default function CoworkPage() {
           // COORDINADORES ignorando el link de Chatters. Para mover a propósito
           // está el código de 6 caracteres (joinByCode).
           const ultimaSala = await cowork.getMyLastRoomId(sessionId);
-          await cowork.joinSession(sessionId, "participant", undefined, salaParaAutoUnir(roomId, ultimaSala));
+          const sala = salaParaAutoUnir(roomId, ultimaSala);
+          await cowork.joinSession(sessionId, "participant", undefined, sala, { porEnlace: sala === roomId });
         }
+        soltarSalaDelEnlace();
         // Silenciosa: sin ruedita ni desmontar la vista (17/11/2026).
         cowork.refetch(true);
       } catch (e) {
