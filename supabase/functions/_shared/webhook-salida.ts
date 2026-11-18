@@ -73,7 +73,16 @@ export type UrlDeWebhook =
 const HOST_VALIDO = /^([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]([a-z0-9-]{0,61}[a-z0-9])?$/;
 const IPV4_LITERAL = /^\d{1,3}(\.\d{1,3}){3}$/;
 
+/** Nombres EXACTOS de integradores que viven bajo un sufijo nuestro pero no son
+ *  Maven (18/11/2026): grupo.kashagency.me es el servidor de Backstage, en Vercel
+ *  (CNAME cname.vercel-dns.com), y ahí recibe el aviso contenido.pedido_subido.
+ *  Solo el nombre exacto, nada más debajo de kashagency.me; y el envío igual
+ *  revisa cada IP (IPS_PROPIAS y rangos privados), así que si un día ese nombre
+ *  apuntara a un servidor nuestro, el aviso no sale. */
+export const HOSTS_DE_INTEGRADORES: readonly string[] = ["grupo.kashagency.me"];
+
 export function esHostProhibido(host: string): boolean {
+  if (HOSTS_DE_INTEGRADORES.includes(host)) return false;
   return SUFIJOS_PROHIBIDOS.some((s) => host === s || host.endsWith("." + s));
 }
 
