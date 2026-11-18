@@ -252,7 +252,22 @@ export function recargaConLlamada(): { sala: string; hace_s: number; nav: string
 // pero no QUÉ la trabó. Chrome avisa de cada cuadro lento (long-animation-frame)
 // y de qué código lo ocupó. Cada minuto se anota el código que más tiempo tomó
 // (archivo y función), para atacar al culpable con nombre propio.
-export interface Traba { ms: number; quien: string }
+export interface Traba {
+  ms: number;
+  quien: string;
+  /** 17/11/2026: el script más largo de ese culpable en el minuto (ms)… */
+  max?: number;
+  /** …y DÓNDE empieza: archivo con su huella de versión y posición en el
+   *  archivo. Con los mapas de fuente de esa versión
+   *  (scripts/mapas-de-produccion.sh) da la función exacta de nuestro código. */
+  donde?: string;
+}
+
+function dondeEmpieza(guion: { sourceURL?: string; sourceCharPosition?: number }): string | undefined {
+  const archivo = (guion.sourceURL || "").split("/").pop();
+  if (!archivo || typeof guion.sourceCharPosition !== "number" || guion.sourceCharPosition < 0) return undefined;
+  return `${archivo}@${guion.sourceCharPosition}`.slice(0, 120);
+}
 
 export function quienTraba(guion: { sourceURL?: string; sourceFunctionName?: string; invoker?: string }): string {
   const archivo = (guion.sourceURL || "").split("/").pop()?.replace(/-[\w-]{8}\.js$/, ".js") || "?";
@@ -262,16 +277,19 @@ export function quienTraba(guion: { sourceURL?: string; sourceFunctionName?: str
 
 export function medirTrabas(): { leer: () => Traba[]; parar: () => void } {
   const suma = new Map<string, number>();
+  const peor = new Map<string, { ms: number; donde?: string }>();
   let obs: PerformanceObserver | null = null;
   try {
     if (PerformanceObserver.supportedEntryTypes?.includes("long-animation-frame")) {
       obs = new PerformanceObserver((lista) => {
-        for (const cuadro of lista.getEntries() as Array<PerformanceEntry & { scripts?: Array<{ duration: number; sourceURL?: string; sourceFunctionName?: string; invoker?: string }> }>) {
+        for (const cuadro of lista.getEntries() as Array<PerformanceEntry & { scripts?: Array<{ duration: number; sourceURL?: string; sourceFunctionName?: string; invoker?: string; sourceCharPosition?: number }> }>) {
           if (cuadro.duration < 100) continue;
           for (const g of cuadro.scripts ?? []) {
             if (g.duration < 30) continue;
             const k = quienTraba(g);
             suma.set(k, (suma.get(k) ?? 0) + g.duration);
+            const antes = peor.get(k);
+            if (!antes || g.duration > antes.ms) peor.set(k, { ms: g.duration, donde: dondeEmpieza(g) });
           }
         }
       });
@@ -280,8 +298,12 @@ export function medirTrabas(): { leer: () => Traba[]; parar: () => void } {
   } catch { obs = null; }
   return {
     leer: () => {
-      const top = [...suma.entries()].sort((a, b) => b[1] - a[1]).slice(0, 3).map(([quien, ms]) => ({ quien, ms: Math.round(ms) }));
+      const top = [...suma.entries()].sort((a, b) => b[1] - a[1]).slice(0, 3).map(([quien, ms]): Traba => {
+        const p = peor.get(quien);
+        return { quien, ms: Math.round(ms), ...(p ? { max: Math.round(p.ms) } : {}), ...(p?.donde ? { donde: p.donde } : {}) };
+      });
       suma.clear();
+      peor.clear();
       return top;
     },
     parar: () => { try { obs?.disconnect(); } catch { /* noop */ } },
