@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
-import { useLocation } from "react-router-dom";
-import { Download, ExternalLink, MonitorDown, X } from "lucide-react";
+import { Link, useLocation } from "react-router-dom";
+import { CircleHelp, Download, ExternalLink, MonitorDown, X } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { useLanguage } from "@/hooks/useLanguage";
@@ -9,6 +9,7 @@ import { useFormato } from "@/hooks/useFormato";
 import { escritorio } from "@/lib/escritorio";
 import { enlaceDeApp } from "@/lib/abrirEnApp";
 import { descargaParaEsteEquipo, estadoSoloApp, type EstadoSoloApp } from "@/lib/coworkSoloApp";
+import { RUTA_GUIA_APP } from "@/lib/guiaApp";
 
 // Ver lib/coworkSoloApp.ts. Aviso (antes de la fecha) o pantalla de «Cowork se
 // abre en la app» (desde la fecha). Si la fecha no se puede leer, no se bloquea.
@@ -76,6 +77,8 @@ function AvisoSoloAppEnCowork() {
       <div className="flex flex-wrap gap-2">
         <Button asChild size="sm"><a href={descarga}><Download className="mr-1.5 h-3.5 w-3.5" />{t("cowork.soloApp.descargar")}</a></Button>
         <Button asChild size="sm" variant="outline"><a href={app}><ExternalLink className="mr-1.5 h-3.5 w-3.5" />{t("cowork.soloApp.abrir")}</a></Button>
+        {/* La guía paso a paso (/app): descargar, instalar, entrar, permisos. */}
+        <Button asChild size="sm" variant="ghost"><Link to={RUTA_GUIA_APP}><CircleHelp className="mr-1.5 h-3.5 w-3.5" />{t("cowork.soloApp.comoSeInstala")}</Link></Button>
       </div>
       <button type="button" onClick={cerrar} aria-label={t("cowork.soloApp.cerrar")} className="rounded-md p-1 text-muted-foreground hover:bg-muted hover:text-foreground">
         <X className="h-4 w-4" />
@@ -97,6 +100,10 @@ export function BloqueoSoloApp() {
         <Button asChild><a href={app}><ExternalLink className="mr-1.5 h-4 w-4" />{t("cowork.soloApp.abrir")}</a></Button>
         <Button asChild variant="outline"><a href={descarga}><Download className="mr-1.5 h-4 w-4" />{t("cowork.soloApp.descargar")}</a></Button>
       </div>
+      {/* /app se puede abrir aunque Cowork sea obligatorio (rutaLibreDeCowork). */}
+      <Link to={RUTA_GUIA_APP} className="inline-flex items-center gap-1.5 text-sm font-medium text-primary underline-offset-2 hover:underline">
+        <CircleHelp className="h-4 w-4" />{t("cowork.soloApp.comoSeInstala")}
+      </Link>
       <p className="max-w-md text-xs text-muted-foreground">{t("cowork.soloApp.celular")}</p>
     </div>
   );

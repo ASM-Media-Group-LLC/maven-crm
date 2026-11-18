@@ -20,6 +20,8 @@ export const navegacion = {
   "nav.contacts": { es: "Contactos", en: "Contacts" },
   // Guía de conexión (/conexion, 17/11/2026): para todos, sin permiso de módulo.
   "nav.connectionGuide": { es: "Guía de conexión", en: "Connection guide" },
+  // Guía para instalar la app de Maven (/app, 18/11/2026): para todos.
+  "nav.appGuide": { es: "Instalar la app", en: "Install the app" },
   "nav.creators": { es: "Creadores", en: "Creators" },
   "nav.creatorSales": { es: "Ventas de Creadores", en: "Creator Sales" },
   "nav.salesReport": { es: "Reporte de Ventas", en: "Sales Report" },

@@ -19,6 +19,7 @@ import BancoConexionEquipo from "./bancoConexionEquipo";
 import BancoCostos from "./bancoCostos";
 import BancoGracia from "./bancoGracia";
 import BancoGuiaConexion from "./bancoGuiaConexion";
+import { BancoGuiaApp, BancoAppDelEquipo } from "./bancoGuiaApp";
 import BancoFondo from "./bancoFondo";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import VirtualOfficePage from "@/pages/oficina-ai/VirtualOfficePage";
@@ -88,8 +89,19 @@ void cargarIdioma(idiomaInicial()).finally(() => raiz.render(
   // /harness.html?ver=costos[&tema=claro] → el tablero de gasto de Costos con los números del 14/11.
   // /harness.html?ver=gracia[&tema=claro] → los minutos de gracia (Cowork + Expediente).
   // /harness.html?ver=guia-conexion[&estado=bien|justo|malo|error…][&tema=claro] → la Guía de conexión.
+  // /harness.html?ver=guia-app[&sistema=mac][&en=app|celular] · ?ver=app-equipo → la app de Maven (18/11).
   ver === "fondo" ? (
     <BancoFondo />
+  ) :
+  ver === "guia-app" ? (
+    <StrictMode>
+      <LanguageProvider><BancoGuiaApp sistema={params.get("sistema") ?? "windows"} en={params.get("en") ?? ""} /></LanguageProvider>
+    </StrictMode>
+  ) :
+  ver === "app-equipo" ? (
+    <StrictMode>
+      <LanguageProvider><BancoAppDelEquipo /></LanguageProvider>
+    </StrictMode>
   ) :
   ver === "guia-conexion" ? (
     <StrictMode>

@@ -1,5 +1,5 @@
 import {
-  Activity, AlertTriangle, BarChart3, Bell, BookOpen, Bot, Briefcase, Calculator, CalendarDays, CalendarRange, ChevronRight, Clapperboard, ClipboardCheck, Clock, DollarSign, Eye, FileSpreadsheet, FileText, Gauge, Gift, GraduationCap, HardDrive, Headphones, Home, Inbox, LayoutDashboard, Mail, Map, Megaphone, MessageCircle, Moon, Palette, Phone, Presentation, RefreshCw, Rocket, Search, Settings, Shield, Smartphone, Sun, Ticket, UserCheck, UserCog, UserPlus, Users, Users2, Video, Wallet, Wifi,
+  Activity, AlertTriangle, BarChart3, Bell, BookOpen, Bot, Briefcase, Calculator, CalendarDays, CalendarRange, ChevronRight, Clapperboard, ClipboardCheck, Clock, DollarSign, Eye, FileSpreadsheet, FileText, Gauge, Gift, GraduationCap, HardDrive, Headphones, Home, Inbox, LayoutDashboard, Mail, Map, Megaphone, MessageCircle, Moon, Palette, Phone, Presentation, RefreshCw, Rocket, Search, Settings, Shield, Smartphone, Sun, Ticket, UserCheck, UserCog, UserPlus, Users, Users2, Video, Wallet, Wifi, MonitorDown,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useIncidentesSalud } from "@/hooks/useIncidentesSalud";
@@ -14,6 +14,7 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import { NavLink } from "@/components/NavLink";
 import { precargarRuta, precargarEnOcio } from "@/lib/prefetchRutas";
 import { RUTA_GUIA_CONEXION } from "@/lib/guiaConexion";
+import { RUTA_GUIA_APP } from "@/lib/guiaApp";
 import Logo from "@/components/Logo";
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from "@/components/ui/collapsible";
 import {
@@ -112,6 +113,9 @@ const DashboardSidebar = () => {
     // Guía de conexión (Alvaro, 17/11/2026): la gente se cae de las llamadas por
     // el Wi-Fi; aquí prueba su internet y ve qué hacer. Para todos.
     { title: t("nav.connectionGuide"), url: RUTA_GUIA_CONEXION, icon: Wifi },
+    // Instalar la app (Alvaro, 18/11/2026): desde el 20/11 Cowork en el
+    // computador va solo en la app; la guía paso a paso, para todos.
+    { title: t("nav.appGuide"), url: RUTA_GUIA_APP, icon: MonitorDown },
   ];
   const mainMenu = mainMenuAll.filter((item) => !item.module || canAccess(item.module, item.submodule));
 
