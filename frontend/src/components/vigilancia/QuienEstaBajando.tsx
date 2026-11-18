@@ -157,7 +157,7 @@ export function QuienEstaBajandoVista({ filas, cargando, error, onReintentar, on
           <p className="text-sm text-muted-foreground">{t("vigilancia.quien.nadie")}</p>
         ) : (
           <>
-            <div className="grid gap-2.5 lg:grid-cols-2 2xl:grid-cols-3">
+            <div className="flex flex-col gap-2.5">
               {mostradas.map((f) => <FilaBajandoPulida key={f.userId} f={f} t={t} onAbrir={() => onAbrir(f)} />)}
             </div>
             {filas.length > VISIBLES && (

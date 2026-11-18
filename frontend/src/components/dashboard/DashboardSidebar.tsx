@@ -596,82 +596,11 @@ const DashboardSidebar = () => {
           </SidebarMenu>
         )}
 
-        {operationsMenu.length > 0 && (
-        <CollapsibleSidebarGroup
-          label={t("sidebar.operations")}
-          storageKey="operations"
-          icon={Briefcase}
-          active={isOperationsActive}
-          collapsedItems={operationsCollapsedItems}
-        >
-            <SidebarMenu>
-              {/* Ítems fuera de todo subgrupo (red de seguridad del mapa de arriba). */}
-              {opsSueltos.map((item) => (
-                <SidebarMenuItem key={item.url}>
-                  <SidebarMenuButton asChild tooltip={item.title}>
-                    <NavLink to={item.url} className={cn(LINK_CLASS, item.url === operationsActiveUrl && ACTIVE_CLASS)} onMouseEnter={() => precargarRuta(item.url)} onFocus={() => precargarRuta(item.url)}>
-                      <item.icon className="h-4 w-4 shrink-0" />
-                      <span>{item.title}</span>
-                      {"badge" in item && item.badge != null && (
-                        <span className={`ml-auto inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 text-[10px] font-semibold ${badgeTint(item.module)}`}>
-                          {compactBadge(item.badge)}
-                        </span>
-                      )}
-                    </NavLink>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
-              {opsGrupos.map((group) => {
-                const isGroupActive = group.items.some((i) => pathname === i.url || pathname.startsWith(i.url + "/"));
-                // Con el subgrupo CERRADO, la suma de sus avisos se asoma en el
-                // título (y se esconde al abrirlo: ahí ya se ven los de cada
-                // ítem) — plegar no puede significar perder los pendientes.
-                const avisos = group.items.reduce((acc, i) => acc + (i.badge ?? 0), 0);
-                return (
-                  <Collapsible key={group.key} defaultOpen={isGroupActive}>
-                    <SidebarMenuItem>
-                      <CollapsibleTrigger asChild>
-                        <SidebarMenuButton tooltip={group.label} className="group/ops sidebar-glass-hover">
-                          <group.icon className="h-4 w-4 shrink-0" />
-                          <span className="truncate">{group.label}</span>
-                          <span className="ml-auto flex shrink-0 items-center gap-1">
-                            {avisos > 0 && (
-                              <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-primary/15 px-1.5 text-[10px] font-semibold text-primary group-data-[state=open]/ops:hidden">
-                                {compactBadge(avisos)}
-                              </span>
-                            )}
-                            <ChevronRight className="h-4 w-4 shrink-0 transition-transform duration-200 group-data-[state=open]/ops:rotate-90" />
-                          </span>
-                        </SidebarMenuButton>
-                      </CollapsibleTrigger>
-                      <CollapsibleContent>
-                        <SidebarMenuSub>
-                          {group.items.map((item) => (
-                            <SidebarMenuSubItem key={item.url}>
-                              <SidebarMenuSubButton asChild isActive={item.url === operationsActiveUrl} className="sidebar-glass-hover data-[active=true]:sidebar-glass-active">
-                                <NavLink to={item.url} onMouseEnter={() => precargarRuta(item.url)} onFocus={() => precargarRuta(item.url)}>
-                                  <span className="truncate">{item.title}</span>
-                                  {"badge" in item && item.badge != null && (
-                                    <span className={`ml-auto inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 text-[10px] font-semibold ${badgeTint(item.module)}`}>
-                                      {compactBadge(item.badge)}
-                                    </span>
-                                  )}
-                                </NavLink>
-                              </SidebarMenuSubButton>
-                            </SidebarMenuSubItem>
-                          ))}
-                        </SidebarMenuSub>
-                      </CollapsibleContent>
-                    </SidebarMenuItem>
-                  </Collapsible>
-                );
-              })}
-            </SidebarMenu>
-        </CollapsibleSidebarGroup>
-        )}
-
         {/* ── Finanzas ────────────────────────────────────────────── */}
-        {canAccess("Finanzas") && (() => {
+        {/* Finanzas y Recursos Humanos fuera del menú del dueño (Alvaro, 18/11/2026:
+            «no lo quiero ver acá»). Las páginas siguen abiertas por su dirección y el
+            resto del equipo las sigue viendo según su permiso. */}
+        {canAccess("Finanzas") && esDueno !== true && (() => {
           type FinItem = { title: string; url: string; submodule: string };
           type FinGroup = { label: string; icon: typeof Wallet; key: string; items: FinItem[] };
 
@@ -834,7 +763,7 @@ const DashboardSidebar = () => {
           );
         })()}
 
-        {canAccess("HR") && (
+        {canAccess("HR") && esDueno !== true && (
         <CollapsibleSidebarGroup
           label="Recursos Humanos"
           storageKey="rrhh"
@@ -964,6 +893,82 @@ const DashboardSidebar = () => {
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               ))}
+            </SidebarMenu>
+        </CollapsibleSidebarGroup>
+        )}
+
+        {/* Operaciones, la última (Alvaro, 18/11/2026: «Menú, Argos, Office y de
+            último Operations»). */}
+        {operationsMenu.length > 0 && (
+        <CollapsibleSidebarGroup
+          label={t("sidebar.operations")}
+          storageKey="operations"
+          icon={Briefcase}
+          active={isOperationsActive}
+          collapsedItems={operationsCollapsedItems}
+        >
+            <SidebarMenu>
+              {/* Ítems fuera de todo subgrupo (red de seguridad del mapa de arriba). */}
+              {opsSueltos.map((item) => (
+                <SidebarMenuItem key={item.url}>
+                  <SidebarMenuButton asChild tooltip={item.title}>
+                    <NavLink to={item.url} className={cn(LINK_CLASS, item.url === operationsActiveUrl && ACTIVE_CLASS)} onMouseEnter={() => precargarRuta(item.url)} onFocus={() => precargarRuta(item.url)}>
+                      <item.icon className="h-4 w-4 shrink-0" />
+                      <span>{item.title}</span>
+                      {"badge" in item && item.badge != null && (
+                        <span className={`ml-auto inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 text-[10px] font-semibold ${badgeTint(item.module)}`}>
+                          {compactBadge(item.badge)}
+                        </span>
+                      )}
+                    </NavLink>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
+              {opsGrupos.map((group) => {
+                const isGroupActive = group.items.some((i) => pathname === i.url || pathname.startsWith(i.url + "/"));
+                // Con el subgrupo CERRADO, la suma de sus avisos se asoma en el
+                // título (y se esconde al abrirlo: ahí ya se ven los de cada
+                // ítem) — plegar no puede significar perder los pendientes.
+                const avisos = group.items.reduce((acc, i) => acc + (i.badge ?? 0), 0);
+                return (
+                  <Collapsible key={group.key} defaultOpen={isGroupActive}>
+                    <SidebarMenuItem>
+                      <CollapsibleTrigger asChild>
+                        <SidebarMenuButton tooltip={group.label} className="group/ops sidebar-glass-hover">
+                          <group.icon className="h-4 w-4 shrink-0" />
+                          <span className="truncate">{group.label}</span>
+                          <span className="ml-auto flex shrink-0 items-center gap-1">
+                            {avisos > 0 && (
+                              <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-primary/15 px-1.5 text-[10px] font-semibold text-primary group-data-[state=open]/ops:hidden">
+                                {compactBadge(avisos)}
+                              </span>
+                            )}
+                            <ChevronRight className="h-4 w-4 shrink-0 transition-transform duration-200 group-data-[state=open]/ops:rotate-90" />
+                          </span>
+                        </SidebarMenuButton>
+                      </CollapsibleTrigger>
+                      <CollapsibleContent>
+                        <SidebarMenuSub>
+                          {group.items.map((item) => (
+                            <SidebarMenuSubItem key={item.url}>
+                              <SidebarMenuSubButton asChild isActive={item.url === operationsActiveUrl} className="sidebar-glass-hover data-[active=true]:sidebar-glass-active">
+                                <NavLink to={item.url} onMouseEnter={() => precargarRuta(item.url)} onFocus={() => precargarRuta(item.url)}>
+                                  <span className="truncate">{item.title}</span>
+                                  {"badge" in item && item.badge != null && (
+                                    <span className={`ml-auto inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 text-[10px] font-semibold ${badgeTint(item.module)}`}>
+                                      {compactBadge(item.badge)}
+                                    </span>
+                                  )}
+                                </NavLink>
+                              </SidebarMenuSubButton>
+                            </SidebarMenuSubItem>
+                          ))}
+                        </SidebarMenuSub>
+                      </CollapsibleContent>
+                    </SidebarMenuItem>
+                  </Collapsible>
+                );
+              })}
             </SidebarMenu>
         </CollapsibleSidebarGroup>
         )}
