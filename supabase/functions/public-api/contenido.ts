@@ -16,6 +16,7 @@
 
 import type { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { ahoraMas, firmar, VENCE } from "../_shared/drive-firma.ts";
+import { servirPedidos } from "./pedidos.ts";
 import {
   CARPETA_PERSONALIZADOS, estadoPublico, nombreDelDia, type FilaDeSubida, leerPedidoDeSubida, respuestaDeSubida,
   rutaDeContenido, rutaEnElBalde,
@@ -39,6 +40,8 @@ export interface ContextoDeContenido {
   llaveNombre: string;
   metodo: string;
   ruta: string[];
+  /** La query del pedido (GET /contenido/pedidos?cambiados_desde=…). */
+  consulta: URLSearchParams;
   cuerpo: Record<string, unknown> | null;
   idempotencia: string | null;
   supabaseUrl: string;
@@ -102,7 +105,8 @@ async function linkDeDescarga(ctx: ContextoDeContenido, itemId: string): Promise
 export async function servirContenido(ctx: ContextoDeContenido): Promise<RespuestaDeContenido> {
   const r = rutaDeContenido(ctx.metodo, ctx.ruta);
   if (!r.ok && r.estado === 405) return { ...error(405, "method_not_allowed", `Método no permitido. Usa: ${r.permitidos!.join(", ")}`), permitidos: r.permitidos };
-  if (!r.ok) return error(404, "not_found", "Ruta no encontrada. Rutas: POST /contenido/subidas, POST /contenido/subidas/{id}/listo, GET /contenido/subidas/{id}");
+  if (!r.ok) return error(404, "not_found", "Ruta no encontrada. Rutas: POST /contenido/subidas, POST /contenido/subidas/{id}/listo, GET /contenido/subidas/{id}, POST /contenido/pedidos, GET /contenido/pedidos, GET /contenido/pedidos/{id}");
+  if (r.accion === "pedido_crear" || r.accion === "pedido_lista" || r.accion === "pedido_ver") return await servirPedidos(ctx, r.accion, r.id);
 
   // ── Crear ────────────────────────────────────────────────────────────────
   if (r.accion === "crear") {

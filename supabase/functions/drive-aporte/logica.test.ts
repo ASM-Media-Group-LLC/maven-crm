@@ -4,6 +4,7 @@ import { esTipoParaCompartir, filaDeBitacora, type Hijo, nombreDeLink, nombreDel
 Deno.test("cada link deja lo suyo: los viejos y los de invitado solo suben, nunca ven", () => {
   assertEquals(permisosDe("personal"), { subir: true, ver: true, compartir: true });
   assertEquals(permisosDe("subir"), { subir: true, ver: false, compartir: false });
+  assertEquals(permisosDe("pedido"), { subir: true, ver: true, compartir: false });
   assertEquals(permisosDe("invitado"), { subir: true, ver: false, compartir: false });
   assertEquals(permisosDe("ver"), { subir: false, ver: true, compartir: false });
   assertEquals(permisosDe("cualquier-cosa"), { subir: false, ver: false, compartir: false });

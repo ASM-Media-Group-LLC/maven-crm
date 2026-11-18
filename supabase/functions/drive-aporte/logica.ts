@@ -6,7 +6,7 @@
 /** La subcarpeta donde el equipo le deja cosas a la creadora. */
 export const NOMBRE_DEL_EQUIPO = "Del equipo";
 
-export type TipoDeLink = "subir" | "personal" | "invitado" | "ver";
+export type TipoDeLink = "subir" | "personal" | "invitado" | "ver" | "pedido";
 
 export interface Permisos {
   /** Puede subir archivos (a la carpeta del día). */
@@ -24,6 +24,9 @@ export function permisosDe(tipo: string | null | undefined): Permisos {
     case "subir":
     case "invitado": return { subir: true, ver: false, compartir: false };
     case "ver": return { subir: false, ver: true, compartir: false };
+    // El link de UN pedido de personalizado (Backstage, 18/11/2026): la modelo
+    // sube a la carpeta del pedido y ve lo que ya subió ahí. Nada más.
+    case "pedido": return { subir: true, ver: true, compartir: false };
     default: return { subir: false, ver: false, compartir: false };
   }
 }

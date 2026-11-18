@@ -492,6 +492,18 @@ export const oficina = {
   // Pestaña de ACTIVIDAD del Drive (estilo Google) — quién hizo qué y cuándo.
   // Página PÚBLICA de subida por link (drive-aporte).
   "drive.aportar.titulo": { es: "Subir contenido", en: "Upload content" },
+  "drive.pedido.titulo": { es: "Pedido {r}", en: "Request {r}" },
+  "drive.pedido.hola": { es: "Hola, {n}: tienes un pedido personalizado", en: "Hi {n}: you have a custom request" },
+  "drive.pedido.queGrabar": { es: "Qué tienes que grabar", en: "What to record" },
+  "drive.pedido.fechaLimite": { es: "Entrégalo antes del {f}", en: "Deliver it before {f}" },
+  "drive.pedido.duracion": { es: "Duración o cantidad: {d}", en: "Length or amount: {d}" },
+  "drive.pedido.tipo.foto": { es: "Foto", en: "Photo" },
+  "drive.pedido.tipo.video": { es: "Video", en: "Video" },
+  "drive.pedido.tipo.audio": { es: "Audio", en: "Audio" },
+  "drive.pedido.subeAqui": { es: "Sube aquí lo que grabaste para este pedido", en: "Upload what you recorded for this request here" },
+  "drive.pedido.loQueSubiste": { es: "Lo que ya subiste", en: "What you already uploaded" },
+  "drive.pedido.cancelado": { es: "Este pedido se canceló. No tienes que grabar nada.", en: "This request was cancelled. You don't need to record anything." },
+  "drive.pedido.pie": { es: "Cuando termines de subir, el equipo ya lo tiene. No hace falta avisar.", en: "Once your upload finishes, the team has it. No need to let anyone know." },
   "drive.aportar.aLaCarpeta": { es: "a «{c}»", en: "to «{c}»" },
   "drive.aportar.cargando": { es: "Cargando…", en: "Loading…" },
   "drive.aportar.cerrado": { es: "Este link ya no está disponible.", en: "This link is no longer available." },

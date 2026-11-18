@@ -29,6 +29,9 @@
 //   POST /public-api/contenido/subidas                   contenido:write (subir un personalizado a la
 //   POST /public-api/contenido/subidas/:id/listo                          carpeta de la modelo; ver
 //   GET  /public-api/contenido/subidas/:id                                ./contenido.ts)
+//   POST /public-api/contenido/pedidos                   contenido:write (pedido para la modelo: ella
+//   GET  /public-api/contenido/pedidos[?cambiados_desde=]                 sube en Maven y aquí se ve
+//   GET  /public-api/contenido/pedidos/:id                                el estado; ver ./pedidos.ts)
 //
 // Escribir en el Messenger (messenger:write, que va siempre con messenger:read):
 //   GET    /public-api/messenger/people                                  a quién se le puede escribir
@@ -364,6 +367,9 @@ Deno.serve(async (req) => {
         { method: "POST", path: "/contenido/subidas", scope: "contenido:write" },
         { method: "POST", path: "/contenido/subidas/{id}/listo", scope: "contenido:write" },
         { method: "GET", path: "/contenido/subidas/{id}", scope: "contenido:write" },
+        { method: "POST", path: "/contenido/pedidos", scope: "contenido:write" },
+        { method: "GET", path: "/contenido/pedidos", scope: "contenido:write" },
+        { method: "GET", path: "/contenido/pedidos/{id}", scope: "contenido:write" },
         { path: "/creators", scope: "creators:read" },
         { path: "/creators/{id}", scope: "creators:read" },
         { path: "/contacts", scope: "contacts:read" },
@@ -422,7 +428,7 @@ Deno.serve(async (req) => {
   // En /contenido solo la creación trae cuerpo («listo» va sin cuerpo).
   const rutaDeContenidoPedida = esContenido ? rutaDeContenido(metodo, rest.slice(1)) : null;
   const rutaDeEscritura = rutaDeContenidoPedida
-    ? { ok: rutaDeContenidoPedida.ok && rutaDeContenidoPedida.accion === "crear" }
+    ? { ok: rutaDeContenidoPedida.ok && (rutaDeContenidoPedida.accion === "crear" || rutaDeContenidoPedida.accion === "pedido_crear") }
     : scopesDeLaRuta(recursoClave, metodo, rest.slice(1));
   if ((metodo === "POST" || metodo === "PATCH") && rutaDeEscritura.ok) {
     const leido = await leerCuerpo(req, CUERPO_MAX_BYTES);
@@ -457,6 +463,7 @@ Deno.serve(async (req) => {
         llaveNombre: String(keyRow.name ?? "API"),
         metodo,
         ruta: rest.slice(1),
+        consulta: url.searchParams,
         cuerpo,
         idempotencia,
         supabaseUrl: Deno.env.get("SUPABASE_URL") ?? "",
