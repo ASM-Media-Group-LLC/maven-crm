@@ -220,3 +220,12 @@ export function escribirTopes(encodings: TopeDeCodificacion[], topes: TopeDeCodi
   });
   return cambio;
 }
+
+// ── MEET Y LLAMADAS DE MAVEN: HD (Alvaro, 17/11/2026) ─────────────────────────
+//
+// Fuera de Cowork (meet_… y las llamadas del chat) la cámara va a 1080p y el
+// perfil liviano NO la recorta a 360p: ahí la cara es lo importante y Alvaro
+// eligió calidad sobre estabilidad. Cowork queda como estaba.
+export function camaraEnHD(sala: string | null | undefined): boolean {
+  return !!sala && !sala.startsWith("cowork_");
+}
