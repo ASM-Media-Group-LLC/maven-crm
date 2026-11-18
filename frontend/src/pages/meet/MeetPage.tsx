@@ -9,12 +9,8 @@ import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { useMeetRooms, MeetRoom } from "@/hooks/useMeetRooms";
 import { usePermissions } from "@/hooks/usePermissions";
-import { isCompleteRoomCode } from "@/lib/coworkRoomCode";
-import { parseJoinInput } from "@/lib/meetJoinInput";
 import { useLanguage } from "@/hooks/useLanguage";
 import { useRoleTier } from "@/hooks/useRoleTier";
-import { invocarMeetRoom } from "@/lib/meetLinkInvitado";
-import AgendarMeet from "./AgendarMeet";
 
 // El link que se COMPARTE es /entrar/<código>, no /call/<sala>: esa página manda
 // a la llamada a quien tiene cuenta en Maven y le pide entrada a quien no la
@@ -39,7 +35,7 @@ function openCall(room: MeetRoom) {
 export default function MeetPage() {
   const {
     myRooms, setMyRooms, loading,
-    createRoom, joinByCode, resolveByLivekitRoom, renameRoom, setPinned, reorder, endRoom, refresh,
+    createRoom, renameRoom, setPinned, reorder, endRoom, refresh,
   } = useMeetRooms();
   const { t } = useLanguage();
   const [renameTarget, setRenameTarget] = useState<MeetRoom | null>(null);
@@ -47,8 +43,6 @@ export default function MeetPage() {
   const [renaming, setRenaming] = useState(false);
   const { explicitPermission } = usePermissions();
   const [creating, setCreating] = useState(false);
-  const [joinInput, setJoinInput] = useState("");
-  const [joining, setJoining] = useState(false);
 
   // Crear una reunión: supervisores y arriba (Alvaro, 17/11/2026; los chatters
   // no). Arriba de ese piso, un admin puede quitar el permiso por rol desde
@@ -60,15 +54,9 @@ export default function MeetPage() {
   // (/unirse/…: escribe su nombre y entra, sin sala de espera). Para el resto,
   // /entrar/<código>: los de Maven entran y alguien de afuera tiene que esperar
   // a que un supervisor lo admita. Si pedir el directo falla, cae al de código.
-  const linkParaCompartir = async (room: MeetRoom): Promise<string> => {
-    if (!isSupervisorOrAbove) return shareLink(room);
-    try {
-      const r = await invocarMeetRoom("inviteLink", { livekitRoom: room.livekit_room_name });
-      return `${getPublicBaseUrl()}/unirse/${r.link}`;
-    } catch {
-      return shareLink(room);
-    }
-  };
+  // Desde el 18/11/2026 (Alvaro): el de afuera SIEMPRE pide permiso y quien
+  // llama lo deja pasar; el link directo (/unirse) ya no se reparte desde aquí.
+  const linkParaCompartir = async (room: MeetRoom): Promise<string> => shareLink(room);
 
   const handleCreate = async () => {
     setCreating(true);
@@ -85,23 +73,6 @@ export default function MeetPage() {
       toast.error(e.message || t("meet.createError"));
     } finally {
       setCreating(false);
-    }
-  };
-
-  const handleJoin = async () => {
-    const parsed = parseJoinInput(joinInput);
-    if (!parsed.code && !parsed.livekitRoom) return;
-    setJoining(true);
-    try {
-      const room = parsed.livekitRoom
-        ? await resolveByLivekitRoom(parsed.livekitRoom)
-        : await joinByCode(parsed.code!);
-      setJoinInput("");
-      openCall(room);
-    } catch (e: any) {
-      toast.error(e.message || t("meet.joinError"));
-    } finally {
-      setJoining(false);
     }
   };
 
@@ -141,12 +112,13 @@ export default function MeetPage() {
   // ítem volver a su lugar mientras responde el servidor se siente roto.
   const onDragEnd = async (result: DropResult) => {
     if (!result.destination || result.destination.index === result.source.index) return;
-    const next = [...myRooms];
+    const next = [...visibles];
     const [movida] = next.splice(result.source.index, 1);
     next.splice(result.destination.index, 0, movida);
-    setMyRooms(next);
+    const todas = [...next, ...myRooms.filter((r) => !next.includes(r))];
+    setMyRooms(todas);
     try {
-      await reorder(next.map((r) => r.id));
+      await reorder(todas.map((r) => r.id));
     } catch {
       toast.error(t("meet.orderError"));
     }
@@ -162,10 +134,13 @@ export default function MeetPage() {
     }
   };
 
-  const joinDisabled = joining || (() => {
-    const parsed = parseJoinInput(joinInput);
-    return !parsed.livekitRoom && !isCompleteRoomCode(parsed.code || "");
-  })();
+  // SOLO LAS DE HOY (Alvaro, 18/11/2026): Meet es para llamar a gente de
+  // afuera; la lista de 35 reuniones viejas sobraba. Las fijadas se quedan.
+  const hoyBogota = new Date().toLocaleDateString("en-CA", { timeZone: "America/Bogota" });
+  const esDeHoy = (r: MeetRoom) => !!r.created_at
+    && new Date(r.created_at).toLocaleDateString("en-CA", { timeZone: "America/Bogota" }) === hoyBogota;
+  const visibles = myRooms.filter((r) => r.pinned || esDeHoy(r));
+
 
   return (
     <div className="flex-1 min-h-0 overflow-y-auto">
@@ -183,12 +158,11 @@ export default function MeetPage() {
           <div className="min-w-0 flex-1">
             <h1 className="text-xl font-bold tracking-tight text-foreground md:text-2xl">Meet</h1>
             <p className="mt-0.5 text-sm text-muted-foreground">
-              {myRooms.length > 0
+              {visibles.length > 0
                 ? t("meet.subtitleBack")
                 : t("meet.subtitleNew")}
             </p>
           </div>
-          {canCreate && <AgendarMeet onAgendada={() => void refresh()} />}
           {canCreate && (
             <Button
               onClick={handleCreate}
@@ -202,28 +176,12 @@ export default function MeetPage() {
           )}
         </div>
 
-        <div className="mt-5 flex flex-col items-center gap-2 border-t border-border/40 pt-4 md:flex-row md:justify-between">
-          <span className="text-xs text-muted-foreground">{t("meet.joinWith")}</span>
-          <div className="flex w-full gap-2 md:w-auto">
-            <Input
-              value={joinInput}
-              onChange={(e) => setJoinInput(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && !joinDisabled && handleJoin()}
-              placeholder={t("meet.joinPlaceholder")}
-              className="rounded-full md:w-64"
-            />
-            <Button onClick={handleJoin} disabled={joinDisabled} className="shrink-0 gap-1 rounded-full">
-              {joining ? <Loader2 className="h-4 w-4 animate-spin" /> : <KeyRound className="h-4 w-4" />}
-              {t("meet.join")}
-            </Button>
-          </div>
-        </div>
       </div>
 
-      {!loading && myRooms.length > 0 && (
+      {!loading && visibles.length > 0 && (
         <div className="w-full flex flex-col gap-2">
           <h2 className="text-xs font-semibold text-muted-foreground px-1">
-            {t("meet.openRooms", { n: myRooms.length })}
+            {t("meet.openRooms", { n: visibles.length })}
           </h2>
           {/* Con muchas reuniones la lista scrollea sola en vez de estirar la
               página. Las fijadas van arriba (el orden lo pone el hook). */}
@@ -235,7 +193,7 @@ export default function MeetPage() {
                   {...dropProvided.droppableProps}
                   className="flex flex-col gap-2 sm:max-h-[420px] sm:overflow-y-auto pr-1"
                 >
-                  {myRooms.map((room, index) => (
+                  {visibles.map((room, index) => (
                     <Draggable key={room.id} draggableId={room.id} index={index}>
                       {(dragProvided, snapshot) => (
                         <div
