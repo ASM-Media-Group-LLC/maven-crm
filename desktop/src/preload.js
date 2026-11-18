@@ -72,6 +72,15 @@ contextBridge.exposeInMainWorld("mavenEscritorio", {
     ipcRenderer.on("maven:visible", f);
     return () => ipcRenderer.removeListener("maven:visible", f);
   },
+  /** Versión nueva de la app ya bajada y lista para instalar (o null). */
+  actualizacionPendiente: () => ipcRenderer.invoke("maven:actualizacion-pendiente"),
+  alActualizacionLista: (cb) => {
+    const f = (_e, version) => cb(String(version ?? ""));
+    ipcRenderer.on("maven:actualizacion-lista", f);
+    return () => ipcRenderer.removeListener("maven:actualizacion-lista", f);
+  },
+  /** Instala la versión nueva y vuelve a abrir Maven. */
+  actualizarAhora: () => ipcRenderer.invoke("maven:actualizar-ahora"),
   /** Memoria: { app_mb, equipo_gb, libre_gb }. */
   memoria: () => ipcRenderer.invoke("maven:memoria"),
   /** Cada minuto: los tramos de app/página al frente (ver desktop/src/apps.js). */

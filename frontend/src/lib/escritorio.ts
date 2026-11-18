@@ -27,6 +27,10 @@ export type MavenEscritorio = {
   alUsoDeApps: (cb: (lote: TramoDeApp[]) => void) => () => void;
   /** Un link maven:// pidió abrir esta ruta (versiones de la app desde el 17/11/2026). */
   alAbrirRuta?: (cb: (ruta: string) => void) => () => void;
+  /** La versión nueva de la app, ya bajada (versiones desde el 18/11/2026). */
+  actualizacionPendiente?: () => Promise<string | null>;
+  alActualizacionLista?: (cb: (version: string) => void) => () => void;
+  actualizarAhora?: () => Promise<boolean>;
   /** Memoria de la app y del equipo: { app_mb, equipo_gb, libre_gb }. */
   memoria?: () => Promise<{ app_mb?: number; equipo_gb?: number; libre_gb?: number } | null>;
   /** true: al compartir, la app elige sola la pantalla completa, sin preguntar (Cowork). Desde el 18/11/2026. */
