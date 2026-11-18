@@ -27,6 +27,7 @@ import { toast } from "sonner";
 // Los avisos de la llamada van por traducir(): se arman en eventos de LiveKit y
 // callbacks, no en el JSX, y los lee la persona en su propio idioma.
 import { traducir } from "@/lib/i18n";
+import { claveDeRecuadro, participantesEstables } from "@/lib/participantesEstables";
 import { esPantallaCompleta, puedeCompartirPantalla, motivoDeFalloAlCompartir } from "@/lib/compartirPantalla";
 import { supabase, SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY } from "@/integrations/supabase/client";
 import { avisarSalidaDeLlamada, mostrarAvisoDeSala, ID_AVISO_ME_SILENCIARON } from "@/lib/avisosDeLlamada";
@@ -1000,7 +1001,9 @@ export function useLiveKit() {
       result.push(...tilesDe(p, buildParticipant(p, false)));
     });
 
-    setParticipants(result);
+    // Sin cambios, la misma lista: React no redibuja la llamada entera cada 3 s
+    // ni con cada evento (lib/participantesEstables.ts).
+    setParticipants((antes) => participantesEstables<LKParticipant>(antes, result, claveDeRecuadro));
   }, [buildParticipant]);
   refreshParticipantsRef.current = refreshParticipants;
 

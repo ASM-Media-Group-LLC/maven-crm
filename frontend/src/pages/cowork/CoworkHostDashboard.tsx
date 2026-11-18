@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { Cronometro, RelojDePersona } from "./RelojVivo";
 import { createPortal } from "react-dom";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -35,7 +36,7 @@ import { useCoworkMediaPresence, type MediaState } from "@/hooks/useCoworkMediaP
 import { cn } from "@/lib/utils";
 import { tituloBonito } from "@/lib/tituloBonito";
 import { leerLimitesPausa, rpcConsumoPausas } from "@/lib/coworkTablas";
-import { relojDesdePresencia, segundosMostrados, formatoReloj } from "@/lib/coworkReloj";
+import { relojDesdePresencia } from "@/lib/coworkReloj";
 import { personasEnSala, relojDeRespaldo, latidoFresco, sinConexionConLaSala } from "@/lib/coworkOcupacion";
 import { cuentaComoTrabajo } from "@/lib/coworkTiempoRegla";
 import { useRelojDeSala } from "@/hooks/useRelojDeSala";
@@ -448,7 +449,11 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
   // rompe— pero es el mismo patrón que tumbó esta pantalla dos veces, y basta
   // que alguien lo mueva a un arreglo de dependencias para que vuelva a pasar.
   // El reloj que mueve los contadores (pausas, tiempos) y re-evalúa los avisos.
-  // Tic de 1 s MIENTRAS se mira; 10 s con la pestaña oculta. Así un tablero en
+  // 17/11/2026: tic de 5 s mientras se mira (antes 1 s) y 30 s con la pestaña
+  // oculta. Con 1 s la página ENTERA (~3.200 líneas, la llamada, las tarjetas)
+  // se redibujaba cada segundo y el hub se trababa. Los segunderos que sí tienen
+  // que moverse cada segundo son componentes chiquitos (RelojVivo.tsx) con su
+  // propio reloj compartido (lib/ahoraCompartido.ts). Oculta, un tablero en
   // segundo plano deja de redibujarse —y de re-evaluar alertas— cada segundo,
   // que es puro gasto cuando nadie lo está viendo. Al volver a la pestaña,
   // salta a `now` al instante y retoma el tic fino.
@@ -457,13 +462,16 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
     let id: number | undefined;
     const armar = () => {
       if (id != null) window.clearInterval(id);
-      const ms = document.visibilityState === "visible" ? 1000 : 10_000;
+      const ms = document.visibilityState === "visible" ? 5000 : 30_000;
       id = window.setInterval(() => setNow(Date.now()), ms);
     };
     const alCambiar = () => { if (document.visibilityState === "visible") setNow(Date.now()); armar(); };
     armar();
+    // El primer tic va al segundo de abrir, como antes: los avisos que ya
+    // corresponden (una pausa pasada, alguien sin cara) salen enseguida.
+    const primero = window.setTimeout(() => setNow(Date.now()), 1000);
     document.addEventListener("visibilitychange", alCambiar);
-    return () => { if (id != null) window.clearInterval(id); document.removeEventListener("visibilitychange", alCambiar); };
+    return () => { if (id != null) window.clearInterval(id); window.clearTimeout(primero); document.removeEventListener("visibilitychange", alCambiar); };
   }, []);
 
   // Límites por tipo de pausa. Si la sesión trae pausas propias en sus reglas,
@@ -1629,7 +1637,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
       // Verde si la presencia general la ve, O si su latido es reciente: está
       // trabajando aunque el socket de Realtime se le haya caído.
       online: isOnline(a.user_id) || latidoFresco(relojRespaldo[a.user_id], now),
-      reloj: reloj ? formatoReloj(segundosMostrados(reloj, now)) : null,
+      reloj,
       corre,
       motivo: (() => {
         const clave = reloj && !corre ? claveMotivoDetenido(reloj.estado, true) : null;
@@ -2123,7 +2131,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                     <div className="flex items-center gap-1.5 shrink-0">
                       <Badge variant="outline" className="text-[9px] border-warning/30 text-warning rounded-full">{s.etiqueta}</Badge>
                       {s.desde != null && (
-                        <span className="text-[11px] font-mono tabular-nums text-warning">{formatoReloj(Math.max(0, Math.floor((now - s.desde) / 1000)))}</span>
+                        <span className="text-[11px] font-mono tabular-nums text-warning"><Cronometro desde={s.desde} /></span>
                       )}
                     </div>
                   </div>
@@ -2394,7 +2402,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                         <span className="block truncate font-display text-sm font-semibold text-foreground">{t("cowork.meet.title")}</span>
                         <span className="block truncate text-xs text-muted-foreground">{gente.map((p) => nombreYApellido(cowork.profiles[p.user_id])).join(", ") || t("cowork.host.everyoneBack")}</span>
                       </div>
-                      <span className="shrink-0 font-mono text-xs tabular-nums text-primary">{formatoReloj(Math.max(0, Math.floor((now - Date.parse(meet.started_at)) / 1000)))}</span>
+                      <span className="shrink-0 font-mono text-xs tabular-nums text-primary"><Cronometro desde={Date.parse(meet.started_at)} /></span>
                       <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground/40" />
                     </button>
                   );
@@ -2409,7 +2417,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                       </span>
                     </div>
                     <div className="mx-2 mb-2 flex aspect-[4/3] flex-col items-center justify-center gap-1 overflow-hidden rounded-xl bg-primary/10 px-3 text-center md:mx-0 md:mb-0 md:aspect-video md:rounded-none">
-                      <div className="font-display text-2xl font-bold tabular-nums text-primary">{formatoReloj(Math.max(0, Math.floor((now - Date.parse(meet.started_at)) / 1000)))}</div>
+                      <div className="font-display text-2xl font-bold tabular-nums text-primary"><Cronometro desde={Date.parse(meet.started_at)} /></div>
                       <div className="text-[11px] text-muted-foreground">{t("cowork.pauses.calledBy", { name: nombreYApellido(cowork.profiles[meet.created_by]) || t("cowork.host.aSupervisor") })}</div>
                       <div className="line-clamp-2 text-[11px] text-foreground/80">{gente.map((p) => nombreYApellido(cowork.profiles[p.user_id])).join(", ") || t("cowork.host.everyoneBack")}</div>
                     </div>
@@ -2690,7 +2698,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                             </span>
                           ) : personas[0]?.reloj ? (
                             <span className="ml-auto shrink-0 text-[11px] tabular-nums text-white/55" title={personas[0].corre ? t("cowork.host.clockRunning") : t("cowork.host.clockStopped", { reason: personas[0].motivo ?? "—" })}>
-                              {personas[0].reloj}
+                              <RelojDePersona reloj={personas[0].reloj} />
                             </span>
                           ) : null}
                         </div>
@@ -2709,7 +2717,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                             <span className="min-w-0 flex-1 truncate text-foreground/90">{nombreCorto(p.nombre)}</span>
                             {p.reloj && (
                               <span className="shrink-0 tabular-nums text-muted-foreground" title={p.corre ? t("cowork.host.clockRunning") : t("cowork.host.clockStopped", { reason: p.motivo ?? "—" })}>
-                                {p.reloj}
+                                <RelojDePersona reloj={p.reloj} />
                               </span>
                             )}
                           </li>
@@ -3046,7 +3054,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                         </span>
                         {p.reloj && (
                           <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
-                            {p.reloj}
+                            <RelojDePersona reloj={p.reloj} />
                           </span>
                         )}
                       </li>
