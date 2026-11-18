@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { MedidorEquipo } from "@/components/MedidorEquipo";
 import { Search } from "lucide-react";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
@@ -46,6 +47,7 @@ const DashboardTopbar = () => {
         </div>
 
         <div className="flex shrink-0 items-center gap-1">
+          <MedidorEquipo />
           <SelectorDeIdioma />
 
           {/* Mensajes (la nube) — a la izquierda de la campana, como Facebook */}

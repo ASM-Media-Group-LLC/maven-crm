@@ -11,6 +11,7 @@ import { AuthProvider } from "@/hooks/useAuth";
 import { AvisoSoloApp } from "@/components/CoworkSoloApp";
 import { AbrirEnApp } from "@/components/AbrirEnApp";
 import { AvisoActualizacionApp } from "@/components/AvisoActualizacionApp";
+import { NovedadesApp } from "@/components/NovedadesApp";
 import { AppLiviana } from "@/components/AppLiviana";
 import { useSkinSync } from "@/hooks/useSkin";
 import { LanguageProvider, idiomaInicial } from "@/hooks/useLanguage";
@@ -300,6 +301,7 @@ const App = () => (
             {/* Los links de Maven abren en la app de computador (17/11/2026). */}
             <AbrirEnApp />
             <AvisoActualizacionApp />
+            <NovedadesApp />
             <AppLiviana />
             <AvisoSoloApp />
             <Suspense fallback={<LoadingFallback />}>

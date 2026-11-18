@@ -20,6 +20,7 @@ import BancoCostos from "./bancoCostos";
 import BancoGracia from "./bancoGracia";
 import BancoGuiaConexion from "./bancoGuiaConexion";
 import { BancoGuiaApp, BancoAppDelEquipo } from "./bancoGuiaApp";
+import { BancoAppMedidor, prepararAppFalsa } from "./bancoAppMedidor";
 import BancoFondo from "./bancoFondo";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import VirtualOfficePage from "@/pages/oficina-ai/VirtualOfficePage";
@@ -80,6 +81,7 @@ const verVigilancia = ver === "quien-baja" || ver === "en-vivo" || ver === "en-v
 const verConexion = ver === "conexion";
 const params = new URLSearchParams(window.location.search);
 if (params.get("tema") === "claro") document.documentElement.classList.remove("dark");
+if (ver === "app-medidor") prepararAppFalsa(params.get("estado") ?? "bien");
 if (params.get("skin")) document.documentElement.setAttribute("data-skin", params.get("skin")!);
 
 // Desde el 16/11/2026 las frases bajan por idioma (lib/i18n.ts → cargarIdioma):
@@ -92,6 +94,12 @@ void cargarIdioma(idiomaInicial()).finally(() => raiz.render(
   // /harness.html?ver=guia-app[&sistema=mac][&en=app|celular] · ?ver=app-equipo → la app de Maven (18/11).
   ver === "fondo" ? (
     <BancoFondo />
+  ) :
+  // /harness.html?ver=app-medidor[&estado=rojo][&tema=claro] → medidor, versión nueva y novedades (18/11).
+  ver === "app-medidor" ? (
+    <StrictMode>
+      <LanguageProvider><BancoAppMedidor /></LanguageProvider>
+    </StrictMode>
   ) :
   ver === "guia-app" ? (
     <StrictMode>
