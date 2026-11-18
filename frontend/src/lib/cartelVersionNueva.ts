@@ -37,3 +37,17 @@ export function alCambiarCartelVersionNueva(fn: Oyente): () => void {
   oyentes.add(fn);
   return () => { oyentes.delete(fn); };
 }
+
+// EL DUEÑO, AL INSTANTE (Alvaro, 18/11/2026: «en mi cuenta, a los 30 segundos de
+// cambiar algo, quiero el update puesto de una vez para probarlo»). pwa.ts deja
+// aquí cómo buscar versión nueva ya; el cartel, con la cuenta del dueño, lo
+// llama cada 30 s y, si hay versión nueva, actualiza solo (sin llamada).
+let buscarYa: (() => void) | null = null;
+
+export function registrarBuscarVersionYa(fn: () => void): void {
+  buscarYa = fn;
+}
+
+export function buscarVersionYa(): void {
+  buscarYa?.();
+}

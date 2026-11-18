@@ -2,9 +2,14 @@ import { useEffect, useState } from "react";
 import { Download, Loader2, Sparkles } from "lucide-react";
 import { useLanguage } from "@/hooks/useLanguage";
 import { hayLlamadaActiva } from "@/lib/llamadaActiva";
+import { useEsDueno } from "@/hooks/useEsDueno";
+import { estaEscribiendoAhora } from "@/lib/recargaAlColgar";
 import {
-  actualizarDesdeElCartel, alCambiarCartelVersionNueva, cartelVersionNuevaAbierto,
+  actualizarDesdeElCartel, alCambiarCartelVersionNueva, buscarVersionYa, cartelVersionNuevaAbierto,
 } from "@/lib/cartelVersionNueva";
+
+/** El dueño busca versión nueva cada 30 s y la pone sola (Alvaro, 18/11/2026). */
+export const DUENO_BUSCA_CADA_MS = 30_000;
 
 // VERSIÓN NUEVA: CARTEL EN EL CENTRO, SIN CERRAR (Alvaro, 18/11/2026).
 // Cada cambio que sube a producción le pone a cada persona este cartel en el
@@ -66,6 +71,27 @@ export function CartelVersionNueva() {
   const [actualizando, setActualizando] = useState(false);
 
   useEffect(() => alCambiarCartelVersionNueva(setAbierto), []);
+
+  // EL DUEÑO: busca cada 30 s y, con versión nueva, la pone sola (sin llamada
+  // y sin estar escribiendo; si lo está, la pone en cuanto suelte el campo).
+  const { esDueno } = useEsDueno();
+  useEffect(() => {
+    if (esDueno !== true) return;
+    buscarVersionYa();
+    const id = window.setInterval(buscarVersionYa, DUENO_BUSCA_CADA_MS);
+    return () => window.clearInterval(id);
+  }, [esDueno]);
+  useEffect(() => {
+    if (esDueno !== true || !abierto) return;
+    const intentar = () => {
+      if (hayLlamadaActiva() || estaEscribiendoAhora()) return;
+      setActualizando(true);
+      void actualizarDesdeElCartel().then((ok) => { if (!ok) setActualizando(false); });
+    };
+    intentar();
+    const id = window.setInterval(intentar, 3000);
+    return () => window.clearInterval(id);
+  }, [esDueno, abierto]);
 
   // hayLlamadaActiva no avisa cambios: se mira cada 3 s mientras haya cartel.
   useEffect(() => {

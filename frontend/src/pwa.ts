@@ -6,7 +6,7 @@ import { almacenDeLaPestana, forzarActualizacion, leerUiBuildMinimo } from "./li
 import { hayLlamadaActiva } from "./lib/llamadaActiva";
 import { registrarSw } from "./lib/registroDelSw";
 import { crearRecargaAlColgar, estaEscribiendoAhora, hayAlgoAMedioEscribir, marcarRecarga } from "./lib/recargaAlColgar";
-import { abrirCartelVersionNueva } from "./lib/cartelVersionNueva";
+import { abrirCartelVersionNueva, registrarBuscarVersionYa } from "./lib/cartelVersionNueva";
 
 /** El aviso "Nueva versión disponible" como toast del design system (el mismo
  *  vidrio de todos los avisos), con `id` fijo para no duplicarse en el chequeo
@@ -158,6 +158,8 @@ export async function initPWA() {
             r.update().catch(() => {});
           };
           setInterval(() => { ultima = 0; mirar(); }, 10 * 60 * 1000);
+          // El dueño busca cada 30 s (lo llama components/CartelVersionNueva.tsx).
+          registrarBuscarVersionYa(() => { r.update().catch(() => {}); });
           window.addEventListener("focus", mirar);
           document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") mirar(); });
         }

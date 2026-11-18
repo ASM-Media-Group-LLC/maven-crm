@@ -240,3 +240,14 @@ describe("versión nueva → cartel en el centro con «Actualizar»", () => {
     expect(s).not.toContain("60 * 60 * 1000");
   });
 });
+
+describe("el dueño: versión nueva a los 30 s, puesta sola (18/11/2026)", () => {
+  const cartel = import.meta.glob("/frontend/src/components/CartelVersionNueva.tsx", { query: "?raw", import: "default", eager: true }) as Record<string, string>;
+  it("busca cada 30 s solo con la cuenta del dueño y actualiza sin llamada", () => {
+    const s = Object.values(cartel)[0];
+    expect(s).toContain("DUENO_BUSCA_CADA_MS = 30_000");
+    expect(s).toContain("if (esDueno !== true) return;");
+    expect(s).toContain("if (hayLlamadaActiva() || estaEscribiendoAhora()) return;");
+    expect(leer("src/pwa.ts")).toContain("registrarBuscarVersionYa(");
+  });
+});
