@@ -26,6 +26,9 @@
 //   GET  /public-api/equipo/horas?desde&hasta            equipo:write   (horas y asistencia de Cowork)
 //   GET  /public-api/equipo/notas?desde&hasta            equipo:write   (la nota de Argos con su desglose)
 //   GET  /public-api/equipo/argos?desde&hasta            equipo:write   (lo que Argos vio en cada turno)
+//   POST /public-api/contenido/subidas                   contenido:write (subir un personalizado a la
+//   POST /public-api/contenido/subidas/:id/listo                          carpeta de la modelo; ver
+//   GET  /public-api/contenido/subidas/:id                                ./contenido.ts)
 //
 // Escribir en el Messenger (messenger:write, que va siempre con messenger:read):
 //   GET    /public-api/messenger/people                                  a quién se le puede escribir
@@ -69,6 +72,8 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { AISLAMIENTO_POR_RECURSO, decidir, esComoUsuario } from "./aislamiento.ts";
 import { clienteDeLlave, comoUsuarioConfigurado } from "./como-usuario.ts";
 import { servirComoUsuario } from "./recursos-como-usuario.ts";
+import { servirContenido } from "./contenido.ts";
+import { rutaDeContenido } from "./contenido-logica.ts";
 import { cabecerasDeCupo, clientIp, CUERPO_MAX_BYTES, fetchSinReintentos, ipAllowed, leerCuerpo } from "./peticion.ts";
 import { idiomaDelPedido, msg, varyConIdioma } from "./mensajes.ts";
 import { esMetodo, leerCuerpoDeEscritura, leerIdempotencia, METODOS, type ObjetoJson, scopesDeLaRuta } from "./escritura-formato.ts";
@@ -229,7 +234,7 @@ Deno.serve(async (req) => {
   const key_hash = await sha256hex(rawKey);
   const { data: keyRow, error: keyErr } = await admin
     .from("api_keys")
-    .select("id, scopes, ip_whitelist, revoked_at, expires_at, tenant_id")
+    .select("id, name, scopes, ip_whitelist, revoked_at, expires_at, tenant_id")
     .eq("key_hash", key_hash).maybeSingle();
   // Antes el error se descartaba y una base caída respondía "API key inválida".
   // Además es la red si esta función se desplegara antes que la migración que crea
@@ -355,6 +360,10 @@ Deno.serve(async (req) => {
         { method: "GET", path: "/equipo/horas", scope: "equipo:write" },
         { method: "GET", path: "/equipo/notas", scope: "equipo:write" },
         { method: "GET", path: "/equipo/argos", scope: "equipo:write" },
+        // Subir personalizados a la carpeta de la modelo (Personalizados/<día>).
+        { method: "POST", path: "/contenido/subidas", scope: "contenido:write" },
+        { method: "POST", path: "/contenido/subidas/{id}/listo", scope: "contenido:write" },
+        { method: "GET", path: "/contenido/subidas/{id}", scope: "contenido:write" },
         { path: "/creators", scope: "creators:read" },
         { path: "/creators/{id}", scope: "creators:read" },
         { path: "/contacts", scope: "contacts:read" },
@@ -390,18 +399,31 @@ Deno.serve(async (req) => {
     return json(req, { error: veredicto.error, message: veredicto.motivo }, veredicto.estado);
   }
 
+  // /contenido (subir personalizados, ver ./contenido.ts): sin su scope no se lee nada.
+  const esContenido = recursoClave === "contenido";
+  if (esContenido && !need("contenido:write")) {
+    return json(req, { error: "forbidden", message: msg(idioma, "falta_scope", { scope: "contenido:write" }) }, 403);
+  }
+
   // ===== Escrituras: lo que se mira antes de tocar el recurso =====
   // (1) Solo los recursos como_usuario se escriben; los demás, 405 SIN leer el cuerpo.
+  // La excepción es /contenido, que escribe con service_role atado a la agencia.
   if (metodo !== "GET" && !esComoUsuario(recursoClave)) {
-    return json(req, {
-      error: "method_not_allowed",
-      message: msg(idioma, "metodo_no_permitido", { permitidos: "GET" }),
-    }, 405, { "Allow": "GET" });
+    if (!esContenido) {
+      return json(req, {
+        error: "method_not_allowed",
+        message: msg(idioma, "metodo_no_permitido", { permitidos: "GET" }),
+      }, 405, { "Allow": "GET" });
+    }
   }
   // (2) El cuerpo, solo de un POST/PATCH a una ruta que existe con ese método (lo
   // demás lo contesta servirComoUsuario: 404 o 405, sin cuerpo). Tope de 64 KB.
   let cuerpo: ObjetoJson | null = null;
-  const rutaDeEscritura = scopesDeLaRuta(recursoClave, metodo, rest.slice(1));
+  // En /contenido solo la creación trae cuerpo («listo» va sin cuerpo).
+  const rutaDeContenidoPedida = esContenido ? rutaDeContenido(metodo, rest.slice(1)) : null;
+  const rutaDeEscritura = rutaDeContenidoPedida
+    ? { ok: rutaDeContenidoPedida.ok && rutaDeContenidoPedida.accion === "crear" }
+    : scopesDeLaRuta(recursoClave, metodo, rest.slice(1));
   if ((metodo === "POST" || metodo === "PATCH") && rutaDeEscritura.ok) {
     const leido = await leerCuerpo(req, CUERPO_MAX_BYTES);
     if (!leido.ok && leido.estado === 413) return json(req, { error: "payload_too_large", message: msg(idioma, "cuerpo_muy_grande") }, 413);
@@ -423,6 +445,32 @@ Deno.serve(async (req) => {
   if (metodo !== "GET" && demoraDeLaBase > BASE_LENTA_MS) {
     console.error(`[public-api] escritura en pausa: la base tardó ${demoraDeLaBase} ms en la key y el cupo`);
     return json(req, { error: "writes_paused", message: msg(idioma, "escritura_en_pausa") }, 503, { "Retry-After": "30" });
+  }
+
+  // ===== /contenido: subir personalizados a la carpeta de la modelo =====
+  if (esContenido) {
+    try {
+      const r = await servirContenido({
+        admin,
+        agencia: tenantId,
+        llaveId: keyRow.id as string,
+        llaveNombre: String(keyRow.name ?? "API"),
+        metodo,
+        ruta: rest.slice(1),
+        cuerpo,
+        idempotencia,
+        supabaseUrl: Deno.env.get("SUPABASE_URL") ?? "",
+        anonKey: Deno.env.get("SUPABASE_ANON_KEY") ?? "",
+        servicio: { key: Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "", cronToken: Deno.env.get("CRON_INTERNAL_TOKEN") ?? "" },
+      });
+      return json(req, r.cuerpo, r.estado, r.permitidos ? { "Allow": r.permitidos.join(", ") } : {});
+    } catch (e) {
+      if (metodo !== "GET") {
+        console.error("[public-api] /contenido:", (e as { message?: string })?.message ?? e);
+        return json(req, { error: "outcome_unknown", message: msg(idioma, "resultado_incierto") }, 503, { "Retry-After": "5" });
+      }
+      return noDisponible(req, "/contenido", e);
+    }
   }
 
   // ===== Recursos que actúan como la persona de la llave =====

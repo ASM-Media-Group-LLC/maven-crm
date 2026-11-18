@@ -115,6 +115,14 @@ export const AISLAMIENTO_POR_RECURSO: MapaDeAislamiento = congelar({
     tipo: "sin_agencia",
     pendiente: "creators no tiene tenant_id",
   },
+  // /contenido/subidas (17/11/2026): Backstage sube personalizados a la carpeta de
+  // la modelo. Corre con service_role y cada consulta va atada a la agencia de la
+  // llave (tenant_id) y a la llave que creó la subida; falta el banco con dos
+  // agencias que lo pruebe, así que con dos o más se apaga como el resto.
+  contenido: {
+    tipo: "sin_agencia",
+    pendiente: "falta el banco con dos agencias que pruebe el filtro por tenant_id de contenido.ts",
+  },
   contacts: {
     tipo: "sin_agencia",
     pendiente: "closers_contacts no tiene tenant_id ni enlace a nada que lo tenga",
@@ -198,6 +206,10 @@ export const FUENTES_POR_RECURSO: Record<string, string[]> = {
   sales: ["creator_daily_earnings"],
   employees: ["profiles", "user_roles", "rol_turnos"],
   creators: ["creators", "creator_of_accounts"],
+  contenido: [
+    "api_contenido_subidas", "creators", "drive_carpeta_creadora", "drive_upload_links",
+    "drive_items", "drive_aportes", "drive_carpeta_hija",
+  ],
   contacts: ["closers_contacts"],
   "sales/chatters": ["chatter_daily_sales"],
   promolog: ["api_promolog_daily"],

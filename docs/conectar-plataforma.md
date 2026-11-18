@@ -391,6 +391,24 @@ la foto completa, así que repetirlo es seguro). Todos traen `{ "error", "messag
 
 ---
 
+## 5 bis. Subir personalizados — `/contenido/subidas` (scope `contenido:write`)
+
+La plataforma sube el personalizado terminado de una modelo y queda en Maven **como si lo hubiera subido ella**: en el Drive, carpeta de la modelo → `Personalizados` → la carpeta del día (`2026-11-18`). El equipo recibe el mismo aviso de «llegó contenido» que con su link.
+
+1. **Crear la subida** — `POST /public-api/contenido/subidas` (con `Idempotency-Key` recomendado):
+   ```json
+   { "creadora": "<id de GET /creators, o su correo>", "nombre_archivo": "pedido-123.mp4", "tamano": 734003200, "tipo": "video/mp4" }
+   ```
+   Responde `201` con `id`, `estado: "esperando_archivo"` y `subida`:
+   - `subida.tus.endpoint`, `subida.tus.headers` (mandar los tres: `authorization`, `apikey`, `x-signature`) y `subida.tus.metadata` (`bucketName`, `objectName`, tal cual). Partes de 6 MB.
+   - `subida.put_url`: alternativa de un solo `PUT` para archivos chicos.
+   - El permiso vence en 2 horas: si vence, se pide otra vez con la misma `Idempotency-Key` y llega uno nuevo.
+2. **Subir el archivo** por TUS con esos datos.
+3. **Avisar «listo»** — `POST /public-api/contenido/subidas/{id}/listo` (sin cuerpo). Responde `202` con `estado: "procesando"`. Si el archivo no terminó de llegar: `409 file_not_uploaded`.
+4. **Consultar** — `GET /public-api/contenido/subidas/{id}` hasta `estado: "listo"` (ya está en el Drive de Maven). Otros estados: `esperando_archivo`, `procesando`, `error`.
+
+Errores de la creación: `404 creator_not_found` (no hay modelo con ese id o correo en la agencia), `409 creator_ambiguous` (el correo es de más de una), `409 creator_without_folder` (la modelo todavía no tiene carpeta en el Drive), `400 invalid_field`. Tope: 50 GB por archivo. Una subida solo la ve la llave que la creó.
+
 ## 6. Para la app de Maven (lo que usa el frontend)
 
 Todo con la sesión de la persona (`supabase.rpc`), y solo para el dueño o un admin de la agencia
