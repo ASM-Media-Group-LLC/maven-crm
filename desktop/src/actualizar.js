@@ -11,7 +11,15 @@
 // tarde», se instala sola la próxima vez que se cierre la app.
 // En Mac solo funciona con la app firmada por Apple: sin firma, el chequeo
 // falla y no pasa nada (la página igual se actualiza sola porque vive en la web).
-const { app, dialog, powerMonitor } = require("electron");
+const { app, dialog, ipcMain, powerMonitor } = require("electron");
+
+// EL AVISO SIEMPRE A LA VISTA (Alvaro, 18/11/2026: «que cada vez que hagamos un
+// update la plataforma te lo ponga enfrente con un botón»). Antes era una
+// ventanita que salía una vez por versión: si la cerrabas, no volvía. Ahora,
+// cuando la versión nueva ya bajó, se le avisa a la página
+// ("maven:actualizacion-lista") y ella muestra una franja fija con «Actualizar»
+// que no se cierra (components/AvisoActualizacionApp.tsx). En llamada la franja
+// avisa que se corta unos segundos; si no se toca, se actualiza al colgar.
 
 const CADA = 15 * 60 * 1000;
 const MINIMO_ENTRE_BUSQUEDAS = 60 * 1000;
@@ -57,12 +65,19 @@ function iniciarActualizaciones(ventana) {
     }
   }
 
-  let ofrecida = null; // cada versión se ofrece una vez sola; después, desde el menú
+  // La página pregunta al cargar (si se recargó después de la descarga) y
+  // escucha el aviso; «Actualizar» instala callada y vuelve a abrir Maven.
+  ipcMain.handle("maven:actualizacion-pendiente", () => lista?.version ?? null);
+  ipcMain.handle("maven:actualizar-ahora", () => {
+    if (!lista) return false;
+    require("./estado").saliendo = true;
+    setImmediate(() => autoUpdater.quitAndInstall(true, true));
+    return true;
+  });
   autoUpdater.on("update-downloaded", (info) => {
     lista = info;
-    if (ofrecida === info.version) return;
-    ofrecida = info.version;
-    ofrecerReinicio();
+    const v = ventana();
+    if (v && !v.isDestroyed()) v.webContents.send("maven:actualizacion-lista", info.version);
   });
   autoUpdater.on("error", () => { /* sin firma, sin red: se reintenta en 15 minutos */ });
 
