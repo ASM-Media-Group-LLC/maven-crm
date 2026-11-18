@@ -12,6 +12,10 @@
 //      de sus minutos de gracia (15 sin pantalla, 15 sin cámara), correo a ella, a
 //      su jefe y a RR. HH. La cuenta la hace la base (argos_gracia_por_correo).
 //
+//   4) PRIMER CONTACTO (Alvaro, 18/11): dos chatters abrieron su primer chat
+//      directo → correo al dueño, admins y anotados de la agencia
+//      (contacto_primer_contacto_por_correo).
+//
 // Ambas son sanción aparte: no tocan la nota. Destinatarios: el empleado + el
 // dueño + los jefes (nivel admin/manager/supervisor) del mismo tenant.
 //
@@ -21,6 +25,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.4";
 import { asuntoGracia, correoGraciaHTML, type CierreGracia } from "../_shared/correo-gracia.ts";
+import { asuntoPrimerContacto, correoPrimerContactoHTML, type PrimerContacto } from "../_shared/correo-primer-contacto.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -127,6 +132,39 @@ async function correrGracia(admin: Admin): Promise<{ pendientes: number; enviado
   return { pendientes: filas.length, enviados, errores };
 }
 
+// ── 4) PRIMER CONTACTO ENTRE CHATTERS (Alvaro, 18/11) ──
+// La base anota la pareja la primera vez que dos personas de un rol aislado abren
+// un chat directo (y pone la campana). Aquí sale el correo al dueño, a los admins
+// y a los anotados de la agencia; nunca con lo que se escribieron.
+async function correrPrimerContacto(admin: Admin): Promise<{ pendientes: number; enviados: number; errores: number }> {
+  const { data, error } = await admin.rpc("contacto_primer_contacto_por_correo");
+  if (error) throw new Error(error.message);
+  const filas = (data ?? []) as PrimerContacto[];
+  if (filas.length === 0) return { pendientes: 0, enviados: 0, errores: 0 };
+
+  const emailPor = new Map<string, string>();
+  const { data: lista, error: errLista } = await admin.auth.admin.listUsers({ page: 1, perPage: 1000 });
+  if (errLista) throw new Error(errLista.message);
+  for (const u of (lista?.users ?? []) as Array<{ id: string; email?: string }>) if (u.email) emailPor.set(u.id, u.email);
+
+  let enviados = 0, errores = 0;
+  for (const f of filas) {
+    const to = [...new Set((f.destinatarios ?? []).map((id) => emailPor.get(id)).filter((e): e is string => !!e))];
+    if (to.length === 0) {
+      // Nadie con correo: se marca igual (la campana ya avisó) para no reintentar para siempre.
+      await admin.rpc("contacto_primer_contacto_marcar_correo", { _tenant: f.tenant_id, _a: f.a, _b: f.b, _correo_a: [] });
+      continue;
+    }
+    const { error: errEnvio } = await admin.functions.invoke("send-notification-email", {
+      body: { to, subject: asuntoPrimerContacto(f), html: correoPrimerContactoHTML(f), tag: "primer-contacto" },
+    });
+    if (errEnvio) { errores++; continue; } // queda pendiente: se reintenta en la próxima vuelta
+    const { error: errMarca } = await admin.rpc("contacto_primer_contacto_marcar_correo", { _tenant: f.tenant_id, _a: f.a, _b: f.b, _correo_a: to });
+    if (errMarca) errores++; else enviados++;
+  }
+  return { pendientes: filas.length, enviados, errores };
+}
+
 interface Persona {
   user_id: string; tenant_id: string;
   entrada: string; entradaMin: number; tolerancia: number;
@@ -144,6 +182,8 @@ serve(async (req) => {
   const admin: Admin = createClient(SUPABASE_URL, SERVICE_KEY, { auth: { persistSession: false, autoRefreshToken: false } });
   // El descuento del día va primero y aparte: no depende de quién tiene hora de entrada.
   const gracia = await correrGracia(admin).catch((e) => ({ error: (e as Error).message }));
+  // El aviso del primer contacto entre chatters (también aparte).
+  const primerContacto = await correrPrimerContacto(admin).catch((e) => ({ error: (e as Error).message }));
   const ahora = new Date();
   const hoy = diaBogota(ahora);
   const nowMin = minBogota(ahora);
@@ -198,7 +238,7 @@ serve(async (req) => {
     });
   }
   if (candidatos.length === 0) {
-    return new Response(JSON.stringify({ ok: true, candidatos: 0, gracia }), { headers: { ...CORS, "Content-Type": "application/json" } });
+    return new Response(JSON.stringify({ ok: true, candidatos: 0, gracia, primerContacto }), { headers: { ...CORS, "Content-Type": "application/json" } });
   }
 
   // Ya avisados hoy (cada tipo su tabla).
@@ -301,5 +341,5 @@ serve(async (req) => {
     }
   }
 
-  return new Response(JSON.stringify({ ok: true, candidatos: candidatos.length, tardNuevas, camNuevas, gracia }), { headers: { ...CORS, "Content-Type": "application/json" } });
+  return new Response(JSON.stringify({ ok: true, candidatos: candidatos.length, tardNuevas, camNuevas, gracia, primerContacto }), { headers: { ...CORS, "Content-Type": "application/json" } });
 });

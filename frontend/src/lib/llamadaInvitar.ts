@@ -5,6 +5,7 @@
 // call_participants. useVideoCall escucha esas filas y muestra el modal; quien
 // ya está en la llamada ve «sonando / rechazó / no contestó» por cada uno.
 import { supabase } from "@/integrations/supabase/client";
+import { idsContactables, restringidosOVacio } from "@/lib/contactoRestringido";
 
 export type EstadoInvitado = "ringing" | "accepted" | "declined" | "missed" | "ended";
 
@@ -93,8 +94,13 @@ export async function invitarALaLlamada(llamada: LlamadaViva, uid: string, userI
   if (error) throw error;
   const filas = (ya ?? []) as { id: string; user_id: string; status: string }[];
   const ahora = new Date().toISOString();
-  const nuevos = ids.filter((u) => !filas.some((f) => f.user_id === u));
+  // Un chatter no suma (ni hace sonar en su grupo) a otro chatter: se quitan los
+  // restringidos NUEVOS. Quien ya tiene su fila en la llamada (el 1 a 1 de
+  // siempre) se puede volver a llamar. La base frena igual (call_participants_contacto).
+  const restringidos = await restringidosOVacio(uid);
+  const nuevos = idsContactables(ids.filter((u) => !filas.some((f) => f.user_id === u)), restringidos);
   const reintento = filas.filter((f) => f.status !== "accepted" && f.status !== "ringing").map((f) => f.id);
+  if (!nuevos.length && !reintento.length) return [];
   if (nuevos.length) {
     const { error: e } = await (supabase.from("call_participants") as any).insert(
       nuevos.map((u) => ({ call_id: llamada.id, user_id: u, status: "ringing", invitado_por: uid })),

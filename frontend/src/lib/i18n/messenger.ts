@@ -700,6 +700,10 @@ export const messenger = {
   },
   // Llamadas tipo Skype (18/11/2026)
   "messenger.header.llamadaDeVoz": { es: "Llamada de voz", en: "Voice call" },
+  "messenger.contacto.bloqueado": {
+    es: "Para sumar a otro chatter a la llamada, pídeselo a tu supervisor",
+    en: "To add another chatter to the call, ask your supervisor",
+  },
   "messenger.llamada.noSePudo": { es: "No se pudo iniciar la llamada. Inténtalo de nuevo.", en: "Couldn't start the call. Please try again." },
   "messenger.llamada.perdida": { es: "Llamada perdida", en: "Missed call" },
   "messenger.llamada.rechazada": { es: "Llamada rechazada", en: "Call declined" },
