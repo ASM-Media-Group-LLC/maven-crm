@@ -321,7 +321,12 @@ function scheduleWhenIdle(cb: () => void, delay = 100) {
 
 // ── Production Room configuration (Google Meet-inspired) ─────────
 const ROOM_OPTIONS: RoomOptions = {
-  adaptiveStream: true,
+  // La calidad que se pide de cada video sale del tamaño en que se ve. Sin
+  // «screen», LiveKit cuenta los píxeles de una pantalla retina (Mac) a la
+  // MITAD: pedía la capa de 720p de una pantalla compartida y la estiraba al
+  // doble, y se veía pixeleada (Alvaro, 18/11/2026). Las cámaras de quien no
+  // habla siguen topadas en baja por calidadPorVoz.ts (setVideoQuality gana).
+  adaptiveStream: { pixelDensity: "screen" },
   dynacast: true,
   // Keep local tracks alive when unpublished — avoids getUserMedia re-calls
   // during quick toggling which causes visible camera flashes
