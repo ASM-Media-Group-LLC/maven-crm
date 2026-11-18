@@ -24,6 +24,7 @@ import { TarjetaArgos } from "@/components/hr/TarjetaArgos";
 import { GraciaDelDia } from "@/components/hr/GraciaDelDia";
 import { AppsDelDia } from "@/components/hr/AppsDelDia";
 import { EquipoDelDia } from "@/components/hr/EquipoDelDia";
+import { AhoraEnVivo } from "@/components/hr/AhoraEnVivo";
 import { CronologiaDelDia } from "@/components/hr/CronologiaDelDia";
 import { useDisenoPulido } from "@/hooks/useDisenoPulido";
 import { Mail } from "lucide-react";
@@ -88,6 +89,7 @@ function construirMomentos(capturas: CapturaDia[]): Momento[] {
 // momento con su pantalla grande y su cámara pegada en la esquina. Firma las URLs
 // de lo visible y se re-firma al cambiar de día (caducan a 2 min).
 type FiltroCaptura = "todos" | "fuera" | "camara" | "pantalla";
+interface HoraDelDia { ms: number; total: number; fuera: number; casillas: Array<{ desde: number; momentos: Momento[]; rep: Momento | null; fuera: number }> }
 const sinCamaraMom = (m: Momento): boolean => !m.camara || m.camara.caraVisible === false;
 function pasaFiltro(m: Momento, f: FiltroCaptura): boolean {
   if (f === "fuera") return m.fueraDeLugar === true;
@@ -105,18 +107,54 @@ function TiraDelDia({ capturas, t }: { capturas: CapturaDia[]; t: Tr }) {
     pantalla: momentos.filter((m) => !m.pantalla).length,
   }), [momentos]);
   const filtrados = useMemo(() => momentos.filter((m) => pasaFiltro(m, filtro)), [momentos, filtro]);
-  const horaDe = (m: Momento) => format(new Date(m.createdAt), "h a", { locale: es });
-  // Horas abiertas: las que tienen algo malo y la más reciente; el resto se abre
-  // al tocar su hora (así no se firman cientos de fotos de una vez).
-  const [abiertas, setAbiertas] = useState<Set<string>>(new Set());
-  useEffect(() => {
-    const s = new Set<string>();
-    if (filtrados[0]) s.add(horaDe(filtrados[0]));
-    for (const m of filtrados) if (m.fueraDeLugar === true) s.add(horaDe(m));
-    setAbiertas(s);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [capturas, filtro]);
-  const visibles = useMemo(() => filtrados.filter((m) => abiertas.has(horaDe(m))), [filtrados, abiertas]);
+  // TODAS LAS HORAS (Alvaro, 18/11/2026: «necesito ver todas las horas»): una
+  // fila por hora, de la más nueva a la más vieja, con SEIS casillas de 10 min
+  // (modelo Hubstaff). Cada casilla, su primer pantallazo con la cámara pegada;
+  // en rojo si hubo algo fuera de lugar; tocarla abre el visor ahí y se recorre
+  // el día entero con las flechas. Las horas sin fotos en medio también salen.
+  const visibles = filtrados;
+  const horas = useMemo(() => {
+    if (filtrados.length === 0) return [] as HoraDelDia[];
+    const porHora = new Map<number, Momento[]>();
+    for (const m of filtrados) {
+      const d = new Date(m.createdAt);
+      d.setMinutes(0, 0, 0);
+      const k = d.getTime();
+      const l = porHora.get(k);
+      if (l) l.push(m); else porHora.set(k, [m]);
+    }
+    const claves = [...porHora.keys()];
+    const max = Math.max(...claves), min = Math.min(...claves);
+    const out: HoraDelDia[] = [];
+    for (let k = max; k >= min; k -= 3_600_000) {
+      const delaHora = porHora.get(k) ?? [];
+      const casillas = Array.from({ length: 6 }, (_, i) => {
+        const asc = delaHora
+          .filter((m) => Math.floor(new Date(m.createdAt).getMinutes() / 10) === i)
+          .sort((a, b) => (a.createdAt < b.createdAt ? -1 : 1));
+        return {
+          desde: k + i * 600_000,
+          momentos: asc,
+          rep: asc.find((m) => m.pantalla) ?? asc[0] ?? null,
+          fuera: asc.filter((m) => m.fueraDeLugar === true && !m.perdonado).length,
+        };
+      });
+      out.push({ ms: k, casillas, total: delaHora.length, fuera: casillas.reduce((a, c) => a + c.fuera, 0) });
+    }
+    return out;
+  }, [filtrados]);
+  // Las horas vacías seguidas se juntan en una sola línea («3 PM – 1 AM · sin capturas»).
+  const filasHoras = useMemo(() => {
+    const filas: Array<{ tipo: "hora"; h: HoraDelDia } | { tipo: "hueco"; desde: number; hasta: number; n: number }> = [];
+    for (const h of horas) {
+      const ult = filas[filas.length - 1];
+      if (h.total === 0 && ult?.tipo === "hueco") { ult.desde = h.ms; ult.n++; }
+      else if (h.total === 0) filas.push({ tipo: "hueco", desde: h.ms, hasta: h.ms, n: 1 });
+      else filas.push({ tipo: "hora", h });
+    }
+    return filas;
+  }, [horas]);
+  const ahoraMs = Date.now();
   const [urls, setUrls] = useState<Record<string, string>>({});
 
   // Si una miniatura del buzón falla (p. ej. la firma venció tras una sesión
@@ -130,6 +168,14 @@ function TiraDelDia({ capturas, t }: { capturas: CapturaDia[]; t: Tr }) {
     if (u) setUrls((prev) => ({ ...prev, [c.path]: u }));
   };
 
+  // Se firma solo lo que se ve: la foto de cada casilla y el momento abierto en
+  // el visor (con el anterior y el siguiente). Lo ya firmado no se repite.
+  const [visorIdx, setVisorIdx] = useState<number | null>(null);
+  const aFirmar = useMemo(() => {
+    const lista: Momento[] = horas.flatMap((h) => h.casillas.map((c) => c.rep).filter((m): m is Momento => !!m));
+    if (visorIdx !== null) for (const i of [visorIdx - 1, visorIdx, visorIdx + 1]) if (visibles[i]) lista.push(visibles[i]);
+    return lista;
+  }, [horas, visorIdx, visibles]);
   useEffect(() => {
     let vivo = true;
     void (async () => {
@@ -137,25 +183,28 @@ function TiraDelDia({ capturas, t }: { capturas: CapturaDia[]; t: Tr }) {
       // edge argos-foto (un solo viaje). El mapa se indexa por clave (path o nasPath).
       const buzon = new Set<string>();
       const nas = new Set<string>();
-      for (const m of visibles) {
+      for (const m of aFirmar) {
         for (const c of [m.pantalla, m.camara]) {
           if (!c) continue;
+          const k = claveFoto(c);
+          if (!k || urls[k]) continue;
           if (c.enNas && c.nasPath) nas.add(c.nasPath);
           else if (!c.enNas) buzon.add(c.path);
         }
       }
+      if (nas.size === 0 && buzon.size === 0) return;
       const [nasUrls, buzonPairs] = await Promise.all([
         urlsDeNas([...nas]),
         Promise.all([...buzon].map(async (p) => [p, await urlCaptura(p)] as const)),
       ]);
-      if (vivo) setUrls({ ...nasUrls, ...Object.fromEntries(buzonPairs.filter(([, u]) => !!u) as [string, string][]) });
+      if (vivo) setUrls((prev) => ({ ...prev, ...nasUrls, ...Object.fromEntries(buzonPairs.filter(([, u]) => !!u) as [string, string][]) }));
     })();
     return () => { vivo = false; };
-  }, [visibles]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [aFirmar]);
 
   // Visor pop-up: índice del momento abierto dentro de `visibles`. Flechas del
   // teclado pasan entre momentos; Esc cierra. (visibles va de más nuevo a más viejo.)
-  const [visorIdx, setVisorIdx] = useState<number | null>(null);
   const puedePerdonar = usePuedePerdonar();
   const perdonar = usePerdonarCaptura();
   useEffect(() => {
@@ -176,15 +225,6 @@ function TiraDelDia({ capturas, t }: { capturas: CapturaDia[]; t: Tr }) {
         <p className="text-sm">{t("hr.exp.sinCapturas")}</p>
       </div>
     );
-  }
-
-  // Agrupar por hora (lo más reciente primero): TODAS las horas del filtro.
-  const grupos: Array<{ hora: string; items: Momento[] }> = [];
-  for (const m of filtrados) {
-    const hora = format(new Date(m.createdAt), "h a", { locale: es });
-    const ult = grupos[grupos.length - 1];
-    if (ult && ult.hora === hora) ult.items.push(m);
-    else grupos.push({ hora, items: [m] });
   }
 
   const chips: Array<{ k: FiltroCaptura; lbl: string; n?: number }> = [
@@ -213,76 +253,89 @@ function TiraDelDia({ capturas, t }: { capturas: CapturaDia[]; t: Tr }) {
 
       {filtrados.length === 0 ? (
         <p className="py-10 text-center text-sm text-muted-foreground">{t("hr.exp.filtroVacio")}</p>
-      ) : grupos.map((g) => {
-        const abierta = abiertas.has(g.hora);
-        const malos = g.items.filter((m) => m.fueraDeLugar === true).length;
-        return (
-        <div key={g.hora}>
-          <button type="button" onClick={() => setAbiertas((v) => { const n = new Set(v); if (n.has(g.hora)) n.delete(g.hora); else n.add(g.hora); return n; })}
-            className="mb-2 flex w-full items-center gap-2 rounded-lg px-1 py-1 text-left text-xs font-semibold text-muted-foreground transition hover:text-foreground">
-            <ChevronRight className={`h-3.5 w-3.5 transition-transform ${abierta ? "rotate-90" : ""}`} />
-            <span className="text-foreground/85">{g.hora}</span>
-            <span className="font-normal tabular-nums">· {t("hr.exp.fotosN", { n: g.items.length })}</span>
-            {malos > 0 && <span className="inline-flex items-center gap-1 font-medium text-foreground/85"><span className="h-1.5 w-1.5 rounded-full bg-destructive" aria-hidden />{t("hr.exp.fueraN", { n: malos })}</span>}
-          </button>
-          {abierta && (
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-5">
-            {g.items.map((m) => {
-              const urlP = m.pantalla ? urls[claveFoto(m.pantalla)!] : undefined;
-              const urlC = m.camara ? urls[claveFoto(m.camara)!] : undefined;
-              const hora = a12(format(new Date(m.createdAt), "HH:mm"));
-              const abrir = () => setVisorIdx(visibles.indexOf(m)); // pop-up, no pestaña nueva
-              return (
-                <button
-                  key={m.id}
-                  type="button"
-                  onClick={abrir}
-                  title={`${hora}${m.veredicto ? ` · ${m.veredicto}` : ""}`}
-                  className={`group relative overflow-hidden rounded-xl border bg-muted/40 transition ${m.fueraDeLugar ? "border-destructive/60" : "border-border/40 hover:border-primary/50"}`}
-                >
-                  <div className="relative aspect-[16/10] w-full">
-                    {/* GRANDE: la pantalla; si no compartía, una X */}
-                    {m.pantalla ? (
-                      urlP ? (
-                        <img src={urlP} alt={hora} loading="lazy" onError={() => reFirmar(m.pantalla)} className="h-full w-full object-cover" />
-                      ) : (
-                        <div className="flex h-full w-full items-center justify-center text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /></div>
-                      )
-                    ) : (
-                      <div className="flex h-full w-full flex-col items-center justify-center gap-1 bg-muted/30 text-muted-foreground">
-                        <ScreenShareOff className="h-5 w-5 opacity-60" />
-                        <span className="text-[9px] font-medium">{t("hr.exp.sinPantalla")}</span>
-                      </div>
-                    )}
-                    {/* ESQUINA: la cámara; si estaba apagada, una X roja */}
-                    <div className="absolute bottom-1 right-1 h-11 w-16 overflow-hidden rounded-control border-2 border-background/80 shadow-md">
-                      {m.camara ? (
-                        urlC ? (
-                          <img src={urlC} alt="" loading="lazy" onError={() => reFirmar(m.camara)} className="h-full w-full object-cover" />
-                        ) : (
-                          <div className="flex h-full w-full items-center justify-center bg-muted/60 text-muted-foreground"><Loader2 className="h-3 w-3 animate-spin" /></div>
-                        )
-                      ) : (
-                        <div className="flex h-full w-full items-center justify-center bg-destructive/15 text-destructive" title={t("hr.exp.camaraApagada")}>
-                          <CameraOff className="h-3.5 w-3.5" />
+      ) : (
+        <div className="flex flex-col gap-4">
+          {filasHoras.map((f) => f.tipo === "hueco" ? (
+            <div key={`hueco-${f.hasta}`} className="flex items-center gap-2 rounded-lg border border-dashed border-border/40 px-2.5 py-1.5 text-xs text-muted-foreground">
+              <span className="font-semibold text-foreground/70">
+                {f.n === 1 ? format(new Date(f.desde), "h a", { locale: es }) : `${format(new Date(f.hasta), "h a", { locale: es })} – ${format(new Date(f.desde), "h a", { locale: es })}`}
+              </span>
+              <span>· {t("hr.exp.horas.sinFotos")}{f.n > 1 ? ` · ${f.n} h` : ""}</span>
+            </div>
+          ) : (() => { const h = f.h; return (
+            <div key={h.ms}>
+              <div className="mb-1.5 flex items-baseline gap-2 px-0.5 text-xs">
+                <span className="w-14 shrink-0 font-semibold text-foreground/90">{format(new Date(h.ms), "h a", { locale: es })}</span>
+                {h.total === 0 ? (
+                  <span className="text-muted-foreground">{t("hr.exp.horas.sinFotos")}</span>
+                ) : (
+                  <span className="tabular-nums text-muted-foreground">{t("hr.exp.fotosN", { n: h.total })}</span>
+                )}
+                {h.fuera > 0 && (
+                  <span className="inline-flex items-center gap-1 font-medium text-foreground/85">
+                    <span className="h-1.5 w-1.5 rounded-full bg-destructive" aria-hidden />{t("hr.exp.fueraN", { n: h.fuera })}
+                  </span>
+                )}
+              </div>
+              {h.total > 0 && (
+                <div className="grid grid-cols-3 gap-2 sm:grid-cols-6">
+                  {h.casillas.map((c) => {
+                    const hora = a12(format(new Date(c.desde), "HH:mm"));
+                    if (!c.rep && c.desde > ahoraMs) {
+                      // Todavía no llega esa casilla.
+                      return <div key={c.desde} className="flex aspect-[16/10] items-end rounded-lg p-1 text-[9px] tabular-nums text-muted-foreground/40">{hora}</div>;
+                    }
+                    if (!c.rep) {
+                      return (
+                        <div key={c.desde} className="flex aspect-[16/10] flex-col items-center justify-center rounded-lg border border-dashed border-border/50 text-[10px] tabular-nums text-muted-foreground/70">
+                          <span>{hora}</span>
+                          <span>{t("hr.exp.horas.vacia")}</span>
                         </div>
-                      )}
-                    </div>
-                    <span className="absolute bottom-1 left-1 rounded bg-black/55 px-1 py-0.5 text-[9px] font-semibold tabular-nums text-white backdrop-blur-sm">{hora}</span>
-                    {m.fueraDeLugar && (
-                      <span className="absolute left-1 top-1 inline-flex items-center gap-0.5 rounded bg-destructive px-1 py-0.5 text-[9px] font-semibold text-destructive-foreground">
-                        <AlertTriangle className="h-2.5 w-2.5" />{t("hr.exp.fueraDeLugar")}
-                      </span>
-                    )}
-                  </div>
-                </button>
-              );
-            })}
-          </div>
-          )}
+                      );
+                    }
+                    const m = c.rep;
+                    const urlP = m.pantalla ? urls[claveFoto(m.pantalla)!] : undefined;
+                    const urlC = m.camara ? urls[claveFoto(m.camara)!] : undefined;
+                    return (
+                      <button
+                        key={c.desde}
+                        type="button"
+                        onClick={() => setVisorIdx(visibles.indexOf(m))}
+                        title={`${hora} · ${t("hr.exp.fotosN", { n: c.momentos.length })}${m.veredicto ? ` · ${m.veredicto}` : ""}`}
+                        className={`group relative aspect-[16/10] overflow-hidden rounded-lg border bg-muted/40 transition ${c.fuera > 0 ? "border-destructive/70 ring-1 ring-destructive/40" : "border-border/40 hover:border-primary/50"}`}
+                      >
+                        {m.pantalla ? (
+                          urlP ? <img src={urlP} alt={hora} loading="lazy" onError={() => reFirmar(m.pantalla)} className="h-full w-full object-cover" />
+                            : <div className="flex h-full w-full items-center justify-center text-muted-foreground"><Loader2 className="h-3.5 w-3.5 animate-spin" /></div>
+                        ) : (
+                          <div className="flex h-full w-full items-center justify-center bg-muted/30 text-muted-foreground"><ScreenShareOff className="h-4 w-4 opacity-60" /></div>
+                        )}
+                        <div className="absolute bottom-1 right-1 h-7 w-10 overflow-hidden rounded border border-background/80 shadow">
+                          {m.camara ? (
+                            urlC ? <img src={urlC} alt="" loading="lazy" onError={() => reFirmar(m.camara)} className="h-full w-full object-cover" />
+                              : <div className="h-full w-full bg-muted/60" />
+                          ) : (
+                            <div className="flex h-full w-full items-center justify-center bg-destructive/20 text-destructive"><CameraOff className="h-3 w-3" /></div>
+                          )}
+                        </div>
+                        <span className="absolute bottom-1 left-1 rounded bg-black/60 px-1 py-px text-[9px] font-semibold tabular-nums text-white">{hora}</span>
+                        {c.momentos.length > 1 && (
+                          <span className="absolute right-1 top-1 rounded bg-black/60 px-1 py-px text-[9px] font-semibold tabular-nums text-white">{c.momentos.length}</span>
+                        )}
+                        {c.fuera > 0 && (
+                          <span className="absolute left-1 top-1 flex h-4 w-4 items-center justify-center rounded bg-destructive text-destructive-foreground" title={t("hr.exp.fueraN", { n: c.fuera })}>
+                            <AlertTriangle className="h-2.5 w-2.5" />
+                          </span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          ); })())}
         </div>
-        );
-      })}
+      )}
 
       {/* ── Pop-up: pantalla (1) grande + cámara (2) flotante, con su minuto exacto ── */}
       {visorIdx !== null && visibles[visorIdx] && (() => {
@@ -1018,36 +1071,13 @@ export default function HRExpediente() {
         </div>
       </section>
 
-      {/* QUÉ HIZO, EN ORDEN (Alvaro, 18/11/2026, propuesta 3 «Cronología»): el
-          día como un chat, lo más nuevo arriba, lo malo con su prueba y los días
-          anteriores debajo. No quita nada: lo de siempre sigue abajo. */}
-      {userId && !cargando && !error && (
-        <CronologiaDelDia
-          userId={userId}
-          dia={dia}
-          horarioEntrada={expediente?.horario.entrada ?? null}
-          diasMes={expediente ? [...expediente.dias.values()] : []}
-          esHoy={esHoy}
-          onElegirDia={(f) => { setDiaSel(f); setVerCalendario(false); window.scrollTo({ top: 0, behavior: "smooth" }); }}
-          onVerMasDias={() => { setVerCalendario(true); window.scrollTo({ top: 0, behavior: "smooth" }); }}
-          onVerFotos={() => document.getElementById("expediente-todo-el-dia")?.scrollIntoView({ behavior: "smooth", block: "start" })}
-        />
-      )}
+      {/* AHORA MISMO, EN VIVO (Alvaro, 18/11/2026: «dice live: la idea es que esté
+          live»): su pantalla y su cámara en video, no en pantallazos. Solo hoy. */}
+      {userId && !cargando && !error && esHoy && <AhoraEnVivo userId={userId} capturas={dia.capturas} />}
 
-      {/* Argos como MANAGER del día: lo PRIMERO, juzga el día con criterio
-          (Alvaro, 09/11). Reemplaza las barras abiertas de pantalla/cámara. */}
-      <TarjetaArgos nombre={nombre} dia={dia} horario={expediente?.horario ?? { entrada: null, salida: null }} />
-
-      {/* Minutos de gracia del turno (Alvaro, 16/11): cuánto se pagó, cuánto se
-          descontó, y RR. HH. puede devolver minutos. */}
-      {userId && <GraciaDelDia userId={userId} fecha={dia.fecha} />}
-
-      {/* Apps y páginas de la app de computador (Alvaro, 17/11/2026). */}
-      {userId && <AppsDelDia userId={userId} fecha={dia.fecha} />}
-      {userId && <EquipoDelDia userId={userId} fecha={dia.fecha} />}
-
-      {/* TODO EL DÍA, justo debajo de Argos (Alvaro, 13/11/2026: «no puedo ver los
-          pantallazos de todo el día»): todas las fotos por hora, sin tope. */}
+      {/* TODAS SUS HORAS, justo debajo del en vivo (Alvaro, 13/11 y 18/11/2026:
+          «no puedo ver los pantallazos de todo el día», «necesito ver todas las
+          horas»): una fila por hora con sus casillas de 10 min. */}
       <section id="expediente-todo-el-dia" className="vidrio sube mt-5 scroll-mt-4 p-4 lg:p-5" style={{ animationDelay: "0.05s" }}>
         <div className="v-cont">
           <p className="mb-3 flex items-center gap-1.5 text-xs font-semibold text-muted-foreground">
@@ -1084,6 +1114,34 @@ export default function HRExpediente() {
           )}
         </div>
       </section>
+
+      {/* QUÉ HIZO, EN ORDEN (Alvaro, 18/11/2026, propuesta 3 «Cronología»): el
+          día como un chat, lo más nuevo arriba, lo malo con su prueba y los días
+          anteriores debajo. No quita nada: lo de siempre sigue abajo. */}
+      {userId && !cargando && !error && (
+        <CronologiaDelDia
+          userId={userId}
+          dia={dia}
+          horarioEntrada={expediente?.horario.entrada ?? null}
+          diasMes={expediente ? [...expediente.dias.values()] : []}
+          esHoy={esHoy}
+          onElegirDia={(f) => { setDiaSel(f); setVerCalendario(false); window.scrollTo({ top: 0, behavior: "smooth" }); }}
+          onVerMasDias={() => { setVerCalendario(true); window.scrollTo({ top: 0, behavior: "smooth" }); }}
+          onVerFotos={() => document.getElementById("expediente-todo-el-dia")?.scrollIntoView({ behavior: "smooth", block: "start" })}
+        />
+      )}
+
+      {/* Argos como MANAGER del día: lo PRIMERO, juzga el día con criterio
+          (Alvaro, 09/11). Reemplaza las barras abiertas de pantalla/cámara. */}
+      <TarjetaArgos nombre={nombre} dia={dia} horario={expediente?.horario ?? { entrada: null, salida: null }} />
+
+      {/* Minutos de gracia del turno (Alvaro, 16/11): cuánto se pagó, cuánto se
+          descontó, y RR. HH. puede devolver minutos. */}
+      {userId && <GraciaDelDia userId={userId} fecha={dia.fecha} />}
+
+      {/* Apps y páginas de la app de computador (Alvaro, 17/11/2026). */}
+      {userId && <AppsDelDia userId={userId} fecha={dia.fecha} />}
+      {userId && <EquipoDelDia userId={userId} fecha={dia.fecha} />}
 
       {/* Asistencia + el desglose técnico, ya COLAPSADO: el perfil abre limpio y
           el detalle (pantalla/cámara/atención) se abre solo si se quiere. */}
