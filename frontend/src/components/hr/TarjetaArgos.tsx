@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { format } from "date-fns";
 import {
-  Bot, Monitor, CameraOff, ScreenShareOff, Loader2, Sparkles, X,
+  Bot, Monitor, CameraOff, ScreenShareOff, Loader2, Sparkles, X, ChevronDown,
   Instagram, Youtube, Facebook, MessageCircle, MessagesSquare, Clapperboard, FolderOpen, Video, Images, Globe,
 } from "lucide-react";
 import { useLanguage } from "@/hooks/useLanguage";
@@ -32,6 +32,8 @@ import { FotoConZoom } from "@/components/hr/FotoConZoom";
 type Tono = "verde" | "ambar" | "rojo" | "neutro";
 type Frase = { k: TranslationKey; p?: Record<string, string | number> };
 type Etiqueta = "entrada" | "salida" | "cambio" | "poca";
+/** Qué detalle abre cada hecho al tocarlo. */
+type Detalle = "momentos" | "fuera" | "asistencia" | "pantalla" | "camara";
 interface Evidencia { id: string; createdAt: string; pantalla: CapturaDia | null; camara: CapturaDia | null; fueraDeLugar: boolean; veredicto: string | null; etiqueta?: Etiqueta | null; }
 const ETIQUETA_LBL: Record<Etiqueta, TranslationKey> = {
   entrada: "hr.exp.mgr.etq.entrada", salida: "hr.exp.mgr.etq.salida", cambio: "hr.exp.mgr.etq.cambio", poca: "hr.exp.mgr.etq.poca",
@@ -146,6 +148,99 @@ function camaraDe(pantalla: CapturaDia, camaras: CapturaDia[], usadas: Set<strin
 
 const MAX_EVIDENCIAS = 8; // las IMPORTANTES (lo malo va aparte, hasta 9)
 
+const TITULO_DETALLE: Record<Exclude<Detalle, "fuera">, TranslationKey> = {
+  momentos: "hr.exp.det.momentos", asistencia: "hr.exp.det.asistencia", pantalla: "hr.exp.det.pantalla", camara: "hr.exp.det.camara",
+};
+const SUB_DETALLE: Record<Exclude<Detalle, "fuera">, TranslationKey> = {
+  momentos: "hr.exp.det.momentosSub", asistencia: "hr.exp.det.asistenciaSub", pantalla: "hr.exp.det.pantallaSub", camara: "hr.exp.det.camaraSub",
+};
+
+/** «6 h 05 min» / «45 min». */
+function minutosLegibles(min: number, t: (k: TranslationKey, p?: Record<string, string | number>) => string): string {
+  const m = Math.max(0, Math.round(min));
+  return m < 60 ? t("hr.exp.det.min", { n: m }) : t("hr.exp.det.horas", { h: Math.floor(m / 60), m: String(m % 60).padStart(2, "0") });
+}
+
+/** En qué se le fue el tiempo del día: una barra repartida y una fila por parte. */
+function Reparto({ pct, frase, filas }: {
+  pct: number | null;
+  frase: TranslationKey;
+  filas: Array<{ k: TranslationKey; seg: number; color: string }>;
+}) {
+  const { t } = useLanguage();
+  const conTiempo = filas.filter((f) => f.seg > 0);
+  const total = conTiempo.reduce((s, f) => s + f.seg, 0);
+  if (total <= 0) return <p className="text-sm text-muted-foreground">{t("hr.exp.det.sinDatos")}</p>;
+  return (
+    <div className="flex flex-col gap-4">
+      {pct != null && (
+        <p className="text-sm text-foreground/90">
+          {conNumero(t(frase, { pct: Math.round(pct) }), [Math.round(pct)])}
+        </p>
+      )}
+      <div className="flex h-2.5 w-full overflow-hidden rounded-full bg-foreground/10" aria-hidden>
+        {conTiempo.map((f) => <span key={f.k} className={f.color} style={{ width: `${(f.seg / total) * 100}%` }} />)}
+      </div>
+      <ul className="grid gap-x-6 gap-y-2 sm:grid-cols-2">
+        {conTiempo.map((f) => (
+          <li key={f.k} className="flex items-center gap-2.5 text-sm">
+            <span className={`h-2 w-2 shrink-0 rounded-full ${f.color}`} aria-hidden />
+            <span className="min-w-0 flex-1 truncate text-muted-foreground">{t(f.k)}</span>
+            <span className="font-medium tabular-nums text-foreground">{minutosLegibles(f.seg / 60, t)}</span>
+            <span className="w-10 text-right text-xs tabular-nums text-muted-foreground">{Math.round((f.seg / total) * 100)}%</span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+/** Su horario contra lo que hizo: a qué hora entró, si salió, cuánto estuvo fuera. */
+function DetalleAsistencia({ a, dia }: {
+  a: { entrada: string | null; salida: string | null; entro: string | null; salio: string | null; difEnt: number | null; difSal: number | null; turnoTerminado: boolean; enSala: boolean };
+  dia: DiaExpediente;
+}) {
+  const { t } = useLanguage();
+  const fila = (etiqueta: string, valor: string, nota?: { texto: string; tono: "bien" | "ojo" }) => (
+    <div className="flex items-baseline justify-between gap-3 border-b border-border/30 py-2.5 last:border-0">
+      <span className="text-sm text-muted-foreground">{etiqueta}</span>
+      <span className="flex items-baseline gap-2 text-right">
+        <span className="text-sm font-medium tabular-nums text-foreground">{valor}</span>
+        {nota && (
+          <span className={`inline-flex items-center gap-1.5 text-xs ${nota.tono === "ojo" ? "text-foreground/85" : "text-muted-foreground"}`}>
+            <span className={`h-1.5 w-1.5 rounded-full ${nota.tono === "ojo" ? "bg-warning" : "bg-success"}`} aria-hidden />{nota.texto}
+          </span>
+        )}
+      </span>
+    </div>
+  );
+  const salida = a.enSala
+    ? fila(t("hr.exp.det.salio"), t("hr.exp.det.sigueEnSala"))
+    : !a.turnoTerminado && a.salio
+      ? fila(t("hr.exp.det.salio"), t("hr.exp.det.fueraDesde", { h: a.salio }), { texto: t("hr.exp.det.turnoSigue", { h: a.salida ?? "—" }), tono: "ojo" })
+      : a.salio
+        ? fila(t("hr.exp.det.salio"), a.salio, a.difSal != null && a.difSal < -5
+            ? { texto: t("hr.exp.det.antes", { n: Math.abs(a.difSal) }), tono: "ojo" }
+            : { texto: t("hr.exp.det.aTiempo"), tono: "bien" })
+        : fila(t("hr.exp.det.salio"), "—");
+  return (
+    <div className="grid gap-6 lg:grid-cols-2">
+      <div>
+        {fila(t("hr.exp.det.horario"), a.entrada && a.salida ? `${a.entrada} – ${a.salida}` : t("hr.exp.det.sinHorario"))}
+        {fila(t("hr.exp.det.entro"), a.entro ?? "—", a.entro
+          ? (a.difEnt != null && a.difEnt > 5 ? { texto: t("hr.exp.det.tarde", { n: a.difEnt }), tono: "ojo" } : { texto: t("hr.exp.det.aTiempo"), tono: "bien" })
+          : undefined)}
+        {salida}
+      </div>
+      <div>
+        {fila(t("hr.exp.det.horasTrabajadas"), minutosLegibles(dia.horas * 60, t))}
+        {fila(t("hr.exp.det.tiempoFuera"), minutosLegibles(dia.minFueraCowork ?? 0, t))}
+        {fila(t("hr.exp.det.pausaDeMas"), minutosLegibles(dia.minutosPausaDeMas, t))}
+      </div>
+    </div>
+  );
+}
+
 export function TarjetaArgosPulida({ nombre, dia, horario }: {
   nombre: string;
   dia: DiaExpediente;
@@ -222,6 +317,13 @@ export function TarjetaArgosPulida({ nombre, dia, horario }: {
     const ahoraMin = (() => { const [h, m] = (hhmm(new Date().toISOString()) ?? "0:0").split(":").map(Number); return h * 60 + m; })();
     const entMin = (() => { if (!horario.entrada) return null; const [h, m] = horario.entrada.split(":").map(Number); return h * 60 + m; })();
     const noEntro = dia.fecha === hoyB && !dia.entroAt && entMin != null && ahoraMin > entMin + 5;
+    // «Salió X min antes» solo si su turno YA TERMINÓ (Alvaro, 18/11/2026: «left
+    // 416 min early… ¿qué significa?»). Antes se calculaba con su última salida
+    // aunque el turno siguiera: un descanso a media mañana salía como «salió 416
+    // min antes». Mientras el turno sigue, lo que hay es «fuera de Cowork desde…».
+    const salMin = (() => { if (!horario.salida) return null; const [h, m] = horario.salida.split(":").map(Number); return h * 60 + m; })();
+    const turnoNocturno = entMin != null && salMin != null && salMin <= entMin;
+    const turnoTerminado = dia.fecha !== hoyB || (!turnoNocturno && salMin != null && ahoraMin >= salMin);
     const tarde = noEntro ? ahoraMin - entMin! : 0;
     const titular: Frase = noEntro ? { k: "hr.exp.mgr.noEntro", p: { n: nom, h: horario.entrada!, d: tarde < 60 ? `${tarde} min` : `${Math.floor(tarde / 60)} h ${String(tarde % 60).padStart(2, "0")} min` } }
       : banda === "bien" ? { k: "hr.exp.mgr.bien", p: { n: nom } }
@@ -231,17 +333,34 @@ export function TarjetaArgosPulida({ nombre, dia, horario }: {
     const tono: Tono = noEntro ? "rojo" : banda === "bien" ? "verde" : banda === "ojo" ? "ambar" : banda === "mal" ? "rojo" : "neutro";
 
     // Hechos cortos (reemplazan el párrafo): cada uno con su color semántico.
-    const hechos: Array<{ k: TranslationKey; p?: Record<string, string | number>; tono: "neutro" | "rojo" | "ambar" }> = [];
-    if (juzgadas.length > 0) hechos.push({ k: "hr.exp.mgr.hecho.momentos", p: { n: juzgadas.length }, tono: "neutro" });
-    if (fuera.length > 0) hechos.push({ k: "hr.exp.mgr.hecho.fuera", p: { n: fuera.length }, tono: "rojo" });
-    if (enSala) hechos.push({ k: "hr.exp.mgr.hecho.enSala", tono: "neutro" });
-    else if (difSal != null && difSal < -5) hechos.push({ k: "hr.exp.mgr.hecho.salioAntes", p: { min: Math.abs(difSal) }, tono: "ambar" });
-    if (difEnt != null && difEnt > 5) hechos.push({ k: "hr.exp.mgr.hecho.entroTarde", p: { min: difEnt }, tono: "ambar" });
-    if (fPant != null && fPant < 50) hechos.push({ k: "hr.exp.mgr.hecho.pantalla", p: { pct: Math.round(fPant) }, tono: "ambar" });
-    if (fCam != null && fCam < 50) hechos.push({ k: "hr.exp.mgr.hecho.camara", p: { pct: Math.round(fCam) }, tono: "ambar" });
+    // Cada hecho se puede tocar y abre su detalle (Alvaro, 18/11/2026: «si lo
+    // presiono, quiero ver en esa pantalla el detallado con un buen diseño»).
+    const hechos: Array<{ k: TranslationKey; p?: Record<string, string | number>; tono: "neutro" | "rojo" | "ambar"; detalle: Detalle }> = [];
+    if (juzgadas.length > 0) hechos.push({ k: "hr.exp.mgr.hecho.momentos", p: { n: juzgadas.length }, tono: "neutro", detalle: "momentos" });
+    if (fuera.length > 0) hechos.push({ k: "hr.exp.mgr.hecho.fuera", p: { n: fuera.length }, tono: "rojo", detalle: "fuera" });
+    if (enSala) hechos.push({ k: "hr.exp.mgr.hecho.enSala", tono: "neutro", detalle: "asistencia" });
+    else if (turnoTerminado && difSal != null && difSal < -5) hechos.push({ k: "hr.exp.mgr.hecho.salioAntes", p: { min: Math.abs(difSal) }, tono: "ambar", detalle: "asistencia" });
+    else if (!turnoTerminado && dia.salioAt && hhmm(dia.salioAt)) hechos.push({ k: "hr.exp.mgr.hecho.fueraDesde", p: { h: hhmm(dia.salioAt)! }, tono: "ambar", detalle: "asistencia" });
+    if (difEnt != null && difEnt > 5) hechos.push({ k: "hr.exp.mgr.hecho.entroTarde", p: { min: difEnt }, tono: "ambar", detalle: "asistencia" });
+    if (fPant != null && fPant < 50) hechos.push({ k: "hr.exp.mgr.hecho.pantalla", p: { pct: Math.round(fPant) }, tono: "ambar", detalle: "pantalla" });
+    if (fCam != null && fCam < 50) hechos.push({ k: "hr.exp.mgr.hecho.camara", p: { pct: Math.round(fCam) }, tono: "ambar", detalle: "camara" });
 
-    return { nom, tono, titular, hechos, sistemas, evid, malas, importantes, hayFuera: fuera.length > 0, hayJuicio: juzgadas.length > 0 };
+    // Todos los momentos mirados, del más nuevo al más viejo (para «N momentos mirados»).
+    const todas: Evidencia[] = juzgadas.map((c) => ({
+      id: c.id, createdAt: c.createdAt, pantalla: c, camara: camaraDe(c, camaras, new Set()),
+      fueraDeLugar: c.fueraDeLugar === true && !c.perdonado, veredicto: c.veredicto,
+    }));
+    const asistencia = {
+      entrada: horario.entrada, salida: horario.salida,
+      entro: hhmm(dia.entroAt), salio: enSala ? null : hhmm(dia.salioAt),
+      difEnt, difSal: turnoTerminado ? difSal : null, turnoTerminado, enSala,
+    };
+    return { nom, tono, titular, hechos, sistemas, evid, malas, importantes, todas, asistencia, fPant, fCam, hayFuera: fuera.length > 0, hayJuicio: juzgadas.length > 0 };
   }, [nombre, dia, horario]);
+
+  const [detalle, setDetalle] = useState<Detalle | null>(null);
+  const malasRef = useRef<HTMLDivElement | null>(null);
+  const aFirmar = useMemo(() => (detalle === "momentos" ? [...r.evid, ...r.todas] : r.evid), [detalle, r.evid, r.todas]);
 
   // Firmar las URLs de las miniaturas de evidencia (buzón + NAS).
   const [urls, setUrls] = useState<Record<string, string>>({});
@@ -249,7 +368,7 @@ export function TarjetaArgosPulida({ nombre, dia, horario }: {
   useEffect(() => {
     let vivo = true;
     const nas = new Set<string>(), buzon = new Set<string>();
-    for (const e of r.evid) for (const c of [e.pantalla, e.camara]) {
+    for (const e of aFirmar) for (const c of [e.pantalla, e.camara]) {
       const k = claveFoto(c); if (!k) continue;
       if (c!.enNas) nas.add(k); else buzon.add(k);
     }
@@ -258,10 +377,10 @@ export function TarjetaArgosPulida({ nombre, dia, horario }: {
         urlsDeNas([...nas]),
         Promise.all([...buzon].map(async (p) => [p, await urlCaptura(p)] as const)),
       ]);
-      if (vivo) setUrls({ ...nasUrls, ...Object.fromEntries(buzonPairs.filter(([, u]) => !!u) as [string, string][]) });
+      if (vivo) setUrls((antes) => ({ ...antes, ...nasUrls, ...Object.fromEntries(buzonPairs.filter(([, u]) => !!u) as [string, string][]) }));
     })();
     return () => { vivo = false; };
-  }, [r.evid]);
+  }, [aFirmar]);
   const reFirmar = async (c: CapturaDia | null) => {
     if (!c || c.enNas || refirmados.current.has(c.path)) return;
     refirmados.current.add(c.path);
@@ -297,12 +416,26 @@ export function TarjetaArgosPulida({ nombre, dia, horario }: {
         </p>
         {r.hechos.length > 0 && (
           <div className="mt-3 flex flex-wrap gap-2">
-            {r.hechos.map((h, i) => (
-              <span key={i} className={PASTILLA}>
-                {h.tono !== "neutro" && <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${PUNTITO[h.tono]}`} aria-hidden />}
-                <span>{conNumero(t(h.k, h.p), h.p ? Object.values(h.p) : undefined)}</span>
-              </span>
-            ))}
+            {r.hechos.map((h, i) => {
+              const abierto = detalle === h.detalle;
+              return (
+                <button
+                  key={i}
+                  type="button"
+                  aria-expanded={h.detalle === "fuera" ? undefined : abierto}
+                  onClick={() => {
+                    // «Fuera de lugar» ya está abajo, en «Lo que hizo mal»: se baja hasta ahí.
+                    if (h.detalle === "fuera") { malasRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }); return; }
+                    setDetalle(abierto ? null : h.detalle);
+                  }}
+                  className={`${PASTILLA} cursor-pointer transition-colors hover:border-foreground/30 hover:bg-foreground/[0.08] ${abierto ? "border-foreground/40 bg-foreground/10" : ""}`}
+                >
+                  {h.tono !== "neutro" && <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${PUNTITO[h.tono]}`} aria-hidden />}
+                  <span>{conNumero(t(h.k, h.p), h.p ? Object.values(h.p) : undefined)}</span>
+                  <ChevronDown className={`h-3 w-3 shrink-0 opacity-60 transition-transform ${abierto ? "rotate-180" : ""} ${h.detalle === "fuera" ? "-rotate-90" : ""}`} aria-hidden />
+                </button>
+              );
+            })}
           </div>
         )}
 
@@ -354,8 +487,55 @@ export function TarjetaArgosPulida({ nombre, dia, horario }: {
               };
           return (
             <>
+              {detalle && detalle !== "fuera" && (
+                <div className="sube mt-4 overflow-hidden rounded-[14px] border border-border/60 bg-foreground/[0.03]" role="region" aria-label={t(TITULO_DETALLE[detalle])}>
+                  <div className="flex items-center gap-3 border-b border-border/50 px-4 py-3">
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-semibold text-foreground">{t(TITULO_DETALLE[detalle])}</p>
+                      <p className="text-[11px] text-muted-foreground">{t(SUB_DETALLE[detalle])}</p>
+                    </div>
+                    <button type="button" onClick={() => setDetalle(null)} aria-label={t("hr.exp.det.cerrar")}
+                      className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-foreground/10 hover:text-foreground">
+                      <X className="h-4 w-4" />
+                    </button>
+                  </div>
+                  <div className="p-4">
+                    {detalle === "momentos" && (
+                      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">{r.todas.map(tarjeta)}</div>
+                    )}
+                    {detalle === "asistencia" && <DetalleAsistencia a={r.asistencia} dia={dia} />}
+                    {detalle === "pantalla" && (
+                      <Reparto
+                        pct={r.fPant}
+                        frase="hr.exp.det.pantallaFrase"
+                        filas={[
+                          { k: "hr.exp.det.conPantalla", seg: dia.segActivo ?? 0, color: "bg-success" },
+                          { k: "hr.exp.det.sinPantalla", seg: dia.segSinPantalla ?? 0, color: "bg-warning" },
+                          { k: "hr.exp.det.enPausa", seg: dia.segPausa ?? 0, color: "bg-primary/70" },
+                          { k: "hr.exp.det.sinConexion", seg: dia.segSinConexion ?? 0, color: "bg-muted-foreground/60" },
+                          { k: "hr.exp.det.fueraDeCowork", seg: (dia.minFueraCowork ?? 0) * 60, color: "bg-destructive" },
+                        ]}
+                      />
+                    )}
+                    {detalle === "camara" && (
+                      <Reparto
+                        pct={r.fCam}
+                        frase="hr.exp.det.camaraFrase"
+                        filas={[
+                          { k: "hr.exp.det.conCamara", seg: dia.segActivo ?? 0, color: "bg-success" },
+                          { k: "hr.exp.det.camaraApagada", seg: dia.segSinCamara ?? 0, color: "bg-warning" },
+                          { k: "hr.exp.det.fueraDeCuadro", seg: dia.segFueraCamara ?? 0, color: "bg-warning/60" },
+                          { k: "hr.exp.det.enPausa", seg: dia.segPausa ?? 0, color: "bg-primary/70" },
+                          { k: "hr.exp.det.sinConexion", seg: dia.segSinConexion ?? 0, color: "bg-muted-foreground/60" },
+                          { k: "hr.exp.det.fueraDeCowork", seg: (dia.minFueraCowork ?? 0) * 60, color: "bg-destructive" },
+                        ]}
+                      />
+                    )}
+                  </div>
+                </div>
+              )}
               {r.malas.length > 0 && (
-                <div className="mt-6">
+                <div className="mt-6 scroll-mt-4" ref={malasRef}>
                   <p className="mb-3 flex items-center gap-1.5 text-xs font-semibold text-foreground/85">
                     <span className="h-1.5 w-1.5 rounded-full bg-destructive" aria-hidden />{t("hr.exp.mgr.loMalo", { n: r.malas.length })}
                   </p>

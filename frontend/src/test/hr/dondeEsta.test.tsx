@@ -16,6 +16,10 @@ vi.mock("@/hooks/useLanguage", () => {
   return { useLanguage: () => idioma, useLanguageSiHay: () => idioma };
 });
 
+// Las pantallas en vivo (últimos 12 min): por defecto nadie tiene.
+let vivos: Array<{ userId: string; pantallaUrl: string | null; camaraUrl: string | null; ultima: string }> = [];
+vi.mock("@/hooks/useCapturasVivo", () => ({ useCapturasVivo: () => ({ personas: vivos }) }));
+
 import { DondeEstaPanel, pasaFiltro } from "@/components/hr/DondeEstaPanel";
 import { type FilaDondeEsta, ordenarFilas, separarPantalla, tonoDe } from "@/hooks/useDondeEsta";
 
@@ -63,14 +67,49 @@ describe("el tablero", () => {
       fila("Karem", "fuera_de_cowork", { fuera_hoy_veces: 2, fuera_hoy_min: 14 }),
     ] };
     render(<DondeEstaPanel />, { wrapper: envolver });
-    // Primero las cajitas por departamento (13/11/2026); al tocar una, su lista.
-    fireEvent.click(await screen.findByRole("button", { name: /Chatters/ }));
+    // Desde el 18/11/2026: tarjetas de todo el equipo, sin cajitas por departamento.
     const filas = await screen.findAllByRole("listitem");
     expect(filas[0]).toHaveTextContent("Karem");
-    expect(within(filas[0]).getByText("hr.donde.estado.fueraDeCowork")).toBeInTheDocument();
+    expect(within(filas[0]).getByText(/hr\.donde\.estado\.fueraDeCowork/)).toBeInTheDocument();
     expect(within(filas[0]).getByText(/hr\.donde\.fueraHoy.*"n":2.*durMin.*14/)).toBeInTheDocument();
-    expect(within(filas[1]).getByText("Infloww")).toBeInTheDocument();
+    expect(within(filas[1]).getByText(/Infloww · Respondiendo fans/)).toBeInTheDocument();
     expect(within(filas[0]).getByRole("link")).toHaveAttribute("href", "/hr/expediente/u-Karem");
+  });
+
+  it("por defecto solo quien está en turno; las fichas filtran por estado y por equipo", async () => {
+    respuesta = { error: null, data: [
+      fila("Ana", "activo"),
+      fila("Beto", "fuera_de_turno"),
+      fila("Caro", "sin_pantalla", { equipo: "Freelance" }),
+    ] };
+    render(<DondeEstaPanel />, { wrapper: envolver });
+    expect(await screen.findAllByRole("listitem")).toHaveLength(2); // Beto, fuera de turno, no
+    fireEvent.click(screen.getByRole("button", { name: /hr\.donde\.filtro\.fueraTurno/ }));
+    expect(screen.getAllByRole("listitem")).toHaveLength(1);
+    expect(screen.getByRole("listitem")).toHaveTextContent("Beto");
+    fireEvent.click(screen.getByRole("button", { name: /hr\.donde\.filtro\.enTurno/ }));
+    fireEvent.click(screen.getByRole("button", { name: /^Freelance/ }));
+    expect(screen.getAllByRole("listitem")).toHaveLength(1);
+    expect(screen.getByRole("listitem")).toHaveTextContent("Caro");
+  });
+
+  it("arriba y en grande quien tiene pantalla en vivo; abajo, en lista, el resto", async () => {
+    // Alvaro, 18/11/2026: «me prometiste que iba a poder ver en vivo a cada
+    // empleado dónde está ahorita y su pantalla» — sin filas de cajas vacías.
+    vivos = [{ userId: "u-Ana", pantallaUrl: "https://x/pantalla.jpg", camaraUrl: null, ultima: new Date().toISOString() }];
+    respuesta = { error: null, data: [
+      fila("Karem", "fuera_de_cowork"),
+      fila("Ana", "activo"),
+    ] };
+    const { container } = render(<DondeEstaPanel />, { wrapper: envolver });
+    const filas = await screen.findAllByRole("listitem");
+    expect(screen.getByText("hr.donde.enPantalla")).toBeInTheDocument();
+    expect(screen.getByText("hr.donde.sinPantallaTitulo")).toBeInTheDocument();
+    expect(filas[0]).toHaveTextContent("Ana");
+    expect(filas[0].querySelector("img[src='https://x/pantalla.jpg']")).not.toBeNull();
+    expect(filas[1]).toHaveTextContent("Karem");
+    expect(container.querySelectorAll("img[src='https://x/pantalla.jpg']")).toHaveLength(1);
+    vivos = [];
   });
 
   it("⚠️ si no carga lo DICE y ofrece reintentar", async () => {
