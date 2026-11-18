@@ -372,25 +372,38 @@ Deno.serve(async (req) => {
       return json(req, { ok: true });
     }
 
-    // Notificar una llamada entrante al destinatario. Lo dispara el frontend de
-    // QUIEN LLAMA justo después de crear el "ringing". No pasa por push_enabled.
+    // Notificar una llamada entrante. Lo dispara el frontend de quien llama (o
+    // de quien agrega a alguien a una llamada en curso) justo después de crear
+    // los "ringing". No pasa por push_enabled.
+    // 18/11/2026: también a varios (grupos y «Agregar a la llamada»): se avisa a
+    // cada invitado que siga sonando en call_participants. Pedirlo puede quien
+    // creó la llamada o cualquiera que ya esté en ella.
     if (action === "notify_call") {
       if (!vapid.publicKey || !vapid.privateKey) return json(req, { error: "push no configurado" }, 503);
-      const callId = (body as { callId?: string }).callId;
+      const { callId, userIds } = body as { callId?: string; userIds?: unknown };
       if (!callId) return json(req, { error: "falta callId" }, 400);
 
       const { data: call } = await admin.from("calls")
-        .select("id, caller_id, receiver_id, room_id, call_type, call_status")
+        .select("id, caller_id, receiver_id, room_id, call_type, call_status, is_group")
         .eq("id", callId).maybeSingle();
       if (!call) return json(req, { error: "llamada no encontrada" }, 404);
-      // Solo quien inició la llamada puede pedir notificarla.
-      if (call.caller_id !== user.id) return json(req, { error: "no autorizado" }, 403);
-      if (!call.receiver_id) return json(req, { ok: true, sent: 0 });
+      const { data: participantes } = await admin.from("call_participants")
+        .select("user_id, status").eq("call_id", callId);
+      const filas = (participantes ?? []) as { user_id: string; status: string }[];
+      const estaAdentro = call.caller_id === user.id || filas.some((f) => f.user_id === user.id && f.status === "accepted");
+      if (!estaAdentro) return json(req, { error: "no autorizado" }, 403);
+
+      const pedidos = Array.isArray(userIds) ? new Set(userIds.filter((u): u is string => typeof u === "string")) : null;
+      let destinos = filas
+        .filter((f) => f.status === "ringing" && f.user_id !== user.id && (!pedidos || pedidos.has(f.user_id)))
+        .map((f) => f.user_id);
+      if (!destinos.length && !pedidos && call.receiver_id && call.receiver_id !== user.id) destinos = [call.receiver_id as string];
+      if (!destinos.length) return json(req, { ok: true, sent: 0 });
 
       const { data: profile } = await admin.from("profiles")
         .select("full_name").eq("id", user.id).maybeSingle();
 
-      const subs = await cargarSubs(admin, [call.receiver_id as string]);
+      const subs = await cargarSubs(admin, destinos.slice(0, 50));
       if (!subs.length) return json(req, { ok: true, sent: 0 });
 
       const payload = JSON.stringify({

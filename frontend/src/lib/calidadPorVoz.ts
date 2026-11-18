@@ -17,7 +17,21 @@ export const NITIDO_TRAS_HABLAR_MS = 10_000;
 
 /** ¿En esta sala se aplica? Todas las de Cowork (trabajo, Hub, meets, 1:1). */
 export function aplicaCalidadPorVoz(sala: string | null | undefined): boolean {
-  return !!sala && sala.startsWith("cowork_");
+  return !!sala && (sala.startsWith("cowork_") || esLlamadaDeGrupoPosible(sala));
+}
+
+/** Llamadas del Messenger y Meet: van en HD (1080p). Con pocas personas se
+ *  quedan así; desde 4 cámaras ajenas se aplica la misma regla de Cowork
+ *  (18/11/2026, llamadas tipo Skype: muchas cámaras en HD traban el equipo). */
+export const DESDE_CUANTOS_EN_GRUPO = 4;
+function esLlamadaDeGrupoPosible(sala: string): boolean {
+  return sala.startsWith("call-") || sala.startsWith("meet_");
+}
+
+/** ¿Hay que ajustar ya, con esta cantidad de personas remotas? */
+export function ajustarConEstaGente(sala: string, remotos: number): boolean {
+  if (sala.startsWith("cowork_")) return true;
+  return esLlamadaDeGrupoPosible(sala) && remotos >= DESDE_CUANTOS_EN_GRUPO;
 }
 
 /** La calidad máxima que se pide para la cámara de ese compañero. */
