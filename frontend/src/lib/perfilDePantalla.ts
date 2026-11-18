@@ -130,6 +130,14 @@ export function elegirPerfilDePantalla(s: {
   return "normal";
 }
 
+/** ¿La pantalla de esta sala es la del trabajo vigilado de Cowork (5 fps)? Las
+ *  salas de Cowork empiezan con `cowork_`; el hub de supervisores (`cowork_hub_…`)
+ *  NO: ahí un supervisor le muestra algo al dueño y tiene que verse bien
+ *  (Alvaro, 17/11/2026), así que va con la calidad de una llamada normal. */
+export function pantallaDeTrabajoCowork(sala: string | null | undefined): boolean {
+  return !!sala && sala.startsWith("cowork_") && !sala.startsWith("cowork_hub_");
+}
+
 /** Las opciones de captura y de publicación de cada perfil. En Cowork, el
  *  normal va a 5 fps (PUBLICACION_DE_PANTALLA_COWORK); el liviano ya lo estaba. */
 export function opcionesDePantalla(
