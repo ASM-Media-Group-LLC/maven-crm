@@ -28,7 +28,7 @@ const fs = require("node:fs");
 const { iniciarActualizaciones } = require("./actualizar");
 const { avisarLlamada, cerrarAvisoLlamada } = require("./llamada");
 const { iniciarVigiaDeApps, segundosInactivo } = require("./apps");
-const { pantallaPermitida, primeraVezSinPermiso, guiaPermisoPantalla } = require("./permisoPantalla");
+const { pantallaPermitida, primeraVezSinPermiso, guiaPermisoPantalla, pedirPermisoSiToca } = require("./permisoPantalla");
 const { revisarCamaraYMicrofono } = require("./permisoCamaraWindows");
 const { guardarAcceso, leerAcceso, olvidarAcceso, hayAccesoGuardado } = require("./acceso");
 const { vigilarVentana, leerYBorrarCierres } = require("./recuperarse");
@@ -543,6 +543,8 @@ app.whenReady().then(() => {
   ipcMain.handle("maven:visible", () => !ventana || (ventana.isVisible() && !ventana.isMinimized()));
   crearMenu();
   crearVentana();
+  // Tras «Arreglar ahora» del permiso de pantalla: macOS vuelve a preguntar.
+  ventana?.webContents.once("did-finish-load", () => pedirPermisoSiToca());
   crearBandeja();
   globalShortcut.register(ATAJO, () => {
     if (ventana && ventana.isVisible() && ventana.isFocused()) ventana.hide();

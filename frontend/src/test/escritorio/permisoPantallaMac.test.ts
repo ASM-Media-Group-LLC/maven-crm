@@ -36,4 +36,13 @@ describe("permiso de pantalla en el Mac (app de computador)", () => {
     expect(permiso).toContain("app.relaunch()");
     expect(permiso).toContain("Privacy_ScreenCapture");
   });
+
+  it("«Arreglar ahora» borra solo el permiso de Maven, reinicia y macOS vuelve a preguntar", () => {
+    // 18/11/2026: el permiso quedaba «negado» aunque se viera prendido y nadie
+    // lograba quitarlo con «−». Maven lo resetea solo (nunca el de otras apps).
+    expect(permiso).toContain('execFile("/usr/bin/tccutil", ["reset", "ScreenCapture", BUNDLE_ID]');
+    expect(permiso).toContain('const BUNDLE_ID = "me.maven-ai.escritorio"');
+    expect(permiso).toContain("Arreglar ahora");
+    expect(main).toContain("pedirPermisoSiToca()");
+  });
 });
