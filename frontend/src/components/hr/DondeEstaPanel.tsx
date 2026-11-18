@@ -1,11 +1,12 @@
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { AlertTriangle, Loader2, MapPin, RefreshCw, Search } from "lucide-react";
+import { AlertTriangle, Check, ChevronDown, Loader2, MapPin, RefreshCw, Search, X } from "lucide-react";
 import { useLanguage } from "@/hooks/useLanguage";
 import type { TranslationKey } from "@/lib/i18n";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { UserAvatar } from "@/components/UserAvatar";
 import { supabase } from "@/integrations/supabase/client";
 import { type FilaDondeEsta, separarPantalla, type Tono, tonoDe, useDondeEsta } from "@/hooks/useDondeEsta";
@@ -98,7 +99,11 @@ export function DondeEstaPanel() {
   const q = useDondeEsta();
   const [filtro, setFiltro] = useState<Filtro>("enTurno");
   const [equipo, setEquipo] = useState<string | null>(null);
-  const [busqueda, setBusqueda] = useState("");
+  // El buscador es un desplegable con todos, en orden alfabético (Alvaro,
+  // 18/11/2026: «ahí debería haber un drop down con nombre alfabético»). Elegir
+  // a alguien deja solo su tarjeta, esté en el estado o equipo que esté.
+  const [elegido, setElegido] = useState<string | null>(null);
+  const [abierto, setAbierto] = useState(false);
   const ahora = Date.now();
 
   const duracion = (desdeIso: string | null): string => {
@@ -130,12 +135,15 @@ export function DondeEstaPanel() {
     return c;
   }, [delEquipo]);
   const vistas = useMemo(() => {
-    const norm = (s: string | null | undefined) => (s ?? "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
-    const b = norm(busqueda.trim());
-    // Buscando a alguien se busca en todos, también fuera de turno.
-    return delEquipo.filter((f) => (b ? true : pasaFiltro(f, filtro))
-      && (!b || [f.nombre, f.puesto, f.equipo].some((x) => norm(x).includes(b))));
-  }, [delEquipo, filtro, busqueda]);
+    // Con alguien elegido se muestra solo esa persona, también fuera de turno.
+    if (elegido) return filas.filter((f) => f.user_id === elegido);
+    return delEquipo.filter((f) => pasaFiltro(f, filtro));
+  }, [filas, delEquipo, filtro, elegido]);
+  const alfabetico = useMemo(
+    () => [...filas].sort((a, b) => (a.nombre ?? "").localeCompare(b.nombre ?? "", "es", { sensitivity: "base" })),
+    [filas],
+  );
+  const nombreElegido = elegido ? filas.find((f) => f.user_id === elegido)?.nombre ?? null : null;
 
   // Lo que cada tarjeta dice de la persona (igual arriba y abajo).
   const datos = (f: FilaDondeEsta): Datos => {
@@ -198,10 +206,68 @@ export function DondeEstaPanel() {
             <p className="text-xs text-muted-foreground">{t("hr.donde.resumen", { n: filas.length, c: enCoworkTotal })}</p>
           </div>
           <div className="flex w-full items-center gap-1.5 sm:w-auto">
-          <div className="relative min-w-0 flex-1 sm:w-64 sm:flex-none">
-            <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Input value={busqueda} onChange={(e) => setBusqueda(e.target.value)} placeholder={t("hr.donde.buscar")} aria-label={t("hr.donde.buscar")} className="h-8 pl-8 text-sm" />
-          </div>
+          <Popover open={abierto} onOpenChange={setAbierto}>
+            <div className="relative min-w-0 flex-1 sm:w-64 sm:flex-none">
+              <PopoverTrigger asChild>
+                <button
+                  type="button"
+                  role="combobox"
+                  aria-expanded={abierto}
+                  aria-label={t("hr.donde.buscar")}
+                  className="flex h-8 w-full items-center gap-2 rounded-md border border-input bg-background/40 pl-2.5 pr-8 text-left text-sm transition-colors hover:bg-foreground/[0.04] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                  <Search className="h-4 w-4 shrink-0 text-muted-foreground" />
+                  <span className={`min-w-0 flex-1 truncate ${nombreElegido ? "text-foreground" : "text-muted-foreground"}`}>
+                    {nombreElegido ?? t("hr.donde.buscar")}
+                  </span>
+                </button>
+              </PopoverTrigger>
+              {elegido ? (
+                <button
+                  type="button"
+                  onClick={() => setElegido(null)}
+                  aria-label={t("hr.donde.verTodos")}
+                  title={t("hr.donde.verTodos")}
+                  className="absolute right-1 top-1/2 flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-full text-muted-foreground hover:bg-foreground/10 hover:text-foreground"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              ) : (
+                <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              )}
+            </div>
+            <PopoverContent align="end" className="w-[var(--radix-popover-trigger-width)] min-w-[17rem] p-0">
+              <Command>
+                <CommandInput placeholder={t("hr.donde.escribeNombre")} />
+                <CommandList className="max-h-80">
+                  <CommandEmpty>{t("hr.donde.nadieConEseNombre")}</CommandEmpty>
+                  <CommandGroup heading={t("hr.donde.todosAZ", { n: alfabetico.length })}>
+                    {alfabetico.map((f) => {
+                      const foto = fotos[f.user_id];
+                      const nombre = f.nombre ?? "—";
+                      return (
+                        <CommandItem
+                          key={f.user_id}
+                          value={`${nombre} ${f.user_id}`}
+                          keywords={[f.puesto ?? "", f.equipo ?? ""]}
+                          onSelect={() => { setElegido(f.user_id); setAbierto(false); }}
+                          className="gap-2.5"
+                        >
+                          <span className="relative shrink-0">
+                            <UserAvatar name={nombre} src={foto?.foto} seed={foto?.seed} size="xs" />
+                            <span className={`absolute -bottom-0.5 -right-0.5 h-2 w-2 rounded-full border border-background ${PUNTO[tonoDe(f.estado)]}`} aria-hidden />
+                          </span>
+                          <span className="min-w-0 flex-1 truncate">{nombre}</span>
+                          <span className="shrink-0 text-[11px] text-muted-foreground">{f.equipo ?? ""}</span>
+                          {elegido === f.user_id && <Check className="h-3.5 w-3.5 shrink-0 text-primary" />}
+                        </CommandItem>
+                      );
+                    })}
+                  </CommandGroup>
+                </CommandList>
+              </Command>
+            </PopoverContent>
+          </Popover>
           <button
             type="button"
             onClick={() => void q.refetch()}
@@ -217,7 +283,7 @@ export function DondeEstaPanel() {
         {/* Por estado. */}
         <div className={FILA_DE_FICHAS} role="group" aria-label={t("hr.donde.porEstado")}>
           {FILTROS.map((x) => (
-            <button key={x.k} type="button" onClick={() => setFiltro(x.k)} aria-pressed={filtro === x.k} className={ficha(filtro === x.k)}>
+            <button key={x.k} type="button" onClick={() => { setFiltro(x.k); setElegido(null); }} aria-pressed={!elegido && filtro === x.k} className={ficha(!elegido && filtro === x.k)}>
               {x.punto && <span className={`h-1.5 w-1.5 rounded-full ${x.punto}`} />}
               {t(x.label)}
               <span className="tabular-nums opacity-70">{conteo[x.k]}</span>
@@ -228,11 +294,11 @@ export function DondeEstaPanel() {
         {/* Por equipo. */}
         {equipos.length > 1 && (
           <div className={FILA_DE_FICHAS} role="group" aria-label={t("hr.donde.porEquipo")}>
-            <button type="button" onClick={() => setEquipo(null)} aria-pressed={!equipo} className={ficha(!equipo)}>
+            <button type="button" onClick={() => { setEquipo(null); setElegido(null); }} aria-pressed={!elegido && !equipo} className={ficha(!elegido && !equipo)}>
               {t("hr.donde.todosLosEquipos")}
             </button>
             {equipos.map(([nombre, n]) => (
-              <button key={nombre} type="button" onClick={() => setEquipo(nombre)} aria-pressed={equipo === nombre} className={ficha(equipo === nombre)}>
+              <button key={nombre} type="button" onClick={() => { setEquipo(nombre); setElegido(null); }} aria-pressed={!elegido && equipo === nombre} className={ficha(!elegido && equipo === nombre)}>
                 {nombre}
                 <span className="tabular-nums opacity-70">{n}</span>
               </button>
