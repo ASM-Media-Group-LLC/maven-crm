@@ -45,4 +45,10 @@ describe("permiso de pantalla en el Mac (app de computador)", () => {
     expect(permiso).toContain("Arreglar ahora");
     expect(main).toContain("pedirPermisoSiToca()");
   });
+
+  it("macOS pone a Maven en la lista: se llama CGRequestScreenCaptureAccess", () => {
+    // 18/11/2026: con desktopCapturer solo, Maven ni aparecía en Ajustes.
+    expect(permiso).toContain("CGRequestScreenCaptureAccess");
+    expect(main).toContain("await pedirAMacOS();");
+  });
 });
