@@ -233,6 +233,46 @@ $$;
 revoke all on function public.contacto_permitido(uuid, uuid) from public, anon;
 grant execute on function public.contacto_permitido(uuid, uuid) to authenticated, service_role;
 
+-- LLAMADAS (Alvaro, 18/11/2026: «un chatter solo puede llamar a su supervisor,
+-- punto»). ¿`_persona` tiene un rol aislado en su agencia y no es de mando?
+create or replace function public.contacto_es_aislado(_persona uuid)
+returns boolean
+language plpgsql
+stable
+security definer
+set search_path = public
+as $$
+begin
+  if _persona is null or to_regclass('public.contacto_roles_aislados') is null then
+    return false;
+  end if;
+  return exists (select 1
+                   from public.contacto_roles_aislados ra
+                   join public.tenant_members ma on ma.tenant_id = ra.tenant_id and ma.user_id = _persona
+                   join public.user_roles ua on ua.user_id = _persona and lower(ua.role) = lower(ra.role))
+     and not public.contacto_es_de_mando(_persona);
+end;
+$$;
+revoke all on function public.contacto_es_aislado(uuid) from public, anon, authenticated;
+grant execute on function public.contacto_es_aislado(uuid) to service_role;
+
+-- ¿Se pueden llamar `_a` y `_b` (1 a 1, sumarse o sonar en grupo)? Si uno es
+-- aislado (un chatter), el otro tiene que ser de mando (supervisor, manager,
+-- admin o dueño). Los mensajes no pasan por aquí: siguen como siempre.
+create or replace function public.llamada_permitida(_a uuid, _b uuid)
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select _a is null or _b is null or _a = _b
+      or ((not public.contacto_es_aislado(_a) or public.contacto_es_de_mando(_b))
+      and (not public.contacto_es_aislado(_b) or public.contacto_es_de_mando(_a)))
+$$;
+revoke all on function public.llamada_permitida(uuid, uuid) from public, anon;
+grant execute on function public.llamada_permitida(uuid, uuid) to authenticated, service_role;
+
 -- Las personas que `_quien` no puede sumar a una llamada (ni hacer sonar).
 create or replace function public.contactos_restringidos_de(_quien uuid)
 returns setof uuid
@@ -245,25 +285,28 @@ begin
   if _quien is null or to_regclass('public.contacto_roles_aislados') is null then
     return;
   end if;
-  -- Lo común (no tiene un rol aislado, o su agencia no aísla a nadie): sale ya.
-  if not exists (select 1
-                   from public.contacto_roles_aislados ra
-                   join public.tenant_members ma on ma.tenant_id = ra.tenant_id and ma.user_id = _quien
-                   join public.user_roles ua on ua.user_id = _quien and lower(ua.role) = lower(ra.role)) then
-    return;
-  end if;
   if public.contacto_es_de_mando(_quien) then
     return;
   end if;
+  if public.contacto_es_aislado(_quien) then
+    -- Un chatter: todos los de su agencia que no son de mando.
+    return query
+      select distinct mb.user_id
+        from public.tenant_members ma
+        join public.tenant_members mb on mb.tenant_id = ma.tenant_id and mb.user_id <> _quien
+       where ma.user_id = _quien
+         and not public.contacto_es_de_mando(mb.user_id);
+    return;
+  end if;
+  -- Cualquier otro que no es de mando: no llama a los chatters de su agencia.
   return query
     select distinct mb.user_id
-      from public.contacto_roles_aislados ra
-      join public.tenant_members ma on ma.tenant_id = ra.tenant_id and ma.user_id = _quien
-      join public.user_roles ua on ua.user_id = _quien and lower(ua.role) = lower(ra.role)
-      join public.tenant_members mb on mb.tenant_id = ra.tenant_id and mb.user_id <> _quien
-      join public.contacto_roles_aislados rb on rb.tenant_id = ra.tenant_id
+      from public.tenant_members ma
+      join public.contacto_roles_aislados rb on rb.tenant_id = ma.tenant_id
+      join public.tenant_members mb on mb.tenant_id = ma.tenant_id and mb.user_id <> _quien
       join public.user_roles ub on ub.user_id = mb.user_id and lower(ub.role) = lower(rb.role)
-     where not public.contacto_es_de_mando(mb.user_id);
+     where ma.user_id = _quien
+       and not public.contacto_es_de_mando(mb.user_id);
 end;
 $$;
 revoke all on function public.contactos_restringidos_de(uuid) from public, anon, authenticated;
@@ -470,16 +513,10 @@ begin
       return new;
     end if;
   end if;
-  -- El 1 a 1 de siempre: quien llama y quien recibe.
-  if exists (select 1 from public.calls c
-              where c.id = new.call_id and c.receiver_id is not null
-                and new.user_id in (c.caller_id, c.receiver_id)) then
-    return new;
-  end if;
-  if _yo is not null and _yo <> new.user_id and not public.contacto_permitido(_yo, new.user_id) then
+  if _yo is not null and _yo <> new.user_id and not public.llamada_permitida(_yo, new.user_id) then
     raise exception 'contacto_no_permitido: no puedes sumar a esta persona a la llamada; pídeselo a tu supervisor';
   end if;
-  if _por is not null and _por <> new.user_id and not public.contacto_permitido(_por, new.user_id) then
+  if _por is not null and _por <> new.user_id and not public.llamada_permitida(_por, new.user_id) then
     raise exception 'contacto_no_permitido: no puedes sumar a esta persona a la llamada; pídeselo a tu supervisor';
   end if;
   return new;
@@ -492,5 +529,29 @@ begin
   if to_regclass('public.call_participants') is not null and to_regclass('public.calls') is not null then
     execute 'drop trigger if exists call_participants_contacto on public.call_participants';
     execute 'create trigger call_participants_contacto before insert or update of status on public.call_participants for each row execute function public.call_participants_contacto()';
+  end if;
+end $$;
+
+-- La llamada 1 a 1: un chatter solo llama a (y recibe de) alguien de mando.
+create or replace function public.calls_contacto()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if new.receiver_id is not null and not public.llamada_permitida(new.caller_id, new.receiver_id) then
+    raise exception 'contacto_no_permitido: un chatter solo puede llamar a su supervisor';
+  end if;
+  return new;
+end;
+$$;
+revoke all on function public.calls_contacto() from public, anon, authenticated;
+
+do $$
+begin
+  if to_regclass('public.calls') is not null then
+    execute 'drop trigger if exists calls_contacto on public.calls';
+    execute 'create trigger calls_contacto before insert on public.calls for each row execute function public.calls_contacto()';
   end if;
 end $$;

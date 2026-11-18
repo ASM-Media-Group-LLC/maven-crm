@@ -1,5 +1,5 @@
-// A quiénes NO puede sumar a una llamada la persona conectada (un chatter no
-// suma a otro chatter). Ver lib/contactoRestringido.ts.
+// A quiénes NO puede llamar ni sumar a una llamada la persona conectada (un
+// chatter solo llama a su supervisor). Ver lib/contactoRestringido.ts.
 import { useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";

@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { esContactoNoPermitido, idsContactables, sinRestringidos } from "@/lib/contactoRestringido";
 
-// Guarda (Alvaro, 18/11/2026): todo sigue como hace 7 días (chat directo y
-// llamada 1 a 1 entre chatters se pueden); solo lo nuevo se restringe: un chatter
-// no suma a otro chatter a una llamada, y en su llamada de grupo a los otros
-// chatters no les suena. La pared es la base (20261118231000_contacto_entre_chatters).
+// Guarda (Alvaro, 18/11/2026): los mensajes siguen como hace 7 días (el chat
+// directo entre chatters se abre y avisa el primer contacto); las llamadas no:
+// «un chatter solo puede llamar a su supervisor, punto». La pared es la base
+// (20261118231000_contacto_entre_chatters).
 const leer = (g: Record<string, unknown>) => Object.values(g)[0] as string;
 const invitar = leer(import.meta.glob("../../lib/llamadaInvitar.ts", { query: "?raw", import: "default", eager: true }));
 const agregar = leer(import.meta.glob("../../pages/messenger/videocall/AgregarALaLlamada.tsx", { query: "?raw", import: "default", eager: true }));
@@ -43,14 +43,16 @@ describe("chatters entre sí", () => {
     expect(agregar).toContain("sinRestringidos(resultados, restringidos");
   });
 
-  it("NO se toca lo que ya andaba: nuevo chat y llamar desde la cabecera", () => {
+  it("el nuevo chat no se toca; la cabecera esconde llamar a quien no se puede", () => {
     expect(nuevoChat).not.toContain("useContactosRestringidos");
-    expect(cabecera).not.toContain("useContactosRestringidos");
+    expect(cabecera).toContain("useContactosRestringidos()");
+    expect(cabecera).toContain("{puedeLlamar && (");
     expect(cabecera).toContain('onStartVideoCall(conversation, "audio")');
   });
 
-  it("la base no frena el directo ni la llamada 1 a 1; avisa el primer contacto", () => {
-    expect(migracion).not.toMatch(/create trigger calls_contacto/);
+  it("la base frena la llamada 1 a 1 de un chatter a quien no es de mando; el directo no", () => {
+    expect(migracion).toMatch(/create trigger calls_contacto before insert on public\.calls/);
+    expect(migracion).toMatch(/create or replace function public\.llamada_permitida/);
     expect(migracion).toMatch(/after insert on public\.chat_participants for each row execute function public\.chat_participants_primer_contacto/);
     expect(migracion).toMatch(/before insert or update of status on public\.call_participants/);
   });

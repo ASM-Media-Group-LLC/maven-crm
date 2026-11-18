@@ -64,6 +64,8 @@ const base = vi.hoisted(() => {
 
 vi.mock("@/integrations/supabase/client", () => ({ supabase: base.supabase }));
 vi.mock("@/hooks/useAuth", () => ({ useAuth: () => ({ user: { id: "yo" } }) }));
+// La cabecera pregunta a quién no puede llamar (18/11/2026); aquí, a nadie.
+vi.mock("@/hooks/useContactosRestringidos", () => ({ useContactosRestringidos: () => new Set<string>() }));
 vi.mock("@/hooks/useLanguage", (original) =>
   import("@/test/messenger/espanolEnTests").then((m) => m.idiomaEnEspanol(original)));
 vi.mock("@/hooks/useOnlinePresence", () => ({

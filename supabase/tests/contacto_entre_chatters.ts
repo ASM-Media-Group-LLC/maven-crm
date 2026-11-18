@@ -10,8 +10,9 @@
 //   3. Chat directo entre dos chatters → SÍ se abre, y la PRIMERA vez avisa (una
 //      sola vez por pareja) al dueño, a los admins vivos y a los anotados, sin
 //      repetir. Los directos que ya existían no avisan. Supervisor ↔ chatter no avisa.
-//   4. Llamada 1 a 1 entre chatters → sí, como siempre. Sumar a otro chatter a una
-//      llamada → no (ni con invitado_por falso); el supervisor sí.
+//   4. Llamadas (Alvaro: «un chatter solo puede llamar a su supervisor, punto»):
+//      chatter → chatter o editor, ni 1 a 1 ni sumándolo → no; con su supervisor,
+//      un admin o el dueño → sí; el supervisor suma a quien quiera.
 //   5. Las listas: la ven / editan los de la agencia que corresponde.
 //   6. El correo: la cola trae la pareja nueva con sus destinatarios y se marca.
 //
@@ -146,7 +147,10 @@ check(await permitido(CH1, MIX), "chatter ↔ chatter con nivel manager: no");
 check(await permitido(X1, X2), "en una agencia sin lista, dos chatters: no");
 {
   const r = (await como(CH1, `select public.contactos_restringidos() as id`)).map((f) => f.id).sort();
-  check(r.join() === [CH2, CH3].sort().join(), `contactos_restringidos de un chatter: los otros chatters (${r.length})`);
+  check([CH2, CH3, ED].every((x) => r.includes(x)) && ![SUP, ADM, DUE].some((x) => r.includes(x)),
+    `contactos_restringidos de un chatter: todos menos los de mando (${r.length})`);
+  const e = (await como(ED, `select public.contactos_restringidos() as id`)).map((f) => f.id);
+  check(e.includes(CH1) && !e.includes(SUP), `un editor no llama a los chatters (${e.length})`);
   check((await como(SUP, `select public.contactos_restringidos() as id`)).length === 0, "el supervisor no tiene restringidos");
 }
 await falla(CH1, `select public.contactos_restringidos_de('${CH2}')`, /permission denied/, "nadie pregunta por los restringidos de otro");
@@ -182,16 +186,23 @@ await anda("postgres", `insert into public.chat_participants(conversation_id, us
   "dos chatters de otra agencia: sí");
 check((await avisos()).length === 3, "ni el supervisor, ni el grupo, ni la otra agencia avisan");
 
-// ════ 4. Llamadas ═════════════════════════════════════════════════════════════
+// ════ 4. Llamadas: un chatter solo llama a su supervisor ═════════════════════
 const UNO = "d0000000-0000-4000-8000-000000000002";
-await anda(CH1, `insert into public.calls(id, caller_id, receiver_id, room_id) values ('${UNO}', '${CH1}', '${CH2}', 'call-x')`,
-  "un chatter SÍ llama 1 a 1 a otro chatter (como siempre)");
-await anda(CH1, `insert into public.call_participants(call_id, user_id, status) values ('${UNO}', '${CH1}', 'accepted'), ('${UNO}', '${CH2}', 'ringing')`,
+await falla(CH1, `insert into public.calls(id, caller_id, receiver_id, room_id) values ('${UNO}', '${CH1}', '${CH2}', 'call-x')`,
+  /contacto_no_permitido/, "un chatter NO llama 1 a 1 a otro chatter");
+await falla(CH1, `insert into public.calls(id, caller_id, receiver_id, room_id) values ('${UNO}', '${CH1}', '${ED}', 'call-x')`,
+  /contacto_no_permitido/, "ni a un editor");
+await falla(ED, `insert into public.calls(id, caller_id, receiver_id, room_id) values ('${UNO}', '${ED}', '${CH1}', 'call-x')`,
+  /contacto_no_permitido/, "y un editor no llama a un chatter");
+await anda(CH1, `insert into public.calls(id, caller_id, receiver_id, room_id) values ('${UNO}', '${CH1}', '${SUP}', 'call-x')`,
+  "un chatter SÍ llama a su supervisor");
+await anda(CH1, `insert into public.call_participants(call_id, user_id, status) values ('${UNO}', '${CH1}', 'accepted'), ('${UNO}', '${SUP}', 'ringing')`,
   "y le suena");
-await anda(CH1, `update public.call_participants set status = 'missed' where call_id = '${UNO}' and user_id = '${CH2}'`, "no contestó");
-await anda(CH1, `update public.call_participants set status = 'ringing' where call_id = '${UNO}' and user_id = '${CH2}'`, "y lo vuelve a llamar");
 await falla(CH1, `insert into public.call_participants(call_id, user_id, status, invitado_por) values ('${UNO}', '${CH3}', 'ringing', '${CH1}')`,
-  /contacto_no_permitido/, "pero no suma a un tercer chatter a esa llamada");
+  /contacto_no_permitido/, "pero no suma a otro chatter a esa llamada");
+const DOS = "d0000000-0000-4000-8000-000000000003";
+await anda(SUP, `insert into public.calls(id, caller_id, receiver_id, room_id) values ('${DOS}', '${SUP}', '${CH2}', 'call-y')`,
+  "el supervisor llama a un chatter");
 const CALL = "d0000000-0000-4000-8000-000000000001";
 await q(`insert into public.calls(id, caller_id, receiver_id, room_id, is_group) values ('${CALL}', '${SUP}', null, 'call-g', true)`);
 await anda(CH1, `insert into public.call_participants(call_id, user_id, status) values ('${CALL}', '${CH1}', 'accepted')`, "un chatter se suma solo a una llamada");
@@ -199,8 +210,10 @@ await falla(CH1, `insert into public.call_participants(call_id, user_id, status,
   /contacto_no_permitido/, "un chatter no suma a otro chatter a una llamada de grupo");
 await falla(CH1, `insert into public.call_participants(call_id, user_id, status, invitado_por) values ('${CALL}', '${CH2}', 'ringing', '${SUP}')`,
   /contacto_no_permitido/, "ni diciendo que lo invitó el supervisor");
-await anda(CH1, `insert into public.call_participants(call_id, user_id, status, invitado_por) values ('${CALL}', '${ED}', 'ringing', '${CH1}')`,
-  "un chatter sí suma a un editor");
+await falla(CH1, `insert into public.call_participants(call_id, user_id, status, invitado_por) values ('${CALL}', '${ED}', 'ringing', '${CH1}')`,
+  /contacto_no_permitido/, "ni a un editor");
+await anda(CH1, `insert into public.call_participants(call_id, user_id, status, invitado_por) values ('${CALL}', '${ADM}', 'ringing', '${CH1}')`,
+  "un chatter sí suma a un admin");
 await anda(SUP, `insert into public.call_participants(call_id, user_id, status, invitado_por) values ('${CALL}', '${CH2}', 'missed', '${SUP}')`,
   "el supervisor suma a un chatter");
 await falla(CH1, `update public.call_participants set status = 'ringing', invitado_por = '${CH1}' where call_id = '${CALL}' and user_id = '${CH2}'`,
@@ -208,7 +221,7 @@ await falla(CH1, `update public.call_participants set status = 'ringing', invita
 await anda(SUP, `update public.call_participants set status = 'ringing' where call_id = '${CALL}' and user_id = '${CH2}'`,
   "el supervisor sí lo vuelve a hacer sonar");
 await anda(CH2, `update public.call_participants set status = 'accepted' where call_id = '${CALL}' and user_id = '${CH2}'`,
-  "el chatter contesta la llamada de grupo");
+  "el chatter contesta la llamada de grupo del supervisor");
 
 // ════ 5. Las listas ═══════════════════════════════════════════════════════════
 check((await como(CH1, `select role from public.contacto_roles_aislados`)).length === 1, "un chatter de Kash ve la lista de roles de su agencia");

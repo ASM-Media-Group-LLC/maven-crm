@@ -20,6 +20,7 @@ import { toast } from "sonner";
 import { getInitials, puedeVerLaListaDeMiembros } from "../utils";
 import { avisarEvento, type ClienteParaAvisos } from "../avisoDeSistema";
 import { useLanguage } from "@/hooks/useLanguage";
+import { useContactosRestringidos } from "@/hooks/useContactosRestringidos";
 import BannerReconectando from "@/components/messenger/BannerReconectando";
 
 interface ChatHeaderProps {
@@ -94,6 +95,10 @@ export default function ChatHeader({
     ? conversation.participants.find(p => p.user_id !== user?.id)
     : null;
   const otherUserId = otherParticipant?.user_id;
+  // Un chatter solo llama a su supervisor (Alvaro, 18/11/2026): en un directo con
+  // alguien a quien no puede llamar, no hay botones de llamada (la base frena igual).
+  const restringidos = useContactosRestringidos();
+  const puedeLlamar = isGroup || !otherUserId || !restringidos.has(otherUserId);
   const otherProfile = otherUserId ? profiles[otherUserId] : null;
   const online = otherUserId ? isOnline(otherUserId) : false;
   const status = otherUserId ? getStatus(otherUserId) : null;
@@ -276,12 +281,16 @@ export default function ChatHeader({
 
         <div className="flex items-center gap-0.5 shrink-0">
           {/* Llamada de voz (sin cámara) y videollamada, como en Skype. */}
-          <Button variant="ghost" size="icon" className="h-9 w-9 sm:h-8 sm:w-8 rounded-full hover:bg-primary/8" onClick={() => onStartVideoCall(conversation, "audio")} title={t("messenger.header.llamadaDeVoz")} aria-label={t("messenger.header.llamadaDeVoz")}>
-            <Phone className="h-4 w-4" />
-          </Button>
-          <Button variant="ghost" size="icon" className="h-9 w-9 sm:h-8 sm:w-8 rounded-full hover:bg-primary/8" onClick={() => onStartVideoCall(conversation, "video")} title={t("messenger.header.videollamada")}>
-            <Video className="h-4 w-4" />
-          </Button>
+          {puedeLlamar && (
+            <>
+              <Button variant="ghost" size="icon" className="h-9 w-9 sm:h-8 sm:w-8 rounded-full hover:bg-primary/8" onClick={() => onStartVideoCall(conversation, "audio")} title={t("messenger.header.llamadaDeVoz")} aria-label={t("messenger.header.llamadaDeVoz")}>
+                <Phone className="h-4 w-4" />
+              </Button>
+              <Button variant="ghost" size="icon" className="h-9 w-9 sm:h-8 sm:w-8 rounded-full hover:bg-primary/8" onClick={() => onStartVideoCall(conversation, "video")} title={t("messenger.header.videollamada")}>
+                <Video className="h-4 w-4" />
+              </Button>
+            </>
+          )}
           <Button
             variant="ghost" size="icon" className="h-9 w-9 sm:h-8 sm:w-8 rounded-full hover:bg-primary/8"
             onClick={onSearchToggle}
