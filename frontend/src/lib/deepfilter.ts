@@ -1,5 +1,6 @@
 import dfWasmUrl from "@lofcz/deepfilternet-web/df_bg.wasm?url";
 import dfWorkletCrudo from "@lofcz/deepfilternet-web/worklet?raw";
+import { escritorio } from "@/lib/escritorio";
 
 // CANCELACIÓN DE RUIDO FUERTE: DeepFilterNet3 (Alvaro, 16/11/2026: «sí, más fuerte»).
 //
@@ -124,8 +125,16 @@ let descartadoEnPestana = false;
 // DeepFilterNet, poner esto en true.
 export const DEEPFILTER_PRENDIDO = false;
 
+// PRENDIDO EN LA APP DE COMPUTADOR (Alvaro, 18/11/2026: «prender todo lo que es
+// el noise cancellation en la aplicación… ahorita enfocamos en la app»). En la
+// app de Mac/Windows corre DeepFilterNet3 (equipos de 8 núcleos o más); el
+// navegador sigue con RNNoise hasta que se decida igualarlo. Si el equipo no
+// aguanta, el relevo vuelve solo a RNNoise como siempre.
+export const DEEPFILTER_EN_APP = true;
+
 export function deepFilterPermitido(): boolean {
-  if (!DEEPFILTER_PRENDIDO) return false;
+  const enApp = DEEPFILTER_EN_APP && escritorio() !== null;
+  if (!DEEPFILTER_PRENDIDO && !enApp) return false;
   if (descartadoEnPestana || typeof WebAssembly === "undefined") return false;
   const nav = navigator as Navigator & { deviceMemory?: number };
   if (!nav.hardwareConcurrency || nav.hardwareConcurrency < NUCLEOS_PARA_DEEPFILTER) return false;

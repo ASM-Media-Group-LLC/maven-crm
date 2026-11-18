@@ -83,10 +83,28 @@ describe("qué se anota en datos.nc", () => {
   });
 });
 
-describe("DeepFilterNet apagado (17/11/2026: el audio se oía lento y cortado)", () => {
-  it("nadie lo arma: todos siguen con RNNoise como antes", async () => {
+describe("DeepFilterNet: apagado en el navegador, prendido en la app (18/11/2026)", () => {
+  it("en el navegador nadie lo arma: siguen con RNNoise", async () => {
     const { deepFilterPermitido, DEEPFILTER_PRENDIDO } = await import("@/lib/deepfilter");
     expect(DEEPFILTER_PRENDIDO).toBe(false);
     expect(deepFilterPermitido()).toBe(false);
+  });
+
+  it("en la app de computador con 8 núcleos sí se arma", async () => {
+    const { deepFilterPermitido, DEEPFILTER_EN_APP } = await import("@/lib/deepfilter");
+    expect(DEEPFILTER_EN_APP).toBe(true);
+    const w = window as unknown as { mavenEscritorio?: unknown };
+    const nucleos = Object.getOwnPropertyDescriptor(navigator, "hardwareConcurrency");
+    w.mavenEscritorio = { esApp: true };
+    Object.defineProperty(navigator, "hardwareConcurrency", { value: 8, configurable: true });
+    try {
+      expect(deepFilterPermitido()).toBe(true);
+      Object.defineProperty(navigator, "hardwareConcurrency", { value: 4, configurable: true });
+      expect(deepFilterPermitido()).toBe(false);
+    } finally {
+      delete w.mavenEscritorio;
+      if (nucleos) Object.defineProperty(navigator, "hardwareConcurrency", nucleos);
+      else delete (navigator as unknown as { hardwareConcurrency?: number }).hardwareConcurrency;
+    }
   });
 });
