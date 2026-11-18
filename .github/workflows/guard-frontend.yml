@@ -65,6 +65,8 @@ on:
       - "supabase/tests/chat_agencia_y_huecos.ts"
       - "infra/nas-drive/**"
       - "nginx.conf"
+      # La app de computador (permisoPantallaMac.test.ts lee su código).
+      - "desktop/src/**"
 
 permissions:
   contents: read

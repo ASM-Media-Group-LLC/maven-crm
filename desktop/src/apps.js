@@ -10,24 +10,30 @@
 // Permisos: en Mac el título de la ventana necesita «Grabación de pantalla»
 // (el mismo de compartir pantalla). Sin ese permiso queda solo el nombre de
 // la app. No se pide Accesibilidad.
+//
+// OJO (17/11/2026): get-windows, para revisar ese permiso, abre una captura de
+// pantalla, y si falta macOS muestra su aviso. Por eso solo se le piden
+// títulos cuando macOS YA dio el permiso (pantallaPermitida solo consulta, no
+// muestra nada). Así este vigía nunca hace saltar el aviso de macOS.
 const { powerMonitor } = require("electron");
+const { pantallaPermitida } = require("./permisoPantalla");
 
 const MUESTRA_MS = 5000;
 const ENVIO_MS = 60 * 1000;
 const INACTIVO_S = 60; // más de 1 min sin tocar nada = ese rato cuenta como inactivo
 
 let leerVentana = null;
-let conTitulos = true; // si falta el permiso de Grabación de pantalla, sigue solo con el nombre de la app
+let titulosRotos = false; // con permiso y aun así falló: sin títulos hasta reabrir Maven (sin reintentos)
 async function ventanaAlFrente() {
   try {
     if (!leerVentana) leerVentana = (await import("get-windows")).activeWindow;
+    const conTitulos = !titulosRotos && pantallaPermitida();
     let w;
     try {
       w = await leerVentana({ accessibilityPermission: false, screenRecordingPermission: conTitulos });
     } catch (e) {
       if (!conTitulos) throw e;
-      conTitulos = false;
-      setTimeout(() => { conTitulos = true; }, 10 * 60 * 1000); // vuelve a probar: quizá ya dio el permiso
+      titulosRotos = true;
       w = await leerVentana({ accessibilityPermission: false, screenRecordingPermission: false });
     }
     if (!w) return null;

@@ -28,6 +28,7 @@ const fs = require("node:fs");
 const { iniciarActualizaciones } = require("./actualizar");
 const { avisarLlamada, cerrarAvisoLlamada } = require("./llamada");
 const { iniciarVigiaDeApps, segundosInactivo } = require("./apps");
+const { pantallaPermitida, primeraVezSinPermiso, guiaPermisoPantalla } = require("./permisoPantalla");
 
 const URL_MAVEN = process.env.MAVEN_URL || "https://app.maven-ai.me/login";
 const ORIGENES_MAVEN = new Set(["https://app.maven-ai.me", "https://maven-ai.me", "https://www.maven-ai.me"]);
@@ -239,6 +240,17 @@ function configurarPermisos() {
   // Compartir pantalla: Maven pide getDisplayMedia y acá se elige qué compartir.
   s.setDisplayMediaRequestHandler(async (pedido, responder) => {
     try {
+      // Mac sin «Grabación de pantalla»: macOS pregunta una sola vez por
+      // arranque; la siguiente vez Maven explica cómo arreglarlo (una vez) y
+      // después no insiste. Sin esto, cada pedido de Cowork hacía saltar el aviso.
+      if (!pantallaPermitida()) {
+        if (primeraVezSinPermiso()) {
+          await desktopCapturer.getSources({ types: ["screen"], thumbnailSize: { width: 1, height: 1 } }).catch(() => {});
+        } else {
+          guiaPermisoPantalla(ventana);
+        }
+        return responder({});
+      }
       const fuentes = await desktopCapturer.getSources({
         types: ["screen", "window"],
         thumbnailSize: { width: 320, height: 200 },
