@@ -1,3 +1,4 @@
+import { formatUI } from "@/lib/formatoHora";
 import { useQuery } from "@tanstack/react-query";
 import { EmptyState } from "@/components/EmptyState";
 import { History } from "lucide-react";
@@ -70,7 +71,7 @@ const HistorialTabContent = ({ creatorId, creatorName }: Props) => {
 
   const formatDate = (dateStr: string) => {
     try {
-      return format(new Date(dateStr), "d MMM yyyy, HH:mm", { locale: f.fechas });
+      return formatUI(new Date(dateStr), "d MMM yyyy, HH:mm", { locale: f.fechas });
     } catch {
       return dateStr;
     }

@@ -1,3 +1,4 @@
+import { formatUI } from "@/lib/formatoHora";
 import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -274,7 +275,7 @@ const AuditLogModal = ({ open, onOpenChange }: Props) => {
                           <TableRow key={c.id} className={isSuspicious ? "bg-warning/5" : ""}>
                             <TableCell className="text-xs text-muted-foreground whitespace-nowrap">
                               {c.changed_at
-                                ? format(new Date(c.changed_at), "dd MMM yy, HH:mm", { locale: f.fechas })
+                                ? formatUI(new Date(c.changed_at), "dd MMM yy, HH:mm", { locale: f.fechas })
                                 : "—"}
                             </TableCell>
                             <TableCell className="text-xs font-mono text-muted-foreground">

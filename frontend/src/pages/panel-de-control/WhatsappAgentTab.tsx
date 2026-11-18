@@ -1,3 +1,4 @@
+import { formatUI } from "@/lib/formatoHora";
 import { useMemo, useState } from "react";
 import { format } from "date-fns";
 import {
@@ -169,7 +170,7 @@ function GroupsList({
               <div className="text-xs text-muted-foreground truncate">
                 {g.provider}
                 {g.last_message_at && (
-                  <> · {format(new Date(g.last_message_at), "d MMM HH:mm", { locale: f.fechas })}</>
+                  <> · {formatUI(new Date(g.last_message_at), "d MMM HH:mm", { locale: f.fechas })}</>
                 )}
               </div>
             </div>
@@ -397,7 +398,7 @@ function CommitmentsList({ groupId }: { groupId: string }) {
                   <>
                     {" · "}
                     <Calendar className="inline h-3 w-3 mr-0.5" />
-                    {format(new Date(c.due_at), "d MMM HH:mm", { locale: f.fechas })}
+                    {formatUI(new Date(c.due_at), "d MMM HH:mm", { locale: f.fechas })}
                   </>
                 )}
                 {c.followup_count > 0 && (
@@ -496,7 +497,7 @@ function MessageRow({ msg }: { msg: WhatsappMessage }) {
           {msg.is_from_bot ? t("panel.wa.botName") : (msg.sender_display_name ?? "anon")}
         </span>
         <span className="text-[10px] text-muted-foreground shrink-0">
-          {format(new Date(msg.sent_at), "d MMM HH:mm", { locale: f.fechas })}
+          {formatUI(new Date(msg.sent_at), "d MMM HH:mm", { locale: f.fechas })}
         </span>
       </div>
       <div className="text-sm whitespace-pre-wrap break-words">{msg.body ?? <em className="text-muted-foreground">[{msg.msg_type}]</em>}</div>
@@ -592,7 +593,7 @@ function MemberRow({
         </div>
         <div className="text-xs text-muted-foreground truncate mt-0.5">
           {member.last_seen_at
-            ? t("panel.wa.activeAt", { date: format(new Date(member.last_seen_at), "d MMM HH:mm", { locale: f.fechas }) })
+            ? t("panel.wa.activeAt", { date: formatUI(new Date(member.last_seen_at), "d MMM HH:mm", { locale: f.fechas }) })
             : t("panel.wa.noRecent")}
         </div>
       </div>
@@ -865,7 +866,7 @@ function DailyReportsList({ groupId }: { groupId: string }) {
                 </div>
               )}
               <p className="text-[10px] text-muted-foreground">
-                {t("panel.wa.captured", { date: format(new Date(selected.created_at), "d MMM HH:mm", { locale: f.fechas }) })}
+                {t("panel.wa.captured", { date: formatUI(new Date(selected.created_at), "d MMM HH:mm", { locale: f.fechas }) })}
               </p>
             </div>
           )}
@@ -934,7 +935,7 @@ function EventsList({ groupId }: { groupId: string }) {
       {events.map((e) => (
         <div key={e.id} className="text-xs flex items-baseline gap-2 py-1 border-b last:border-b-0">
           <span className="text-muted-foreground shrink-0 w-32">
-            {format(new Date(e.created_at), "d MMM HH:mm:ss", { locale: f.fechas })}
+            {formatUI(new Date(e.created_at), "d MMM HH:mm:ss", { locale: f.fechas })}
           </span>
           <Badge variant="outline" className="text-[10px] shrink-0">{e.kind}</Badge>
           <span className="text-muted-foreground truncate">

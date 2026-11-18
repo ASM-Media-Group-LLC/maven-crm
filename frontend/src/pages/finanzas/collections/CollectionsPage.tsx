@@ -1,3 +1,4 @@
+import { formatUI } from "@/lib/formatoHora";
 import { useState, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
@@ -625,7 +626,7 @@ export default function CollectionsPage() {
                 <div><span className="text-xs text-muted-foreground">{t("finanzas.common.creatorF")}</span><p>{viewInvoice.creators?.artistic_name || viewInvoice.creators?.name || "—"}</p></div>
                 <div><span className="text-xs text-muted-foreground">{t("finanzas.common.amount")}</span><p className="font-medium">{fmt(Number(viewInvoice.amount) || 0)}</p></div>
                 <div><span className="text-xs text-muted-foreground">{t("common.method")}</span><p>{metodoDePago(t, viewInvoice.payment_method)}</p></div>
-                <div><span className="text-xs text-muted-foreground">{t("common.date")}</span><p>{format(new Date(viewInvoice.created_at), "dd/MM/yyyy HH:mm")}</p></div>
+                <div><span className="text-xs text-muted-foreground">{t("common.date")}</span><p>{formatUI(new Date(viewInvoice.created_at), "dd/MM/yyyy HH:mm")}</p></div>
               </div>
               {viewInvoice.notes && (
                 <div><span className="text-xs text-muted-foreground">{t("finanzas.common.notes")}</span><p className="text-sm mt-1">{viewInvoice.notes}</p></div>

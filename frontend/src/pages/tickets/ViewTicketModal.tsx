@@ -1,3 +1,4 @@
+import { formatUI } from "@/lib/formatoHora";
 import { useState } from "react";
 import { format } from "date-fns";
 import { Pencil, Trash2, MessageSquare } from "lucide-react";
@@ -85,7 +86,7 @@ const ViewTicketModal = ({ open, onOpenChange, ticket, onEdit, onDelete }: Props
           {ticket.created_at && (
             <p className="text-xs text-muted-foreground">
               {t("tickets.view.createdOn", {
-                date: format(new Date(ticket.created_at), "dd MMM yyyy, HH:mm", { locale: f.fechas }),
+                date: formatUI(new Date(ticket.created_at), "dd MMM yyyy, HH:mm", { locale: f.fechas }),
               })}
             </p>
           )}
@@ -188,7 +189,7 @@ const ViewTicketModal = ({ open, onOpenChange, ticket, onEdit, onDelete }: Props
                       <span className="text-sm font-medium">{c.author_name}</span>
                       {c.created_at && (
                         <span className="text-[10px] text-muted-foreground">
-                          {format(new Date(c.created_at), "dd MMM yyyy, HH:mm", { locale: f.fechas })}
+                          {formatUI(new Date(c.created_at), "dd MMM yyyy, HH:mm", { locale: f.fechas })}
                         </span>
                       )}
                     </div>

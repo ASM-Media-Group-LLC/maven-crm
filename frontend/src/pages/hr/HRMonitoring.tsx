@@ -1,3 +1,4 @@
+import { formatUI } from "@/lib/formatoHora";
 import { useState, useMemo } from "react";
 import {
   Users, TrendingUp, AlertTriangle, Clock, Search, ListIcon, LayoutGrid,
@@ -262,7 +263,7 @@ export default function HRMonitoring() {
                   {config?.sync_enabled ? t("hr.mon.connected") : config?.api_token_set ? t("hr.mon.tokenSetSyncOff") : t("hr.mon.pendingSetup")}
                 </p>
                 {config?.last_sync_at && (
-                  <p className="text-xs text-muted-foreground">{t("hr.mon.lastSync", { when: format(new Date(config.last_sync_at), f.idioma === "en" ? "MM/dd/yyyy HH:mm" : "dd/MM/yyyy HH:mm") })}</p>
+                  <p className="text-xs text-muted-foreground">{t("hr.mon.lastSync", { when: formatUI(new Date(config.last_sync_at), f.idioma === "en" ? "MM/dd/yyyy HH:mm" : "dd/MM/yyyy HH:mm") })}</p>
                 )}
               </div>
             </div>

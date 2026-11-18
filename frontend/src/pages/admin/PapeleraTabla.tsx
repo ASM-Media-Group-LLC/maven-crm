@@ -1,3 +1,4 @@
+import { formatUI } from "@/lib/formatoHora";
 import { useState } from "react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { UserAvatar } from "@/components/UserAvatar";
@@ -114,7 +115,7 @@ export default function PapeleraTabla({
                 </div>
               </TableCell>
               <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
-                {format(new Date(c.deleted_at), "d MMM yyyy, HH:mm", { locale: f.fechas })}
+                {formatUI(new Date(c.deleted_at), "d MMM yyyy, HH:mm", { locale: f.fechas })}
               </TableCell>
               <TableCell className="text-sm text-muted-foreground">
                 {c.deleted_by_name || "—"}

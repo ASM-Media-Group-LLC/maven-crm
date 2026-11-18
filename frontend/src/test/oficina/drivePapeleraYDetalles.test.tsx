@@ -257,7 +257,7 @@ describe("fechas, tipos y nombres (sin dibujar)", () => {
   const ahora = new Date(2026, 9, 3, 18, 0);
   const hoy = (h: string) => `Hoy, ${h}`;
   it("hoy dice «Hoy, 17:10» (no «17:10» a secas); este año «29 sep»; otro año «20 nov 2024»", () => {
-    expect(fechaCorta(new Date(2026, 9, 3, 17, 10).toISOString(), es, hoy, ahora)).toBe("Hoy, 17:10");
+    expect(fechaCorta(new Date(2026, 9, 3, 17, 10).toISOString(), es, hoy, ahora)).toBe("Hoy, 5:10 PM");
     expect(fechaCorta(new Date(2026, 8, 29, 9, 0).toISOString(), es, hoy, ahora)).toBe("29 sep");
     expect(fechaCorta(new Date(2024, 10, 20, 9, 0).toISOString(), es, hoy, ahora)).toBe("20 nov 2024");
     expect(fechaCorta(null, es, hoy, ahora)).toBe("—");
@@ -269,7 +269,7 @@ describe("fechas, tipos y nombres (sin dibujar)", () => {
     expect(fechaCorta(new Date(2024, 10, 20).toISOString(), en, today, ahora)).toBe("Nov 20, 2024");
   });
   it("la completa, para el globito y los Detalles", () => {
-    expect(fechaCompleta(new Date(2026, 8, 29, 17, 10).toISOString(), es)).toBe("29 de septiembre de 2026, 17:10");
+    expect(fechaCompleta(new Date(2026, 8, 29, 17, 10).toISOString(), es)).toBe("29 de septiembre de 2026, 5:10 PM");
     expect(fechaCompleta(new Date(2026, 8, 29, 17, 10).toISOString(), en)).toBe("September 29, 2026, 5:10 PM");
   });
   it("el tipo, como Google", () => {
@@ -343,7 +343,7 @@ describe("el tamaño de las carpetas, de a tandas", () => {
     const tarjeta = await screen.findByRole("button", { name: /^Contabilidad/ });
     await waitFor(() => expect(within(tarjeta).getByText("3.0 MB")).toBeInTheDocument());
     const archivo = screen.getByText("a.pdf").closest("li")!;
-    expect(within(archivo).getByText((_, el) => el?.textContent === "1.5 KB · Hoy, 09:30")).toBeInTheDocument();
+    expect(within(archivo).getByText((_, el) => el?.textContent === "1.5 KB · Hoy, 9:30 AM")).toBeInTheDocument();
   });
 });
 
@@ -352,10 +352,10 @@ describe("fechas y «Propietario» en la lista", () => {
   it("hoy es «Hoy, 09:30», con la fecha completa en el globito; lo mío dice «yo»", async () => {
     dibujar();
     const f = within(await waitFor(() => fila("a.pdf")));
-    const fechas = f.getAllByText("Hoy, 09:30");
+    const fechas = f.getAllByText("Hoy, 9:30 AM");
     for (const fecha of fechas) {
       expect(fecha.tagName).toBe("TIME");
-      expect(fecha.getAttribute("title")).toMatch(/^\d{1,2} de [a-z]+ de \d{4}, 09:30$/);
+      expect(fecha.getAttribute("title")).toMatch(/^\d{1,2} de [a-z]+ de \d{4}, 9:30 AM$/);
     }
     expect(f.getByText("yo")).toBeInTheDocument();
   });
@@ -374,7 +374,7 @@ describe("⚠️ la papelera, como la de Google", () => {
     dibujar("/oficina/drive?vista=papelera");
     const plan = within(await waitFor(() => fila("Plan.docx")));
     expect(plan.getByText("Ana Pérez")).toBeInTheDocument();
-    expect(plan.getAllByText("Hoy, 10:05").length).toBeGreaterThan(0);
+    expect(plan.getAllByText("Hoy, 10:05 AM").length).toBeGreaterThan(0);
     expect(plan.getByText("Marketing")).toBeInTheDocument();
     const viejas = within(fila("Viejas"));
     expect(viejas.getAllByText("20 nov 2024").length).toBeGreaterThan(0);

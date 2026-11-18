@@ -12,6 +12,7 @@ import "./lib/sinZoomAlEnfocar";
 // Windows: Alt + números del teclado numérico (Alt+64 = «@») no navega hacia atrás.
 import "./lib/codigosAlt";
 import { applyStoredSkin, applyStoredAppearance } from "./hooks/useSkin";
+import { instalarFormatoHora } from "./lib/formatoHora";
 import { irAlDominioCanonico } from "./lib/dominioCanonico";
 import { traducir, cargarIdioma } from "./lib/i18n";
 import { idiomaInicial } from "./hooks/useLanguage";
@@ -29,6 +30,8 @@ irAlDominioCanonico();
 // (ui_prefs) — mismo contrato: local primero, el perfil sincroniza después.
 applyStoredSkin();
 applyStoredAppearance();
+// La hora de la empresa (AM/PM o militar) en toda la plataforma (18/11/2026).
+instalarFormatoHora();
 
 // --- Deploy con la app abierta ---
 //

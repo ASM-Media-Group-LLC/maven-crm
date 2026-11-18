@@ -1,3 +1,4 @@
+import { formatUI } from "@/lib/formatoHora";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
@@ -108,7 +109,7 @@ const ActivityTimeline = ({ creatorId, passedDate, confirmedDate, completedDate,
               <p className="text-sm font-medium">{event.label}</p>
               <div className="flex items-center gap-2">
                 <span className="text-xs text-muted-foreground">
-                  {format(new Date(event.date), "dd MMM yyyy, HH:mm", { locale: f.fechas })}
+                  {formatUI(new Date(event.date), "dd MMM yyyy, HH:mm", { locale: f.fechas })}
                 </span>
                 {event.detail && <Badge variant="outline" className="text-xs h-5">{event.detail}</Badge>}
               </div>

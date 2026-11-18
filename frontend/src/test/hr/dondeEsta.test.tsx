@@ -121,7 +121,7 @@ describe("la tarjeta, separadita y en am/pm (Alvaro, 18/11/2026)", () => {
     render(<DondeEstaPanel />, { wrapper: envolver });
     const [tarjeta] = await screen.findAllByRole("listitem");
     expect(within(tarjeta).getByText("hr.donde.et.desde")).toBeInTheDocument();
-    expect(within(tarjeta).getByText(/^4:07 pm · /)).toBeInTheDocument();
+    expect(within(tarjeta).getByText(/^4:07 PM · /)).toBeInTheDocument();
     expect(tarjeta.textContent).not.toMatch(/16:07/);
   });
 });

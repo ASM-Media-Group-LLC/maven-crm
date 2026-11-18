@@ -1,3 +1,4 @@
+import { formatUI } from "@/lib/formatoHora";
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -247,7 +248,7 @@ const ContactoDetailDialog = ({ open, onOpenChange, contacto, onEdit, onConvert,
                     <Badge variant="secondary" className="font-normal">{ch.label}</Badge>
                     <span className="text-xs text-muted-foreground tabular-nums whitespace-nowrap">
                       {ch.lastAt
-                        ? format(parseISO(ch.lastAt), "dd MMM yy, HH:mm", { locale: f.fechas })
+                        ? formatUI(parseISO(ch.lastAt), "dd MMM yy, HH:mm", { locale: f.fechas })
                         : "—"}
                     </span>
                   </div>

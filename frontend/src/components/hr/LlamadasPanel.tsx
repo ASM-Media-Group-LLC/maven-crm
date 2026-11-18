@@ -1,3 +1,4 @@
+import { horaUI } from "@/lib/formatoHora";
 import { useMemo } from "react";
 import { Link } from "react-router-dom";
 import { AlertTriangle, AudioLines, Gauge, Loader2, PhoneOff, RefreshCw } from "lucide-react";
@@ -49,8 +50,7 @@ const CAUSA_CON_PUNTO = new Set(["computador", "internet_subida", "internet_ines
 const PUNTO: Record<Tono, string> = { bien: "bg-success", flojo: "bg-warning", sin_dato: "bg-muted-foreground/50" };
 const PASTILLA = "inline-flex items-center gap-1.5 rounded-full border border-border/60 bg-foreground/[0.04] px-2.5 py-0.5 text-xs font-medium";
 
-const horaBogota = (iso: string) =>
-  new Date(iso).toLocaleTimeString("es-CO", { timeZone: "America/Bogota", hour: "2-digit", minute: "2-digit", hour12: false });
+const horaBogota = (iso: string) => horaUI(iso);
 const horaActualBogota = () => Number(new Date().toLocaleString("en-US", { timeZone: "America/Bogota", hour: "2-digit", hour12: false })) % 24;
 const mbps = (n: number) => (n >= 10 ? Math.round(n).toString() : n.toFixed(1));
 

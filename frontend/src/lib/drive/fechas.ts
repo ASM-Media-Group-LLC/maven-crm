@@ -9,6 +9,7 @@
 //
 // Puras (sin hooks) para poder probarlas con una hora fija. La palabra «Hoy»
 // viene de afuera (`hoy`), ya traducida: este archivo no tiene texto propio.
+import { formatUI } from "@/lib/formatoHora";
 import { format, isSameDay, isSameYear } from "date-fns";
 import type { Formato } from "@/lib/formato";
 
@@ -20,7 +21,7 @@ const fecha = (iso: string | null | undefined): Date | null => {
 
 /** La hora como se escribe en cada idioma: 17:10 / 5:10 PM. */
 export function horaDe(d: Date, f: Formato): string {
-  return format(d, f.idioma === "en" ? "h:mm a" : "HH:mm", { locale: f.fechas });
+  return formatUI(d, f.idioma === "en" ? "h:mm a" : "HH:mm", { locale: f.fechas });
 }
 
 /** La fecha corta de una lista. `hoy` arma «Hoy, {hora}» en el idioma de la
@@ -37,5 +38,5 @@ export function fechaCorta(iso: string | null | undefined, f: Formato, hoy: (hor
 export function fechaCompleta(iso: string | null | undefined, f: Formato): string {
   const d = fecha(iso);
   if (!d) return "—";
-  return format(d, f.idioma === "en" ? "MMMM d, yyyy, h:mm a" : "d 'de' MMMM 'de' yyyy, HH:mm", { locale: f.fechas });
+  return formatUI(d, f.idioma === "en" ? "MMMM d, yyyy, h:mm a" : "d 'de' MMMM 'de' yyyy, HH:mm", { locale: f.fechas });
 }
