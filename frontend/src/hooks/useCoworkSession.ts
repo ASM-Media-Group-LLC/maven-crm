@@ -70,7 +70,9 @@ export interface AdminSessionRow {
   // `gente` = nombres ASIGNADOS a la sala (DB, is_active): dice quién trabaja
   // dónde aunque tenga la pestaña cerrada; el punto/conteo `online` sigue
   // siendo la verdad en vivo de LiveKit. Opcional: una edge vieja no lo manda.
-  rooms: Array<{ id: string; name: string; online: number | null; gente?: string[] }>;
+  // `adentro` = quién está conectado AHORA en la sala según LiveKit (sin los que
+  // miran escondidos). null = LiveKit no contestó; ausente = edge vieja.
+  rooms: Array<{ id: string; name: string; online: number | null; gente?: string[]; adentro?: Array<{ id: string; nombre: string }> | null }>;
   // Admins mirando esta sesión DE INCÓGNITO ahora (latido fresco). Solo lo ven
   // otros admins: el dato sale de adminListSessions, que exige rol admin.
   incognito: string[];

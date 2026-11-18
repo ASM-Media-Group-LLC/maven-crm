@@ -143,8 +143,12 @@ export function useTurnoPersonas(dia: string, hDesde: number, hHasta: number, ha
         const calificado = esCalificado(f.user_id) && !esExento(exo, f.user_id, rolesPor.get(f.user_id));
         // Denominador: el turno menos el baño+comida de esa persona (no cuenta en contra).
         const exentoSeg = horarioDe(horarios, f.user_id).exentoSeg;
-        const pantallaPct = calificado ? fraccionJornada(segPantalla, horasJornada, exentoSeg) : undefined;
-        const camaraPct = calificado ? fraccionJornada(segCamara, horasJornada, exentoSeg) : undefined;
+        // El día COMPLETO (0–24) se mide sobre SU jornada, como el expediente
+        // (18/11/2026: la nota del inicio y la del expediente deben ser la misma;
+        // sobre 24 h, 8 h perfectas daban 33).
+        const horasDen = hDesde === 0 && hHasta >= 24 ? horarioDe(horarios, f.user_id).jornadaHoras : horasJornada;
+        const pantallaPct = calificado ? fraccionJornada(segPantalla, horasDen, exentoSeg) : undefined;
+        const camaraPct = calificado ? fraccionJornada(segCamara, horasDen, exentoSeg) : undefined;
         const atencionPct = juz > 0 ? juzOk / juz : undefined;
         const nota = calcularNota({ pantallaPct, camaraPct, atencionPct });
         const perfil = perfilPor.get(f.user_id);
