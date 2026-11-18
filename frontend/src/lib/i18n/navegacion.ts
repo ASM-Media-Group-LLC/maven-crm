@@ -7,6 +7,7 @@ export const PREFIJOS_NAVEGACION = ["sidebar.", "nav.", "topbar.", "search."] as
 export const navegacion = {
   // Sidebar groups
   "sidebar.menu": { es: "Menu", en: "Menu" },
+  "sidebar.mas": { es: "Más", en: "More" },
   "sidebar.plegarMenu": { es: "Plegar o abrir el menú (⌘B)", en: "Collapse or expand the menu (⌘B)" },
   "sidebar.operations": { es: "Operaciones", en: "Operations" },
   // Subgrupos de Operaciones (acordeón anidado, rediseño Aurora 10/2026).

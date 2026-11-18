@@ -1,5 +1,6 @@
 import {
   Activity, AlertTriangle, BarChart3, Bell, BookOpen, Bot, Briefcase, Calculator, CalendarDays, CalendarRange, ChevronRight, Clapperboard, ClipboardCheck, Clock, DollarSign, Eye, FileSpreadsheet, FileText, Gauge, Gift, GraduationCap, HardDrive, Headphones, Home, Inbox, LayoutDashboard, Mail, Map, Megaphone, MessageCircle, Moon, Palette, Phone, Presentation, RefreshCw, Rocket, Search, Settings, Shield, Smartphone, Sun, Ticket, UserCheck, UserCog, UserPlus, Users, Users2, Video, Wallet, Wifi, MonitorDown,
+ MoreHorizontal,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useIncidentesSalud } from "@/hooks/useIncidentesSalud";
@@ -106,12 +107,13 @@ const DashboardSidebar = () => {
 
   // Sin `module` = para todo el que entra (no pasa por canAccess).
   const mainMenuAll: { title: string; url: string; icon: any; module?: string; submodule?: string; badge?: number }[] = [
+    // Los cinco de todos los días, cada uno con su fila propia (Alvaro, 18/11/2026).
     { title: t("nav.dashboard"), url: "/dashboard", icon: LayoutDashboard, module: "Dashboard" },
-    { title: t("nav.mail"), url: "/correo", icon: Mail, module: "Correo", badge: correoUnreadCount || undefined },
+    { title: t("nav.cowork"), url: "/cowork", icon: Users2, module: "Cowork", badge: coworkRequestsCount || undefined },
     // El mute del Messenger vive en la cabecera de su lista de chats, al lado
     // del "+" (Jhon, 09/09/2026); WhatsApp y Telegram lo siguen teniendo acá.
     { title: t("nav.messenger"), url: "/messenger", icon: MessageCircle, module: "Messenger", badge: unreadChatCount || undefined },
-    { title: t("nav.cowork"), url: "/cowork", icon: Users2, module: "Cowork", badge: coworkRequestsCount || undefined },
+    { title: t("nav.mail"), url: "/correo", icon: Mail, module: "Correo", badge: correoUnreadCount || undefined },
     { title: t("nav.meet"), url: "/meet", icon: Video, module: "Meet" },
     { title: t("nav.recordings"), url: "/grabaciones", icon: Clapperboard, module: "Grabaciones" },
     { title: t("nav.contacts"), url: "/contactos", icon: UserPlus, module: "Contactos" },
@@ -123,6 +125,11 @@ const DashboardSidebar = () => {
     { title: t("nav.appGuide"), url: RUTA_GUIA_APP, icon: MonitorDown },
   ];
   const mainMenu = mainMenuAll.filter((item) => !item.module || canAccess(item.module, item.submodule));
+  // MENÚ NUEVO (Alvaro, 18/11/2026): Dashboard, Cowork, Messenger, Mail y Meet
+  // sueltos arriba; lo demás (Grabaciones, Contactos, guías, Creadores) en «Más».
+  const URLS_PRINCIPALES = ["/dashboard", "/cowork", "/messenger", "/correo", "/meet"];
+  const principales = mainMenu.filter((i) => URLS_PRINCIPALES.includes(i.url));
+  const masMenu = mainMenu.filter((i) => !URLS_PRINCIPALES.includes(i.url));
 
   const creadoresSubItems = [
     { title: t("nav.creators.dashboard"), url: "/creadores/dashboard", submodule: "Dashboard" },
@@ -364,7 +371,7 @@ const DashboardSidebar = () => {
     | { kind: "separator" };
 
   const menuCollapsedItems: CI[] = [
-    ...mainMenu.map((i) => ({ title: i.title, url: i.url })),
+    ...masMenu.map((i) => ({ title: i.title, url: i.url })),
     ...(canAccess("Creadores") && allCreadoresItems.length > 0
       ? ([
           { kind: "separator" } as const,
@@ -374,7 +381,7 @@ const DashboardSidebar = () => {
       : []),
   ];
   const isMenuActive =
-    mainMenu.some((i) => pathname === i.url || pathname.startsWith(i.url + "/")) ||
+    masMenu.some((i) => pathname === i.url || pathname.startsWith(i.url + "/")) ||
     isCreadoresActive ||
     enDashboardVentas;
 
@@ -494,11 +501,11 @@ const DashboardSidebar = () => {
 
   // Icono Home con puntito rojo si hay incidente de salud abierto (Alvaro 09/11).
   // Así ves la salud estés donde estés: Cowork, Messenger, lo que sea.
-  const HomeConPuntito = ({ className }: { className?: string }) => {
+  const IconoConPuntito = ({ className, icono: Icono }: { className?: string; icono: typeof Home }) => {
     const { hayAbiertos } = useIncidentesSalud();
     return (
       <span className="relative inline-flex">
-        <Home className={className} />
+        <Icono className={className} />
         {hayAbiertos && (
           <span className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-destructive ring-2 ring-background" aria-label={t("dashboard.centro.salud.hayProblema")} />
         )}
@@ -541,45 +548,26 @@ const DashboardSidebar = () => {
       </SidebarHeader>
 
       <SidebarContent className="gap-0.5 overflow-x-hidden px-2 py-1">
-        <CollapsibleSidebarGroup
-          label={t("sidebar.menu")}
-          storageKey="menu"
-          icon={HomeConPuntito}
-          active={isMenuActive}
-          collapsedItems={menuCollapsedItems}
-          collapsedHref="/dashboard"
-        >
-            <SidebarMenu>
-              {mainMenu.map((item) => (
-                <SidebarMenuItem key={item.url}>
-                  <SidebarMenuButton asChild tooltip={item.title}>
-                    <NavLink to={item.url} end={item.url === "/dashboard"} className={LINK_CLASS} activeClassName={ACTIVE_CLASS} onMouseEnter={() => precargarRuta(item.url)} onFocus={() => precargarRuta(item.url)}>
-                      <item.icon className="h-4 w-4 shrink-0" />
-                      <span>{item.title}</span>
-                      {"badge" in item && item.badge != null && (
-                        <span className={`ml-auto inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 text-[10px] font-semibold ${badgeTint(item.module)}`}>
-                          {compactBadge(item.badge)}
-                        </span>
-                      )}
-                    </NavLink>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
-
-              {/* Creadores — single link to dashboard; submenu vive como subtabs en la página */}
-              {canAccess("Creadores") && (
-                <SidebarMenuItem>
-                  <SidebarMenuButton asChild tooltip={t("nav.creators")}>
-                    <button type="button" onClick={() => navigate("/creadores/dashboard")} className={`${LINK_CLASS} ${isCreadoresActive ? ACTIVE_CLASS : ""} w-full text-left`}>
-                      <Users className="h-4 w-4 shrink-0" />
-                      <span>{t("nav.creators")}</span>
-                    </button>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              )}
-
-            </SidebarMenu>
-        </CollapsibleSidebarGroup>
+        {/* Los cinco de todos los días, sueltos (Alvaro, 18/11/2026). El puntito
+            rojo de salud que tenía «Menú» queda en el icono del Dashboard. */}
+        <SidebarMenu>
+          {principales.map((item) => (
+            <SidebarMenuItem key={item.url}>
+              <SidebarMenuButton asChild tooltip={item.title}>
+                <NavLink to={item.url} end={item.url === "/dashboard"} className={LINK_CLASS} activeClassName={ACTIVE_CLASS} onMouseEnter={() => precargarRuta(item.url)} onFocus={() => precargarRuta(item.url)}>
+                  {item.url === "/dashboard" ? <IconoConPuntito icono={item.icon} className="h-4 w-4 shrink-0" /> : <item.icon className="h-4 w-4 shrink-0" />}
+                  <span>{item.title}</span>
+                  {item.badge != null && (
+                    <span className={`ml-auto inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 text-[10px] font-semibold ${badgeTint(item.module)}`}>
+                      {compactBadge(item.badge)}
+                    </span>
+                  )}
+                </NavLink>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          ))}
+        </SidebarMenu>
+        <div className="mx-3 my-1.5 h-px bg-border/50 group-data-[collapsible=icon]:mx-2" aria-hidden />
 
         {/* Argos: su PROPIO botón en el riel (Alvaro), no dentro del flyout de
             Menú. Lo ven dueño, admins, RR. HH. y supervisores (ve_argos). */}
@@ -969,6 +957,48 @@ const DashboardSidebar = () => {
                   </Collapsible>
                 );
               })}
+            </SidebarMenu>
+        </CollapsibleSidebarGroup>
+        )}
+
+        {/* «Más»: lo que se usa de vez en cuando (Alvaro, 18/11/2026). */}
+        {(masMenu.length > 0 || canAccess("Creadores")) && (
+        <CollapsibleSidebarGroup
+          label={t("sidebar.mas")}
+          storageKey="mas"
+          icon={MoreHorizontal}
+          active={isMenuActive}
+          collapsedItems={menuCollapsedItems}
+        >
+            <SidebarMenu>
+              {masMenu.map((item) => (
+                <SidebarMenuItem key={item.url}>
+                  <SidebarMenuButton asChild tooltip={item.title}>
+                    <NavLink to={item.url} end={item.url === "/dashboard"} className={LINK_CLASS} activeClassName={ACTIVE_CLASS} onMouseEnter={() => precargarRuta(item.url)} onFocus={() => precargarRuta(item.url)}>
+                      <item.icon className="h-4 w-4 shrink-0" />
+                      <span>{item.title}</span>
+                      {"badge" in item && item.badge != null && (
+                        <span className={`ml-auto inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 text-[10px] font-semibold ${badgeTint(item.module)}`}>
+                          {compactBadge(item.badge)}
+                        </span>
+                      )}
+                    </NavLink>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
+
+              {/* Creadores — single link to dashboard; submenu vive como subtabs en la página */}
+              {canAccess("Creadores") && (
+                <SidebarMenuItem>
+                  <SidebarMenuButton asChild tooltip={t("nav.creators")}>
+                    <button type="button" onClick={() => navigate("/creadores/dashboard")} className={`${LINK_CLASS} ${isCreadoresActive ? ACTIVE_CLASS : ""} w-full text-left`}>
+                      <Users className="h-4 w-4 shrink-0" />
+                      <span>{t("nav.creators")}</span>
+                    </button>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              )}
+
             </SidebarMenu>
         </CollapsibleSidebarGroup>
         )}
