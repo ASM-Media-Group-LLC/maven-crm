@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { AlertTriangle, Check, ChevronDown, Loader2, MapPin, RefreshCw, Search, X } from "lucide-react";
 import { useLanguage } from "@/hooks/useLanguage";
+import { a12 } from "@/lib/horaBogota";
 import type { TranslationKey } from "@/lib/i18n";
 import { Button } from "@/components/ui/button";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
@@ -75,8 +76,10 @@ export function pasaFiltro(f: Pick<FilaDondeEsta, "estado">, filtro: Filtro | "t
   return tono === filtro;
 }
 
+// En am/pm, nunca en hora militar (Alvaro, 08/11 y 18/11/2026).
 const horaBogota = (iso: string) =>
-  new Date(iso).toLocaleTimeString("es-CO", { timeZone: "America/Bogota", hour: "2-digit", minute: "2-digit", hour12: false });
+  a12(new Date(iso).toLocaleTimeString("en-GB", { timeZone: "America/Bogota", hour: "2-digit", minute: "2-digit", hour12: false })) ?? "";
+const hora12 = (hhmm: string | null | undefined) => (hhmm ? a12(hhmm.slice(0, 5)) : null);
 
 /** Las fotos de la gente. Si no se pueden leer, quedan las iniciales. */
 function useFotos(ids: string[]) {
@@ -207,15 +210,15 @@ export function DondeEstaPanel() {
       estado: t(ETIQUETA[f.estado] ?? "hr.donde.estado.otro"),
       pantalla: [app, que].filter(Boolean).join(" · "),
       foto: fotos[f.user_id],
-      linea: f.estado === "no_ha_entrado" && f.entrada
-        ? t("hr.donde.debiaEntrarCorto", { h: f.entrada.slice(0, 5) })
-        : f.estado_desde && f.estado !== "fuera_de_turno"
-          ? t("hr.donde.desdeCorto", { h: horaBogota(f.estado_desde), d: duracion(f.estado_desde) })
-          : f.entrada && f.salida
-            ? t("hr.donde.turno", { e: f.entrada.slice(0, 5), s: f.salida.slice(0, 5) })
-            : "",
+      // Cada dato en su renglón, con su etiqueta (Alvaro, 18/11/2026: «separadito,
+      // más fácil de entender el cuadrito»).
+      desde: f.estado_desde && f.estado !== "fuera_de_turno" && f.estado !== "no_ha_entrado"
+        ? { hora: horaBogota(f.estado_desde), hace: duracion(f.estado_desde) }
+        : null,
+      debia: f.estado === "no_ha_entrado" ? hora12(f.entrada) : null,
+      turno: f.entrada && f.salida ? `${hora12(f.entrada)} – ${hora12(f.salida)}` : null,
       fueraHoy: f.fuera_hoy_veces > 0
-        ? t(f.fuera_hoy_veces === 1 ? "hr.donde.fueraHoyUna" : "hr.donde.fueraHoy", { n: f.fuera_hoy_veces, d: minutosATexto(f.fuera_hoy_min) })
+        ? t(f.fuera_hoy_veces === 1 ? "hr.donde.val.unaVez" : "hr.donde.val.veces", { n: f.fuera_hoy_veces, d: minutosATexto(f.fuera_hoy_min) })
         : "",
     };
   };
@@ -427,37 +430,51 @@ type Datos = {
   estado: string;
   pantalla: string;
   foto: { foto: string | null; seed: string | null } | undefined;
-  linea: string;
+  desde: { hora: string; hace: string } | null;
+  debia: string | null;
+  turno: string | null;
   fueraHoy: string;
 };
 
-/** Su cara con el puntito del estado, su nombre y en qué anda. */
+/** Su cara, su nombre y su estado en una etiqueta aparte. */
 function Quien({ f, d }: { f: FilaDondeEsta; d: Datos }) {
   return (
-    <div className="flex items-center gap-2.5 px-3 py-2.5">
-      <span className="relative shrink-0">
-        <UserAvatar name={d.nombre} src={d.foto?.foto} seed={d.foto?.seed} size="sm" />
-        <span className={`absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-2 border-background ${PUNTO[d.tono]}`} aria-hidden />
-      </span>
+    <div className="flex items-center gap-2.5 px-3 pb-2 pt-3">
+      <UserAvatar name={d.nombre} src={d.foto?.foto} seed={d.foto?.seed} size="sm" />
       <div className="min-w-0 flex-1">
-        <p className="truncate text-sm font-semibold">{d.nombre}</p>
-        <p className={`truncate text-[11px] ${d.tono === "verde" || d.tono === "gris" ? "text-muted-foreground" : "text-foreground/85"}`}>
-          {d.estado}{d.linea ? <span className="tabular-nums text-muted-foreground"> · {d.linea}</span> : null}
-        </p>
+        <p className="truncate text-sm font-semibold leading-tight">{d.nombre}</p>
+        <span className="mt-1 inline-flex max-w-full items-center gap-1.5 rounded-full bg-foreground/[0.06] px-2 py-0.5 text-[11px] font-medium text-foreground/85">
+          <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${PUNTO[d.tono]}`} aria-hidden />
+          <span className="truncate">{d.estado}</span>
+        </span>
       </div>
       {f.pantalla_fuera_de_lugar && d.tono !== "gris" && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-destructive" aria-hidden />}
     </div>
   );
 }
 
-/** Qué tiene en pantalla y cuántas veces salió hoy, si hay algo que decir. */
+/** Los datos, uno por renglón y con su etiqueta: desde cuándo, qué tenía en
+ *  pantalla, cuánto ha estado fuera hoy, a qué hora debía entrar o su turno. */
 function Detalles({ f, d }: { f: FilaDondeEsta; d: Datos }) {
-  const conPantalla = !!d.pantalla && d.tono !== "gris";
-  if (!conPantalla && !d.fueraHoy) return null;
+  const { t } = useLanguage();
+  const filas: Array<[string, string, boolean?]> = [];
+  if (d.desde) filas.push([t("hr.donde.et.desde"), `${d.desde.hora} · ${d.desde.hace}`]);
+  if (d.debia) filas.push([t("hr.donde.et.debia"), d.debia]);
+  if (d.pantalla && d.tono !== "gris") filas.push([t("hr.donde.et.pantalla"), d.pantalla, !!f.pantalla_fuera_de_lugar]);
+  if (d.fueraHoy) filas.push([t("hr.donde.et.fueraHoy"), d.fueraHoy]);
+  if (d.turno && (d.tono === "gris" || !d.desde)) filas.push([t("hr.donde.et.turno"), d.turno]);
+  if (filas.length === 0) return null;
   return (
-    <div className="mt-auto flex flex-col gap-0.5 border-t border-border/30 px-3 py-2 text-[11px] text-muted-foreground">
-      {conPantalla && <p className={`truncate ${f.pantalla_fuera_de_lugar ? "text-foreground/90" : ""}`}>{d.pantalla}</p>}
-      {d.fueraHoy && <p className="truncate tabular-nums">{d.fueraHoy}</p>}
-    </div>
+    <dl className="mt-auto grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-1 border-t border-border/30 px-3 py-2.5 text-[11.5px] leading-snug">
+      {filas.map(([etiqueta, valor, ojo]) => (
+        <div key={etiqueta} className="contents">
+          <dt className="whitespace-nowrap text-muted-foreground">{etiqueta}</dt>
+          <dd className={`truncate tabular-nums ${ojo ? "text-foreground" : "text-foreground/80"}`} title={valor}>
+            {ojo && <span className="mr-1.5 inline-block h-1.5 w-1.5 rounded-full bg-destructive align-middle" aria-hidden />}
+            {valor}
+          </dd>
+        </div>
+      ))}
+    </dl>
   );
 }

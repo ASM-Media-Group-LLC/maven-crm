@@ -8,6 +8,7 @@
 // hooks/useHoyDelEquipo.ts y hooks/usePuntualidadSemana.ts.
 
 import { tonoDe, type FilaDondeEsta } from "@/hooks/useDondeEsta";
+import { a12 } from "@/lib/horaBogota";
 
 /** Minutos de gracia: llegar 10:05 con entrada 10:00 todavía es a tiempo. */
 export const TOLERANCIA_TARDE_MIN = 5;
@@ -21,9 +22,9 @@ export function minutoBogota(iso: string): number | null {
   return (h % 24) * 60 + m;
 }
 
-/** «HH:MM» de Bogotá de un instante ISO. */
+/** Hora de Bogotá de un instante ISO, en am/pm (nunca militar). */
 export function horaBogota(iso: string): string {
-  return new Date(iso).toLocaleTimeString("en-GB", { timeZone: "America/Bogota", hour: "2-digit", minute: "2-digit", hour12: false });
+  return a12(new Date(iso).toLocaleTimeString("en-GB", { timeZone: "America/Bogota", hour: "2-digit", minute: "2-digit", hour12: false })) ?? "";
 }
 
 /** «08:00:00» u «08:00» → minuto del día. */
@@ -87,7 +88,7 @@ export function armarHoyDelEquipo(
       userId: f.user_id,
       nombre: f.nombre ?? "—",
       equipo: f.equipo,
-      entrada: f.entrada ? f.entrada.slice(0, 5) : null,
+      entrada: f.entrada ? a12(f.entrada.slice(0, 5)) : null,
       llegoAt,
       tardeMin: minutosTarde(f.entrada, llegoAt),
       estado: f.estado,
@@ -132,7 +133,7 @@ export function contarPuntualidad(
       if (!entrada) continue;
       llegaron++;
       const min = minutosTarde(entrada, f.primer_ingreso);
-      if (min != null) tarde.push({ userId: f.user_id, nombre: f.nombre ?? "—", entrada: entrada.slice(0, 5), llegoAt: f.primer_ingreso!, tardeMin: min });
+      if (min != null) tarde.push({ userId: f.user_id, nombre: f.nombre ?? "—", entrada: a12(entrada.slice(0, 5)) ?? entrada.slice(0, 5), llegoAt: f.primer_ingreso!, tardeMin: min });
     }
     tarde.sort((a, b) => b.tardeMin - a.tardeMin);
     return { dia, esHoy: dia === hoy, llegaron, tarde };

@@ -71,7 +71,9 @@ describe("el tablero", () => {
     const filas = await screen.findAllByRole("listitem");
     expect(filas[0]).toHaveTextContent("Karem");
     expect(within(filas[0]).getByText(/hr\.donde\.estado\.fueraDeCowork/)).toBeInTheDocument();
-    expect(within(filas[0]).getByText(/hr\.donde\.fueraHoy.*"n":2.*durMin.*14/)).toBeInTheDocument();
+    // Desde el 18/11/2026 cada dato va en su renglón con su etiqueta («Fuera hoy · 2 veces · 14 min»).
+    expect(within(filas[0]).getByText("hr.donde.et.fueraHoy")).toBeInTheDocument();
+    expect(within(filas[0]).getByText(/hr\.donde\.val\.veces.*"n":2.*durMin.*14/)).toBeInTheDocument();
     expect(within(filas[1]).getByText(/Infloww · Respondiendo fans/)).toBeInTheDocument();
     expect(within(filas[0]).getByRole("link")).toHaveAttribute("href", "/hr/expediente/u-Karem");
   });
@@ -108,5 +110,18 @@ describe("el tablero", () => {
     const alerta = await screen.findByRole("alert", {}, { timeout: 4000 });
     expect(alerta).toHaveTextContent("hr.donde.fallo");
     expect(screen.queryByText("hr.donde.vacio")).not.toBeInTheDocument();
+  });
+});
+
+describe("la tarjeta, separadita y en am/pm (Alvaro, 18/11/2026)", () => {
+  it("cada dato con su etiqueta y la hora en am/pm, nunca militar", async () => {
+    respuesta = { error: null, data: [
+      fila("Karem", "fuera_de_cowork", { estado_desde: "2026-11-18T21:07:00Z", fuera_hoy_veces: 1, fuera_hoy_min: 69 }),
+    ] };
+    render(<DondeEstaPanel />, { wrapper: envolver });
+    const [tarjeta] = await screen.findAllByRole("listitem");
+    expect(within(tarjeta).getByText("hr.donde.et.desde")).toBeInTheDocument();
+    expect(within(tarjeta).getByText(/^4:07 pm · /)).toBeInTheDocument();
+    expect(tarjeta.textContent).not.toMatch(/16:07/);
   });
 });
