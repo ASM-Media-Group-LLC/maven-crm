@@ -178,9 +178,13 @@ describe("2 · «Quién está bajando ahora»", () => {
     ]) {
       expect(fuente(ruta), ruta).toContain('<QuienEstaBajando lugar="arriba"');
     }
-    // En el Centro va antes de la cabecera.
+    // En el Centro va lo primero, antes de las dos columnas. Desde el 18/11/2026
+    // el Centro ya no tiene cabecera (Alvaro: «todo eso no se necesita, volátelo»).
     const centro = fuente("/frontend/src/pages/centro/CentroDeOperaciones.tsx");
-    expect(centro.indexOf('<QuienEstaBajando lugar="arriba"')).toBeLessThan(centro.indexOf("<SelectorDeTablero"));
+    const quien = centro.indexOf('<QuienEstaBajando lugar="arriba"');
+    expect(quien).toBeGreaterThan(-1);
+    expect(quien).toBeLessThan(centro.indexOf("lg:grid-cols-[minmax(0,1fr)_minmax(320px,380px)]"));
+    expect(centro).not.toContain("<SelectorDeTablero");
     expect(fuente("/frontend/src/components/centro/PulsoEquipoVivo.tsx")).toContain('<QuienEstaBajando lugar="pulso"');
   });
 });
