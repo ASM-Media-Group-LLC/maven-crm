@@ -381,11 +381,30 @@ ipcMain.handle("maven:flotante", (e, si) => (deLaVentana(e) ? flotante(si === un
 ipcMain.handle("maven:inactividad", (e) => (deLaVentana(e) ? segundosInactivo() : null));
 // Cuánta memoria usa la app y cuánta tiene el equipo (17/11/2026: el equipo usa
 // Windows de 8 GB o menos). Va en la salud de las llamadas para ver quién sufre.
+// Y desde el 18/11/2026 también el procesador, para el medidor de la app
+// (cuánto del procesador usa todo el computador y cuánto Maven).
+let cpuPrevio = null;
+function cpuDelEquipo() {
+  const t = require("os").cpus().reduce((a, c) => {
+    const total = Object.values(c.times).reduce((x, y) => x + y, 0);
+    return { total: a.total + total, libre: a.libre + c.times.idle };
+  }, { total: 0, libre: 0 });
+  const antes = cpuPrevio;
+  cpuPrevio = t;
+  if (!antes || t.total <= antes.total) return null;
+  return Math.max(0, Math.min(100, Math.round(100 * (1 - (t.libre - antes.libre) / (t.total - antes.total)))));
+}
 ipcMain.handle("maven:memoria", (e) => {
   if (!deLaVentana(e)) return null;
-  const kb = app.getAppMetrics().reduce((t, m) => t + (m.memory?.workingSetSize ?? 0), 0);
+  const metricas = app.getAppMetrics();
+  const kb = metricas.reduce((t, m) => t + (m.memory?.workingSetSize ?? 0), 0);
+  const nucleos = Math.max(1, require("os").cpus().length);
+  const cpuApp = metricas.reduce((t, m) => t + (m.cpu?.percentCPUUsage ?? 0), 0) / nucleos;
   const gb = (b) => Math.round((b / 1024 ** 3) * 10) / 10;
-  return { app_mb: Math.round(kb / 1024), equipo_gb: gb(require("os").totalmem()), libre_gb: gb(require("os").freemem()) };
+  return {
+    app_mb: Math.round(kb / 1024), equipo_gb: gb(require("os").totalmem()), libre_gb: gb(require("os").freemem()),
+    cpu_equipo_pct: cpuDelEquipo(), cpu_app_pct: Math.round(cpuApp),
+  };
 });
 ipcMain.handle("maven:ultimo-cierre", (e) => (deLaVentana(e) ? leerYBorrarCierres() : []));
 ipcMain.handle("maven:llamada", (e, datos) => (deLaVentana(e) ? avisarLlamada(datos, () => mostrar()) : "cerrada"));
