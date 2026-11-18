@@ -42,7 +42,7 @@ describe("llamadas tipo Skype", () => {
   });
 
   it("la llamada deja su rastro en la conversación", () => {
-    expect(migracion).toContain("create trigger llamada_al_chat");
+    expect(migracion).toContain("create trigger llamada_al_chat after update of call_status");
     const t = (k: string, v?: Record<string, string | number>) => `${k}${v ? JSON.stringify(v) : ""}`;
     const l = datosDeLlamada({ llamada: { estado: "terminada", tipo: "video", segundos: 610 } });
     expect(l && textoDeLlamada(l, t as never)).toBe('messenger.llamada.deVideo{"min":10}');

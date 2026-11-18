@@ -9,37 +9,44 @@
 --    (call_participants_agencia ya lo frena si no es de la agencia).
 -- 3. Al terminar, la base deja el aviso en el chat (aviso de sistema).
 
--- Realtime: el timbre a cada invitado y el «rechazó / no contestó» a quien llama.
+-- Las bases de prueba parciales (bancos PGlite) no traen las tablas de
+-- llamadas: ahí esta parte se salta.
 do $$
 begin
-  if not exists (
-    select 1 from pg_publication_tables
-     where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = 'call_participants'
-  ) then
-    alter publication supabase_realtime add table public.call_participants;
+  if to_regclass('public.call_participants') is null or to_regclass('public.calls') is null then
+    return;
   end if;
+
+  -- Realtime: el timbre a cada invitado y el «rechazó / no contestó» a quien llama.
+  if exists (select 1 from pg_publication where pubname = 'supabase_realtime')
+     and not exists (
+       select 1 from pg_publication_tables
+        where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = 'call_participants'
+     ) then
+    execute 'alter publication supabase_realtime add table public.call_participants';
+  end if;
+
+  execute 'alter table public.call_participants add column if not exists invitado_por uuid references auth.users(id)';
+  execute 'alter table public.call_participants add column if not exists actualizado timestamptz not null default now()';
+  execute 'create index if not exists call_participants_user_status_idx on public.call_participants (user_id, status)';
+
+  -- Los que están en la llamada se ven entre sí (para saber a quién ya se invitó).
+  execute $p$alter policy "Users can view their call participations" on public.call_participants
+    using (
+      user_id = (select auth.uid())
+      or public.is_call_creator((select auth.uid()), call_id)
+      or public.is_call_participant((select auth.uid()), call_id)
+    )$p$;
+
+  -- Invitar: quien creó la llamada o cualquiera que ya esté en ella. Uno mismo
+  -- puede sumarse (entrar por link).
+  execute $p$alter policy "Call creators can insert participants" on public.call_participants
+    with check (
+      public.is_call_creator((select auth.uid()), call_id)
+      or user_id = (select auth.uid())
+      or public.is_call_participant((select auth.uid()), call_id)
+    )$p$;
 end $$;
-
-alter table public.call_participants add column if not exists invitado_por uuid references auth.users(id);
-alter table public.call_participants add column if not exists actualizado timestamptz not null default now();
-create index if not exists call_participants_user_status_idx on public.call_participants (user_id, status);
-
--- Los que están en la llamada se ven entre sí (para saber a quién ya se invitó).
-alter policy "Users can view their call participations" on public.call_participants
-  using (
-    user_id = (select auth.uid())
-    or public.is_call_creator((select auth.uid()), call_id)
-    or public.is_call_participant((select auth.uid()), call_id)
-  );
-
--- Invitar: quien creó la llamada o cualquiera que ya esté en ella. Uno mismo
--- puede sumarse (entrar por link).
-alter policy "Call creators can insert participants" on public.call_participants
-  with check (
-    public.is_call_creator((select auth.uid()), call_id)
-    or user_id = (select auth.uid())
-    or public.is_call_participant((select auth.uid()), call_id)
-  );
 
 -- ── El rastro de la llamada en la conversación ──────────────────────────────
 create or replace function public.llamada_al_chat()
@@ -92,10 +99,14 @@ exception when others then
 end;
 $$;
 
-drop trigger if exists llamada_al_chat on public.calls;
-create trigger llamada_al_chat
-  after update of call_status on public.calls
-  for each row execute function public.llamada_al_chat();
+do $$
+begin
+  if to_regclass('public.calls') is null then
+    return;
+  end if;
+  execute 'drop trigger if exists llamada_al_chat on public.calls';
+  execute 'create trigger llamada_al_chat after update of call_status on public.calls for each row execute function public.llamada_al_chat()';
+end $$;
 
 -- Las notificaciones de la campana: la llamada perdida sí avisa; «Llamada de
 -- video · 12 min» no (los que hablaron ya lo saben).
