@@ -113,7 +113,13 @@ const ParticipantTile = memo(function ParticipantTile({
   // la pista de TODOS los elementos de la sala. Ver el comentario del final.
   const attachedAudioElRef = useRef<HTMLAudioElement | null>(null);
 
-  const showVideo = !participant.isCameraOff || participant.isScreenSharing;
+  // TU PROPIA PANTALLA COMPARTIDA NO SE DIBUJA (Alvaro, 18/11/2026: «se le va
+  // al infinito la pantalla»). Si Maven muestra tu pantalla y esa pantalla
+  // muestra Maven, la imagen se repite adentro de sí misma como dos espejos, y
+  // eso es lo que les llega a todos. Meet hace lo mismo: a quien comparte le
+  // dice «estás compartiendo» en vez de mostrársela.
+  const esMiPantalla = participant.isLocal && participant.isScreenSharing;
+  const showVideo = !esMiPantalla && (!participant.isCameraOff || participant.isScreenSharing);
 
   // Zoom estilo Google Meet: solo sobre pantallas compartidas, que es donde hay
   // texto que leer. Sobre una cámara no aporta.
@@ -185,7 +191,7 @@ const ParticipantTile = memo(function ParticipantTile({
 
   // ── Video attachment effect ────────────────────────────────────
   useEffect(() => {
-    if (!room) return;
+    if (!room || esMiPantalla) return;
 
     if (videoRef.current !== attachedVideoElRef.current) {
       if (attachedVideoTrackRef.current && attachedVideoElRef.current) {
@@ -248,7 +254,7 @@ const ParticipantTile = memo(function ParticipantTile({
     if (needsRetry && (!participant.isCameraOff || participant.isScreenSharing)) scheduleAttachRetry();
 
     return () => { if (retryTimer) clearTimeout(retryTimer); };
-  }, [room, participant.identity, participant.isLocal, participant.isCameraOff, participant.isScreenSharing, participant.hasVideoTrack]);
+  }, [room, participant.identity, participant.isLocal, participant.isCameraOff, participant.isScreenSharing, participant.hasVideoTrack, esMiPantalla]);
 
   // ── Audio attachment effect (separate from video) ──────────────
   useEffect(() => {
@@ -402,6 +408,12 @@ const ParticipantTile = memo(function ParticipantTile({
                 : { transform: participant.isLocal ? "scaleX(-1)" : undefined }
             }
           />
+        </div>
+      ) : esMiPantalla ? (
+        <div className="z-[1] flex max-w-[16rem] flex-col items-center gap-2 px-4 text-center">
+          <Monitor className={cn("text-white/70", compact ? "h-5 w-5" : "h-8 w-8")} aria-hidden />
+          <p className={cn("font-medium text-white/90", compact ? "text-[11px]" : "text-sm")}>{t("messenger.tile.tuPantalla")}</p>
+          {!compact && <p className="text-xs text-white/50">{t("messenger.tile.tuPantallaDetalle")}</p>}
         </div>
       ) : (
         <UserAvatar

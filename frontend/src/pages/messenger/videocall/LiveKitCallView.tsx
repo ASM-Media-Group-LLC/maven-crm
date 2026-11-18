@@ -939,8 +939,15 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
       const pinned = visibleParticipants.find((p) => p.sid === pinnedSid);
       if (pinned) return pinned;
     }
-    const ss = visibleParticipants.find((p) => p.isScreenSharing);
-    return ss || visibleParticipants.find((p) => p.identity === lk.activeSpeaker) || visibleParticipants[0];
+    // Al escenario va la pantalla de OTRO. La tuya no se dibuja (ParticipantTile,
+    // esMiPantalla): ponerla en grande era un cuadro que solo dice «estás
+    // compartiendo», y antes de eso, el túnel de espejos que veía el supervisor.
+    const noEsMiPantalla = (p: (typeof visibleParticipants)[number]) => !(p.isLocal && p.isScreenSharing);
+    const ss = visibleParticipants.find((p) => p.isScreenSharing && !p.isLocal);
+    return ss
+      || visibleParticipants.find((p) => p.identity === lk.activeSpeaker && noEsMiPantalla(p))
+      || visibleParticipants.find(noEsMiPantalla)
+      || visibleParticipants[0];
   }, [visibleParticipants, lk.activeSpeaker, pinnedSid]);
 
   // Los que NO son el destacado. Se calculaba dos veces inline; con la vista
