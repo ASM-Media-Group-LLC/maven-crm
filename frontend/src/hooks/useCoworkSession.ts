@@ -392,8 +392,11 @@ export function useCoworkSession(sessionId: string | null) {
     return invokeCowork("createSession", { name, roomNames, description });
   }, []);
 
-  const joinSession = useCallback(async (sid: string, role?: string, hostCode?: string, roomId?: string) => {
-    return invokeCowork("joinSession", { sessionId: sid, role, hostCode, roomId });
+  // `porEnlace`: el roomId viene del enlace del supervisor → la mueve aunque ya
+  // tenga sala y la deja fija ahí (sala fija, 18/11/2026). Sin la marca, el
+  // roomId solo vale si no tiene sala.
+  const joinSession = useCallback(async (sid: string, role?: string, hostCode?: string, roomId?: string, opts?: { porEnlace?: boolean }) => {
+    return invokeCowork("joinSession", { sessionId: sid, role, hostCode, roomId, porEnlace: opts?.porEnlace === true });
   }, []);
 
   // Gestión de salas (host): añadir, renombrar / cambiar modo de preview, cerrar.
@@ -411,7 +414,7 @@ export function useCoworkSession(sessionId: string | null) {
   // El anfitrión mueve a una persona a otra sala (Alvaro, 17/11/2026). A ella le
   // llega por Realtime (su fila de asignación) y su vista entra sola a la nueva.
   const asignarSala = useCallback(async (targetUserId: string, roomId: string) =>
-    invokeCowork("asignarSala", { sessionId, targetUserId, roomId }) as Promise<{ ok: boolean; sinCambio?: boolean; roomId: string; roomName: string }>, [sessionId]);
+    invokeCowork("asignarSala", { sessionId, targetUserId, roomId }) as Promise<{ ok: boolean; sinCambio?: boolean; soloFija?: boolean; roomId: string; roomName: string }>, [sessionId]);
 
   // Canjea un código de sala. Devuelve { sessionId, roomId, ... } para navegar.
   const joinByCode = useCallback(async (code: string) => invokeCowork("joinByCode", { code }), []);

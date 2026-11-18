@@ -18,9 +18,19 @@ describe("decidirAutoJoin — la URL de Cowork nunca degrada a un host", () => {
   it("participante con código de host sube a host", () => {
     expect(decidirAutoJoin({ ...base, role: "host", code: "ABC", membresia: { role: "participant" } })).toBe("unirse-como-host");
   });
-  it("participante ya miembro: se une solo si le falta la sala", () => {
+  it("participante ya miembro: sin sala se une; en la misma sala del enlace, nada", () => {
     expect(decidirAutoJoin({ ...base, roomId: "r1", membresia: { role: "participant" }, tieneAsignacion: false })).toBe("unirse-como-participante");
+    expect(decidirAutoJoin({ ...base, roomId: "r1", membresia: { role: "participant" }, tieneAsignacion: true, salaActual: "r1" })).toBe("nada");
+    // Sin saber en qué sala está no se mueve a ciegas.
     expect(decidirAutoJoin({ ...base, roomId: "r1", membresia: { role: "participant" }, tieneAsignacion: true })).toBe("nada");
+  });
+  // SALA FIJA (18/11/2026): el supervisor le pasaba el enlace de «Plus 2» a un
+  // chatter que ya estaba en «Masivo 1» y el enlace no hacía nada.
+  it("EL BUG: el enlace del supervisor mueve al participante que ya tiene otra sala", () => {
+    expect(decidirAutoJoin({ ...base, roomId: "plus-2", membresia: { role: "participant" }, tieneAsignacion: true, salaActual: "masivo-1" })).toBe("mover-de-sala");
+  });
+  it("a un host nunca lo mueve el enlace de sala", () => {
+    expect(decidirAutoJoin({ ...base, roomId: "plus-2", membresia: { role: "host" }, tieneAsignacion: true, salaActual: "masivo-1" })).toBe("nada");
   });
   it("sin membresía: entra con el rol que pide la URL", () => {
     expect(decidirAutoJoin({ ...base, role: "host", code: "ABC" })).toBe("unirse-como-host");

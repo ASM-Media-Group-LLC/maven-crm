@@ -41,6 +41,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 interface Props {
   cowork: ReturnType<typeof useCoworkSession>;
@@ -108,6 +109,27 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
   // undefined = todavía no se sabe; null = nunca estuvo en una sala de esta sesión.
   const [lastRoomId, setLastRoomId] = useState<string | null | undefined>(undefined);
   const [resuming, setResuming] = useState(false);
+  // «Entrar con el código de tu sala» desde el menú, también con sala (sala fija,
+  // 18/11/2026): antes el campo solo existía en pantallas que casi nunca se veían.
+  const [codigoAbierto, setCodigoAbierto] = useState(false);
+
+  // Canjea el código que dio el supervisor: pasa a esa sala y queda fija ahí.
+  const canjearCodigo = async () => {
+    const code = normalizeRoomCode(roomCode);
+    if (!isCompleteRoomCode(code)) return;
+    setJoiningByCode(true);
+    try {
+      const res = await cowork.joinByCode(code) as { roomName?: string };
+      setRoomCode("");
+      setCodigoAbierto(false);
+      if (res?.roomName) toast.success(t("cowork.participant.movedByCode", { room: res.roomName }));
+      cowork.refetch(true);
+    } catch (e: unknown) {
+      toast.error((e as Error)?.message || t("cowork.common.codeError"));
+    } finally {
+      setJoiningByCode(false);
+    }
+  };
 
   const myAssignment = cowork.myAssignment;
   const myRoom = cowork.rooms.find(r => r.id === myAssignment?.room_id);
@@ -127,8 +149,10 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
 
   // ENTRA SOLO, SIN CÓDIGO (Alvaro, 13/11/2026: «con que estén en un tipo de rol
   // deberían de poder entrar»). Cada quien es participante del Cowork de su
-  // departamento: sin sala, se le mete a su última sala de esta sesión o, si nunca
-  // estuvo, a la primera. El código queda solo para que un coordinador lo mueva.
+  // departamento: sin sala, el servidor lo mete a su SALA FIJA (la que le puso el
+  // supervisor, 18/11/2026), si no a su última sala de esta sesión o, si nunca
+  // estuvo, a la primera. Por eso aquí NO se manda sala: una sala pedida desde
+  // el cliente pisaría la fija.
   const autoEntro = useRef<string | null>(null);
   useEffect(() => {
     const sid = cowork.session?.id;
@@ -144,11 +168,11 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
     setResuming(true);
     // Relectura SILENCIOSA: la normal prendía la ruedita, desmontaba esta vista y
     // repetía todas sus cargas antes de conectar la llamada.
-    cowork.joinSession(sid, "participant", undefined, lastRoomId ?? undefined)
+    cowork.joinSession(sid, "participant")
       .then(() => cowork.refetch(true))
       .catch((e: unknown) => toast.error((e as Error)?.message || t("cowork.participant.resumeError")))
       .finally(() => setResuming(false));
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- lastRoomId a propósito fuera: no se espera
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cowork.session?.id, myAssignment, cowork.myMembership?.role, cowork.joinSession, cowork.refetch, t]);
 
   // `persistente`: la presencia del chatter tiene que durar lo que dura su
@@ -784,20 +808,7 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
       }
     };
 
-    const enterWithCode = async () => {
-      const code = normalizeRoomCode(roomCode);
-      if (!isCompleteRoomCode(code)) return;
-      setJoiningByCode(true);
-      try {
-        await cowork.joinByCode(code);
-        setRoomCode("");
-        cowork.refetch();
-      } catch (e: any) {
-        toast.error(e.message || t("cowork.common.codeError"));
-      } finally {
-        setJoiningByCode(false);
-      }
-    };
+    const enterWithCode = canjearCodigo;
 
     return (
       <div className="flex-1 min-h-0 overflow-y-auto">
@@ -1033,6 +1044,10 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
                 <Phone className="h-4 w-4 mr-2" />
                 {isInOneOnOne ? t("cowork.participant.inPrivateCall") : t("cowork.participant.privateCallWithSupervisor")}
               </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setCodigoAbierto(true)}>
+                <KeyRound className="h-4 w-4 mr-2" />
+                {t("cowork.page.enterWithCode")}
+              </DropdownMenuItem>
               {breakStartedAt ? (
                 <DropdownMenuItem onClick={() => toggleBreak()}>
                   <Coffee className="h-4 w-4 mr-2" />
@@ -1059,6 +1074,39 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
           </DropdownMenu>
         </div>
       </div>
+
+      {/* Entrar con el código de tu sala (sala fija, 18/11/2026): el supervisor
+          te da el código de otra sala y con esto pasas a ella y quedas fijo ahí. */}
+      <Dialog open={codigoAbierto} onOpenChange={(v) => { setCodigoAbierto(v); if (!v) setRoomCode(""); }}>
+        <DialogContent className="vidrio max-w-sm rounded-3xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <KeyRound className="h-4 w-4 text-primary" />
+              {t("cowork.page.enterWithCode")}
+            </DialogTitle>
+            <DialogDescription>{t("cowork.participant.roomCodeHint")}</DialogDescription>
+          </DialogHeader>
+          <div className="flex gap-2">
+            <Input
+              autoFocus
+              value={roomCode}
+              onChange={(e) => setRoomCode(normalizeRoomCode(e.target.value))}
+              onKeyDown={(e) => e.key === "Enter" && void canjearCodigo()}
+              placeholder="ABC234"
+              maxLength={ROOM_CODE_LENGTH}
+              className="rounded-full text-center font-mono tracking-[0.25em] uppercase"
+            />
+            <Button
+              onClick={() => void canjearCodigo()}
+              disabled={!isCompleteRoomCode(roomCode) || joiningByCode}
+              className="rounded-full gap-1 shrink-0"
+            >
+              {joiningByCode ? <Loader2 className="h-4 w-4 animate-spin" /> : <DoorOpen className="h-4 w-4" />}
+              {t("cowork.common.enter")}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Tu supervisor está en pausa (break / lunch / ausente): la pantalla del
           mock, con el paisaje y sin contador. Entre la barra y el video, así se
