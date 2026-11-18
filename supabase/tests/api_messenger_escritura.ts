@@ -28,6 +28,14 @@
 // aquí. Sale con código 1 si algo falla. Corre en el guard de cada PR.
 import { PGlite } from "npm:@electric-sql/pglite@0.3";
 
+// El reloj de las bases: PGlite saca su now() de Date.now(). Solo se adelanta,
+// nunca se atrasa, así que para la base es como si el banco hubiera esperado.
+const relojReal = Date.now;
+let adelanto = 0;
+Date.now = () => relojReal() + adelanto;
+/** Salta al comienzo del minuto siguiente (con 50 ms de holgura). */
+const alComienzoDeUnMinuto = () => { adelanto += 60_000 - (Date.now() % 60_000) + 50; };
+
 const leer = (rel: string) => Deno.readTextFileSync(new URL(rel, import.meta.url));
 const FIXTURE = leer("./fixtures/prod_chat_api_20260928.sql");
 const COMPLEMENTO = leer("./fixtures/prod_api_escritura_20261001.sql");
@@ -1113,6 +1121,11 @@ const QUE_QUEDO = `select (select count(*)::int from pg_attribute where attrelid
   anda(await intentar(db, PG, `update api_escritura_cupos set lim_msj_hora = 2000, lim_msj_dia = 20000 where clave = 'plataforma'`), "hasta el techo sí (2.000 por hora)");
   rechazo(await intentar(db, PG, `update api_escritura_cupos set lim_msj_min = 100, lim_msj_hora = 50 where clave = 'plataforma'`), "23514", null, null, "el minuto no puede ser más que la hora");
   await db.exec(`update api_escritura_cupos set lim_msj_hora = 1000, lim_msj_dia = 10000 where clave = 'plataforma'`);
+  // Lo que sigue cuenta dentro de UN minuto: si el minuto cambiaba a la mitad, la
+  // ventana se vaciaba y «el 4.º se rechaza» fallaba sin que nada estuviera mal.
+  // Se salta al comienzo del minuto siguiente (minuto nuevo es también hora y día
+  // nuevos si toca), así que todo lo de abajo corre dentro del mismo minuto.
+  alComienzoDeUnMinuto();
   // El peso: un directo 4, «Grupo» (5) 7.
   anda(await enviar(db, BLU, DM_AJ, "un directo"), "BLU manda un directo");
   anda(await enviar(db, BLU, G, "a cinco"), "y uno a «Grupo»");
