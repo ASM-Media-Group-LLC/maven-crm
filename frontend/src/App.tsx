@@ -8,6 +8,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { ThemeProvider } from "next-themes";
 import { AuthProvider } from "@/hooks/useAuth";
+import { AvisoSoloApp } from "@/components/CoworkSoloApp";
 import { AbrirEnApp } from "@/components/AbrirEnApp";
 import { useSkinSync } from "@/hooks/useSkin";
 import { LanguageProvider, idiomaInicial } from "@/hooks/useLanguage";
@@ -293,6 +294,7 @@ const App = () => (
           <BrowserRouter>
             {/* Los links de Maven abren en la app de computador (17/11/2026). */}
             <AbrirEnApp />
+            <AvisoSoloApp />
             <Suspense fallback={<LoadingFallback />}>
             <Routes>
               {/* Public routes */}
