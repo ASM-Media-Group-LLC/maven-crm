@@ -17,10 +17,6 @@
 
 export const MALAS_PARA_PRENDER = 2;
 export const BUENAS_PARA_APAGAR = 5;
-/** Debajo de esto (kbps de subida disponible) no caben cámara + pantalla. */
-export const SUBIDA_JUSTA_KBPS = 1200;
-/** Encima de esto hay holgura de sobra para volver a la calidad normal. */
-export const SUBIDA_HOLGADA_KBPS = 2500;
 /** Sin video mandándose, WebRTC informa una «subida» enorme que no significa nada. */
 const SUBIDA_SIN_SENTIDO_KBPS = 50_000;
 
@@ -35,14 +31,24 @@ export interface EstadoAhorro {
 
 export const AHORRO_INICIAL: EstadoAhorro = { activo: false, malas: 0, buenas: 0 };
 
+// ⚠️ 17/11/2026 (Alvaro: «si él comparte, lo tengo que ver sí o sí, y en buena
+// calidad»): la subida que llega acá es lo que la llamada ESTÁ USANDO, no lo que
+// el internet aguanta. Una pantalla quieta a 5 fps y una cámara liviana usan
+// 150–900 kbps con cualquier internet, así que «menos de 1200» prendía el ahorro
+// a TODOS (también con internet excelente) y «más de 2500» para apagarlo nunca
+// llegaba: el ahorro quedaba pegado y las pantallas salían en la calidad mínima.
+// Ahora solo cuenta la señal real del navegador —el codificador limitado por
+// ancho de banda— y la prueba de velocidad (ahorroPorPrueba). Se apaga con 5
+// minutos seguidos sin esa limitación.
 export function siguienteAhorro(
   prev: EstadoAhorro,
   m: { subida_kbps: number | null; limite_cam: string | null; limite_pant: string | null },
 ): EstadoAhorro {
   const subida = m.subida_kbps !== null && m.subida_kbps < SUBIDA_SIN_SENTIDO_KBPS ? m.subida_kbps : null;
   const limitada = m.limite_cam === "bandwidth" || m.limite_pant === "bandwidth";
-  const mala = limitada || (subida !== null && subida < SUBIDA_JUSTA_KBPS);
-  const buena = !limitada && subida !== null && subida >= SUBIDA_HOLGADA_KBPS;
+  const mala = limitada;
+  // Sin video mandándose (subida sin sentido o sin dato) no hay con qué juzgar.
+  const buena = !limitada && subida !== null;
   const malas = mala ? prev.malas + 1 : 0;
   const buenas = buena ? prev.buenas + 1 : 0;
   if (!prev.activo && malas >= MALAS_PARA_PRENDER) return { activo: true, malas, buenas: 0 };

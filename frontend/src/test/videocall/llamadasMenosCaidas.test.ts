@@ -21,7 +21,7 @@ import { SALTO_DE_SUENO_MS, crearVigiaDelSueno, faseSegunSueno } from "@/lib/equ
 import { BIEN_SOSTENIDO_MS, DEBIL_INICIAL, DEBIL_SOSTENIDO_MS, siguienteDebil, type EstadoDebil } from "@/lib/internetDebil";
 import { CAMARA_LIVIANA, FPS_DE_COWORK, topesDeCowork, topesLivianos, type TopeDeCodificacion } from "@/lib/perfilDeCamara";
 import {
-  CAPTURA_COWORK, PUBLICACION_DE_PANTALLA, PUBLICACION_DE_PANTALLA_COWORK, PUBLICACION_DE_PANTALLA_LIVIANA, opcionesDePantalla,
+  CAPTURA_COWORK, PUBLICACION_DE_PANTALLA, PUBLICACION_DE_PANTALLA_COWORK, PUBLICACION_DE_PANTALLA_LIVIANA, opcionesDePantalla, pantallaDeTrabajoCowork,
 } from "@/lib/perfilDePantalla";
 import { cuentaComoTrabajo, estadoDeTiempo } from "@/lib/coworkTiempoRegla";
 
@@ -269,7 +269,7 @@ describe("4. Cowork más liviano: todo en vivo, menos cuadros", () => {
     const s = leer("hooks/useLiveKit.ts");
     expect(s).toContain("const topes = liviano ? topesLivianos(antes, ladoCorto, conPrueba) : topesDeCowork(antes);");
     expect(s).toContain("if (liviano || conPrueba) {");
-    expect(s).toContain("const pantalla = opcionesDePantalla(perfil, captura, salaConPrueba(room.name));");
+    expect(s).toContain("const pantalla = opcionesDePantalla(perfil, captura, pantallaDeTrabajoCowork(room.name));");
   });
 
   it("⚠️ quien habla o está fijado se sigue viendo nítido: la calidad por voz sigue en la vista", () => {
@@ -330,5 +330,16 @@ describe("7. mapas de fuente: se generan ocultos y nunca se sirven", () => {
 
   it("nginx no los sirve aunque estén", () => {
     expect(leer("/nginx.conf")).toMatch(/location ~\* \\\.map\$ \{\s*return 404;\s*\}/);
+  });
+});
+
+// 17/11/2026: en el hub de supervisores la pantalla compartida se tiene que ver
+// bien (Alvaro); los 5 fps son solo para el trabajo vigilado de Cowork.
+describe("calidad de pantalla según la sala", () => {
+  it("las salas de trabajo de Cowork van a 5 fps; el hub y las llamadas comunes, no", () => {
+    expect(pantallaDeTrabajoCowork("cowork_a6bae2d8_7")).toBe(true);
+    expect(pantallaDeTrabajoCowork("cowork_hub_a6bae2d8")).toBe(false);
+    expect(pantallaDeTrabajoCowork("meet_123")).toBe(false);
+    expect(pantallaDeTrabajoCowork(null)).toBe(false);
   });
 });

@@ -38,7 +38,7 @@ import {
 import type { ImagenDeFondo } from "@/lib/fondoDeLlamada";
 import { NoiseSuppresionTrackProcessor, supportsNoiseSuppression, loadNCPreference } from "@/lib/noise-suppression-processor";
 import { estadoDeNC, type EstadoNC } from "@/lib/estadoNC";
-import { elegirPerfilDePantalla, opcionesDePantalla } from "@/lib/perfilDePantalla";
+import { PRUEBA_VIGENTE_MS, elegirPerfilDePantalla, opcionesDePantalla, pantallaDeTrabajoCowork } from "@/lib/perfilDePantalla";
 import { medirRed, salaConPrueba, tocaProbar, PRUEBA_CADA_MS, REINTENTO_TRAS_FALLO_MS, type PruebaDeRed } from "@/lib/pruebaDeRed";
 import { marcarConexionEnCurso, marcarLlamadaActiva, quitarLlamadaActiva } from "@/lib/llamadaActiva";
 import {
@@ -749,7 +749,11 @@ export function useLiveKit() {
           }
         }
         const estabaEnAhorro = ahorroRef.current.activo;
-        ahorroRef.current = ahorroPorPrueba(siguienteAhorro(ahorroRef.current, muestra), prueba?.subida_mbps ?? null);
+        // La prueba de velocidad vale una hora: mientras diga que la subida es
+        // floja, el ahorro sigue (no se apaga porque la llamada ya use poco).
+        const ultima = ultimaPruebaRef.current;
+        const pruebaVigente = ultima && Date.now() - ultima.at <= PRUEBA_VIGENTE_MS ? ultima.resultado : null;
+        ahorroRef.current = ahorroPorPrueba(siguienteAhorro(ahorroRef.current, muestra), pruebaVigente?.subida_mbps ?? null);
         const ahorro = ahorroRef.current;
         // Prendido se vuelve a aplicar cada minuto: LiveKit puede reponer capas.
         if (ahorro.activo) void aplicarAhorro(true);
@@ -2629,7 +2633,7 @@ export function useLiveKit() {
         limitePant: ultimaMuestraRef.current?.limite_pant ?? null,
       });
       // En Cowork, la pantalla a 5 fps (perfilDePantalla.ts, PUBLICACION_DE_PANTALLA_COWORK).
-      const pantalla = opcionesDePantalla(perfil, captura, salaConPrueba(room.name));
+      const pantalla = opcionesDePantalla(perfil, captura, pantallaDeTrabajoCowork(room.name));
       if (newState) console.info(`[LiveKit] compartiendo pantalla con el perfil ${perfil}`);
       await room.localParticipant.setScreenShareEnabled(newState, pantalla.captura, pantalla.publicacion);
       if (exigir) {

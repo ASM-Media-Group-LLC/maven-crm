@@ -26,4 +26,15 @@ describe("modo ahorro según el internet de subida", () => {
   it("con buen internet nunca se prende", () => {
     expect(pasar(AHORRO_INICIAL, holgada, holgada, holgada).activo).toBe(false);
   });
+  // 17/11/2026: la subida es lo que la llamada USA. Una pantalla quieta a 5 fps
+  // usa poco con cualquier internet; eso prendía el ahorro a todos y lo dejaba pegado.
+  it("usar poca subida sin que el navegador esté limitado NO prende el ahorro", () => {
+    const quieta = { subida_kbps: 300, limite_cam: "none", limite_pant: "none" };
+    expect(pasar(AHORRO_INICIAL, quieta, quieta, quieta, quieta).activo).toBe(false);
+  });
+  it("prendido, se apaga con 5 minutos sin limitación aunque la llamada use poco", () => {
+    const prendido = pasar(AHORRO_INICIAL, lenta, lenta);
+    const quieta = { subida_kbps: 300, limite_cam: "none", limite_pant: "none" };
+    expect(pasar(prendido, quieta, quieta, quieta, quieta, quieta).activo).toBe(false);
+  });
 });
