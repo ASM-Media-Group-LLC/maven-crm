@@ -169,6 +169,18 @@ function crearVentana() {
 
   ventana.once("ready-to-show", () => ventana.show());
 
+  // MÁS LIVIANA (Alvaro, 18/11/2026). Con backgroundThrottling apagado la
+  // página cree que siempre está a la vista (document.visibilityState queda en
+  // "visible" aunque la ventana esté minimizada o escondida en la barra), así
+  // que seguía decodificando la cámara de cada compañero todo el día. Se le
+  // avisa a la página cuándo de verdad nadie la ve, y ella pausa ese video
+  // (frontend/src/lib/videoEscondido.ts). La llamada, el audio y Argos siguen.
+  const avisarVisibilidad = () => {
+    if (!ventana || ventana.isDestroyed()) return;
+    ventana.webContents.send("maven:visible", ventana.isVisible() && !ventana.isMinimized());
+  };
+  for (const ev of ["minimize", "restore", "hide", "show"]) ventana.on(ev, avisarVisibilidad);
+
   // La X esconde; solo «Salir» (o Cmd+Q) cierra de verdad.
   ventana.on("close", (e) => {
     if (estado.saliendo) return;
@@ -485,6 +497,7 @@ app.whenReady().then(() => {
   }
 
   configurarPermisos();
+  ipcMain.handle("maven:visible", () => !ventana || (ventana.isVisible() && !ventana.isMinimized()));
   crearMenu();
   crearVentana();
   crearBandeja();

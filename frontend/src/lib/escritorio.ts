@@ -33,6 +33,9 @@ export type MavenEscritorio = {
   pantallaAutomatica?: (si: boolean) => void;
   /** Las veces que la app se cayó o se congeló y se recuperó sola (se leen una vez). Desde el 18/11/2026. */
   ultimoCierre?: () => Promise<unknown[]>;
+  /** ¿Alguien ve la ventana? (versiones de la app desde el 18/11/2026). */
+  visible?: () => Promise<boolean>;
+  alCambiarVisibilidad?: (cb: (visible: boolean) => void) => () => void;
 };
 
 /** La app de computador, o null en el navegador (o en una versión vieja de la app sin esa función). */
