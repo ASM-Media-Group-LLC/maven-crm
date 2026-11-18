@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useEsDueno } from "@/hooks/useEsDueno";
 import { getPublicBaseUrl } from "@/lib/getPublicUrl";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -139,7 +140,9 @@ export default function MeetPage() {
   const hoyBogota = new Date().toLocaleDateString("en-CA", { timeZone: "America/Bogota" });
   const esDeHoy = (r: MeetRoom) => !!r.created_at
     && new Date(r.created_at).toLocaleDateString("en-CA", { timeZone: "America/Bogota" }) === hoyBogota;
-  const visibles = myRooms.filter((r) => r.pinned || esDeHoy(r));
+  // El dueño las ve TODAS (Alvaro, 18/11/2026: «el dueño sí tengo que verlas»).
+  const { esDueno } = useEsDueno();
+  const visibles = esDueno === true ? myRooms : myRooms.filter((r) => r.pinned || esDeHoy(r));
 
 
   return (

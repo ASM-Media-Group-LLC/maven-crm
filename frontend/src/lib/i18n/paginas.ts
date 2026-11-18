@@ -196,7 +196,7 @@ export const paginas = {
   "meet.ended": { es: "Reunión terminada", en: "Meeting ended" },
   "meet.endError": { es: "No se pudo terminar la reunión", en: "Couldn't end the meeting" },
   "meet.subtitleBack": { es: "Vuelve a una de tus reuniones abiertas o crea una nueva.", en: "Go back to one of your open meetings or create a new one." },
-  "meet.subtitleNew": { es: "Crea una reunión, comparte el link o el código, y quien lo tenga entra.", en: "Create a meeting, share the link or the code, and anyone who has it can join." },
+  "meet.subtitleNew": { es: "Crea una reunión y manda el link a quien quieras: pide permiso y tú lo dejas pasar.", en: "Create a meeting and send the link to anyone: they ask to join and you let them in." },
   "meet.new": { es: "Nueva reunión", en: "New meeting" },
   "meet.joinWith": { es: "Entrar con un link o un código", en: "Join with a link or a code" },
   "meet.joinPlaceholder": { es: "ABC234 o pega el link", en: "ABC234 or paste the link" },
