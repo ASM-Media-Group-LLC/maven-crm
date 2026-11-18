@@ -78,10 +78,7 @@ export default function CoworkPage() {
   // sin fila, decide el nivel de acceso del rol.
   const { isSupervisorOrAbove, isLoading: tierLoading } = useRoleTier();
   const { explicitPermission, isLoading: permsLoading } = usePermissions();
-  // Crear salas de Cowork: SOLO el dueño y los admins (Alvaro, 18/11/2026: «las
-  // puede hacer el admin nada más y yo»). Antes también los supervisores.
-  // (El dueño también tiene el rol de admin.)
-  const canCreateSessions = isAdmin;
+  const canCreateSessions = explicitPermission("Cowork", "Crear sesión") ?? isSupervisorOrAbove;
   const permissionLoading = tierLoading || permsLoading;
 
   useEffect(() => {
