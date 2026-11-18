@@ -406,6 +406,7 @@ La plataforma sube el personalizado terminado de una modelo y queda en Maven **c
 2. **Subir el archivo** por TUS con esos datos.
 3. **Avisar «listo»** — `POST /public-api/contenido/subidas/{id}/listo` (sin cuerpo). Responde `202` con `estado: "procesando"`. Si el archivo no terminó de llegar: `409 file_not_uploaded`.
 4. **Consultar** — `GET /public-api/contenido/subidas/{id}` hasta `estado: "listo"` (ya está en el Drive de Maven). Otros estados: `esperando_archivo`, `procesando`, `error`.
+   Con `listo` trae `link_descarga` (el archivo original, para bajarlo) y `link_vence` (dura 6 horas; un GET nuevo da un link nuevo). Antes de `listo`, los dos vienen en `null`.
 
 Errores de la creación: `404 creator_not_found` (no hay modelo con ese id o correo en la agencia), `409 creator_ambiguous` (el correo es de más de una), `409 creator_without_folder` (la modelo todavía no tiene carpeta en el Drive), `400 invalid_field`. Tope: 50 GB por archivo. Una subida solo la ve la llave que la creó.
 

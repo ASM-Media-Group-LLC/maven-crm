@@ -15,6 +15,7 @@
 // agencia de la llave (tenant_id), y una subida solo la ve la llave que la creó.
 
 import type { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { ahoraMas, firmar, VENCE } from "../_shared/drive-firma.ts";
 import {
   CARPETA_PERSONALIZADOS, estadoPublico, nombreDelDia, type FilaDeSubida, leerPedidoDeSubida, respuestaDeSubida,
   rutaDeContenido, rutaEnElBalde,
@@ -42,6 +43,8 @@ export interface ContextoDeContenido {
   idempotencia: string | null;
   supabaseUrl: string;
   anonKey: string;
+  /** El NAS del Drive y su secreto, para firmar el link de descarga (como la edge drive). */
+  nas: { url: string; secreto: string };
   servicio: { key: string; cronToken: string };
 }
 
@@ -76,6 +79,24 @@ async function permisoDeSubida(ctx: ContextoDeContenido, path: string) {
     put_url: data.signedUrl,
     vence_en_segundos: 7200,
   };
+}
+
+/** El link para bajar el archivo del NAS (Backstage: la PR lo revisa y el chatter
+ *  lo baja para mandárselo al fan). Firmado como en la edge drive, dura 6 horas;
+ *  un GET nuevo da uno nuevo. Sin NAS configurado o sin el archivo listo: null. */
+async function linkDeDescarga(ctx: ContextoDeContenido, itemId: string): Promise<{ link_descarga: string | null; link_vence: string | null }> {
+  const nada = { link_descarga: null, link_vence: null };
+  const nas = ctx.nas.url.replace(/\/+$/, "");
+  if (!nas || ctx.nas.secreto.length < 32) return nada;
+  const { data: f } = await ctx.admin.from("drive_items").select("nombre, mime, storage_key, estado, trashed_at")
+    .eq("id", itemId).eq("tenant_id", ctx.agencia).maybeSingle();
+  if (!f || f.estado !== "listo" || f.trashed_at || !f.storage_key) return nada;
+  const vence = ahoraMas(VENCE.bajar);
+  const permiso = await firmar(ctx.nas.secreto, {
+    op: "get", k: f.storage_key as string, ct: (f.mime as string | null) ?? "application/octet-stream",
+    n: f.nombre as string, dl: true, e: vence,
+  });
+  return { link_descarga: `${nas}/o?t=${permiso}`, link_vence: new Date(vence * 1000).toISOString() };
 }
 
 export async function servirContenido(ctx: ContextoDeContenido): Promise<RespuestaDeContenido> {
@@ -146,8 +167,12 @@ export async function servirContenido(ctx: ContextoDeContenido): Promise<Respues
         .eq("id", g.aporte_id).eq("tenant_id", ctx.agencia).maybeSingle();
       aporte = (data as Aporte | null) ?? null;
     }
-    return respuestaDeSubida(g, await nombreDeCreadora(ctx.admin, ctx.agencia, g.creator_id), estadoPublico(g, aporte),
-      aporte?.drive_item_id ?? aporte?.nas_item_id ?? null);
+    const estado = estadoPublico(g, aporte);
+    const itemId = aporte?.drive_item_id ?? aporte?.nas_item_id ?? null;
+    return {
+      ...respuestaDeSubida(g, await nombreDeCreadora(ctx.admin, ctx.agencia, g.creator_id), estado, itemId),
+      ...(estado === "listo" && itemId ? await linkDeDescarga(ctx, itemId) : { link_descarga: null, link_vence: null }),
+    };
   };
 
   if (r.accion === "ver") return { estado: 200, cuerpo: await verla() };
