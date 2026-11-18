@@ -112,6 +112,17 @@ export const cowork = {
   "cowork.atasco.titulo": { es: "Cowork no terminó de cargar", en: "Cowork didn't finish loading" },
   "cowork.atasco.desc": { es: "Algo se trabó al entrar a la sala. Reintentar suele arreglarlo.", en: "Something got stuck while joining the room. Retrying usually fixes it." },
   "cowork.atasco.reintentar": { es: "Reintentar", en: "Retry" },
+  // Cowork solo con la app de computador (Alvaro, 17/11/2026): lib/appObligatoria.ts.
+  "cowork.app.titulo": { es: "Cowork ahora funciona con la app de Maven", en: "Cowork now runs in the Maven app" },
+  "cowork.app.desc": {
+    es: "Para trabajar en Cowork necesitas la app de Maven en tu computador: comparte tu pantalla sola y no se corta. Descárgala, instálala y entra con tu misma cuenta.",
+    en: "To work in Cowork you need the Maven app on your computer: it shares your screen on its own and doesn't drop. Download it, install it and sign in with the same account.",
+  },
+  "cowork.app.descargarMac": { es: "Descargar para Mac", en: "Download for Mac" },
+  "cowork.app.descargarWindows": { es: "Descargar para Windows", en: "Download for Windows" },
+  "cowork.app.descargar": { es: "Descargar la app", en: "Download the app" },
+  "cowork.app.yaLaTengo": { es: "Ya la tengo: abrir en la app", en: "I already have it: open in the app" },
+  "cowork.app.aviso": { es: "Desde el {fecha}, Cowork funciona solo con la app de Maven.", en: "Starting {fecha}, Cowork only works in the Maven app." },
   "cowork.lobby.defaultName": { es: "Sesión Cowork", en: "Cowork session" },
   "cowork.lobby.joinAsParticipant": { es: "Unirse como participante", en: "Join as participant" },
   "cowork.lobby.joinError": { es: "Error al unirse", en: "Couldn't join" },

@@ -61,6 +61,8 @@ contextBridge.exposeInMainWorld("mavenEscritorio", {
     ipcRenderer.on("maven:abrir-ruta", f);
     return () => ipcRenderer.removeListener("maven:abrir-ruta", f);
   },
+  /** Cowork: true = al compartir, la pantalla completa sola, sin la ventanita para elegir. */
+  pantallaAutomatica: (si) => ipcRenderer.send("maven:pantalla-auto", Boolean(si)),
   /** Memoria: { app_mb, equipo_gb, libre_gb }. */
   memoria: () => ipcRenderer.invoke("maven:memoria"),
   /** Cada minuto: los tramos de app/página al frente (ver desktop/src/apps.js). */

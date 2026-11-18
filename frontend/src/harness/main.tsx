@@ -19,6 +19,7 @@ import BancoConexionEquipo from "./bancoConexionEquipo";
 import BancoCostos from "./bancoCostos";
 import BancoGracia from "./bancoGracia";
 import BancoGuiaConexion from "./bancoGuiaConexion";
+import BancoAppObligatoria from "./bancoAppObligatoria";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import VirtualOfficePage from "@/pages/oficina-ai/VirtualOfficePage";
 import TardanzasPage from "@/pages/admin/TardanzasPage";
@@ -87,6 +88,12 @@ void cargarIdioma(idiomaInicial()).finally(() => raiz.render(
   // /harness.html?ver=costos[&tema=claro] → el tablero de gasto de Costos con los números del 14/11.
   // /harness.html?ver=gracia[&tema=claro] → los minutos de gracia (Cowork + Expediente).
   // /harness.html?ver=guia-conexion[&estado=bien|justo|malo|error…][&tema=claro] → la Guía de conexión.
+  // /harness.html?ver=app-obligatoria[&tema=claro] → Cowork solo con la app (aviso + bloqueo).
+  ver === "app-obligatoria" ? (
+    <StrictMode>
+      <LanguageProvider><BancoAppObligatoria /></LanguageProvider>
+    </StrictMode>
+  ) :
   ver === "guia-conexion" ? (
     <StrictMode>
       <LanguageProvider><BancoGuiaConexion estado={params.get("estado") ?? "quieto"} /></LanguageProvider>

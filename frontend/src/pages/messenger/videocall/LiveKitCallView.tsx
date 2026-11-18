@@ -1,5 +1,8 @@
 import { useState, useEffect, useCallback, useMemo, useRef, type ReactNode } from "react";
 import { ConnectionState, CriticalTimers, RoomEvent, Track } from "livekit-client";
+import { escritorio } from "@/lib/escritorio";
+import { estaEnPausa } from "@/lib/coworkPausa";
+import { proximoIntentoDePantalla } from "@/lib/pantallaSolaEnLaApp";
 import { useLiveKit } from "@/hooks/useLiveKit";
 import CallTopBar from "./CallTopBar";
 import CallControls from "./CallControls";
@@ -727,6 +730,39 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
   // En la sala de Cowork se exige la PANTALLA COMPLETA (Alvaro, 10/11): si
   // elige una pestaña o una ventana, useLiveKit se la rechaza y se la pide de nuevo.
   useEffect(() => { lk.setExigirPantallaCompleta(!!supervisorEncuadre); }, [lk.setExigirPantallaCompleta, supervisorEncuadre]);
+  // EN LA APP DE COMPUTADOR, COWORK COMPARTE LA PANTALLA SOLO (Alvaro, 17/11/2026:
+  // «esta plataforma vive de que alguien comparta pantalla todo el tiempo»). La
+  // app elige sola la pantalla completa (sin la ventanita) y, si se corta —una
+  // caída, la sala que se reconecta, alguien que tocó «dejar de compartir»—, se
+  // vuelve a compartir sola, con esperas que crecen si falla (10 s, 20 s… hasta
+  // 5 min). Nunca durante una pausa. En el navegador no existe: ahí Chrome exige
+  // un clic cada vez. Ver lib/pantallaSolaEnLaApp.ts y desktop/src/main.js.
+  const appDeComputador = escritorio();
+  const pantallaSola = !!supervisorEncuadre && !hideScreenShare && typeof appDeComputador?.pantallaAutomatica === "function";
+  useEffect(() => {
+    if (!pantallaSola) return;
+    const app = escritorio();
+    app?.pantallaAutomatica?.(true);
+    return () => { app?.pantallaAutomatica?.(false); };
+  }, [pantallaSola]);
+  const intentoPantallaRef = useRef({ enCurso: false, ultimo: 0, fallos: 0 });
+  useEffect(() => {
+    if (!pantallaSola) return;
+    const tic = () => {
+      const l = lkRef.current;
+      const st = intentoPantallaRef.current;
+      if (l.isScreenSharing) { st.fallos = 0; return; }
+      if (st.enCurso || l.connectionState !== ConnectionState.Connected) return;
+      if (estaEnPausa() || antesDePausaRef.current) return;
+      if (Date.now() < proximoIntentoDePantalla(st.ultimo, st.fallos)) return;
+      st.enCurso = true;
+      st.ultimo = Date.now();
+      st.fallos += 1; // vuelve a 0 apenas se ve compartiendo
+      Promise.resolve(l.toggleScreenShare()).catch(() => {}).finally(() => { st.enCurso = false; });
+    };
+    const id = window.setInterval(tic, 3000);
+    return () => window.clearInterval(id);
+  }, [pantallaSola]);
   const ultimoPantallazo = useUltimoPantallazo();
   const [ahoraMonitor, setAhoraMonitor] = useState(() => Date.now());
   useEffect(() => {

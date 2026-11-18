@@ -230,6 +230,12 @@ function crearVentana() {
 }
 
 // ── Permisos: cámara, micrófono, avisos, pantalla completa… solo para Maven ──
+// Cowork le avisa a la app que comparta la pantalla completa sin preguntar.
+let pantallaAutomatica = false;
+ipcMain.on("maven:pantalla-auto", (e, si) => {
+  if (esDeMaven(e.sender.getURL())) pantallaAutomatica = Boolean(si);
+});
+
 function configurarPermisos() {
   const s = session.defaultSession;
   s.setPermissionRequestHandler((wc, permiso, responder) => {
@@ -251,6 +257,17 @@ function configurarPermisos() {
           guiaPermisoPantalla(ventana);
         }
         return responder({});
+      }
+      // Cowork (la página prendió pantallaAutomatica): la pantalla completa sola,
+      // sin la ventanita, para que se pueda volver a compartir sin que nadie toque
+      // nada (Alvaro, 17/11/2026). La pantalla principal del computador.
+      if (pantallaAutomatica && esDeMaven(pedido.securityOrigin || pedido.frame?.url || "")) {
+        const pantallas = await desktopCapturer.getSources({ types: ["screen"], thumbnailSize: { width: 1, height: 1 } });
+        const principal = String(require("electron").screen.getPrimaryDisplay().id);
+        const pantalla = pantallas.find((f) => f.display_id === principal) || pantallas[0];
+        if (pantalla) {
+          return responder({ video: pantalla, ...(pedido.audioRequested && !esMac ? { audio: "loopback" } : {}) });
+        }
       }
       const fuentes = await desktopCapturer.getSources({
         types: ["screen", "window"],

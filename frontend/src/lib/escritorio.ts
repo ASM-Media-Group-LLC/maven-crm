@@ -27,6 +27,8 @@ export type MavenEscritorio = {
   alUsoDeApps: (cb: (lote: TramoDeApp[]) => void) => () => void;
   /** Un link maven:// pidió abrir esta ruta (versiones de la app desde el 17/11/2026). */
   alAbrirRuta?: (cb: (ruta: string) => void) => () => void;
+  /** true: al compartir, la app elige sola la pantalla completa, sin preguntar (Cowork). Desde el 18/11/2026. */
+  pantallaAutomatica?: (si: boolean) => void;
 };
 
 /** La app de computador, o null en el navegador (o en una versión vieja de la app sin esa función). */

@@ -23,6 +23,7 @@ import {
 import { normalizeRoomCode, isCompleteRoomCode, ROOM_CODE_LENGTH } from "@/lib/coworkRoomCode";
 import { Plus, Users2, ArrowRight, KeyRound, Loader2, VenetianMask, LogOut, History, MoreHorizontal, Power } from "lucide-react";
 import CoworkIncognitoView from "./CoworkIncognitoView";
+import { AvisoAppObligatoria, CoworkSoloEnLaApp, useAppObligatoria } from "./CoworkSoloEnLaApp";
 import { toast } from "sonner";
 import { useFormato } from "@/hooks/useFormato";
 import type { Formato } from "@/lib/formato";
@@ -33,7 +34,32 @@ import { UserAvatar } from "@/components/UserAvatar";
 import { cn } from "@/lib/utils";
 import { ATASCO_MS, anotarAtasco, marcarRecargaPorAtasco, queHacerConElAtasco, tomarAtascoPrevio, ultimaRecargaPorAtasco } from "@/lib/coworkAtascado";
 
+// Cowork solo con la app de computador (Alvaro, 17/11/2026): en el navegador de
+// un computador, a quien ya le toca ve la pantalla de descarga; antes de la fecha,
+// una franja con el aviso. Se decide ANTES de montar la sala, para no conectarse
+// y después echar a la persona. Ver lib/appObligatoria.ts.
 export default function CoworkPage() {
+  const app = useAppObligatoria();
+  if (app === null) {
+    return (
+      <div className="flex flex-1 min-h-0 items-center justify-center">
+        <Loader2 className="h-6 w-6 animate-spin motion-reduce:animate-none text-muted-foreground" aria-hidden />
+      </div>
+    );
+  }
+  if (app.tipo === "obligatoria") return <CoworkSoloEnLaApp />;
+  if (app.tipo === "aviso") {
+    return (
+      <div className="flex flex-1 min-h-0 flex-col">
+        <AvisoAppObligatoria desde={app.desde} />
+        <CoworkPageInterna />
+      </div>
+    );
+  }
+  return <CoworkPageInterna />;
+}
+
+function CoworkPageInterna() {
   const [searchParams, setSearchParams] = useSearchParams();
   const sessionId = searchParams.get("session");
   const navigate = useNavigate();
