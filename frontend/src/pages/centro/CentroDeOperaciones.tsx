@@ -7,11 +7,13 @@ import PulsoEquipoVivo, { NumerosDelInicio } from "@/components/centro/PulsoEqui
 import QuienEstaBajando from "@/components/vigilancia/QuienEstaBajando";
 import SaludPlataformaBloque from "@/components/centro/SaludPlataformaBloque";
 import EspacioNasLinea from "@/components/centro/EspacioNasLinea";
+import { PuntualidadSemana } from "@/components/centro/PuntualidadSemana";
+import { SesionEnVivo } from "@/components/centro/SesionEnVivo";
+import { useFotosDe } from "@/hooks/useHoyDelEquipo";
 import { TarjetaKpi } from "@/components/ui/TarjetaKpi";
 import { Button } from "@/components/ui/button";
 import { useCoworkSession, type AdminSessionRow } from "@/hooks/useCoworkSession";
 import { useEquipoTiempoCowork } from "@/hooks/useEquipoTiempoCowork";
-import { useProductividad7Dias } from "@/hooks/useProductividad7Dias";
 import { usePanelMensajeria } from "@/hooks/usePanelMensajeria";
 import { supabase } from "@/integrations/supabase/client";
 import { useLanguage } from "@/hooks/useLanguage";
@@ -75,11 +77,8 @@ export default function CentroDeOperaciones() {
 
   const { porPersona, cargando: tiempoCargando } = useEquipoTiempoCowork(hoy, hoy);
   const mensajeria = usePanelMensajeria();
-  const productividad = useProductividad7Dias();
-  const maxProd = useMemo(
-    () => productividad.dias.reduce((m, d) => Math.max(m, d.horas), 0),
-    [productividad.dias],
-  );
+  // Las caras de quién está adentro de cada sala (Alvaro, 18/11/2026).
+  const fotosSalas = useFotosDe([...new Set(sesiones.flatMap((s) => s.rooms.flatMap((r) => (r.adentro ?? []).map((p) => p.id))))]).data ?? {};
 
   // Totales de la cabecera. online null = LiveKit no contestó: se propaga como
   // desconocido ("–"), jamás como cero.
@@ -172,57 +171,9 @@ export default function CentroDeOperaciones() {
               Le pasamos los conectados EN COWORK (de LiveKit) para el número de arriba. */}
           <PulsoEquipoVivo coworkConectados={sesionesQ.isLoading ? null : vivo.conectados} conNumeros={false} />
 
-          {/* Productividad del equipo — barras REALES de horas de Cowork por día,
-              últimos 7 días (como la gráfica central del link). Hoy se resalta. */}
-          <section className="vidrio sube p-4" style={{ animationDelay: "0.2s" }}>
-            <div className="mb-4 flex items-center justify-between gap-3">
-              <h2 className="flex items-baseline gap-2 text-sm font-semibold">
-                <span className="flex h-7 w-7 items-center justify-center rounded-panel bg-primary/10 text-primary"><BarChart3 className="h-4 w-4" /></span>
-                {t("dashboard.centro.productividad")}
-                <span className="text-xs font-normal text-muted-foreground">· {t("dashboard.centro.ultimos7")}</span>
-              </h2>
-              <span className="flex items-center gap-1.5 text-xs text-success">
-                <span className="relative flex h-2 w-2">
-                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-success opacity-60 motion-reduce:animate-none" />
-                  <span className="relative inline-flex h-2 w-2 rounded-full bg-success" />
-                </span>
-                {t("dashboard.centro.hoy")}
-              </span>
-            </div>
-            {productividad.fallo ? (
-              <p className="text-sm text-muted-foreground">
-                {t("dashboard.centro.fallo")}
-                <button type="button" className="underline underline-offset-2 hover:text-foreground" onClick={() => productividad.reintentar()}>{t("dashboard.centro.reintentar")}</button>
-              </p>
-            ) : productividad.cargando ? (
-              <div className="flex h-40 items-end gap-3">
-                {Array.from({ length: 7 }).map((_, i) => (
-                  <div key={i} className="flex-1 animate-pulse rounded-t-lg bg-muted" style={{ height: `${30 + ((i * 37) % 60)}%` }} />
-                ))}
-              </div>
-            ) : maxProd <= 0 ? (
-              <p className="text-sm text-muted-foreground">{t("dashboard.centro.sinProductividad")}</p>
-            ) : (
-              <div className="flex h-40 items-end gap-2.5 sm:gap-3">
-                {productividad.dias.map((d, i) => (
-                  <div key={d.dia} className="group flex h-full flex-1 flex-col items-center justify-end gap-2">
-                    <span className="text-[10px] font-semibold tabular-nums text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100">
-                      {horasBonitas(d.horas)}
-                    </span>
-                    <div
-                      className={`barra-crece w-full max-w-[38px] rounded-t-lg transition-[filter] group-hover:brightness-110 ${
-                        d.esHoy
-                          ? "bg-gradient-to-b from-primary to-primary/40 shadow-[0_0_22px_hsl(var(--primary)/0.5)]"
-                          : "bg-gradient-to-b from-primary/50 to-primary/10"
-                      }`}
-                      style={{ height: `${Math.max(4, (d.horas / maxProd) * 100)}%`, animationDelay: `${0.1 + i * 0.07}s` }}
-                    />
-                    <span className={`text-[11px] font-semibold ${d.esHoy ? "text-primary" : "text-muted-foreground"}`}>{d.etiqueta}</span>
-                  </div>
-                ))}
-              </div>
-            )}
-          </section>
+          {/* Puntualidad de la semana (Alvaro, 18/11/2026): reemplaza la gráfica de
+              horas totales, que «no tiene ningún sentido». */}
+          <PuntualidadSemana />
 
           {/* Tiempo del equipo hoy */}
           <section className="vidrio sube p-4" style={{ animationDelay: "0.3s" }}>
@@ -278,7 +229,7 @@ export default function CentroDeOperaciones() {
           {/* Los números de hoy, en UNA lista (13/11/2026): los 4 del Pulso + Cowork
               hoy, mensajes y respuesta (antes eran 7 cajas sueltas). */}
           <NumerosDelInicio
-            coworkConectados={sesionesQ.isLoading ? null : vivo.conectados}
+            coworkConectados={sesionesQ.isLoading || sesionesQ.isError ? null : vivo.conectados}
             extra={[
               { icono: Clock, tono: "success", etiqueta: t("dashboard.centro.coworkHoy"),
                 valor: tiempoCargando ? "…" : horasBonitas(totalHoras), detalle: t("dashboard.centro.personas", { n: equipoHoy.length }) },
@@ -321,78 +272,10 @@ export default function CentroDeOperaciones() {
             ) : sesiones.length === 0 ? (
               <p className="text-sm text-muted-foreground">{t("dashboard.centro.sinSesiones")}</p>
             ) : (
-              <div className="grid gap-2.5 sm:grid-cols-2">
-                {sesiones.map((s) => {
-                  // Interfaz nueva (Alvaro, 10/2026 — "mejor interfaz de salas"): el
-                  // muro de chips iguales se separa en DOS. Las salas con gente suben
-                  // como filas con las INICIALES de quién está adentro (r.gente, de la
-                  // DB) + el conteo en vivo; las vacías se recogen en un resumen, para
-                  // que de un vistazo se vea DÓNDE hay movimiento y no una pared.
-                  const activas = s.rooms.filter((r) => (r.online ?? 0) > 0);
-                  const reposo = s.rooms.filter((r) => (r.online ?? 0) === 0);
-                  const enLinea = s.online == null ? "–" : s.online;
-                  return (
-                    <div key={s.id} className="flex flex-col gap-2.5 rounded-panel border border-white/50 bg-white/50 dark:border-white/[0.07] dark:bg-white/[0.04] p-3">
-                      <div className="flex items-center justify-between gap-2">
-                        <span className="truncate text-sm font-semibold">{tituloBonito(s.name)}</span>
-                        <span className="flex shrink-0 items-center gap-1.5">
-                          <span className={`inline-flex items-center gap-1 rounded-control px-1.5 py-0.5 text-[11px] font-semibold tabular-nums ${(s.online ?? 0) > 0 ? "bg-success/10 text-success" : "text-muted-foreground"}`}>
-                            <Users className="h-3 w-3" />{enLinea}
-                          </span>
-                          {(s.hubOnline ?? 0) > 0 && (
-                            <span className="rounded-control bg-primary/10 px-1.5 py-0.5 text-[10px] font-semibold text-primary">
-                              {t("dashboard.centro.hub")} {s.hubOnline}
-                            </span>
-                          )}
-                        </span>
-                      </div>
-
-                      {/* Salas con gente ahora: fila por sala con iniciales + conteo. */}
-                      {activas.length > 0 && (
-                        <div className="flex flex-col gap-1">
-                          {activas.map((r) => {
-                            const gente = r.gente ?? [];
-                            const visibles = gente.slice(0, 4);
-                            return (
-                              <div key={r.id} className="flex items-center gap-2 rounded-control bg-success/5 px-2 py-1.5">
-                                <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-success" />
-                                <span className="truncate text-xs font-medium">{tituloBonito(r.name)}</span>
-                                <span className="ml-auto flex shrink-0 items-center gap-1">
-                                  {visibles.map((nm, i) => (
-                                    <span key={i} title={nm} className="flex h-5 w-5 items-center justify-center rounded-full bg-success/15 text-[9px] font-bold text-success">
-                                      {iniciales(nm)}
-                                    </span>
-                                  ))}
-                                  <span className="ml-0.5 text-xs font-semibold tabular-nums text-success">{r.online}</span>
-                                </span>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      )}
-
-                      {/* Vacías: recogidas. Si NO hay ninguna activa, una línea calma
-                          con el total; si hay activas, un solo chip "+N en reposo"
-                          (con los nombres en el title) en vez del muro gris. */}
-                      {activas.length === 0 ? (
-                        reposo.length > 0 ? (
-                          <span className="text-xs text-muted-foreground">
-                            {reposo.length === 1 ? t("dashboard.centro.unaSalaLista") : t("dashboard.centro.salasListas", { n: reposo.length })}
-                          </span>
-                        ) : (
-                          <span className="text-xs text-muted-foreground">{t("dashboard.centro.sinSalas")}</span>
-                        )
-                      ) : reposo.length > 0 && (
-                        <span
-                          className="w-fit rounded-control bg-muted px-2 py-0.5 text-[10px] text-muted-foreground"
-                          title={reposo.map((r) => r.name).join(", ")}
-                        >
-                          +{reposo.length} {t("dashboard.centro.enReposo")}
-                        </span>
-                      )}
-                    </div>
-                  );
-                })}
+              <div className="flex flex-col gap-3">
+                {sesiones.map((s) => (
+                  <SesionEnVivo key={s.id} s={s} fotos={fotosSalas} />
+                ))}
               </div>
             )}
           </section>

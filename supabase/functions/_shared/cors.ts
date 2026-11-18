@@ -32,6 +32,10 @@ export const ALLOWED_ORIGINS = [
   // Alvaro veía una y otra vez en el panel (10/2026).
   "http://localhost:8080",
   "http://127.0.0.1:8080",
+  // La vista local de revisión corre en 8081 cuando otra sesión ocupa el 8080
+  // (18/11/2026: «Salas en vivo» decía «No se pudo leer» solo por esto).
+  "http://localhost:8081",
+  "http://127.0.0.1:8081",
   "http://localhost:4173", // Vite preview
   // El preview por IP: pwa.ts no registra el service worker cuando el host es
   // "localhost", así que para probar push en local el build se abre en

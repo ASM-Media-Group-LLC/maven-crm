@@ -66,8 +66,9 @@ export function ordenarFilas(filas: FilaDondeEsta[]): FilaDondeEsta[] {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const sinTipar = supabase as unknown as { rpc: (f: string) => Promise<{ data: any; error: { message: string } | null }> };
 
-export function useDondeEsta() {
+export function useDondeEsta(habilitado = true) {
   return useQuery<FilaDondeEsta[]>({
+    enabled: habilitado,
     queryKey: ["donde-esta-cada-uno"],
     refetchInterval: 20_000,
     staleTime: 10_000,

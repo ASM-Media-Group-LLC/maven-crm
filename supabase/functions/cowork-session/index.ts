@@ -430,6 +430,52 @@ serve(async (req) => {
         }
       }
 
+      // QUIÉN ESTÁ ADENTRO DE VERDAD (Alvaro, 18/11/2026: «Salas en vivo, si lo
+      // vas a poner, ponerlo bien» → cada sala con las caras de quién está). Solo
+      // las salas con gente según ListRooms; un ListParticipants por sala, en
+      // paralelo. Se quitan los que miran escondidos (vigía, incógnito). Si una
+      // sala no contesta, queda en null y el inicio usa las asignaciones.
+      const adentroPorSala = new Map<string, Array<{ id: string; nombre: string }> | null>();
+      if (lkOk) {
+        const httpUrl = lkUrl.replace(/^wss:/, "https:").replace(/^ws:/, "http:");
+        const conGente = (rooms || []).filter((r) => (lkOnline.get(r.livekit_room_name) ?? 0) > 0).slice(0, 40);
+        const idsPorSala = new Map<string, string[]>();
+        await Promise.all(conGente.map(async (r) => {
+          try {
+            const tk = await createLKToken(lkKey, lkSecret, `cowork-admin-lista-${userId.slice(0, 8)}`, userName, { roomAdmin: true, room: r.livekit_room_name }, 60);
+            const resp = await fetch(`${httpUrl}/twirp/livekit.RoomService/ListParticipants`, {
+              method: "POST",
+              headers: { Authorization: `Bearer ${tk}`, "Content-Type": "application/json" },
+              body: JSON.stringify({ room: r.livekit_room_name }),
+            });
+            if (!resp.ok) { adentroPorSala.set(r.id, null); return; }
+            const j = await resp.json();
+            const ids = new Set<string>();
+            for (const p of (j.participants || []) as Array<{ identity?: string; permission?: { hidden?: boolean } }>) {
+              const identidad = p.identity ?? "";
+              if (!identidad || p.permission?.hidden || /__(vigia|incognito)/.test(identidad)) continue;
+              const base = identidad.split("__")[0];
+              if (/^[0-9a-f-]{36}$/i.test(base)) ids.add(base);
+            }
+            idsPorSala.set(r.id, [...ids]);
+          } catch (_e) {
+            adentroPorSala.set(r.id, null);
+          }
+        }));
+        const todos = [...new Set([...idsPorSala.values()].flat())];
+        let profsAdentro: Array<{ id: string; full_name: string | null }> = [];
+        if (todos.length) {
+          const { data } = await admin.from("profiles").select("id, full_name").in("id", todos);
+          profsAdentro = (data || []) as Array<{ id: string; full_name: string | null }>;
+        }
+        const nombreDe = new Map(profsAdentro.map((p) => [p.id, p.full_name || ""]));
+        for (const [salaId, ids] of idsPorSala) {
+          adentroPorSala.set(salaId, ids
+            .map((id) => ({ id, nombre: nombreDe.get(id) ?? "" }))
+            .sort((a, b) => a.nombre.localeCompare(b.nombre)));
+        }
+      }
+
       const result = sessions.map((s: { id: string; [k: string]: unknown }) => {
         const sessRooms = (rooms || []).filter((r) => r.session_id === s.id);
         const roomList = sessRooms.map((r) => ({
@@ -437,6 +483,7 @@ serve(async (req) => {
           name: r.name,
           online: lkOk ? (lkOnline.get(r.livekit_room_name) ?? 0) : null,
           gente: gentePorSala.get(r.id) ?? [],
+          adentro: adentroPorSala.has(r.id) ? adentroPorSala.get(r.id) : (lkOk ? [] : null),
         }));
         const hubLk = hubDe.get(s.id as string) ?? null;
         return {

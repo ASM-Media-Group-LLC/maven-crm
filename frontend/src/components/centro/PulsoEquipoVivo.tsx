@@ -11,6 +11,7 @@ import { usePulsoEquipo } from "@/hooks/usePulsoEquipo";
 import { useEsDueno } from "@/hooks/useEsDueno";
 import { useVigilancia } from "@/hooks/useVigilancia";
 import QuienEstaBajando from "@/components/vigilancia/QuienEstaBajando";
+import { useAtajosDeHoy } from "@/components/centro/AtajosDeHoy";
 import type { EstadoVivo } from "@/hooks/useRondinVivo";
 import type { CajaEquipo, PersonaPulso } from "@/lib/pulsoEquipo";
 import type { TranslationKey } from "@/lib/i18n";
@@ -140,6 +141,8 @@ export function NumerosDelInicio({ coworkConectados, extra = [] }: { coworkConec
   const { t, language } = useLanguage();
   const { puedeVer, pulso, ultimaRonda } = usePulsoEquipo();
   const ultima = ultimaRonda ? hace(ultimaRonda.toISOString(), language) : null;
+  // Primero los cuatro atajos de hoy (Alvaro, 18/11/2026); después, lo de ahora mismo.
+  const atajos = useAtajosDeHoy(puedeVer);
   const filas: FilaNumero[] = [];
   if (puedeVer && pulso && pulso.total > 0) {
     filas.push(
@@ -153,7 +156,7 @@ export function NumerosDelInicio({ coworkConectados, extra = [] }: { coworkConec
         detalle: pulso.conProblema === 0 ? t("dashboard.pulso.todoEnOrden") : t("dashboard.pulso.hazClicProblema") },
     );
   }
-  return <ListaDeNumeros titulo={t("dashboard.centro.numeros")} icono={Gauge} filas={[...filas, ...extra]} />;
+  return <ListaDeNumeros titulo={t("dashboard.centro.numeros")} icono={Gauge} filas={[...atajos, ...filas, ...extra]} />;
 }
 
 export default function PulsoEquipoVivo({ coworkConectados, conEquipo = false, conNumeros = true }: {
