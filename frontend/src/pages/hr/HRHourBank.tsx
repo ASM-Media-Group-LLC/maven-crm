@@ -1,3 +1,4 @@
+import { formatUI } from "@/lib/formatoHora";
 import { useState, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
@@ -360,7 +361,7 @@ const HRHourBank = () => {
               <div><span className="text-muted-foreground">{t("hr.employee")}:</span> <span className="font-medium">{viewData.employees ? `${viewData.employees.first_name} ${viewData.employees.last_name}` : "—"}</span></div>
               <div><span className="text-muted-foreground">{t("common.type")}:</span> {viewData.movement_type === "deposit" ? t("hr.bank.deposit") : t("hr.bank.withdrawal")}</div>
               <div><span className="text-muted-foreground">{t("common.hours")}:</span> {viewData.hours}h</div>
-              <div><span className="text-muted-foreground">{t("common.date")}:</span> {format(parseISO(viewData.created_at), `${DMY} HH:mm`)}</div>
+              <div><span className="text-muted-foreground">{t("common.date")}:</span> {formatUI(parseISO(viewData.created_at), `${DMY} HH:mm`)}</div>
               {viewData.reason && <div><span className="text-muted-foreground">{t("common.reason")}:</span> {viewData.reason}</div>}
             </div>
           )}

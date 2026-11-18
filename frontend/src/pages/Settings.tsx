@@ -49,6 +49,7 @@ import { useAvisarme } from "@/lib/avisoPersona";
 import { useMyProfile, useRequestWhatsappVerification, useUpdateMyPhone, useUploadUserAvatar, type VerificationCode, useSaveAvatarSeed, useRemoveUserAvatar } from "@/hooks/useUserProfile";
 import ChangePasswordModal from "@/components/dashboard/ChangePasswordModal";
 import { TarjetaDeApariencia } from "@/components/ajustes/TarjetaDeApariencia";
+import { TarjetaHoraEmpresa } from "@/components/ajustes/TarjetaHoraEmpresa";
 
 // Settings page — left rail with the user's role banner + tab list,
 // right side renders the active section. Layout matches the screenshot
@@ -257,6 +258,8 @@ const MyAccountTab = () => {
       </Card>
 
       <TarjetaDeApariencia />
+      {/* La hora de toda la empresa: solo la ve el dueño (18/11/2026). */}
+      <TarjetaHoraEmpresa />
 
       <WhatsappPhoneCard
         currentValue={profileQ.data?.phone_e164 ?? null}

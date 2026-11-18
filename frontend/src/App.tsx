@@ -12,6 +12,7 @@ import { AvisoSoloApp } from "@/components/CoworkSoloApp";
 import { AbrirEnApp } from "@/components/AbrirEnApp";
 import { AvisoActualizacionApp } from "@/components/AvisoActualizacionApp";
 import { CartelVersionNueva } from "@/components/CartelVersionNueva";
+import { RelojDeLaEmpresa } from "@/components/ajustes/TarjetaHoraEmpresa";
 import { NovedadesApp } from "@/components/NovedadesApp";
 import { AppLiviana } from "@/components/AppLiviana";
 import { useSkinSync } from "@/hooks/useSkin";
@@ -304,6 +305,8 @@ const App = () => (
             <AvisoActualizacionApp />
             {/* Versión nueva de la página: cartel en el centro (18/11/2026). */}
             <CartelVersionNueva />
+            {/* La hora que eligió el dueño (AM/PM o militar), 18/11/2026. */}
+            <RelojDeLaEmpresa />
             <NovedadesApp />
             <AppLiviana />
             <AvisoSoloApp />

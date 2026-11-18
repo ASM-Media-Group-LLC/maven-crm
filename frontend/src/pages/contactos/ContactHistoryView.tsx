@@ -1,3 +1,4 @@
+import { formatUI } from "@/lib/formatoHora";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
@@ -106,7 +107,7 @@ export default function ContactHistoryView({ contactId, contactName, open, onClo
                           <p className="text-sm font-medium text-foreground">{e.title}</p>
                           {e.event_at && (
                             <span className="shrink-0 text-xs text-muted-foreground tabular-nums">
-                              {format(parseISO(e.event_at), "dd MMM yy, HH:mm", { locale: f.fechas })}
+                              {formatUI(parseISO(e.event_at), "dd MMM yy, HH:mm", { locale: f.fechas })}
                             </span>
                           )}
                         </div>

@@ -10,6 +10,7 @@
 //
 // Si no hay archivos, muestra estado vacío.
 
+import { formatUI } from "@/lib/formatoHora";
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -111,7 +112,7 @@ const EvidenceViewer = ({ entityType, entityId, uploaderNameHint }: Props) => {
                 </div>
               )}
               <div className="absolute bottom-0 left-0 right-0 truncate bg-black/60 px-1 py-0.5 text-[10px] text-white">
-                {format(new Date(f.uploaded_at), enIngles ? "MMM d HH:mm" : "d MMM HH:mm", { locale: formato.fechas })}
+                {formatUI(new Date(f.uploaded_at), enIngles ? "MMM d HH:mm" : "d MMM HH:mm", { locale: formato.fechas })}
               </div>
             </button>
           ))}
@@ -135,7 +136,7 @@ const EvidenceViewer = ({ entityType, entityId, uploaderNameHint }: Props) => {
                   {t("leadgen.viewer.imageOf", { index: openIndex + 1, total: files.length })}
                   {" · "}
                   {t("leadgen.viewer.uploaded", {
-                    date: format(new Date(files[openIndex].uploaded_at), enIngles ? "MMM d, yyyy HH:mm" : "d MMM yyyy HH:mm", {
+                    date: formatUI(new Date(files[openIndex].uploaded_at), enIngles ? "MMM d, yyyy HH:mm" : "d MMM yyyy HH:mm", {
                       locale: formato.fechas,
                     }),
                   })}

@@ -1,3 +1,4 @@
+import { formatUI } from "@/lib/formatoHora";
 import { useEffect, useMemo, useRef, useState, type DragEvent, type ReactNode } from "react";
 import { useSearchParams } from "react-router-dom";
 import { format, isToday, isThisYear } from "date-fns";
@@ -193,7 +194,7 @@ function iconoCarpeta(f: string): LucideIcon {
 function fechaCorta(iso: string, formatoUi: Formato): string {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return "";
-  if (isToday(d)) return format(d, "HH:mm");
+  if (isToday(d)) return formatUI(d, "HH:mm");
   if (isThisYear(d)) return format(d, "d MMM", { locale: formatoUi.fechas });
   return format(d, "d MMM yy", { locale: formatoUi.fechas });
 }
@@ -202,7 +203,7 @@ function fechaLarga(iso: string): string {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return iso;
   // Idioma fijo a propósito: va en la cita del correo que se le manda a otra persona.
-  return format(d, "d 'de' MMMM 'de' yyyy, HH:mm", { locale: es });
+  return formatUI(d, "d 'de' MMMM 'de' yyyy, HH:mm", { locale: es });
 }
 
 const CARPETAS_KEY = "maven.correo.carpetas";
@@ -1545,7 +1546,7 @@ export default function CorreoPage() {
                               >
                                 <span className="flex-1">{ROTULO_POSPONER[o.clave] ? t(ROTULO_POSPONER[o.clave]) : o.rotulo}</span>
                                 <span className="ml-3 text-[10px] tabular-nums text-muted-foreground">
-                                  {format(o.cuando, "d MMM HH:mm", { locale: formatoUi.fechas })}
+                                  {formatUI(o.cuando, "d MMM HH:mm", { locale: formatoUi.fechas })}
                                 </span>
                               </DropdownMenuItem>
                             )

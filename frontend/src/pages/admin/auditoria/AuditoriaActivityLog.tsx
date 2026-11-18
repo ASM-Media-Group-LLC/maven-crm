@@ -1,3 +1,4 @@
+import { formatUI } from "@/lib/formatoHora";
 import { format } from "date-fns";
 import { useFormato } from "@/hooks/useFormato";
 import { Badge } from "@/components/ui/badge";
@@ -64,7 +65,7 @@ const AuditoriaActivityLog = ({ entries, profiles }: Props) => {
             <div className="flex-1 min-w-0">
               <p className="text-sm font-medium">{description}</p>
               <p className="text-xs text-muted-foreground mt-0.5">
-                {format(new Date(entry.created_at), "d MMM yyyy, HH:mm", { locale: f.fechas })}
+                {formatUI(new Date(entry.created_at), "d MMM yyyy, HH:mm", { locale: f.fechas })}
               </p>
             </div>
             <Badge variant="outline" className={`shrink-0 text-[10px] ${config.color}`}>

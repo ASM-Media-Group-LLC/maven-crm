@@ -1,3 +1,4 @@
+import { formatUI } from "@/lib/formatoHora";
 import { useCallback } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
@@ -54,7 +55,7 @@ export function useHistorialDeOficina(
       currentVersion: cruda.currentVersion,
       history: cruda.history.map((v) => ({
         ...v,
-        created: format(new Date(v.created), "d MMM yyyy, HH:mm", { locale }),
+        created: formatUI(new Date(v.created), "d MMM yyyy, HH:mm", { locale }),
       })),
     };
   }, [documentoId, locale]);

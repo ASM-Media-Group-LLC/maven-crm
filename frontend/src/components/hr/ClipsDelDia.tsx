@@ -1,3 +1,4 @@
+import { formatUI } from "@/lib/formatoHora";
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { format } from "date-fns";
@@ -107,7 +108,7 @@ export function ClipsDelDia({ userId, fecha }: Params) {
               <div className="min-w-0 flex-1">
                 <div className="flex items-baseline gap-2 text-sm">
                   <span className="font-semibold">{etiquetaMotivo(c.motivo, t)}</span>
-                  <span className="text-xs text-muted-foreground tabular-nums">{format(new Date(c.startedAt), "HH:mm")}</span>
+                  <span className="text-xs text-muted-foreground tabular-nums">{formatUI(new Date(c.startedAt), "HH:mm")}</span>
                   <span className="text-xs text-muted-foreground">· {minSeg(c.duracionSeg)}</span>
                 </div>
                 <p className="text-[11px] text-muted-foreground">{t("hr.exp.clips.pistaReproducir")}</p>

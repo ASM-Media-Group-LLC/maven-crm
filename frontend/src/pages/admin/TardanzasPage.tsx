@@ -1,3 +1,4 @@
+import { a12 } from "@/lib/horaBogota";
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Clock, AlertTriangle, Eye, Loader2, Mail, Send } from "lucide-react";
@@ -174,7 +175,7 @@ export default function TardanzasPage() {
                     <div className="text-[11px] text-muted-foreground tabular-nums">
                       {f.turno_nombre && <span className="mr-2 rounded-full border border-border/50 bg-card/40 px-1.5 py-0.5 text-[10px]">{f.turno_nombre}</span>}
                       {t("admin.tardanzas.esperaba", { h: f.horario_asignado.slice(0, 5) })} ·
-                      {t("admin.tardanzas.entroA", { h: hhmm(f.entro_at) })}
+                      {t("admin.tardanzas.entroA", { h: a12(hhmm(f.entro_at)) ?? "—" })}
                     </div>
                   </div>
                   <div className="flex flex-col items-end gap-0.5">
@@ -185,7 +186,7 @@ export default function TardanzasPage() {
                   </div>
                   <button type="button" onClick={() => setPreview({
                     nombre: f.nombre, rol: f.turno_nombre ?? null,
-                    horario: f.horario_asignado.slice(0, 5), entro: hhmm(f.entro_at),
+                    horario: a12(f.horario_asignado.slice(0, 5)) ?? "", entro: a12(hhmm(f.entro_at)) ?? "—",
                     tardeMin: f.tarde_min, esPrueba: false,
                   })} className="rounded-lg border border-border/60 bg-card/40 px-2 py-1 text-[11px] font-medium text-muted-foreground transition hover:bg-foreground/5 hover:text-foreground">
                     <Eye className="inline h-3 w-3 mr-1" />{t("admin.tardanzas.verCorreoDeEsta")}

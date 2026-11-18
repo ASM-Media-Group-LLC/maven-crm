@@ -1,3 +1,4 @@
+import { formatUI } from "@/lib/formatoHora";
 import { useState, useMemo } from "react";
 import { startOfMonth, endOfDay, format } from "date-fns";
 import {
@@ -233,7 +234,7 @@ const ClosersActivityDashboard = ({ isAdmin, isManager, viewAsCloserId }: Props)
                       </TableCell>
                       <TableCell><CountChips data={r.by_result} labelOf={(k) => resultLabel(t, k)} /></TableCell>
                       <TableCell className="whitespace-nowrap text-xs text-muted-foreground">
-                        {r.last_activity ? format(new Date(r.last_activity), "d MMM HH:mm", { locale: f.fechas }) : "—"}
+                        {r.last_activity ? formatUI(new Date(r.last_activity), "d MMM HH:mm", { locale: f.fechas }) : "—"}
                       </TableCell>
                       <TableCell><ChevronRight className="h-4 w-4 text-muted-foreground" /></TableCell>
                     </TableRow>
@@ -344,7 +345,7 @@ const EmployeeActivityDetail = ({
                         <div className="min-w-0 flex-1 pb-4 pt-0.5">
                           <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
                             <span className="text-xs tabular-nums text-muted-foreground">
-                              {format(new Date(c.contact_date), "HH:mm")}
+                              {formatUI(new Date(c.contact_date), "HH:mm")}
                             </span>
                             {url ? (
                               <a href={url} target="_blank" rel="noopener noreferrer"

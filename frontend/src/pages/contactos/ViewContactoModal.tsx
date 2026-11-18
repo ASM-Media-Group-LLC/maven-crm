@@ -1,3 +1,4 @@
+import { formatUI } from "@/lib/formatoHora";
 import { useState, useRef } from "react";
 import { ExternalLink, MessageCircle, Pencil, Plus, Sparkles, Trash2, Upload, X, Phone, FileText } from "lucide-react";
 import { format } from "date-fns";
@@ -395,7 +396,7 @@ const ViewContactoModal = ({ open, onOpenChange, contacto, onEdit, onDelete }: P
                         </div>
                         {inter.created_at && (
                           <span className="text-[10px] text-muted-foreground">
-                            {format(new Date(inter.created_at), "dd MMM yyyy, HH:mm", { locale: f.fechas })}
+                            {formatUI(new Date(inter.created_at), "dd MMM yyyy, HH:mm", { locale: f.fechas })}
                           </span>
                         )}
                       </div>

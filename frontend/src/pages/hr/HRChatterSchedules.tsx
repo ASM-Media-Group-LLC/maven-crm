@@ -1,3 +1,4 @@
+import { formatUI } from "@/lib/formatoHora";
 import { useState, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
@@ -525,7 +526,7 @@ const HRChatterSchedules = () => {
           }
           return list.slice(0, 100).map((s: any): KpiRow => ({
             primary: s.title ?? s.employee_name ?? t("hr.noTitle"),
-            secondary: s.start_at ? format(new Date(s.start_at), "EEEE dd MMM HH:mm", { locale: f.fechas }) : undefined,
+            secondary: s.start_at ? formatUI(new Date(s.start_at), "EEEE dd MMM HH:mm", { locale: f.fechas }) : undefined,
             right: s.shift_type ?? "—",
           }));
         })()}

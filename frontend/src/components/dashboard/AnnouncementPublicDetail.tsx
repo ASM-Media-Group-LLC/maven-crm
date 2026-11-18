@@ -1,3 +1,4 @@
+import { formatUI } from "@/lib/formatoHora";
 import { useEffect } from "react";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
@@ -41,7 +42,7 @@ export default function AnnouncementPublicDetail({ announcement, open, onOpenCha
             )}
           </div>
           <p className="text-xs text-muted-foreground">
-            {format(new Date(announcement.starts_at), f.idioma === "en" ? "MMMM d, yyyy, HH:mm" : "d 'de' MMMM yyyy, HH:mm", { locale: f.fechas })}
+            {formatUI(new Date(announcement.starts_at), f.idioma === "en" ? "MMMM d, yyyy, HH:mm" : "d 'de' MMMM yyyy, HH:mm", { locale: f.fechas })}
           </p>
         </DialogHeader>
 

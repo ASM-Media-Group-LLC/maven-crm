@@ -1,3 +1,4 @@
+import { formatUI } from "@/lib/formatoHora";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { enHoras } from "@/lib/duracion";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
@@ -343,8 +344,8 @@ function TiraDelDia({ capturas, t }: { capturas: CapturaDia[]; t: Tr }) {
         const m = visibles[visorIdx];
         const urlP = m.pantalla ? urls[claveFoto(m.pantalla)!] : undefined;
         const urlC = m.camara ? urls[claveFoto(m.camara)!] : undefined;
-        const hp = m.pantalla ? format(new Date(m.pantalla.createdAt), "HH:mm:ss") : null;
-        const hc = m.camara ? format(new Date(m.camara.createdAt), "HH:mm:ss") : null;
+        const hp = m.pantalla ? formatUI(new Date(m.pantalla.createdAt), "HH:mm:ss") : null;
+        const hc = m.camara ? formatUI(new Date(m.camara.createdAt), "HH:mm:ss") : null;
         return (
           <Dialog open onOpenChange={(o) => { if (!o) setVisorIdx(null); }}>
             <DialogContent className="max-w-5xl bg-none from-transparent p-2 sm:p-3">
@@ -717,7 +718,7 @@ function PruebaTardanza({ userId, fecha, nombre, entroAt, horarioEntrada, entrad
               nombre,
               rol: correo?.rol ?? null,
               horario: horarioEntrada ?? "—",
-              entro: entradaReal ?? "—",
+              entro: a12(entradaReal) ?? "—",
               tardeMin,
               esPrueba: !correo?.enviadoAt,
             })}
@@ -866,7 +867,7 @@ function DesgloseNotaContenido({ dia, atencion, t, compacto }: {
                     <div key={f.id} className="flex items-center gap-2 text-[11px]">
                       <AlertTriangle className="h-3 w-3 shrink-0 text-destructive/70" />
                       <span className="min-w-0 flex-1 truncate">{lbl ? t(lbl) : f.tipo}</span>
-                      <span className="shrink-0 tabular-nums text-muted-foreground">{format(new Date(f.createdAt), "HH:mm")}</span>
+                      <span className="shrink-0 tabular-nums text-muted-foreground">{formatUI(new Date(f.createdAt), "HH:mm")}</span>
                     </div>
                   );
                 })}
@@ -1032,9 +1033,9 @@ export default function HRExpediente() {
                 const entro = dia.entroAt ? new Date(dia.entroAt).toLocaleTimeString("es-CO", { timeZone: "America/Bogota", hour: "2-digit", minute: "2-digit", hour12: false }) : null;
                 const tarde = debia && entro ? (Number(entro.slice(0, 2)) * 60 + Number(entro.slice(3))) - (Number(debia.slice(0, 2)) * 60 + Number(debia.slice(3))) : null;
                 return [debia
-                  ? { k: "hr.exp.entradaTile" as const, p: { h: debia }, v: entro ?? "—", punto: tarde != null && tarde > 5 ? "bg-destructive" : !entro ? "bg-warning" : null,
+                  ? { k: "hr.exp.entradaTile" as const, p: { h: a12(debia) ?? debia }, v: a12(entro) ?? "—", punto: tarde != null && tarde > 5 ? "bg-destructive" : !entro ? "bg-warning" : null,
                       title: tarde != null && tarde > 5 ? t("hr.exp.det.tarde", { n: tarde }) : undefined }
-                  : { k: "hr.exp.entradaSola" as const, v: entro ?? "—", punto: null }];
+                  : { k: "hr.exp.entradaSola" as const, v: a12(entro) ?? "—", punto: null }];
               })(),
               // Sin pantalla (Alvaro, 13/11/2026): pausas + sin compartir + sin conexión +
               // fuera de Cowork, contra lo permitido (40 chats, 70 el resto).
@@ -1116,7 +1117,7 @@ export default function HRExpediente() {
                       {f.capturaPath && (
                         <button type="button" onClick={() => abrirPath(f.capturaPath!)} className="shrink-0 text-muted-foreground hover:text-primary" title={t("hr.exp.abrir")}><ImageIcon className="h-3.5 w-3.5" /></button>
                       )}
-                      <span className="shrink-0 text-[10px] tabular-nums text-muted-foreground">{format(new Date(f.createdAt), "HH:mm")}</span>
+                      <span className="shrink-0 text-[10px] tabular-nums text-muted-foreground">{formatUI(new Date(f.createdAt), "HH:mm")}</span>
                     </div>
                   );
                 })}

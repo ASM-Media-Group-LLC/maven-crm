@@ -1,3 +1,4 @@
+import { formatUI } from "@/lib/formatoHora";
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { ClipboardCheck, Search, Users, UserCheck, Clock, UserX, ListIcon, LayoutGrid, Pencil, Trash2 } from "lucide-react";
@@ -94,7 +95,7 @@ function formatDuration(checkIn: string | null, checkOut: string | null): string
 
 function formatTime(ts: string | null): string {
   if (!ts) return "—";
-  return format(new Date(ts), "HH:mm");
+  return formatUI(new Date(ts), "HH:mm");
 }
 
 function getInitials(first: string, last: string): string {

@@ -1,3 +1,4 @@
+import { formatUI } from "@/lib/formatoHora";
 import React, { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
@@ -459,7 +460,7 @@ export default function ReportesPage() {
                 <TableCell className="text-sm">{r.period_from && r.period_to ? `${r.period_from} — ${r.period_to}` : "—"}</TableCell>
                 <TableCell className="text-sm">{r.area || "—"}</TableCell>
                 <TableCell><Badge variant="outline">{(r.format || "csv").toUpperCase()}</Badge></TableCell>
-                <TableCell className="text-sm whitespace-nowrap">{format(new Date(r.created_at), "dd/MM/yyyy HH:mm")}</TableCell>
+                <TableCell className="text-sm whitespace-nowrap">{formatUI(new Date(r.created_at), "dd/MM/yyyy HH:mm")}</TableCell>
                 <TableCell className="sticky right-0 bg-card group-hover:bg-muted/30">
                   <div className="flex items-center gap-1">
                     <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="sm" className="h-7 w-7 p-0"><Download className="h-3.5 w-3.5" /></Button></TooltipTrigger><TooltipContent side="left">{t("common.download")}</TooltipContent></Tooltip>
@@ -484,7 +485,7 @@ export default function ReportesPage() {
           </div>
           <p className="text-sm font-medium">{tipoReporte(r.report_type)}</p>
           <p className="text-xs text-muted-foreground mt-1">{r.area || t("finanzas.common.noArea")}</p>
-          <p className="text-xs text-muted-foreground mt-1">{format(new Date(r.created_at), "dd/MM/yyyy HH:mm")}</p>
+          <p className="text-xs text-muted-foreground mt-1">{formatUI(new Date(r.created_at), "dd/MM/yyyy HH:mm")}</p>
         </div>
       ))}
     </div>

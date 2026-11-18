@@ -1,3 +1,4 @@
+import { formatUI } from "@/lib/formatoHora";
 import { useState } from "react";
 import { EmptyState } from "@/components/EmptyState";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -61,7 +62,7 @@ const NotasTabContent = ({ creatorId }: Props) => {
 
   const formatDate = (dateStr: string) => {
     try {
-      return format(new Date(dateStr), "d MMM yyyy, HH:mm", { locale: f.fechas });
+      return formatUI(new Date(dateStr), "d MMM yyyy, HH:mm", { locale: f.fechas });
     } catch {
       return dateStr;
     }

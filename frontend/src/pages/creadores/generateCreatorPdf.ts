@@ -1,3 +1,4 @@
+import { formatUI } from "@/lib/formatoHora";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { format } from "date-fns";
@@ -59,7 +60,7 @@ export function generateCreatorPdf(creator: CreatorForPdf) {
 
   doc.setFont("helvetica", "normal");
   doc.setFontSize(9);
-  doc.text(format(new Date(), "dd/MM/yyyy HH:mm"), pw - margin, y, { align: "right" });
+  doc.text(formatUI(new Date(), "dd/MM/yyyy HH:mm"), pw - margin, y, { align: "right" });
 
   y += 4;
   doc.setDrawColor(180);

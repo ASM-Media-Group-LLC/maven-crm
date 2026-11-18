@@ -1,3 +1,4 @@
+import { formatUI } from "@/lib/formatoHora";
 import { useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -41,7 +42,7 @@ const ContactHistoryPanel = ({ creatorId }: Props) => {
       {history.map((h) => (
         <div key={h.id} className="border border-border rounded-xl p-3 space-y-1">
           <div className="flex items-center gap-2 text-xs">
-            <span className="text-muted-foreground">{format(new Date(h.contact_date), "dd/MM/yyyy HH:mm")}</span>
+            <span className="text-muted-foreground">{formatUI(new Date(h.contact_date), "dd/MM/yyyy HH:mm")}</span>
             <Badge variant="secondary">{h.channel}</Badge>
             {h.result && <Badge variant="outline">{resultLabel(t, h.result)}</Badge>}
           </div>

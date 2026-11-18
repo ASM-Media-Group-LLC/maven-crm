@@ -1,3 +1,4 @@
+import { formatUI } from "@/lib/formatoHora";
 import { useState, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
@@ -799,7 +800,7 @@ export default function HRVacations() {
                 <div><p className="text-xs text-muted-foreground">{t("hr.vac.start")}</p><p className="font-medium">{format(new Date(viewModalData.start_date), DMY)}</p></div>
                 <div><p className="text-xs text-muted-foreground">{t("hr.vac.end")}</p><p className="font-medium">{format(new Date(viewModalData.end_date), DMY)}</p></div>
                 <div><p className="text-xs text-muted-foreground">{t("hr.vac.totalDays")}</p><p className="font-medium">{viewModalData.total_days}</p></div>
-                <div><p className="text-xs text-muted-foreground">{t("hr.vac.createdAt")}</p><p className="font-medium">{format(new Date(viewModalData.created_at), `${DMY} HH:mm`)}</p></div>
+                <div><p className="text-xs text-muted-foreground">{t("hr.vac.createdAt")}</p><p className="font-medium">{formatUI(new Date(viewModalData.created_at), `${DMY} HH:mm`)}</p></div>
               </div>
               {viewModalData.reason && <div><p className="text-xs text-muted-foreground">{t("hr.reasonLabel")}</p><p className="text-sm mt-1">{viewModalData.reason}</p></div>}
               {viewModalData.status === "pending" && (

@@ -1,3 +1,4 @@
+import { formatUI } from "@/lib/formatoHora";
 import { useMemo, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { format, startOfDay, startOfMonth, endOfMonth, startOfWeek, endOfWeek, subDays, subMonths, endOfDay, differenceInCalendarDays } from "date-fns";
@@ -739,7 +740,7 @@ const Dashboard2 = () => {
     doc.setFontSize(16);
     doc.text(`Ventas OnlyFans - ${selectedPeriod.labelPdf ?? selectedPeriod.label}`, 14, 15);
     doc.setFontSize(9);
-    doc.text(`Periodo: ${selectedPeriod.startStr} a ${selectedPeriod.endStr} | Generado: ${format(new Date(), "dd/MM/yyyy HH:mm")}`, 14, 21);
+    doc.text(`Periodo: ${selectedPeriod.startStr} a ${selectedPeriod.endStr} | Generado: ${formatUI(new Date(), "dd/MM/yyyy HH:mm")}`, 14, 21);
     doc.setFontSize(10);
     const activeCount = creators.filter(c => c.total > 0).length;
     doc.text(`Total Bruto: ${fmt(grandTotal)}  |  Neto (80%): ${fmt(grandTotal * 0.8)}  |  Creadoras: ${activeCount}  |  Retencion: ${hlKpis.renewalRate.toFixed(1)}%`, 14, 28);

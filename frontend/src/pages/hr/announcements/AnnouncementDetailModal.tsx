@@ -1,3 +1,4 @@
+import { formatUI } from "@/lib/formatoHora";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
@@ -80,12 +81,12 @@ const AnnouncementDetailModal = ({ open, onOpenChange, announcement }: Props) =>
             <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
               <span className="flex items-center gap-1.5">
                 <Calendar className="h-3.5 w-3.5" />
-                {t("hrg.ann.publishedAt", { date: format(new Date(announcement.starts_at), "d MMM yyyy HH:mm", { locale: f.fechas }) })}
+                {t("hrg.ann.publishedAt", { date: formatUI(new Date(announcement.starts_at), "d MMM yyyy HH:mm", { locale: f.fechas }) })}
               </span>
               {announcement.expires_at && (
                 <span className="flex items-center gap-1.5">
                   <Calendar className="h-3.5 w-3.5" />
-                  {t("hrg.ann.expiresAt", { date: format(new Date(announcement.expires_at), "d MMM yyyy HH:mm", { locale: f.fechas }) })}
+                  {t("hrg.ann.expiresAt", { date: formatUI(new Date(announcement.expires_at), "d MMM yyyy HH:mm", { locale: f.fechas }) })}
                 </span>
               )}
             </div>
@@ -171,11 +172,11 @@ const AnnouncementDetailModal = ({ open, onOpenChange, announcement }: Props) =>
                       <TableRow key={v.id}>
                         <TableCell className="font-medium">{profileMap[v.user_id] ?? t("common.user")}</TableCell>
                         <TableCell className="text-sm text-muted-foreground">
-                          {format(new Date(v.viewed_at), "d MMM yyyy HH:mm", { locale: f.fechas })}
+                          {formatUI(new Date(v.viewed_at), "d MMM yyyy HH:mm", { locale: f.fechas })}
                         </TableCell>
                         <TableCell className="text-sm text-muted-foreground">
                           {v.opened_at
-                            ? format(new Date(v.opened_at), "d MMM yyyy HH:mm", { locale: f.fechas })
+                            ? formatUI(new Date(v.opened_at), "d MMM yyyy HH:mm", { locale: f.fechas })
                             : "—"}
                         </TableCell>
                       </TableRow>

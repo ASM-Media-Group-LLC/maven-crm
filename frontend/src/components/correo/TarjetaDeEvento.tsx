@@ -1,3 +1,4 @@
+import { formatUI } from "@/lib/formatoHora";
 import { format, isSameDay } from "date-fns";
 import { es } from "date-fns/locale";
 import { CalendarDays, Clock, MapPin, Repeat, Users, Video } from "lucide-react";
@@ -51,18 +52,18 @@ export default function TarjetaDeEvento({ evento }: { evento: EventoDeCalendario
     const dia = format(evento.inicio, PATRON_LARGO, { locale });
     if (evento.todoElDia) return `${dia} · ${t("correo.evento.todoElDia")}`;
 
-    const desde = format(evento.inicio, "HH:mm");
+    const desde = formatUI(evento.inicio, "HH:mm");
     if (!evento.fin) return `${dia} · ${desde}`;
     if (isSameDay(evento.inicio, evento.fin)) {
       // ⚠️ Los marcadores van en inglés a propósito: la guarda de i18n lee la
       // columna `en` y un {desde} adentro la hace creer que quedó sin traducir.
       const rango = t("correo.evento.rango", {
         from: desde,
-        to: format(evento.fin, "HH:mm"),
+        to: formatUI(evento.fin, "HH:mm"),
       });
       return `${dia} · ${rango}`;
     }
-    return `${dia} ${desde} → ${format(evento.fin, PATRON_CORTO, { locale })} ${format(evento.fin, "HH:mm")}`;
+    return `${dia} ${desde} → ${formatUI(evento.fin, PATRON_CORTO, { locale })} ${formatUI(evento.fin, "HH:mm")}`;
   };
 
   const fecha = cuando();
