@@ -9,13 +9,38 @@ import MessagesBell from "@/components/messenger/MessagesBell";
 import { BOTON_TOPBAR } from "./topbarStyles";
 import GlobalSearchCommand from "./GlobalSearchCommand";
 import SelectorDeIdioma from "./SelectorDeIdioma";
+import { escritorio } from "@/lib/escritorio";
+import { versionDeLaApp } from "@/lib/novedadesApp";
 
 // Topbar — search + timezone + language + notifications. El timezone
 // vive a la izquierda del globe icon; afecta cómo todos los pages
 // formatean fechas (ver useTimezone.ts).
+/** En la app de computador, en lugar del buscador: «Maven» y la versión
+ *  instalada (Alvaro, 18/11/2026: «no me dice en qué punto vamos»). */
+export function TituloDeLaApp({ version }: { version: string | null }) {
+  const { t } = useLanguage();
+  return (
+    <div className="flex min-w-0 flex-1 items-center justify-center gap-2">
+      <span className="text-base font-semibold tracking-tight text-foreground">Maven</span>
+      {version && (
+        <span
+          className="rounded-full border border-border/60 px-2 py-0.5 font-mono text-[10px] text-muted-foreground"
+          title={t("topbar.versionDeLaApp", { version })}
+        >
+          v{version}
+        </span>
+      )}
+    </div>
+  );
+}
+
 const DashboardTopbar = () => {
   const { t } = useLanguage();
   const [searchOpen, setSearchOpen] = useState(false);
+  // En la app de computador (Alvaro, 18/11/2026): arriba dice «Maven» con la
+  // versión, en vez del buscador (sigue con ⌘K). El logo del riel se quita (CSS).
+  const enLaApp = !!escritorio();
+  const version = enLaApp ? versionDeLaApp(navigator.userAgent) : null;
 
   return (
     <>
@@ -32,6 +57,9 @@ const DashboardTopbar = () => {
         {/* min-w-0 + truncate: sin esto el texto del buscador (que no parte) fija
             el ancho mínimo de la fila y a 390 px empuja la campana fuera de la
             pantalla. Los iconos de la derecha van shrink-0 y el buscador cede. */}
+        {enLaApp ? (
+          <TituloDeLaApp version={version} />
+        ) : (
         <div className="flex min-w-0 flex-1 justify-center">
           <Button
             variant="outline"
@@ -45,6 +73,7 @@ const DashboardTopbar = () => {
             </kbd>
           </Button>
         </div>
+        )}
 
         <div className="flex shrink-0 items-center gap-1">
           <MedidorEquipo />

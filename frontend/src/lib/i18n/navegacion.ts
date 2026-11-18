@@ -42,6 +42,7 @@ export const navegacion = {
 
   // Topbar
   "topbar.search": { es: "Buscar en la plataforma...", en: "Search the platform..." },
+  "topbar.versionDeLaApp": { es: "Versión de la app: {version}", en: "App version: {version}" },
   "topbar.lightMode": { es: "Modo claro", en: "Light mode" },
   "topbar.darkMode": { es: "Modo oscuro", en: "Dark mode" },
   "topbar.notifications": { es: "Notificaciones", en: "Notifications" },

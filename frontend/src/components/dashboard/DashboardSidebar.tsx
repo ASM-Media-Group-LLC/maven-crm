@@ -456,7 +456,7 @@ const DashboardSidebar = () => {
   if (permisosCargando || permisosFallaron) {
     return (
       <Sidebar collapsible="icon" variant="floating">
-        <SidebarHeader className="flex h-14 flex-row items-center justify-start px-5 border-b border-border shrink-0">
+        <SidebarHeader className="riel-logo flex h-14 flex-row items-center justify-start px-5 border-b border-border shrink-0">
           <Link
           to="/dashboard"
           aria-label={t("nav.goToDashboard")}

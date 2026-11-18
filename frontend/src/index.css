@@ -1829,5 +1829,10 @@ html.escritorio-mac div[data-variant] > div.fixed { -webkit-app-region: drag; }
 html.escritorio-mac [data-sidebar="sidebar"] { -webkit-app-region: no-drag; }
 /* Windows: los tres botones del sistema ocupan ~140 px arriba a la derecha. */
 html.escritorio-windows .barra-arrastrable { padding-right: 150px; }
+/* App (Alvaro, 18/11/2026): el logo del riel se veía mal; arriba ya dice
+   «Maven». Y en Mac, con el riel angosto, el botón verde del semáforo caía
+   sobre el borde de la barra de arriba: la barra se corre a la derecha. */
+html.en-escritorio .riel-logo { display: none; }
+html.escritorio-mac:has(.peer[data-state="collapsed"]) .barra-arrastrable { margin-left: 26px; }
 /* En la app no hay «Volver al inicio» (la portada es para el navegador). */
 html.en-escritorio .entrar-volver { display: none; }

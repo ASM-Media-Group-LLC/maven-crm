@@ -20,6 +20,20 @@
       ],
       "port": 8080,
       "autoPort": false
+    },
+    {
+      "name": "Banco (Vite dev 8091)",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "run",
+        "dev",
+        "--",
+        "--port",
+        "8091",
+        "--strictPort"
+      ],
+      "port": 8091,
+      "autoPort": false
     }
   ]
 }
