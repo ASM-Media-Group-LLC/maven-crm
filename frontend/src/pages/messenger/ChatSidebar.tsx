@@ -61,6 +61,17 @@ interface ChatSidebarProps {
 }
 
 
+/** La gente que coincide con la búsqueda y con la que NO hay chat todavía
+ *  (sin tildes ni mayúsculas, por cualquier parte del nombre). Hasta 20. */
+export function personasQueCoinciden<P extends { id: string; full_name?: string | null }>(
+  gente: P[], busqueda: string, conChat: Set<string>,
+): P[] {
+  const limpiar = (x: string) => x.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+  const q = limpiar(busqueda);
+  if (!q) return [];
+  return gente.filter((p) => !conChat.has(p.id) && limpiar(p.full_name || "").includes(q)).slice(0, 20);
+}
+
 export default function ChatSidebar({
   conversations, activeChatId, onSelectChat, onNewChat, onNewGroup,
   onSelectContact, onDeleteChat, loading, profiles,
@@ -171,6 +182,23 @@ export default function ChatSidebar({
 
   const onlineCount = useMemo(() => contacts.filter(p => isOnline(p.id)).length, [contacts, isOnline]);
 
+  // UN SOLO BUSCADOR (Alvaro, 18/11/2026: «search all chats y el + es pendejada
+  // tener dos»). Buscando, además de los chats aparece la GENTE con la que
+  // nunca has hablado: tocarla abre el chat nuevo, como hacía «Nuevo mensaje».
+  // Quien ya tiene chat contigo sale arriba, en sus chats, no dos veces.
+  const conChatDirecto = useMemo(() => {
+    const ids = new Set<string>();
+    for (const c of conversations) {
+      if (c.type === "group") continue;
+      for (const p of c.participants ?? []) if (p.user_id !== user?.id) ids.add(p.user_id);
+    }
+    return ids;
+  }, [conversations, user?.id]);
+  const personasNuevas = useMemo(
+    () => personasQueCoinciden(contacts, search, conChatDirecto),
+    [contacts, search, conChatDirecto],
+  );
+
   const handleConfirmDelete = async () => {
     if (!deleteTarget) return;
     setDeleting(true);
@@ -214,21 +242,18 @@ export default function ChatSidebar({
           </div>
           <div className="flex items-center gap-0.5">
             <BotonSilenciarCanal channel="messenger" className="h-9 w-9 sm:h-8 sm:w-8 hover:bg-primary/8" />
-            <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" className="h-9 w-9 sm:h-8 sm:w-8 rounded-full hover:bg-primary/8" title={t("messenger.sidebar.nuevo")}>
-                <Plus className="h-5 w-5" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="rounded-2xl min-w-[180px]">
-              <DropdownMenuItem onClick={onNewChat}>
-                <Pencil className="h-3.5 w-3.5 mr-2" /> {t("messenger.sidebar.nuevoMensaje")}
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={onNewGroup}>
-                <Users className="h-3.5 w-3.5 mr-2" /> {t("messenger.sidebar.nuevoGrupo")}
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-            </DropdownMenu>
+            {/* El «+» es solo para crear un grupo: a una persona se le escribe
+                buscándola arriba (Alvaro, 18/11/2026). */}
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-9 w-9 sm:h-8 sm:w-8 rounded-full hover:bg-primary/8"
+              onClick={onNewGroup}
+              title={t("messenger.sidebar.nuevoGrupo")}
+              aria-label={t("messenger.sidebar.nuevoGrupo")}
+            >
+              <Plus className="h-5 w-5" />
+            </Button>
           </div>
         </div>
 
@@ -236,7 +261,7 @@ export default function ChatSidebar({
         <div className="relative">
           <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
-            placeholder={t("messenger.sidebar.buscarEnChats")}
+            placeholder={t("messenger.sidebar.buscarChatsOPersonas")}
             className="pl-10 pr-8 h-11 sm:h-9 bg-primary/5 border-0 focus-visible:ring-1 focus-visible:ring-primary/30 rounded-full text-sm"
             value={search}
             onChange={e => setSearch(e.target.value)}
@@ -395,6 +420,36 @@ export default function ChatSidebar({
               </>
             );
           })()}
+
+          {/* Gente con la que nunca has hablado, que coincide con la búsqueda. */}
+          {search.trim() && personasNuevas.length > 0 && (
+            <div className="mt-1 px-2">
+              <div className="flex items-center gap-1.5 px-2 py-1.5 text-xs font-semibold text-muted-foreground">
+                <User className="h-3.5 w-3.5" />
+                <span>{t("messenger.sidebar.personas")}</span>
+              </div>
+              {personasNuevas.map((p) => {
+                const online = isOnline(p.id);
+                return (
+                  <button
+                    key={p.id}
+                    onClick={() => { onSelectContact(p.id); setSearch(""); }}
+                    className="w-full flex items-center gap-2.5 px-3 py-[7px] min-h-[40px] sm:min-h-0 rounded-2xl text-left hover:bg-primary/5 transition-colors"
+                  >
+                    <div className="relative shrink-0">
+                      <UserAvatar name={p.full_name || "?"} src={p.avatar_url} seed={p.avatar_seed} size="sm" className="h-7 w-7" />
+                      <span className={cn(
+                        "absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-[1.5px] border-card",
+                        getStatusColor(getStatus(p.id), online, getStatusColorPersonal(p.id)),
+                      )} />
+                    </div>
+                    <span className="min-w-0 flex-1 truncate text-sm text-foreground">{p.full_name || t("messenger.sidebar.sinNombre")}</span>
+                    <span className="shrink-0 text-[10px] text-muted-foreground">{t("messenger.sidebar.escribirle")}</span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
 
           {/* Global message search results */}
           {search.trim().length >= 2 && (

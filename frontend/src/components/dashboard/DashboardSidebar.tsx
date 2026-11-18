@@ -23,8 +23,13 @@ import {
 import {
   Sidebar, SidebarContent,
   SidebarHeader, SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarMenuSub,
-  SidebarMenuSubItem, SidebarMenuSubButton, SidebarFooter, SidebarSeparator, useSidebar,
+  SidebarMenuSubItem, SidebarMenuSubButton, SidebarFooter, SidebarSeparator, SidebarTrigger, useSidebar,
 } from "@/components/ui/sidebar";
+import NotificationBell from "@/components/notifications/NotificationBell";
+import MessagesBell from "@/components/messenger/MessagesBell";
+import SelectorDeIdioma from "./SelectorDeIdioma";
+import { MedidorEquipo } from "@/components/MedidorEquipo";
+import { abrirBuscador } from "./DashboardTopbar";
 import { useLanguage } from "@/hooks/useLanguage";
 import { usePermissions } from "@/hooks/usePermissions";
 import { useEsDueno } from "@/hooks/useEsDueno";
@@ -503,17 +508,36 @@ const DashboardSidebar = () => {
 
   return (
     <Sidebar collapsible="icon" variant="floating">
-      {/* Rediseño 09/2026: la marca va centrada y con aire arriba (como en el
-          resto de las plataformas de Unlimited), sin línea debajo: el menú
-          arranca solo. En el rail plegado queda la baldosa. */}
-      <SidebarHeader className="flex h-20 flex-row items-center justify-center px-4 shrink-0">
+      {/* Compacto (Alvaro, 18/11/2026: «está muy grande»): la marca más chica a
+          la izquierda y, al lado, la lupa del buscador (⌘K) y el botón para
+          plegar el menú, que vivían en la barra de arriba (ya no está en
+          computador). Plegado: la baldosa y los dos botones uno debajo del otro. */}
+      <SidebarHeader className={cn(
+        "shrink-0",
+        collapsed ? "flex flex-col items-center gap-1 px-1 py-2" : "flex h-14 flex-row items-center gap-1 pl-4 pr-2",
+      )}>
         <Link
           to="/dashboard"
           aria-label={t("nav.goToDashboard")}
           className="rounded-md transition-opacity hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
         >
-          <Logo size={collapsed ? "sm" : "md"} collapsed={collapsed} />
+          <Logo size="sm" collapsed={collapsed} />
         </Link>
+        {!isMobile && (
+          <div className={cn("flex items-center gap-0.5 text-muted-foreground", collapsed ? "flex-col" : "ml-auto")}>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8 rounded-full"
+              onClick={abrirBuscador}
+              title={t("topbar.search")}
+              aria-label={t("topbar.search")}
+            >
+              <Search className="h-4 w-4" />
+            </Button>
+            <SidebarTrigger className="h-8 w-8 rounded-full" title={t("sidebar.plegarMenu")} />
+          </div>
+        )}
       </SidebarHeader>
 
       <SidebarContent className="gap-0.5 overflow-x-hidden px-2 py-1">
@@ -951,7 +975,17 @@ const DashboardSidebar = () => {
 
       </SidebarContent>
 
-      <SidebarFooter className="border-t border-border p-3">
+      <SidebarFooter className="border-t border-border p-2.5">
+        {/* Lo que estaba en la barra de arriba: idioma, mensajes, campana (y en
+            la app, el medidor del equipo). En el teléfono siguen arriba. */}
+        {!isMobile && (
+          <div className={cn("flex items-center justify-center gap-1", collapsed && "flex-col")}>
+            <MedidorEquipo />
+            <SelectorDeIdioma />
+            <MessagesBell />
+            <NotificationBell />
+          </div>
+        )}
         <UserFooterBlock collapsed={collapsed} />
       </SidebarFooter>
     </Sidebar>

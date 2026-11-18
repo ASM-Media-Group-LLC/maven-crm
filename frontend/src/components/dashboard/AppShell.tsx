@@ -1,4 +1,5 @@
 import { Suspense, useEffect } from "react";
+import type { CSSProperties } from "react";
 import { BarraDeLlamada } from "@/components/BarraDeLlamada";
 import { Navigate, Outlet, useLocation } from "react-router-dom";
 import { toast } from "sonner";
@@ -103,7 +104,11 @@ const AppShell = () => {
     {/* defaultOpen=false: el menú arranca como RIEL fino de iconos (la barra
         del link). Nada se pierde — cada icono abre su menú flotante con todo, y
         el riel se puede expandir con su tirador o ⌘B. */}
-    <SidebarProvider defaultOpen={false}>
+    {/* El menú arranca ABIERTO y compacto (Alvaro, 18/11/2026: «prefiero tener
+        a Maven que me reciba abierto el lado izquierdo, pero con buena
+        estética… está muy grande»): 13.5rem en vez de 16rem. Se pliega con
+        el botón del propio menú o con ⌘B. */}
+    <SidebarProvider defaultOpen style={{ "--sidebar-width": "13.5rem" } as CSSProperties}>
       {/* alto-de-la-app = h-dvh (no h-screen: en mobile el alto dinámico descuenta el
           teclado virtual y la barra del navegador, así el composer del Messenger no
           queda tapado) MÁS la compensación de la PWA instalada de iPhone, donde 100dvh
