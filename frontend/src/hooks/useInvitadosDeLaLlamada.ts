@@ -11,13 +11,18 @@ export interface Invitado {
   user_id: string;
   nombre: string;
   status: EstadoInvitado;
+  /** Foto y muñequito, para la pantalla de «Llamando a…». */
+  foto?: string | null;
+  seed?: string | null;
 }
+
+type Perfil = { nombre: string; foto: string | null; seed: string | null };
 
 export function useInvitadosDeLaLlamada(roomName: string | undefined, uid: string | undefined, activo: boolean) {
   const [llamada, setLlamada] = useState<LlamadaViva | null>(null);
   const [invitados, setInvitados] = useState<Invitado[]>([]);
   const [error, setError] = useState(false);
-  const nombres = useRef(new Map<string, string>());
+  const perfiles = useRef(new Map<string, Perfil>());
 
   const cargar = useCallback(async () => {
     if (!roomName || !uid) return;
@@ -31,12 +36,17 @@ export function useInvitadosDeLaLlamada(roomName: string | undefined, uid: strin
         .eq("call_id", viva.id);
       if (e) throw e;
       const filas = (data ?? []) as { user_id: string; status: EstadoInvitado }[];
-      const faltan = filas.map((f) => f.user_id).filter((id) => !nombres.current.has(id));
+      const faltan = filas.map((f) => f.user_id).filter((id) => !perfiles.current.has(id));
       if (faltan.length) {
-        const { data: perfiles } = await supabase.from("profiles").select("id, full_name").in("id", faltan);
-        for (const p of perfiles ?? []) nombres.current.set(p.id as string, (p.full_name as string) || "");
+        const { data: filasPerfil } = await supabase.from("profiles").select("id, full_name, avatar_url, avatar_seed").in("id", faltan);
+        for (const p of (filasPerfil ?? []) as { id: string; full_name: string | null; avatar_url: string | null; avatar_seed: string | null }[]) {
+          perfiles.current.set(p.id, { nombre: p.full_name || "", foto: p.avatar_url ?? null, seed: p.avatar_seed ?? null });
+        }
       }
-      setInvitados(filas.map((f) => ({ ...f, nombre: nombres.current.get(f.user_id) || "" })));
+      setInvitados(filas.map((f) => {
+        const p = perfiles.current.get(f.user_id);
+        return { ...f, nombre: p?.nombre || "", foto: p?.foto ?? null, seed: p?.seed ?? null };
+      }));
     } catch {
       setError(true);
     }

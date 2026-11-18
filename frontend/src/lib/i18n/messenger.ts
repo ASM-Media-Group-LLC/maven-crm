@@ -721,6 +721,12 @@ export const messenger = {
   "messenger.enLlamada.invitados.queHacer": { es: "Puedes volver a llamar o cerrar.", en: "You can call again or close." },
   "messenger.enLlamada.invitados.volverALlamar": { es: "Volver a llamar", en: "Call again" },
   "messenger.enLlamada.invitados.cerrar": { es: "Cerrar", en: "Close" },
+  "messenger.enLlamada.llamando.uno": { es: "Llamando a {name}", en: "Calling {name}" },
+  "messenger.enLlamada.llamando.varios": { es: "Llamando a {name} y {n} más", en: "Calling {name} and {n} more" },
+  "messenger.enLlamada.llamando.sonando": { es: "Sonando…", en: "Ringing…" },
+  "messenger.enLlamada.llamando.voz": { es: "Llamada de voz", en: "Voice call" },
+  "messenger.enLlamada.llamando.video": { es: "Videollamada", en: "Video call" },
+  "messenger.enLlamada.llamando.colgar": { es: "Colgar", en: "Hang up" },
   "messenger.enLlamada.pantallaCompleta.entrar": { es: "Pantalla completa", en: "Full screen" },
   "messenger.enLlamada.pantallaCompleta.salir": { es: "Salir de pantalla completa", en: "Exit full screen" },
 } as const satisfies Record<string, { es: string; en: string }>;

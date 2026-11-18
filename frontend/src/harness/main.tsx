@@ -23,6 +23,7 @@ import { BancoGuiaApp, BancoAppDelEquipo } from "./bancoGuiaApp";
 import { BancoAppMedidor, prepararAppFalsa } from "./bancoAppMedidor";
 import BancoFondo from "./bancoFondo";
 import BancoCamaraAnfitrion from "./bancoCamaraAnfitrion";
+import { BancoLlamada } from "./bancoLlamada";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import VirtualOfficePage from "@/pages/oficina-ai/VirtualOfficePage";
 import TardanzasPage from "@/pages/admin/TardanzasPage";
@@ -93,6 +94,12 @@ void cargarIdioma(idiomaInicial()).finally(() => raiz.render(
   // /harness.html?ver=gracia[&tema=claro] → los minutos de gracia (Cowork + Expediente).
   // /harness.html?ver=guia-conexion[&estado=bien|justo|malo|error…][&tema=claro] → la Guía de conexión.
   // /harness.html?ver=guia-app[&sistema=mac][&en=app|celular] · ?ver=app-equipo → la app de Maven (18/11).
+  // /harness.html?ver=llamada[&estado=llamando|grupo|entrante|en-curso][&tipo=audio] → llamada del Messenger (18/11).
+  ver === "llamada" ? (
+    <StrictMode>
+      <LanguageProvider><BancoLlamada estado={params.get("estado") ?? "llamando"} tipo={params.get("tipo") ?? "video"} /></LanguageProvider>
+    </StrictMode>
+  ) :
   ver === "fondo" ? (
     <BancoFondo />
   ) :

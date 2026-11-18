@@ -268,6 +268,8 @@ export default function VideoCallPage() {
               : undefined
           }
           shareLink={meetShareLink ?? undefined}
+          // En una llamada del Messenger se suma gente con «Agregar», no con un link.
+          hideShareLink={esDelMessenger}
           accionesBarra={
             <>
               {esDelMessenger && user && (

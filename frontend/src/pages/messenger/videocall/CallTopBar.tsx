@@ -21,10 +21,14 @@ interface CallTopBarProps {
   extra?: ReactNode;
   /** Botones extra a la derecha (antes de «Copiar enlace»). */
   acciones?: ReactNode;
+  /** Una llamada del Messenger, no una sala ni un Meet (Alvaro, 18/11/2026:
+   *  «está todo abultado arriba»): sin «EN VIVO» y con «Ajustar vista» solo
+   *  como ícono. */
+  esLlamada?: boolean;
 }
 
 export default function CallTopBar({
-  roomName, participantCount, isEncrypted, onOpenAdjustView, shareLink, hideShareLink, compact, tactil, extra, acciones,
+  roomName, participantCount, isEncrypted, onOpenAdjustView, shareLink, hideShareLink, compact, tactil, extra, acciones, esLlamada,
 }: CallTopBarProps) {
   const { t } = useLanguage();
   const [elapsed, setElapsed] = useState(0);
@@ -53,7 +57,7 @@ export default function CallTopBar({
             además se repetía con el título de la ventanita, uno debajo del otro
             (Jhon, 10/09). Sin selector —un Meet, una videollamada— el nombre. */}
         {/* EN VIVO (Estudio Acero): la sala está transmitiendo. */}
-        {!compact && (
+        {!compact && !esLlamada && (
           <span className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card/50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">
             <span className="h-1.5 w-1.5 rounded-full bg-destructive animate-pulse motion-reduce:animate-none" />{t("messenger.call.enVivo")}
           </span>
@@ -98,7 +102,7 @@ export default function CallTopBar({
             className="flex items-center gap-1.5 h-8 px-3 rounded-full border border-border bg-card/40 text-xs text-foreground hover:bg-card transition-colors"
           >
             <LayoutGrid className="h-3.5 w-3.5" />
-            <span className="hidden md:inline">{t("messenger.call.ajustarVista")}</span>
+            {!esLlamada && <span className="hidden md:inline">{t("messenger.call.ajustarVista")}</span>}
           </button>
         )}
       </div>
