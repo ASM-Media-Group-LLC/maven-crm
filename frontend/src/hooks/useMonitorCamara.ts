@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 import { toast } from "sonner";
+import { huellaDeCanvas } from "@/lib/huellaPantalla";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useLanguage } from "@/hooks/useLanguage";
@@ -55,7 +56,12 @@ const sinTipar = supabase as unknown as { from: (t: string) => any };
 /** Saca un JPEG (base64 sin prefijo) del track local. null si no se pudo.
  *  `maxAncho`/`calidad`: la CÁMARA va chica (una cara se ve bien en 640); la
  *  PANTALLA va grande (1600) para que se lea el texto de los chats y las tabs. */
-async function capturarJPEG(track: MediaStreamTrack, maxAncho = 640, calidad = 0.6): Promise<string | null> {
+async function capturarJPEG(
+  track: MediaStreamTrack,
+  maxAncho = 640,
+  calidad = 0.6,
+  alHuella?: (huella: string | null) => void,
+): Promise<string | null> {
   return await new Promise((resolve) => {
     let listo = false;
     const video = document.createElement("video");
@@ -79,6 +85,8 @@ async function capturarJPEG(track: MediaStreamTrack, maxAncho = 640, calidad = 0
         const ctx = canvas.getContext("2d");
         if (!ctx) { limpiar(); resolve(null); return; }
         ctx.drawImage(video, 0, 0, w, h);
+        // Argos a USD 15: huella gratis de la pantalla (lib/huellaPantalla.ts).
+        if (alHuella) alHuella(huellaDeCanvas(canvas));
         const dataUrl = canvas.toDataURL("image/jpeg", calidad);
         limpiar();
         resolve(dataUrl.split(",")[1] ?? null);
@@ -126,7 +134,10 @@ async function guardarEnBuzon(
   caraVisible: boolean | null,
 ): Promise<void> {
   // Pantalla nítida (1600) para leer el texto; cámara chica (640) basta para una cara.
-  const b64 = tipo === "pantalla" ? await capturarJPEG(track, 1600, 0.8) : await capturarJPEG(track);
+  let huella: string | null = null;
+  const b64 = tipo === "pantalla"
+    ? await capturarJPEG(track, 1600, 0.8, (h) => { huella = h; })
+    : await capturarJPEG(track);
   if (!b64) return;
   const path = `${userId}/${fechaBogota()}/${tipo}/${Date.now()}.jpg`;
   const sub = await supabase.storage
@@ -144,6 +155,8 @@ async function guardarEnBuzon(
     // la cámara% REAL del día (momentos con cara ÷ momentos medidos), en vez del
     // viejo 100% de adorno. Para pantalla no aplica (null).
     cara_visible: caraVisible,
+    // Solo pantalla: ¿cambió respecto de la anterior? (semana de prueba, 18/11).
+    huella,
   });
 }
 

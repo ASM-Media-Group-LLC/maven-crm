@@ -23,6 +23,7 @@ import {
 import { normalizeRoomCode, isCompleteRoomCode, ROOM_CODE_LENGTH } from "@/lib/coworkRoomCode";
 import { Plus, Users2, ArrowRight, KeyRound, Loader2, VenetianMask, LogOut, History, MoreHorizontal, Power } from "lucide-react";
 import CoworkIncognitoView from "./CoworkIncognitoView";
+import { BloqueoSoloApp, useCoworkSoloApp } from "@/components/CoworkSoloApp";
 import { toast } from "sonner";
 import { useFormato } from "@/hooks/useFormato";
 import type { Formato } from "@/lib/formato";
@@ -40,6 +41,8 @@ export default function CoworkPage() {
   // `f` ya es la variable de las filas de finalizadas; por eso este se llama `formato`.
   const formato = useFormato();
   const { t } = useLanguage();
+  // Argos a USD 15: Cowork en el computador solo en la app (desde monitor_config).
+  const soloApp = useCoworkSoloApp();
   const [showCreate, setShowCreate] = useState(false);
   const [autoJoining, setAutoJoining] = useState(false);
   const [autoJoinFailed, setAutoJoinFailed] = useState(false);
@@ -349,6 +352,8 @@ export default function CoworkPage() {
   }, [sessionId, cowork.loading, cowork.myMembership, cowork.myAssignment, autoJoining, autoJoinFailed, searchParams]);
 
   // No session selected → landing
+  if (soloApp.estado === "bloqueo") return <BloqueoSoloApp />;
+
   if (!sessionId) {
     return (
       <div className="fondo-glass flex-1 min-h-0 overflow-y-auto">
