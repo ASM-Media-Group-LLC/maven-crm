@@ -86,6 +86,9 @@ const rechazos: Array<[string, MotivoUrl]> = [
   ["https://10-0-0-1.sslip.io/x", "host_prohibido"],
   ["https://mavenv3-x.traefik.me/x", "host_prohibido"],
   ["https://of.unlok.me/x", "host_prohibido"],
+  ["https://kashagency.me/x", "host_prohibido"],
+  ["https://otro.kashagency.me/x", "host_prohibido"],
+  ["https://x.grupo.kashagency.me/x", "host_prohibido"],
   ["https://integrador.com/?q=\\x", "url_invalida"],
   ["no es una url", "url_invalida"],
   ["", "url_invalida"],
@@ -97,6 +100,12 @@ for (const [entrada, motivo] of rechazos) {
     assertEquals(!r.ok && r.motivo, motivo);
   });
 }
+
+Deno.test("URL: Backstage (grupo.kashagency.me, en Vercel) sí recibe avisos; solo ese nombre exacto", () => {
+  const r = normalizarUrlDeWebhook("https://grupo.kashagency.me/api/maven/contenido-aviso");
+  assert(r.ok);
+  assertEquals(r.ok && r.host, "grupo.kashagency.me");
+});
 
 Deno.test("URL: lo que se parece a nuestro dominio pero no es, pasa (sufijo por etiqueta, no por texto)", () => {
   assert(normalizarUrlDeWebhook("https://notmaven-ai.me/x").ok);
