@@ -44,7 +44,7 @@ export const TARJETAS = {
     // v=8 (Alvaro, 17/11/2026): «que diga Maven y abajito Meeting, bonito, para
     // compartir en WhatsApp y Telegram». Subir el número al cambiar la imagen,
     // para que WhatsApp no siga mostrando la vieja.
-    imagen: `${BASE}/og-reunion.jpg?v=8`,
+    imagen: `${BASE}/og-reunion.jpg?v=9`,
     alt: "Maven Meeting",
   },
   cowork: {
