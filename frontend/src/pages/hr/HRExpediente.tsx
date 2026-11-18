@@ -24,6 +24,7 @@ import { TarjetaArgos } from "@/components/hr/TarjetaArgos";
 import { GraciaDelDia } from "@/components/hr/GraciaDelDia";
 import { AppsDelDia } from "@/components/hr/AppsDelDia";
 import { EquipoDelDia } from "@/components/hr/EquipoDelDia";
+import { CronologiaDelDia } from "@/components/hr/CronologiaDelDia";
 import { useDisenoPulido } from "@/hooks/useDisenoPulido";
 import { Mail } from "lucide-react";
 
@@ -1017,6 +1018,22 @@ export default function HRExpediente() {
         </div>
       </section>
 
+      {/* QUÉ HIZO, EN ORDEN (Alvaro, 18/11/2026, propuesta 3 «Cronología»): el
+          día como un chat, lo más nuevo arriba, lo malo con su prueba y los días
+          anteriores debajo. No quita nada: lo de siempre sigue abajo. */}
+      {userId && !cargando && !error && (
+        <CronologiaDelDia
+          userId={userId}
+          dia={dia}
+          horarioEntrada={expediente?.horario.entrada ?? null}
+          diasMes={expediente ? [...expediente.dias.values()] : []}
+          esHoy={esHoy}
+          onElegirDia={(f) => { setDiaSel(f); setVerCalendario(false); window.scrollTo({ top: 0, behavior: "smooth" }); }}
+          onVerMasDias={() => { setVerCalendario(true); window.scrollTo({ top: 0, behavior: "smooth" }); }}
+          onVerFotos={() => document.getElementById("expediente-todo-el-dia")?.scrollIntoView({ behavior: "smooth", block: "start" })}
+        />
+      )}
+
       {/* Argos como MANAGER del día: lo PRIMERO, juzga el día con criterio
           (Alvaro, 09/11). Reemplaza las barras abiertas de pantalla/cámara. */}
       <TarjetaArgos nombre={nombre} dia={dia} horario={expediente?.horario ?? { entrada: null, salida: null }} />
@@ -1031,7 +1048,7 @@ export default function HRExpediente() {
 
       {/* TODO EL DÍA, justo debajo de Argos (Alvaro, 13/11/2026: «no puedo ver los
           pantallazos de todo el día»): todas las fotos por hora, sin tope. */}
-      <section className="vidrio sube mt-5 p-4 lg:p-5" style={{ animationDelay: "0.05s" }}>
+      <section id="expediente-todo-el-dia" className="vidrio sube mt-5 scroll-mt-4 p-4 lg:p-5" style={{ animationDelay: "0.05s" }}>
         <div className="v-cont">
           <p className="mb-3 flex items-center gap-1.5 text-xs font-semibold text-muted-foreground">
             <ScreenShare className="h-3.5 w-3.5" />{t("hr.exp.todoElDia")}
