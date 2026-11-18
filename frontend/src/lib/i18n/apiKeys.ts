@@ -279,6 +279,11 @@ export const apiKeys = {
     es: "Empleados de la agencia: nombre, rol (chatter, closer, manager, coordinador…) y fecha de alta.",
     en: "Agency employees: name, role (chatter, closer, manager, coordinator…) and start date.",
   },
+  "apiKeys.scope.contenido.label": { es: "Subir personalizados a la carpeta de la modelo", en: "Upload custom content to the model's folder" },
+  "apiKeys.scope.contenido.desc": {
+    es: "Para la plataforma de la agencia (Backstage u otra): POST /contenido/subidas crea la subida de un archivo para una modelo (su id de /creators o su correo) y da el permiso para subirlo por TUS; POST /contenido/subidas/{id}/listo avisa que terminó y GET /contenido/subidas/{id} dice si ya quedó («listo»). El archivo queda en el Drive de Maven, en la carpeta de la modelo → Personalizados → la carpeta del día, igual que si lo hubiera subido ella.",
+    en: "For the agency's platform (Backstage or another): POST /contenido/subidas creates an upload of a file for a model (her id from /creators or her email) and gives the permission to upload it via TUS; POST /contenido/subidas/{id}/listo reports it finished and GET /contenido/subidas/{id} says whether it's done («listo»). The file lands in Maven's Drive, in the model's folder → Personalizados → the day's folder, just as if she had uploaded it.",
+  },
   "apiKeys.scope.team.label": { es: "⚠️ Tu plataforma manda el equipo", en: "⚠️ Your platform manages the team" },
   "apiKeys.scope.team.desc": {
     es: "Para la plataforma de RR. HH. de la agencia (Backstage u otra): POST /equipo/sync con sus roles y la lista completa del equipo (correo, rol, equipo, a quién reporta, nivel, horario y si sigue activo), y GET /equipo, /equipo/horas, /equipo/notas y /equipo/argos para leer de vuelta. Maven cambia rol, nivel, horario, equipo y jefe, y manda a la papelera a quien venga inactivo; los roles nuevos nacen sin permisos y quien no tiene cuenta queda pendiente hasta que el dueño o un admin lo apruebe. Nunca toca a admins ni dueños y nunca sube a nadie a admin. Mientras el dueño no prenda «aplicar», todo es ensayo: solo contesta qué cambiaría. Solo sirve si quien crea la key es admin o dueño.",

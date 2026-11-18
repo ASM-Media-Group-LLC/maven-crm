@@ -64,6 +64,13 @@ export const SCOPE_CATALOG_COMPLETO: ScopeDef[] = [
       "Empleados de la agencia: nombre, rol (chatter, closer, manager, coordinador…) y fecha de alta.",
   },
   {
+    key: "contenido:write",
+    group: "Creadoras",
+    label: "Subir personalizados a la carpeta de la modelo",
+    description:
+      "Para la plataforma de la agencia (Backstage u otra): POST /contenido/subidas crea la subida de un archivo para una modelo (su id de /creators o su correo) y da el permiso para subirlo por TUS; POST /contenido/subidas/{id}/listo avisa que terminó y GET /contenido/subidas/{id} dice si ya quedó («listo»). El archivo queda en el Drive de Maven, en la carpeta de la modelo → Personalizados → la carpeta del día, igual que si lo hubiera subido ella.",
+  },
+  {
     key: "equipo:write",
     group: "Empleados",
     label: "⚠️ Tu plataforma manda el equipo",
