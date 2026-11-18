@@ -10,6 +10,7 @@ import { ThemeProvider } from "next-themes";
 import { AuthProvider } from "@/hooks/useAuth";
 import { AvisoSoloApp } from "@/components/CoworkSoloApp";
 import { AbrirEnApp } from "@/components/AbrirEnApp";
+import { AppLiviana } from "@/components/AppLiviana";
 import { useSkinSync } from "@/hooks/useSkin";
 import { LanguageProvider, idiomaInicial } from "@/hooks/useLanguage";
 import { IDIOMAS } from "@/lib/idiomas";
@@ -294,6 +295,7 @@ const App = () => (
           <BrowserRouter>
             {/* Los links de Maven abren en la app de computador (17/11/2026). */}
             <AbrirEnApp />
+            <AppLiviana />
             <AvisoSoloApp />
             <Suspense fallback={<LoadingFallback />}>
             <Routes>

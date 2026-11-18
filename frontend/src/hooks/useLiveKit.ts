@@ -33,6 +33,7 @@ import { toast } from "sonner";
 // callbacks, no en el JSX, y los lee la persona en su propio idioma.
 import { traducir } from "@/lib/i18n";
 import { claveDeRecuadro, participantesEstables } from "@/lib/participantesEstables";
+import { modoLivianoActivo } from "@/lib/appLiviana";
 import { esPantallaCompleta, puedeCompartirPantalla, motivoDeFalloAlCompartir } from "@/lib/compartirPantalla";
 import { supabase, SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY } from "@/integrations/supabase/client";
 import { avisarSalidaDeLlamada, mostrarAvisoDeSala, ID_AVISO_ME_SILENCIARON } from "@/lib/avisosDeLlamada";
@@ -610,6 +611,7 @@ export function useLiveKit() {
       ahorroActivo: ahorroRef.current.activo,
       limiteCam: muestra?.limite_cam ?? null,
       limitePant: muestra?.limite_pant ?? null,
+      equipoFlojo: modoLivianoActivo(),
     };
   }, []);
   // Sala de Cowork del participante: solo el audio de los compañeros, no su

@@ -61,6 +61,10 @@ contextBridge.exposeInMainWorld("mavenEscritorio", {
     ipcRenderer.on("maven:abrir-ruta", f);
     return () => ipcRenderer.removeListener("maven:abrir-ruta", f);
   },
+  /** Cowork: true = al compartir, la pantalla completa sola, sin la ventanita para elegir. */
+  pantallaAutomatica: (si) => ipcRenderer.send("maven:pantalla-auto", Boolean(si)),
+  /** Las veces que la app se cayó o se congeló y se recuperó sola (se leen una vez). */
+  ultimoCierre: () => ipcRenderer.invoke("maven:ultimo-cierre"),
   /** Memoria: { app_mb, equipo_gb, libre_gb }. */
   memoria: () => ipcRenderer.invoke("maven:memoria"),
   /** Cada minuto: los tramos de app/página al frente (ver desktop/src/apps.js). */
