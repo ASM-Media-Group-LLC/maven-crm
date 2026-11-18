@@ -34,6 +34,21 @@ function pantallaPermitida() {
   }
 }
 
+// 18/11/2026: pedir la pantalla con desktopCapturer NO pone a Maven en la lista
+// de «Grabación de pantalla» de macOS (en el Mac de Alvaro Maven ni aparecía y
+// no había interruptor que prender). CGRequestScreenCaptureAccess sí lo pone y
+// muestra el aviso de macOS. Electron no lo trae, así que se llama por
+// osascript: corre como hijo de Maven y macOS se lo atribuye a Maven.
+// Probado en su Mac: tras esta llamada Maven apareció en la lista.
+const PEDIR_A_MACOS =
+  'ObjC.import("CoreGraphics"); ObjC.bindFunction("CGRequestScreenCaptureAccess", ["bool", []]); $.CGRequestScreenCaptureAccess();';
+function pedirAMacOS() {
+  if (!esMac) return Promise.resolve();
+  return new Promise((resolver) => {
+    execFile("/usr/bin/osascript", ["-l", "JavaScript", "-e", PEDIR_A_MACOS], { timeout: 15_000 }, () => resolver());
+  });
+}
+
 let macOSYaPregunto = false;
 /** Una vez por arranque se deja que macOS muestre su propio aviso (si nunca
  *  preguntó en este Mac, así Maven aparece en la lista de Ajustes). Si ya
@@ -73,6 +88,7 @@ async function pedirPermisoSiToca() {
   }
   if (pantallaPermitida()) return;
   macOSYaPregunto = true;
+  await pedirAMacOS();
   await desktopCapturer.getSources({ types: ["screen"], thumbnailSize: { width: 1, height: 1 } }).catch(() => {});
   // Si macOS no mostró nada, se abre directo el lugar del interruptor.
   if (systemPreferences.getMediaAccessStatus("screen") !== "granted") shell.openExternal(AJUSTES_PANTALLA);
@@ -144,4 +160,4 @@ async function guiaPermisoPantalla(ventana) {
   }
 }
 
-module.exports = { pantallaPermitida, primeraVezSinPermiso, guiaPermisoPantalla, pedirPermisoSiToca, reiniciar };
+module.exports = { pantallaPermitida, primeraVezSinPermiso, guiaPermisoPantalla, pedirPermisoSiToca, pedirAMacOS, reiniciar };

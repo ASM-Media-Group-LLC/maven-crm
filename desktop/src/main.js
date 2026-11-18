@@ -28,7 +28,7 @@ const fs = require("node:fs");
 const { iniciarActualizaciones } = require("./actualizar");
 const { avisarLlamada, cerrarAvisoLlamada } = require("./llamada");
 const { iniciarVigiaDeApps, segundosInactivo } = require("./apps");
-const { pantallaPermitida, primeraVezSinPermiso, guiaPermisoPantalla, pedirPermisoSiToca } = require("./permisoPantalla");
+const { pantallaPermitida, primeraVezSinPermiso, guiaPermisoPantalla, pedirPermisoSiToca, pedirAMacOS } = require("./permisoPantalla");
 const { revisarCamaraYMicrofono } = require("./permisoCamaraWindows");
 const { guardarAcceso, leerAcceso, olvidarAcceso, hayAccesoGuardado } = require("./acceso");
 const { vigilarVentana, leerYBorrarCierres } = require("./recuperarse");
@@ -282,6 +282,7 @@ function configurarPermisos() {
       // de una vez cada 10 minutos (Cowork vuelve a pedir la pantalla sola).
       if (!pantallaPermitida()) {
         if (primeraVezSinPermiso()) {
+          await pedirAMacOS(); // pone a Maven en la lista de Ajustes con su aviso
           await desktopCapturer.getSources({ types: ["screen"], thumbnailSize: { width: 1, height: 1 } }).catch(() => {});
         }
         guiaPermisoPantalla(ventana);
