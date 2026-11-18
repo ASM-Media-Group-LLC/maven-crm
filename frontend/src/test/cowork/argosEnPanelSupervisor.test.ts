@@ -12,8 +12,11 @@ describe("Argos en el panel del supervisor", () => {
   const p = fuente(panel);
   const e = fuente(edge);
 
-  it("el Hub prende a Argos (fotos, encuadre, pantalla) solo si no es admin", () => {
-    expect(p).toMatch(/const vigilarAnfitrion = miRol !== null && !isAdmin;/);
+  it("el Hub prende a Argos (fotos, encuadre, pantalla) a quien la base dice que se vigila", () => {
+    // Desde el 18/11/2026: todos menos los admins libres (Grace y Jackeline,
+    // admins, sí se vigilan). Lo dice mi_regla_de_anfitrion.
+    expect(p).toMatch(/const regla = useReglaDeAnfitrion\(miRol !== null, isAdmin\);/);
+    expect(p).toMatch(/const vigilarAnfitrion = regla\?\.vigilado \?\? false;/);
     expect(p).toMatch(/supervisorEncuadre: vigilarAnfitrion,/);
     expect(p).toMatch(/onMediaStateChange: \(m\) => \{\s*medioHubRef\.current = /);
   });
@@ -25,7 +28,10 @@ describe("Argos en el panel del supervisor", () => {
 
   it("el servidor le cuenta el reloj al anfitrión sin sala y le exige cámara y pantalla", () => {
     expect(e).toMatch(/esAnfitrion = membresia\?\.role === "host";/);
-    expect(e).toMatch(/const exige = esAnfitrion \? EXIGE_TODO : exigenciasDelReloj/);
+    expect(e).toMatch(/let exige = esAnfitrion \? EXIGE_TODO : exigenciasDelReloj/);
+    // La pantalla opcional se exige recién cuando ya la compartió; el aviso del
+    // navegador solo agrega la exigencia.
+    expect(e).toMatch(/regla\?\.pantalla_obligatoria === false && body\.pantallaYaCompartida !== true/);
     expect(e).toMatch(/room_id: salaId/);
   });
 });
