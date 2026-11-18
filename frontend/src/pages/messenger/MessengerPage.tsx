@@ -21,7 +21,8 @@ import { cn } from "@/lib/utils";
 import { EmptyState } from "@/components/EmptyState";
 import { toast } from "sonner";
 import { useLanguage } from "@/hooks/useLanguage";
-import { Video, BellOff, Archive, Users2 } from "lucide-react";
+import { BellOff, Archive, Users2 } from "lucide-react";
+import { getStatusColor, getStatusLabel } from "./components/StatusPicker";
 
 function openCallInNewTab(roomName: string, isAdmin: boolean, displayName?: string) {
   const params = new URLSearchParams();
@@ -48,18 +49,27 @@ const inicialesDe = (nombre: string | null | undefined) =>
 // la conversación con la ficha del contacto/grupo, acciones rápidas y, en grupos,
 // los miembros. Solo en escritorio ancho (lg+); en pantallas chicas no cabe y se
 // esconde. Datos reales de la conversación activa; acciones que ya existen.
-function PanelContexto({ conv, userId, isOnline, onVideo, onMute, onArchive }: {
+//
+// Alvaro, 18/11/2026 («¿tiene sentido?»): la cámara de aquí repetía la
+// videollamada de arriba del chat y se quitó; y el estado y la foto son los
+// MISMOS que arriba (antes decía «online» con ella «Ocupada», y salían sus
+// iniciales teniendo foto).
+function PanelContexto({ conv, userId, isOnline, onMute, onArchive }: {
   conv: ConversationWithDetails;
   userId: string | undefined;
   isOnline: (id: string) => boolean;
-  onVideo: () => void;
   onMute: () => void;
   onArchive: () => void;
 }) {
   const { t } = useLanguage();
+  const { getStatus, getStatusText, getStatusColorPersonal } = useOnlinePresence();
   const esGrupo = conv.type === "group";
   const otro = !esGrupo ? conv.participants.find((p) => p.user_id !== userId) : null;
   const enLinea = otro ? isOnline(otro.user_id) : false;
+  const estado = otro ? getStatus(otro.user_id) : null;
+  const textoPropio = otro ? getStatusText(otro.user_id) : "";
+  const etiquetaEstado = textoPropio || (enLinea ? getStatusLabel(estado, enLinea, t) : t("messenger.status.desconectado"));
+  const foto = esGrupo ? conv.avatar_url : (otro?.profile?.avatar_url ?? conv.avatar_url);
   const miembros = conv.participants.length;
   return (
     <aside className="hidden w-[260px] shrink-0 flex-col overflow-y-auto border-l border-white/40 bg-card/55 backdrop-blur-xl dark:border-white/[0.06] lg:flex">
@@ -67,8 +77,8 @@ function PanelContexto({ conv, userId, isOnline, onVideo, onMute, onArchive }: {
         <div className="relative">
           <div aria-hidden className="pointer-events-none absolute inset-0 -z-10 rounded-full bg-primary/25 blur-2xl" />
           <div className="flex h-20 w-20 items-center justify-center overflow-hidden rounded-full border border-white/50 bg-white/55 text-lg font-bold text-primary shadow-[inset_0_1px_0_rgba(255,255,255,0.6)] backdrop-blur-xl dark:border-white/10 dark:bg-white/[0.06]">
-            {conv.avatar_url ? (
-              <img src={conv.avatar_url} alt="" className="h-full w-full object-cover" />
+            {foto ? (
+              <img src={foto} alt="" className="h-full w-full object-cover" />
             ) : esGrupo ? (
               <Users2 className="h-8 w-8" />
             ) : (
@@ -81,15 +91,15 @@ function PanelContexto({ conv, userId, isOnline, onVideo, onMute, onArchive }: {
           <div className="mt-0.5 text-xs text-muted-foreground">
             {esGrupo
               ? t("messenger.ctx.members", { n: miembros })
-              : enLinea
-                ? <span className="text-success">{t("messenger.ctx.online")}</span>
-                : t("messenger.ctx.offline")}
+              : (
+                <span className="inline-flex items-center gap-1.5">
+                  <span className={cn("h-2 w-2 rounded-full", getStatusColor(estado, enLinea, otro ? getStatusColorPersonal(otro.user_id) : null))} />
+                  {etiquetaEstado}
+                </span>
+              )}
           </div>
         </div>
         <div className="mt-1 flex items-center gap-2">
-          <button type="button" onClick={onVideo} title={t("messenger.ctx.video")} className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/10 text-primary transition-colors hover:bg-primary/20">
-            <Video className="h-4 w-4" />
-          </button>
           <button type="button" onClick={onMute} title={t("messenger.ctx.mute")} className="flex h-9 w-9 items-center justify-center rounded-full bg-muted text-muted-foreground transition-colors hover:text-foreground">
             <BellOff className="h-4 w-4" />
           </button>
@@ -474,7 +484,6 @@ export default function MessengerPage() {
           conv={activeConv}
           userId={user?.id}
           isOnline={isOnline}
-          onVideo={() => handleStartVideoCall(activeConv)}
           onMute={() => toggleMute(activeConv.id)}
           onArchive={() => { toggleArchive(activeConv.id); selectChat(null); }}
         />
