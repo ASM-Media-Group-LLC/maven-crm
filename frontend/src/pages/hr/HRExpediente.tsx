@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { enHoras } from "@/lib/duracion";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
@@ -737,7 +738,7 @@ function desgloseDeFactor(
   atencion: { pct: number; ok: number; n: number } | null,
   t: Tr,
 ): { lbl: string; valor: string; color: string }[] {
-  const min = (s: number | undefined) => `${Math.round((Number(s) || 0) / 60)} min`;
+  const min = (s: number | undefined) => enHoras((Number(s) || 0) / 60);
   const act = dia.segActivo ?? 0, sp = dia.segSinPantalla ?? 0, sc = dia.segSinCamara ?? 0, fc = dia.segFueraCamara ?? 0;
   if (clave === "pantalla") {
     return [
@@ -1022,17 +1023,27 @@ export default function HRExpediente() {
           {/* Stats del día. Pulido: casillas neutras (filo fino, radio 10), la cifra
               en blanco y la etiqueta arriba en gris; lo flojo, solo un puntito. */}
           {pulido ? (
-          <div className="mt-4 grid grid-cols-3 gap-2 lg:grid-cols-6">
+          <div className="mt-4 grid grid-cols-3 gap-2 lg:grid-cols-7">
             {[
               { k: "hr.exp.nota" as const, v: dia.nota.valor != null ? String(dia.nota.valor) : "—", punto: null },
+              // A qué hora entró y a qué hora debía (Alvaro, 18/11/2026).
+              ...(() => {
+                const debia = expediente?.horario.entrada?.slice(0, 5) ?? null;
+                const entro = dia.entroAt ? new Date(dia.entroAt).toLocaleTimeString("es-CO", { timeZone: "America/Bogota", hour: "2-digit", minute: "2-digit", hour12: false }) : null;
+                const tarde = debia && entro ? (Number(entro.slice(0, 2)) * 60 + Number(entro.slice(3))) - (Number(debia.slice(0, 2)) * 60 + Number(debia.slice(3))) : null;
+                return [debia
+                  ? { k: "hr.exp.entradaTile" as const, p: { h: debia }, v: entro ?? "—", punto: tarde != null && tarde > 5 ? "bg-destructive" : !entro ? "bg-warning" : null,
+                      title: tarde != null && tarde > 5 ? t("hr.exp.det.tarde", { n: tarde }) : undefined }
+                  : { k: "hr.exp.entradaSola" as const, v: entro ?? "—", punto: null }];
+              })(),
               // Sin pantalla (Alvaro, 13/11/2026): pausas + sin compartir + sin conexión +
               // fuera de Cowork, contra lo permitido (40 chats, 70 el resto).
-              { k: "hr.exp.sinPantallaTile" as const, p: { n: permitidoMin }, v: `${sinPantallaMin} min`,
+              { k: "hr.exp.sinPantallaTile" as const, p: { n: permitidoMin }, v: enHoras(sinPantallaMin),
                 punto: sinPantallaMin > permitidoMin ? "bg-destructive" : sinPantallaMin > permitidoMin * 0.8 ? "bg-warning" : null },
               { k: "hr.exp.atencion" as const, v: atencion ? `${atencion.pct}%` : "—", punto: atencion == null ? null : atencion.pct < 60 ? "bg-destructive" : atencion.pct < 80 ? "bg-warning" : null, title: atencion ? t("hr.exp.atencionDetalle", { ok: atencion.ok, n: atencion.n }) : undefined },
-              { k: "hr.exp.horas" as const, v: `${dia.horas.toFixed(1)}h`, punto: null },
+              { k: "hr.exp.horas" as const, v: enHoras(dia.horas * 60), punto: null },
               { k: "hr.exp.faltas" as const, v: String(dia.faltas.length), punto: null },
-              { k: "hr.exp.pausas" as const, v: `${Math.round(dia.minutosPausaDeMas)}m`, punto: null },
+              { k: "hr.exp.pausas" as const, v: enHoras(dia.minutosPausaDeMas), punto: null },
             ].map((x) => (
               <div key={x.k} title={"title" in x ? x.title : undefined} className="rounded-[10px] border border-border/60 bg-card/30 px-3 py-2.5">
                 <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">

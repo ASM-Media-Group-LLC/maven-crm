@@ -1,4 +1,5 @@
 import type Diccionario from "./diccionario";
+import { minutosEnHorasEnPlantilla } from "./duracion";
 import type { TranslationKey as ClaveDelDiccionario } from "./diccionario";
 import { type Idioma } from "./idiomas";
 
@@ -105,6 +106,8 @@ export function getTranslation(
 ): string {
   let s: string = catalogos[lang]?.[key] ?? catalogos.en?.[key] ?? catalogos.es?.[key] ?? key;
   if (params) {
+    // 60 minutos o más se dicen en horas, en toda la plataforma (18/11/2026).
+    s = minutosEnHorasEnPlantilla(s, params);
     for (const [k, v] of Object.entries(params)) s = s.replaceAll(`{${k}}`, String(v));
   }
   return s;

@@ -10,6 +10,7 @@
 // Fondo: el mismo paisaje nocturno de la miniatura del coordinador
 // (PaisajeDePausa), para que las dos vistas de pausa sean la misma familia y el
 // ámbar/rojo del tiempo se lea igual en los dos temas.
+import { enHoras } from "@/lib/duracion";
 import { cn } from "@/lib/utils";
 import { cuentaPausa, type EstadoPausa } from "@/lib/pausaCowork";
 import { PaisajeDePausa } from "./SalaEnPausa";
@@ -31,8 +32,7 @@ const TITULO_ACTIVA: Record<TipoPausa, TranslationKey> = {
 
 function mmss(seg: number): string {
   const s = Math.max(0, Math.round(seg));
-  const m = Math.floor(s / 60);
-  return `${m} min`;
+  return enHoras(Math.floor(s / 60));
 }
 
 /** Iniciales para el avatar: primera y última palabra del nombre. */

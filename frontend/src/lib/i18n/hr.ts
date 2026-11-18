@@ -1246,6 +1246,8 @@ export const hr = {
   "hr.exp.zoom.volver": { es: "Ver completa", en: "Fit to screen" },
   "hr.exp.zoom.original": { es: "Abrir la foto original", en: "Open the original photo" },
   "hr.exp.zoom.ayuda": { es: "Toca o pellizca para acercar", en: "Tap or pinch to zoom" },
+  "hr.exp.entradaTile": { es: "Entró · debía {h}", en: "Clocked in · due {h}" },
+  "hr.exp.entradaSola": { es: "Entró", en: "Clocked in" },
   "hr.exp.sinPantallaTile": { es: "Sin pantalla · de {n}", en: "No screen · of {n}" },
   "hr.exp.cron.titulo": { es: "Qué hizo, en orden", en: "What they did, in order" },
   "hr.exp.cron.sub": { es: "Lo más nuevo arriba. Lo que estuvo mal sale grande con su prueba; el tiempo que trabajó bien, en una línea.", en: "Newest first. What went wrong shows large with its proof; the time they worked well, in one line." },

@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { enHoras } from "@/lib/duracion";
 import { Cronometro, RelojDePersona } from "./RelojVivo";
 import { createPortal } from "react-dom";
 import { useNavigate } from "react-router-dom";
@@ -1679,7 +1680,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
     setAnclaMuelle(hubMinimized ? document.getElementById(MUELLE_EXTRA_ID) : null);
   }, [hubMinimized, isMobile]);
 
-  const minutosTexto = (seg: number) => (seg < 60 ? `${seg} s` : `${Math.floor(seg / 60)} min`);
+  const minutosTexto = (seg: number) => (seg < 60 ? `${seg} s` : enHoras(Math.floor(seg / 60)));
 
   // El reloj de una persona: la presencia manda; si no llegó, el que el latido
   // dejó en la base. (La presencia ya no se queda vieja con la página de la
