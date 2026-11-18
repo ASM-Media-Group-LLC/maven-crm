@@ -40,6 +40,7 @@ let ventana = null;
 let bandeja = null;
 const estado = require("./estado"); // estado.saliendo: true = cerrar de verdad
 let sinLeer = 0;
+let buscarActualizacion = () => {}; // lo pone iniciarActualizaciones al arrancar
 
 const esDeMaven = (url) => {
   try {
@@ -387,6 +388,7 @@ function armarMenuBandeja() {
       checked: ajustes.abrirAlPrender !== false,
       click: (item) => abrirAlPrender(item.checked),
     },
+    { label: `Buscar actualización (versión ${app.getVersion()})`, click: () => buscarActualizacion(true) },
     { type: "separator" },
     { label: "Salir de Maven", click: () => { estado.saliendo = true; app.quit(); } },
   ]));
@@ -399,6 +401,7 @@ function crearMenu() {
       label: "Maven",
       submenu: [
         { role: "about", label: "Acerca de Maven" },
+        { label: "Buscar actualización…", click: () => buscarActualizacion(true) },
         { type: "separator" },
         { role: "hide", label: "Ocultar Maven" },
         { role: "hideOthers", label: "Ocultar otros" },
@@ -462,7 +465,7 @@ app.whenReady().then(() => {
     else mostrar();
   });
   globalShortcut.register(ATAJO_FLOTANTE, () => flotante());
-  iniciarActualizaciones(() => ventana);
+  buscarActualizacion = iniciarActualizaciones(() => ventana);
   iniciarVigiaDeApps((lote) => {
     if (ventana && !ventana.isDestroyed()) ventana.webContents.send("maven:apps", lote);
   });
