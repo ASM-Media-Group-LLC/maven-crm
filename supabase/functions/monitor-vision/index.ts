@@ -145,8 +145,15 @@ Deno.serve(async (req: Request) => {
   const admin = createClient(SUPABASE_URL, SERVICE_KEY, { auth: { persistSession: false, autoRefreshToken: false } });
 
   // 2) Nunca monitoreamos admins (el dueño es admin).
-  const { data: esAdmin } = await admin.rpc("is_in_role_group", { _user_id: user.id, _group: "admin" });
-  if (esAdmin === true) return json({ ok: true, skip: "admin" });
+  // Salvo los admins que Argos sí vigila (argos_reglas_persona: Grace y
+  // Jackeline, Alvaro 18/11/2026). Si la consulta falla, la regla de rol.
+  const { data: vigila, error: errVigila } = await admin.rpc("argos_vigila_a", { _uid: user.id });
+  if (errVigila || typeof vigila !== "boolean") {
+    const { data: esAdmin } = await admin.rpc("is_in_role_group", { _user_id: user.id, _group: "admin" });
+    if (esAdmin === true) return json({ ok: true, skip: "admin" });
+  } else if (!vigila) {
+    return json({ ok: true, skip: "admin" });
+  }
 
   // 3) Monitor apagado → no se gasta IA.
   const { data: cfg } = await admin.from("monitor_config").select("activo").eq("id", 1).maybeSingle();

@@ -40,8 +40,18 @@ export function useMonitorEstado(habilitado: boolean): MonitorEstado {
     let vivo = true;
     void (async () => {
       try {
-        const { data } = await supabase.rpc("is_in_role_group", { _user_id: user.id, _group: "admin" });
-        if (vivo) setEsAdmin(data === true);
+        // «Admin» aquí significa «Argos no lo vigila»: todos los admins menos los
+        // marcados como vigilados (Grace y Jackeline, Alvaro 18/11/2026). Lo
+        // decide la base (argos_vigila_a); si la consulta falla, la regla de rol.
+        const r = await (supabase as unknown as {
+          rpc: (fn: string, args: Record<string, unknown>) => Promise<{ data: unknown; error: unknown }>;
+        }).rpc("argos_vigila_a", { _uid: user.id });
+        if (r.error || typeof r.data !== "boolean") {
+          const { data } = await supabase.rpc("is_in_role_group", { _user_id: user.id, _group: "admin" });
+          if (vivo) setEsAdmin(data === true);
+          return;
+        }
+        if (vivo) setEsAdmin(!r.data);
       } catch { if (vivo) setEsAdmin(false); }
     })();
     return () => { vivo = false; };

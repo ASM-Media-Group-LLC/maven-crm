@@ -103,6 +103,18 @@ interface LiveKitCallViewProps {
   /** La pantalla que comparto aquí no la ve nadie de esta llamada (Argos sí la
    *  usa). El Supervisor Hub: su pantalla va solo a la sala donde habla. */
   pantallaSoloParaMi?: boolean;
+  /** Con pantallaSoloParaMi: estas personas (user id) SÍ ven la pantalla. En el
+   *  Supervisor Hub, los admins libres (Alvaro, 18/11/2026: «solo en el Hub»). */
+  pantallaVisiblePara?: string[];
+  /** La pantalla no se comparte sola ni se reclama (el grupo de Luis: Luis, Juan
+   *  Pachas, Grace, Jackeline y Alvaro René — Alvaro, 18/11/2026). */
+  pantallaOpcional?: boolean;
+  /** La cámara no se reclama ni su ausencia se anota como falta. Si la prende,
+   *  Argos trabaja como con todos (fotos, IA, «no se te ve»). */
+  camaraOpcional?: boolean;
+  /** Una pantalla que ya existe (la del Supervisor Hub) para publicar en ESTA
+   *  llamada como pantalla compartida, sin pedir otra. null = no se publica. */
+  pantallaPrestada?: MediaStreamTrack | null;
   /** No cuenta como «llamada de Maven» para callar a Argos: la sala en la que
    *  entra el supervisor no le quita la vigilancia del Hub. */
   sinLatidoDeLlamada?: boolean;
@@ -168,7 +180,7 @@ function usePunteroGrueso(): boolean {
   return grueso;
 }
 
-export default function LiveKitCallView({ roomName, displayName, callDisplayName, isAdmin = false, onLeave, initialMicOn = true, initialCamOn = true, initialScreenShareOn = false, initialAudioDeviceId, initialVideoDeviceId, initialAudioOutputDeviceId, initialBackgroundEffect = "none", hideShareLink, hideScreenShare, hideLeaveButton, leaveLabel, leaveIcon, suppressLeaveToast, compact, autoPip = true, autoLeaveOnEmpty, getToken, onMediaStateChange, onFaceStateChange, supervisorEncuadre, onLocalScreenTrack, pantallaSoloParaMi, sinLatidoDeLlamada, incomingAudioMuted, roomSwitcher, recording, shareLink: shareLinkProp, accionesBarra, guardarChat, encima, hideEndForAll, controlesExtra, sinVideoAjeno = false, telemetria, sinVolverEnError = false }: LiveKitCallViewProps) {
+export default function LiveKitCallView({ roomName, displayName, callDisplayName, isAdmin = false, onLeave, initialMicOn = true, initialCamOn = true, initialScreenShareOn = false, initialAudioDeviceId, initialVideoDeviceId, initialAudioOutputDeviceId, initialBackgroundEffect = "none", hideShareLink, hideScreenShare, hideLeaveButton, leaveLabel, leaveIcon, suppressLeaveToast, compact, autoPip = true, autoLeaveOnEmpty, getToken, onMediaStateChange, onFaceStateChange, supervisorEncuadre, onLocalScreenTrack, pantallaSoloParaMi, pantallaVisiblePara, pantallaOpcional = false, camaraOpcional = false, pantallaPrestada = null, sinLatidoDeLlamada, incomingAudioMuted, roomSwitcher, recording, shareLink: shareLinkProp, accionesBarra, guardarChat, encima, hideEndForAll, controlesExtra, sinVideoAjeno = false, telemetria, sinVolverEnError = false }: LiveKitCallViewProps) {
   // Lista de salas del navegador (solo Cowork supervisor+): estado del popup.
   const [salasAbiertas, setSalasAbiertas] = useState(false);
   const lk = useLiveKit();
@@ -628,18 +640,27 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
   // por el clon que manda el tablero. Se recalcula cuando entra alguien o cambia
   // lo que publico.
   const salaLista = lk.connectionState === ConnectionState.Connected;
+  const pantallaVisibleParaRef = useRef(pantallaVisiblePara);
+  pantallaVisibleParaRef.current = pantallaVisiblePara;
+  const quienesVen = (pantallaVisiblePara ?? []).join(",");
   useEffect(() => {
     if (!pantallaSoloParaMi || !salaLista) return;
     const room = lk.getRoom();
     if (!room) return;
     const aplicar = () => {
       const lp = room.localParticipant;
-      const permitidas = Array.from(lp.trackPublications.values())
+      const todas = Array.from(lp.trackPublications.values());
+      const permitidas = todas
         .filter((p) => p.source !== Track.Source.ScreenShare && p.source !== Track.Source.ScreenShareAudio)
         .map((p) => p.trackSid);
-      lp.setTrackSubscriptionPermissions(false, Array.from(room.remoteParticipants.values()).map((rp) => ({
-        participantIdentity: rp.identity, allowAll: false, allowedTrackSids: permitidas,
-      })));
+      // Los que sí la ven (los admins libres en el Hub). La identidad de LiveKit
+      // empieza con el user id (a veces lleva «__pestaña» detrás).
+      const venla = new Set(pantallaVisibleParaRef.current ?? []);
+      lp.setTrackSubscriptionPermissions(false, Array.from(room.remoteParticipants.values()).map((rp) => (
+        venla.has(rp.identity.split("__")[0])
+          ? { participantIdentity: rp.identity, allowAll: true }
+          : { participantIdentity: rp.identity, allowAll: false, allowedTrackSids: permitidas }
+      )));
     };
     aplicar();
     const eventos = [RoomEvent.ParticipantConnected, RoomEvent.LocalTrackPublished, RoomEvent.LocalTrackUnpublished] as const;
@@ -648,7 +669,29 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
       eventos.forEach((e) => room.off(e, aplicar));
       try { room.localParticipant.setTrackSubscriptionPermissions(true); } catch { /* ya colgó */ }
     };
-  }, [pantallaSoloParaMi, salaLista, lk]);
+  }, [pantallaSoloParaMi, salaLista, lk, quienesVen]);
+  // PANTALLA PRESTADA (Alvaro, 18/11/2026): el supervisor que entra a la sala de
+  // un chatter le muestra la pantalla que ya comparte en el Hub, sin pedir otra.
+  // Se publica un CLON (el original sigue en el Hub) y se retira al apagarla, al
+  // salir o si la sala se reconecta.
+  useEffect(() => {
+    if (!salaLista || !pantallaPrestada || pantallaPrestada.readyState === "ended") return;
+    const room = lk.getRoom();
+    if (!room) return;
+    const clon = pantallaPrestada.clone();
+    let vivo = true;
+    room.localParticipant.publishTrack(clon, { source: Track.Source.ScreenShare })
+      .then(() => { if (!vivo) { try { room.localParticipant.unpublishTrack(clon, true); } catch { /* ya colgó */ } } })
+      .catch((e) => {
+        console.error("[LiveKit] no pude mostrar la pantalla del Hub en esta sala:", e);
+        try { clon.stop(); } catch { /* noop */ }
+      });
+    return () => {
+      vivo = false;
+      try { room.localParticipant.unpublishTrack(clon, true); } catch { /* ya colgó */ }
+      try { clon.stop(); } catch { /* noop */ }
+    };
+  }, [pantallaPrestada, salaLista, lk]);
   // La lista se sigue usando para DIBUJAR (el tile de pantalla), que es su
   // trabajo. Para decidir si se le reclama a alguien, manda el estado real.
   const localScreenShare = compartiendoReal;
@@ -762,7 +805,9 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
   // Con la sala caída la cámara se ve apagada aunque no lo esté: reclamarle
   // "prende la cámara" la mandaría a arreglar lo que no está roto, en vez de
   // enterarse de que se cayó la sala (para eso está el cartel).
-  useFaceNudge(supervisorEncuadre && conSalaViva ? faceWatch : null);
+  // Con la cámara opcional, Argos le habla solo con la cámara prendida.
+  const argosConCamara = !camaraOpcional || camaraRealOn;
+  useFaceNudge(supervisorEncuadre && conSalaViva && argosConCamara ? faceWatch : null);
   // Monitor de cámara de RRHH: vive JUSTO acá, pegado al supervisor de encuadre,
   // porque comparte su mismo track y estado y su misma vida (sobrevive a la
   // ventanita flotante). Registra las faltas gratis (cámara apagada/tapada, se
@@ -779,7 +824,9 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
   // 5 min). Nunca durante una pausa. En el navegador no existe: ahí Chrome exige
   // un clic cada vez. Ver lib/pantallaSolaEnLaApp.ts y desktop/src/main.js.
   const appDeComputador = escritorio();
-  const pantallaSola = !!supervisorEncuadre && !hideScreenShare && typeof appDeComputador?.pantallaAutomatica === "function";
+  // Con la pantalla opcional (el grupo de Luis) no se comparte sola: la
+  // comparten cuando quieren (Alvaro, 18/11/2026).
+  const pantallaSola = !!supervisorEncuadre && !pantallaOpcional && !hideScreenShare && typeof appDeComputador?.pantallaAutomatica === "function";
   useEffect(() => {
     if (!pantallaSola) return;
     const app = escritorio();
@@ -816,7 +863,7 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
     trackPantalla: localScreenTrack,
     camaraRealOn,
     faceWatch,
-    activo: !!supervisorEncuadre && conSalaViva,
+    activo: !!supervisorEncuadre && conSalaViva && argosConCamara,
     roomNombre: roomName,
   });
   // Argos — escalera de muestreo + grabación al distraerse (Alvaro, 08/11).
@@ -828,7 +875,7 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
     trackCamara: localCameraTrack,
     trackPantalla: localScreenTrack,
     faceWatch,
-    activo: !!supervisorEncuadre && conSalaViva,
+    activo: !!supervisorEncuadre && conSalaViva && argosConCamara,
     roomNombre: roomName,
   });
   // El aviso de voz a la persona + su registro en el expediente los hace el
@@ -856,14 +903,18 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
   }, [supervisorEncuadre, sinLatidoDeLlamada, roomName]);
   // En Cowork la pantalla compartida es la mitad del trabajo: sin ella se ve la
   // cara pero no QUÉ está haciendo la persona.
-  useScreenShareNudge(localScreenShare, !!supervisorEncuadre && conSalaViva);
+  // Con la pantalla opcional (el grupo de Luis), Argos no la reclama.
+  useScreenShareNudge(localScreenShare, !!supervisorEncuadre && conSalaViva && !pantallaOpcional);
   // Y que quede constancia: los mismos llamados, guardados. Va acá al lado de
   // los avisos a propósito — se anota lo que la persona efectivamente escuchó,
   // no una regla parecida calculada en otra parte que puede irse separando.
   useRegistrarLlamados({
     faceWatch,
-    compartiendo: localScreenShare,
-    activo: !!supervisorEncuadre,
+    // Lo que no se le exige no se le anota: sin pantalla obligatoria, la falta de
+    // pantalla no es un llamado; sin cámara obligatoria, solo cuenta con la
+    // cámara prendida.
+    compartiendo: pantallaOpcional ? true : localScreenShare,
+    activo: !!supervisorEncuadre && argosConCamara,
     // Con la sala caída, LiveKit vacía la lista de participantes y la cámara de
     // todo el mundo se ve apagada aunque esté prendida. Sin esto, una caída de
     // veinte minutos le anotaba a cada persona veinte minutos de "cámara

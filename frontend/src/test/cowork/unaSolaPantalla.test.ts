@@ -1,7 +1,8 @@
-// UNA SOLA PANTALLA (Alvaro, 16/11/2026): el supervisor (anfitrión que no es
-// admin ni dueño) comparte UNA pantalla —la del Supervisor Hub— y el tablero la
-// reenvía solo a la sala donde habla. Estas guardas frenan que vuelva la segunda
-// captura o el «Pantalla a todas» para ellos.
+// UNA SOLA PANTALLA (Alvaro, 16/11/2026): el supervisor (anfitrión vigilado)
+// comparte UNA pantalla —la del Supervisor Hub— y el tablero la reenvía a las
+// salas. Desde el 18/11 puede mandarla a una, varias o todas las salas (también
+// «Pantalla a todas»); la segunda captura sigue sin abrirse si su pantalla del
+// Hub es obligatoria. Ver también pantallaDeAnfitriones.test.ts.
 import { describe, it, expect, vi } from "vitest";
 import { fijarPantallaDelHub, pantallaDelHub, suscribirPantallaDelHub } from "@/lib/pantallaDelHub";
 
@@ -37,8 +38,9 @@ describe("el tablero del supervisor no abre otra pantalla", () => {
   it("se leyó el tablero", () => {
     expect(tablero.length).toBeGreaterThan(1000);
   });
-  it("la captura propia del tablero no corre para el supervisor", () => {
-    expect(tablero).toMatch(/if \(!screenArmed \|\| unaSolaPantalla\) return;/);
+  it("la captura propia del tablero no corre para el supervisor con la del Hub obligatoria", () => {
+    expect(tablero).toMatch(/if \(!screenArmed \|\| !capturaAparte\) return;/);
+    expect(tablero).toContain("const capturaAparte = !usaPantallaDelHub || (!pantallaHub && !pantallaObligatoria);");
   });
   it("las salas reciben la pantalla única, no una captura aparte", () => {
     expect(tablero).not.toMatch(/screenBaseTrack=\{screenBaseTrack\}/);
@@ -47,9 +49,10 @@ describe("el tablero del supervisor no abre otra pantalla", () => {
   it("el Hub le pasa su pantalla al tablero", () => {
     expect(tablero).toMatch(/onLocalScreenTrack: fijarPantallaDelHub/);
   });
-  it("sin «Pantalla a todas» y sin segundo compartir dentro de la sala", () => {
-    expect(tablero).toMatch(/\{!unaSolaPantalla && \(/);
-    expect(tablero).toMatch(/hideScreenShare=\{unaSolaPantalla && !activeMeetId\}/);
+  it("«Pantalla a todas» para todos, y dentro de la sala la del Hub en vez de un segundo compartir", () => {
+    expect(tablero).not.toMatch(/\{!unaSolaPantalla && \(/);
+    expect(tablero).toMatch(/hideScreenShare=\{usaPantallaDelHub && !activeMeetId\}/);
+    expect(tablero).toMatch(/pantallaPrestada=\{usaPantallaDelHub && !activeMeetId/);
   });
 });
 
@@ -63,7 +66,7 @@ describe("el supervisor no se escapa de Argos", () => {
     expect(llamada).toMatch(/setTrackSubscriptionPermissions\(false,/);
   });
   it("entrar a una sala no calla a Argos", () => {
-    expect(tablero).toMatch(/sinLatidoDeLlamada=\{unaSolaPantalla\}/);
+    expect(tablero).toMatch(/sinLatidoDeLlamada=\{usaPantallaDelHub\}/);
     expect(llamada).toMatch(/if \(supervisorEncuadre \|\| sinLatidoDeLlamada\) return;/);
   });
   it("no se le pide pantalla en cada sala", () => {
@@ -78,7 +81,7 @@ describe("la pantalla del supervisor no se manda sola a la sala", () => {
     expect(tablero).not.toMatch(/setRoomScreen\(destino/);
     expect(tablero).not.toMatch(/pilaHablar/);
   });
-  it("el botón de pantalla de la sala sigue (si él quiere)", () => {
-    expect(tablero).toMatch(/\(m\[room\.id\] \?\? false\) \? \{\} : \{ \[room\.id\]: true \}/);
+  it("el botón de pantalla de cada sala sigue (si él quiere) y no apaga las otras", () => {
+    expect(tablero).toContain("onClick={() => setRoomScreen((m) => ({ ...m, [room.id]: !(m[room.id] ?? false) }))}");
   });
 });

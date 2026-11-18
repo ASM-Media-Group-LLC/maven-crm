@@ -82,7 +82,8 @@ describe("en Cowork la pantalla se comparte sola", () => {
     expect(manejador).toContain("getPrimaryDisplay().id");
   });
   it("la llamada la pide sola solo en la app, solo en Cowork y nunca en pausa", () => {
-    expect(llamada).toMatch(/const pantallaSola = !!supervisorEncuadre && !hideScreenShare && typeof appDeComputador\?\.pantallaAutomatica === "function"/);
+    // Desde el 18/11/2026, tampoco a quien tiene la pantalla opcional (el grupo de Luis).
+    expect(llamada).toMatch(/const pantallaSola = !!supervisorEncuadre && !pantallaOpcional && !hideScreenShare && typeof appDeComputador\?\.pantallaAutomatica === "function"/);
     expect(llamada).toContain("if (estaEnPausa() || antesDePausaRef.current) return;");
   });
   it("si falla, espera 10 s, 20 s, 40 s… hasta 5 min", () => {
