@@ -7,6 +7,10 @@ export const PREFIJOS_AUTH = ["auth."] as const;
 export const auth = {
   // Auth
   "auth.loginTitle": { es: "Iniciar sesión", en: "Sign in" },
+  "auth.recordadoEnApp": {
+    es: "La app recuerda tu correo y tu contraseña en este equipo.",
+    en: "The app remembers your email and password on this computer.",
+  },
   "auth.loginSubtitle": { es: "Ingresa tus credenciales para acceder al CRM", en: "Enter your credentials to access the CRM" },
   "auth.email": { es: "Email", en: "Email" },
   "auth.emailPlaceholder": { es: "tu@email.com", en: "you@email.com" },

@@ -29,8 +29,10 @@ describe("permiso de pantalla en el Mac (app de computador)", () => {
     expect(manejador).toContain("guiaPermisoPantalla(");
   });
 
-  it("la guía se muestra una sola vez y ofrece reiniciar", () => {
-    expect(permiso).toMatch(/if \(guiaMostrada\) return;/);
+  it("la guía no insiste (a lo sumo cada 10 minutos) y ofrece reiniciar", () => {
+    // 18/11/2026: antes era una vez por arranque y recién en el SEGUNDO clic;
+    // ahora sale en el primero y no se repite antes de 10 minutos.
+    expect(permiso).toMatch(/if \(Date\.now\(\) - ultimaGuia < 10 \* 60_000\) return;/);
     expect(permiso).toContain("app.relaunch()");
     expect(permiso).toContain("Privacy_ScreenCapture");
   });

@@ -37,6 +37,13 @@ export type MavenEscritorio = {
   pantallaAutomatica?: (si: boolean) => void;
   /** Las veces que la app se cayó o se congeló y se recuperó sola (se leen una vez). Desde el 18/11/2026. */
   ultimoCierre?: () => Promise<unknown[]>;
+  /** El correo y la contraseña que la app recuerda en este equipo, cifrados con
+   *  el llavero del sistema (desktop/src/acceso.js). `leer` solo contesta en
+   *  /login. Versiones de la app desde el 18/11/2026. */
+  acceso?: {
+    leer: () => Promise<{ correo: string; clave: string } | null>;
+    guardar: (correo: string, clave: string) => Promise<boolean>;
+  };
   /** ¿Alguien ve la ventana? (versiones de la app desde el 18/11/2026). */
   visible?: () => Promise<boolean>;
   alCambiarVisibilidad?: (cb: (visible: boolean) => void) => () => void;
