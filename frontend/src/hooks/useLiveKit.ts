@@ -1698,7 +1698,8 @@ export function useLiveKit() {
       roomRef.current = room;
       // App de computador minimizada o en la barra: el video de los demás en
       // pausa, como en una pestaña oculta (lib/videoEscondido.ts, 18/11/2026).
-      room.once(RoomEvent.Disconnected, pausarVideoConAppEscondida(room));
+      const soltarPausaDeVideo = pausarVideoConAppEscondida(room);
+      room.on(RoomEvent.Disconnected, () => soltarPausaDeVideo());
       // Idempotente (solo toca lo que está distinto): se llama en cada evento que
       // puede traer una pista nueva y en el repaso de cada 3 s.
       const ajustarVideoAjeno = () => {

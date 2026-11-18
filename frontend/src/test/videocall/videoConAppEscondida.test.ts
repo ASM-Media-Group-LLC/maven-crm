@@ -65,6 +65,6 @@ describe("video de los demás en pausa con la app escondida", () => {
     expect(main).toMatch(/for \(const ev of \["minimize", "restore", "hide", "show"\]\) ventana\.on\(ev, avisarVisibilidad\)/);
     expect(main).toMatch(/ipcMain\.handle\("maven:visible"/);
     expect(preload).toMatch(/alCambiarVisibilidad: \(cb\) =>/);
-    expect(livekit).toMatch(/room\.once\(RoomEvent\.Disconnected, pausarVideoConAppEscondida\(room\)\)/);
+    expect(livekit).toMatch(/const soltarPausaDeVideo = pausarVideoConAppEscondida\(room\);\s*room\.on\(RoomEvent\.Disconnected, \(\) => soltarPausaDeVideo\(\)\);/);
   });
 });
