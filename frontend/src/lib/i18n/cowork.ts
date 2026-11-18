@@ -523,6 +523,13 @@ export const cowork = {
     en: "Your screen is showing in this room. Tap to stop sharing it here.",
   },
   "cowork.host.room.screenHint": { es: "Comparte tu pantalla solo con esta sala.", en: "Share your screen with this room only." },
+  "cowork.host.room.mostrarPantalla": { es: "Mostrar mi pantalla", en: "Show my screen" },
+  "cowork.host.room.dejarDeMostrar": { es: "Dejar de mostrar", en: "Stop showing" },
+  "cowork.host.room.mostrarPantallaHint": {
+    es: "Muestra en esta sala la pantalla que compartes en el Hub. Los que están aquí la ven en grande.",
+    en: "Shows this room the screen you share in the Hub. Everyone here sees it full size.",
+  },
+  "cowork.host.room.dejarDeMostrarHint": { es: "Tu pantalla se ve en esta sala. Toca para dejar de mostrarla.", en: "Your screen is showing in this room. Tap to stop showing it." },
   "cowork.host.linkCopied": { es: "Enlace de {room} copiado", en: "{room} link copied" },
   "cowork.host.codeCopied": { es: "Código de {room}: {code}", en: "{room} code: {code}" },
   "cowork.host.roomsSummary": { es: "{people} en {rooms}.", en: "{people} across {rooms}." },
