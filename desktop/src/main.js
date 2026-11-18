@@ -30,6 +30,7 @@ const { avisarLlamada, cerrarAvisoLlamada } = require("./llamada");
 const { iniciarVigiaDeApps, segundosInactivo } = require("./apps");
 const { pantallaPermitida, primeraVezSinPermiso, guiaPermisoPantalla } = require("./permisoPantalla");
 const { revisarCamaraYMicrofono } = require("./permisoCamaraWindows");
+const { guardarAcceso, leerAcceso, olvidarAcceso, hayAccesoGuardado } = require("./acceso");
 const { vigilarVentana, leerYBorrarCierres } = require("./recuperarse");
 
 const URL_MAVEN = process.env.MAVEN_URL || "https://app.maven-ai.me/login";
@@ -275,15 +276,15 @@ function configurarPermisos() {
   // Compartir pantalla: Maven pide getDisplayMedia y acá se elige qué compartir.
   s.setDisplayMediaRequestHandler(async (pedido, responder) => {
     try {
-      // Mac sin «Grabación de pantalla»: macOS pregunta una sola vez por
-      // arranque; la siguiente vez Maven explica cómo arreglarlo (una vez) y
-      // después no insiste. Sin esto, cada pedido de Cowork hacía saltar el aviso.
+      // Mac sin «Grabación de pantalla»: Maven explica cómo arreglarlo en el
+      // mismo clic (antes el primer intento fallaba mudo) y, una vez por
+      // arranque, deja que macOS muestre su propio aviso. Nunca se insiste más
+      // de una vez cada 10 minutos (Cowork vuelve a pedir la pantalla sola).
       if (!pantallaPermitida()) {
         if (primeraVezSinPermiso()) {
           await desktopCapturer.getSources({ types: ["screen"], thumbnailSize: { width: 1, height: 1 } }).catch(() => {});
-        } else {
-          guiaPermisoPantalla(ventana);
         }
+        guiaPermisoPantalla(ventana);
         return responder({});
       }
       // Cowork (la página prendió pantallaAutomatica): la pantalla principal,
@@ -384,6 +385,21 @@ function flotante(si = !antesDeFlotar) {
 const deLaVentana = (e) => ventana && e.sender === ventana.webContents;
 ipcMain.handle("maven:flotante", (e, si) => (deLaVentana(e) ? flotante(si === undefined ? undefined : Boolean(si)) : false));
 ipcMain.handle("maven:inactividad", (e) => (deLaVentana(e) ? segundosInactivo() : null));
+// El correo y la contraseña guardados en este equipo (acceso.js). Solo la
+// ventana de Maven: leerlos, únicamente en su pantalla de entrada; guardarlos,
+// desde Maven (al entrar, la página ya puede ir camino al inicio).
+const enLaEntradaDeMaven = (e) => {
+  if (!deLaVentana(e)) return false;
+  const url = e.sender.getURL();
+  try { return esDeMaven(url) && new URL(url).pathname.startsWith("/login"); } catch { return false; }
+};
+ipcMain.handle("maven:acceso-leer", (e) => (enLaEntradaDeMaven(e) ? leerAcceso() : null));
+ipcMain.handle("maven:acceso-guardar", (e, correo, clave) => {
+  if (!deLaVentana(e) || !esDeMaven(e.sender.getURL())) return false;
+  const ok = guardarAcceso(correo, clave);
+  armarMenuBandeja();
+  return ok;
+});
 // Cuánta memoria usa la app y cuánta tiene el equipo (17/11/2026: el equipo usa
 // Windows de 8 GB o menos). Va en la salud de las llamadas para ver quién sufre.
 // Y desde el 18/11/2026 también el procesador, para el medidor de la app
@@ -453,6 +469,9 @@ function armarMenuBandeja() {
       click: (item) => abrirAlPrender(item.checked),
     },
     { label: `Buscar actualización (versión ${app.getVersion()})`, click: () => buscarActualizacion(true) },
+    ...(hayAccesoGuardado()
+      ? [{ label: "Olvidar mi contraseña en este equipo", click: () => { olvidarAcceso(); armarMenuBandeja(); } }]
+      : []),
     { type: "separator" },
     { label: "Salir de Maven", click: () => { estado.saliendo = true; app.quit(); } },
   ]));

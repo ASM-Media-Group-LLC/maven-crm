@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, Navigate, useLocation, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,6 +9,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { useLanguage } from "@/hooks/useLanguage";
 import { traducirErrorAuth } from "@/lib/authErrors";
+import { escritorio } from "@/lib/escritorio";
 import { Eye, EyeOff, Loader2 } from "lucide-react";
 
 const Login = () => {
@@ -38,6 +39,23 @@ const Login = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
 
+  // En la app de computador (Alvaro, 18/11/2026: «que el app recuerde tu login
+  // y password»): la app no trae el gestor de contraseñas de Chrome, así que
+  // ella misma guarda el correo y la contraseña en este equipo, cifrados con el
+  // llavero del sistema (desktop/src/acceso.js), y aquí vuelven puestos. En el
+  // navegador no hay nada de esto: ahí los recuerda el navegador.
+  const accesoDeLaApp = escritorio()?.acceso;
+  useEffect(() => {
+    if (!accesoDeLaApp) return;
+    let vivo = true;
+    accesoDeLaApp.leer().then((guardado) => {
+      if (!vivo || !guardado) return;
+      setEmail((actual) => actual || guardado.correo);
+      if (guardado.clave) setPassword((actual) => actual || guardado.clave);
+    }).catch(() => { /* sin acceso guardado: se escribe como siempre */ });
+    return () => { vivo = false; };
+  }, [accesoDeLaApp]);
+
   if (authLoading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
@@ -65,6 +83,8 @@ const Login = () => {
     if (error) {
       toast({ title: t("auth.loginError"), description: traducirErrorAuth(error), variant: "destructive" });
     } else {
+      // Entró bien: la app lo recuerda para la próxima (solo en la app de computador).
+      void accesoDeLaApp?.guardar(email.trim(), password).catch(() => { /* no se pudo guardar: no frena la entrada */ });
       navigate(destino);
     }
   };
@@ -118,6 +138,7 @@ const Login = () => {
             {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             {t("auth.loginButton")}
           </Button>
+          {accesoDeLaApp && <p className="text-center text-xs text-white/40">{t("auth.recordadoEnApp")}</p>}
         </form>
 
         <div className="flex flex-col items-center text-sm">

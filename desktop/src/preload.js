@@ -81,6 +81,11 @@ contextBridge.exposeInMainWorld("mavenEscritorio", {
   },
   /** Instala la versión nueva y vuelve a abrir Maven. */
   actualizarAhora: () => ipcRenderer.invoke("maven:actualizar-ahora"),
+  /** El correo y la contraseña que la app recuerda en este equipo (solo en /login). Desde el 18/11/2026. */
+  acceso: {
+    leer: () => ipcRenderer.invoke("maven:acceso-leer"),
+    guardar: (correo, clave) => ipcRenderer.invoke("maven:acceso-guardar", String(correo ?? ""), String(clave ?? "")),
+  },
   /** Memoria: { app_mb, equipo_gb, libre_gb }. */
   memoria: () => ipcRenderer.invoke("maven:memoria"),
   /** Cada minuto: los tramos de app/página al frente (ver desktop/src/apps.js). */

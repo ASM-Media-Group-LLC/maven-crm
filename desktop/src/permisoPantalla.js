@@ -12,9 +12,9 @@
 //      aunque se vea prendido: hay que quitarlo con «−» y volver a darlo.
 //
 // Regla: la pantalla solo se toca si macOS ya dio el permiso (esa consulta no
-// muestra nada). Si falta, macOS pregunta UNA vez por arranque (al compartir),
-// y la vez siguiente Maven explica una sola vez cómo arreglarlo, con un botón
-// para reiniciar. Después no insiste hasta que se vuelva a abrir Maven.
+// muestra nada). Si falta, Maven explica cómo arreglarlo en el mismo clic, con
+// botones para abrir Ajustes y reiniciar (a lo sumo cada 10 minutos), y una vez
+// por arranque deja además que macOS muestre su propio aviso.
 const { app, dialog, shell, systemPreferences } = require("electron");
 const estado = require("./estado");
 
@@ -32,29 +32,35 @@ function pantallaPermitida() {
 }
 
 let macOSYaPregunto = false;
-/** La primera vez por arranque se deja que macOS muestre su aviso (así Maven
- *  también aparece en la lista de Ajustes). Las siguientes, no. */
+/** Una vez por arranque se deja que macOS muestre su propio aviso (si nunca
+ *  preguntó en este Mac, así Maven aparece en la lista de Ajustes). Si ya
+ *  preguntó antes, macOS no dice nada: por eso Maven explica igual en el mismo
+ *  clic (guiaPermisoPantalla). 18/11/2026: en el Mac de Alvaro el permiso
+ *  estaba negado, el primer clic fallaba mudo y la explicación salía recién en
+ *  el segundo. */
 function primeraVezSinPermiso() {
   if (macOSYaPregunto) return false;
   macOSYaPregunto = true;
   return true;
 }
 
-let guiaMostrada = false;
-/** Explica cómo dar el permiso. Una sola vez por arranque. */
+let ultimaGuia = 0;
+/** Explica cómo dar el permiso. A lo sumo una vez cada 10 minutos: Cowork vuelve
+ *  a pedir la pantalla solo tras una caída y no tiene que llenar de avisos. */
 async function guiaPermisoPantalla(ventana) {
-  if (guiaMostrada) return;
-  guiaMostrada = true;
+  if (Date.now() - ultimaGuia < 10 * 60_000) return;
+  ultimaGuia = Date.now();
   const opciones = {
     type: "warning",
     title: "Maven",
-    message: "Falta un permiso del Mac para compartir tu pantalla",
+    message: "Falta el permiso del Mac para compartir tu pantalla",
     detail:
-      "Abre Ajustes → Privacidad y seguridad → Grabación de pantalla y audio del sistema.\n\n" +
-      "• Si Maven está apagado, préndelo.\n" +
-      "• Si ya está prendido y aun así no funciona, selecciónalo, quítalo con «−» y vuelve a prenderlo " +
-      "cuando el Mac lo pida (pasa cuando Maven se actualiza).\n\n" +
-      "Después toca «Reiniciar Maven».",
+      "Se arregla una sola vez:\n\n" +
+      "1. Toca «Abrir Ajustes» (Privacidad y seguridad → Grabación de pantalla y audio del sistema).\n" +
+      "2. Si Maven está en la lista, selecciónalo y quítalo con «−», aunque se vea prendido " +
+      "(pasa cuando Maven se actualiza: el Mac ya no lo reconoce).\n" +
+      "3. Toca «+», elige Maven en Aplicaciones y déjalo prendido.\n" +
+      "4. Vuelve aquí y toca «Reiniciar Maven».",
     buttons: ["Abrir Ajustes", "Reiniciar Maven", "Ahora no"],
     defaultId: 0,
     cancelId: 2,
@@ -65,7 +71,10 @@ async function guiaPermisoPantalla(ventana) {
       ventana && !ventana.isDestroyed()
         ? await dialog.showMessageBox(ventana, opciones)
         : await dialog.showMessageBox(opciones);
-    if (response === 0) shell.openExternal(AJUSTES_PANTALLA);
+    if (response === 0) {
+      shell.openExternal(AJUSTES_PANTALLA);
+      ultimaGuia = 0; // al volver de Ajustes, el próximo intento vuelve a explicar (con «Reiniciar»)
+    }
     if (response === 1) {
       estado.saliendo = true;
       app.relaunch();
