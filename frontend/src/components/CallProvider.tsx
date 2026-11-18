@@ -3,6 +3,8 @@ import { escritorio } from "@/lib/escritorio";
 import { traducir } from "@/lib/i18n";
 import { useVideoCall } from "@/hooks/useVideoCall";
 import { usePushSubscription } from "@/hooks/usePushSubscription";
+import { useAuth } from "@/hooks/useAuth";
+import { supabase } from "@/integrations/supabase/client";
 import IncomingCallModal from "@/pages/messenger/components/IncomingCallModal";
 
 // Sistema de llamadas GLOBAL. Antes vivía dentro de MessengerPage, así que una
@@ -148,6 +150,24 @@ function useLlamadaEnLaApp(
   }, [id]);
 }
 
+/** «Me está sonando en Maven» (Alvaro, 18/11/2026: «no sé si le suena»): apenas
+ *  sale el cartel, se anota en la fila propia de la llamada y quien llama ve
+ *  «Sonando en su Maven». Si falla, quien llama solo ve que le llegó la
+ *  notificación: no es grave, no se insiste. */
+function useAvisarQueMeSuena(callId: string | null) {
+  const { user } = useAuth();
+  const uid = user?.id ?? null;
+  useEffect(() => {
+    if (!callId || !uid) return;
+    void (supabase.from("call_participants") as unknown as {
+      update: (v: Record<string, unknown>) => { eq: (c: string, v: string) => { eq: (c: string, v: string) => { eq: (c: string, v: string) => PromiseLike<unknown> } } };
+    })
+      .update({ sonando_en_maven_at: new Date().toISOString() })
+      .eq("call_id", callId).eq("user_id", uid).eq("status", "ringing")
+      .then(() => {}, () => {});
+  }, [callId, uid]);
+}
+
 export function CallProvider({ children }: { children: React.ReactNode }) {
   const call = useVideoCall();
   // Suscribe el navegador a Web Push (llamada entrante con Maven cerrado).
@@ -156,6 +176,7 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
   // pestaña de Maven quede de fondo cuando llega la llamada.
   useEffect(() => installRingAudioUnlock(), []);
   useLlamadaEnLaApp(call.incomingCall, call.acceptCall, call.declineCall);
+  useAvisarQueMeSuena(call.incomingCall?.id ?? null);
   return (
     <CallContext.Provider value={call}>
       {children}

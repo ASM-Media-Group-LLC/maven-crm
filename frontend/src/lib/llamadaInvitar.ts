@@ -9,7 +9,7 @@ import { supabase } from "@/integrations/supabase/client";
 export type EstadoInvitado = "ringing" | "accepted" | "declined" | "missed" | "ended";
 
 /** Segundos que suena a cada invitado antes de quedar como «no contestó». */
-export const SUENA_MS = 30_000;
+export const SUENA_MS = 45_000;
 
 export interface LlamadaViva {
   id: string;
@@ -115,7 +115,7 @@ export async function invitarALaLlamada(llamada: LlamadaViva, uid: string, userI
   void supabase.functions
     .invoke("web-push", { body: { action: "notify_call", callId: llamada.id, userIds: invitados } })
     .catch(() => {});
-  // Si nadie contesta en 30 s, queda «no contestó» (y deja de sonar).
+  // Si nadie contesta en SUENA_MS (45 s), queda «no contestó» (y deja de sonar).
   setTimeout(() => {
     void (supabase.from("call_participants") as any)
       .update({ status: "missed", actualizado: new Date().toISOString() })

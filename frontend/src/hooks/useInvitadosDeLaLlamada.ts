@@ -11,6 +11,8 @@ export interface Invitado {
   user_id: string;
   nombre: string;
   status: EstadoInvitado;
+  /** Le apareció el cartel en Maven (si no, solo le llegó la notificación). */
+  enMaven?: boolean;
   /** Foto y muñequito, para la pantalla de «Llamando a…». */
   foto?: string | null;
   seed?: string | null;
@@ -32,10 +34,11 @@ export function useInvitadosDeLaLlamada(roomName: string | undefined, uid: strin
       setError(false);
       if (!viva) { setInvitados([]); return; }
       const { data, error: e } = await (supabase.from("call_participants") as any)
-        .select("user_id, status")
+        .select("user_id, status, sonando_en_maven_at")
         .eq("call_id", viva.id);
       if (e) throw e;
-      const filas = (data ?? []) as { user_id: string; status: EstadoInvitado }[];
+      const filas = ((data ?? []) as { user_id: string; status: EstadoInvitado; sonando_en_maven_at?: string | null }[])
+        .map(({ sonando_en_maven_at, ...f }) => ({ ...f, enMaven: !!sonando_en_maven_at }));
       const faltan = filas.map((f) => f.user_id).filter((id) => !perfiles.current.has(id));
       if (faltan.length) {
         const { data: filasPerfil } = await supabase.from("profiles").select("id, full_name, avatar_url, avatar_seed").in("id", faltan);

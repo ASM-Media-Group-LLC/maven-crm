@@ -1,4 +1,5 @@
 import { Suspense, useEffect } from "react";
+import { BarraDeLlamada } from "@/components/BarraDeLlamada";
 import { Navigate, Outlet, useLocation } from "react-router-dom";
 import { toast } from "sonner";
 import { SidebarProvider } from "@/components/ui/sidebar";
@@ -117,6 +118,8 @@ const AppShell = () => {
         <DashboardSidebar />
         <div className="flex flex-1 flex-col min-w-0 gap-2 py-2 pr-2">
           <DashboardTopbar />
+          {/* La llamada abierta en otra pestaña o ventana: volver o colgar (18/11/2026). */}
+          <BarraDeLlamada />
           <BackToDashboardBar />
           <AvisoNasCaido />
           {/* Argos: en su turno y fuera de Cowork → cartel + voz en cualquier página (13/11/2026). */}
