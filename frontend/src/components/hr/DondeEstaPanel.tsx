@@ -220,6 +220,18 @@ export function DondeEstaPanel() {
     };
   };
 
+  // En «Todos», el pantallazo más reciente de la empresa va primero (Alvaro,
+  // 18/11/2026: «el último tomado es el primero que miro aquí»). Quien no tiene
+  // ninguno hoy, al final.
+  const ultimaDe = (id: string): number => {
+    const v = enVivo.get(id);
+    const iso = v?.pantallaUrl ? v.ultima : ultimas[id]?.ultima;
+    return iso ? Date.parse(iso) : 0;
+  };
+  const ordenadas = !elegido && filtro === "todos"
+    ? [...vistas].sort((a, b) => ultimaDe(b.user_id) - ultimaDe(a.user_id))
+    : vistas;
+
   if (q.isLoading) {
     return <div className="flex items-center justify-center py-16"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>;
   }
@@ -357,7 +369,7 @@ export function DondeEstaPanel() {
           </div>
         ) : (
           <ul className="grid grid-cols-1 gap-3 pt-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
-            {vistas.map((f) => {
+            {ordenadas.map((f) => {
               const d = datos(f);
               const v = enVivo.get(f.user_id);
               const enVivoAhora = !!v?.pantallaUrl;
