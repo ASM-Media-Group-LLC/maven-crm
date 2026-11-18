@@ -438,6 +438,13 @@ export const cowork = {
   "cowork.host.camDropped": { es: "Tu cámara se cayó", en: "Your camera dropped" },
   "cowork.host.camDroppedDesc": { es: "Las salas dejaron de ver tu cámara.", en: "The rooms can no longer see your camera." },
   "cowork.host.camAccessError": { es: "No pude acceder a la cámara", en: "Couldn't access the camera" },
+  "cowork.host.blurUnsupported": { es: "Este equipo no puede difuminar el fondo", en: "This device can't blur the background" },
+  "cowork.host.blurFailed": { es: "No se pudo difuminar tu fondo", en: "Couldn't blur your background" },
+  "cowork.host.blurDropped": { es: "El difuminado de tu fondo se cayó", en: "Your background blur stopped working" },
+  "cowork.host.blurFailedDesc": {
+    es: "Tu cámara sigue llegando a las salas, pero sin difuminar. Toca Difuminar fondo para reintentar.",
+    en: "Your camera still reaches the rooms, but without the blur. Tap Blur background to try again.",
+  },
   "cowork.host.movedTo": { es: "Te moviste a {room}", en: "You moved to {room}" },
   "cowork.host.meetCreatedOne": { es: "Meet grupal con 1 persona", en: "Group meet with 1 person" },
   "cowork.host.meetCreatedMany": { es: "Meet grupal con {n} personas", en: "Group meet with {n} people" },
@@ -503,6 +510,7 @@ export const cowork = {
   },
   "cowork.host.room.talkHint": { es: "Toca para hablarle solo a esta sala.", en: "Tap to talk to this room only." },
   "cowork.host.camera": { es: "Cámara", en: "Camera" },
+  "cowork.host.blur": { es: "Difuminar fondo", en: "Blur background" },
   "cowork.host.room.cameraOnHint": {
     es: "Tu cámara se ve en esta sala. Toca para apagarla aquí.",
     en: "Your camera is showing in this room. Tap to turn it off here.",
@@ -627,6 +635,14 @@ export const cowork = {
   "cowork.host.all.cameraHint": {
     es: "Comparte tu cámara con todas las salas a la vez. Después puedes apagarla en salas puntuales.",
     en: "Share your camera with every room at once. Afterwards you can turn it off in specific rooms.",
+  },
+  "cowork.host.all.blurOnHint": {
+    es: "Las salas ven tu cámara con el fondo difuminado. Toca para quitarlo.",
+    en: "The rooms see your camera with a blurred background. Tap to remove it.",
+  },
+  "cowork.host.all.blurHint": {
+    es: "Difumina el fondo de tu cámara en las salas. También queda para tus llamadas.",
+    en: "Blur your camera's background in the rooms. It also carries over to your calls.",
   },
   "cowork.host.all.screenOnHint": {
     es: "Tu pantalla se ve en TODAS las salas. Toca para dejar de compartirla en todas.",
