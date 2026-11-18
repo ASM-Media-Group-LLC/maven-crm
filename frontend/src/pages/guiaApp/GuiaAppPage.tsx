@@ -1,5 +1,5 @@
-import { useState, type KeyboardEvent, type ReactNode } from "react";
-import { Link } from "react-router-dom";
+import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
+import { Link, useSearchParams } from "react-router-dom";
 import {
   ArrowDownToLine, ArrowRight, CheckCircle2, ChevronUp, Command, Download, ExternalLink, Folder, Grid2x2, Info,
   Minus, MonitorDown, Smartphone, Square, Users2, Wifi, X,
@@ -34,6 +34,27 @@ export default function GuiaAppPage() {
   // La fecha sale de monitor_config (se mueve sin subir código); sin fecha, el texto va sin ella.
   const { desde } = useCoworkSoloApp();
   const sistema: SistemaGuia = app ? (app.plataforma === "mac" ? "mac" : "windows") : sistemaDeLaGuia(ua, tactil);
+  // ?descargar=1: la descarga arranca sola y la persona ya está mirando los
+  // pasos (el aviso azul de Windows, arrastrar a Aplicaciones en Mac).
+  const [params, setParams] = useSearchParams();
+  const yaBajo = useRef(false);
+  const celular = !app && esCelularOTableta(ua, tactil);
+  useEffect(() => {
+    if (params.get("descargar") !== "1" || yaBajo.current) return;
+    yaBajo.current = true;
+    if (!app && !celular) {
+      const a = document.createElement("a");
+      a.href = urlDeDescarga(sistema);
+      a.download = "";
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => document.getElementById("guia-app-pasos")?.scrollIntoView({ behavior: "smooth", block: "start" }), 300);
+    }
+    const sin = new URLSearchParams(params);
+    sin.delete("descargar");
+    setParams(sin, { replace: true });
+  }, [params, setParams, app, celular, sistema]);
   return <VistaGuiaApp sistemaInicial={sistema} enApp={!!app} enCelular={!app && esCelularOTableta(ua, tactil)} desde={desde} />;
 }
 

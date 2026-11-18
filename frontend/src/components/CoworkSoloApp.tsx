@@ -8,7 +8,8 @@ import { useAuth } from "@/hooks/useAuth";
 import { useFormato } from "@/hooks/useFormato";
 import { escritorio } from "@/lib/escritorio";
 import { enlaceDeApp } from "@/lib/abrirEnApp";
-import { descargaParaEsteEquipo, estadoSoloApp, type EstadoSoloApp } from "@/lib/coworkSoloApp";
+import { estadoSoloApp, type EstadoSoloApp } from "@/lib/coworkSoloApp";
+import { RUTA_DESCARGAR_CON_GUIA } from "@/lib/guiaApp";
 import { RUTA_GUIA_APP } from "@/lib/guiaApp";
 
 // Ver lib/coworkSoloApp.ts. Aviso (antes de la fecha) o pantalla de «Cowork se
@@ -16,7 +17,6 @@ import { RUTA_GUIA_APP } from "@/lib/guiaApp";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const sinTipar = supabase as unknown as { from: (t: string) => any };
-const DESCARGAS = `${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/descargas`;
 const CLAVE_CERRADO = "maven.coworkSoloApp.avisoCerrado";
 
 export function useCoworkSoloApp(): { estado: EstadoSoloApp; desde: Date | null } {
@@ -43,7 +43,9 @@ export function useCoworkSoloApp(): { estado: EstadoSoloApp; desde: Date | null 
 
 function enlaces() {
   const ruta = `${window.location.pathname}${window.location.search}`;
-  return { app: enlaceDeApp(ruta), descarga: `${DESCARGAS}/${descargaParaEsteEquipo(navigator.userAgent || "")}` };
+  // La descarga pasa por la guía (/app?descargar=1): baja sola y muestra los
+  // pasos, incluido el aviso azul de Windows (18/11/2026).
+  return { app: enlaceDeApp(ruta), descarga: RUTA_DESCARGAR_CON_GUIA };
 }
 
 /** Aviso flotante en Cowork (antes de la fecha). Va montado en App.tsx para que

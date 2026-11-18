@@ -1,3 +1,4 @@
+import { RUTA_DESCARGAR_CON_GUIA } from "@/lib/guiaApp";
 import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { ExternalLink, Loader2, X } from "lucide-react";
@@ -12,7 +13,6 @@ import { debeOfrecerApp, enlaceDeApp, guardarPreferencia, leerPreferencia } from
 //  · en el navegador de un computador: ofrece «Abrir en la app» (una vez por
 //    pestaña) o la abre sola si la persona eligió «Siempre».
 
-const DESCARGAS = `${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/descargas`;
 
 export function AbrirEnApp() {
   const navigate = useNavigate();
@@ -61,8 +61,8 @@ export function AbrirEnApp() {
     setModo("abriendo");
   };
   const quedarme = () => setModo("oculto");
-  const esMac = /Macintosh/i.test(navigator.userAgent || "");
-  const descarga = `${DESCARGAS}/${esMac ? "Maven-Mac.dmg" : "Maven-Windows.exe"}`;
+  // «No se abrió» = no la tiene: la guía la baja sola y muestra los pasos.
+  const descarga = RUTA_DESCARGAR_CON_GUIA;
 
   return (
     <div

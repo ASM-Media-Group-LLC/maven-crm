@@ -33,6 +33,11 @@ export function urlDeDescarga(sistema: SistemaGuia, base = import.meta.env.VITE_
   return `${base ?? ""}/storage/v1/object/public/descargas/${archivoDeDescarga(sistema)}`;
 }
 
+/** Descargar Y ver la guía a la vez (18/11/2026: a Daniel le salió el aviso azul
+ *  de Windows y nadie le había dicho qué hacer). Los botones de descarga de
+ *  adentro de Maven llevan aquí: la guía se abre y la descarga arranca sola. */
+export const RUTA_DESCARGAR_CON_GUIA = `${RUTA_GUIA_APP}?descargar=1`;
+
 /** Los cinco pasos, en orden. Las claves de texto salen de aquí (guiaApp.paso.<paso>.*). */
 export const PASOS_GUIA_APP = ["descargar", "instalar", "entrar", "permisos", "listo"] as const;
 export type PasoGuiaApp = (typeof PASOS_GUIA_APP)[number];
