@@ -63,12 +63,12 @@ vi.mock("livekit-client", () => ({
   LocalVideoTrack: vi.fn(),
 }));
 
-vi.mock("@livekit/track-processors", () => ({
-  BackgroundProcessor: vi.fn().mockReturnValue({
+vi.mock("@/lib/fondoFino/procesador", () => ({
+  ProcesadorDeFondo: vi.fn().mockReturnValue({
     switchTo: vi.fn().mockResolvedValue(undefined),
     destroy: vi.fn().mockResolvedValue(undefined),
   }),
-  supportsBackgroundProcessors: vi.fn().mockReturnValue(true),
+  soportaProcesadorDeFondo: vi.fn().mockReturnValue(true),
 }));
 
 vi.mock("@/integrations/supabase/client", () => ({

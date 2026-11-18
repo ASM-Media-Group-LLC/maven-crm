@@ -22,7 +22,7 @@ import {
   reproducirAudiosPausados, reanudarAudioConGesto, dejarDeEsperarGesto, registrarDesbloqueo,
   decidirSiRepararElMicro, MEMORIA_VIGILANTE_VACIA, type MemoriaDelVigilante,
 } from "@/lib/audioDeLaLlamada";
-import { BackgroundProcessor, supportsBackgroundProcessors } from "@livekit/track-processors";
+import { ProcesadorDeFondo, soportaProcesadorDeFondo } from "@/lib/fondoFino/procesador";
 import { toast } from "sonner";
 // Los avisos de la llamada van por traducir(): se arman en eventos de LiveKit y
 // callbacks, no en el JSX, y los lee la persona en su propio idioma.
@@ -32,7 +32,7 @@ import { supabase, SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY } from "@/integrations
 import { avisarSalidaDeLlamada, mostrarAvisoDeSala, ID_AVISO_ME_SILENCIARON } from "@/lib/avisosDeLlamada";
 import type { BackgroundEffect } from "@/lib/fondoDeLlamada";
 import {
-  esBlur, radioDeBlur, isTemplateBackground, isCustomBackground,
+  esBlur, radioDeBlur, isTemplateBackground, isCustomBackground, perfilDeCamaraConFondo,
   resolverImagenDeFondo, leerFondoGuardado, guardarFondo,
 } from "@/lib/fondoDeLlamada";
 import type { ImagenDeFondo } from "@/lib/fondoDeLlamada";
@@ -151,25 +151,21 @@ function getDeviceConstraint(deviceId?: string) {
   return deviceId ? ({ deviceId: { ideal: deviceId } } as any) : undefined;
 }
 
-// Perfil de cámara cuando hay fondo borroso/virtual activo. El blur corre
-// segmentación con ML por CADA cuadro + compositing a la resolución de captura,
-// así que es de lo más pesado de CPU y hace congelar el video. Antes era
-// 720p@24 (poco "seguro"). Lo bajamos a 540p@15: ~la mitad de píxeles y 37%
-// menos cuadros que segmentar (~60-65% menos trabajo), y para una videollamada
-// con fondo se ve perfecto. Sin fondo, la cámara usa el perfil normal (720p).
-const BACKGROUND_SAFE_VIDEO_CONSTRAINTS = {
-  width: { ideal: 960, max: 960 },
-  height: { ideal: 540, max: 540 },
-  frameRate: { ideal: 15, max: 15 },
-} as const;
-
+// Perfil de cámara cuando hay fondo borroso/virtual activo. El fondo corre
+// segmentación con ML + varias pasadas de GPU por cuadro. Hasta el 17/11/2026
+// CUALQUIER fondo bajaba la cámara a 540p@15; desde ahí (Alvaro: «caras en HD
+// con el blur en las máquinas fuertes») los equipos de 8+ núcleos siguen en
+// 720p@30 y solo los flojos y los celulares bajan a 540p@15. La regla vive en
+// `perfilDeCamaraConFondo` (lib/fondoDeLlamada.ts). Sin fondo, la cámara usa el
+// perfil normal (720p, o 1080p en Meet).
 function getVideoConstraint(deviceId?: string, backgroundSafeProfile = false) {
   const constraint: Record<string, any> = {};
   if (deviceId) constraint.deviceId = { ideal: deviceId };
   if (backgroundSafeProfile) {
-    constraint.width = BACKGROUND_SAFE_VIDEO_CONSTRAINTS.width;
-    constraint.height = BACKGROUND_SAFE_VIDEO_CONSTRAINTS.height;
-    constraint.frameRate = BACKGROUND_SAFE_VIDEO_CONSTRAINTS.frameRate;
+    const perfil = perfilDeCamaraConFondo();
+    constraint.width = perfil.width;
+    constraint.height = perfil.height;
+    constraint.frameRate = perfil.frameRate;
   }
   return Object.keys(constraint).length ? (constraint as any) : undefined;
 }
@@ -1108,7 +1104,7 @@ export function useLiveKit() {
     const room = roomRef.current;
     if (!room) return false;
 
-    if (effect !== "none" && !supportsBackgroundProcessors()) {
+    if (effect !== "none" && !soportaProcesadorDeFondo()) {
       console.warn("[LiveKit] Background processors are not supported in this browser.");
       return false;
     }
@@ -1158,7 +1154,7 @@ export function useLiveKit() {
       // Lazy-create the processor — the constructor loads the ML model
       let processor = bgProcessorRef.current;
       if (!processor) {
-        processor = BackgroundProcessor({ mode: "disabled" });
+        processor = ProcesadorDeFondo({ mode: "disabled" });
         bgProcessorRef.current = processor;
       }
 

@@ -22,20 +22,32 @@ describe("niveles de difuminado", () => {
     expect(esBlur("custom:f1")).toBe(false);
   });
 
-  it("el nivel de siempre no se toca y el fuerte difumina más", () => {
-    expect(radioDeBlur("blur")).toBe(20);
-    expect(radioDeBlur("blur-strong")).toBeGreaterThan(radioDeBlur("blur"));
+  // 17/11/2026: el número dejó de ser el «radio» del paquete de LiveKit (que se
+  // dividía por 4 y se topaba en 64, por eso antes se fijaba 20 y 64) y pasó a
+  // ser la SIGMA de un gaussiano en px a 720p de nuestro procesador
+  // (lib/fondoFino). El 20 viejo equivalía a ~5 px de sigma: Alvaro dijo que
+  // apenas difuminaba, así que «el nivel de siempre» ya no se conserva.
+  it("«un poco» difumina de verdad y «fuerte» bastante más", () => {
+    expect(radioDeBlur("blur")).toBeGreaterThanOrEqual(7);
+    expect(radioDeBlur("blur-strong")).toBeGreaterThanOrEqual(2.5 * radioDeBlur("blur"));
   });
 
-  it("el radio fuerte llega al máximo útil del shader y no lo pasa", () => {
-    // El paquete divide el radio por 4 y clampa las muestras en 16: pasado 64
-    // no cambia nada. Pedir más sería gastar sin que se vea.
-    expect(RADIO_DE_BLUR["blur-strong"]).toBeLessThanOrEqual(64);
-    expect(Math.floor(RADIO_DE_BLUR["blur-strong"] / 4)).toBe(16);
+  it("el fuerte cabe en el bucle del shader (sin recorte silencioso) y con costo topado", async () => {
+    const { muestrasPorLado, pasoDeMuestreo, sigmaEnTextura, MUESTRAS_MAX_POR_LADO } = await import("@/lib/fondoFino/parametros");
+    // Hasta con una cámara de 1080p las muestras cubren 3 sigmas enteras…
+    const sigma = sigmaEnTextura(RADIO_DE_BLUR["blur-strong"], 1080);
+    expect(muestrasPorLado(sigma) * pasoDeMuestreo(sigma)).toBeGreaterThanOrEqual(3 * sigma);
+    // …sin pasar el tope del bucle, y saltando como mucho de a 3 texeles.
+    expect(muestrasPorLado(sigma)).toBeLessThanOrEqual(MUESTRAS_MAX_POR_LADO);
+    expect(pasoDeMuestreo(sigma)).toBeLessThanOrEqual(3);
+  });
+
+  it("«un poco» ya esconde el detalle: más de 3 veces el viejo (~11 px)", () => {
+    expect(radioDeBlur("blur")).toBeGreaterThanOrEqual(30);
   });
 
   it("un valor desconocido cae al blur normal, no a un radio raro", () => {
-    expect(radioDeBlur("blur-loquesea")).toBe(20);
+    expect(radioDeBlur("blur-loquesea")).toBe(RADIO_DE_BLUR.blur);
   });
 });
 

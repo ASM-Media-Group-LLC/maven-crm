@@ -41,35 +41,91 @@ export const BACKGROUND_TEMPLATES = [
 
 // ── Niveles de difuminado ────────────────────────────────────────────────────
 //
-// DOS niveles, como Google Meet (pedido de Jhon, 09/09): el de siempre y uno
-// más fuerte. Los números salen de leer el shader de `@livekit/track-processors`
-// 0.7.2, no de tantear:
+// DOS niveles, como Google Meet: «un poco» y «fuerte» (Alvaro, 17/11/2026: «se
+// siente como una porquería, no como Google»). Desde ese día el fondo lo pinta
+// NUESTRO procesador (lib/fondoFino/), no el de `@livekit/track-processors`, y
+// el número ya no es el «radio» de aquel paquete (que se dividía por 4 y se
+// topaba en 16 muestras: 20 apenas se notaba y 64 era el techo).
 //
-//   · El blur corre sobre una textura a 1/4 de resolución (`downsampleFactor
-//     = 4`), así que el radio que se pasa se divide por 4 antes del shader.
-//   · El shader clampa las muestras en 16: `min(16, ceil(radio/4))`. Pasado 64
-//     la ventana ya no crece y solo se aplanan los pesos (de 64 a 200 el
-//     desenfoque efectivo pasa de ~35 px a ~38 px): 64 es el máximo ÚTIL.
-//   · El bucle recorre -16..16 pero saltea el `texture()` fuera del radio
-//     (`if (abs(offset) > radius) continue;` va ANTES de la lectura). Así que
-//     el nivel fuerte NO es gratis: pasa de 11 a 33 lecturas de textura por
-//     píxel y por pasada, y el blur son dos pasadas por cuadro. Sobre una
-//     textura a 1/4 (unos 240×135) el absoluto sigue siendo chico, pero es
-//     TRIPLE, no igual — importa porque esto corre 8 horas y hay gente en
-//     celular. Quien vuelva a subir este número: no es gratis, medilo.
+// Ahora el número es la SIGMA de un desenfoque gaussiano de verdad, en píxeles
+// de una imagen de 720 de alto (a 540p se escala solo, así se ve igual en todos
+// los equipos). Para tener una idea: una gaussiana de sigma s se parece a
+// promediar una ventana de ~2,5·s píxeles.
 //
-// `blur` se queda en 20 a propósito: es lo que la gente ya tiene y no se le
-// cambia debajo de los pies. El nivel nuevo es el fuerte.
+//   · «blur» (un poco): sigma 34 ≈ ventana de ~85 px a 720p. Ya no se leen
+//     ventanas, luces ni objetos del cuarto, pero quedan las formas grandes
+//     (dónde está la pared, la ventana) — el «difuminar un poco» de Meet.
+//   · «blur-strong» (fuerte): sigma 90 ≈ ventana de ~225 px. Solo quedan
+//     campos de color suaves, como el difuminado completo de Meet.
+//
+// Para comparar: el shader viejo cortaba el gaussiano en 1 sigma (ventana de
+// ±radio/4 a 1/4 de resolución), así que su «20» desenfocaba como una sigma de
+// ~11 px y su «64» como una de ~35 px. Medido lado a lado con capturas.
+//
+// Costo: el desenfoque corre a 1/4 de resolución con dos pasadas separables y
+// a lo sumo 48 muestras por lado (con sigmas grandes se muestrea de a 2-3
+// texeles; ver pasoDeMuestreo): una fracción de milisegundo en la GPU.
 export const RADIO_DE_BLUR: Record<string, number> = {
-  blur: 20,
-  "blur-strong": 64,
+  blur: 34,
+  "blur-strong": 90,
 };
+
+// ── Cámara con fondo: HD en equipos fuertes ──────────────────────────────────
+//
+// Antes, cualquier fondo bajaba la cámara a 960×540 a 15 cuadros para no
+// congelar el video. Alvaro (17/11/2026) eligió «caras en HD con el blur en las
+// máquinas fuertes»: con 8 núcleos o más (la misma vara que
+// NUCLEOS_PARA_DEEPFILTER en lib/deepfilter.ts) la cámara sigue a 1280×720 a
+// 30 cuadros con el fondo puesto; los equipos más flojos y los celulares se
+// quedan con el perfil liviano de siempre.
+export const NUCLEOS_PARA_FONDO_HD = 8;
+
+export const PERFIL_FONDO_HD = {
+  width: { ideal: 1280, max: 1280 },
+  height: { ideal: 720, max: 720 },
+  frameRate: { ideal: 30, max: 30 },
+} as const;
+
+export const PERFIL_FONDO_LIVIANO = {
+  width: { ideal: 960, max: 960 },
+  height: { ideal: 540, max: 540 },
+  frameRate: { ideal: 15, max: 15 },
+} as const;
+
+type EquipoParaFondo = { hardwareConcurrency?: number; userAgent?: string } | undefined;
+
+function equipoActual(): EquipoParaFondo {
+  return typeof navigator === "undefined" ? undefined : navigator;
+}
+
+/** ¿El equipo aguanta el fondo en HD? 8+ núcleos y no es celular. */
+export function equipoAguantaFondoHD(equipo: EquipoParaFondo = equipoActual()): boolean {
+  if (!equipo?.hardwareConcurrency || equipo.hardwareConcurrency < NUCLEOS_PARA_FONDO_HD) return false;
+  // En el celular la batería y el calor pesan más (igual que con DeepFilterNet).
+  if (/Android|iPhone|iPad|iPod|Mobile/i.test(equipo.userAgent ?? "")) return false;
+  return true;
+}
+
+/** Restricciones de la cámara mientras hay un fondo puesto. */
+export function perfilDeCamaraConFondo(equipo: EquipoParaFondo = equipoActual()) {
+  return equipoAguantaFondoHD(equipo) ? PERFIL_FONDO_HD : PERFIL_FONDO_LIVIANO;
+}
+
+/**
+ * Cada cuántos cuadros se corre el detector de la persona. En los fuertes, en
+ * todos (30 por segundo); en los flojos, uno sí y uno no (7-8 por segundo sobre
+ * la cámara a 15). Entre medio se reusa la última máscara, que igual se
+ * suaviza en el tiempo, así que no se nota.
+ */
+export function cadaCuantosCuadrosSegmentar(equipo: EquipoParaFondo = equipoActual()): 1 | 2 {
+  return equipoAguantaFondoHD(equipo) ? 1 : 2;
+}
 
 export function esBlur(effect: BackgroundEffect): boolean {
   return effect === "blur" || effect === "blur-strong";
 }
 
-/** Radio para `processor.switchTo({ mode: "background-blur", blurRadius })`. */
+/** Sigma (px a 720p) para `processor.switchTo({ mode: "background-blur", blurRadius })`. */
 export function radioDeBlur(effect: BackgroundEffect): number {
   return RADIO_DE_BLUR[effect] ?? RADIO_DE_BLUR.blur;
 }
