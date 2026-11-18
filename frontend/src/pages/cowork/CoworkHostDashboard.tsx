@@ -12,7 +12,7 @@ import {
   Mic, MicOff, Video, VideoOff, ArrowLeft, Plus, Pencil, Volume2, VolumeX, ScreenShare, ScreenShareOff,
   PanelRightClose, PanelRightOpen, MoreVertical, MessageCircle,
   Pin, PinOff, PhoneOff, PictureInPicture2, KeyRound, Check, Coffee, EyeOff, MonitorOff, Settings2, MoreHorizontal,
-  WifiOff, WifiLow, ChevronRight, Megaphone, ArrowRightLeft, type LucideIcon } from "lucide-react";
+  WifiOff, WifiLow, ChevronRight, Megaphone, ArrowRightLeft, Cloud, type LucideIcon } from "lucide-react";
 import { toast } from "sonner";
 import LiveKitCallView from "@/pages/messenger/videocall/LiveKitCallView";
 import { usePersistentCall, CallOutlet } from "@/components/PersistentCallProvider";
@@ -74,6 +74,10 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "
 import { useLanguage } from "@/hooks/useLanguage";
 import { traducir, type TranslationKey } from "@/lib/i18n";
 import { ETIQUETA_SUPERVISOR, NOMBRE_PAUSA, claveMotivoDetenido, mensajeDeSolicitud } from "./textosCowork";
+import { alternarBlur, esBlur, guardarFondo, leerFondoGuardado, type BackgroundEffect } from "@/lib/fondoDeLlamada";
+import { precalentarFondo, soportaProcesadorDeFondo } from "@/lib/fondoFino/procesador";
+import { crearCamaraDelAnfitrion, type CamaraDelAnfitrion, type ResultadoDelFondo } from "@/lib/camaraDelAnfitrion";
+import { escritorio } from "@/lib/escritorio";
 
 // Lo que vio el detector de encuadre, como CÓDIGO: se compara y se elige el
 // icono con esto, y el texto sale del diccionario en el idioma de quien mira.
@@ -792,6 +796,70 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
     };
   }, [micArmed, generacionMic]);
 
+  // ── EL FONDO DE LA CÁMARA DEL ANFITRIÓN (18/11/2026) ─────────────────────
+  //
+  // Alvaro no podía difuminar el fondo en Cowork: la cámara que se reparte a las
+  // salas salía CRUDA (no pasaba por ningún procesador) y no había botón. Ahora
+  // pasa por el MISMO procesador de las llamadas (lib/camaraDelAnfitrion.ts) con
+  // la MISMA preferencia (leerFondoGuardado): si eligió difuminar en una llamada,
+  // Cowork lo respeta, y lo que elija aquí vale para sus llamadas.
+  const [fondo, setFondo] = useState<BackgroundEffect>(() => leerFondoGuardado());
+  const fondoRef = useRef(fondo);
+  fondoRef.current = fondo;
+  // El último nivel de difuminado elegido, para que el botón lo devuelva igual
+  // (mismo criterio que el botón rápido de la llamada).
+  const ultimoBlurRef = useRef<BackgroundEffect>("blur");
+  if (esBlur(fondo)) ultimoBlurRef.current = fondo;
+  const [preparandoFondo, setPreparandoFondo] = useState(false);
+  const camaraRef = useRef<CamaraDelAnfitrion | null>(null);
+  // Saberlo crea un canvas con WebGL2: una sola vez.
+  const puedeDifuminar = useMemo(() => soportaProcesadorDeFondo(), []);
+
+  // El detector baja ~9,4 MB la primera vez: se baja de antemano a quien ya
+  // tiene un fondo elegido o está en la app de computador (como en la llamada).
+  useEffect(() => {
+    if (!puedeDifuminar) return;
+    if (leerFondoGuardado() === "none" && !escritorio()) return;
+    const id = window.setTimeout(() => { void precalentarFondo(); }, 3000);
+    return () => window.clearTimeout(id);
+  }, [puedeDifuminar]);
+
+  /** Pone el fondo en la cámara que se reparte y actualiza lo que ven las salas. */
+  const ponerFondoEnCamara = useCallback(async (camara: CamaraDelAnfitrion, efecto: BackgroundEffect) => {
+    setPreparandoFondo(efecto !== "none");
+    const r: ResultadoDelFondo = await camara.aplicar(efecto);
+    // Se apagó la cámara o llegó otro pedido: lo resuelve el que sigue.
+    if (camaraRef.current !== camara || r === "apagada" || r === "reemplazado") return;
+    setPreparandoFondo(false);
+    // La procesada si enganchó; la cruda si no. Nunca sin cámara por el fondo.
+    // Si es la misma pista de antes (cambio en vivo), las salas no re-publican.
+    setCamBaseTrack(camara.salida());
+    if (r === "puesto" || r === "sin-fondo") return;
+    // El botón muestra lo que de verdad sale: sin fondo. La preferencia guardada
+    // solo se borra si la imagen ya no existe (igual que en la llamada).
+    fondoRef.current = "none";
+    setFondo("none");
+    if (r === "imagen-perdida") {
+      guardarFondo("none");
+      toast.error(traducir("shared.call.bgGone"), { description: traducir("shared.call.bgGoneDesc"), id: "fondo-cowork" });
+    } else if (r === "no-soportado") {
+      toast.error(traducir("cowork.host.blurUnsupported"), { id: "fondo-cowork" });
+    } else {
+      toast.error(traducir("cowork.host.blurFailed"), { description: traducir("cowork.host.blurFailedDesc"), id: "fondo-cowork" });
+    }
+  }, []);
+
+  /** El botón «Difuminar fondo»: alterna y lo guarda; con la cámara al aire, en vivo. */
+  const alternarDifuminado = useCallback(() => {
+    const nuevo = alternarBlur(fondoRef.current, ultimoBlurRef.current);
+    fondoRef.current = nuevo;
+    setFondo(nuevo);
+    // Se guarda SIEMPRE: con la cámara apagada, se pone al encenderla.
+    guardarFondo(nuevo);
+    const camara = camaraRef.current;
+    if (camara) void ponerFondoEnCamara(camara, nuevo);
+  }, [ponerFondoEnCamara]);
+
   // Captura ÚNICA de la cámara para broadcastear (calidad capada a ~540p/15fps
   // a propósito: publicar video es un encoder POR SALA — con nueve salas, la
   // máquina y la subida del coordinador tienen que sobrevivir). Si el track
@@ -801,6 +869,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
     if (!camArmed) return;
     let cancelled = false;
     let track: MediaStreamTrack | null = null;
+    let camara: CamaraDelAnfitrion | null = null;
     (async () => {
       try {
         const stream = await navigator.mediaDevices.getUserMedia({
@@ -813,17 +882,42 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
           toast.error(traducir("cowork.host.camDropped"), { description: traducir("cowork.host.camDroppedDesc"), id: "cam-broadcast" });
           setRoomCam({});
         });
-        setCamBaseTrack(track);
       } catch {
         if (!cancelled) { toast.error(traducir("cowork.host.camAccessError")); setRoomCam({}); }
+        return;
       }
+      // La cámara cruda pasa por el procesador de fondo de las llamadas.
+      const cam = crearCamaraDelAnfitrion(track, {
+        alPrimeraCarga: () => toast.info(traducir("shared.call.bgPreparando"), { id: "fondo-preparando", duration: 8000 }),
+        // El procesador se cayó con la cámara al aire: vuelve la cruda y se avisa.
+        alCaerse: () => {
+          if (cancelled) return;
+          setCamBaseTrack(cam.salida());
+          fondoRef.current = "none";
+          setFondo("none");
+          toast.error(traducir("cowork.host.blurDropped"), { description: traducir("cowork.host.blurFailedDesc"), id: "fondo-cowork" });
+        },
+      });
+      camara = cam;
+      camaraRef.current = cam;
+      // El fondo elegido se pone ANTES de repartir la cámara: las salas no ven el
+      // cuarto ni un instante. Si no se puede, sale la cruda (ponerFondoEnCamara).
+      const efecto = leerFondoGuardado();
+      fondoRef.current = efecto;
+      setFondo(efecto);
+      if (efecto === "none") setCamBaseTrack(cam.salida());
+      else await ponerFondoEnCamara(cam, efecto);
     })();
     return () => {
       cancelled = true;
+      if (camaraRef.current === camara) camaraRef.current = null;
       setCamBaseTrack(null);
-      try { track?.stop(); } catch { /* noop */ }
+      setPreparandoFondo(false);
+      // Limpia el procesador, la pista procesada y la cámara cruda.
+      if (camara) void camara.destruir();
+      else { try { track?.stop(); } catch { /* noop */ } }
     };
-  }, [camArmed]);
+  }, [camArmed, ponerFondoEnCamara]);
 
   // Captura ÚNICA de la pantalla (el picker del navegador se abre UNA vez; esa
   // misma pantalla va a todas las salas activadas). "Dejar de compartir" desde
@@ -2370,6 +2464,27 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                 >
                   {camaraATodas ? <Video className="h-3.5 w-3.5" /> : <VideoOff className="h-3.5 w-3.5" />}
                   <span className="hidden sm:inline">{t("cowork.host.camera")}</span>
+                </Button>
+                {/* Difuminar el fondo de la cámara que ven las salas (18/11/2026).
+                    Es la misma preferencia de las llamadas; con la cámara al
+                    aire el cambio se ve en vivo. Verde = difuminado puesto. */}
+                <Button
+                  size="sm"
+                  variant={esBlur(fondo) ? "default" : "outline"}
+                  disabled={!puedeDifuminar}
+                  aria-pressed={esBlur(fondo)}
+                  aria-label={t("cowork.host.blur")}
+                  data-boton="difuminar-fondo"
+                  className={`gap-1.5 rounded-full h-8 ${esBlur(fondo) ? "bg-success hover:bg-success/90 text-success-foreground border-transparent" : ""}`}
+                  title={!puedeDifuminar
+                    ? t("cowork.host.blurUnsupported")
+                    : esBlur(fondo)
+                      ? t("cowork.host.all.blurOnHint")
+                      : t("cowork.host.all.blurHint")}
+                  onClick={alternarDifuminado}
+                >
+                  {preparandoFondo ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Cloud className="h-3.5 w-3.5" />}
+                  <span className="hidden sm:inline">{t("cowork.host.blur")}</span>
                 </Button>
                 {!unaSolaPantalla && (
                 <Button

@@ -22,6 +22,7 @@ import BancoGuiaConexion from "./bancoGuiaConexion";
 import { BancoGuiaApp, BancoAppDelEquipo } from "./bancoGuiaApp";
 import { BancoAppMedidor, prepararAppFalsa } from "./bancoAppMedidor";
 import BancoFondo from "./bancoFondo";
+import BancoCamaraAnfitrion from "./bancoCamaraAnfitrion";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import VirtualOfficePage from "@/pages/oficina-ai/VirtualOfficePage";
 import TardanzasPage from "@/pages/admin/TardanzasPage";
@@ -94,6 +95,10 @@ void cargarIdioma(idiomaInicial()).finally(() => raiz.render(
   // /harness.html?ver=guia-app[&sistema=mac][&en=app|celular] · ?ver=app-equipo → la app de Maven (18/11).
   ver === "fondo" ? (
     <BancoFondo />
+  ) :
+  // /harness.html?ver=camara-anfitrion → la cámara del anfitrión de Cowork con el fondo difuminado (18/11).
+  ver === "camara-anfitrion" ? (
+    <BancoCamaraAnfitrion />
   ) :
   // /harness.html?ver=app-medidor[&estado=rojo][&tema=claro] → medidor, versión nueva y novedades (18/11).
   ver === "app-medidor" ? (
