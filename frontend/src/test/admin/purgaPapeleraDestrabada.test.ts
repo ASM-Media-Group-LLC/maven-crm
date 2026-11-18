@@ -33,6 +33,13 @@ describe("purga de la papelera, cuenta por cuenta", () => {
     expect(bucle).toMatch(/app_encolar_buzon/);
   });
 
+  it("la purga automática respeta las cuentas que se conservan (Jhon)", () => {
+    expect(sql).toMatch(/create table if not exists public\.papelera_conservar/);
+    expect(sql).toMatch(/alter table public\.papelera_conservar enable row level security;/);
+    expect(sql).toMatch(/and not exists \(select 1 from public\.papelera_conservar c where c\.user_id = p\.id\)/);
+    expect(sql).toMatch(/c5b124cb-f272-458d-aa8e-1b11de0ff4d6/);
+  });
+
   it("la fecha de nacimiento se revisa solo cuando se escribe", () => {
     expect(sql).toMatch(/alter table public\.creators drop constraint if exists creators_birth_date_plausible;/);
     expect(sql).toMatch(/before insert or update of birth_date on public\.creators/);

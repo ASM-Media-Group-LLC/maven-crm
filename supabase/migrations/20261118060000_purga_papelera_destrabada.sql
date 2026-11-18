@@ -22,8 +22,12 @@
 --    fecha imposible sigue sin poder entrar, y una fila vieja ya no traba nada.
 -- 2) La purga va cuenta por cuenta: si una se traba, queda en la papelera, se
 --    anota en el registro de la base y las demás siguen. Mañana se reintenta.
+-- 3) Cuentas que se quedan en la papelera sin purgarse (papelera_conservar).
+--    Alvaro, 18/11/2026: «Borra todos los correos que no está usando la gente,
+--    menos el de John» → la cuenta y la casilla de Jhon Lopez se conservan.
+--    Solo la purga automática la respeta; purgar a mano sigue siendo posible.
 --
--- Ningún dato se toca en esta migración: la purga la hace el cron de siempre.
+-- La purga en sí la hace el cron de siempre; esta migración solo anota a Jhon.
 
 set local lock_timeout = '5s';
 
@@ -51,6 +55,22 @@ create trigger creators_fecha_de_nacimiento_plausible
 
 alter table public.creators drop constraint if exists creators_birth_date_plausible;
 
+-- ── 3) Las que se conservan ─────────────────────────────────────────────────
+create table if not exists public.papelera_conservar (
+  user_id uuid primary key references auth.users (id) on delete cascade,
+  motivo text not null,
+  pedido_por text not null,
+  creado timestamptz not null default now()
+);
+-- Sin políticas: solo la leen la purga (security definer) y el service role.
+alter table public.papelera_conservar enable row level security;
+
+insert into public.papelera_conservar (user_id, motivo, pedido_por)
+select u.id, 'Alvaro, 18/11/2026: «menos el de John». Su cuenta y jhon.lopez@maven-ai.me se conservan.', 'Alvaro'
+from auth.users u
+where u.id = 'c5b124cb-f272-458d-aa8e-1b11de0ff4d6'
+on conflict (user_id) do nothing;
+
 -- ── 2) La purga, cuenta por cuenta ───────────────────────────────────────────
 create or replace function public.app_purgar_cuentas_vencidas(p_dias integer default 30, p_tope integer default 50)
 returns integer
@@ -75,6 +95,7 @@ begin
     left join auth.users u on u.id = p.id
     where p.deleted_at is not null
       and p.deleted_at < now() - make_interval(days => p_dias)
+      and not exists (select 1 from public.papelera_conservar c where c.user_id = p.id)
     order by p.deleted_at
     limit p_tope
   loop
