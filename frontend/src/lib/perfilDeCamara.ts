@@ -99,6 +99,9 @@ export interface SenalesDeSubida {
   ahorroActivo: boolean;
   limiteCam: string | null;
   limitePant: string | null;
+  /** 17/11/2026: la app de computador en un equipo de 8 GB o menos
+   *  (lib/appLiviana.ts). Ahí codificar la cámara en alta pesa de más. */
+  equipoFlojo?: boolean;
 }
 
 /**
@@ -119,6 +122,7 @@ export function elegirPerfilDeCamara(s: SenalesDeSubida): PerfilDeCamara {
   if (prueba !== null && prueba < SUBIDA_PARA_CAMARA_NORMAL_MBPS) return "liviano";
   if (s.ahorroActivo) return "liviano";
   if (s.limiteCam === "bandwidth" || s.limitePant === "bandwidth") return "liviano";
+  if (s.equipoFlojo) return "liviano";
   return "normal";
 }
 
