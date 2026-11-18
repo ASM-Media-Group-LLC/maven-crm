@@ -112,6 +112,9 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
   // «Entrar con el código de tu sala» desde el menú, también con sala (sala fija,
   // 18/11/2026): antes el campo solo existía en pantallas que casi nunca se veían.
   const [codigoAbierto, setCodigoAbierto] = useState(false);
+  // El servidor no le asignó sala (varias salas y sin sala fija): se queda en la
+  // pantalla del código, sin reintentar ni ofrecer «volver a mi sala».
+  const [necesitaCodigo, setNecesitaCodigo] = useState(false);
 
   // Canjea el código que dio el supervisor: pasa a esa sala y queda fija ahí.
   const canjearCodigo = async () => {
@@ -122,6 +125,7 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
       const res = await cowork.joinByCode(code) as { roomName?: string };
       setRoomCode("");
       setCodigoAbierto(false);
+      setNecesitaCodigo(false);
       if (res?.roomName) toast.success(t("cowork.participant.movedByCode", { room: res.roomName }));
       cowork.refetch(true);
     } catch (e: unknown) {
@@ -150,9 +154,10 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
   // ENTRA SOLO, SIN CÓDIGO (Alvaro, 13/11/2026: «con que estén en un tipo de rol
   // deberían de poder entrar»). Cada quien es participante del Cowork de su
   // departamento: sin sala, el servidor lo mete a su SALA FIJA (la que le puso el
-  // supervisor, 18/11/2026), si no a su última sala de esta sesión o, si nunca
-  // estuvo, a la primera. Por eso aquí NO se manda sala: una sala pedida desde
-  // el cliente pisaría la fija.
+  // supervisor, 18/11/2026); si no tiene y hay una sola sala, a esa. Con varias
+  // salas y sin fija el servidor contesta `necesitaCodigo` y la vista se queda en
+  // la pantalla del código (se intenta UNA vez por sesión: `autoEntro` no deja
+  // reintentar). Por eso aquí NO se manda sala: una pedida pisaría la fija.
   const autoEntro = useRef<string | null>(null);
   useEffect(() => {
     const sid = cowork.session?.id;
@@ -169,7 +174,10 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
     // Relectura SILENCIOSA: la normal prendía la ruedita, desmontaba esta vista y
     // repetía todas sus cargas antes de conectar la llamada.
     cowork.joinSession(sid, "participant")
-      .then(() => cowork.refetch(true))
+      .then((r) => {
+        if ((r as { necesitaCodigo?: boolean } | null)?.necesitaCodigo) { setNecesitaCodigo(true); return; }
+        return cowork.refetch(true);
+      })
       .catch((e: unknown) => toast.error((e as Error)?.message || t("cowork.participant.resumeError")))
       .finally(() => setResuming(false));
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -822,7 +830,7 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
             <p className="text-xs text-muted-foreground/70">{cowork.session?.name}</p>
           </div>
 
-          {lastRoomId && (
+          {lastRoomId && !necesitaCodigo && (
             <Button onClick={resumeLastRoom} disabled={resuming} className="w-full rounded-full gap-2">
               {resuming ? <Loader2 className="h-4 w-4 animate-spin" /> : <DoorOpen className="h-4 w-4" />}
               {t("cowork.participant.backToMyRoom")}
@@ -831,7 +839,7 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
 
           <div className="w-full flex flex-col gap-2">
             <span className="text-xs text-muted-foreground text-center">
-              {lastRoomId ? t("cowork.participant.orOtherCode") : t("cowork.participant.enterSupervisorCode")}
+              {lastRoomId && !necesitaCodigo ? t("cowork.participant.orOtherCode") : t("cowork.participant.enterSupervisorCode")}
             </span>
             <div className="flex gap-2">
               <Input

@@ -546,17 +546,22 @@ serve(async (req) => {
       // SALA POR DEFECTO (Alvaro, 13/11/2026: «con que estén en un tipo de rol
       // deberían de poder entrar»). El participante solo ve SU sala (RLS), así que
       // quien es nuevo en un Cowork no tiene a cuál entrar y se le pedía código. Sin
-      // `roomId`, el servidor elige: su SALA FIJA (18/11/2026, la que le puso el
-      // supervisor), si no su última sala de esta sesión, si no la primera.
+      // `roomId`, el servidor elige (18/11/2026): su SALA FIJA (la que le puso el
+      // supervisor); si no tiene y hay una sola sala, esa; con varias salas y sin
+      // fija no se le asigna nada y la respuesta dice `necesitaCodigo`.
       const salaPorDefecto = async (): Promise<string | null> => {
-        const [fija, { data: ultima }, { data: salas }] = await Promise.all([
+        const [fija, { data: salas }] = await Promise.all([
           leerSalaFija(admin, sessionId, userId),
-          admin.from("cowork_room_assignments")
-            .select("room_id").eq("session_id", sessionId).eq("user_id", userId)
-            .order("assigned_at", { ascending: false }).limit(1).maybeSingle(),
           admin.from("cowork_rooms").select("id, sort_order").eq("session_id", sessionId),
         ]);
-        return elegirSalaPorDefecto({ fija, ultima: (ultima?.room_id as string | undefined) ?? null, salas: salas ?? [] });
+        return elegirSalaPorDefecto({ fija, salas: salas ?? [] });
+      };
+      // Participante sin sala activa al terminar: tiene que poner el código.
+      const sinSala = async (): Promise<boolean> => {
+        if (memberRole !== "participant") return false;
+        const { data } = await admin.from("cowork_room_assignments")
+          .select("id").eq("session_id", sessionId).eq("user_id", userId).eq("is_active", true).maybeSingle();
+        return !data;
       };
       const salaPedida: string | null = roomId ?? (memberRole === "participant" ? await salaPorDefecto() : null);
 
@@ -593,7 +598,7 @@ serve(async (req) => {
               return json(req, { membership: existing, alreadyJoined: true, roomId: salaPedida, roomName: roomCheck.name });
             }
           }
-          return json(req, { membership: existing, alreadyJoined: true });
+          return json(req, { membership: existing, alreadyJoined: true, necesitaCodigo: !salaPedida && await sinSala() });
         }
 
         // Un HOST nunca se degrada a participante por esta puerta (07/09/2026:
@@ -647,7 +652,7 @@ serve(async (req) => {
         }
       }
 
-      return json(req, { membership, alreadyJoined: false });
+      return json(req, { membership, alreadyJoined: false, necesitaCodigo: !salaPedida && await sinSala() });
     }
 
     // ═══════════════════════════════════════════════════════════════

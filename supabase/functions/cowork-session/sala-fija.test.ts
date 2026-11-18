@@ -14,25 +14,25 @@ const salas = [
   { id: "plus-1", sort_order: 1 },
 ];
 
-Deno.test("la sala fija manda sobre la última y la primera", () => {
-  assertEquals(elegirSalaPorDefecto({ fija: "plus-2", ultima: "plus-1", salas }), "plus-2");
+Deno.test("la sala fija manda", () => {
+  assertEquals(elegirSalaPorDefecto({ fija: "plus-2", salas }), "plus-2");
 });
 
-Deno.test("EL BUG: sin fija ni historial cae en la primera por orden (como antes)", () => {
-  assertEquals(elegirSalaPorDefecto({ fija: null, ultima: null, salas }), "masivo-1");
+Deno.test("EL BUG: con varias salas y sin fija NO cae en la primera: se le pide el código", () => {
+  assertEquals(elegirSalaPorDefecto({ fija: null, salas }), null);
 });
 
-Deno.test("sin fija, reanuda la última sala", () => {
-  assertEquals(elegirSalaPorDefecto({ fija: null, ultima: "plus-1", salas }), "plus-1");
+Deno.test("con una sola sala entra sin código (Editores, PR…)", () => {
+  assertEquals(elegirSalaPorDefecto({ fija: null, salas: [{ id: "editores" }] }), "editores");
+  assertEquals(elegirSalaPorDefecto({ fija: "cerrada", salas: [{ id: "editores" }] }), "editores");
 });
 
-Deno.test("si su sala fija se cerró, sigue con la regla de antes", () => {
-  assertEquals(elegirSalaPorDefecto({ fija: "cerrada", ultima: "plus-1", salas }), "plus-1");
-  assertEquals(elegirSalaPorDefecto({ fija: "cerrada", ultima: "otra-cerrada", salas }), "masivo-1");
+Deno.test("si su sala fija se cerró y hay varias: código", () => {
+  assertEquals(elegirSalaPorDefecto({ fija: "cerrada", salas }), null);
 });
 
 Deno.test("sesión sin salas: null", () => {
-  assertEquals(elegirSalaPorDefecto({ fija: "plus-1", ultima: null, salas: [] }), null);
+  assertEquals(elegirSalaPorDefecto({ fija: "plus-1", salas: [] }), null);
 });
 
 Deno.test("asignar sala: conectado se mueve, desconectado o sin membresía solo queda fijo", () => {
@@ -99,6 +99,9 @@ Deno.test("joinSession prefiere la sala fija y solo el enlace (porEnlace) mueve"
   assert(b.includes("body.porEnlace === true"));
   assert(/porEnlace && currentAssignment && currentAssignment\.room_id !== salaPedida/.test(b));
   assert(b.includes("guardarSalaFija(admin"));
+  // Sin sala: la respuesta lo dice para que la vista muestre el código.
+  assert(b.includes("necesitaCodigo: !salaPedida && await sinSala()"));
+  assert(!b.includes("order(\"assigned_at\""));
 });
 
 Deno.test("joinByCode y asignarSala guardan la sala fija", () => {

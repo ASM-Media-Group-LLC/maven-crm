@@ -10,7 +10,7 @@
 //     persona todavía no esté conectada;
 //   · también queda fija la sala del código o del enlace que el supervisor le dio;
 //   · al entrar sin sala, el servidor la manda a su fija; si no tiene (o esa sala
-//     se cerró), sigue como antes: su última sala o la primera.
+//     se cerró) y la sesión tiene varias salas, se le pide el código de su sala.
 //
 // La tabla llega por migración aplicada a mano y la edge se despliega al fundir:
 // todo lo de acá tolera que la tabla todavía no exista (lee null, no escribe).
@@ -20,18 +20,22 @@ export type Base = { from(tabla: string): any };
 
 export interface SalaDeLaSesion { id: string; sort_order?: number | null }
 
-/** A qué sala entra quien llega sin pedir una: su fija, si no su última, si no la
- *  primera por orden. Solo valen salas que siguen abiertas en esta sesión. */
+/** A qué sala entra quien llega sin pedir una (Alvaro, 18/11/2026):
+ *   · su sala fija, si sigue abierta;
+ *   · si no tiene y la sesión tiene UNA sola sala, esa (Editores, PR… entran sin
+ *     código, como siempre);
+ *   · si hay varias salas y no tiene fija: null = NO se le asigna ninguna y se le
+ *     pide el código de su sala (como hace una semana). Su «última sala» ya no
+ *     cuenta: así nadie cae en la sala de otro.
+ *  Solo valen salas que siguen abiertas en esta sesión. */
 export function elegirSalaPorDefecto(p: {
   fija: string | null;
-  ultima: string | null;
   salas: SalaDeLaSesion[];
 }): string | null {
   const abiertas = new Set(p.salas.map((s) => s.id));
   if (p.fija && abiertas.has(p.fija)) return p.fija;
-  if (p.ultima && abiertas.has(p.ultima)) return p.ultima;
-  const primera = [...p.salas].sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0))[0];
-  return primera?.id ?? null;
+  if (p.salas.length === 1) return p.salas[0].id;
+  return null;
 }
 
 export type DecisionAsignar =

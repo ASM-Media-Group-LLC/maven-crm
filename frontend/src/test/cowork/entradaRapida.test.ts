@@ -21,7 +21,8 @@ describe("entrar a Cowork rápido", () => {
   });
 
   it("después de unirse, la relectura es silenciosa (sin ruedita)", () => {
-    expect(vista).toMatch(/\.then\(\(\) => cowork\.refetch\(true\)\)/);
+    // 18/11/2026: si el servidor pide el código no relee; si entró, relee en silencio.
+    expect(vista).toMatch(/return cowork\.refetch\(true\);/);
     expect(pagina).not.toMatch(/joinSession\([^)]*\);\s*cowork\.refetch\(\);/);
   });
 

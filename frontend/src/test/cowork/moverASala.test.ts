@@ -51,6 +51,9 @@ describe("mover a una persona a otra sala", () => {
     expect(v).toMatch(/await cowork\.joinByCode\(code\)/);
     // La entrada sola no manda sala: el servidor elige la fija.
     expect(v).toMatch(/cowork\.joinSession\(sid, "participant"\)/);
+    // Con varias salas y sin fija: pantalla del código, sin reintentar ni «volver a mi sala».
+    expect(v).toMatch(/necesitaCodigo\) \{ setNecesitaCodigo\(true\); return; \}/);
+    expect(v).toMatch(/\{lastRoomId && !necesitaCodigo && \(/);
   });
 
   it("el hook llama a la acción de la edge", () => {
