@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter } from "react-router-dom";
 import type { ReactNode } from "react";
@@ -11,7 +11,9 @@ import type { ReactNode } from "react";
 // —nunca como «nadie tuvo cortes»—.
 
 let respuesta: { data: unknown; error: { message: string } | null } = { data: [], error: null };
-const rpc = vi.fn(async () => respuesta);
+// Cada corte del día (argos_llamadas_cortes_hoy, 18/11/2026).
+let cortesRespuesta: { data: unknown; error: { message: string } | null } = { data: [], error: null };
+const rpc = vi.fn(async (nombre?: string) => (nombre === "argos_llamadas_cortes_hoy" ? cortesRespuesta : respuesta));
 vi.mock("@/integrations/supabase/client", () => ({ supabase: { rpc: (...a: unknown[]) => rpc(...(a as [])) } }));
 vi.mock("@/hooks/useLanguage", () => {
   const idioma = { language: "es", t: (k: string, p?: Record<string, string | number>) => (p ? `${k} ${JSON.stringify(p)}` : k) };
@@ -101,18 +103,23 @@ describe("el panel", () => {
     expect(rpc).toHaveBeenCalledWith("argos_llamadas_hoy");
     expect(filas[0]).toHaveTextContent("Karem");
     expect(within(filas[0]).getByText("hr.llamadas.causa.internet_subida")).toBeInTheDocument();
+    // Compacto desde el 18/11/2026: el consejo y el resto se ven al abrir la fila.
+    expect(within(filas[0]).queryByText("hr.llamadas.consejo.internet_subida")).not.toBeInTheDocument();
+    fireEvent.click(within(filas[0]).getByRole("button", { expanded: false }));
     expect(within(filas[0]).getByText("hr.llamadas.consejo.internet_subida")).toBeInTheDocument();
     expect(within(filas[0]).getByText(/hr\.llamadas\.subida .*"n":"0\.9"/)).toBeInTheDocument();
     expect(within(filas[0]).getByText(/hr\.llamadas\.bajada .*"n":"22"/)).toBeInTheDocument();
     expect(within(filas[0]).getByText(/hr\.llamadas\.rtt .*115/)).toBeInTheDocument();
     expect(within(filas[0]).getByText(/hr\.llamadas\.perdida .*0\.1/)).toBeInTheDocument();
-    expect(within(filas[0]).getByText("Chrome 157 · Windows")).toBeInTheDocument();
-    expect(within(filas[0]).getByText("hr.llamadas.nc.fallo")).toBeInTheDocument();
+    expect(within(filas[0]).getByText(/Chrome 157 · Windows/)).toBeInTheDocument();
+    expect(within(filas[0]).getByText(/hr\.llamadas\.nc\.fallo/)).toBeInTheDocument();
+    // El internet, en una palabra (sube 0.9 Mbps: flojo).
+    expect(within(filas[0]).getByText("hr.llamadas.internet.flojo")).toBeInTheDocument();
     // La estimación de 1.000.000 kbps NO aparece como si fuera su internet.
     expect(within(filas[0]).queryByText(/hr\.llamadas\.estimada/)).toBeNull();
     expect(within(filas[0]).getByRole("link")).toHaveAttribute("href", "/hr/expediente/u-Karem");
     // Sin prueba de velocidad todavía: lo dice, no inventa un número.
-    expect(within(filas[1]).getByText("hr.llamadas.sinPrueba")).toBeInTheDocument();
+    expect(within(filas[1]).getByText("hr.llamadas.internet.sinMedir")).toBeInTheDocument();
     // Los tiles del día: 10 cortes, 1 grave, 2 personas, 1 sin cancelación de ruido.
     expect(screen.getByText("hr.llamadas.tile.cortes").previousSibling).toHaveTextContent("10");
     expect(screen.getByText("hr.llamadas.tile.graves").previousSibling).toHaveTextContent("1");
@@ -122,6 +129,8 @@ describe("el panel", () => {
   it("la estimación con sentido va rotulada como estimación, no como velocidad", async () => {
     respuesta = { error: null, data: [fila("Lina", { subida_estimada_kbps: 1132 })] };
     render(<LlamadasPanel />, { wrapper: envolver });
+    const lista = await screen.findByRole("list", { name: "hr.llamadas.titulo" });
+    fireEvent.click(within(lista).getByRole("button", { expanded: false }));
     expect(await screen.findByText(/hr\.llamadas\.estimada .*1132/)).toBeInTheDocument();
   });
 
@@ -170,5 +179,40 @@ describe("la pestaña en Argos", () => {
     const sinComentarios = sql.split("\n").map((l) => l.replace(/--.*$/, "")).join("\n");
     expect(sinComentarios).not.toMatch(/\b(insert\s+into|update\s+public|delete\s+from)\b/i);
     expect(sinComentarios).toMatch(/grant execute on function public\.argos_llamadas_hoy\(\) to authenticated/);
+  });
+});
+
+describe("en palabras, con filtros y por páginas (Alvaro, 18/11/2026)", () => {
+  it("cada persona dice cuántas veces, cuánto sin llamada y en cuánto volvía; al abrir, cada corte", async () => {
+    respuesta = { error: null, data: [fila("Karem", { cortes: 3, graves: 1 })] };
+    cortesRespuesta = { error: null, data: [
+      { user_id: "u-Karem", creado: "2026-11-18T20:42:00Z", fase: "parpadeo_ok", tipo: "internet", duracion_s: 12, volvio: true },
+      { user_id: "u-Karem", creado: "2026-11-18T19:10:00Z", fase: "caida", tipo: "caida", duracion_s: 228, volvio: true },
+      { user_id: "u-Karem", creado: "2026-11-18T15:05:00Z", fase: "parpadeo_ok", tipo: "internet", duracion_s: null, volvio: true },
+    ] };
+    render(<LlamadasPanel />, { wrapper: envolver });
+    const lista = await screen.findByRole("list", { name: "hr.llamadas.titulo" });
+    const [fila0] = within(lista).getAllByRole("listitem");
+    // 12 s + 228 s = 4 min sin llamada; promedio 120 s = 2 min.
+    expect(await within(fila0).findByText(/hr\.llamadas\.resumen\.veces.*"n":3.*sinLlamada.*dur\.min.*4.*volvia.*dur\.min.*2.*cayoUna/)).toBeInTheDocument();
+    fireEvent.click(within(fila0).getByRole("button", { expanded: false }));
+    expect(within(fila0).getByText("3:42 pm")).toBeInTheDocument();
+    expect(within(fila0).getAllByText("hr.llamadas.tipo.internet")).toHaveLength(2);
+    expect(within(fila0).getByText(/hr\.llamadas\.corte\.volvioEn.*dur\.s.*12/)).toBeInTheDocument();
+    expect(within(fila0).getByText("hr.llamadas.corte.volvio")).toBeInTheDocument();
+    cortesRespuesta = { data: [], error: null };
+  });
+
+  it("10 por página y el filtro «solo a quien se le cayó la llamada»", async () => {
+    respuesta = { error: null, data: Array.from({ length: 12 }, (_, i) => fila(`P${String(i).padStart(2, "0")}`, { cortes: 20 - i, graves: i === 11 ? 1 : 0 })) };
+    render(<LlamadasPanel />, { wrapper: envolver });
+    const lista = await screen.findByRole("list", { name: "hr.llamadas.titulo" });
+    expect(within(lista).getAllByRole("listitem")).toHaveLength(10);
+    fireEvent.click(screen.getByRole("button", { name: /hr\.llamadas\.pag\.siguiente/ }));
+    expect(within(screen.getByRole("list", { name: "hr.llamadas.titulo" })).getAllByRole("listitem")).toHaveLength(2);
+    fireEvent.click(screen.getByRole("button", { name: /hr\.llamadas\.filtro\.soloCaidas/ }));
+    const solo = within(screen.getByRole("list", { name: "hr.llamadas.titulo" })).getAllByRole("listitem");
+    expect(solo).toHaveLength(1);
+    expect(solo[0]).toHaveTextContent("P11");
   });
 });

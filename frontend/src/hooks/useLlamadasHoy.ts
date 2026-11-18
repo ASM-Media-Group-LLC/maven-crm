@@ -143,3 +143,57 @@ export function useLlamadasHoy() {
     },
   });
 }
+
+// ── CADA CORTE, EN PALABRAS (Alvaro, 18/11/2026) ─────────────────────────────
+// RPC argos_llamadas_cortes_hoy (migración 20261118234000): una fila por corte
+// del día con qué pasó, cuánto estuvo sin llamada y si volvió.
+
+export type TipoCorte = "internet" | "caida" | "no_volvio" | "recarga";
+export interface CorteDelDia {
+  creado: string;
+  tipo: TipoCorte;
+  /** Segundos sin llamada; null = no se sabe. */
+  duracionS: number | null;
+  volvio: boolean;
+}
+
+/** El resumen de una persona: cuántos, cuánto tiempo sin llamada en total y
+ *  cuánto tardaba en volver (promedio de los que se saben). */
+export function resumirCortes(cortes: CorteDelDia[]): { totalS: number | null; promedioS: number | null; sabidos: number } {
+  const sabidos = cortes.filter((c) => c.duracionS != null);
+  if (sabidos.length === 0) return { totalS: null, promedioS: null, sabidos: 0 };
+  const totalS = sabidos.reduce((s, c) => s + (c.duracionS ?? 0), 0);
+  return { totalS, promedioS: Math.round(totalS / sabidos.length), sabidos: sabidos.length };
+}
+
+/** El internet en una palabra (Alvaro: «un semáforo, no números»). */
+export type Semaforo = "bueno" | "flojo" | "malo" | "sin_medir";
+export function semaforoInternet(f: Pick<FilaLlamadas, "prueba_subida_mbps" | "prueba_bajada_mbps" | "rtt_ms" | "perdida_pct">): Semaforo {
+  const sub = f.prueba_subida_mbps, baj = f.prueba_bajada_mbps;
+  if (sub == null && baj == null) return "sin_medir";
+  const perdida = f.perdida_pct ?? 0;
+  if ((sub != null && sub < 0.8) || perdida >= 8) return "malo";
+  if (tonoSubida(sub) === "flojo" || tonoBajada(baj) === "flojo" || (f.rtt_ms ?? 0) > 250 || perdida >= 3) return "flojo";
+  return "bueno";
+}
+
+export function useCortesHoy() {
+  return useQuery<Map<string, CorteDelDia[]>>({
+    queryKey: ["argos-llamadas-cortes-hoy"],
+    refetchInterval: 60_000,
+    staleTime: 30_000,
+    retry: 1,
+    queryFn: async () => {
+      const db = supabase as unknown as { rpc: (f: string) => Promise<{ data: unknown[] | null; error: { message: string } | null }> };
+      const { data, error } = await db.rpc("argos_llamadas_cortes_hoy");
+      if (error) throw new Error(error.message);
+      const m = new Map<string, CorteDelDia[]>();
+      for (const r of (data ?? []) as Array<{ user_id: string; creado: string; tipo: TipoCorte; duracion_s: number | null; volvio: boolean }>) {
+        const l = m.get(r.user_id) ?? [];
+        l.push({ creado: r.creado, tipo: r.tipo, duracionS: r.duracion_s == null ? null : Number(r.duracion_s), volvio: !!r.volvio });
+        m.set(r.user_id, l);
+      }
+      return m;
+    },
+  });
+}

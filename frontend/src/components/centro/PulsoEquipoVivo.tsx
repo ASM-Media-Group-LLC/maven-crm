@@ -159,7 +159,7 @@ export function NumerosDelInicio({ coworkConectados, extra = [] }: { coworkConec
   return <ListaDeNumeros titulo={t("dashboard.centro.numeros")} icono={Gauge} filas={[...atajos, ...filas, ...extra]} />;
 }
 
-export default function PulsoEquipoVivo({ coworkConectados, conEquipo = false, conNumeros = true }: {
+export default function PulsoEquipoVivo({ coworkConectados, conEquipo = false, conNumeros = true, conCabecera = true }: {
   /** Conectados en Cowork según LiveKit (solo el Centro lo trae). Sin él, la
    *  primera tarjeta cuenta los conectados del propio Pulso. */
   coworkConectados?: number | null;
@@ -167,6 +167,8 @@ export default function PulsoEquipoVivo({ coworkConectados, conEquipo = false, c
   conEquipo?: boolean;
   /** Las 4 tarjetas de números. El inicio en dos columnas las pone aparte (NumerosDelInicio). */
   conNumeros?: boolean;
+  /** La línea «Pulso del equipo · En vivo · Solo visible para…». El inicio no la lleva. */
+  conCabecera?: boolean;
 }) {
   const { t, language } = useLanguage();
   const navigate = useNavigate();
@@ -186,7 +188,9 @@ export default function PulsoEquipoVivo({ coworkConectados, conEquipo = false, c
 
   return (
     <section className="space-y-3">
-      {/* Cabecera del Pulso (solo título + en vivo + aviso) */}
+      {/* Cabecera del Pulso (solo título + en vivo + aviso). En el inicio del
+          dueño ya no va (Alvaro, 18/11/2026: «no se necesita, que quede más espacio»). */}
+      {conCabecera && (
       <div className="flex flex-wrap items-center justify-between gap-2 px-0.5">
         <h2 className="flex items-center gap-2 text-sm font-semibold">
           <span className="flex h-7 w-7 items-center justify-center rounded-full bg-primary/[0.08] text-primary/90 ring-1 ring-primary/20"><Activity className="h-4 w-4" /></span>
@@ -203,6 +207,7 @@ export default function PulsoEquipoVivo({ coworkConectados, conEquipo = false, c
           <ShieldAlert className="h-3.5 w-3.5" />{t("dashboard.pulso.soloVigilancia")}
         </span>
       </div>
+      )}
 
       {/* «Quién está bajando ahora» (11/11): computadora, arriba del Pulso. Se
           dibuja solo fuera del teléfono (allá va lo primero de la página). */}

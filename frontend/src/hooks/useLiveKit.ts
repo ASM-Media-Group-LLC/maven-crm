@@ -1715,15 +1715,22 @@ export function useLiveKit() {
         setConnectionState(state);
       });
 
+      // Cuánto duró el corte: el «parpadeo» se intenta guardar justo sin
+      // internet y muchas veces no llega; el «parpadeo_ok» sí, así que lleva la
+      // duración (Argos › Llamadas: «cuánto tardó en volver», 18/11/2026).
+      let inicioDelCorte: number | null = null;
       room.on(RoomEvent.Reconnecting, () => {
         setIsReconnecting(true);
+        inicioDelCorte = Date.now();
         anotarCorte("parpadeo", room.name);
         console.info("[LiveKit] Reconnecting...");
       });
 
       room.on(RoomEvent.Reconnected, () => {
         setIsReconnecting(false);
-        anotarCorte("parpadeo_ok", room.name);
+        const duracion_ms = inicioDelCorte != null ? Date.now() - inicioDelCorte : null;
+        inicioDelCorte = null;
+        anotarCorte("parpadeo_ok", room.name, null, duracion_ms != null ? { duracion_ms } : undefined);
         console.info("[LiveKit] Reconnected successfully");
         ajustarVideoAjeno();
         refreshParticipants();

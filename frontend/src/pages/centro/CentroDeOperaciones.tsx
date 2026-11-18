@@ -1,8 +1,7 @@
 import { useMemo } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowRight, BarChart3, Building2, Clock, DoorOpen, Headset, MessageCircle, Timer, Users } from "lucide-react";
-import SelectorDeTablero from "@/pages/dashboard/SelectorDeTablero";
+import { ArrowRight, BarChart3, Clock, DoorOpen, MessageCircle, Timer } from "lucide-react";
 import PulsoEquipoVivo, { NumerosDelInicio } from "@/components/centro/PulsoEquipoVivo";
 import QuienEstaBajando from "@/components/vigilancia/QuienEstaBajando";
 import SaludPlataformaBloque from "@/components/centro/SaludPlataformaBloque";
@@ -17,7 +16,6 @@ import { useEquipoTiempoCowork } from "@/hooks/useEquipoTiempoCowork";
 import { usePanelMensajeria } from "@/hooks/usePanelMensajeria";
 import { supabase } from "@/integrations/supabase/client";
 import { useLanguage } from "@/hooks/useLanguage";
-import { BUILD_PROPIO } from "@/lib/versionDelBundle";
 import { tituloBonito } from "@/lib/tituloBonito";
 
 // CENTRO DE OPERACIONES — el tablero por defecto del admin desde el rediseño
@@ -133,32 +131,10 @@ export default function CentroDeOperaciones() {
           nota ahora (Alvaro, 11/11). En la computadora va arriba del Pulso. */}
       <QuienEstaBajando lugar="arriba" />
 
-      {/* Cabecera */}
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <SelectorDeTablero actual="centro" />
-          <p className="mt-0.5 text-sm text-muted-foreground">{t("dashboard.centro.subtitulo")}</p>
-          {/* La hora del build que carga ESTA pestaña (meta maven-build): con verla,
-              se sabe si el último cambio ya llegó, sin adivinar. 0 = dev/tests. */}
-          {BUILD_PROPIO > 0 && (
-            <p className="mt-0.5 text-xs text-muted-foreground/80 tabular-nums">
-              {t("dashboard.centro.version")}{" "}
-              {new Date(BUILD_PROPIO).toLocaleString(undefined, { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}
-            </p>
-          )}
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <Button asChild variant="outline" size="sm" className="rounded-control">
-            <Link to="/oficina-ai"><Building2 className="mr-1.5 h-4 w-4" />{t("dashboard.centro.virtualOffice")}</Link>
-          </Button>
-          <Button asChild variant="outline" size="sm" className="rounded-control">
-            <Link to="/cowork"><Headset className="mr-1.5 h-4 w-4" />{t("dashboard.centro.abrirCowork")}</Link>
-          </Button>
-          <Button asChild variant="outline" size="sm" className="rounded-control">
-            <Link to="/messenger"><MessageCircle className="mr-1.5 h-4 w-4" />{t("dashboard.centro.abrirMessenger")}</Link>
-          </Button>
-        </div>
-      </div>
+      {/* Sin cabecera (Alvaro, 18/11/2026: «todo eso no se necesita, volátelo,
+          que quede más espacio y que quede estético»): ni el título con el
+          selector, ni la versión de la app, ni los botones de Virtual Office,
+          Cowork y Messenger (están en el menú). La página abre con lo que importa. */}
 
       {/* DOS COLUMNAS (Alvaro, 13/11/2026: «una cosa arriba, abajo, cuadro, cuadro,
           cuadro… no se siente estético»). Izquierda, ancha: lo que pasa con la
@@ -169,7 +145,7 @@ export default function CentroDeOperaciones() {
           {/* Pulso del equipo en vivo (solo supervisor+): conectados + nota viva +
               quién la baja + cajas por equipo. Devuelve null para quien no vigila.
               Le pasamos los conectados EN COWORK (de LiveKit) para el número de arriba. */}
-          <PulsoEquipoVivo coworkConectados={sesionesQ.isLoading ? null : vivo.conectados} conNumeros={false} />
+          <PulsoEquipoVivo coworkConectados={sesionesQ.isLoading ? null : vivo.conectados} conNumeros={false} conCabecera={false} />
 
           {/* Puntualidad de la semana (Alvaro, 18/11/2026): reemplaza la gráfica de
               horas totales, que «no tiene ningún sentido». */}
