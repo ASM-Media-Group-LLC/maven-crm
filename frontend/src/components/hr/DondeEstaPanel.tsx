@@ -7,7 +7,6 @@ import type { TranslationKey } from "@/lib/i18n";
 import { Button } from "@/components/ui/button";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { urlCaptura } from "@/hooks/useMonitorEventos";
 import { UserAvatar } from "@/components/UserAvatar";
 import { supabase } from "@/integrations/supabase/client";
@@ -49,6 +48,13 @@ const PUNTO: Record<Tono, string> = {
   gris: "bg-muted-foreground/50",
 };
 
+
+// En el teléfono las fichas corren de lado (una sola fila); en computador se acomodan.
+const FILA_DE_FICHAS = "-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-0.5 [scrollbar-width:none] sm:flex-wrap sm:overflow-visible sm:pb-0";
+const ficha = (activa: boolean) =>
+  `inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border px-2.5 py-1 text-xs font-medium transition-colors ${
+    activa ? "border-foreground/30 bg-foreground/10 text-foreground" : "border-border/40 bg-card/30 text-muted-foreground hover:bg-card/50"
+  }`;
 
 type Filtro = "enTurno" | "rojo" | "naranja" | "enCowork" | "gris";
 const FILTROS: { k: Filtro; label: TranslationKey; punto: string }[] = [
@@ -317,40 +323,32 @@ export function DondeEstaPanel() {
           </div>
         </div>
 
-        {/* Situación y equipo en dos menús (Alvaro, 18/11/2026). */}
-        <div className="flex gap-2">
-          <Select value={elegido ? "" : filtro} onValueChange={(v) => { setFiltro(v as FiltroSituacion); setElegido(null); }}>
-            <SelectTrigger className="h-9 w-full text-sm sm:w-56" aria-label={t("hr.donde.porEstado")}>
-              <SelectValue placeholder={t("hr.donde.porEstado")} />
-            </SelectTrigger>
-            <SelectContent>
-              {SITUACIONES.map((x) => (
-                <SelectItem key={x.k} value={x.k}>
-                  <span className="flex items-center gap-2">
-                    {x.punto ? <span className={`h-1.5 w-1.5 rounded-full ${x.punto}`} /> : <span className="h-1.5 w-1.5" />}
-                    {t(x.label)}
-                    <span className="tabular-nums text-muted-foreground">{conteo[x.k]}</span>
-                  </span>
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          {equipos.length > 1 && (
-            <Select value={equipo ?? "__todos"} onValueChange={(v) => { setEquipo(v === "__todos" ? null : v); setElegido(null); }}>
-              <SelectTrigger className="h-9 w-full text-sm sm:w-56" aria-label={t("hr.donde.porEquipo")}>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="__todos">{t("hr.donde.todosLosEquipos")}</SelectItem>
-                {equipos.map(([nombre, n]) => (
-                  <SelectItem key={nombre} value={nombre}>
-                    <span className="flex items-center gap-2">{nombre}<span className="tabular-nums text-muted-foreground">{n}</span></span>
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          )}
+        {/* Por situación: un toque y filtra (Alvaro, 18/11/2026: «antes estaba
+            bien, un botoncito»). Entra en «Todos». */}
+        <div className={FILA_DE_FICHAS} role="group" aria-label={t("hr.donde.porEstado")}>
+          {SITUACIONES.map((x) => (
+            <button key={x.k} type="button" onClick={() => { setFiltro(x.k); setElegido(null); }} aria-pressed={!elegido && filtro === x.k} className={ficha(!elegido && filtro === x.k)}>
+              {x.punto && <span className={`h-1.5 w-1.5 rounded-full ${x.punto}`} />}
+              {t(x.label)}
+              <span className="tabular-nums opacity-70">{conteo[x.k]}</span>
+            </button>
+          ))}
         </div>
+
+        {/* Por equipo. */}
+        {equipos.length > 1 && (
+          <div className={FILA_DE_FICHAS} role="group" aria-label={t("hr.donde.porEquipo")}>
+            <button type="button" onClick={() => { setEquipo(null); setElegido(null); }} aria-pressed={!elegido && !equipo} className={ficha(!elegido && !equipo)}>
+              {t("hr.donde.todosLosEquipos")}
+            </button>
+            {equipos.map(([nombre, n]) => (
+              <button key={nombre} type="button" onClick={() => { setEquipo(nombre); setElegido(null); }} aria-pressed={!elegido && equipo === nombre} className={ficha(!elegido && equipo === nombre)}>
+                {nombre}
+                <span className="tabular-nums opacity-70">{n}</span>
+              </button>
+            ))}
+          </div>
+        )}
 
         {vistas.length === 0 ? (
           <div className="flex flex-col items-center gap-2 py-10 text-center text-muted-foreground">
