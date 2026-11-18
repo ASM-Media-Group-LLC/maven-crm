@@ -19,6 +19,7 @@ import {
   type QuienTieneLaSala,
 } from "@/lib/sesionDuplicada";
 import { escritorio } from "@/lib/escritorio";
+import { pausarVideoConAppEscondida } from "@/lib/videoEscondido";
 import { esperaDeReentrada, fueUnaCaida, MAX_REENTRADAS } from "@/lib/conexionSala";
 import { faseSegunSueno, vigiaDelSueno } from "@/lib/equipoDormido";
 import { DEBIL_INICIAL, MIRAR_DEBIL_CADA_MS, siguienteDebil } from "@/lib/internetDebil";
@@ -1695,6 +1696,9 @@ export function useLiveKit() {
       afirmarRelojesDeLiveKit();
       const room = new Room(opcionesDeSala(roomName));
       roomRef.current = room;
+      // App de computador minimizada o en la barra: el video de los demás en
+      // pausa, como en una pestaña oculta (lib/videoEscondido.ts, 18/11/2026).
+      room.once(RoomEvent.Disconnected, pausarVideoConAppEscondida(room));
       // Idempotente (solo toca lo que está distinto): se llama en cada evento que
       // puede traer una pista nueva y en el repaso de cada 3 s.
       const ajustarVideoAjeno = () => {

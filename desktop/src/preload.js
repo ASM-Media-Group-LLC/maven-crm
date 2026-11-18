@@ -65,6 +65,13 @@ contextBridge.exposeInMainWorld("mavenEscritorio", {
   pantallaAutomatica: (si) => ipcRenderer.send("maven:pantalla-auto", Boolean(si)),
   /** Las veces que la app se cayó o se congeló y se recuperó sola (se leen una vez). */
   ultimoCierre: () => ipcRenderer.invoke("maven:ultimo-cierre"),
+  /** ¿Alguien ve la ventana? false = minimizada o escondida en la barra. */
+  visible: () => ipcRenderer.invoke("maven:visible"),
+  alCambiarVisibilidad: (cb) => {
+    const f = (_e, v) => cb(v !== false);
+    ipcRenderer.on("maven:visible", f);
+    return () => ipcRenderer.removeListener("maven:visible", f);
+  },
   /** Memoria: { app_mb, equipo_gb, libre_gb }. */
   memoria: () => ipcRenderer.invoke("maven:memoria"),
   /** Cada minuto: los tramos de app/página al frente (ver desktop/src/apps.js). */
