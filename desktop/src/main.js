@@ -29,6 +29,7 @@ const { iniciarActualizaciones } = require("./actualizar");
 const { avisarLlamada, cerrarAvisoLlamada } = require("./llamada");
 const { iniciarVigiaDeApps, segundosInactivo } = require("./apps");
 const { pantallaPermitida, primeraVezSinPermiso, guiaPermisoPantalla } = require("./permisoPantalla");
+const { revisarCamaraYMicrofono } = require("./permisoCamaraWindows");
 const { vigilarVentana, leerYBorrarCierres } = require("./recuperarse");
 
 const URL_MAVEN = process.env.MAVEN_URL || "https://app.maven-ai.me/login";
@@ -262,7 +263,11 @@ ipcMain.on("maven:pantalla-auto", (e, si) => {
 function configurarPermisos() {
   const s = session.defaultSession;
   s.setPermissionRequestHandler((wc, permiso, responder) => {
-    responder(esDeMaven(wc.getURL()));
+    const deMaven = esDeMaven(wc.getURL());
+    responder(deMaven);
+    // Windows no pregunta: si tiene apagada la cámara o el micrófono para las
+    // apps, Cowork se quedaba sin imagen o sin voz sin avisar. Aquí se explica.
+    if (deMaven && permiso === "media") revisarCamaraYMicrofono(ventana);
   });
   s.setPermissionCheckHandler((_wc, _permiso, origen) => esDeMaven(origen || ""));
   s.setSpellCheckerLanguages(["es", "en-US"].filter((l) => s.availableSpellCheckerLanguages.includes(l)));

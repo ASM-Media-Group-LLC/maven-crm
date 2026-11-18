@@ -95,12 +95,12 @@ export const guiaApp = {
     en: "Maven already shows as on but it keeps asking? Select it, remove it with “−”, add it again with “+” (from Applications) and reopen Maven.",
   },
   "guiaApp.paso.permisos.windows": {
-    es: "Si Maven te pide la cámara o el micrófono, toca «Permitir».",
-    en: "If Maven asks for your camera or microphone, tap “Allow”.",
+    es: "En Windows, Maven no te pide permisos: usa la cámara y el micrófono directo. Si Windows los tiene apagados, la app te avisa: toca «Abrir Configuración».",
+    en: "On Windows, Maven doesn't ask for permissions: it uses your camera and microphone right away. If Windows has them turned off, the app tells you: tap “Open Settings”.",
   },
   "guiaApp.paso.permisos.windowsArreglo": {
-    es: "¿No se te ve la cámara o no se te escucha? Abre Configuración → Privacidad y seguridad → Cámara (y después Micrófono) y activa «Permitir que las aplicaciones de escritorio accedan».",
-    en: "Camera not showing or nobody can hear you? Open Settings → Privacy & security → Camera (and then Microphone) and turn on “Let desktop apps access”.",
+    es: "Ahí prende todo: el acceso a la cámara y «Permitir que las aplicaciones de escritorio accedan» (o Maven, si sale en la lista). Haz lo mismo en Micrófono y vuelve a entrar a Cowork.",
+    en: "There, turn everything on: camera access and “Let desktop apps access” (or Maven, if it's on the list). Do the same under Microphone and join Cowork again.",
   },
 
   "guiaApp.paso.listo.titulo": { es: "Listo", en: "You're done" },
@@ -141,6 +141,9 @@ export const guiaApp = {
   "guiaApp.dibujo.permitir": { es: "Permitir", en: "Allow" },
   "guiaApp.dibujo.grabacionPantalla": { es: "Grabación de pantalla y audio del sistema", en: "Screen & System Audio Recording" },
   "guiaApp.dibujo.salirYAbrir": { es: "Salir y volver a abrir", en: "Quit & Reopen" },
+  "guiaApp.dibujo.avisoWindows": { es: "Windows no deja que Maven use la cámara", en: "Windows won't let Maven use the camera" },
+  "guiaApp.dibujo.ahoraNo": { es: "Ahora no", en: "Not now" },
+  "guiaApp.dibujo.abrirConfiguracion": { es: "Abrir Configuración", en: "Open Settings" },
   "guiaApp.dibujo.camaraWindows": { es: "Privacidad y seguridad › Cámara", en: "Privacy & security › Camera" },
   "guiaApp.dibujo.appsEscritorio": {
     es: "Permitir que las aplicaciones de escritorio accedan",

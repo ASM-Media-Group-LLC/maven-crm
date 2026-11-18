@@ -201,7 +201,7 @@ export function VistaGuiaApp({ sistemaInicial, enApp, enCelular, desde }: {
                 <Paso
                   n={4}
                   titulo={t("guiaApp.paso.permisos.titulo")}
-                  dibujo={<><DibujoPideCamara />{mac ? <DibujoGrabacionMac /> : <DibujoCamaraWindows />}</>}
+                  dibujo={mac ? <><DibujoPideCamara /><DibujoGrabacionMac /></> : <><DibujoCamaraApagadaWindows /><DibujoCamaraWindows /></>}
                 >
                   {mac ? (
                     <>
@@ -449,6 +449,25 @@ function DibujoGrabacionMac() {
         </div>
       </div>
     </Ventana>
+  );
+}
+
+/** Windows no pregunta nada: si tiene la cámara o el micrófono apagados, es la
+ *  app de Maven la que avisa, con «Abrir Configuración» (desktop/src/permisoCamaraWindows.js). */
+function DibujoCamaraApagadaWindows() {
+  const { t } = useLanguage();
+  return (
+    <div className="w-full max-w-[240px] rounded-xl border border-border bg-background p-3 text-center shadow-sm">
+      <div className="flex justify-center"><IconoApp tam="sm" /></div>
+      <p className="mt-2 text-[11px] font-semibold leading-snug text-foreground">{t("guiaApp.dibujo.avisoWindows")}</p>
+      <div className="mt-2.5 grid grid-cols-2 gap-1.5">
+        <span className="rounded-control bg-muted px-2 py-1 text-[10px] font-medium text-foreground">{t("guiaApp.dibujo.ahoraNo")}</span>
+        <span className="relative rounded-control bg-primary px-2 py-1 text-[10px] font-semibold text-primary-foreground">
+          {t("guiaApp.dibujo.abrirConfiguracion")}
+          <Marcador n={1} />
+        </span>
+      </div>
+    </div>
   );
 }
 
