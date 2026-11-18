@@ -6,6 +6,7 @@
 // campana de mensajes del topbar. Duplicar esto era garantía de que un día una
 // dijera "📷 Foto" y la otra mostrara una URL.
 import { ConversationWithDetails } from "./types";
+import { datosDeLlamada, textoDeLlamada } from "./components/AvisoDeLlamada";
 import type { Language, TranslationKey } from "@/lib/i18n";
 
 // El `t` del componente que dibuja (useLanguage). Se pasa desde afuera y no se
@@ -44,7 +45,11 @@ export function getMessagePreview(
   if (!lastMsg) return t("messenger.preview.sinMensajes");
   if (lastMsg.is_deleted) return t("messenger.preview.eliminado");
   // El texto de un mensaje de sistema es DATO (se guardó así en chat_messages).
-  if (lastMsg.type === "system") return `ℹ️ ${lastMsg.content || ""}`;
+  if (lastMsg.type === "system") {
+    const llamada = datosDeLlamada(lastMsg.content_rich);
+    if (llamada) return `📞 ${textoDeLlamada(llamada, t)}`;
+    return `ℹ️ ${lastMsg.content || ""}`;
+  }
   let body = "";
   if (lastMsg.type === "file") {
     const fn = lastMsg.file_name || "";

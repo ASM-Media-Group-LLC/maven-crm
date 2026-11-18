@@ -129,7 +129,7 @@ export default function MessengerPage() {
   const { isOnline, onlineUsers, getStatus } = useOnlinePresence();
   const { user } = useAuth();
   const { t } = useLanguage();
-  const { initiateCall } = useCall();
+  const { initiateCall, initiateGroupCall } = useCall();
   const { isPinned, togglePin, pinnedOrder, reorderPinned } = usePinnedChats();
   const { isArchived, toggleArchive } = useArchivedChats();
   const { isAdmin: isSystemAdmin } = useUserRole();
@@ -295,7 +295,7 @@ export default function MessengerPage() {
     setNewGroupOpen(false);
   };
 
-  const handleStartVideoCall = async (conv: ConversationWithDetails) => {
+  const handleStartVideoCall = async (conv: ConversationWithDetails, tipo: "audio" | "video" = "video") => {
     // 1-a-1: llamada estilo WhatsApp — al otro le SUENA y aparece el modal para
     // aceptar o rechazar, esté en la sección de Maven que esté. Se detecta por
     // `type === "direct"` (confiable), NO por participants.length: esa lista
@@ -317,18 +317,27 @@ export default function MessengerPage() {
       if (otroId) {
         // `initiateCall` crea el "ringing" (dispara el modal por realtime + el
         // push) y abre la sala.
-        await initiateCall(conv.id, otroId, conv.displayName, "video");
+        await initiateCall(conv.id, otroId, conv.displayName, tipo);
         return;
       }
     }
-    // Grupo (o no se pudo resolver el otro) → se comparte el link. Hacer sonar
-    // a varios a la vez es otra vuelta (la tabla `calls` tiene un solo receiver).
-    const roomName = `call-${conv.id}`;
-    openCallInNewTab(roomName, true, conv.displayName);
-    const callLink = `${window.location.origin}/call/${encodeURIComponent(roomName)}`;
-    // Este texto es un MENSAJE que se guarda en chat_messages y lo leen todos los
-    // del grupo, cada uno en su idioma: es dato, no se traduce.
-    await sendMessage(`📹 Videollamada iniciada\n${callLink}`, "text");
+    // Grupo: le suena a todos los miembros (Alvaro, 18/11/2026). Antes se pegaba
+    // un link en el chat y nadie recibía timbre. La lista se pide a la base: la
+    // de la conversación viene recortada en grupos grandes.
+    if (!user?.id) return;
+    const { data: miembros, error } = await supabase
+      .from("chat_participants")
+      .select("user_id")
+      .eq("conversation_id", conv.id);
+    if (error) {
+      toast.error(t("messenger.llamada.noSePudo"));
+      return;
+    }
+    try {
+      await initiateGroupCall(conv.id, (miembros ?? []).map((m) => m.user_id as string), conv.displayName, tipo);
+    } catch {
+      toast.error(t("messenger.llamada.noSePudo"));
+    }
   };
 
   const handleDeleteChat = async (chatId: string) => {
