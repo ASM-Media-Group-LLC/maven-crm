@@ -6,6 +6,7 @@ import {
   EXIGE_TODO, LATIDO_VENCIDO_MS, TOPE_SIN_CONEXION_MS, VENTANA_SIN_CONEXION_MS, type Exigencias, type TramoGuardado,
 } from "../_shared/cowork-tiempo.ts";
 import { agenciaDePersona, agenciaDeSesion, esUuid, revisarPedido, topeDeLaTabla } from "./agencia.ts";
+import { decidirAsignarSala, elegirSalaPorDefecto, guardarSalaFija, leerSalaFija } from "./sala-fija.ts";
 
 const corsHeaders = (req: Request) => corsFor(req, { "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version" });
 
@@ -505,6 +506,11 @@ serve(async (req) => {
     if (action === "joinSession") {
       const { sessionId, role, hostCode, roomId } = body;
       if (!sessionId) return err(req, "sessionId required");
+      // `porEnlace`: el `roomId` viene del enlace que dio el supervisor (no de una
+      // reanudación). Ese enlace MUEVE a la persona aunque ya tenga sala y la deja
+      // fija ahí (Alvaro, 18/11/2026). Sin la marca, el roomId solo vale si no
+      // tiene sala, como siempre.
+      const porEnlace = body.porEnlace === true && esUuid(roomId);
 
       // Check session exists and is active
       const { data: session } = await admin.from("cowork_sessions").select("*").eq("id", sessionId).eq("status", "active").single();
@@ -540,18 +546,22 @@ serve(async (req) => {
       // SALA POR DEFECTO (Alvaro, 13/11/2026: «con que estén en un tipo de rol
       // deberían de poder entrar»). El participante solo ve SU sala (RLS), así que
       // quien es nuevo en un Cowork no tiene a cuál entrar y se le pedía código. Sin
-      // `roomId`, el servidor elige: su última sala de esta sesión o la primera.
+      // `roomId`, el servidor elige (18/11/2026): su SALA FIJA (la que le puso el
+      // supervisor); si no tiene y hay una sola sala, esa; con varias salas y sin
+      // fija no se le asigna nada y la respuesta dice `necesitaCodigo`.
       const salaPorDefecto = async (): Promise<string | null> => {
-        const { data: ultima } = await admin.from("cowork_room_assignments")
-          .select("room_id").eq("session_id", sessionId).eq("user_id", userId)
-          .order("assigned_at", { ascending: false }).limit(1).maybeSingle();
-        if (ultima?.room_id) {
-          const { data: sigue } = await admin.from("cowork_rooms").select("id").eq("id", ultima.room_id).eq("session_id", sessionId).maybeSingle();
-          if (sigue) return sigue.id as string;
-        }
-        const { data: primera } = await admin.from("cowork_rooms").select("id").eq("session_id", sessionId)
-          .order("sort_order", { ascending: true }).limit(1).maybeSingle();
-        return (primera?.id as string | undefined) ?? null;
+        const [fija, { data: salas }] = await Promise.all([
+          leerSalaFija(admin, sessionId, userId),
+          admin.from("cowork_rooms").select("id, sort_order").eq("session_id", sessionId),
+        ]);
+        return elegirSalaPorDefecto({ fija, salas: salas ?? [] });
+      };
+      // Participante sin sala activa al terminar: tiene que poner el código.
+      const sinSala = async (): Promise<boolean> => {
+        if (memberRole !== "participant") return false;
+        const { data } = await admin.from("cowork_room_assignments")
+          .select("id").eq("session_id", sessionId).eq("user_id", userId).eq("is_active", true).maybeSingle();
+        return !data;
       };
       const salaPedida: string | null = roomId ?? (memberRole === "participant" ? await salaPorDefecto() : null);
 
@@ -564,18 +574,31 @@ serve(async (req) => {
           // If participant re-joins with a roomId but has no active assignment, create one
           if (memberRole === "participant" && salaPedida) {
             const { data: currentAssignment } = await admin.from("cowork_room_assignments")
-              .select("id").eq("session_id", sessionId).eq("user_id", userId).eq("is_active", true).single();
-            if (!currentAssignment) {
-              const { data: roomCheck } = await admin.from("cowork_rooms")
-                .select("id").eq("id", salaPedida).eq("session_id", sessionId).single();
-              if (roomCheck) {
-                await admin.from("cowork_room_assignments").insert({
-                  session_id: sessionId, user_id: userId, room_id: salaPedida, assigned_by: userId,
-                });
+              .select("id, room_id").eq("session_id", sessionId).eq("user_id", userId).eq("is_active", true).maybeSingle();
+            const { data: roomCheck } = await admin.from("cowork_rooms")
+              .select("id, name").eq("id", salaPedida).eq("session_id", sessionId).maybeSingle();
+            if (roomCheck && !currentAssignment) {
+              await admin.from("cowork_room_assignments").insert({
+                session_id: sessionId, user_id: userId, room_id: salaPedida, assigned_by: userId,
+              });
+            } else if (roomCheck && porEnlace && currentAssignment && currentAssignment.room_id !== salaPedida) {
+              // El enlace del supervisor MUEVE: se apaga la vigente y se crea la
+              // nueva (el índice único solo deja una activa por persona y sesión).
+              await admin.from("cowork_room_assignments").update({ is_active: false }).eq("id", currentAssignment.id);
+              const { error: insErr } = await admin.from("cowork_room_assignments").insert({
+                session_id: sessionId, user_id: userId, room_id: salaPedida, assigned_by: userId,
+              });
+              if (insErr) {
+                await admin.from("cowork_room_assignments").update({ is_active: true }).eq("id", currentAssignment.id);
+                return err(req, insErr.message, 500);
               }
             }
+            if (roomCheck && porEnlace) {
+              await guardarSalaFija(admin, { sessionId, userId, roomId: salaPedida, por: userId });
+              return json(req, { membership: existing, alreadyJoined: true, roomId: salaPedida, roomName: roomCheck.name });
+            }
           }
-          return json(req, { membership: existing, alreadyJoined: true });
+          return json(req, { membership: existing, alreadyJoined: true, necesitaCodigo: !salaPedida && await sinSala() });
         }
 
         // Un HOST nunca se degrada a participante por esta puerta (07/09/2026:
@@ -605,6 +628,7 @@ serve(async (req) => {
             await admin.from("cowork_room_assignments").insert({
               session_id: sessionId, user_id: userId, room_id: salaPedida, assigned_by: userId,
             });
+            if (porEnlace) await guardarSalaFija(admin, { sessionId, userId, roomId: salaPedida, por: userId });
           }
         }
 
@@ -624,10 +648,11 @@ serve(async (req) => {
           await admin.from("cowork_room_assignments").insert({
             session_id: sessionId, user_id: userId, room_id: salaPedida, assigned_by: userId,
           });
+          if (porEnlace) await guardarSalaFija(admin, { sessionId, userId, roomId: salaPedida, por: userId });
         }
       }
 
-      return json(req, { membership, alreadyJoined: false });
+      return json(req, { membership, alreadyJoined: false, necesitaCodigo: !salaPedida && await sinSala() });
     }
 
     // ═══════════════════════════════════════════════════════════════
@@ -677,6 +702,8 @@ serve(async (req) => {
           session_id: room.session_id, user_id: userId, room_id: room.id, assigned_by: userId,
         });
         if (asgErr) return err(req, asgErr.message, 500);
+        // El código lo dio el supervisor: esa es su sala desde ahora (sala fija).
+        await guardarSalaFija(admin, { sessionId: room.session_id, userId, roomId: room.id, por: userId });
       }
 
       return json(req, {
@@ -716,13 +743,33 @@ serve(async (req) => {
 
       const { data: miembro } = await admin.from("cowork_memberships")
         .select("role").eq("session_id", sessionId).eq("user_id", target).maybeSingle();
-      if (!miembro) return err(req, "Esa persona no está en esta sesión", 404);
       // Los anfitriones trabajan desde el Hub, sin sala asignada.
-      if (miembro.role === "host") return err(req, "A un anfitrión no se le asigna sala", 400);
+      if (miembro && miembro.role === "host") return err(req, "A un anfitrión no se le asigna sala", 400);
 
       const { data: actual } = await admin.from("cowork_room_assignments")
         .select("id, room_id").eq("session_id", sessionId).eq("user_id", target).eq("is_active", true).maybeSingle();
-      if (actual?.room_id === roomId) return json(req, { ok: true, sinCambio: true, roomId, roomName: sala.name });
+
+      // SALA FIJA (Alvaro, 18/11/2026): lo que hace el supervisor es dejar a la
+      // persona fija en esa sala. Si está conectada, además se la mueve ya; si no
+      // (o todavía no es miembro de la sesión, pero es de esta agencia), se guarda
+      // solo la fija y entra ahí la próxima vez que abra Cowork.
+      const decision = decidirAsignarSala({
+        rolMiembro: miembro?.role ?? null,
+        tieneSalaActiva: !!actual,
+        mismaAgencia: miembro ? true : (!!miAgencia && (await agenciaDePersona(admin, target)) === miAgencia),
+      });
+      if (decision === "fuera") return err(req, "Esa persona no está en esta sesión", 404);
+      if (decision === "es-anfitrion") return err(req, "A un anfitrión no se le asigna sala", 400);
+
+      if (decision === "solo-fija") {
+        const ok = await guardarSalaFija(admin, { sessionId, userId: target, roomId, por: userId });
+        if (!ok) return err(req, "No se pudo guardar la sala fija. Intenta de nuevo.", 500);
+        console.log(`[cowork] ${userId} dejó a ${target} fijo en la sala ${roomId} (${sessionId}, sin conectar)`);
+        return json(req, { ok: true, soloFija: true, roomId, roomName: sala.name });
+      }
+
+      const fija = await guardarSalaFija(admin, { sessionId, userId: target, roomId, por: userId });
+      if (actual?.room_id === roomId) return json(req, { ok: true, sinCambio: true, fija, roomId, roomName: sala.name });
 
       if (actual) {
         const { error: offErr } = await admin.from("cowork_room_assignments").update({ is_active: false }).eq("id", actual.id);
@@ -736,8 +783,8 @@ serve(async (req) => {
         if (actual) await admin.from("cowork_room_assignments").update({ is_active: true }).eq("id", actual.id);
         return err(req, insErr.message, 500);
       }
-      console.log(`[cowork] ${userId} movió a ${target} a la sala ${roomId} (${sessionId})`);
-      return json(req, { ok: true, roomId, roomName: sala.name });
+      console.log(`[cowork] ${userId} movió a ${target} a la sala ${roomId} (${sessionId}) y la dejó fija`);
+      return json(req, { ok: true, fija, roomId, roomName: sala.name });
     }
 
     // ═══════════════════════════════════════════════════════════════

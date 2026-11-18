@@ -10,7 +10,13 @@
 // Regla: un host nunca se auto-une como participante. A las salas entra desde
 // el tablero, sin cambiar de rol.
 
-export type Decision = "nada" | "unirse-como-host" | "unirse-como-participante";
+//
+// SALA FIJA (Alvaro, 18/11/2026): el enlace con `?room=` que da el supervisor
+// MUEVE al participante aunque ya tenga sala (antes se ignoraba si ya tenía una)
+// y lo deja fijo ahí. Para eso hace falta saber en qué sala está (`salaActual`):
+// si ya está en la del enlace, no hay nada que hacer.
+
+export type Decision = "nada" | "unirse-como-host" | "unirse-como-participante" | "mover-de-sala";
 
 export function decidirAutoJoin(p: {
   role: string | null;
@@ -18,6 +24,8 @@ export function decidirAutoJoin(p: {
   roomId: string | null;
   membresia: { role: string } | null;
   tieneAsignacion: boolean;
+  /** La sala en la que está ahora (su asignación activa). */
+  salaActual?: string | null;
 }): Decision {
   const quiereHost = p.role === "host" && !!p.code;
   if (!quiereHost && !p.roomId) return "nada";
@@ -28,8 +36,11 @@ export function decidirAutoJoin(p: {
     if (esHost && !quiereHost) return "nada";
     if (quiereHost && esHost) return "nada";
     if (!quiereHost && !esHost) {
-      // Participante que ya es miembro: solo hace falta unirse si le falta sala.
-      return p.roomId && !p.tieneAsignacion ? "unirse-como-participante" : "nada";
+      // Participante que ya es miembro: sin sala, se une a la del enlace; con
+      // otra sala, el enlace del supervisor lo mueve; en la misma, nada.
+      if (!p.roomId) return "nada";
+      if (!p.tieneAsignacion) return "unirse-como-participante";
+      return p.salaActual && p.salaActual !== p.roomId ? "mover-de-sala" : "nada";
     }
     // Participante que trae código de host: sube a host.
     return "unirse-como-host";

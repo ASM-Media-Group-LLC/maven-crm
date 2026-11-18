@@ -33,6 +33,7 @@ import {
   previewDeMensaje,
 } from "../_shared/push-notify.ts";
 import { nombreDelEmisor } from "./nombre-emisor.ts";
+import { sinRestringidos } from "./contacto.ts";
 
 /** Margen para que el cliente de quien está mirando el chat marque last_read_at
  *  (lo hace al recibir el mensaje con la ventana en foco). */
@@ -398,6 +399,14 @@ Deno.serve(async (req) => {
         .filter((f) => f.status === "ringing" && f.user_id !== user.id && (!pedidos || pedidos.has(f.user_id)))
         .map((f) => f.user_id);
       if (!destinos.length && !pedidos && call.receiver_id && call.receiver_id !== user.id) destinos = [call.receiver_id as string];
+      // Un chatter solo llama a su supervisor (Alvaro, 18/11/2026): a quien no
+      // puedo llamar no le suena, ni en grupo ni 1 a 1.
+      const { data: restringidos, error: errRestringidos } = await admin.rpc("contactos_restringidos_de", { _quien: user.id });
+      if (errRestringidos) console.error("web-push notify_call: contactos_restringidos_de falló:", errRestringidos.message);
+      destinos = sinRestringidos(
+        destinos,
+        errRestringidos ? null : ((restringidos ?? []) as unknown[]).map((r) => String(r)),
+      );
       if (!destinos.length) return json(req, { ok: true, sent: 0 });
 
       const { data: profile } = await admin.from("profiles")

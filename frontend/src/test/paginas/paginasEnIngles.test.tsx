@@ -104,7 +104,7 @@ vi.mock("sonner", () => ({ toast: Object.assign(vi.fn(), { success: vi.fn(), err
 // ── Meet ────────────────────────────────────────────────────────────────────
 vi.mock("@/hooks/useMeetRooms", () => ({
   useMeetRooms: () => ({
-    myRooms: [{ id: "r1", code: "ABC234", name: "Weekly sync", livekit_room_name: "meet_r1", isHost: true, pinned: false, created_at: new Date().toISOString() }],
+    myRooms: [{ id: "r1", code: "ABC234", name: "Weekly sync", livekit_room_name: "meet_r1", isHost: true, pinned: false }],
     setMyRooms: vi.fn(), loading: false, createRoom: vi.fn(), joinByCode: vi.fn(), resolveByLivekitRoom: vi.fn(),
     renameRoom: vi.fn(), setPinned: vi.fn(), reorder: vi.fn(), endRoom: vi.fn(),
   }),
@@ -298,7 +298,7 @@ describe("Meet en inglés", () => {
     montar(<MeetPage />);
     await screen.findByText("Weekly sync");
     expect(screen.getByText("New meeting")).toBeTruthy();
-    // «Schedule» y «Join with a code» se quitaron (Alvaro, 18/11/2026).
+    expect(screen.getByText("Schedule")).toBeTruthy();
     expect(enEspanol()).toEqual([]);
     fireEvent.click(screen.getByRole("button", { name: "Rename" }));
     const dialogo = await screen.findByRole("dialog");
