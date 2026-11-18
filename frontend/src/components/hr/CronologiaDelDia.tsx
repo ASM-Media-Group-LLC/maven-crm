@@ -113,7 +113,7 @@ export function CronologiaDelDia({ userId, dia, horarioEntrada, diasMes, esHoy, 
     const ms = Math.max(p ? Date.parse(p.createdAt) : 0, c ? Date.parse(c.createdAt) : 0);
     return { pantalla: p, camara: c, ms };
   }, [dia.capturas]);
-  const mostrarAhora = esHoy && ultimo.ms > 0 && Date.now() - ultimo.ms < 10 * 60_000;
+  const mostrarAhora = false; // el «ahora» vive arriba, en video (AhoraEnVivo)
 
   const [urls, setUrls] = useState<Record<string, string>>({});
   useEffect(() => {
@@ -182,23 +182,7 @@ export function CronologiaDelDia({ userId, dia, horarioEntrada, diasMes, esHoy, 
           <p className="mt-1 text-xs text-muted-foreground">{t("hr.exp.cron.sub")}</p>
         </div>
 
-        {/* AHORA: su último pantallazo con la cámara pegada, si es de hace poco. */}
-        {mostrarAhora && (
-          <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-            <button type="button" onClick={() => abrir(ultimo.pantalla)} className="relative aspect-[16/10] overflow-hidden rounded-xl border border-border/50 bg-muted/40">
-              <Foto c={ultimo.pantalla} />
-              <span className="absolute left-2 top-2 inline-flex items-center gap-1.5 rounded-md bg-black/60 px-2 py-1 text-[11px] font-semibold text-white backdrop-blur-sm">
-                <span className="h-1.5 w-1.5 rounded-full bg-success" aria-hidden />{t("hr.exp.cron.ahora")} · {t("hr.exp.pantalla")}
-              </span>
-            </button>
-            <button type="button" onClick={() => abrir(ultimo.camara)} className="relative aspect-[16/10] overflow-hidden rounded-xl border border-border/50 bg-muted/40">
-              <Foto c={ultimo.camara} />
-              <span className="absolute left-2 top-2 rounded-md bg-black/60 px-2 py-1 text-[11px] font-semibold text-white backdrop-blur-sm">{t("hr.exp.camara")}</span>
-              <span className="absolute bottom-2 left-2 rounded-md bg-black/60 px-2 py-1 text-[10px] tabular-nums text-white backdrop-blur-sm">{t("hr.exp.cron.ultimo", { hora: hhmmBog(ultimo.ms) ?? "—" })}</span>
-            </button>
-          </div>
-        )}
-
+        {/* «Ahora mismo» ya no va aquí: arriba del expediente, EN VIVO (AhoraEnVivo, 18/11/2026). */}
         {/* El día, lo más nuevo arriba. */}
         {tramos.length === 0 ? (
           <p className="py-6 text-center text-sm text-muted-foreground">{t("hr.exp.cron.vacio")}</p>
