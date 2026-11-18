@@ -556,6 +556,8 @@ export const messenger = {
   "messenger.tile.silenciarDesc": { es: "Deja de escucharse para toda la sala, no solo para ti. Se le avisa que lo silenciaron y puede volver a activar su micrófono cuando quiera — tú no puedes hacerlo por él.", en: "They stop being heard by the whole room, not just you. They're told they were muted and can turn their microphone back on whenever they want — you can't do it for them." },
   "messenger.tile.anclado": { es: "Anclado", en: "Pinned" },
   "messenger.tile.compartiendoPantalla": { es: "Compartiendo pantalla", en: "Sharing screen" },
+  "messenger.tile.tuPantalla": { es: "Estás compartiendo tu pantalla", en: "You're sharing your screen" },
+  "messenger.tile.tuPantallaDetalle": { es: "Los demás la ven. Aquí no se muestra para que no se repita sin fin.", en: "Everyone else sees it. It isn't shown here so it doesn't repeat endlessly." },
   "messenger.tile.soloAudio": { es: "Solo audio", en: "Audio only" },
   "messenger.tile.soloAudioDesc": {
     es: "Para cuidar tu internet, en tu sala de Cowork no recibes el video de tus compañeros. Sí los escuchas.",

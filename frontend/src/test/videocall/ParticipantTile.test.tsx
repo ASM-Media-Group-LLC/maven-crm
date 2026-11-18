@@ -141,12 +141,22 @@ describe("ParticipantTile", () => {
   it("does NOT mirror video for screen share", () => {
     const { container } = render(
       <ParticipantTile
-        participant={makeMockParticipant({ isLocal: true, isCameraOff: false, isScreenSharing: true })}
+        participant={makeMockParticipant({ isCameraOff: false, isScreenSharing: true })}
         room={null}
       />
     );
     const video = container.querySelector("video") as HTMLVideoElement;
     expect(video.style.transform).toBeFalsy();
+  });
+
+  it("does NOT draw your own screen share (no hall of mirrors)", () => {
+    const { container } = render(
+      <ParticipantTile
+        participant={makeMockParticipant({ isLocal: true, isCameraOff: false, isScreenSharing: true })}
+        room={null}
+      />
+    );
+    expect(container.querySelector("video")).not.toBeInTheDocument();
   });
 
   it("shows connection quality indicator bars", () => {

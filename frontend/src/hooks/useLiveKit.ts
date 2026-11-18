@@ -2687,11 +2687,18 @@ export function useLiveKit() {
         return;
       }
       const exigir = newState && exigirPantallaCompletaRef.current;
+      // EN COWORK LA PANTALLA VA SIN SONIDO (Alvaro, 18/11/2026). En la app de
+      // Windows, pedir el audio de la pantalla completa trae TODO el sonido del
+      // computador: la música que el chatter escucha mientras trabaja le llegaba
+      // al supervisor de fondo. En Cowork la pantalla es para ver qué se hace;
+      // la voz va por el micrófono. En una llamada común sí se comparte el
+      // audio (mostrar un video con sonido).
+      const enCowork = !!room.name && room.name.startsWith("cowork_");
       // Con la exigencia, el diálogo de Chrome abre en «Pantalla completa» y no
       // ofrece esta pestaña ni cambiar de pestaña a mitad de camino.
       const captura: ScreenShareCaptureOptions = exigir
-        ? { audio: true, video: { displaySurface: "monitor" }, selfBrowserSurface: "exclude", surfaceSwitching: "exclude" }
-        : { audio: newState };
+        ? { audio: false, video: { displaySurface: "monitor" }, selfBrowserSurface: "exclude", surfaceSwitching: "exclude" }
+        : { audio: newState && !enCowork };
       // El perfil (normal o liviano) se elige CADA VEZ que empieza a compartir,
       // con lo último que se sabe de su internet: la prueba de velocidad real, el
       // modo ahorro y la última muestra de la llamada (lib/perfilDePantalla.ts).
