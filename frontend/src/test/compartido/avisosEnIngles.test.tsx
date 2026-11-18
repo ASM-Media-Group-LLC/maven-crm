@@ -54,9 +54,9 @@ vi.mock("livekit-client", () => ({
   LocalAudioTrack: vi.fn(),
   LocalVideoTrack: vi.fn(),
 }));
-vi.mock("@livekit/track-processors", () => ({
-  BackgroundProcessor: vi.fn().mockReturnValue({ switchTo: vi.fn(), destroy: vi.fn() }),
-  supportsBackgroundProcessors: vi.fn().mockReturnValue(false),
+vi.mock("@/lib/fondoFino/procesador", () => ({
+  ProcesadorDeFondo: vi.fn().mockReturnValue({ switchTo: vi.fn(), destroy: vi.fn() }),
+  soportaProcesadorDeFondo: vi.fn().mockReturnValue(false),
 }));
 vi.mock("@/pages/messenger/videocall/BackgroundSelector", () => ({ BACKGROUND_TEMPLATES: [] }));
 // La cancelación de ruido carga un worklet por `?url`; acá no hace falta.

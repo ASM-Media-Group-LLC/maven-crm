@@ -30,13 +30,13 @@ vi.mock("livekit-client", () => ({
 }));
 
 const procesadores: Array<{ switchTo: ReturnType<typeof vi.fn>; destroy: ReturnType<typeof vi.fn> }> = [];
-vi.mock("@livekit/track-processors", () => ({
-  BackgroundProcessor: vi.fn(() => {
+vi.mock("@/lib/fondoFino/procesador", () => ({
+  ProcesadorDeFondo: vi.fn(() => {
     const p = { switchTo: vi.fn(async () => {}), destroy: vi.fn(async () => {}) };
     procesadores.push(p);
     return p;
   }),
-  supportsBackgroundProcessors: vi.fn(() => true),
+  soportaProcesadorDeFondo: vi.fn(() => true),
 }));
 
 import PreJoinLobby from "@/pages/messenger/videocall/PreJoinLobby";

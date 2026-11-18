@@ -1,0 +1,350 @@
+// EL PROCESADOR DE FONDO DE LAS LLAMADAS (17/11/2026).
+//
+// Reemplaza al `BackgroundProcessor` de `@livekit/track-processors`, que Alvaro
+// describió como «una porquería, no como Google». Lo que tenía mal ese paquete:
+//   · usaba solo la máscara de CATEGORÍAS del detector (sí/no por píxel), así que
+//     el borde era un escalón estirado de 256×256, con halo y sin pelo;
+//   · ningún suavizado en el tiempo: el borde parpadeaba cuadro a cuadro;
+//   · el blur corría a 1/4 con un tope de 16 muestras: el nivel normal apenas
+//     difuminaba y el fuerte no llegaba a esconder el cuarto;
+//   · al desenfocar mezclaba a la persona con la pared: halo claro alrededor.
+//
+// Este usa la CONFIANZA del detector (0..1 por píxel), la suaviza en el tiempo,
+// la ajusta a los bordes reales de la imagen y desenfoca el fondo SIN la persona
+// (ver pipelineGL.ts para el detalle de cada pasada).
+//
+// La forma de uso es la MISMA que la del paquete viejo, para que el cambio en
+// useLiveKit y en el lobby sea solo el import:
+//   const p = ProcesadorDeFondo({ mode: "disabled" });
+//   await track.setProcessor(p, true);
+//   await p.switchTo({ mode: "background-blur", blurRadius: radioDeBlur(effect) });
+//   await p.switchTo({ mode: "virtual-background", imagePath: url });
+// Lo que sigue del paquete es el `ProcessorWrapper`: el caño que saca cuadros de
+// la cámara y entrega la pista procesada (con su respaldo para navegadores sin
+// MediaStreamTrackProcessor). Eso funciona bien y no hay por qué rehacerlo.
+
+import * as vision from "@mediapipe/tasks-vision";
+import { ProcessorWrapper } from "@livekit/track-processors";
+import type {
+  ProcessorWrapperOptions,
+  TrackTransformerDestroyOptions,
+  VideoTrackTransformer,
+  VideoTransformerInitOptions,
+} from "@livekit/track-processors";
+import { RADIO_DE_BLUR, cadaCuantosCuadrosSegmentar } from "@/lib/fondoDeLlamada";
+import { crearPipelineFondo, type PipelineFondo } from "./pipelineGL";
+
+// ── El detector ──────────────────────────────────────────────────────────────
+//
+// Versión de los .wasm de MediaPipe: la MISMA que la librería instalada
+// (package.json la fija exacta en 0.10.14). Si no coinciden, el wasm no carga.
+export const VERSION_MEDIAPIPE = "0.10.14";
+const WASM_MEDIAPIPE = `https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@${VERSION_MEDIAPIPE}/wasm`;
+
+/**
+ * Los dos modelos de MediaPipe que sirven para esto, comparados en Chrome con
+ * la cámara a 1280×720 (PR del 17/11/2026, capturas en el PR):
+ *
+ *  · `selfie_segmenter` (250 KB, entrada 256×256): el que usaba el paquete.
+ *    Con su CONFIANZA más nuestro borde guiado y el suavizado, el contorno ya
+ *    no tiene escalones ni parpadea. ~5,9 ms por cuadro (detector + dibujo,
+ *    esperando a la GPU) en la Mac de pruebas: lo mismo que el procesador viejo.
+ *  · `selfie_multiclass_256x256` (16 MB, 6 clases con el pelo aparte): con
+ *    buena luz recorta un poco mejor el pelo esponjado, PERO con poca luz o de
+ *    perfil se comía la cabeza y las manos (pedazos de persona convertidos en
+ *    fondo, que es lo peor que puede pasar), cuesta ~13 ms por cuadro (más del
+ *    doble) y son 16 MB que bajar: con el internet del equipo eso pasa el tope de
+ *    6 s del enganche y el fondo fallaría.
+ *  · `selfie_segmenter_landscape` (144×256) no se probó a fondo: ve la cara con
+ *    144 filas en vez de 256, menos detalle justo donde importa.
+ *
+ * Se queda `selfie_segmenter`. El multiclase sigue disponible (`modelo:
+ * "multiclase"`) por si un día se quiere volver a medir.
+ */
+export const MODELOS = {
+  selfie: {
+    url: "https://storage.googleapis.com/mediapipe-models/image_segmenter/selfie_segmenter/float16/latest/selfie_segmenter.tflite",
+    // Su única máscara es la confianza de «persona».
+    mascara: 0,
+    invertir: false,
+  },
+  multiclase: {
+    url: "https://storage.googleapis.com/mediapipe-models/image_segmenter/selfie_multiclass_256x256/float32/latest/selfie_multiclass_256x256.tflite",
+    // La máscara 0 es «fondo»: persona = 1 − fondo (incluye pelo, ropa, accesorios).
+    mascara: 0,
+    invertir: true,
+  },
+} as const;
+
+export type ModeloDeFondo = keyof typeof MODELOS;
+export const MODELO_POR_DEFECTO: ModeloDeFondo = "selfie";
+
+export interface EstadisticasDeCuadro {
+  processingTimeMs: number;
+  segmentationTimeMs: number;
+  filterTimeMs: number;
+}
+
+export type OpcionesFondoFino = {
+  /** Sigma del desenfoque en px a 720p (RADIO_DE_BLUR). */
+  blurRadius?: number;
+  imagePath?: string;
+  backgroundDisabled?: boolean;
+  /** Cada cuántos cuadros se segmenta (1 en equipos fuertes, 2 en flojos). */
+  cadaCuantos?: number;
+  /** Detector (por defecto, MODELO_POR_DEFECTO). Se fija al crear el procesador. */
+  modelo?: ModeloDeFondo;
+  onFrameProcessed?: (stats: EstadisticasDeCuadro) => void;
+};
+
+function soportaTransformador(): boolean {
+  try {
+    return (
+      typeof OffscreenCanvas !== "undefined" &&
+      typeof VideoFrame !== "undefined" &&
+      typeof createImageBitmap !== "undefined" &&
+      typeof document !== "undefined" &&
+      !!document.createElement("canvas").getContext("webgl2")
+    );
+  } catch {
+    return false;
+  }
+}
+
+async function cargarImagen(url: string): Promise<ImageBitmap> {
+  const img = new Image();
+  img.crossOrigin = "anonymous";
+  await new Promise<void>((resolve, reject) => {
+    img.onload = () => resolve();
+    img.onerror = () => reject(new Error("fondo-fino: no carga la imagen"));
+    img.src = url;
+  });
+  return createImageBitmap(img);
+}
+
+export class TransformadorFondoFino implements VideoTrackTransformer<OpcionesFondoFino> {
+  static get isSupported() {
+    return soportaTransformador();
+  }
+
+  transformer?: TransformStream;
+  options: OpcionesFondoFino;
+  canvas?: OffscreenCanvas | HTMLCanvasElement;
+  inputVideo?: HTMLVideoElement;
+
+  private pipeline?: PipelineFondo;
+  private segmentador?: vision.ImageSegmenter;
+  private imagen: { url: string; bitmap: ImageBitmap } | null = null;
+  private cuadro = 0;
+  private ultimoTs = 0;
+  private apagado = false;
+  private segmentacionMs = 0;
+
+  constructor(opciones: OpcionesFondoFino) {
+    this.options = { ...opciones };
+  }
+
+  async init({ outputCanvas, inputElement }: VideoTransformerInitOptions): Promise<void> {
+    if (!(inputElement instanceof HTMLVideoElement)) {
+      throw new TypeError("fondo-fino: necesita un <video> de entrada");
+    }
+    this.inputVideo = inputElement;
+    this.canvas = outputCanvas;
+    this.transformer = new TransformStream({
+      transform: (frame, controller) => this.transform(frame, controller),
+    });
+    // Primero NUESTRO contexto WebGL (si falla, el enganche falla y la llamada
+    // sigue sin fondo, avisando: ver el catch de useLiveKit). Después MediaPipe
+    // pide el mismo contexto al mismo canvas.
+    this.pipeline = crearPipelineFondo(outputCanvas);
+    this.segmentador = await this.crearSegmentador(outputCanvas);
+    this.apagado = false;
+    this.cuadro = 0;
+    if (this.options.imagePath) {
+      await this.cargarFondo(this.options.imagePath).catch((e) => console.warn("[fondo] imagen:", e));
+    }
+  }
+
+  private modelo() {
+    return MODELOS[this.options.modelo ?? MODELO_POR_DEFECTO];
+  }
+
+  private async crearSegmentador(canvas: OffscreenCanvas | HTMLCanvasElement) {
+    const archivos = await vision.FilesetResolver.forVisionTasks(WASM_MEDIAPIPE);
+    const crear = (delegate: "GPU" | "CPU") =>
+      vision.ImageSegmenter.createFromOptions(archivos, {
+        baseOptions: { modelAssetPath: this.modelo().url, delegate },
+        canvas,
+        runningMode: "VIDEO",
+        outputCategoryMask: false,
+        outputConfidenceMasks: true,
+      });
+    try {
+      return await crear("GPU");
+    } catch (e) {
+      // Sin GPU usable (driver viejo, bloqueada): la CPU es más lenta pero sirve.
+      console.warn("[fondo] detector en GPU no disponible, se usa la CPU:", e);
+      return crear("CPU");
+    }
+  }
+
+  async restart({ outputCanvas, inputElement }: VideoTransformerInitOptions) {
+    // Cambió la cámara: contexto nuevo sobre el canvas nuevo. El detector va
+    // atado al canvas viejo, así que se rehace también.
+    this.pipeline?.destruir();
+    this.segmentador?.close();
+    this.segmentador = undefined;
+    this.canvas = outputCanvas;
+    this.inputVideo = inputElement;
+    this.pipeline = crearPipelineFondo(outputCanvas);
+    this.segmentador = await this.crearSegmentador(outputCanvas);
+    if (this.imagen) this.pipeline.ponerImagen(this.imagen.bitmap);
+    this.apagado = false;
+    this.cuadro = 0;
+  }
+
+  async destroy(_opciones?: TrackTransformerDestroyOptions) {
+    this.apagado = true;
+    try { this.segmentador?.close(); } catch { /* ya cerrado */ }
+    this.segmentador = undefined;
+    try { this.pipeline?.destruir(); } catch { /* contexto perdido */ }
+    this.pipeline = undefined;
+    this.imagen?.bitmap.close();
+    this.imagen = null;
+    this.canvas = undefined;
+  }
+
+  private async cargarFondo(url: string) {
+    if (this.imagen?.url !== url) {
+      const bitmap = await cargarImagen(url);
+      this.imagen?.bitmap.close();
+      this.imagen = { url, bitmap };
+    }
+    this.pipeline?.ponerImagen(this.imagen.bitmap);
+  }
+
+  async update(opciones: OpcionesFondoFino) {
+    // La imagen se carga ANTES de cambiar de modo: mientras baja se sigue viendo
+    // el efecto anterior, nunca un cuadro sin fondo. Si no carga, se lanza y el
+    // modo no cambia (quien llama avisa).
+    if (opciones.imagePath) {
+      await this.cargarFondo(opciones.imagePath);
+    }
+    this.options = { ...this.options, ...opciones };
+  }
+
+  private modo(): "borroso" | "imagen" | null {
+    const o = this.options;
+    if (o.backgroundDisabled) return null;
+    if (typeof o.blurRadius === "number" && o.blurRadius > 0) return "borroso";
+    if (typeof o.imagePath === "string" && this.imagen?.url === o.imagePath) return "imagen";
+    return null;
+  }
+
+  async transform(frame: VideoFrame, controller: TransformStreamDefaultController<VideoFrame>) {
+    let entregado = false;
+    try {
+      if (!(frame instanceof VideoFrame) || frame.codedWidth === 0 || frame.codedHeight === 0) return;
+      const modo = this.modo();
+      if (this.apagado || !modo || !this.pipeline || !this.canvas) {
+        // Sin efecto pedido: el cuadro pasa tal cual (cero costo).
+        controller.enqueue(frame);
+        entregado = true;
+        return;
+      }
+      const w = frame.displayWidth;
+      const h = frame.displayHeight;
+      this.pipeline.ajustarTamano(w, h);
+
+      const t0 = performance.now();
+      const cadaCuantos = Math.max(1, this.options.cadaCuantos ?? 1);
+      if (this.segmentador && this.cuadro % cadaCuantos === 0) {
+        const modelo = this.modelo();
+        // VIDEO exige marcas de tiempo crecientes.
+        const ts = Math.max(performance.now(), this.ultimoTs + 1);
+        this.ultimoTs = ts;
+        // Sincrónico: la máscara solo vale DENTRO del callback, ahí se copia.
+        this.segmentador.segmentForVideo(frame, ts, (resultado) => {
+          const mascara = resultado.confidenceMasks?.[modelo.mascara];
+          if (mascara) this.pipeline?.actualizarMascara(mascara.getAsWebGLTexture(), modelo.invertir, cadaCuantos);
+          resultado.close();
+        });
+        this.segmentacionMs = performance.now() - t0;
+      }
+      this.cuadro++;
+      const t1 = performance.now();
+      this.pipeline.dibujar(frame, modo, this.options.blurRadius ?? 0);
+      const nuevo = new VideoFrame(this.canvas, { timestamp: frame.timestamp ?? 0 });
+      controller.enqueue(nuevo);
+      const filtroMs = performance.now() - t1;
+      this.options.onFrameProcessed?.({
+        processingTimeMs: this.segmentacionMs + filtroMs,
+        segmentationTimeMs: this.segmentacionMs,
+        filterTimeMs: filtroMs,
+      });
+    } catch (e) {
+      // Igual que el paquete viejo: el cuadro se descarta (nunca se manda la
+      // cámara cruda: la persona cree que tiene el fondo puesto).
+      console.error("[fondo] error procesando un cuadro:", e);
+    } finally {
+      if (!entregado) frame.close();
+    }
+  }
+}
+
+// ── El envoltorio, con la misma API que el paquete viejo ─────────────────────
+
+export type OpcionesDeCambio =
+  | { mode: "disabled" }
+  | { mode: "background-blur"; blurRadius?: number }
+  | { mode: "virtual-background"; imagePath: string };
+
+export class ProcesadorFondoFino extends ProcessorWrapper<OpcionesFondoFino, TransformadorFondoFino> {
+  get mode(): OpcionesDeCambio["mode"] {
+    const o = this.transformer.options;
+    if (o.backgroundDisabled) return "disabled";
+    if (typeof o.blurRadius === "number") return "background-blur";
+    if (typeof o.imagePath === "string") return "virtual-background";
+    return "disabled";
+  }
+
+  async switchTo(opciones: OpcionesDeCambio) {
+    switch (opciones.mode) {
+      case "background-blur":
+        await this.updateTransformerOptions({ imagePath: undefined, blurRadius: opciones.blurRadius ?? RADIO_DE_BLUR.blur, backgroundDisabled: false });
+        break;
+      case "virtual-background":
+        await this.updateTransformerOptions({ imagePath: opciones.imagePath, blurRadius: undefined, backgroundDisabled: false });
+        break;
+      case "disabled":
+        await this.updateTransformerOptions({ backgroundDisabled: true });
+        break;
+    }
+  }
+}
+
+/** ¿Este navegador puede poner fondos? (WebGL2 + VideoFrame + un camino de pistas). */
+export function soportaProcesadorDeFondo(): boolean {
+  return TransformadorFondoFino.isSupported && ProcessorWrapper.isSupported;
+}
+
+/**
+ * Crea el procesador. Igual que el paquete viejo: arranca en el modo pedido y
+ * después se cambia con `switchTo` sin cortar el video.
+ */
+export function ProcesadorDeFondo(
+  opciones: OpcionesDeCambio & { modelo?: ModeloDeFondo; cadaCuantos?: number; onFrameProcessed?: OpcionesFondoFino["onFrameProcessed"] } & ProcessorWrapperOptions,
+  nombre = "background-processor",
+): ProcesadorFondoFino {
+  if (!TransformadorFondoFino.isSupported) throw new Error("fondo-fino: el navegador no soporta el procesador");
+  if (!ProcessorWrapper.isSupported) throw new Error("fondo-fino: el navegador no puede procesar pistas");
+  const base: OpcionesFondoFino = {
+    modelo: opciones.modelo,
+    cadaCuantos: opciones.cadaCuantos ?? cadaCuantosCuadrosSegmentar(),
+    onFrameProcessed: opciones.onFrameProcessed,
+  };
+  if (opciones.mode === "background-blur") base.blurRadius = opciones.blurRadius ?? RADIO_DE_BLUR.blur;
+  else if (opciones.mode === "virtual-background") base.imagePath = opciones.imagePath;
+  else base.backgroundDisabled = true;
+  return new ProcesadorFondoFino(new TransformadorFondoFino(base), nombre, { maxFps: opciones.maxFps });
+}

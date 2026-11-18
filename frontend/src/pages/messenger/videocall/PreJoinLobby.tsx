@@ -5,7 +5,7 @@ import {
   ChevronDown, Monitor, Volume2, Loader2, Settings,
 } from "lucide-react";
 import { createLocalTracks, LocalAudioTrack, LocalVideoTrack } from "livekit-client";
-import { BackgroundProcessor, supportsBackgroundProcessors } from "@livekit/track-processors";
+import { ProcesadorDeFondo, soportaProcesadorDeFondo } from "@/lib/fondoFino/procesador";
 import { UserAvatar } from "@/components/UserAvatar";
 import { cn } from "@/lib/utils";
 import BackgroundSelector from "./BackgroundSelector";
@@ -226,7 +226,7 @@ export default function PreJoinLobby({ roomName, displayName, callDisplayName, o
   // ── Background helpers ──────────────────────────────────────
   const applyBackgroundToTrack = useCallback(async (track: LocalVideoTrack, effect: BackgroundEffect) => {
     if (!mountedRef.current) return false;
-    if (effect !== "none" && !supportsBackgroundProcessors()) {
+    if (effect !== "none" && !soportaProcesadorDeFondo()) {
       setBackgroundPreviewUnsupported(true);
       return false;
     }
@@ -244,7 +244,7 @@ export default function PreJoinLobby({ roomName, displayName, callDisplayName, o
       }
       let processor = bgProcessorRef.current;
       if (!processor) {
-        processor = BackgroundProcessor({ mode: "disabled" });
+        processor = ProcesadorDeFondo({ mode: "disabled" });
         bgProcessorRef.current = processor;
       }
       if (bgAttachedTrackRef.current !== track) {

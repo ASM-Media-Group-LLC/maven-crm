@@ -11,13 +11,13 @@ vi.mock("livekit-client", () => ({
   LocalVideoTrack: vi.fn(),
 }));
 
-// Mock track-processors
-vi.mock("@livekit/track-processors", () => ({
-  BackgroundProcessor: vi.fn().mockReturnValue({
+// El procesador de fondo (lib/fondoFino) se simula: en jsdom no hay WebGL.
+vi.mock("@/lib/fondoFino/procesador", () => ({
+  ProcesadorDeFondo: vi.fn().mockReturnValue({
     switchTo: vi.fn().mockResolvedValue(undefined),
     destroy: vi.fn().mockResolvedValue(undefined),
   }),
-  supportsBackgroundProcessors: vi.fn().mockReturnValue(true),
+  soportaProcesadorDeFondo: vi.fn().mockReturnValue(true),
 }));
 
 import PreJoinLobby from "@/pages/messenger/videocall/PreJoinLobby";
