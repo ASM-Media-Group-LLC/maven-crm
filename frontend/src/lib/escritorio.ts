@@ -22,6 +22,8 @@ export type MavenEscritorio = {
   llamadaEntrante: (datos: { id: string; nombre: string; detalle?: string; foto?: string | null }) => Promise<"contestar" | "rechazar" | "cerrada">;
   terminarLlamadaEntrante: (id: string) => void;
   flotante: (si?: boolean) => Promise<boolean>;
+  /** La ventana de una llamada se trae al frente («Volver a la llamada»). Apps desde el 18/11/2026. */
+  mostrarEstaVentana?: () => Promise<boolean>;
   alCambiarFlotante: (cb: (flotando: boolean) => void) => () => void;
   inactividad: () => Promise<number | null>;
   alUsoDeApps: (cb: (lote: TramoDeApp[]) => void) => () => void;
