@@ -2277,8 +2277,13 @@ function FilaMensaje({
         // frost pareja, SIN barra lateral. El no-leído se marca con punto morado
         // + negrita; el seleccionado con aro morado. El círculo de selección
         // aparece solo al pasar el mouse.
-        "group relative flex items-center gap-1 rounded-2xl border border-border/40 bg-card/50 pl-2 transition-colors",
-        seleccionado && "border-primary/30 bg-primary/10 ring-1 ring-primary/30",
+        // UN SOLO TONO (Alvaro, 18/11/2026: «ese diseño de 2 tonos se ve mal»):
+        // el color va en la tarjeta entera; el botón de adentro no pinta nada.
+        "group relative flex items-center gap-1 rounded-2xl border border-border/40 pl-2 transition-colors",
+        seleccionado ? "border-primary/30 bg-primary/10 ring-1 ring-primary/30"
+          : activo ? "bg-primary/10"
+          : sinLeer ? "bg-primary/[0.07] hover:bg-primary/[0.1]"
+          : "bg-card/50 hover:bg-primary/5",
       )}
     >
       {/* La casilla es un botón aparte (Radix): no puede ir DENTRO del botón
@@ -2301,13 +2306,6 @@ function FilaMensaje({
       onTouchStart={onPrecargar}
       className={cn(
         "relative flex min-w-0 flex-1 items-center gap-3 rounded-2xl px-2.5 py-2.5 text-left transition-all duration-150",
-        activo
-          ? "bg-primary/10"
-          : sinLeer && !seleccionado
-            // No-leído SIN barra lateral (decisión final): un tinte suave de
-            // tarjeta; lo que marca el no-leído es el punto morado + la negrita.
-            ? "bg-primary/[0.07] hover:bg-primary/[0.1]"
-            : !seleccionado && "hover:bg-primary/5",
       )}
     >
       <UserAvatar name={nombre} size="md" className={cn("shrink-0", activo && "ring-2 ring-primary/20")} />
