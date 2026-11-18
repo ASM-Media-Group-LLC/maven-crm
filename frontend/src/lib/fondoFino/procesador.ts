@@ -33,6 +33,7 @@ import type {
 } from "@livekit/track-processors";
 import { RADIO_DE_BLUR, cadaCuantosCuadrosSegmentar } from "@/lib/fondoDeLlamada";
 import { crearPipelineFondo, type PipelineFondo } from "./pipelineGL";
+import { FUSION_POR_DEFECTO, tocaMulticlase } from "./parametros";
 
 // ── El detector ──────────────────────────────────────────────────────────────
 //
@@ -58,8 +59,18 @@ const WASM_MEDIAPIPE = `https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@${V
  *  · `selfie_segmenter_landscape` (144×256) no se probó a fondo: ve la cara con
  *    144 filas en vez de 256, menos detalle justo donde importa.
  *
- * Se queda `selfie_segmenter`. El multiclase sigue disponible (`modelo:
- * "multiclase"`) por si un día se quiere volver a medir.
+ * Se queda `selfie_segmenter`. El 17/11 (noche) se probó el multiclase como
+ * AYUDA del liviano (`fusion: true`, ver personaFusionada en parametros.ts): se
+ * baja de fondo DESPUÉS de que el fondo ya está puesto (nunca demora el
+ * enganche), queda en el Cache Storage, corre uno de cada
+ * CADA_CUANTOS_MULTICLASE cuadros y solo puede SUMAR persona cerca del
+ * contorno del liviano. Así ya no se come la cabeza ni las manos, PERO:
+ *   · el borde no mejoró a la vista (con el pelo esponjado sumaba más pared
+ *     gris, no menos: lo que falla ahí es el color, no el detector);
+ *   · el cuadro en que corre tarda ~20 ms: promedio ~9-10 ms (antes ~5) y se
+ *     pierden cuadros (29,2-29,7 por segundo en vez de 30).
+ * Por eso queda APAGADO (FUSION_POR_DEFECTO) y lo que sí mejoró el borde es el
+ * «borde por color» de pipelineGL.ts (mate), que cuesta menos de 0,5 ms.
  */
 export const MODELOS = {
   selfie: {
@@ -94,8 +105,34 @@ export type OpcionesFondoFino = {
   cadaCuantos?: number;
   /** Detector (por defecto, MODELO_POR_DEFECTO). Se fija al crear el procesador. */
   modelo?: ModeloDeFondo;
+  /**
+   * Sumar el multiclase como ayuda del borde (por defecto, FUSION_POR_DEFECTO:
+   * no; ver arriba por qué). Se fija al crear el procesador.
+   */
+  fusion?: boolean;
+  /** Borde por color en la franja del contorno (por defecto, sí). */
+  mate?: boolean;
   onFrameProcessed?: (stats: EstadisticasDeCuadro) => void;
 };
+
+const CACHE_DE_MODELOS = "maven-fondo-modelos-v1";
+
+/**
+ * Baja un modelo guardándolo en el Cache Storage: la primera llamada lo baja
+ * (de fondo, sin apuro), las siguientes lo leen del disco al instante. Sin
+ * Cache Storage (contexto no seguro), se baja igual.
+ */
+async function bajarModeloConCache(url: string): Promise<Uint8Array> {
+  let cache: Cache | undefined;
+  try { cache = await caches.open(CACHE_DE_MODELOS); } catch { cache = undefined; }
+  const guardado = await cache?.match(url).catch(() => undefined);
+  if (guardado?.ok) return new Uint8Array(await guardado.arrayBuffer());
+  const r = await fetch(url);
+  if (!r.ok) throw new Error(`fondo-fino: el modelo respondió ${r.status}`);
+  const bytes = new Uint8Array(await r.arrayBuffer());
+  await cache?.put(url, new Response(bytes, { headers: { "Content-Type": "application/octet-stream" } })).catch(() => undefined);
+  return bytes;
+}
 
 function soportaTransformador(): boolean {
   try {
@@ -139,6 +176,10 @@ export class TransformadorFondoFino implements VideoTrackTransformer<OpcionesFon
   private ultimoTs = 0;
   private apagado = false;
   private segmentacionMs = 0;
+  // El multiclase de ayuda: se carga de fondo; mientras no esté, no se usa.
+  private fino?: vision.ImageSegmenter;
+  private ultimoTsFino = 0;
+  private generacion = 0;
 
   constructor(opciones: OpcionesFondoFino) {
     this.options = { ...opciones };
@@ -160,6 +201,7 @@ export class TransformadorFondoFino implements VideoTrackTransformer<OpcionesFon
     this.segmentador = await this.crearSegmentador(outputCanvas);
     this.apagado = false;
     this.cuadro = 0;
+    this.cargarFinoDeFondo(outputCanvas);
     if (this.options.imagePath) {
       await this.cargarFondo(this.options.imagePath).catch((e) => console.warn("[fondo] imagen:", e));
     }
@@ -167,6 +209,47 @@ export class TransformadorFondoFino implements VideoTrackTransformer<OpcionesFon
 
   private modelo() {
     return MODELOS[this.options.modelo ?? MODELO_POR_DEFECTO];
+  }
+
+  private usaFusion(): boolean {
+    // Si el principal ya es el multiclase, no tiene sentido sumarlo otra vez.
+    if ((this.options.modelo ?? MODELO_POR_DEFECTO) === "multiclase") return false;
+    return this.options.fusion ?? FUSION_POR_DEFECTO;
+  }
+
+  /**
+   * Baja (o saca del caché) el multiclase y lo prepara, SIN esperar: el fondo ya
+   * funciona con el liviano. Si falla (sin internet, sin GPU), sigue sin él.
+   */
+  private cargarFinoDeFondo(canvas: OffscreenCanvas | HTMLCanvasElement) {
+    if (!this.usaFusion()) return;
+    const gen = ++this.generacion;
+    void (async () => {
+      try {
+        const bytes = await bajarModeloConCache(MODELOS.multiclase.url);
+        if (gen !== this.generacion || this.apagado) return;
+        const archivos = await vision.FilesetResolver.forVisionTasks(WASM_MEDIAPIPE);
+        const fino = await vision.ImageSegmenter.createFromOptions(archivos, {
+          // Solo en la GPU: en la CPU cuesta demasiado para ser una ayuda.
+          baseOptions: { modelAssetBuffer: bytes, delegate: "GPU" },
+          canvas,
+          runningMode: "VIDEO",
+          outputCategoryMask: false,
+          outputConfidenceMasks: true,
+        });
+        if (gen !== this.generacion || this.apagado) { fino.close(); return; }
+        this.fino = fino;
+      } catch (e) {
+        console.warn("[fondo] el multiclase de ayuda no cargó, sigue el liviano solo:", e);
+      }
+    })();
+  }
+
+  private cerrarFino() {
+    this.generacion++;
+    try { this.fino?.close(); } catch { /* ya cerrado */ }
+    this.fino = undefined;
+    this.pipeline?.olvidarFina();
   }
 
   private async crearSegmentador(canvas: OffscreenCanvas | HTMLCanvasElement) {
@@ -191,6 +274,7 @@ export class TransformadorFondoFino implements VideoTrackTransformer<OpcionesFon
   async restart({ outputCanvas, inputElement }: VideoTransformerInitOptions) {
     // Cambió la cámara: contexto nuevo sobre el canvas nuevo. El detector va
     // atado al canvas viejo, así que se rehace también.
+    this.cerrarFino();
     this.pipeline?.destruir();
     this.segmentador?.close();
     this.segmentador = undefined;
@@ -201,10 +285,12 @@ export class TransformadorFondoFino implements VideoTrackTransformer<OpcionesFon
     if (this.imagen) this.pipeline.ponerImagen(this.imagen.bitmap);
     this.apagado = false;
     this.cuadro = 0;
+    this.cargarFinoDeFondo(outputCanvas);
   }
 
   async destroy(_opciones?: TrackTransformerDestroyOptions) {
     this.apagado = true;
+    this.cerrarFino();
     try { this.segmentador?.close(); } catch { /* ya cerrado */ }
     this.segmentador = undefined;
     try { this.pipeline?.destruir(); } catch { /* contexto perdido */ }
@@ -271,9 +357,26 @@ export class TransformadorFondoFino implements VideoTrackTransformer<OpcionesFon
         });
         this.segmentacionMs = performance.now() - t0;
       }
+      if (this.fino && tocaMulticlase(this.cuadro)) {
+        const ts = Math.max(performance.now(), this.ultimoTsFino + 1);
+        this.ultimoTsFino = ts;
+        try {
+          this.fino.segmentForVideo(frame, ts, (resultado) => {
+            // Máscara 0 = fondo; la pasada la invierte a «persona».
+            const mascara = resultado.confidenceMasks?.[0];
+            if (mascara) this.pipeline?.actualizarFina(mascara.getAsWebGLTexture());
+            resultado.close();
+          });
+        } catch (e) {
+          // Una ayuda que falla no puede tumbar el fondo: se apaga y listo.
+          console.warn("[fondo] el multiclase falló, sigue el liviano solo:", e);
+          this.cerrarFino();
+        }
+        this.segmentacionMs = performance.now() - t0;
+      }
       this.cuadro++;
       const t1 = performance.now();
-      this.pipeline.dibujar(frame, modo, this.options.blurRadius ?? 0);
+      this.pipeline.dibujar(frame, modo, this.options.blurRadius ?? 0, this.options.mate ?? true);
       const nuevo = new VideoFrame(this.canvas, { timestamp: frame.timestamp ?? 0 });
       controller.enqueue(nuevo);
       const filtroMs = performance.now() - t1;
@@ -333,13 +436,15 @@ export function soportaProcesadorDeFondo(): boolean {
  * después se cambia con `switchTo` sin cortar el video.
  */
 export function ProcesadorDeFondo(
-  opciones: OpcionesDeCambio & { modelo?: ModeloDeFondo; cadaCuantos?: number; onFrameProcessed?: OpcionesFondoFino["onFrameProcessed"] } & ProcessorWrapperOptions,
+  opciones: OpcionesDeCambio & Pick<OpcionesFondoFino, "modelo" | "cadaCuantos" | "fusion" | "mate" | "onFrameProcessed"> & ProcessorWrapperOptions,
   nombre = "background-processor",
 ): ProcesadorFondoFino {
   if (!TransformadorFondoFino.isSupported) throw new Error("fondo-fino: el navegador no soporta el procesador");
   if (!ProcessorWrapper.isSupported) throw new Error("fondo-fino: el navegador no puede procesar pistas");
   const base: OpcionesFondoFino = {
     modelo: opciones.modelo,
+    fusion: opciones.fusion,
+    mate: opciones.mate,
     cadaCuantos: opciones.cadaCuantos ?? cadaCuantosCuadrosSegmentar(),
     onFrameProcessed: opciones.onFrameProcessed,
   };

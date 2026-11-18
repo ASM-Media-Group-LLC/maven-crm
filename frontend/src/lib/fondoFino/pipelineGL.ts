@@ -16,8 +16,16 @@
 //      de la cabeza que tenía el procesador viejo).
 //   4. (solo blur) GAUSSIANO SEPARABLE: horizontal y vertical, con la sigma del
 //      nivel. Al final se divide por el peso: queda solo el fondo, desenfocado.
+//   4b. (borde por color, «mate») PROMEDIOS LOCALES: el mismo fondo-sin-persona
+//      y un persona-sin-fondo, a 1/4 con un gaussiano chico. Dicen, cerca de
+//      cada píxel del borde, de qué color es la pared vieja y de qué color la
+//      persona (ver «El borde por color» en parametros.ts).
 //   5. COMPOSICIÓN: persona nítida encima, fondo (borroso o imagen) debajo, con
-//      la curva del borde de parametros.ts.
+//      la curva del borde de parametros.ts. Con el mate, en la franja del borde
+//      la «a» se corrige por color (los huecos del pelo pasan a fondo) y el
+//      color de la persona se despeja de la pared vieja.
+//   (Opcional, apagado) FUSIÓN con el multiclase en la pasada 1: solo suma
+//      persona cerca del contorno del liviano.
 //
 // Convención de coordenadas: en todas las texturas t=0 es la fila de ARRIBA de
 // la imagen (así sube un VideoFrame y así entrega MediaPipe la máscara). Solo la
@@ -31,6 +39,7 @@
 import {
   CURVA_BORDE_BLUR, CURVA_BORDE_IMAGEN, MUESTRAS_MAX_POR_LADO, REDUCCION_DE_LA_MASCARA,
   REDUCCION_DEL_DESENFOQUE, SUAVIZADO_MAX, SUAVIZADO_MIN, CAMBIO_CHICO, CAMBIO_GRANDE,
+  CONFIANZA_COLOR, FRANJA, FUERZA_DEL_MATE, PISO_DEL_DESPEJE, SUBIDA_MAX_DEL_COLOR, RADIO_CERCA_TEXELES, SIGMA_DEL_MATE_720,
   muestrasPorLado, pasoDeMuestreo, sigmaEnTextura, uvParaCubrir,
 } from "./parametros";
 
@@ -55,6 +64,10 @@ uniform sampler2D previa;
 uniform bool invertir;
 uniform bool primera;
 uniform float suavMin;
+// Fusión con el multiclase (ver personaFusionada en parametros.ts): su persona
+// ya copiada a nuestra textura «fina»; solo SUMA, y solo cerca del contorno.
+uniform sampler2D fina;
+uniform bool usarFina;
 out vec4 color;
 float leer(ivec2 p, ivec2 tam) {
   float v = texelFetch(mascaraMP, clamp(p, ivec2(0), tam - 1), 0).r;
@@ -68,6 +81,16 @@ void main() {
   float a = mix(leer(p, tam), leer(p + ivec2(1, 0), tam), w.x);
   float b = mix(leer(p + ivec2(0, 1), tam), leer(p + ivec2(1, 1), tam), w.x);
   float detectada = clamp(mix(a, b, w.y), 0.0, 1.0);
+  if (usarFina) {
+    float maximo = 0.0;
+    for (int j = -${RADIO_CERCA_TEXELES}; j <= ${RADIO_CERCA_TEXELES}; j += 2) {
+      for (int i = -${RADIO_CERCA_TEXELES}; i <= ${RADIO_CERCA_TEXELES}; i += 2) {
+        maximo = max(maximo, leer(p + ivec2(i, j), tam));
+      }
+    }
+    float cerca = smoothstep(0.25, 0.6, maximo);
+    detectada = max(detectada, texture(fina, uv).r * cerca);
+  }
   if (primera) { color = vec4(detectada); return; }
   float anterior = texture(previa, uv).r;
   float cambio = abs(detectada - anterior);
@@ -110,6 +133,7 @@ in vec2 uv;
 uniform sampler2D cuadro;
 uniform sampler2D mascara;
 uniform vec2 pasoFuente;
+uniform bool pesarPersona;
 out vec4 color;
 void main() {
   // 4 lecturas bilineales = el promedio de un bloque de 4×4 píxeles.
@@ -121,7 +145,9 @@ void main() {
   // Solo cuenta lo que es fondo con claridad: el borde de la persona tampoco
   // debe teñir el desenfoque.
   float fondo = 1.0 - smoothstep(0.15, 0.5, persona);
-  color = vec4(c * 0.25 * fondo, fondo);
+  // Para el borde por color: el promedio de lo que es persona SEGURA cerca.
+  float peso = pesarPersona ? smoothstep(0.6, 0.9, persona) : fondo;
+  color = vec4(c * 0.25 * peso, peso);
 }`;
 
 // 4. Gaussiano separable (una dirección por pasada).
@@ -159,6 +185,11 @@ uniform sampler2D fondo;
 uniform int modo; // 1 = borroso, 2 = imagen
 uniform vec4 cubrir; // escala.xy, corrimiento.zw
 uniform vec2 curva;
+// Borde por color (ver alfaFinal y colorSinFondoViejo en parametros.ts):
+// promedios locales ponderados de fondo viejo (locB) y de persona (locF).
+uniform sampler2D locB;
+uniform sampler2D locF;
+uniform bool mate;
 out vec4 color;
 void main() {
   vec3 persona = texture(cuadro, uv).rgb;
@@ -178,7 +209,27 @@ void main() {
   } else {
     atras = texture(fondo, uv * cubrir.xy + cubrir.zw).rgb;
   }
-  color = vec4(mix(atras, persona, a), 1.0);
+  if (!mate) { color = vec4(mix(atras, persona, a), 1.0); return; }
+  vec4 lb = texture(locB, uv);
+  vec4 lf = texture(locF, uv);
+  vec3 B = lb.rgb / max(lb.a, 1e-3);
+  vec3 F = lf.rgb / max(lf.a, 1e-3);
+  float franjaFondo = smoothstep(${FRANJA.desde.toFixed(3)}, ${FRANJA.hasta.toFixed(3)}, lb.a);
+  float franja = franjaFondo * smoothstep(${FRANJA.desde.toFixed(3)}, ${FRANJA.hasta.toFixed(3)}, lf.a);
+  vec3 d = F - B;
+  float dd = dot(d, d);
+  float confianza = smoothstep(${CONFIANZA_COLOR.desde.toFixed(4)}, ${CONFIANZA_COLOR.hasta.toFixed(4)}, dd);
+  float ac = dd < 1e-4 ? 0.5 : clamp(dot(persona - B, d) / dd, 0.0, 1.0);
+  // El color puede SACAR fondo sin límite (los huecos del pelo), pero solo
+  // puede AGREGAR un poco, y solo donde la máscara ya ve algo de persona.
+  ac = min(ac, a + ${SUBIDA_MAX_DEL_COLOR.toFixed(2)} * smoothstep(0.02, 0.2, m));
+  a += franja * confianza * ${FUERZA_DEL_MATE.toFixed(3)} * (ac - a);
+  // Color de la persona SIN el fondo viejo (ver colorDePersona en parametros.ts):
+  // de I = a·F + (1 − a)·B se despeja F. Lejos del borde B → I y F = I.
+  vec3 be = mix(persona, B, franja);
+  vec3 despejada = clamp((persona - (1.0 - a) * be) / max(a, ${PISO_DEL_DESPEJE.toFixed(2)}), 0.0, 1.0);
+  vec3 f = mix(mix(persona, F, franja), despejada, smoothstep(0.1, 0.4, a));
+  color = vec4(mix(atras, f, a), 1.0);
 }`;
 
 type Programa = { p: WebGLProgram; u: Record<string, WebGLUniformLocation | null> };
@@ -190,8 +241,15 @@ export interface PipelineFondo {
   ajustarTamano(w: number, h: number): void;
   /** Mete una máscara nueva de MediaPipe (textura del mismo contexto). */
   actualizarMascara(textura: WebGLTexture, invertir: boolean, cadaCuantos: number): void;
-  /** Dibuja el cuadro en el canvas. */
-  dibujar(frame: VideoFrame, modo: ModoDeDibujo, sigma720: number): void;
+  /**
+   * Guarda la persona del multiclase (máscara 0 = fondo, se invierte). Desde ahí
+   * cada máscara del liviano se fusiona con ella (ver personaFusionada).
+   */
+  actualizarFina(textura: WebGLTexture): void;
+  /** Deja de fusionar (el multiclase se apagó o falló). */
+  olvidarFina(): void;
+  /** Dibuja el cuadro en el canvas (`mate`: con el borde por color, por defecto sí). */
+  dibujar(frame: VideoFrame, modo: ModoDeDibujo, sigma720: number, mate?: boolean): void;
   ponerImagen(imagen: ImageBitmap | null): void;
   /** Olvida la máscara (al cambiar de cámara): el próximo cuadro arranca de cero. */
   reiniciarMascara(): void;
@@ -246,11 +304,11 @@ export function crearPipelineFondo(canvas: OffscreenCanvas | HTMLCanvasElement):
   const conFlotante = !!gl.getExtension("EXT_color_buffer_float") || !!gl.getExtension("EXT_color_buffer_half_float");
 
   const vs = compilar(gl, gl.VERTEX_SHADER, VERTICES);
-  const pSuav = programa(gl, vs, SUAVIZADO, ["mascaraMP", "previa", "invertir", "primera", "suavMin"]);
+  const pSuav = programa(gl, vs, SUAVIZADO, ["mascaraMP", "previa", "invertir", "primera", "suavMin", "fina", "usarFina"]);
   const pRefinar = programa(gl, vs, REFINAR, ["mascara", "cuadro", "paso"]);
-  const pReducir = programa(gl, vs, REDUCIR, ["cuadro", "mascara", "pasoFuente"]);
+  const pReducir = programa(gl, vs, REDUCIR, ["cuadro", "mascara", "pasoFuente", "pesarPersona"]);
   const pGauss = programa(gl, vs, GAUSS, ["fuente", "direccion", "sigma", "muestras", "paso"]);
-  const pComponer = programa(gl, vs, COMPONER, ["cuadro", "mascara", "fondo", "modo", "cubrir", "curva"]);
+  const pComponer = programa(gl, vs, COMPONER, ["cuadro", "mascara", "fondo", "modo", "cubrir", "curva", "locB", "locF", "mate"]);
   gl.deleteShader(vs);
 
   const vao = gl.createVertexArray();
@@ -311,6 +369,12 @@ export function crearPipelineFondo(canvas: OffscreenCanvas | HTMLCanvasElement):
   let alfa: Destino | null = null;
   let red1: Destino | null = null;
   let red2: Destino | null = null;
+  // Promedios locales para el borde por color (1/4) y la persona del multiclase.
+  let locB: Destino | null = null;
+  let locF: Destino | null = null;
+  let tmp: Destino | null = null;
+  let fina: Destino | null = null;
+  let hayFina = false;
 
   function ajustarTamano(w: number, h: number) {
     if (w === ancho && h === alto && ema) return;
@@ -318,6 +382,7 @@ export function crearPipelineFondo(canvas: OffscreenCanvas | HTMLCanvasElement):
     alto = h;
     if (ema) { borrarDestino(ema[0]); borrarDestino(ema[1]); }
     borrarDestino(alfa); borrarDestino(red1); borrarDestino(red2);
+    borrarDestino(locB); borrarDestino(locF); borrarDestino(tmp); borrarDestino(fina);
     const mw = Math.max(1, Math.ceil(w / REDUCCION_DE_LA_MASCARA));
     const mh = Math.max(1, Math.ceil(h / REDUCCION_DE_LA_MASCARA));
     ema = [destino(mw, mh, false), destino(mw, mh, false)];
@@ -326,7 +391,12 @@ export function crearPipelineFondo(canvas: OffscreenCanvas | HTMLCanvasElement):
     const bh = Math.max(1, Math.ceil(h / REDUCCION_DEL_DESENFOQUE));
     red1 = destino(bw, bh, conFlotante);
     red2 = destino(bw, bh, conFlotante);
+    locB = destino(bw, bh, conFlotante);
+    locF = destino(bw, bh, conFlotante);
+    tmp = destino(bw, bh, conFlotante);
+    fina = destino(mw, mh, false);
     hayMascara = false;
+    hayFina = false;
   }
 
   function prepararPasada(d: Destino | null, prog: Programa, voltear: boolean) {
@@ -363,9 +433,55 @@ export function crearPipelineFondo(canvas: OffscreenCanvas | HTMLCanvasElement):
     gl!.uniform1i(pSuav.u.invertir, invertir ? 1 : 0);
     gl!.uniform1i(pSuav.u.primera, hayMascara ? 0 : 1);
     gl!.uniform1f(pSuav.u.suavMin, 1 - Math.pow(1 - SUAVIZADO_MIN, Math.max(1, cadaCuantos)));
+    unir(2, fina ? fina.tex : texCuadro, pSuav.u.fina);
+    gl!.uniform1i(pSuav.u.usarFina, hayFina ? 1 : 0);
     dibujarQuad();
     emaLeer = escribir;
     hayMascara = true;
+  }
+
+  function actualizarFina(texMP: WebGLTexture) {
+    if (!fina || !ema) return;
+    // La misma pasada, en modo «primera» y sin fusión: solo copia e invierte.
+    prepararPasada(fina, pSuav, false);
+    unir(0, texMP, pSuav.u.mascaraMP);
+    unir(1, ema[emaLeer].tex, pSuav.u.previa);
+    unir(2, ema[emaLeer].tex, pSuav.u.fina);
+    gl!.uniform1i(pSuav.u.invertir, 1);
+    gl!.uniform1i(pSuav.u.primera, 1);
+    gl!.uniform1i(pSuav.u.usarFina, 0);
+    gl!.uniform1f(pSuav.u.suavMin, 1);
+    dibujarQuad();
+    hayFina = true;
+  }
+
+  function gauss(desde: Destino, medio: Destino, hasta: Destino, sigma: number) {
+    const n = muestrasPorLado(sigma);
+    const paso = pasoDeMuestreo(sigma);
+    prepararPasada(medio, pGauss, false);
+    unir(0, desde.tex, pGauss.u.fuente);
+    gl!.uniform2f(pGauss.u.direccion, 1 / desde.w, 0);
+    gl!.uniform1f(pGauss.u.sigma, sigma);
+    gl!.uniform1i(pGauss.u.muestras, n);
+    gl!.uniform1f(pGauss.u.paso, paso);
+    dibujarQuad();
+    prepararPasada(hasta, pGauss, false);
+    unir(0, medio.tex, pGauss.u.fuente);
+    gl!.uniform2f(pGauss.u.direccion, 0, 1 / medio.h);
+    gl!.uniform1f(pGauss.u.sigma, sigma);
+    gl!.uniform1i(pGauss.u.muestras, n);
+    gl!.uniform1f(pGauss.u.paso, paso);
+    dibujarQuad();
+  }
+
+  function reducir(d: Destino, w: number, h: number, persona: boolean) {
+    if (!alfa) return;
+    prepararPasada(d, pReducir, false);
+    unir(0, texCuadro, pReducir.u.cuadro);
+    unir(1, alfa.tex, pReducir.u.mascara);
+    gl!.uniform2f(pReducir.u.pasoFuente, 1 / w, 1 / h);
+    gl!.uniform1i(pReducir.u.pesarPersona, persona ? 1 : 0);
+    dibujarQuad();
   }
 
   function subirCuadro(frame: VideoFrame) {
@@ -376,13 +492,13 @@ export function crearPipelineFondo(canvas: OffscreenCanvas | HTMLCanvasElement):
     gl!.texImage2D(gl!.TEXTURE_2D, 0, gl!.RGBA, gl!.RGBA, gl!.UNSIGNED_BYTE, frame);
   }
 
-  function dibujar(frame: VideoFrame, modo: ModoDeDibujo, sigma720: number) {
+  function dibujar(frame: VideoFrame, modo: ModoDeDibujo, sigma720: number, mate = true) {
     const w = frame.displayWidth;
     const h = frame.displayHeight;
     if (canvas.width !== w) canvas.width = w;
     if (canvas.height !== h) canvas.height = h;
     ajustarTamano(w, h);
-    if (!ema || !alfa || !red1 || !red2) return;
+    if (!ema || !alfa || !red1 || !red2 || !locB || !locF || !tmp) return;
     subirCuadro(frame);
 
     // 2. Borde guiado (si todavía no hubo máscara, la de ceros = todo fondo).
@@ -392,33 +508,21 @@ export function crearPipelineFondo(canvas: OffscreenCanvas | HTMLCanvasElement):
     gl!.uniform2f(pRefinar.u.paso, 1 / alfa.w, 1 / alfa.h);
     dibujarQuad();
 
+    // 3. Fondo sin la persona, a 1/4 (sirve al blur y al borde por color).
+    if (modo === "borroso" || mate) reducir(locB, w, h, false);
+
     let texFondo: WebGLTexture = texImagen;
     if (modo === "borroso") {
-      // 3. Fondo sin la persona, a 1/4.
-      prepararPasada(red1, pReducir, false);
-      unir(0, texCuadro, pReducir.u.cuadro);
-      unir(1, alfa.tex, pReducir.u.mascara);
-      gl!.uniform2f(pReducir.u.pasoFuente, 1 / w, 1 / h);
-      dibujarQuad();
-      // 4. Gaussiano: horizontal a red2, vertical de vuelta a red1.
-      const sigma = sigmaEnTextura(sigma720, h);
-      const n = muestrasPorLado(sigma);
-      const paso = pasoDeMuestreo(sigma);
-      prepararPasada(red2, pGauss, false);
-      unir(0, red1.tex, pGauss.u.fuente);
-      gl!.uniform2f(pGauss.u.direccion, 1 / red1.w, 0);
-      gl!.uniform1f(pGauss.u.sigma, sigma);
-      gl!.uniform1i(pGauss.u.muestras, n);
-      gl!.uniform1f(pGauss.u.paso, paso);
-      dibujarQuad();
-      prepararPasada(red1, pGauss, false);
-      unir(0, red2.tex, pGauss.u.fuente);
-      gl!.uniform2f(pGauss.u.direccion, 0, 1 / red2.h);
-      gl!.uniform1f(pGauss.u.sigma, sigma);
-      gl!.uniform1i(pGauss.u.muestras, n);
-      gl!.uniform1f(pGauss.u.paso, paso);
-      dibujarQuad();
+      // 4. Gaussiano grande: horizontal a red2, vertical a red1.
+      gauss(locB, red2, red1, sigmaEnTextura(sigma720, h));
       texFondo = red1.tex;
+    }
+    if (mate) {
+      // Promedios LOCALES de fondo viejo y de persona, para el borde por color.
+      const sigmaMate = sigmaEnTextura(SIGMA_DEL_MATE_720, h);
+      gauss(locB, tmp, locB, sigmaMate);
+      reducir(locF, w, h, true);
+      gauss(locF, tmp, locF, sigmaMate);
     }
 
     // 5. Composición al canvas.
@@ -431,6 +535,9 @@ export function crearPipelineFondo(canvas: OffscreenCanvas | HTMLCanvasElement):
     gl!.uniform4f(pComponer.u.cubrir, c.escalaX, c.escalaY, c.corrX, c.corrY);
     const curva = modo === "borroso" ? CURVA_BORDE_BLUR : CURVA_BORDE_IMAGEN;
     gl!.uniform2f(pComponer.u.curva, curva.desde, curva.hasta);
+    unir(3, locB.tex, pComponer.u.locB);
+    unir(4, locF.tex, pComponer.u.locF);
+    gl!.uniform1i(pComponer.u.mate, mate ? 1 : 0);
     dibujarQuad();
   }
 
@@ -456,7 +563,8 @@ export function crearPipelineFondo(canvas: OffscreenCanvas | HTMLCanvasElement):
     for (const p of [pSuav, pRefinar, pReducir, pGauss, pComponer]) gl!.deleteProgram(p.p);
     if (ema) { borrarDestino(ema[0]); borrarDestino(ema[1]); }
     borrarDestino(alfa); borrarDestino(red1); borrarDestino(red2);
-    ema = null; alfa = null; red1 = null; red2 = null;
+    borrarDestino(locB); borrarDestino(locF); borrarDestino(tmp); borrarDestino(fina);
+    ema = null; alfa = null; red1 = null; red2 = null; locB = null; locF = null; tmp = null; fina = null;
     gl!.deleteTexture(texCuadro);
     gl!.deleteTexture(texImagen);
     gl!.deleteBuffer(vbo);
@@ -470,6 +578,8 @@ export function crearPipelineFondo(canvas: OffscreenCanvas | HTMLCanvasElement):
       ajustarTamano(w, h);
     },
     actualizarMascara,
+    actualizarFina,
+    olvidarFina: () => { hayFina = false; },
     dibujar,
     ponerImagen,
     reiniciarMascara: () => { hayMascara = false; },
