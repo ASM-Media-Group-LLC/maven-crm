@@ -12,6 +12,7 @@ import ParticipantTile from "./ParticipantTile";
 import RecordingControl, { leerMiGrabacion, detenerAlSalir } from "./RecordingControl";
 import RoomAudioSink from "./RoomAudioSink";
 import { useAutoPiP } from "./useAutoPiP";
+import AvisoCaidasSeguidas from "./AvisoCaidasSeguidas";
 import { suscribirOrdenesDePausa } from "@/lib/ordenesDePausa";
 
 import { Loader2, Wifi, WifiOff, Copy, ChevronLeft, ChevronRight, DoorOpen, Check } from "lucide-react";
@@ -1000,6 +1001,9 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
           <Wifi className="h-3.5 w-3.5 shrink-0" aria-hidden="true" /> {t("messenger.callView.internetDebil")}
         </div>
       )}
+      {/* «Tu internet se está cortando seguido» (lib/caidasSeguidas.ts): con 3
+          caídas propias en 30 min, una vez por hora. Solo avisa. */}
+      <AvisoCaidasSeguidas />
       {salaCaida && (
         <div role="status" className="shrink-0 flex flex-wrap items-center justify-center gap-x-3 gap-y-1 py-2 px-3 bg-warning/15 text-warning text-xs font-medium text-center">
           <WifiOff className="h-3.5 w-3.5 shrink-0 animate-pulse" />
