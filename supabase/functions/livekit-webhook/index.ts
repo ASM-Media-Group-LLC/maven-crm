@@ -73,6 +73,27 @@ Deno.serve(async (req) => {
       return json({ ok: true });
     }
 
+    // Se vació una sala de llamada del Messenger: la llamada terminó. Antes nadie
+    // la marcaba como terminada (cada uno cerraba su pestaña y listo), así que
+    // tampoco quedaba en el chat. Al pasar a 'ended', la base deja el aviso
+    // «Llamada de video · N min» en la conversación (llamada_al_chat).
+    if (evento.event === "room_finished") {
+      const sala = evento.room?.name;
+      if (!sala || !sala.startsWith("call-")) return json({ ok: true, ignorado: "room_finished de otra sala" });
+      const admin = createClient(PROJECT_URL, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+      const ahora = new Date().toISOString();
+      const { error } = await admin.from("calls")
+        .update({ call_status: "ended", end_time: ahora })
+        .eq("room_id", sala)
+        .in("call_status", ["ringing", "accepted"]);
+      if (error) console.warn("[livekit-webhook] cerrar llamada:", error.message);
+      await admin.from("call_participants")
+        .update({ status: "missed", actualizado: ahora })
+        .eq("status", "ringing")
+        .in("call_id", (await admin.from("calls").select("id").eq("room_id", sala).gte("created_at", new Date(Date.now() - 12 * 3600_000).toISOString())).data?.map((c) => c.id) ?? []);
+      return json({ ok: true });
+    }
+
     // Solo interesa el fin de una grabación. `room_finished` no sirve acá:
     // el egress sigue cerrando el archivo unos segundos después de que la
     // sala muere, así que mirar el peso en ese momento da un valor parcial.

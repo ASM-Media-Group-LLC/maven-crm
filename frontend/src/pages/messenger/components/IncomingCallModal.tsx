@@ -17,7 +17,7 @@ export default function IncomingCallModal({ call, onAccept, onDecline }: Props) 
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-      <div className="bg-card border border-border rounded-2xl shadow-2xl p-8 flex flex-col items-center gap-6 w-80 animate-in zoom-in-95">
+      <div className="vidrio vidrio-glow sube rounded-[20px] border border-border/60 p-8 flex flex-col items-center gap-6 w-80">
         {/* Avatar ring */}
         <div className="relative">
           <div className="h-20 w-20 rounded-full bg-primary/20 flex items-center justify-center">
@@ -40,6 +40,10 @@ export default function IncomingCallModal({ call, onAccept, onDecline }: Props) 
             )}
           </p>
           <p className="text-xl font-semibold text-foreground">{call.caller_name ?? t("messenger.incoming.desconocido")}</p>
+          {/* En grupo: en qué chat es la llamada. */}
+          {isGroup && call.titulo && call.titulo !== call.caller_name && (
+            <p className="text-xs text-muted-foreground truncate max-w-[16rem]">{call.titulo}</p>
+          )}
         </div>
 
         <div className="flex gap-6">

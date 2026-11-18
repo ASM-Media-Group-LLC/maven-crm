@@ -118,7 +118,7 @@ function mostrarLlamada(data) {
     // Se queda hasta que el usuario la toque (como un timbre real).
     requireInteraction: true,
     vibrate: [400, 200, 400, 200, 400],
-    data: { room: data.room || "", callId: data.callId || "" },
+    data: { room: data.room || "", callId: data.callId || "", caller: caller, audio: !esVideo },
   });
 }
 
@@ -278,7 +278,11 @@ self.addEventListener("notificationclick", function (event) {
 
   // --- Llamada entrante ---
   var room = d.room || "";
-  var urlLlamada = room ? "/call/" + encodeURIComponent(room) : "/";
+  // Tocar el aviso = contestar: entra directo, con el nombre de quien llama
+  // arriba (y sin cámara si es de voz). La pestaña marca la llamada como
+  // contestada al entrar.
+  var q = "?directo=1" + (d.caller ? "&name=" + encodeURIComponent(d.caller) : "") + (d.audio ? "&audio=1" : "");
+  var urlLlamada = room ? "/call/" + encodeURIComponent(room) + q : "/";
   event.waitUntil(
     self.clients
       .matchAll({ type: "window", includeUncontrolled: true })

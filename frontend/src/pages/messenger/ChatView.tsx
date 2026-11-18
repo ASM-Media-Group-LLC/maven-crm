@@ -30,7 +30,7 @@ interface ChatViewProps {
   onDeleteMessage: (id: string) => void;
   onRetryMessage?: (id: string) => void;
   onBack: () => void;
-  onStartVideoCall: (conv: ConversationWithDetails) => void;
+  onStartVideoCall: (conv: ConversationWithDetails, tipo?: "audio" | "video") => void;
   loading: boolean;
   getReactionsForMessage: (messageId: string) => ReactionGroup[];
   onToggleReaction: (messageId: string, emoji: string) => void;

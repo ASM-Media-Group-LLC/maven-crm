@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import {
-  Video, Search, MoreVertical, ArrowLeft, Bell, FileText, Users,
+  Video, Phone, Search, MoreVertical, ArrowLeft, Bell, FileText, Users,
   Pin, PinOff, Archive, Trash2, Settings, Pencil, Check,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -28,7 +28,7 @@ interface ChatHeaderProps {
   typingUsers: string[];
   onSearchToggle: () => void;
   onBack: () => void;
-  onStartVideoCall: (conv: ConversationWithDetails) => void;
+  onStartVideoCall: (conv: ConversationWithDetails, tipo?: "audio" | "video") => void;
   onOpenProfile?: (userId: string) => void;
   onOpenNotificationSettings: () => void;
   onOpenSharedFiles: () => void;
@@ -275,7 +275,11 @@ export default function ChatHeader({
         </div>
 
         <div className="flex items-center gap-0.5 shrink-0">
-          <Button variant="ghost" size="icon" className="h-9 w-9 sm:h-8 sm:w-8 rounded-full hover:bg-primary/8" onClick={() => onStartVideoCall(conversation)} title={t("messenger.header.videollamada")}>
+          {/* Llamada de voz (sin cámara) y videollamada, como en Skype. */}
+          <Button variant="ghost" size="icon" className="h-9 w-9 sm:h-8 sm:w-8 rounded-full hover:bg-primary/8" onClick={() => onStartVideoCall(conversation, "audio")} title={t("messenger.header.llamadaDeVoz")} aria-label={t("messenger.header.llamadaDeVoz")}>
+            <Phone className="h-4 w-4" />
+          </Button>
+          <Button variant="ghost" size="icon" className="h-9 w-9 sm:h-8 sm:w-8 rounded-full hover:bg-primary/8" onClick={() => onStartVideoCall(conversation, "video")} title={t("messenger.header.videollamada")}>
             <Video className="h-4 w-4" />
           </Button>
           <Button

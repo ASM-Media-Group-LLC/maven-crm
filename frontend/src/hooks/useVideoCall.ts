@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { SUENA_MS, invitarALaLlamada } from "@/lib/llamadaInvitar";
+import { urlDeLaLlamada } from "@/lib/urlDeLaLlamada";
 
 export type CallStatus = "idle" | "ringing" | "accepted" | "ended" | "declined";
 export type CallType = "audio" | "video";
@@ -14,6 +16,8 @@ export interface Call {
   start_time: string | null;
   end_time: string | null;
   caller_name?: string;
+  /** Para el título de la llamada: el nombre del chat o de quien llama. */
+  titulo?: string;
   conversation_id: string | null;
   call_type?: CallType;
   is_group?: boolean;
@@ -130,7 +134,7 @@ export function useVideoCall() {
         setIncomingCall(null);
         setActiveCall({ ...fromOther, call_status: "accepted" });
         setCalling(false);
-        window.open(`/call/${encodeURIComponent(roomId)}`, `call-${roomId}`, "noopener");
+        window.open(urlDeLaLlamada(roomId, { nombre: receiverName, directo: true, audio: callType === "audio" }), `call-${roomId}`, "noopener");
         return;
       }
 
@@ -140,7 +144,7 @@ export function useVideoCall() {
       if (mine) {
         setActiveCall(mine);
         setCalling(false);
-        window.open(`/call/${encodeURIComponent(roomId)}?admin=1`, `call-${roomId}`, "noopener");
+        window.open(urlDeLaLlamada(roomId, { nombre: receiverName, admin: true, directo: true, audio: callType === "audio" }), `call-${roomId}`, "noopener");
         return;
       }
 
@@ -174,8 +178,8 @@ export function useVideoCall() {
       setActiveCall({ ...call, caller_name: "Yo", call_type: callType } as Call);
       setCalling(false);
 
-      // Open call in new tab
-      window.open(`/call/${encodeURIComponent(roomId)}?admin=1`, `call-${roomId}`, "noopener");
+      // Quien llama entra directo (sin sala previa) y ve el nombre de a quién llama.
+      window.open(urlDeLaLlamada(roomId, { nombre: receiverName, admin: true, directo: true, audio: callType === "audio" }), `call-${roomId}`, "noopener");
 
       // Push al receptor: si tiene Maven cerrado o en otra pestaña, igual le
       // suena. Best-effort — el modal in-app cubre "Maven abierto".
@@ -186,36 +190,103 @@ export function useVideoCall() {
       // Auto-end after 30s if no answer
       clearRingingTimer();
       ringingTimerRef.current = setTimeout(async () => {
+        // Quien no contestó queda «no contestó» (la pestaña de quien llama lo muestra).
+        await (supabase.from("call_participants") as any)
+          .update({ status: "missed", actualizado: new Date().toISOString() })
+          .eq("call_id", call.id)
+          .eq("status", "ringing");
         await (supabase.from("calls") as any)
           .update({ call_status: "ended", end_time: new Date().toISOString() })
           .eq("id", call.id)
           .eq("call_status", "ringing");
 
         setActiveCall(null);
-      }, 30_000);
+      }, SUENA_MS);
     },
     [user, clearRingingTimer]
+  );
+
+  // ── Llamada de grupo: le suena a todos (Alvaro, 18/11/2026) ─────────
+  // Antes se pegaba un link en el chat y nadie recibía timbre. Ahora la llamada
+  // nace en curso (quien llama ya está adentro) y cada miembro es una fila
+  // 'ringing': rechazar o no contestar es solo de cada uno.
+  const initiateGroupCall = useCallback(
+    async (conversationId: string, memberIds: string[], groupName: string, callType: CallType = "video") => {
+      if (!user || !conversationId) return;
+      setCalling(true);
+      const roomId = `call-${conversationId}`;
+      try {
+        const desde = new Date(Date.now() - 12 * 3600_000).toISOString();
+        const { data: vivas } = await (supabase.from("calls") as any)
+          .select("*")
+          .eq("room_id", roomId)
+          .in("call_status", ["ringing", "accepted"])
+          .gte("created_at", desde)
+          .order("created_at", { ascending: false })
+          .limit(1);
+        let call = ((vivas ?? [])[0] as Call | undefined) ?? null;
+        if (!call) {
+          const { data, error } = await (supabase.from("calls") as any)
+            .insert({
+              caller_id: user.id,
+              receiver_id: null,
+              call_status: "accepted",
+              start_time: new Date().toISOString(),
+              room_id: roomId,
+              conversation_id: conversationId,
+              call_type: callType,
+              is_group: true,
+            })
+            .select()
+            .single();
+          if (error || !data) throw error ?? new Error("calls insert");
+          call = data as Call;
+          await (supabase.from("call_participants") as any).insert({ call_id: call.id, user_id: user.id, status: "accepted" });
+        }
+        window.open(urlDeLaLlamada(roomId, { nombre: groupName, admin: true, directo: true, audio: callType === "audio" }), `call-${roomId}`, "noopener");
+        // Tope de 20 timbres a la vez: un grupo de 60 no se llama entero de golpe.
+        await invitarALaLlamada(
+          { id: call.id, caller_id: call.caller_id, room_id: roomId, conversation_id: conversationId, call_status: call.call_status, call_type: callType, is_group: true },
+          user.id,
+          memberIds.filter((m) => m !== user.id).slice(0, 20),
+        );
+      } catch (e) {
+        console.error("[Llamadas] No se pudo iniciar la llamada de grupo:", e);
+        throw e;
+      } finally {
+        setCalling(false);
+      }
+    },
+    [user],
   );
 
   // ── Accept call ──────────────────────────────────────────────────
   const acceptCall = useCallback(async () => {
     if (!incomingCall || !user) return;
 
+    // Solo si seguía sonando: a una llamada de grupo ya en curso no se le pisa
+    // la hora de inicio.
     await (supabase.from("calls") as any)
       .update({ call_status: "accepted", start_time: new Date().toISOString() })
-      .eq("id", incomingCall.id);
+      .eq("id", incomingCall.id)
+      .eq("call_status", "ringing");
 
     await (supabase.from("call_participants") as any)
-      .update({ status: "accepted" })
+      .update({ status: "accepted", actualizado: new Date().toISOString() })
       .eq("call_id", incomingCall.id)
       .eq("user_id", user.id);
 
     setActiveCall(incomingCall);
     setIncomingCall(null);
 
-    // Open call in new tab
+    // Contestar = entrar ya a la llamada (sin sala previa), con el nombre de
+    // quien llama arriba.
     window.open(
-      `/call/${encodeURIComponent(incomingCall.room_id)}`,
+      urlDeLaLlamada(incomingCall.room_id, {
+        nombre: incomingCall.titulo || incomingCall.caller_name,
+        directo: true,
+        audio: incomingCall.call_type === "audio",
+      }),
       `call-${incomingCall.room_id}`,
       "noopener"
     );
@@ -225,9 +296,19 @@ export function useVideoCall() {
   const declineCall = useCallback(async () => {
     if (!incomingCall || !user) return;
 
-    await (supabase.from("calls") as any)
-      .update({ call_status: "declined", end_time: new Date().toISOString() })
-      .eq("id", incomingCall.id);
+    await (supabase.from("call_participants") as any)
+      .update({ status: "declined", actualizado: new Date().toISOString() })
+      .eq("call_id", incomingCall.id)
+      .eq("user_id", user.id);
+
+    // En el 1 a 1, rechazar corta la llamada. En grupo (o si ya estaba en curso)
+    // solo te sacas tú: los demás siguen hablando.
+    if (!incomingCall.is_group) {
+      await (supabase.from("calls") as any)
+        .update({ call_status: "declined", end_time: new Date().toISOString() })
+        .eq("id", incomingCall.id)
+        .eq("call_status", "ringing");
+    }
 
     setIncomingCall(null);
   }, [incomingCall, user]);
@@ -253,6 +334,7 @@ export function useVideoCall() {
   useEffect(() => {
     if (!incomingCall || !uid) return;
     const id = incomingCall.id;
+    const esDeGrupo = !!incomingCall.is_group;
     const cerrarSiEsEsta = () =>
       setIncomingCall((prev) => (prev && prev.id === id ? null : prev));
 
@@ -263,10 +345,20 @@ export function useVideoCall() {
         { event: "UPDATE", schema: "public", table: "calls", filter: `id=eq.${id}` },
         (payload) => {
           const c = payload.new as Call;
-          // Cualquier cosa que no sea 'ringing' significa que ya se resolvio:
-          // la atendieron, la rechazaron o se corto. En los tres casos, aca no
-          // hay nada mas que mostrar.
-          if (c.call_status !== "ringing") cerrarSiEsEsta();
+          // Terminada o rechazada: no hay nada que contestar. Una llamada de
+          // grupo ya en curso ('accepted') sigue sonándote hasta que contestes:
+          // lo que cierra el modal es TU fila (abajo).
+          if (c.call_status === "ended" || c.call_status === "declined") cerrarSiEsEsta();
+          else if (c.call_status !== "ringing" && !c.is_group && !esDeGrupo) cerrarSiEsEsta();
+        },
+      )
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "call_participants", filter: `call_id=eq.${id}` },
+        (payload) => {
+          const f = payload.new as { user_id: string; status: string };
+          // La atendiste o rechazaste en otra pestaña, o ya pasó el tiempo.
+          if (f.user_id === uid && f.status !== "ringing") cerrarSiEsEsta();
         },
       )
       .subscribe((estado) => {
@@ -353,7 +445,45 @@ export function useVideoCall() {
       }
     };
 
+    // Invitación a una llamada (grupo o «Agregar»): se muestra igual que el 1 a 1.
+    const mostrarInvitacion = async (callId: string, invitadoPor: string | null) => {
+      const { data: call } = await (supabase.from("calls") as any)
+        .select("*").eq("id", callId).maybeSingle();
+      if (!call || (call.call_status !== "ringing" && call.call_status !== "accepted")) return;
+      const c = call as Call;
+      // La llamada 1 a 1 de siempre ya la muestra el canal de `calls`.
+      if (!c.is_group && c.receiver_id === uid && c.call_status === "ringing") return;
+      const quien = invitadoPor || c.caller_id;
+      const [{ data: profile }, { data: conv }] = await Promise.all([
+        supabase.from("profiles").select("full_name").eq("id", quien).maybeSingle(),
+        c.conversation_id
+          ? (supabase.from("chat_conversations") as any).select("name, type").eq("id", c.conversation_id).maybeSingle()
+          : Promise.resolve({ data: null }),
+      ]);
+      setIncomingCall((prev) => {
+        if (prev?.id === c.id) return prev;
+        return {
+          ...c,
+          is_group: true,
+          caller_name: profile?.full_name ?? "Usuario",
+          titulo: (conv?.type === "group" && conv?.name) ? conv.name : profile?.full_name ?? undefined,
+        };
+      });
+    };
+
     checkIncoming();
+    void (async () => {
+      const desde = new Date(Date.now() - 45_000).toISOString();
+      const { data: filas } = await (supabase.from("call_participants") as any)
+        .select("call_id, invitado_por, actualizado")
+        .eq("user_id", uid)
+        .eq("status", "ringing")
+        .gte("actualizado", desde)
+        .order("actualizado", { ascending: false })
+        .limit(1);
+      const f = (filas ?? [])[0] as { call_id: string; invitado_por: string | null } | undefined;
+      if (f) await mostrarInvitacion(f.call_id, f.invitado_por);
+    })();
 
     // Subscribe to realtime changes on calls table for this user
     const channel = supabase
@@ -416,6 +546,22 @@ export function useVideoCall() {
             caller_name: profile?.full_name ?? "Usuario",
           });
         }
+      )
+      // Timbre por persona (grupos y «Agregar a la llamada»): cada invitado es
+      // una fila 'ringing' en call_participants.
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "call_participants",
+          filter: `user_id=eq.${uid}`,
+        },
+        async (payload) => {
+          const fila = payload.new as { call_id?: string; status?: string; invitado_por?: string | null };
+          if (!fila?.call_id || fila.status !== "ringing") return;
+          await mostrarInvitacion(fila.call_id, fila.invitado_por ?? null);
+        },
       )
       // Si el canal no queda SUBSCRIBED, el timbre no suena y hasta ahora eso no
       // dejaba ni una linea en consola: se veia igual que "me llamaron y no me
@@ -510,6 +656,7 @@ export function useVideoCall() {
     activeCall,
     calling,
     initiateCall,
+    initiateGroupCall,
     acceptCall,
     declineCall,
     endCall,

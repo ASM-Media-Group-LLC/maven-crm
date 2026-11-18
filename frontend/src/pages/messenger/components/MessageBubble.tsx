@@ -25,6 +25,7 @@ import { formatTime as formatMsgTime } from "../utils";
 import { useNavigate } from "react-router-dom";
 import NotaDeVoz from "./NotaDeVoz";
 import { useLanguage } from "@/hooks/useLanguage";
+import AvisoDeLlamada, { datosDeLlamada } from "./AvisoDeLlamada";
 
 const MAX_GRID_IMAGES = 9;
 
@@ -168,6 +169,14 @@ const MessageBubble = forwardRef<HTMLDivElement, MessageBubbleProps>(({
   // en gris y cursiva. Antes se dibujaba como burbuja normal y parecía enviado por
   // quien hizo la acción ("Jhon Lopez eliminó a X" salía como si Jhon lo hubiera escrito).
   if (message.type === "system") {
+    const llamada = datosDeLlamada(message.content_rich);
+    if (llamada) {
+      return (
+        <div ref={ref} className="flex justify-center px-1 my-2">
+          <AvisoDeLlamada llamada={llamada} hora={new Date(message.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })} />
+        </div>
+      );
+    }
     return (
       <div ref={ref} className="flex justify-center px-1 my-2">
         <span className="max-w-[80%] text-center text-[11px] italic leading-snug text-muted-foreground">

@@ -14,7 +14,13 @@ import InvitarDeAfuera from "./meet/InvitarDeAfuera";
 import { salaAdmiteInvitados } from "@/lib/meetLinkInvitado";
 import { useRoleTier } from "@/hooks/useRoleTier";
 import type { BackgroundEffect } from "./messenger/videocall/BackgroundSelector";
-import { Loader2 } from "lucide-react";
+import { Loader2, Maximize2, Minimize2 } from "lucide-react";
+import { leerFondoGuardado } from "@/lib/fondoDeLlamada";
+import { buscarLlamadaViva, conversacionDeLaSala } from "@/lib/llamadaInvitar";
+import { guardarArchivoDeLlamada, guardarMensajeDeLlamada } from "@/lib/chatDeLaLlamada";
+import { useInvitadosDeLaLlamada } from "@/hooks/useInvitadosDeLaLlamada";
+import AgregarALaLlamada from "./messenger/videocall/AgregarALaLlamada";
+import AvisoDeInvitados from "./messenger/videocall/AvisoDeInvitados";
 import { useLanguage } from "@/hooks/useLanguage";
 
 export default function VideoCallPage() {
@@ -29,7 +35,13 @@ export default function VideoCallPage() {
   // Invitar gente de afuera (link directo, sin sala de espera): supervisores y
   // arriba, en un Meet o en una llamada del Messenger (Alvaro, 17/11/2026).
   const { isSupervisorOrAbove } = useRoleTier();
-  const [joined, setJoined] = useState(false);
+  // Llamadas del Messenger (Alvaro, 18/11/2026): contestar o llamar = entrar
+  // ya, sin sala previa; la de voz arranca sin cámara.
+  const directo = searchParams.get("directo") === "1";
+  const soloAudio = searchParams.get("audio") === "1";
+  const esDelMessenger = !!roomName?.startsWith("call-");
+  const conversacion = roomName ? conversacionDeLaSala(roomName) : null;
+  const [joined, setJoined] = useState(directo);
   const [coworkRedirecting, setCoworkRedirecting] = useState(() => {
     // Synchronously detect cowork rooms to block rendering from the start
     return !!roomName && (roomName.startsWith("cowork_hub_") || roomName.startsWith("cowork_"));
@@ -41,7 +53,42 @@ export default function VideoCallPage() {
     videoDeviceId?: string;
     audioOutputDeviceId?: string;
     backgroundEffect?: BackgroundEffect;
-  }>({ micOn: false, camOn: false, backgroundEffect: "none" });
+  }>(() =>
+    directo
+      ? { micOn: true, camOn: !soloAudio, backgroundEffect: soloAudio ? "none" : leerFondoGuardado() }
+      : { micOn: false, camOn: false, backgroundEffect: "none" },
+  );
+  const invitados = useInvitadosDeLaLlamada(roomName, user?.id, esDelMessenger && joined);
+  // Entrar a la sala = contestar. Si llegaste por el aviso del celular o por el
+  // link del chat, tu timbre se apaga y la llamada deja de contar como perdida.
+  useEffect(() => {
+    if (!joined || !esDelMessenger || !roomName || !user?.id) return;
+    void (async () => {
+      try {
+        const viva = await buscarLlamadaViva(roomName);
+        if (!viva) return;
+        const ahora = new Date().toISOString();
+        await (supabase.from("call_participants") as any)
+          .update({ status: "accepted", actualizado: ahora })
+          .eq("call_id", viva.id).eq("user_id", user.id).in("status", ["ringing", "missed", "declined"]);
+        if (viva.call_status === "ringing" && viva.caller_id !== user.id) {
+          await (supabase.from("calls") as any)
+            .update({ call_status: "accepted", start_time: ahora })
+            .eq("id", viva.id).eq("call_status", "ringing");
+        }
+      } catch { /* contestar es un extra: la llamada sigue igual */ }
+    })();
+  }, [joined, esDelMessenger, roomName, user?.id]);
+  const [pantallaCompleta, setPantallaCompleta] = useState(false);
+  useEffect(() => {
+    const alCambiar = () => setPantallaCompleta(!!document.fullscreenElement);
+    document.addEventListener("fullscreenchange", alCambiar);
+    return () => document.removeEventListener("fullscreenchange", alCambiar);
+  }, []);
+  const alternarPantallaCompleta = () => {
+    if (document.fullscreenElement) void document.exitFullscreen().catch(() => {});
+    else void document.documentElement.requestFullscreen?.().catch(() => {});
+  };
 
   // Detect cowork rooms and redirect to cowork dashboard
   useEffect(() => {
@@ -221,7 +268,49 @@ export default function VideoCallPage() {
               : undefined
           }
           shareLink={meetShareLink ?? undefined}
-          accionesBarra={isSupervisorOrAbove && salaAdmiteInvitados(roomName) ? <InvitarDeAfuera livekitRoom={roomName} /> : undefined}
+          accionesBarra={
+            <>
+              {esDelMessenger && user && (
+                <AgregarALaLlamada
+                  roomName={roomName}
+                  uid={user.id}
+                  tipo={soloAudio ? "audio" : "video"}
+                  invitados={invitados.invitados}
+                  alInvitar={() => void invitados.recargar()}
+                />
+              )}
+              {isSupervisorOrAbove && salaAdmiteInvitados(roomName) && <InvitarDeAfuera livekitRoom={roomName} />}
+              <button
+                type="button"
+                onClick={alternarPantallaCompleta}
+                className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-border/60 text-foreground hover:bg-primary/10"
+                title={t(pantallaCompleta ? "messenger.enLlamada.pantallaCompleta.salir" : "messenger.enLlamada.pantallaCompleta.entrar")}
+                aria-label={t(pantallaCompleta ? "messenger.enLlamada.pantallaCompleta.salir" : "messenger.enLlamada.pantallaCompleta.entrar")}
+              >
+                {pantallaCompleta ? <Minimize2 className="h-3.5 w-3.5" /> : <Maximize2 className="h-3.5 w-3.5" />}
+              </button>
+            </>
+          }
+          guardarChat={
+            esDelMessenger && conversacion && user
+              ? {
+                  texto: (texto) => { void guardarMensajeDeLlamada(conversacion, user.id, texto); },
+                  archivo: (archivo) => { void guardarArchivoDeLlamada(conversacion, user.id, archivo); },
+                }
+              : undefined
+          }
+          encima={
+            esDelMessenger && user ? (
+              <AvisoDeInvitados
+                roomName={roomName}
+                uid={user.id}
+                llamada={invitados.llamada}
+                invitados={invitados.invitados}
+                alColgar={handleLeave}
+                alReintentar={() => void invitados.recargar()}
+              />
+            ) : undefined
+          }
         />
         {/* Sala de espera: si es una reunión de Meet, quien está adentro (con
             cuenta) ve a los invitados sin cuenta que piden entrar y los admite.

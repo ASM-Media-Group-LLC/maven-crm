@@ -433,8 +433,14 @@ ipcMain.handle("maven:llamada", (e, datos) => (deLaVentana(e) ? avisarLlamada(da
 ipcMain.on("maven:llamada-fin", (e, id) => { if (deLaVentana(e)) cerrarAvisoLlamada(id); });
 
 // ── El número de chats sin leer ──────────────────────────────────────────────
+let insigniaPuesta = false;
 ipcMain.on("maven:insignia", (_e, n, dibujo) => {
-  sinLeer = Math.max(0, Number(n) || 0);
+  // El chat lo manda en cada cambio de conversaciones, aunque el número sea el
+  // mismo: si no cambió, no se vuelve a leer disco ni rearmar el menú (8 h de uso).
+  const nuevo = Math.max(0, Number(n) || 0);
+  if (nuevo === sinLeer && insigniaPuesta) return;
+  insigniaPuesta = true;
+  sinLeer = nuevo;
   if (esMac) {
     app.dock?.setBadge(sinLeer > 0 ? String(sinLeer > 99 ? "99+" : sinLeer) : "");
   } else if (ventana) {

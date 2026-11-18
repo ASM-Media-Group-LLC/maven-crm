@@ -21,7 +21,7 @@ import { caidaEnCurso, conexionDeSala, marcarCaida, olvidarCaida } from "@/lib/c
 import type { ConexionSala } from "@/lib/coworkTiempoRegla";
 import type { DestinoDeTelemetria } from "@/lib/saludDeLlamada";
 import { cn } from "@/lib/utils";
-import { aplicaCalidadPorVoz, calidadDeCamara } from "@/lib/calidadPorVoz";
+import { ajustarConEstaGente, aplicaCalidadPorVoz, calidadDeCamara } from "@/lib/calidadPorVoz";
 import { puedeCompartirPantalla } from "@/lib/compartirPantalla";
 import { toast } from "sonner";
 import { useFaceWatch, faceStateLabel, type FaceWatch } from "@/hooks/useFaceWatch";
@@ -154,6 +154,11 @@ interface LiveKitCallViewProps {
   /** Botones extra a la derecha de la barra de arriba (p. ej. «Invitar de
    *  afuera» en un Meet o una llamada del Messenger). */
   accionesBarra?: ReactNode;
+  /** Llamadas del Messenger: lo que escribo en el chat de la llamada queda
+   *  además en la conversación (texto y archivos). */
+  guardarChat?: { texto: (texto: string) => void; archivo: (archivo: File) => void };
+  /** Algo encima de la llamada (el aviso «no contestó», quién está sonando). */
+  encima?: ReactNode;
   /** Sala de Cowork del PARTICIPANTE: oye a todos pero no recibe el video de
    *  sus compañeros (lib/videoAjeno.ts). Solo lo pasa CoworkParticipantView
    *  para su sala; el tablero, el Hub, los meets y las 1:1 no lo pasan. */
@@ -175,7 +180,7 @@ function usePunteroGrueso(): boolean {
   return grueso;
 }
 
-export default function LiveKitCallView({ roomName, displayName, callDisplayName, isAdmin = false, onLeave, initialMicOn = true, initialCamOn = true, initialScreenShareOn = false, initialAudioDeviceId, initialVideoDeviceId, initialAudioOutputDeviceId, initialBackgroundEffect = "none", hideShareLink, hideScreenShare, hideLeaveButton, leaveLabel, leaveIcon, suppressLeaveToast, compact, autoPip = true, autoLeaveOnEmpty, getToken, onMediaStateChange, onFaceStateChange, supervisorEncuadre, onLocalScreenTrack, pantallaSoloParaMi, pantallaVisiblePara, pantallaOpcional = false, camaraOpcional = false, pantallaPrestada = null, sinLatidoDeLlamada, incomingAudioMuted, roomSwitcher, recording, shareLink: shareLinkProp, accionesBarra, hideEndForAll, controlesExtra, sinVideoAjeno = false, telemetria, sinVolverEnError = false }: LiveKitCallViewProps) {
+export default function LiveKitCallView({ roomName, displayName, callDisplayName, isAdmin = false, onLeave, initialMicOn = true, initialCamOn = true, initialScreenShareOn = false, initialAudioDeviceId, initialVideoDeviceId, initialAudioOutputDeviceId, initialBackgroundEffect = "none", hideShareLink, hideScreenShare, hideLeaveButton, leaveLabel, leaveIcon, suppressLeaveToast, compact, autoPip = true, autoLeaveOnEmpty, getToken, onMediaStateChange, onFaceStateChange, supervisorEncuadre, onLocalScreenTrack, pantallaSoloParaMi, pantallaVisiblePara, pantallaOpcional = false, camaraOpcional = false, pantallaPrestada = null, sinLatidoDeLlamada, incomingAudioMuted, roomSwitcher, recording, shareLink: shareLinkProp, accionesBarra, guardarChat, encima, hideEndForAll, controlesExtra, sinVideoAjeno = false, telemetria, sinVolverEnError = false }: LiveKitCallViewProps) {
   // Lista de salas del navegador (solo Cowork supervisor+): estado del popup.
   const [salasAbiertas, setSalasAbiertas] = useState(false);
   const lk = useLiveKit();
@@ -538,7 +543,8 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
     }
   }, [lk.participants, pinnedSid]);
 
-  // En Cowork, la cámara de quien no habla llega en calidad baja (lib/calidadPorVoz.ts).
+  // En Cowork (y en llamadas de 4+ personas), la cámara de quien no habla llega
+  // en calidad baja (lib/calidadPorVoz.ts).
   const conectada = lk.connectionState === ConnectionState.Connected;
   const getRoomLk = lk.getRoom;
   useEffect(() => {
@@ -547,12 +553,16 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
     const ultimaVez = new Map<string, number>();
     const ajustar = () => {
       const ahora = Date.now();
+      // Messenger/Meet: solo con 4 o más cámaras ajenas; con menos, todos nítidos.
+      const ajustarYa = ajustarConEstaGente(room.name, room.remoteParticipants.size);
       room.remoteParticipants.forEach((p) => {
         if (p.isSpeaking) ultimaVez.set(p.sid, ahora);
         const pub = p.getTrackPublication(Track.Source.Camera);
         if (!pub?.isSubscribed) return;
         try {
-          const calidad = calidadDeCamara({ fijado: p.sid === pinnedSid, hablando: p.isSpeaking, ultimaVezHablo: ultimaVez.get(p.sid), ahora });
+          const calidad = ajustarYa
+            ? calidadDeCamara({ fijado: p.sid === pinnedSid, hablando: p.isSpeaking, ultimaVezHablo: ultimaVez.get(p.sid), ahora })
+            : VideoQuality.HIGH;
           // App en un equipo de 8 GB o menos (lib/appLiviana.ts): como mucho media.
           pub.setVideoQuality(modoLivianoActivo() && calidad === VideoQuality.HIGH ? VideoQuality.MEDIUM : calidad);
         } catch { /* la calidad nunca rompe la llamada */ }
@@ -561,10 +571,12 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
     ajustar();
     room.on(RoomEvent.ActiveSpeakersChanged, ajustar);
     room.on(RoomEvent.TrackSubscribed, ajustar);
+    room.on(RoomEvent.ParticipantConnected, ajustar);
     const repaso = window.setInterval(ajustar, 3_000);
     return () => {
       room.off(RoomEvent.ActiveSpeakersChanged, ajustar);
       room.off(RoomEvent.TrackSubscribed, ajustar);
+      room.off(RoomEvent.ParticipantConnected, ajustar);
       window.clearInterval(repaso);
     };
   }, [getRoomLk, conectada, pinnedSid]);
@@ -1097,6 +1109,7 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
   return (
     <div ref={rootRef} className="relative flex flex-col h-full bg-background text-foreground">
       <CallTopBar roomName={callDisplayName || roomName} participantCount={cantidadDePersonas} onOpenAdjustView={() => setAdjustViewOpen(true)} shareLink={shareLink} hideShareLink={hideShareLink} compact={effectiveCompact} tactil={tactil} extra={selectorDeSalas} acciones={accionesBarra} />
+      {encima}
 
       {lk.isReconnecting && (
         <div className="shrink-0 flex items-center justify-center gap-2 py-1.5 bg-warning/15 text-warning text-xs font-medium">
@@ -1274,7 +1287,15 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
 
         </div>
 
-        {chatOpen && <CallChatSidebar messages={lk.chatMessages} onSend={lk.sendChatMessage} onSendFile={lk.sendChatFile} onClose={() => setChatOpen(false)} localIdentity={room?.localParticipant.identity || ""} />}
+        {chatOpen && (
+          <CallChatSidebar
+            messages={lk.chatMessages}
+            onSend={(texto) => { lk.sendChatMessage(texto); guardarChat?.texto(texto); }}
+            onSendFile={async (archivo, alAvanzar) => { await lk.sendChatFile(archivo, alAvanzar); guardarChat?.archivo(archivo); }}
+            onClose={() => setChatOpen(false)}
+            localIdentity={room?.localParticipant.identity || ""}
+          />
+        )}
         {/* El aviso de encuadre se le muestra a la PROPIA persona: si el sistema
           detecta que no se le ve, que se entere y se acomode. Es una ayuda, no
           una cámara de vigilancia silenciosa. */}
