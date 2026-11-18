@@ -214,13 +214,15 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
   // Argos vigila a todos menos a los admins libres: al supervisor que trabaja
   // desde este panel le pide cámara y pantalla, le toma fotos y le cuenta el
   // tiempo (Alvaro, 13/11/2026). Desde el 18/11 lo decide la base, persona por
-  // persona (useReglaDeAnfitrion): Grace y Jackeline son admins vigiladas, y a
-  // Luis, Juan Pachas, Grace y Jackeline la pantalla del Hub no se les exige.
+  // persona (useReglaDeAnfitrion): al grupo de Luis (Luis, Juan Pachas, Grace,
+  // Jackeline y Alvaro René) Argos lo vigila pero nada le es obligatorio: ni
+  // cámara ni pantalla. Si prenden la cámara, Argos los juzga como a todos.
   // Mientras carga, no.
   const regla = useReglaDeAnfitrion(miRol !== null, isAdmin);
   const vigilarAnfitrion = regla?.vigilado ?? false;
   const pantallaObligatoria = regla?.pantallaObligatoria ?? false;
-  // Quiénes ven en el Hub la pantalla de un vigilado: los admins libres.
+  const camaraObligatoria = regla?.camaraObligatoria ?? false;
+  // Quiénes ven en el Hub la pantalla de un vigilado: los admins.
   const venPantallasDelHub = useVenPantallasDelHub(vigilarAnfitrion);
   const puedeFinalizar = !!cowork.session && (cowork.session.created_by === userId || isAdmin);
   // Avisar: cualquier anfitrión de la sesión le avisa a un CHATTER (Alvaro,
@@ -1093,20 +1095,19 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
       // Los callbacks van a funciones de módulo: siguen vivos con el Hub flotando
       // en otra sección.
       supervisorEncuadre: vigilarAnfitrion,
-      // Si su pantalla del Hub no es obligatoria, no se comparte sola ni se le
-      // reclama hasta que la comparta una vez (Luis, Juan, Grace, Jackeline).
+      // El grupo de Luis: ni la pantalla ni la cámara se comparten solas ni se
+      // reclaman. Con la cámara prendida, Argos trabaja como con todos.
       pantallaOpcional: vigilarAnfitrion && !pantallaObligatoria,
+      camaraOpcional: vigilarAnfitrion && !camaraObligatoria,
       // Su pantalla del Hub es la única: el tablero la reenvía a las salas que elija.
       onLocalScreenTrack: fijarPantallaDelHub,
-      // …y en el Hub la ven solo los admins libres (Alvaro, 18/11/2026: «solo en
-      // el Hub»). Los supervisores no se la ven entre ellos: era otro espejo.
+      // …y en el Hub la ven solo los admins (Alvaro, 18/11/2026: «solo en el
+      // Hub»). Los supervisores no se la ven entre ellos: era otro espejo.
       pantallaSoloParaMi: vigilarAnfitrion,
       pantallaVisiblePara: venPantallasDelHub,
       onFaceStateChange: (w) => actualizarLatido({ faceState: w.state, faceSince: w.since }),
       onMediaStateChange: (m) => {
         medioHubRef.current = { camOn: m.camOn, screenShareOn: m.screenShareOn, conexionSala: m.conexionSala ?? null };
-        // Con la pantalla opcional, el reloj la exige desde que la compartió una vez.
-        if (m.screenShareOn) actualizarLatido({ pantallaYaCompartida: true });
         empujarMedios();
       },
       incomingAudioMuted: hubSilenciado,
@@ -1128,7 +1129,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
         onSwitch: (id: string) => cambiarDeSesionRef.current(id),
       },
     });
-  }, [hubRoom, hubKey, displayName, colgarHub, getHubToken, startCall, hubSilenciado, fijarHubSilencio, cowork.session?.id, vigilarAnfitrion, pantallaObligatoria, venPantallasDelHub, empujarMedios]);
+  }, [hubRoom, hubKey, displayName, colgarHub, getHubToken, startCall, hubSilenciado, fijarHubSilencio, cowork.session?.id, vigilarAnfitrion, pantallaObligatoria, camaraObligatoria, venPantallasDelHub, empujarMedios]);
 
   // EL RELOJ DEL SUPERVISOR (Alvaro, 13/11/2026): con el Hub conectado late como
   // cualquiera en su sala, y su tiempo en el panel cuenta como trabajo. No se
@@ -1181,7 +1182,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
     // Solo cuando cambia el silencio o se sabe si se le vigila (el rol llega
     // después); conectarHub cambia de identidad justo por eso.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [hubSilenciado, vigilarAnfitrion, pantallaObligatoria, venPantallasDelHub]);
+  }, [hubSilenciado, vigilarAnfitrion, pantallaObligatoria, camaraObligatoria, venPantallasDelHub]);
 
   const getActiveRoomToken = useCallback(async () => {
     const result = activeMeetId

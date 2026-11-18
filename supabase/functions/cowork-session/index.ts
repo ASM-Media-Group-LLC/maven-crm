@@ -759,15 +759,15 @@ serve(async (req) => {
       // El anfitrión, cámara y pantalla SIEMPRE (Alvaro, 13/11/2026: «con cámara y
       // pantalla como todos»): las reglas de la sesión son para su equipo.
       let exige = esAnfitrion ? EXIGE_TODO : exigenciasDelReloj(sesionReloj?.alert_rules);
-      // Salvo la pantalla de quien la tiene opcional (argos_reglas_persona: Luis,
-      // Juan Pachas, Grace, Jackeline — Alvaro, 18/11/2026): se exige recién
-      // después de que la compartió una vez («si la comparte y la quita, cuenta»).
-      // El aviso del navegador solo puede AGREGAR la exigencia, nunca quitarla.
+      // Salvo el grupo de Luis (argos_reglas_persona: Luis, Juan Pachas, Grace,
+      // Jackeline y Alvaro René — Alvaro, 18/11/2026): ni cámara ni pantalla
+      // obligatorias; su tiempo cuenta mientras estén conectados. Lo dice la
+      // base, nunca el navegador.
       if (esAnfitrion) {
         const { data: regla } = await admin.from("argos_reglas_persona")
-          .select("pantalla_obligatoria").eq("user_id", userId).maybeSingle();
-        if (regla?.pantalla_obligatoria === false && body.pantallaYaCompartida !== true) {
-          exige = { camara: true, pantalla: false };
+          .select("pantalla_obligatoria, camara_obligatoria").eq("user_id", userId).maybeSingle();
+        if (regla) {
+          exige = { camara: regla.camara_obligatoria !== false, pantalla: regla.pantalla_obligatoria !== false };
         }
       }
 

@@ -44,9 +44,6 @@ export interface Latido {
   enMeet?: boolean;
   /** Ausente o null = no se sabe: se aplica la regla de siempre. */
   conexionSala?: ConexionSala | null;
-  /** Anfitrión con la pantalla del Hub opcional (Luis, Juan, Grace, Jackeline):
-   *  true desde que la compartió una vez. Recién ahí el reloj la exige. */
-  pantallaYaCompartida?: boolean;
 }
 
 export interface Veredicto {

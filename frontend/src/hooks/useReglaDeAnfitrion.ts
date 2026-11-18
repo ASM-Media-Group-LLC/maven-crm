@@ -1,10 +1,11 @@
 // LA REGLA DE PANTALLA Y DE ARGOS DE QUIEN ESTÁ EN EL TABLERO DE COWORK
 // (Alvaro, 18/11/2026). La decide la base (mi_regla_de_anfitrion y la tabla
 // argos_reglas_persona):
-//   · vigilado: Argos lo vigila (todos menos los admins libres; Grace y
-//     Jackeline son admins vigiladas).
-//   · pantallaObligatoria: la pantalla del Supervisor Hub se comparte sola y se
-//     le exige. Luis, Juan Pachas, Grace y Jackeline: vigilados, pero opcional.
+//   · vigilado: Argos lo vigila (todos menos los admins libres; Grace,
+//     Jackeline y Alvaro René son admins vigilados).
+//   · pantallaObligatoria / camaraObligatoria: se comparten solas y se le
+//     exigen. El grupo de Luis (Luis, Juan Pachas, Grace, Jackeline y Alvaro
+//     René): vigilados, pero nada obligatorio (Alvaro, 18/11/2026).
 // Mientras carga, nada (null): como antes, no se vigila a nadie a ciegas.
 // Si la consulta FALLA no se concluye «libre»: se usa la regla de siempre (los
 // admins libres, el resto vigilado y con pantalla obligatoria).
@@ -14,6 +15,7 @@ import { supabase } from "@/integrations/supabase/client";
 export interface ReglaDeAnfitrion {
   vigilado: boolean;
   pantallaObligatoria: boolean;
+  camaraObligatoria: boolean;
 }
 
 // La RPC es nueva y todavía no está en los tipos generados.
@@ -25,14 +27,18 @@ const sinTipar = supabase as unknown as {
 export function leerRegla(data: unknown): ReglaDeAnfitrion | null {
   const fila = Array.isArray(data) ? data[0] : data;
   if (!fila || typeof fila !== "object") return null;
-  const f = fila as { vigilado?: unknown; pantalla_obligatoria?: unknown };
+  const f = fila as { vigilado?: unknown; pantalla_obligatoria?: unknown; camara_obligatoria?: unknown };
   if (typeof f.vigilado !== "boolean") return null;
-  return { vigilado: f.vigilado, pantallaObligatoria: f.vigilado && f.pantalla_obligatoria !== false };
+  return {
+    vigilado: f.vigilado,
+    pantallaObligatoria: f.vigilado && f.pantalla_obligatoria !== false,
+    camaraObligatoria: f.vigilado && f.camara_obligatoria !== false,
+  };
 }
 
 /** La regla de siempre, para cuando la base no contesta. */
 export function reglaPorRol(esAdmin: boolean): ReglaDeAnfitrion {
-  return { vigilado: !esAdmin, pantallaObligatoria: !esAdmin };
+  return { vigilado: !esAdmin, pantallaObligatoria: !esAdmin, camaraObligatoria: !esAdmin };
 }
 
 export function useReglaDeAnfitrion(rolCargado: boolean, esAdmin: boolean): ReglaDeAnfitrion | null {
@@ -63,8 +69,8 @@ export function useReglaDeAnfitrion(rolCargado: boolean, esAdmin: boolean): Regl
   return regla;
 }
 
-/** Quiénes ven, en el Hub, la pantalla de un anfitrión vigilado (los admins
- *  libres). Vacío mientras carga o si falla: nadie la ve, como antes. */
+/** Quiénes ven, en el Hub, la pantalla de un anfitrión vigilado (los admins).
+ *  Vacío mientras carga o si falla: nadie la ve, como antes. */
 export function useVenPantallasDelHub(activo: boolean): string[] {
   const [ids, setIds] = useState<string[]>([]);
   useEffect(() => {
