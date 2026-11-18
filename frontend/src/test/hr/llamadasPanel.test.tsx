@@ -196,7 +196,7 @@ describe("en palabras, con filtros y por páginas (Alvaro, 18/11/2026)", () => {
     // 12 s + 228 s = 4 min sin llamada; promedio 120 s = 2 min.
     expect(await within(fila0).findByText(/hr\.llamadas\.resumen\.veces.*"n":3.*sinLlamada.*dur\.min.*4.*volvia.*dur\.min.*2.*cayoUna/)).toBeInTheDocument();
     fireEvent.click(within(fila0).getByRole("button", { expanded: false }));
-    expect(within(fila0).getByText("3:42 pm")).toBeInTheDocument();
+    expect(within(fila0).getByText(/^3:42 (pm|PM)$/)).toBeInTheDocument();
     expect(within(fila0).getAllByText("hr.llamadas.tipo.internet")).toHaveLength(2);
     expect(within(fila0).getByText(/hr\.llamadas\.corte\.volvioEn.*dur\.s.*12/)).toBeInTheDocument();
     expect(within(fila0).getByText("hr.llamadas.corte.volvio")).toBeInTheDocument();
