@@ -1108,7 +1108,7 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
 
   return (
     <div ref={rootRef} className="relative flex flex-col h-full bg-background text-foreground">
-      <CallTopBar roomName={callDisplayName || roomName} participantCount={cantidadDePersonas} onOpenAdjustView={() => setAdjustViewOpen(true)} shareLink={shareLink} hideShareLink={hideShareLink} compact={effectiveCompact} tactil={tactil} extra={selectorDeSalas} acciones={accionesBarra} />
+      <CallTopBar roomName={callDisplayName || roomName} participantCount={cantidadDePersonas} onOpenAdjustView={() => setAdjustViewOpen(true)} shareLink={shareLink} hideShareLink={hideShareLink} compact={effectiveCompact} tactil={tactil} extra={selectorDeSalas} acciones={accionesBarra} esLlamada={roomName.startsWith("call-")} />
       {encima}
 
       {lk.isReconnecting && (

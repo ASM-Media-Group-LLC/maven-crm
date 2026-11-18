@@ -2,7 +2,9 @@
 // sonando, quién rechazó y quién no contestó. Antes la pestaña no escuchaba
 // nada de eso y uno se quedaba solo en la sala, esperando.
 import { useEffect, useRef } from "react";
-import { PhoneMissed, PhoneOff, RotateCcw } from "lucide-react";
+import { Phone, PhoneMissed, PhoneOff, RotateCcw, Video } from "lucide-react";
+import { UserAvatar } from "@/components/UserAvatar";
+import { ESPERA, sonar } from "@/lib/tonosDeLlamada";
 import { toast } from "sonner";
 import { useLanguage } from "@/hooks/useLanguage";
 import type { Invitado } from "@/hooks/useInvitadosDeLaLlamada";
@@ -25,6 +27,15 @@ export default function AvisoDeInvitados({ roomName, uid, llamada, invitados, al
   const sonando = otros.filter((i) => i.status === "ringing");
   const nadieContesto =
     otros.length > 0 && otros.every((i) => i.status === "declined" || i.status === "missed");
+  // LLAMANDO, COMO EN SKYPE (Alvaro, 18/11/2026: «no suena que estoy llamando…
+  // está todo abultado arriba»). Mientras le suena a alguien y nadie entró
+  // todavía, quien llama ve a quién llama en grande y oye el tono de espera.
+  const alguienEntro = otros.some((i) => i.status === "accepted");
+  const llamando = sonando.length > 0 && !alguienEntro && !!llamada && estaViva(llamada);
+  useEffect(() => {
+    if (!llamando) return;
+    return sonar(ESPERA);
+  }, [llamando]);
 
   // Un aviso corto por cada «rechazó» / «no contestó», una sola vez.
   useEffect(() => {
@@ -82,6 +93,52 @@ export default function AvisoDeInvitados({ roomName, uid, llamada, invitados, al
               {t("messenger.enLlamada.invitados.cerrar")}
             </button>
           </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (llamando) {
+    const primero = sonando[0];
+    const esVoz = llamada?.call_type === "audio";
+    return (
+      <div className="absolute inset-0 z-30 flex items-center justify-center bg-background/90 p-6 backdrop-blur-xl">
+        <div className="sube flex w-full max-w-sm flex-col items-center text-center">
+          <div className="flex items-center gap-1.5 rounded-full border border-border/60 bg-card/50 px-3 py-1 text-[11px] font-medium text-muted-foreground">
+            {esVoz ? <Phone className="h-3 w-3" /> : <Video className="h-3 w-3" />}
+            {t(esVoz ? "messenger.enLlamada.llamando.voz" : "messenger.enLlamada.llamando.video")}
+          </div>
+          <div className="relative mt-10 mb-8">
+            {/* Las ondas que salen de la foto mientras suena. */}
+            <span className="absolute inset-0 rounded-full bg-primary/20 animate-ping motion-reduce:animate-none" />
+            <span className="absolute -inset-3 rounded-full border border-primary/25" />
+            <span className="absolute -inset-7 rounded-full border border-primary/10" />
+            <UserAvatar name={primero.nombre || "?"} src={primero.foto} seed={primero.seed} size="xl" className="relative h-28 w-28 text-3xl" />
+          </div>
+          <p className="text-xl font-semibold text-foreground [text-wrap:balance]">
+            {sonando.length > 1
+              ? t("messenger.enLlamada.llamando.varios", { name: primero.nombre || "?", n: sonando.length - 1 })
+              : t("messenger.enLlamada.llamando.uno", { name: primero.nombre || "?" })}
+          </p>
+          <p className="mt-1.5 text-sm text-muted-foreground">{t("messenger.enLlamada.llamando.sonando")}</p>
+          {sonando.length > 1 && (
+            <div className="mt-4 flex -space-x-2">
+              {sonando.slice(1, 6).map((i) => (
+                <UserAvatar key={i.user_id} name={i.nombre || "?"} src={i.foto} seed={i.seed} size="sm" className="ring-2 ring-background" />
+              ))}
+            </div>
+          )}
+          <button
+            type="button"
+            onClick={alColgar}
+            className="mt-12 flex flex-col items-center gap-2 text-xs text-muted-foreground"
+            aria-label={t("messenger.enLlamada.llamando.colgar")}
+          >
+            <span className="flex h-14 w-14 items-center justify-center rounded-full bg-destructive text-destructive-foreground shadow-lg transition-transform hover:scale-105">
+              <PhoneOff className="h-6 w-6" />
+            </span>
+            {t("messenger.enLlamada.llamando.colgar")}
+          </button>
         </div>
       </div>
     );
