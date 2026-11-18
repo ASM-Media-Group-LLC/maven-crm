@@ -32,6 +32,7 @@ const { pantallaPermitida, primeraVezSinPermiso, guiaPermisoPantalla, pedirPermi
 const { revisarCamaraYMicrofono } = require("./permisoCamaraWindows");
 const { guardarAcceso, leerAcceso, olvidarAcceso, hayAccesoGuardado } = require("./acceso");
 const { vigilarVentana, leerYBorrarCierres } = require("./recuperarse");
+const { esLlamada, prepararVentanaDeLlamada, mostrarVentana } = require("./ventanaDeLlamada");
 
 const URL_MAVEN = process.env.MAVEN_URL || "https://app.maven-ai.me/login";
 const ORIGENES_MAVEN = new Set(["https://app.maven-ai.me", "https://maven-ai.me", "https://www.maven-ai.me"]);
@@ -214,6 +215,11 @@ function crearVentana() {
     if (/^https?:|^mailto:|^tel:/.test(url)) shell.openExternal(url);
     return { action: "deny" };
   });
+  // La ventana de una llamada no se esconde detrás de Maven: al perder el foco
+  // se achica a una ventanita siempre encima (ventanaDeLlamada.js, 18/11/2026).
+  ventana.webContents.on("did-create-window", (hija, { url }) => {
+    if (esDeMaven(url) && esLlamada(url)) prepararVentanaDeLlamada(hija);
+  });
   ventana.webContents.on("will-navigate", (e, url) => {
     if (!esDeMaven(url)) {
       e.preventDefault();
@@ -384,6 +390,13 @@ function flotante(si = !antesDeFlotar) {
 
 // ── Lo que la página le pide a la app (preload.js) ──────────────────────────
 const deLaVentana = (e) => ventana && e.sender === ventana.webContents;
+// «Volver a la llamada» (la barra de Maven): la ventana de la llamada se trae al
+// frente. Solo una ventana de llamada de Maven puede pedirlo para sí misma.
+ipcMain.handle("maven:mostrar-esta-ventana", (e) => {
+  const url = e.sender.getURL();
+  if (!esDeMaven(url) || !esLlamada(url)) return false;
+  return mostrarVentana(BrowserWindow.fromWebContents(e.sender));
+});
 ipcMain.handle("maven:flotante", (e, si) => (deLaVentana(e) ? flotante(si === undefined ? undefined : Boolean(si)) : false));
 ipcMain.handle("maven:inactividad", (e) => (deLaVentana(e) ? segundosInactivo() : null));
 // El correo y la contraseña guardados en este equipo (acceso.js). Solo la

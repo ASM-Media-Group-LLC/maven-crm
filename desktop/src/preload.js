@@ -46,6 +46,8 @@ contextBridge.exposeInMainWorld("mavenEscritorio", {
   /** Ventanita de llamada entrante encima de todo. Resuelve «contestar», «rechazar» o «cerrada». */
   llamadaEntrante: (datos) => ipcRenderer.invoke("maven:llamada", datos),
   terminarLlamadaEntrante: (id) => ipcRenderer.send("maven:llamada-fin", id),
+  /** La ventana de una llamada se trae al frente («Volver a la llamada» desde la barra de Maven). */
+  mostrarEstaVentana: () => ipcRenderer.invoke("maven:mostrar-esta-ventana"),
   /** Ventanita flotante: true la achica y la deja encima; false la devuelve. Sin argumento alterna. */
   flotante: (si) => ipcRenderer.invoke("maven:flotante", si),
   alCambiarFlotante: (cb) => {
