@@ -165,6 +165,17 @@ export const compartido = {
     en: "Your account opened this in another tab or device. It can only be active in one place at a time.",
   },
   "shared.otherTab.useHere": { es: "Usar aquí", en: "Use here" },
+  // La sala la tomó la app de Maven, o la app la soltó (lib/sesionDuplicada.ts,
+  // Alvaro 17/11/2026: «la app manda, el navegador se aparta solo»).
+  "shared.salaTomada.app.title": { es: "Sigues en la llamada desde la app de Maven", en: "You're still in the call from the Maven app" },
+  "shared.salaTomada.app.detail": { es: "Esta pestaña soltó la llamada.", en: "This tab let go of the call." },
+  "shared.salaTomada.app.useHere": { es: "Usar esta pestaña", en: "Use this tab" },
+  "shared.salaTomada.otroLado.title": {
+    es: "Sigues en la llamada desde otra ventana o el navegador",
+    en: "You're still in the call from another window or the browser",
+  },
+  "shared.salaTomada.otroLado.detail": { es: "Esta ventana soltó la llamada.", en: "This window let go of the call." },
+  "shared.salaTomada.otroLado.useHere": { es: "Usar esta ventana", en: "Use this window" },
 
   // ─── Evaluador de chatters (hooks/useChatterEvaluator.ts) ──────────────────
   // Solo los avisos y errores de pantalla. Los criterios originales, el mensaje

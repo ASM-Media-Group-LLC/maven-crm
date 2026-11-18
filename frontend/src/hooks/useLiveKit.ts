@@ -14,7 +14,11 @@ import {
   TrackEvent,
 } from "livekit-client";
 import type { ScreenShareCaptureOptions } from "livekit-client";
-import { esOtraPestana } from "@/lib/sesionDuplicada";
+import {
+  anotarQueEntro, anotarSalaSoltada, esOtraPestana, olvidarSalaSoltada, otraPestanaEntroA, quienTieneLaSala, salaSoltada,
+  type QuienTieneLaSala,
+} from "@/lib/sesionDuplicada";
+import { escritorio } from "@/lib/escritorio";
 import { esperaDeReentrada, fueUnaCaida, MAX_REENTRADAS } from "@/lib/conexionSala";
 import { faseSegunSueno, vigiaDelSueno } from "@/lib/equipoDormido";
 import { DEBIL_INICIAL, MIRAR_DEBIL_CADA_MS, siguienteDebil } from "@/lib/internetDebil";
@@ -146,6 +150,10 @@ export interface ConnectOptions {
    *  (invitado de afuera, por la edge meet-guest). Sin esto van a las tablas
    *  del equipo, que exigen sesión. Ver saludDeLlamada.ts. */
   telemetria?: DestinoDeTelemetria;
+  /** La persona apretó «Usar esta pestaña / ventana»: entra aunque esta pestaña
+   *  haya soltado la sala a otro lado (lib/sesionDuplicada.ts, salaSoltada).
+   *  Sin esto, una pestaña que soltó la sala no la vuelve a tomar sola. */
+  tomarLaSala?: boolean;
 }
 
 function getDeviceConstraint(deviceId?: string) {
@@ -819,6 +827,9 @@ export function useLiveKit() {
   // Va aparte de `error` a propósito: no se rompió nada, y sobre todo NO se
   // reintenta — reintentar es lo que arma la pelea infinita entre las dos.
   const [otraPestanaTomoLaSesion, setOtraPestanaTomoLaSesion] = useState(false);
+  // Y desde dónde sigue la persona (la app, otra ventana, otra pestaña): elige
+  // el texto del cartel. Ver lib/sesionDuplicada.ts.
+  const [quienTieneLaSalaAhora, setQuienTieneLaSala] = useState<QuienTieneLaSala | null>(null);
   // POR QUÉ nos soltó la sala la última vez. Sin esto no se distingue una caída
   // (red, servidor: hay que volver solos) de una salida a propósito (salió,
   // cambió de sala, la sacó el supervisor: NO se vuelve). Ver lib/conexionSala.
@@ -1515,13 +1526,37 @@ export function useLiveKit() {
   ) => {
     // Empieza un intento nuevo: la marca de "me la tomaron" ya no aplica.
     setOtraPestanaTomoLaSesion(false);
+    setQuienTieneLaSala(null);
     setRazonDeSalida(null);
+    // LA SALA LA TIENE OTRO LADO (lib/sesionDuplicada.ts): a esta pestaña (o a la
+    // app) la sacaron por identidad duplicada y ni una recarga —F5, la recarga
+    // sola por versión nueva, la pestaña descartada— la hace volver sola: entrar
+    // le quitaría la llamada a la app, que se la volvería a quitar. Se queda como
+    // la dejó el corte: fuera, con el cartel, y solo el botón (`tomarLaSala`) la
+    // vuelve a tomar. Nada de esto toca el reloj de Cowork: queda «reemplazada»,
+    // que no late (coworkLatido.ts) ni cuenta como caída.
+    if (options.tomarLaSala) {
+      olvidarSalaSoltada(roomName);
+    } else {
+      const quien = salaSoltada(roomName);
+      if (quien) {
+        console.info(`[LiveKit] La sala ${roomName} la tiene otro lado (${quien}): no se entra sola`);
+        setOtraPestanaTomoLaSesion(true);
+        setQuienTieneLaSala(quien);
+        setRazonDeSalida(DisconnectReason.DUPLICATE_IDENTITY);
+        setConnectionState(ConnectionState.Disconnected);
+        return;
+      }
+    }
     // Guard against concurrent connect calls
     if (connectingRef.current) {
       console.warn("[LiveKit] Connect already in progress, ignoring duplicate call");
       return;
     }
     connectingRef.current = true;
+    // Para que la pestaña a la que esta le quite la sala sepa que fue otra
+    // pestaña de este navegador y no la app (lib/sesionDuplicada.ts).
+    anotarQueEntro(roomName);
     // La re-entrada automática recuerda estos argumentos, y un connect nuevo
     // (manual o automático) cancela cualquier reintento que esté esperando.
     if (reentradaTimerRef.current != null) {
@@ -1534,7 +1569,8 @@ export function useLiveKit() {
     // El vigía del sueño arranca con la primera llamada: tiene que estar mirando
     // ANTES de que el equipo se duerma para darse cuenta al despertar.
     vigiaDelSueno();
-    ultimaConexionRef.current = { roomName, participantName, isAdmin, options };
+    // Sin `tomarLaSala`: una re-entrada AUTOMÁTICA nunca entra «a propósito».
+    ultimaConexionRef.current = { roomName, participantName, isAdmin, options: { ...options, tomarLaSala: false } };
     telemetriaRef.current = options.telemetria ?? null;
     const intento = ++intentoRef.current;
     const vigente = () => intento === intentoRef.current;
@@ -1973,7 +2009,17 @@ export function useLiveKit() {
         // (después de que el reintento ya empezó) y pisaba el estado de la nueva:
         // dejaba la razón CLIENT_INITIATED y el reloj volvía a "sin cámara".
         if (roomRef.current !== room) return;
-        setOtraPestanaTomoLaSesion(esOtraPestana(razon));
+        // Nos la tomaron desde otro lado: se anota desde dónde (la app, otra
+        // ventana, otra pestaña) y que ESTA la soltó, para que ni una recarga la
+        // haga volver sola (lib/sesionDuplicada.ts). No hay re-entrada:
+        // fueUnaCaida() es false para esta razón.
+        const tomada = esOtraPestana(razon);
+        const quien = tomada
+          ? quienTieneLaSala({ soyLaApp: escritorio() !== null, otraPestanaEntro: otraPestanaEntroA(room.name) })
+          : null;
+        if (quien) anotarSalaSoltada(room.name, quien);
+        setOtraPestanaTomoLaSesion(tomada);
+        setQuienTieneLaSala(quien);
         setRazonDeSalida(razon ?? null);
         clearSyncInterval();
         clearBackgroundReapplyTimer();
@@ -1988,7 +2034,10 @@ export function useLiveKit() {
         setActiveSpeaker(null);
         // Se mira ANTES de anotar: anotarCorte también lo consulta (la fase).
         const durmio = fueUnaCaida(razon) ? vigiaDelSueno().durmioHacePoco() : null;
-        anotarCorte(fueUnaCaida(razon) ? "caida" : "salida", room.name, razon);
+        // Con identidad duplicada va también desde dónde se soltó y quién la
+        // tiene: así llamada_cortes dice cuántas son app ↔ navegador.
+        anotarCorte(fueUnaCaida(razon) ? "caida" : "salida", room.name, razon,
+          quien ? { cliente: escritorio() ? "app" : "navegador", quien } : undefined);
         pararMuestreoRef.current?.();
         if (!fueUnaCaida(razon)) borrarLlamadaEnCurso();
         // La caída de verdad no se queda esperando un clic: se vuelve solo. Pero
@@ -3028,6 +3077,7 @@ export function useLiveKit() {
     equipoDormido,
     internetDebil,
     otraPestanaTomoLaSesion,
+    quienTieneLaSala: quienTieneLaSalaAhora,
     razonDeSalida,
     connect,
     disconnect,

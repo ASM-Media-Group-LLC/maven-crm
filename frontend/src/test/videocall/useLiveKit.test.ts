@@ -235,3 +235,106 @@ describe("⚠️ isMicOn se entera cuando OTRO silencia el micrófono", () => {
     expect(result.current.isMicOn).toBe(true);
   });
 });
+
+// LA APP MANDA, EL NAVEGADOR SE APARTA SOLO (Alvaro, 17/11/2026). La pestaña a la
+// que la app (u otra pestaña) le quitó la sala por identidad duplicada no vuelve
+// sola: ni con la re-entrada, ni con una recarga (el connect automático de la
+// vista que se vuelve a montar). Solo con `tomarLaSala` (el botón).
+describe("⚠️ la sala que se soltó a otro lado no se retoma sola", () => {
+  const salaFalsa = (nombre: string) => {
+    const oyentes: Record<string, Array<(...a: unknown[]) => void>> = {};
+    const lp: Record<string, unknown> = {
+      identity: "user-1", name: "Test User", sid: "sid-local", isSpeaking: false,
+      isMicrophoneEnabled: false, isCameraEnabled: false,
+      audioTrackPublications: new Map(), videoTrackPublications: new Map(), trackPublications: new Map(),
+      connectionQuality: 3, permissions: { canPublish: true, canSubscribe: true }, metadata: "{}",
+      setMicrophoneEnabled: vi.fn().mockResolvedValue(undefined),
+      setCameraEnabled: vi.fn().mockResolvedValue(undefined),
+      setScreenShareEnabled: vi.fn().mockResolvedValue(undefined),
+      publishData: vi.fn(),
+      getTrackPublication: vi.fn().mockReturnValue(undefined),
+    };
+    const sala = {
+      connect: vi.fn().mockResolvedValue(undefined), disconnect: vi.fn(),
+      on: vi.fn((ev: string, cb: (...a: unknown[]) => void) => { (oyentes[ev] ??= []).push(cb); return sala; }),
+      once: vi.fn().mockReturnThis(), off: vi.fn().mockReturnThis(),
+      localParticipant: lp, remoteParticipants: new Map(), startAudio: vi.fn().mockResolvedValue(undefined),
+      canPlaybackAudio: true, name: nombre,
+    };
+    return { sala, oyentes };
+  };
+
+  beforeEach(() => {
+    sessionStorage.clear();
+    localStorage.clear();
+  });
+
+  it("la tomó la app: queda «app», se anota, y el connect automático (recarga) no entra", async () => {
+    const { Room } = await import("livekit-client");
+    const RoomMock = Room as unknown as ReturnType<typeof vi.fn>;
+    const { sala, oyentes } = salaFalsa("cowork_sala_1");
+    RoomMock.mockImplementationOnce(function () { return sala; });
+    const { result } = renderHook(() => useLiveKit());
+    await act(async () => {
+      await result.current.connect("cowork_sala_1", "Test User", false, { initialMicOn: false, initialCamOn: false }).catch(() => {});
+    });
+    expect(oyentes["disconnected"]?.length ?? 0).toBeGreaterThan(0); // que PUEDA fallar
+
+    // LiveKit nos saca: entró la misma identidad desde otro lado (la app).
+    await act(async () => { for (const cb of oyentes["disconnected"]) cb(2 /* DUPLICATE_IDENTITY */); });
+    expect(result.current.otraPestanaTomoLaSesion).toBe(true);
+    expect(result.current.quienTieneLaSala).toBe("app");
+    expect(result.current.isReconnecting).toBe(false);
+    expect(sessionStorage.getItem("sala-soltada:cowork_sala_1")).toContain("\"app\"");
+
+    // La vista se vuelve a montar (F5, recarga por versión nueva): no entra.
+    const salasAntes = RoomMock.mock.calls.length;
+    await act(async () => {
+      await result.current.connect("cowork_sala_1", "Test User", false, {}).catch(() => {});
+    });
+    expect(RoomMock.mock.calls.length).toBe(salasAntes);
+    expect(result.current.otraPestanaTomoLaSesion).toBe(true);
+    expect(result.current.quienTieneLaSala).toBe("app");
+    expect(result.current.razonDeSalida).toBe(2);
+    expect(result.current.connectionState).toBe("disconnected");
+
+    // «Usar esta pestaña»: entra, y la marca se borra.
+    const otra = salaFalsa("cowork_sala_1");
+    RoomMock.mockImplementationOnce(function () { return otra.sala; });
+    await act(async () => {
+      await result.current.connect("cowork_sala_1", "Test User", false, { tomarLaSala: true }).catch(() => {});
+    });
+    expect(RoomMock.mock.calls.length).toBe(salasAntes + 1);
+    expect(result.current.otraPestanaTomoLaSesion).toBe(false);
+    expect(sessionStorage.getItem("sala-soltada:cowork_sala_1")).toBeNull();
+  });
+
+  it("la tomó otra pestaña de este navegador: queda «pestana» (el cartel de siempre)", async () => {
+    const { Room } = await import("livekit-client");
+    const { sala, oyentes } = salaFalsa("cowork_hub_1");
+    (Room as unknown as ReturnType<typeof vi.fn>).mockImplementationOnce(function () { return sala; });
+    const { result } = renderHook(() => useLiveKit());
+    await act(async () => {
+      await result.current.connect("cowork_hub_1", "Test User", false, { initialMicOn: false, initialCamOn: false }).catch(() => {});
+    });
+    // La otra pestaña anotó que estaba entrando a la misma sala.
+    localStorage.setItem("maven.sala-entrando", JSON.stringify({ sala: "cowork_hub_1", pestana: "otra-pestana", t: Date.now() }));
+    await act(async () => { for (const cb of oyentes["disconnected"] ?? []) cb(2); });
+    expect(result.current.quienTieneLaSala).toBe("pestana");
+  });
+
+  it("una caída de red NO deja la marca (esa sí vuelve sola)", async () => {
+    const { Room } = await import("livekit-client");
+    const { sala, oyentes } = salaFalsa("cowork_sala_2");
+    (Room as unknown as ReturnType<typeof vi.fn>).mockImplementationOnce(function () { return sala; });
+    const { result } = renderHook(() => useLiveKit());
+    await act(async () => {
+      await result.current.connect("cowork_sala_2", "Test User", false, { initialMicOn: false, initialCamOn: false }).catch(() => {});
+    });
+    await act(async () => { for (const cb of oyentes["disconnected"] ?? []) cb(9 /* SIGNAL_CLOSE */); });
+    expect(result.current.otraPestanaTomoLaSesion).toBe(false);
+    expect(result.current.quienTieneLaSala).toBeNull();
+    expect(sessionStorage.getItem("sala-soltada:cowork_sala_2")).toBeNull();
+    act(() => { result.current.disconnect(); }); // apaga la re-entrada que quedó esperando
+  });
+});
