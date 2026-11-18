@@ -27,6 +27,13 @@ jobs:
   # Intel sin Rosetta, y en Linux pide wine).
   windows:
     runs-on: windows-latest
+    # Firma de Windows (17/11/2026): Azure Artifact Signing, cuenta «mavenfirma»,
+    # certificado «mavenwindows» a nombre de Alvaro Mejia. GitHub entra a Azure
+    # sin contraseña (OIDC): la app «maven-firma-github» confía solo en la rama
+    # main de este repo y solo puede firmar. Los IDs van en variables del repo.
+    permissions:
+      id-token: write
+      contents: read
     defaults:
       run:
         shell: bash
@@ -41,11 +48,27 @@ jobs:
       - name: Instalar
         working-directory: desktop
         run: npm ci --no-audit --no-fund
+      - name: Entrar a Azure para firmar (sin contraseña)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          allow-no-subscriptions: true
       - name: Armar
         working-directory: desktop
         run: |
           npm version "2.0.${{ github.run_number }}" --no-git-tag-version
           npx electron-builder --win --publish never -c.directories.output=dist
+      - name: Revisar que salió firmado (si no, no se publica)
+        shell: pwsh
+        run: |
+          foreach ($archivo in @("desktop/dist/Maven-Windows.exe", "desktop/dist/win-unpacked/Maven.exe")) {
+            $firma = Get-AuthenticodeSignature $archivo
+            Write-Host "$archivo -> $($firma.Status) · $($firma.SignerCertificate.Subject)"
+            if ($firma.Status -ne "Valid" -or $firma.SignerCertificate.Subject -notmatch "CN=Alvaro Mejia") {
+              throw "$archivo salió sin la firma de Alvaro Mejia: no se publica."
+            }
+          }
       - name: Subir a Supabase (balde descargas)
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}

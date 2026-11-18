@@ -69,7 +69,13 @@
         }
       ],
       "icon": "build/icon.ico",
-      "artifactName": "Maven-Windows.exe"
+      "artifactName": "Maven-Windows.exe",
+      "azureSignOptions": {
+        "publisherName": "Alvaro Mejia",
+        "endpoint": "https://eus.codesigning.azure.net",
+        "codeSigningAccountName": "mavenfirma",
+        "certificateProfileName": "mavenwindows"
+      }
     },
     "nsis": {
       "oneClick": true,
