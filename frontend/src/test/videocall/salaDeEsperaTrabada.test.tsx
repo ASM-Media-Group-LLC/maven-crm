@@ -37,6 +37,9 @@ vi.mock("@/lib/fondoFino/procesador", () => ({
     return p;
   }),
   soportaProcesadorDeFondo: vi.fn(() => true),
+  precalentarFondo: vi.fn(async () => true),
+  fondoPrecalentado: vi.fn(() => true),
+  topeParaPonerFondo: vi.fn((ms: number) => ms),
 }));
 
 import PreJoinLobby from "@/pages/messenger/videocall/PreJoinLobby";

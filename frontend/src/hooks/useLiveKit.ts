@@ -22,7 +22,7 @@ import {
   reproducirAudiosPausados, reanudarAudioConGesto, dejarDeEsperarGesto, registrarDesbloqueo,
   decidirSiRepararElMicro, MEMORIA_VIGILANTE_VACIA, type MemoriaDelVigilante,
 } from "@/lib/audioDeLaLlamada";
-import { ProcesadorDeFondo, soportaProcesadorDeFondo } from "@/lib/fondoFino/procesador";
+import { ProcesadorDeFondo, fondoPrecalentado, precalentarFondo, soportaProcesadorDeFondo, topeParaPonerFondo } from "@/lib/fondoFino/procesador";
 import { toast } from "sonner";
 // Los avisos de la llamada van por traducir(): se arman en eventos de LiveKit y
 // callbacks, no en el JSX, y los lee la persona en su propio idioma.
@@ -1159,9 +1159,15 @@ export function useLiveKit() {
       }
 
       if (bgAttachedTrackRef.current !== camTrack) {
+        // La primera vez el detector baja ~9,4 MB: se avisa y se le da tiempo
+        // (lib/fondoFino/procesador.ts, «La primera vez»).
+        if (!fondoPrecalentado()) {
+          void precalentarFondo();
+          toast.info(traducir("shared.call.bgPreparando"), { id: "fondo-preparando", duration: 8000 });
+        }
         await withTimeout(
           Promise.resolve(camTrack.setProcessor(processor, true)),
-          BACKGROUND_ATTACH_TIMEOUT_MS,
+          topeParaPonerFondo(BACKGROUND_ATTACH_TIMEOUT_MS),
           "bg-attach",
         );
         bgAttachedTrackRef.current = camTrack;
