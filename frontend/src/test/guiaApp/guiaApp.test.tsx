@@ -142,6 +142,11 @@ describe("la guía: la página", () => {
       "guiaApp.paso.permisos.titulo", "guiaApp.paso.listo.titulo",
     ]);
     expect(screen.getByText("guiaApp.paso.listo.cerrarWindows")).toBeTruthy();
+    // Windows no pregunta por la cámara: la guía no dibuja un «Permitir» que no
+    // existe, sino el aviso de la app cuando Windows la tiene apagada.
+    expect(screen.getByText("guiaApp.dibujo.avisoWindows")).toBeTruthy();
+    expect(screen.getByText("guiaApp.dibujo.abrirConfiguracion")).toBeTruthy();
+    expect(screen.queryByText("guiaApp.dibujo.pideCamara")).toBeNull();
     expect(screen.queryByRole("status")).toBeNull();
   });
 
@@ -156,6 +161,8 @@ describe("la guía: la página", () => {
     expect(screen.getByText("guiaApp.paso.permisos.macPantalla")).toBeTruthy();
     expect(screen.getByText("guiaApp.paso.permisos.macArreglo")).toBeTruthy();
     expect(screen.getByText("guiaApp.dibujo.grabacionPantalla")).toBeTruthy();
+    expect(screen.getByText("guiaApp.dibujo.pideCamara")).toBeTruthy();
+    expect(screen.queryByText("guiaApp.dibujo.avisoWindows")).toBeNull();
     expect(screen.getByText("guiaApp.paso.listo.cerrarMac")).toBeTruthy();
     expect(screen.queryByText("guiaApp.paso.instalar.windowsAviso")).toBeNull();
   });
