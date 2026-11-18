@@ -5,7 +5,8 @@ import { BUILD_PROPIO, crearVigiaDelMinimo } from "./lib/versionDelBundle";
 import { almacenDeLaPestana, forzarActualizacion, leerUiBuildMinimo } from "./lib/minimoDelBundle";
 import { hayLlamadaActiva } from "./lib/llamadaActiva";
 import { registrarSw } from "./lib/registroDelSw";
-import { crearRecargaAlColgar, hayAlgoAMedioEscribir, marcarRecarga } from "./lib/recargaAlColgar";
+import { crearRecargaAlColgar, estaEscribiendoAhora, hayAlgoAMedioEscribir, marcarRecarga } from "./lib/recargaAlColgar";
+import { abrirCartelVersionNueva } from "./lib/cartelVersionNueva";
 
 /** El aviso "Nueva versión disponible" como toast del design system (el mismo
  *  vidrio de todos los avisos), con `id` fijo para no duplicarse en el chequeo
@@ -113,7 +114,13 @@ export async function initPWA() {
     const recargarUnaVez = () => { marcarRecarga(almacen, build); window.location.reload(); };
     const avisar = crearRecargaAlColgar({
       enLlamada: hayLlamadaActiva,
-      aMedioEscribir: () => hayAlgoAMedioEscribir(),
+      // El cartel solo espera a que suelte el campo donde está escribiendo.
+      aMedioEscribir: () => estaEscribiendoAhora(),
+      // EL CARTEL DEL CENTRO (Alvaro, 18/11/2026): «Actualizar» pasa a la versión
+      // nueva. Mira solo la llamada: lo que tenga escrito, lo decide la persona.
+      mostrarCartel: () => abrirCartelVersionNueva(
+        () => forzarActualizacion(registro, updateSW, recargarUnaVez, hayLlamadaActiva),
+      ),
       // Busca el SW nuevo, le da el control y recarga; mira la llamada y lo escrito
       // otra vez justo antes (en esos segundos alguien puede entrar a una llamada).
       pasarALaNueva: () => forzarActualizacion(registro, updateSW, recargarUnaVez, ocupada),
@@ -141,7 +148,19 @@ export async function initPWA() {
       // nunca en pestañas longevas. Chequeo explícito cada hora.
       alRegistrar(r) {
         registro = r;
-        if (r) setInterval(() => { r.update().catch(() => {}); }, 60 * 60 * 1000);
+        // Cada 10 minutos (Alvaro, 18/11/2026; antes cada hora) y al volver a
+        // la pestaña, con freno de 1 minuto: mirar es bajar un archivito.
+        if (r) {
+          let ultima = Date.now();
+          const mirar = () => {
+            if (Date.now() - ultima < 60_000) return;
+            ultima = Date.now();
+            r.update().catch(() => {});
+          };
+          setInterval(() => { ultima = 0; mirar(); }, 10 * 60 * 1000);
+          window.addEventListener("focus", mirar);
+          document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") mirar(); });
+        }
       },
       alNecesitarRecarga: avisar,
       enLlamada: hayLlamadaActiva,

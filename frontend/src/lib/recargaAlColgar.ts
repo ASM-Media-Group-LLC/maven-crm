@@ -1,4 +1,10 @@
-// MAVEN SE ACTUALIZA SOLO, PERO NUNCA EN UNA LLAMADA (Alvaro, 17/11/2026).
+// VERSIÓN NUEVA: CARTEL EN EL CENTRO CON «ACTUALIZAR» (Alvaro, 18/11/2026).
+// Ya no se recarga sola en silencio: la gente no entendía qué pasaba y, si no
+// podía recargar, el avisito de abajo no se veía. Ahora, sin llamada y sin estar
+// escribiendo, sale el cartel del centro (components/CartelVersionNueva.tsx) y la
+// persona toca «Actualizar». Lo de abajo sigue valiendo para la espera.
+//
+// Antes (17/11/2026): MAVEN SE ACTUALIZA SOLO, PERO NUNCA EN UNA LLAMADA.
 //
 // Cada deploy deja a la gente con la versión vieja hasta que recarga, y los
 // arreglos (los de caídas incluidos) no les llegan. Recargar sola en cualquier
@@ -68,6 +74,13 @@ export function hayAlgoAMedioEscribir(doc: Document = document): boolean {
   return false;
 }
 
+/** ¿Está escribiendo AHORA (el cursor en un campo)? El cartel espera solo a
+ *  esto: un borrador olvidado en un chat no puede tapar la versión nueva. */
+export function estaEscribiendoAhora(doc: Document = document): boolean {
+  const activo = doc.activeElement;
+  return !!activo && (activo.tagName === "TEXTAREA" || esCampoDeTexto(activo) || (activo as HTMLElement).isContentEditable);
+}
+
 export interface OpcionesDeLaRecarga {
   /** ¿Hay una llamada conectada (o entrando) en esta pestaña? */
   enLlamada: () => boolean;
@@ -80,6 +93,9 @@ export interface OpcionesDeLaRecarga {
   mostrarEnLlamada: () => void;
   /** El aviso de siempre, con «Recargar»: cuando ya recargó desde este build. */
   mostrarNormal: () => void;
+  /** El cartel del centro con «Actualizar» (18/11/2026). Si no se pasa, se
+   *  recarga sola como antes. */
+  mostrarCartel?: () => void;
   almacen: AlmacenMinimo | null;
   build: string;
   cadaMs?: number;
@@ -112,6 +128,12 @@ export function crearRecargaAlColgar(o: OpcionesDeLaRecarga): () => void {
       o.mostrarNormal();
       return;
     }
+    if (o.mostrarCartel) {
+      // El botón del cartel hace la recarga; ya no hay nada que vigilar aquí.
+      rendida = true;
+      o.mostrarCartel();
+      return;
+    }
     enCurso = true;
     let recargo = false;
     try { recargo = await o.pasarALaNueva(); } catch { recargo = false; }
@@ -125,7 +147,7 @@ export function crearRecargaAlColgar(o: OpcionesDeLaRecarga): () => void {
   };
 
   return () => {
-    if (rendida) { o.mostrarNormal(); return; }
+    if (rendida) { if (!o.mostrarCartel || yaRecargoDesde(o.almacen, o.build)) o.mostrarNormal(); return; }
     void intentar();
     if (!enCurso) empezar();
   };

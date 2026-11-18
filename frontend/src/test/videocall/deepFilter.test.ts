@@ -83,23 +83,21 @@ describe("qué se anota en datos.nc", () => {
   });
 });
 
-describe("DeepFilterNet: apagado en el navegador, prendido en la app (18/11/2026)", () => {
+describe("DeepFilterNet: apagado en el navegador Y en la app (18/11/2026: la voz salía robotizada)", () => {
   it("en el navegador nadie lo arma: siguen con RNNoise", async () => {
     const { deepFilterPermitido, DEEPFILTER_PRENDIDO } = await import("@/lib/deepfilter");
     expect(DEEPFILTER_PRENDIDO).toBe(false);
     expect(deepFilterPermitido()).toBe(false);
   });
 
-  it("en la app de computador con 8 núcleos sí se arma", async () => {
+  it("en la app de computador, ni con 8 núcleos: la voz robotizada no vuelve", async () => {
     const { deepFilterPermitido, DEEPFILTER_EN_APP } = await import("@/lib/deepfilter");
-    expect(DEEPFILTER_EN_APP).toBe(true);
+    expect(DEEPFILTER_EN_APP).toBe(false);
     const w = window as unknown as { mavenEscritorio?: unknown };
     const nucleos = Object.getOwnPropertyDescriptor(navigator, "hardwareConcurrency");
     w.mavenEscritorio = { esApp: true };
-    Object.defineProperty(navigator, "hardwareConcurrency", { value: 8, configurable: true });
+    Object.defineProperty(navigator, "hardwareConcurrency", { value: 16, configurable: true });
     try {
-      expect(deepFilterPermitido()).toBe(true);
-      Object.defineProperty(navigator, "hardwareConcurrency", { value: 4, configurable: true });
       expect(deepFilterPermitido()).toBe(false);
     } finally {
       delete w.mavenEscritorio;

@@ -130,7 +130,10 @@ export const DEEPFILTER_PRENDIDO = false;
 // app de Mac/Windows corre DeepFilterNet3 (equipos de 8 núcleos o más); el
 // navegador sigue con RNNoise hasta que se decida igualarlo. Si el equipo no
 // aguanta, el relevo vuelve solo a RNNoise como siempre.
-export const DEEPFILTER_EN_APP = true;
+// APAGADO OTRA VEZ (Alvaro, 18/11/2026, en la tarde: «es nuestra voz la que se
+// ve rara cuando uno habla»): en la app la voz salía robotizada, igual que el
+// 17/11 en el navegador. Todos vuelven a RNNoise.
+export const DEEPFILTER_EN_APP = false;
 
 export function deepFilterPermitido(): boolean {
   const enApp = DEEPFILTER_EN_APP && escritorio() !== null;
