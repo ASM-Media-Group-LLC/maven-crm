@@ -161,11 +161,11 @@ export const CollapsibleSidebarGroup = ({
               con una superficie neutra: "estás aquí" sin robarle el acento al
               ítem. */}
           <SidebarGroupLabel
-            className={`group/label flex h-auto w-full cursor-pointer items-center gap-2.5 rounded-xl px-2.5 py-2.5 text-sm font-medium !text-foreground/85 transition-colors hover:!text-foreground hover:bg-foreground/5 ${
+            className={`group/label flex h-auto w-full cursor-pointer items-center gap-2.5 rounded-xl px-2.5 py-1.5 text-[13px] font-medium !text-foreground/85 transition-colors hover:!text-foreground hover:bg-foreground/5 ${
               active && !open ? "bg-foreground/[0.06] !text-foreground" : ""
             }`}
           >
-            <Icon className="h-[18px] w-[18px] shrink-0 opacity-80 transition-opacity group-hover/label:opacity-100" />
+            <Icon className="h-4 w-4 shrink-0 opacity-80 transition-opacity group-hover/label:opacity-100" />
             <span className="flex-1 truncate text-left">{label}</span>
             {/* El puntito "estás acá": se pinta con el acento del skin de cada
                 persona (bg-accent) y brilla. Se ve siempre que la ruta activa

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { MedidorEquipo } from "@/components/MedidorEquipo";
 import { Search } from "lucide-react";
 import { SidebarTrigger } from "@/components/ui/sidebar";
@@ -34,9 +34,28 @@ export function TituloDeLaApp({ version }: { version: string | null }) {
   );
 }
 
+/** El buscador de toda la plataforma (⌘K) se abre también desde la lupa del
+ *  menú izquierdo: la barra de arriba ya no está en computador. */
+export const EVENTO_ABRIR_BUSCADOR = "maven:abrir-buscador";
+export function abrirBuscador() {
+  window.dispatchEvent(new Event(EVENTO_ABRIR_BUSCADOR));
+}
+
+// SIN BARRA DE ARRIBA EN COMPUTADOR (Alvaro, 18/11/2026: «esta mierda volátela…
+// no quita espacio»). En computador la barra se fue: el idioma, los mensajes y
+// la campana viven abajo del menú izquierdo, junto a tu foto, y el buscador se
+// abre con ⌘K o con la lupa del menú. En el TELÉFONO la barra sigue: ahí es
+// donde se abre el menú. En la app de computador queda solo una franja fina
+// arriba para arrastrar la ventana (y para que los botones del sistema no
+// tapen nada), con «Maven» y la versión.
 const DashboardTopbar = () => {
   const { t } = useLanguage();
   const [searchOpen, setSearchOpen] = useState(false);
+  useEffect(() => {
+    const abrir = () => setSearchOpen(true);
+    window.addEventListener(EVENTO_ABRIR_BUSCADOR, abrir);
+    return () => window.removeEventListener(EVENTO_ABRIR_BUSCADOR, abrir);
+  }, []);
   // En la app de computador (Alvaro, 18/11/2026): arriba dice «Maven» con la
   // versión, en vez del buscador (sigue con ⌘K). El logo del riel se quita (CSS).
   const enLaApp = !!escritorio();
@@ -51,7 +70,7 @@ const DashboardTopbar = () => {
           la columna y la barra, como ítem flex, se encogía hasta su contenido
           (perdía ~12 px: se "comía" las campanas). Con shrink-0 la barra mide
           siempre sus 56 px y es la pantalla la que se acomoda. */}
-      <header className="barra-arrastrable vidrio-barra z-30 box-content flex h-14 shrink-0 items-center gap-2 px-3 pt-safe sm:gap-4 sm:px-4">
+      <header className="barra-arrastrable vidrio-barra z-30 box-content flex h-14 shrink-0 items-center gap-2 px-3 pt-safe sm:gap-4 sm:px-4 md:hidden">
         <SidebarTrigger />
 
         {/* min-w-0 + truncate: sin esto el texto del buscador (que no parte) fija
@@ -86,6 +105,13 @@ const DashboardTopbar = () => {
           <NotificationBell />
         </div>
       </header>
+
+      {/* App de computador: la franja para mover la ventana. */}
+      {enLaApp && (
+        <div className="barra-arrastrable hidden h-7 shrink-0 items-center md:flex">
+          <TituloDeLaApp version={version} />
+        </div>
+      )}
 
       <GlobalSearchCommand open={searchOpen} onOpenChange={setSearchOpen} />
     </>
