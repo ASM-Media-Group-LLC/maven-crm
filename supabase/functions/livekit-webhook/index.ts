@@ -19,6 +19,8 @@
 // dice que no confíes solo en sus webhooks.
 
 import { WebhookReceiver } from "https://esm.sh/livekit-server-sdk@2.9.2?deps=@bufbuild/protobuf@1.10.0";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.4";
+import { usuarioDeIdentidad } from "../_shared/grabacion-al-drive.ts";
 
 const PROJECT_URL = Deno.env.get("SUPABASE_URL")!;
 
@@ -53,6 +55,22 @@ Deno.serve(async (req) => {
       // la firma es lo ÚNICO que lo protege.
       console.warn("[livekit-webhook] firma rechazada:", (e as Error).message);
       return json({ error: "Unauthorized" }, 401);
+    }
+
+    // Alguien entró a una sala: si se está grabando, queda anotado, para que la
+    // copia de la grabación en el Drive se comparta con quien estuvo en la
+    // llamada (grabaciones-al-drive). La función de la base no hace nada si la
+    // sala no se está grabando, así que no hace falta preguntarlo antes.
+    if (evento.event === "participant_joined") {
+      const uid = usuarioDeIdentidad(evento.participant?.identity);
+      const sala = evento.room?.name;
+      if (!uid || !sala) return json({ ok: true, ignorado: "participant_joined sin usuario de Maven" });
+      const admin = createClient(PROJECT_URL, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+      const { error } = await admin.rpc("grabacion_anotar_participantes", { p_sala: sala, p_usuarios: [uid] });
+      // Un fallo acá no se reintenta (contestar 200): el barrido y el Detener
+      // vuelven a anotar a quien siga en la sala.
+      if (error) console.warn("[livekit-webhook] anotar participante:", error.message);
+      return json({ ok: true });
     }
 
     // Solo interesa el fin de una grabación. `room_finished` no sirve acá:

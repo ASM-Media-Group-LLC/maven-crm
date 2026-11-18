@@ -377,6 +377,9 @@ verify_jwt = false  # auth propia: Bearer del usuario + resuelve su conexión ad
 [functions.recordings]
 verify_jwt = false  # auth propia: Bearer del usuario en start/stop/download/delete; X-Cron-Token en expire (el cron no manda JWT)
 
+[functions.grabaciones-al-drive]
+verify_jwt = false  # solo cron (X-Cron-Token contra CRON_INTERNAL_TOKEN): copia las grabaciones al Drive del NAS
+
 [functions.creator-video]
 verify_jwt = false  # auth propia: Bearer del usuario, verificado con getUser (mismo patrón que recordings)
 

@@ -77,7 +77,7 @@ export const paginas = {
   "grab.expiringThisWeek": { es: "Vencen esta semana", en: "Expiring this week" },
   "grab.warnBefore": { es: "Toda grabación ", en: "Every recording " },
   "grab.warnBold": { es: "se borra a los 90 días, sin excepciones", en: "is deleted after 90 days, no exceptions" },
-  "grab.warnAfter": { es: ". Si necesitas conservar una por más tiempo, descárgala a tu equipo antes de que venza.", en: ". If you need to keep one longer, download it to your computer before it expires." },
+  "grab.warnAfterDrive": { es: ". Además se copia al Drive de quien grabó por 30 días, y desde aquí puede guardarla 30 días más las veces que quiera.", en: ". It's also copied to the recorder's Drive for 30 days, and they can keep it 30 more days from here as many times as they like." },
   "grab.searchPlaceholder": { es: "Buscar por título o sala…", en: "Search by title or room…" },
   "grab.onlyMine": { es: "Solo mías", en: "Only mine" },
   "grab.noMatch": { es: "Ninguna grabación coincide con lo que buscaste.", en: "No recording matches your search." },
@@ -109,6 +109,15 @@ export const paginas = {
   "grab.keepRecording": { es: "Seguir grabando", en: "Keep recording" },
   "grab.coworkSession": { es: "Sesión de Cowork", en: "Cowork session" },
   "grab.playError": { es: "No se pudo reproducir. Prueba descargarla.", en: "Couldn't play it. Try downloading it." },
+  // La copia en el Drive: 30 días desde que se copia, extensible (Alvaro, 17/11/2026).
+  "grab.drive.until": { es: "en el Drive hasta el {fecha}", en: "in Drive until {fecha}" },
+  "grab.drive.copying": { es: "copiándose al Drive…", en: "copying to Drive…" },
+  "grab.drive.extend": { es: "Guardar 30 días más", en: "Keep 30 more days" },
+  "grab.drive.extended": { es: "Queda en el Drive hasta el {fecha}", en: "It stays in Drive until {fecha}" },
+  "grab.drive.extendError": { es: "No se pudo guardar más tiempo", en: "Couldn't keep it longer" },
+  "grab.drive.askTitle": { es: "¿Guardar esta grabación 30 días más en el Drive?", en: "Keep this recording in Drive for 30 more days?" },
+  "grab.drive.askDesc": { es: "está en tu Drive hasta el {fecha}. Si no la extiendes, ese día se borra del Drive. Puedes extenderla las veces que quieras.", en: "is in your Drive until {fecha}. If you don't extend it, it's deleted from Drive that day. You can extend it as many times as you like." },
+  "grab.drive.askDescSinFecha": { es: "Se suman 30 días a lo que le queda en tu Drive. Puedes extenderla las veces que quieras.", en: "30 days are added to the time it has left in your Drive. You can extend it as many times as you like." },
 
   // ── Teléfonos (/telefonos) ──────────────────────────────────────────────────
   "phones.title": { es: "Teléfonos", en: "Phones" },
