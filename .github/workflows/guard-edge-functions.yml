@@ -114,6 +114,15 @@ jobs:
         if: steps.cambios.outputs.correr == 'true'
         run: deno test --allow-read supabase/functions/_shared/correo-gracia.test.ts
 
+      # Chatters entre sí (Alvaro, 18/11): el directo y el 1 a 1 siguen; el primer
+      # directo entre dos chatters avisa una vez (campana + correo) al dueño, admins
+      # y anotados; un chatter no suma a otro chatter a una llamada.
+      - name: Banco — chatters entre sí (PGlite) y su correo
+        if: steps.cambios.outputs.correr == 'true'
+        run: |
+          deno run -A --node-modules-dir=none --no-lock supabase/tests/contacto_entre_chatters.ts
+          deno test --allow-read supabase/functions/_shared/correo-primer-contacto.test.ts
+
       - name: Tipos — mail-fetch
         if: steps.cambios.outputs.correr == 'true'
         run: deno check supabase/functions/mail-fetch/index.ts supabase/functions/mail-fetch/programados.test.ts supabase/functions/mail-fetch/reacciones.test.ts

@@ -10,6 +10,8 @@ import { useLanguage } from "@/hooks/useLanguage";
 import { asegurarLlamada, invitarALaLlamada } from "@/lib/llamadaInvitar";
 import type { Invitado } from "@/hooks/useInvitadosDeLaLlamada";
 import { cn } from "@/lib/utils";
+import { useContactosRestringidos } from "@/hooks/useContactosRestringidos";
+import { esContactoNoPermitido, sinRestringidos } from "@/lib/contactoRestringido";
 
 interface Persona { id: string; full_name: string | null }
 
@@ -32,6 +34,14 @@ export default function AgregarALaLlamada({ roomName, uid, tipo, invitados, alIn
   const [llamando, setLlamando] = useState(false);
 
   const estadoDe = useMemo(() => new Map(invitados.map((i) => [i.user_id, i.status])), [invitados]);
+  // Un chatter no suma a otro chatter (Alvaro, 18/11/2026): no se muestran,
+  // salvo quien ya está en la llamada (el 1 a 1 de siempre).
+  const restringidos = useContactosRestringidos();
+  const visibles = useMemo(
+    () => sinRestringidos(resultados, restringidos, (p) => p.id, (id) => estadoDe.has(id)),
+    [resultados, restringidos, estadoDe],
+  );
+  const hayOcultos = visibles.length < resultados.length;
 
   useEffect(() => {
     if (!abierto) return;
@@ -68,8 +78,8 @@ export default function AgregarALaLlamada({ roomName, uid, tipo, invitados, alIn
       setElegidos(new Set());
       setAbierto(false);
       alInvitar();
-    } catch {
-      toast.error(t("messenger.enLlamada.agregar.error"));
+    } catch (e) {
+      toast.error(t(esContactoNoPermitido(e) ? "messenger.contacto.bloqueado" : "messenger.enLlamada.agregar.error"));
     } finally {
       setLlamando(false);
     }
@@ -104,14 +114,17 @@ export default function AgregarALaLlamada({ roomName, uid, tipo, invitados, alIn
             </label>
           </div>
           <div className="max-h-80 overflow-y-auto px-2 py-2">
-            {buscando && !resultados.length && (
+            {buscando && !visibles.length && (
               <div className="flex justify-center py-6"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
             )}
             {fallo && <p className="px-3 py-6 text-center text-sm text-destructive">{t("messenger.enLlamada.agregar.errorBuscar")}</p>}
-            {!buscando && !fallo && !resultados.length && (
+            {!buscando && !fallo && !visibles.length && (
               <p className="px-3 py-6 text-center text-sm text-muted-foreground">{t("messenger.enLlamada.agregar.nadie")}</p>
             )}
-            {resultados.map((p) => {
+            {hayOcultos && !fallo && (
+              <p className="px-3 pb-1 text-[11px] text-muted-foreground">{t("messenger.contacto.bloqueado")}</p>
+            )}
+            {visibles.map((p) => {
               const estado = estadoDe.get(p.id);
               const adentro = estado === "accepted";
               const sonando = estado === "ringing";
