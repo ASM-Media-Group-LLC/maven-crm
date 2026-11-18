@@ -2,7 +2,7 @@
 //
 // Para que Argos sepa gratis qué app y qué página tiene cada persona al frente,
 // el equipo tiene que trabajar en la app de Maven para computador. Decidido:
-// esta semana, aviso en el navegador del computador; desde el lunes 24/11
+// esta semana, aviso en el navegador del computador; desde el viernes 20/11
 // (monitor_config.cowork_solo_app_desde, se puede mover sin subir código)
 // Cowork en el navegador de un computador manda a la app. Celular: nada cambia.
 
@@ -15,10 +15,14 @@ export function esNavegadorDeComputador(p: { ua: string; tactil: boolean; enApp:
   return /Macintosh|Windows/i.test(p.ua);
 }
 
-/** Qué mostrar en Cowork. Sin fecha (o si no se pudo leer) no se bloquea nunca. */
-export function estadoSoloApp(p: { ua: string; tactil: boolean; enApp: boolean; desde: Date | null; ahora: Date }): EstadoSoloApp {
-  if (!p.desde || Number.isNaN(p.desde.getTime())) return "nada";
+/** Qué mostrar en Cowork. Sin fecha (o si no se pudo leer) no se bloquea nunca.
+ *  17/11/2026 (Alvaro): la fecha pasó al viernes 20/11 y antes hay una prueba
+ *  con 3 personas (monitor_config.cowork_solo_app_probadores): a ellas ya se
+ *  les pide la app, con o sin fecha. */
+export function estadoSoloApp(p: { ua: string; tactil: boolean; enApp: boolean; desde: Date | null; ahora: Date; probador?: boolean }): EstadoSoloApp {
   if (!esNavegadorDeComputador(p)) return "nada";
+  if (p.probador) return "bloqueo";
+  if (!p.desde || Number.isNaN(p.desde.getTime())) return "nada";
   return p.ahora >= p.desde ? "bloqueo" : "aviso";
 }
 

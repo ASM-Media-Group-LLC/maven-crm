@@ -63,6 +63,14 @@ describe("Cowork en el computador solo en la app", () => {
     expect(estadoSoloApp({ ua: WIN, tactil: false, enApp: false, desde: null, ahora: despues })).toBe("nada");
   });
 
+  it("los probadores ya tienen que usar la app en el computador, con o sin fecha (17/11/2026)", () => {
+    expect(estadoSoloApp({ ua: WIN, tactil: false, enApp: false, desde, ahora: antes, probador: true })).toBe("bloqueo");
+    expect(estadoSoloApp({ ua: WIN, tactil: false, enApp: false, desde: null, ahora: antes, probador: true })).toBe("bloqueo");
+    // En la app o en el celular, a un probador tampoco se le cambia nada.
+    expect(estadoSoloApp({ ua: MAC, tactil: false, enApp: true, desde, ahora: antes, probador: true })).toBe("nada");
+    expect(estadoSoloApp({ ua: IPHONE, tactil: true, enApp: false, desde, ahora: antes, probador: true })).toBe("nada");
+  });
+
   it("baja el instalador de su sistema", () => {
     expect(descargaParaEsteEquipo(MAC)).toBe("Maven-Mac.dmg");
     expect(descargaParaEsteEquipo(WIN)).toBe("Maven-Windows.exe");

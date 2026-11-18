@@ -4,6 +4,7 @@ import { Download, ExternalLink, MonitorDown, X } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { useLanguage } from "@/hooks/useLanguage";
+import { useAuth } from "@/hooks/useAuth";
 import { useFormato } from "@/hooks/useFormato";
 import { escritorio } from "@/lib/escritorio";
 import { enlaceDeApp } from "@/lib/abrirEnApp";
@@ -18,21 +19,25 @@ const DESCARGAS = `${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public
 const CLAVE_CERRADO = "maven.coworkSoloApp.avisoCerrado";
 
 export function useCoworkSoloApp(): { estado: EstadoSoloApp; desde: Date | null } {
+  const { user } = useAuth();
   const [desde, setDesde] = useState<Date | null>(null);
+  const [probadores, setProbadores] = useState<string[]>([]);
   useEffect(() => {
     let vivo = true;
     void (async () => {
       try {
-        const { data, error } = await sinTipar.from("monitor_config").select("cowork_solo_app_desde").eq("id", 1).maybeSingle();
+        const { data, error } = await sinTipar.from("monitor_config").select("cowork_solo_app_desde, cowork_solo_app_probadores").eq("id", 1).maybeSingle();
         if (error || !vivo) return;
         setDesde(data?.cowork_solo_app_desde ? new Date(data.cowork_solo_app_desde) : null);
+        setProbadores(Array.isArray(data?.cowork_solo_app_probadores) ? data.cowork_solo_app_probadores : []);
       } catch { /* sin fecha no se bloquea */ }
     })();
     return () => { vivo = false; };
   }, []);
   const ua = typeof navigator !== "undefined" ? navigator.userAgent || "" : "";
   const tactil = typeof navigator !== "undefined" && (navigator.maxTouchPoints ?? 0) > 1;
-  return { estado: estadoSoloApp({ ua, tactil, enApp: !!escritorio(), desde, ahora: new Date() }), desde };
+  const probador = !!user?.id && probadores.includes(user.id);
+  return { estado: estadoSoloApp({ ua, tactil, enApp: !!escritorio(), desde, ahora: new Date(), probador }), desde };
 }
 
 function enlaces() {
