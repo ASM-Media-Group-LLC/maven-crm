@@ -59,6 +59,18 @@ const MA = "3a000000-0000-4000-8000-000000000001", MB = "3b000000-0000-4000-8000
 const SALAS = ["cowork_hub_5a000000", "cowork_5a000000_0", "cowork_meet_5a000000_3a000000", "cowork_1on1_5a000000_4a000000",
   "cowork_5a000000_deadbeef", "cowork_hub_5a200000", "meet_aaaa00000001", "call-c1"];
 
+// El banco corre a las 15:00 de Bogotá de hoy, lo lance el CI a la hora que sea.
+// «El baño consumido hoy» mira el día de Bogotá y la pausa de Ana empieza 40 min
+// antes: entre las 00:00 y las 00:40 caía «ayer» y la línea base fallaba sin que
+// nada estuviera mal. PGlite saca su now() de Date.now(), así que esto mueve a las
+// dos bases a la vez; el reloj sigue andando, solo arranca a media tarde.
+const relojReal = Date.now;
+{
+  const hoyEnBogota = new Date(relojReal() - 5 * 3_600_000).toISOString().slice(0, 10);
+  const desfase = Date.parse(`${hoyEnBogota}T15:00:00-05:00`) - relojReal();
+  Date.now = () => relojReal() + desfase;
+}
+
 // Horas fijas (las dos bases del ensayo tienen que tener los MISMOS datos).
 const AHORA = Date.now();
 const hace = (min: number) => new Date(AHORA - min * 60_000).toISOString();
