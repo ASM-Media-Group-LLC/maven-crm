@@ -21,6 +21,7 @@ import BancoGracia from "./bancoGracia";
 import BancoGuiaConexion from "./bancoGuiaConexion";
 import { BancoGuiaApp, BancoAppDelEquipo } from "./bancoGuiaApp";
 import { BancoAppMedidor, prepararAppFalsa } from "./bancoAppMedidor";
+import { BancoAppBarra, prepararBarraFalsa } from "./bancoAppBarra";
 import BancoFondo from "./bancoFondo";
 import BancoCamaraAnfitrion from "./bancoCamaraAnfitrion";
 import { BancoLlamada } from "./bancoLlamada";
@@ -84,6 +85,7 @@ const verConexion = ver === "conexion";
 const params = new URLSearchParams(window.location.search);
 if (params.get("tema") === "claro") document.documentElement.classList.remove("dark");
 if (ver === "app-medidor") prepararAppFalsa(params.get("estado") ?? "bien");
+if (ver === "app-barra") prepararBarraFalsa(params.get("mac") !== "0");
 if (params.get("skin")) document.documentElement.setAttribute("data-skin", params.get("skin")!);
 
 // Desde el 16/11/2026 las frases bajan por idioma (lib/i18n.ts → cargarIdioma):
@@ -108,7 +110,11 @@ void cargarIdioma(idiomaInicial()).finally(() => raiz.render(
     <BancoCamaraAnfitrion />
   ) :
   // /harness.html?ver=app-medidor[&estado=rojo][&tema=claro] → medidor, versión nueva y novedades (18/11).
-  ver === "app-medidor" ? (
+  ver === "app-barra" ? (
+    <StrictMode>
+      <LanguageProvider><BancoAppBarra /></LanguageProvider>
+    </StrictMode>
+  ) : ver === "app-medidor" ? (
     <StrictMode>
       <LanguageProvider><BancoAppMedidor /></LanguageProvider>
     </StrictMode>

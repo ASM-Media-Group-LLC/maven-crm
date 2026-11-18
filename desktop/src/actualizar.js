@@ -114,6 +114,10 @@ function iniciarActualizaciones(ventana) {
   setInterval(() => buscar(), CADA);
   powerMonitor.on("resume", () => buscar());
   powerMonitor.on("unlock-screen", () => buscar());
+  // Al volver a Maven (Alvaro, 18/11/2026: «me fui a la aplicación y no me pidió
+  // que le dé update»): la versión subió entre dos vueltas de 15 min. Volver a
+  // la ventana también busca (a lo sumo una vez por minuto).
+  app.on("browser-window-focus", () => buscar());
   return buscar;
 }
 
