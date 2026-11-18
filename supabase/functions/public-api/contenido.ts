@@ -16,10 +16,9 @@
 
 import type { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 import {
-  CARPETA_PERSONALIZADOS, estadoPublico, type FilaDeSubida, leerPedidoDeSubida, respuestaDeSubida,
+  CARPETA_PERSONALIZADOS, estadoPublico, nombreDelDia, type FilaDeSubida, leerPedidoDeSubida, respuestaDeSubida,
   rutaDeContenido, rutaEnElBalde,
 } from "./contenido-logica.ts";
-import { nombreDelDia } from "../drive-aporte/logica.ts";
 
 const BALDE = "drive-aportes";
 const COLUMNAS = "id, creator_id, nombre_archivo, size, estado, error, created_at, confirmado_at, carpeta, storage_path, aporte_id";

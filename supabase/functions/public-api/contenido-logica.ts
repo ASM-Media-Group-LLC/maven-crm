@@ -25,6 +25,12 @@ export function rutaDeContenido(metodo: string, ruta: string[]): RutaDeContenido
 export const TAMANO_MAXIMO = 50 * 1024 * 1024 * 1024;
 export const CARPETA_PERSONALIZADOS = "Personalizados";
 
+/** La carpeta del día en Bogotá («2026-11-18»), igual que drive-aporte/logica.ts
+ *  (copia a propósito: public-api no importa de otras funciones). */
+export function nombreDelDia(ahora: Date = new Date()): string {
+  return ahora.toLocaleDateString("sv-SE", { timeZone: "America/Bogota" });
+}
+
 export type PedidoDeSubida =
   | { ok: true; creadora: { id: string } | { email: string }; nombre: string; tamano: number | null; mime: string | null }
   | { ok: false; campo: string; problema: string };
