@@ -4,13 +4,25 @@
 // de la modelo, dentro de «Personalizados», en la carpeta del día.
 
 export type RutaDeContenido =
-  | { ok: true; accion: "crear" | "listo" | "ver"; id: string | null }
+  | { ok: true; accion: "crear" | "listo" | "ver" | "pedido_crear" | "pedido_lista" | "pedido_ver"; id: string | null }
   | { ok: false; estado: 404 | 405; permitidos?: string[] };
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-/** POST /contenido/subidas · POST /contenido/subidas/:id/listo · GET /contenido/subidas/:id */
+/** POST /contenido/subidas · POST /contenido/subidas/:id/listo · GET /contenido/subidas/:id
+ *  POST /contenido/pedidos · GET /contenido/pedidos · GET /contenido/pedidos/:id (18/11/2026) */
 export function rutaDeContenido(metodo: string, ruta: string[]): RutaDeContenido {
+  if (ruta[0] === "pedidos") {
+    if (ruta.length === 1) {
+      if (metodo === "POST") return { ok: true, accion: "pedido_crear", id: null };
+      if (metodo === "GET") return { ok: true, accion: "pedido_lista", id: null };
+      return { ok: false, estado: 405, permitidos: ["GET", "POST"] };
+    }
+    if (ruta.length === 2 && UUID.test(ruta[1] ?? "")) {
+      return metodo === "GET" ? { ok: true, accion: "pedido_ver", id: ruta[1].toLowerCase() } : { ok: false, estado: 405, permitidos: ["GET"] };
+    }
+    return { ok: false, estado: 404 };
+  }
   if (ruta[0] !== "subidas") return { ok: false, estado: 404 };
   if (ruta.length === 1) return metodo === "POST" ? { ok: true, accion: "crear", id: null } : { ok: false, estado: 405, permitidos: ["POST"] };
   if (!UUID.test(ruta[1] ?? "")) return { ok: false, estado: 404 };

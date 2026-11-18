@@ -1,11 +1,12 @@
 import { type ReactNode, useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { CloudUpload, Eye, FolderOpen, Inbox, Loader2, Lock, Share2, Upload } from "lucide-react";
+import { Clapperboard, CloudUpload, Eye, FolderOpen, Inbox, Loader2, Lock, Share2, Upload } from "lucide-react";
 import { useLanguage } from "@/hooks/useLanguage";
 import { SubirAqui } from "@/components/aportar/SubirAqui";
 import { ExploradorDeCarpeta } from "@/components/aportar/ExploradorDeCarpeta";
 import { CompartirCarpeta } from "@/components/aportar/CompartirCarpeta";
+import { PedidoParaGrabar } from "@/components/aportar/PedidoParaGrabar";
 import {
   hoyEnColombia, type InfoDelLink, invocarAporte, leerVisto, type Listado, marcarVisto, nuevosDesde,
 } from "@/lib/aportar/api";
@@ -36,6 +37,8 @@ export default function PaginaAportar() {
   const d = info.data;
   const personal = d?.tipo === "personal";
   const soloVer = d?.tipo === "ver";
+  // El link de un pedido de personalizado (Backstage, 18/11/2026).
+  const pedido = d?.tipo === "pedido" ? d.pedido ?? null : null;
 
   // «Del equipo»: cuántas cosas nuevas desde la última vez que lo miró.
   const equipo = useQuery<Listado>({
@@ -53,21 +56,26 @@ export default function PaginaAportar() {
     setVisto(ahora);
   }, [pestana, token]);
 
-  const ancho = personal || soloVer ? "max-w-3xl" : "max-w-md";
+  const ancho = personal || soloVer || pedido ? "max-w-3xl" : "max-w-md";
 
   return (
     <div className="flex min-h-[100svh] justify-center bg-background px-4 py-8 text-foreground sm:py-10">
       <div className={`flex w-full ${ancho} flex-col gap-5`}>
         <header className="flex flex-col items-center text-center">
           <span className="mb-3 flex h-12 w-12 items-center justify-center rounded-panel bg-primary/15 text-primary">
-            {soloVer ? <Eye className="h-6 w-6" /> : personal ? <FolderOpen className="h-6 w-6" /> : <CloudUpload className="h-6 w-6" />}
+            {pedido ? <Clapperboard className="h-6 w-6" /> : soloVer ? <Eye className="h-6 w-6" /> : personal ? <FolderOpen className="h-6 w-6" /> : <CloudUpload className="h-6 w-6" />}
           </span>
           <h1 className="font-display text-xl font-bold tracking-tight">
-            {personal
+            {pedido
+              ? (d?.creadora ? t("drive.pedido.hola", { n: d.creadora }) : t("drive.pedido.titulo", { r: pedido.referencia }))
+              : personal
               ? (d?.creadora ? t("drive.carpeta.hola", { n: d.creadora }) : t("drive.carpeta.tuCarpeta"))
               : soloVer ? t("drive.carpeta.compartidaContigo") : t("drive.aportar.titulo")}
           </h1>
-          {d?.activo && d.carpeta && (
+          {d?.activo && pedido && (
+            <p className="mt-1 text-sm text-muted-foreground">{t("drive.pedido.titulo", { r: pedido.referencia })}</p>
+          )}
+          {d?.activo && d.carpeta && !pedido && (
             <p className="mt-1 text-sm text-muted-foreground">
               {personal ? t("drive.carpeta.tuCarpeta") : soloVer ? d.etiqueta || d.carpeta : t("drive.aportar.aLaCarpeta", { c: d.etiqueta || d.carpeta })}
             </p>
@@ -87,6 +95,8 @@ export default function PaginaAportar() {
             <Lock className="h-8 w-8 text-muted-foreground/60" />
             <p className="text-sm text-muted-foreground">{t(d?.existe ? "drive.aportar.cerrado" : "drive.aportar.noExiste")}</p>
           </div>
+        ) : pedido ? (
+          <PedidoParaGrabar token={token} pedido={pedido} carpetaId={d.carpeta_id ?? null} />
         ) : soloVer && d.carpeta_id ? (
           <ExploradorDeCarpeta token={token} raizId={d.carpeta_id} modo="compartida" puedeCompartir={false} version={version} />
         ) : personal && d.carpeta_id ? (

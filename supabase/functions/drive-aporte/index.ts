@@ -132,6 +132,42 @@ async function nombreDeLaCreadora(link: Link): Promise<string | null> {
   return ((c?.artistic_name as string | null) || (c?.name as string | null)) ?? null;
 }
 
+/** Lo que la modelo ve del pedido en la página del link. */
+async function elPedido(token: string) {
+  const { data: p } = await admin.from("api_pedidos").select("request_id, referencia").eq("link_token", token).maybeSingle();
+  if (!p) return null;
+  const { data: r } = await admin.from("custom_requests")
+    .select("description, due_on, duration_or_qty, content_type, status").eq("id", p.request_id).maybeSingle();
+  if (!r) return null;
+  return {
+    referencia: p.referencia as string,
+    que_grabar: r.description as string,
+    fecha_limite: (r.due_on as string | null) ?? null,
+    duracion: (r.duration_or_qty as string | null) ?? null,
+    tipo: (r.content_type as string | null) ?? null,
+    cancelado: ["denegado", "reembolsado"].includes(r.status as string),
+  };
+}
+
+/** Llegó un archivo por el link de un pedido: Backstage lo ve en /contenido/pedidos
+ *  y el equipo, como entrega en Personalizados. Si algo de esto falla, el archivo
+ *  igual queda en la carpeta del pedido (Backstage lo ve por la carpeta). */
+async function yaSubioAlPedido(token: string, f: { itemId: string; nombre: string; mime: string; size: number | null }) {
+  try {
+    const ahora = new Date().toISOString();
+    const { data: p } = await admin.from("api_pedidos").select("request_id, subido_at").eq("link_token", token).maybeSingle();
+    if (!p) return;
+    await admin.from("api_pedidos").update({ subido_at: (p.subido_at as string | null) ?? ahora, actualizado: ahora }).eq("link_token", token);
+    await admin.from("custom_request_attachments").insert({
+      request_id: p.request_id, storage_path: null, drive_item_id: f.itemId, file_name: f.nombre.slice(0, 300),
+      mime_type: f.mime, size_bytes: f.size, kind: "entrega",
+    });
+    await admin.from("custom_requests").update({ status: "listo" }).eq("id", p.request_id).in("status", ["aprobado", "en_produccion"]);
+  } catch (e) {
+    console.error("[drive-aporte] pedido:", (e as { message?: string })?.message ?? e);
+  }
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
   if (req.method !== "POST") return json({ error: "método no permitido" }, 405);
@@ -161,7 +197,9 @@ Deno.serve(async (req) => {
         delEquipo = (id as string | null) ?? null;
       }
       void admin.from("drive_upload_links").update({ usado_at: new Date().toISOString() }).eq("token", token).then(() => {}, () => {});
+      const pedido = link.tipo === "pedido" ? await elPedido(token) : null;
       return json({
+        pedido,
         existe: true, activo: true, tipo: link.tipo, permisos,
         carpeta: di?.nombre ?? null, carpeta_id: permisos.ver ? link.item_id : null,
         etiqueta: link.nombre ?? null, creadora: await nombreDeLaCreadora(link), del_equipo_id: delEquipo,
@@ -233,10 +271,23 @@ Deno.serve(async (req) => {
         return json({ error: "El archivo no terminó de llegar. Vuelve a elegirlo: sigue desde donde quedó." }, 409);
       }
 
-      const { data: dia, error: eDia } = await admin.rpc("drive_carpeta_hija", {
-        _padre: link.item_id, _nombre: nombreDelDia(), _owner: link.created_by,
-      });
-      if (eDia || !dia) return json({ error: eDia?.message ?? "no se pudo crear la carpeta del día" }, 500);
+      // El link de un pedido sube DIRECTO a la carpeta del pedido (sin carpeta
+      // del día): así Backstage ve justo lo de ese pedido.
+      const esPedido = link.tipo === "pedido";
+      let dia: string | null = esPedido ? link.item_id : null;
+      if (!esPedido) {
+        const { data, error: eDia } = await admin.rpc("drive_carpeta_hija", {
+          _padre: link.item_id, _nombre: nombreDelDia(), _owner: link.created_by,
+        });
+        if (eDia || !data) return json({ error: eDia?.message ?? "no se pudo crear la carpeta del día" }, 500);
+        dia = data as string;
+      }
+      // Los avisos y totales van por la carpeta de la creadora (la raíz).
+      let raiz = link.item_id;
+      if (esPedido && link.creator_id) {
+        const { data: suya } = await admin.from("drive_carpeta_creadora").select("item_id").eq("creator_id", link.creator_id).limit(1).maybeSingle();
+        raiz = (suya?.item_id as string | undefined) ?? link.item_id;
+      }
 
       const itemId = crypto.randomUUID();
       const up = crypto.randomUUID();
@@ -250,10 +301,11 @@ Deno.serve(async (req) => {
       // item_id = la carpeta de la creadora (no la del día): con eso se arman
       // los avisos («llegó contenido de MIMIMOUSE») y los totales por creadora.
       const { error } = await admin.from("drive_aportes").insert({
-        token, item_id: link.item_id, tenant_id: link.tenant_id, nombre_archivo: nombre,
+        token, item_id: raiz, tenant_id: link.tenant_id, nombre_archivo: nombre,
         storage_path: path, size, quien, nas_item_id: itemId, nas_up: up, nas_parte: 0,
       });
       if (error) return json({ error: error.message }, 500);
+      if (esPedido) await yaSubioAlPedido(token, { itemId, nombre, mime: mimeDe(nombre), size });
 
       // Arranca la migración de una (no esperar al cron). Fire-and-forget.
       if (CRON_TOKEN) {

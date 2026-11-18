@@ -437,6 +437,10 @@ export const conexionEquipo = {
     es: "A alguien le cambiaron el rol.",
     en: "Someone's role changed.",
   },
+  "conexionEquipo.evento.pedido_subido": {
+    es: "La modelo subió el contenido de un pedido de personalizado.",
+    en: "The creator uploaded the content for a custom request.",
+  },
   "conexionEquipo.evento.prueba": { es: "La prueba de «Enviar prueba».", en: "The “Send test” notice." },
 
   // El alta del aviso: qué recibe.

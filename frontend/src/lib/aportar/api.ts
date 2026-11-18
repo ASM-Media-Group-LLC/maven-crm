@@ -5,7 +5,7 @@ import { supabaseAnon } from "@/integrations/supabase/client";
 // Sin sesión: el token es la llave y la edge decide qué deja hacer cada tipo de
 // link (ver supabase/functions/drive-aporte/logica.ts → permisosDe).
 
-export type TipoDeLink = "subir" | "personal" | "invitado" | "ver";
+export type TipoDeLink = "subir" | "personal" | "invitado" | "ver" | "pedido";
 
 export interface Permisos { subir: boolean; ver: boolean; compartir: boolean }
 
@@ -19,6 +19,17 @@ export interface InfoDelLink {
   etiqueta?: string | null;
   creadora?: string | null;
   del_equipo_id?: string | null;
+  /** Solo en el link de un pedido (Backstage, 18/11/2026). */
+  pedido?: PedidoDelLink | null;
+}
+
+export interface PedidoDelLink {
+  referencia: string;
+  que_grabar: string;
+  fecha_limite: string | null;
+  duracion: string | null;
+  tipo: string | null;
+  cancelado: boolean;
 }
 
 export interface HijoDeCarpeta {
