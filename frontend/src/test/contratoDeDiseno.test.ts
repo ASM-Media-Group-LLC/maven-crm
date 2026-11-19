@@ -48,6 +48,10 @@ const FUERA_DEL_SHELL = new Set([
   // ResetPassword), y PortalLayout es su marco (monta un <Outlet>). Sus páginas
   // (PortalInicio, PortalFicha, PortalAjustes) sí cumplen el contrato.
   "PortalEntrar", "PortalContrasena", "PortalLayout",
+  // La casa de la plataforma (/plataforma, /mi-empresa) es su MARCO: vive fuera del
+  // AppShell de Kash y monta un <Outlet>. Sus páginas (PanelDueno, MiEmpresa,
+  // MiPlanYPagos, EquipoMaven) sí cumplen el contrato.
+  "PlataformaRaiz",
   // Subida pública por link (/aportar/:token): la abre gente SIN cuenta, no lleva
   // el shell de la app. Como la portada y el Portal de creadoras.
   "PaginaAportar",

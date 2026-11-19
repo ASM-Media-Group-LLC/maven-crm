@@ -31,7 +31,10 @@ const leer = (ruta: string): string | null => fuentes[ruta] ?? null;
  *  pone cada hijo (por eso HRStaffSchedules trae el suyo). */
 const SON_LAYOUT = new Set(["HRLayout",
   // El marco del portal de creadoras: monta un <Outlet> y cada página trae su <Page>.
-  "PortalLayout"]);
+  "PortalLayout",
+  // El marco de la plataforma (/plataforma, /mi-empresa): monta un <Outlet> y cada
+  // página trae su <Page>.
+  "PlataformaRaiz"]);
 
 /** Páginas que NO viven dentro del AppShell: la ventana scrollea sola. */
 const FUERA_DEL_SHELL = new Set([
