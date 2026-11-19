@@ -1,10 +1,12 @@
+import type * as React from "react";
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, ChevronDown, ChevronRight, Info, MoreHorizontal, Plus, Search, ShieldCheck, Users } from "lucide-react";
+import { ArrowLeft, Check, ChevronDown, ChevronRight, Info, Minus, MoreHorizontal, Plus, Search, ShieldCheck, Users } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { Page } from "@/components/ui/page";
 import { Card, CardContent } from "@/components/ui/card";
-import { Checkbox } from "@/components/ui/checkbox";
+import * as CheckboxPrimitive from "@radix-ui/react-checkbox";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
@@ -64,6 +66,28 @@ function useDatos() {
   });
 }
 
+/** Check como el de Blu: ✓ completo, «–» cuando la sección o el grupo está
+ *  marcado solo en parte. */
+function Casilla({ className, checked, ...props }: React.ComponentPropsWithoutRef<typeof CheckboxPrimitive.Root>) {
+  return (
+    <CheckboxPrimitive.Root
+      checked={checked}
+      className={cn(
+        "peer flex h-4 w-4 shrink-0 items-center justify-center rounded-[4px] border border-muted-foreground/60 transition-colors",
+        "data-[state=checked]:border-primary data-[state=checked]:bg-primary data-[state=checked]:text-primary-foreground",
+        "data-[state=indeterminate]:border-primary data-[state=indeterminate]:bg-primary/25 data-[state=indeterminate]:text-primary",
+        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50",
+        className,
+      )}
+      {...props}
+    >
+      <CheckboxPrimitive.Indicator>
+        {checked === "indeterminate" ? <Minus className="h-3 w-3" strokeWidth={3} /> : <Check className="h-3 w-3" strokeWidth={3} />}
+      </CheckboxPrimitive.Indicator>
+    </CheckboxPrimitive.Root>
+  );
+}
+
 function Letra({ nombre }: { nombre: string | null }) {
   return (
     <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary/10 text-[11px] font-semibold text-primary">
@@ -81,23 +105,24 @@ export default function Posiciones() {
 
   if (cargando) return null;
   if (esDueno !== true) {
-    return <div className="p-8 text-sm text-muted-foreground">{t("posiciones.soloDueno")}</div>;
+    return <Page><div className="text-sm text-muted-foreground">{t("posiciones.soloDueno")}</div></Page>;
   }
 
   const posAbierta = datos.data?.posiciones.find((p) => p.id === abierta) ?? null;
 
   return (
-    <div className="mx-auto flex w-full max-w-6xl flex-col gap-5 p-4 md:p-6">
+    <Page>
+    <div className="mx-auto flex w-full max-w-6xl flex-col gap-5 pb-16 md:pr-16">
       {posAbierta ? (
         <PermisosDe pos={posAbierta} personas={datos.data!.personas} asignaciones={datos.data!.asignaciones} onVolver={() => setAbierta(null)} />
       ) : (
         <>
-          <div className="flex flex-wrap items-end justify-between gap-3">
+          <div className="flex flex-col gap-3">
             <div>
               <h1 className="text-2xl font-semibold tracking-tight">{t("posiciones.titulo")}</h1>
               <p className="mt-1 text-sm text-muted-foreground">{t("posiciones.sub")}</p>
             </div>
-            <div className="flex rounded-lg border border-border p-0.5 text-sm">
+            <div className="flex w-fit rounded-lg border border-border p-0.5 text-sm">
               {(["posiciones", "personas"] as const).map((p) => (
                 <button key={p} type="button" onClick={() => setPestana(p)}
                   className={cn("rounded-md px-3 py-1.5 transition-colors", pestana === p ? "bg-primary/10 font-medium text-primary" : "text-muted-foreground hover:text-foreground")}>
@@ -122,6 +147,7 @@ export default function Posiciones() {
         </>
       )}
     </div>
+    </Page>
   );
 }
 
@@ -393,7 +419,7 @@ function PermisosDe({ pos, personas, asignaciones, onVolver }: { pos: Posicion; 
 
       {([["acceso_total", "posiciones.accesoTotal", "posiciones.accesoTotalDesc"], ["todas_creadoras", "posiciones.todasCreadoras", "posiciones.todasCreadorasDesc"]] as const).map(([campo, tit, desc]) => (
         <label key={campo} className="flex cursor-pointer items-start gap-3 rounded-xl border border-border bg-card p-4">
-          <Checkbox className="mt-0.5" checked={pos[campo]} onCheckedChange={(v) => guardar.mutate({ [campo]: v === true } as Partial<Posicion>)} />
+          <Casilla className="mt-0.5" checked={pos[campo]} onCheckedChange={(v) => guardar.mutate({ [campo]: v === true } as Partial<Posicion>)} />
           <span>
             <span className="block text-sm font-semibold">{t(tit)}</span>
             <span className="block text-xs text-muted-foreground">{t(desc)}</span>
@@ -419,12 +445,12 @@ function PermisosDe({ pos, personas, asignaciones, onVolver }: { pos: Posicion; 
                   <tr className="border-t border-border">
                     <td className="px-4 py-2.5">
                       <label className="flex items-center gap-2 font-medium">
-                        <Checkbox disabled={bloqueado} checked={estadoDe(clavesSec)} onCheckedChange={(v) => marcar(clavesSec, v === true)} />{t("posiciones.todo")}
+                        <Casilla disabled={bloqueado} checked={estadoDe(clavesSec)} onCheckedChange={(v) => marcar(clavesSec, v === true)} />{t("posiciones.todo")}
                       </label>
                     </td>
                     <td className="px-4 py-2.5" colSpan={2}>
                       <label className="flex items-center gap-2 text-muted-foreground">
-                        <Checkbox disabled={bloqueado} checked={estadoDe(clavesSec)} onCheckedChange={(v) => marcar(clavesSec, v === true)} />{t("posiciones.todo")}
+                        <Casilla disabled={bloqueado} checked={estadoDe(clavesSec)} onCheckedChange={(v) => marcar(clavesSec, v === true)} />{t("posiciones.todo")}
                       </label>
                     </td>
                   </tr>
@@ -436,7 +462,7 @@ function PermisosDe({ pos, personas, asignaciones, onVolver }: { pos: Posicion; 
                       <tr key={id} className="border-t border-border bg-muted/20">
                         <td className="px-4 py-2.5">
                           <span className="flex items-center gap-2 font-medium">
-                            <Checkbox disabled={bloqueado} checked={estadoDe(clavesG)} onCheckedChange={(v) => marcar(clavesG, v === true)} aria-label={t(g.etiqueta)} />
+                            <Casilla disabled={bloqueado} checked={estadoDe(clavesG)} onCheckedChange={(v) => marcar(clavesG, v === true)} aria-label={t(g.etiqueta)} />
                             <button type="button" onClick={() => alternar(id)} className="flex items-center gap-1 hover:text-primary" aria-expanded={abierto}>
                               {abierto ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}{t(g.etiqueta)}
                             </button>
@@ -474,14 +500,14 @@ function FilaPermiso({ fila, pos, bloqueado, on, estadoDe, marcar, alcance }: {
     <tr className="border-t border-border align-top">
       <td className="px-4 py-3">
         <label className="flex items-center gap-2 pl-6">
-          <Checkbox disabled={bloqueado} checked={estadoDe(claves)} onCheckedChange={(v) => marcar(claves, v === true)} />{t(fila.etiqueta)}
+          <Casilla disabled={bloqueado} checked={estadoDe(claves)} onCheckedChange={(v) => marcar(claves, v === true)} />{t(fila.etiqueta)}
         </label>
       </td>
       <td className="px-4 py-3">
         <div className="flex flex-wrap gap-x-4 gap-y-1.5">
           {fila.funciones.map((fn) => (
             <label key={fn.clave} className={cn("flex items-center gap-1.5", !on(fn.clave) && "text-muted-foreground")}>
-              <Checkbox disabled={bloqueado} checked={on(fn.clave)} onCheckedChange={(v) => marcar([fn.clave], v === true)} />
+              <Casilla disabled={bloqueado} checked={on(fn.clave)} onCheckedChange={(v) => marcar([fn.clave], v === true)} />
               {t(fn.etiqueta)}
               {fn.nueva && <span title={t("posiciones.nuevoAyuda")} className="rounded bg-amber-500/15 px-1.5 text-[10px] font-medium uppercase tracking-wide text-amber-600 dark:text-amber-400">{t("posiciones.nuevo")}</span>}
             </label>
@@ -549,23 +575,19 @@ function ListaPersonas({ datos }: { datos: NonNullable<ReturnType<typeof useDato
           </div>
           <span className="text-xs text-muted-foreground">{t("posiciones.personas.total", { n: visibles.length })}</span>
         </div>
-        <div className="overflow-x-auto rounded-lg border border-border">
-          <table className="w-full min-w-[760px] text-sm">
-            <thead className="bg-muted/40 text-left text-xs uppercase tracking-wide text-muted-foreground">
-              <tr>
-                <th className="px-4 py-2.5 font-medium">{t("posiciones.personas.col.persona")}</th>
-                <th className="px-4 py-2.5 font-medium">{t("posiciones.personas.col.posiciones")}</th>
-                <th className="px-4 py-2.5 font-medium">{t("posiciones.personas.col.marcas")}</th>
-              </tr>
-            </thead>
-            <tbody>
+        <div className="divide-y divide-border rounded-lg border border-border text-sm">
+          <div className="hidden grid-cols-[1.1fr_1.4fr_1.5fr] gap-4 bg-muted/40 px-4 py-2.5 text-xs font-medium uppercase tracking-wide text-muted-foreground md:grid">
+            <span>{t("posiciones.personas.col.persona")}</span>
+            <span>{t("posiciones.personas.col.posiciones")}</span>
+            <span>{t("posiciones.personas.col.marcas")}</span>
+          </div>
               {visibles.map((p) => {
                 const mias = posDe(p.id);
                 const m = marcas.get(p.id);
                 return (
-                  <tr key={p.id} className="border-t border-border align-top">
-                    <td className="px-4 py-3"><span className="flex items-center gap-2 font-medium"><Letra nombre={p.full_name} />{p.full_name}</span></td>
-                    <td className="px-4 py-3">
+                  <div key={p.id} className="grid gap-2 px-4 py-3 md:grid-cols-[1.1fr_1.4fr_1.5fr] md:gap-4">
+                    <div><span className="flex items-center gap-2 font-medium"><Letra nombre={p.full_name} />{p.full_name}</span></div>
+                    <div>
                       <Popover>
                         <PopoverTrigger asChild>
                           <button type="button" aria-label={t("posiciones.personas.asignar", { nombre: p.full_name ?? "" })}
@@ -580,28 +602,26 @@ function ListaPersonas({ datos }: { datos: NonNullable<ReturnType<typeof useDato
                           <div className="flex max-h-72 flex-col gap-0.5 overflow-y-auto">
                             {datos.posiciones.map((pos) => (
                               <label key={pos.id} className="flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 text-sm hover:bg-muted">
-                                <Checkbox checked={mias.includes(pos.id)} onCheckedChange={(v) => cambiarPos.mutate({ uid: p.id, pid: pos.id, v: v === true })} />
+                                <Casilla checked={mias.includes(pos.id)} onCheckedChange={(v) => cambiarPos.mutate({ uid: p.id, pid: pos.id, v: v === true })} />
                                 {pos.nombre}
                               </label>
                             ))}
                           </div>
                         </PopoverContent>
                       </Popover>
-                    </td>
-                    <td className="px-4 py-3">
+                    </div>
+                    <div>
                       <div className="flex flex-col gap-1.5 text-xs">
                         {([["protegido", "posiciones.personas.protegido"], ["sin_camara", "posiciones.personas.sinCamara"], ["deshabilitada", "posiciones.personas.deshabilitada"]] as const).map(([campo, k]) => (
                           <label key={campo} className={cn("flex cursor-pointer items-center gap-2", !m?.[campo] && "text-muted-foreground")}>
-                            <Checkbox checked={!!m?.[campo]} onCheckedChange={(v) => cambiarMarca.mutate({ uid: p.id, campo, v: v === true })} />{t(k)}
+                            <Casilla checked={!!m?.[campo]} onCheckedChange={(v) => cambiarMarca.mutate({ uid: p.id, campo, v: v === true })} />{t(k)}
                           </label>
                         ))}
                       </div>
-                    </td>
-                  </tr>
+                    </div>
+                  </div>
                 );
               })}
-            </tbody>
-          </table>
         </div>
       </CardContent>
     </Card>
