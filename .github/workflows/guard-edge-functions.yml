@@ -125,12 +125,13 @@ jobs:
 
       # El embudo de Argos prendido (Alvaro, 19/11): huella → lista → IA chica →
       # Argos detallado, escritorio remoto nunca por el nombre, el tope del día y
-      # el saldo que solo cobra las miradas de verdad. Y la edge, con tipos.
-      - name: Banco — embudo de Argos (PGlite) y argos-mirar con tipos
+      # el saldo que solo cobra las miradas de verdad. Y el embudo, con tipos
+      # (index.ts no: edge-runtime.d.ts pide npm:openai y en CI no hay node_modules).
+      - name: Banco — embudo de Argos (PGlite) y embudo con tipos
         if: steps.cambios.outputs.correr == 'true'
         run: |
           deno run -A --node-modules-dir=none --no-lock supabase/tests/argos_embudo.ts
-          deno check supabase/functions/argos-mirar/index.ts supabase/functions/salud-vigilante/index.ts
+          deno check supabase/functions/argos-mirar/embudo.ts
 
       - name: Tipos — mail-fetch
         if: steps.cambios.outputs.correr == 'true'
