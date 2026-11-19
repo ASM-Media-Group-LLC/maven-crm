@@ -19,6 +19,8 @@ beforeEach(async () => {
   // Un computador de escritorio con memoria de sobra y nada guardado: así el test
   // solo mide los núcleos, sin depender del navegador simulado de CI.
   try { localStorage.clear(); } catch { /* noop */ }
+  // Prueba voluntaria (19/11/2026): sin esto nadie arma DeepFilterNet.
+  try { localStorage.setItem("maven.deepfilter", "si"); } catch { /* noop */ }
   vi.spyOn(navigator, "userAgent", "get").mockReturnValue(
     "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36",
   );
@@ -77,6 +79,7 @@ describe("¿a quién le toca DeepFilterNet?", () => {
   });
 
   it("la regla de los 14 días sigue: un equipo fuerte que no aguantó no lo vuelve a intentar", () => {
+    try { localStorage.setItem("maven.deepfilter", "si"); } catch { /* noop */ }
     nucleos(16);
     expect(deepFilterPermitido()).toBe(DEEPFILTER_PRENDIDO);
     marcarDeepFilterPesado();
