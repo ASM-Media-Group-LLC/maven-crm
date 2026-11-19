@@ -152,16 +152,55 @@ export function pantallaDeTrabajoCowork(sala: string | null | undefined): boolea
   return !!sala && sala.startsWith("cowork_") && !sala.startsWith("cowork_hub_");
 }
 
+// ── EL SUPERVISOR HUB: COMO GOOGLE MEET (Alvaro, 18/11/2026) ─────────────────
+//
+// «Cuando entro al Hub la pantalla de los supervisores se ve mal.» En el Hub el
+// dueño mira las pantallas de los supervisores: tienen que leerse (nítidas) Y
+// moverse fluido, como en Meet. Hasta hoy el Hub usaba el perfil de una llamada
+// común: 15 fps pero con «maintain-framerate», que al apurarse ACHICA la imagen
+// (el texto llegaba pixeleado), y sin marcar la captura.
+//
+//  · 1080p a 15 fps, tope 2,5 Mbps en la capa grande: lo que usa Meet para una
+//    pantalla con texto.
+//  · «maintain-resolution»: si el codificador se apura, baja cuadros, nunca
+//    resolución. Una letra borrosa no se lee; un cuadro menos no se nota.
+//  · contentHint «detail»: Chrome cuida el detalle fino (letras, bordes) sin
+//    bajar a los 5 fps del modo «text».
+//  · Capa chica 720p@5 para el MOSAICO del dueño: varias pantallas a la vez sin
+//    traerse el 1080p de cada una (adaptiveStream pide la capa por el tamaño
+//    del recuadro; al agrandar una, pasa sola a la grande).
+//  · Con la subida floja medida sigue mandando el perfil liviano (720p@5,
+//    500 kbps), igual que en todos lados.
+// Solo el Hub (`cowork_hub_…`). Las salas de los chatters siguen a 5 fps y las
+// llamadas del Messenger no cambian.
+export const PUBLICACION_DE_PANTALLA_HUB: TrackPublishOptions = {
+  screenShareEncoding: { maxBitrate: 2_500_000, maxFramerate: 15 },
+  screenShareSimulcastLayers: [ScreenSharePresets.h720fps5],
+  degradationPreference: "maintain-resolution",
+};
+export const CAPTURA_HUB: Pick<ScreenShareCaptureOptions, "resolution" | "contentHint"> = {
+  resolution: { width: 1920, height: 1080, frameRate: 15 },
+  contentHint: "detail",
+};
+
+/** ¿Es el Supervisor Hub? Ahí la pantalla va como en Meet (PUBLICACION_DE_PANTALLA_HUB). */
+export function esSalaDelHub(sala: string | null | undefined): boolean {
+  return !!sala && sala.startsWith("cowork_hub_");
+}
+
 /** Las opciones de captura y de publicación de cada perfil. En Cowork, el
- *  normal va a 5 fps (PUBLICACION_DE_PANTALLA_COWORK); el liviano ya lo estaba. */
+ *  normal va a 5 fps (PUBLICACION_DE_PANTALLA_COWORK); en el Hub, como Meet
+ *  (PUBLICACION_DE_PANTALLA_HUB); el liviano manda en todos lados. */
 export function opcionesDePantalla(
   perfil: PerfilDePantalla,
   captura: ScreenShareCaptureOptions,
   enCowork = false,
+  enHub = false,
 ): { captura: ScreenShareCaptureOptions; publicacion: TrackPublishOptions } {
   if (perfil === "liviano") {
     return { captura: { ...captura, ...CAPTURA_LIVIANA }, publicacion: PUBLICACION_DE_PANTALLA_LIVIANA };
   }
+  if (enHub) return { captura: { ...captura, ...CAPTURA_HUB }, publicacion: PUBLICACION_DE_PANTALLA_HUB };
   if (enCowork) return { captura: { ...captura, ...CAPTURA_COWORK }, publicacion: PUBLICACION_DE_PANTALLA_COWORK };
   return { captura, publicacion: PUBLICACION_DE_PANTALLA };
 }

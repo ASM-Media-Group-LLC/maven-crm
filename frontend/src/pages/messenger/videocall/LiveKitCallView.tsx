@@ -15,7 +15,7 @@ import { useAutoPiP } from "./useAutoPiP";
 import AvisoCaidasSeguidas from "./AvisoCaidasSeguidas";
 import { suscribirOrdenesDePausa } from "@/lib/ordenesDePausa";
 
-import { Loader2, Wifi, WifiOff, Copy, ChevronLeft, ChevronRight, DoorOpen, Check } from "lucide-react";
+import { Loader2, Wifi, WifiOff, Copy, ChevronLeft, ChevronRight, DoorOpen, Check, MonitorUp, LayoutGrid } from "lucide-react";
 import { CLAVES_SALA_TOMADA, olvidarSalaSoltada } from "@/lib/sesionDuplicada";
 import { caidaEnCurso, conexionDeSala, marcarCaida, olvidarCaida } from "@/lib/conexionSala";
 import type { ConexionSala } from "@/lib/coworkTiempoRegla";
@@ -38,6 +38,8 @@ import { escritorio } from "@/lib/escritorio";
 import { estaEnPausa } from "@/lib/coworkPausa";
 import { modoLivianoActivo } from "@/lib/appLiviana";
 import { proximoIntentoDePantalla } from "@/lib/pantallaSolaEnLaApp";
+import { useHubDelSupervisor } from "@/hooks/useHubDelSupervisor";
+import { columnasDelMosaico, textoDePantallaDelHub, pantallasParaMosaico } from "@/lib/hubComoMeet";
 import { useLanguage } from "@/hooks/useLanguage";
 
 const DEFAULT_VIEW_SETTINGS: ViewSettings = { layout: "auto", maxTiles: 49, hideNoVideo: false };
@@ -169,6 +171,14 @@ interface LiveKitCallViewProps {
   /** En la pantalla de error, solo «Reintentar». Para el invitado de afuera:
    *  «Volver» le gastaba la admisión y tenía que pedir entrada otra vez. */
   sinVolverEnError?: boolean;
+  /** El Supervisor Hub de un supervisor VIGILADO (Alvaro, 18/11/2026): manda su
+   *  señal al dueño (lib/senalDelHub.ts), vigila que su pantalla no llegue en
+   *  negro y, si la quita a mano, no se la vuelve a compartir sola (cuenta como
+   *  «sin pantalla» y el dueño se entera). Solo lo pasa el tablero de Cowork. */
+  hubDelSupervisor?: { sessionId: string } | null;
+  /** Ver las pantallas como en Meet (el dueño en el Hub): con dos o más, un
+   *  mosaico; un clic agranda una y las caras quedan chicas al costado. */
+  mosaicoDePantallas?: boolean;
 }
 
 /** ¿Este dispositivo se maneja con el dedo? Se mide una sola vez: nadie cambia
@@ -180,7 +190,7 @@ function usePunteroGrueso(): boolean {
   return grueso;
 }
 
-export default function LiveKitCallView({ roomName, displayName, callDisplayName, isAdmin = false, onLeave, initialMicOn = true, initialCamOn = true, initialScreenShareOn = false, initialAudioDeviceId, initialVideoDeviceId, initialAudioOutputDeviceId, initialBackgroundEffect = "none", hideShareLink, hideScreenShare, hideLeaveButton, leaveLabel, leaveIcon, suppressLeaveToast, compact, autoPip = true, autoLeaveOnEmpty, getToken, onMediaStateChange, onFaceStateChange, supervisorEncuadre, onLocalScreenTrack, pantallaSoloParaMi, pantallaVisiblePara, pantallaOpcional = false, camaraOpcional = false, pantallaPrestada = null, sinLatidoDeLlamada, incomingAudioMuted, roomSwitcher, recording, shareLink: shareLinkProp, accionesBarra, guardarChat, encima, hideEndForAll, controlesExtra, sinVideoAjeno = false, telemetria, sinVolverEnError = false }: LiveKitCallViewProps) {
+export default function LiveKitCallView({ roomName, displayName, callDisplayName, isAdmin = false, onLeave, initialMicOn = true, initialCamOn = true, initialScreenShareOn = false, initialAudioDeviceId, initialVideoDeviceId, initialAudioOutputDeviceId, initialBackgroundEffect = "none", hideShareLink, hideScreenShare, hideLeaveButton, leaveLabel, leaveIcon, suppressLeaveToast, compact, autoPip = true, autoLeaveOnEmpty, getToken, onMediaStateChange, onFaceStateChange, supervisorEncuadre, onLocalScreenTrack, pantallaSoloParaMi, pantallaVisiblePara, pantallaOpcional = false, camaraOpcional = false, pantallaPrestada = null, sinLatidoDeLlamada, incomingAudioMuted, roomSwitcher, recording, shareLink: shareLinkProp, accionesBarra, guardarChat, encima, hideEndForAll, controlesExtra, sinVideoAjeno = false, telemetria, sinVolverEnError = false, hubDelSupervisor = null, mosaicoDePantallas = false }: LiveKitCallViewProps) {
   // Lista de salas del navegador (solo Cowork supervisor+): estado del popup.
   const [salasAbiertas, setSalasAbiertas] = useState(false);
   // ⚠️ `lk` es un objeto NUEVO en cada dibujo (cambia con cada participante que
@@ -840,12 +850,27 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
     return () => { app?.pantallaAutomatica?.(false); };
   }, [pantallaSola]);
   const intentoPantallaRef = useRef({ enCurso: false, ultimo: 0, fallos: 0 });
+  // EN EL HUB, QUITARLA A MANO SE RESPETA (Alvaro, 18/11/2026: «la pueden
+  // apagar, pero cuenta como que no comparten»). Mientras esté así no se vuelve
+  // a compartir sola; si se cae sola (la sala, el sistema), sí.
+  const enHubVigilado = !!hubDelSupervisor;
+  const [pantallaApagadaAMano, setPantallaApagadaAMano] = useState(false);
+  const apagadaAManoRef = useRef(false);
+  apagadaAManoRef.current = pantallaApagadaAMano;
+  const pantallaNegraRef = useRef(false);
+  const alternarPantallaDesdeBoton = useCallback(() => {
+    const l = lkRef.current;
+    if (enHubVigilado) setPantallaApagadaAMano(l.isScreenSharing);
+    return l.toggleScreenShare();
+  }, [enHubVigilado]);
   useEffect(() => {
     if (!pantallaSola) return;
     const tic = () => {
       const l = lkRef.current;
       const st = intentoPantallaRef.current;
-      if (l.isScreenSharing) { st.fallos = 0; return; }
+      // Compartiendo en NEGRO no es compartir: la espera sigue creciendo.
+      if (l.isScreenSharing) { if (!pantallaNegraRef.current) st.fallos = 0; return; }
+      if (apagadaAManoRef.current) return;
       if (st.enCurso || l.connectionState !== ConnectionState.Connected) return;
       if (estaEnPausa() || antesDePausaRef.current) return;
       if (Date.now() < proximoIntentoDePantalla(st.ultimo, st.fallos)) return;
@@ -911,6 +936,48 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
   // cara pero no QUÉ está haciendo la persona.
   // Con la pantalla opcional (el grupo de Luis), Argos no la reclama.
   useScreenShareNudge(localScreenShare, !!supervisorEncuadre && conSalaViva && !pantallaOpcional);
+  // El Supervisor Hub: señal al dueño + pantalla en negro (hooks/useHubDelSupervisor).
+  const { negra: pantallaNegra } = useHubDelSupervisor({
+    sessionId: hubDelSupervisor?.sessionId ?? null,
+    compartiendo: localScreenShare,
+    pantalla: localScreenTrack,
+    camOn: camaraRealOn,
+    conexion: conexionActual,
+    apagadaAMano: pantallaApagadaAMano,
+    ultimoFallo: lk.ultimoFalloDePantalla,
+    enPausa: estaEnPausa,
+    alQuedarNegra: () => {
+      // Se corta y la vuelve a pedir la app sola (con espera creciente).
+      const l = lkRef.current;
+      const st = intentoPantallaRef.current;
+      st.fallos += 1;
+      st.ultimo = Date.now();
+      if (l.isScreenSharing) void l.toggleScreenShare();
+    },
+  });
+  pantallaNegraRef.current = pantallaNegra;
+  // El aviso grande al supervisor: sin pantalla (o en negro) en el Hub, con la
+  // causa y un botón. En el navegador (no debería pasar: Cowork es solo en la
+  // app) es la única forma de compartir: Chrome exige un clic.
+  const [sinPantallaDesde, setSinPantallaDesde] = useState<number | null>(null);
+  const faltaPantallaEnHub = enHubVigilado && !pantallaOpcional && !hideScreenShare && conSalaViva
+    && (!localScreenShare || pantallaNegra) && !estaEnPausa() && !antesDePausaRef.current;
+  useEffect(() => {
+    if (!faltaPantallaEnHub) { setSinPantallaDesde(null); return; }
+    setSinPantallaDesde((d) => d ?? Date.now());
+    const id = window.setInterval(() => setSinPantallaDesde((d) => d ?? Date.now()), 5_000);
+    return () => window.clearInterval(id);
+  }, [faltaPantallaEnHub]);
+  const [ahoraHub, setAhoraHub] = useState(() => Date.now());
+  useEffect(() => {
+    if (sinPantallaDesde == null) return;
+    const id = window.setInterval(() => setAhoraHub(Date.now()), 2_000);
+    return () => window.clearInterval(id);
+  }, [sinPantallaDesde]);
+  // Unos segundos de gracia: al entrar la app la está pidiendo sola.
+  const avisoPantallaHub = sinPantallaDesde != null && (pantallaNegra || pantallaApagadaAMano || !pantallaSola || ahoraHub - sinPantallaDesde > 8_000)
+    ? textoDePantallaDelHub({ negra: pantallaNegra, apagadaAMano: pantallaApagadaAMano, fallo: lk.ultimoFalloDePantalla(), enLaApp: pantallaSola })
+    : null;
   // Y que quede constancia: los mismos llamados, guardados. Va acá al lado de
   // los avisos a propósito — se anota lo que la persona efectivamente escuchó,
   // no una regla parecida calculada en otra parte que puede irse separando.
@@ -1029,6 +1096,20 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
     () => visibleParticipants.filter((p) => p.sid !== spotlightParticipant?.sid),
     [visibleParticipants, spotlightParticipant],
   );
+  // EL HUB COMO MEET (Alvaro, 18/11/2026): con dos o más pantallas, el dueño las
+  // ve todas en mosaico; un clic agranda una (se fija) y las caras van chicas al
+  // costado. adaptiveStream pide la capa de cada recuadro por su tamaño.
+  const pantallasEnMosaico = useMemo(
+    () => pantallasParaMosaico(visibleParticipants, { activo: mosaicoDePantallas, fijado: pinnedSid, compacto: effectiveCompact }),
+    [visibleParticipants, mosaicoDePantallas, pinnedSid, effectiveCompact],
+  );
+  const carasDelMosaico = useMemo(
+    () => (pantallasEnMosaico ? visibleParticipants.filter((p) => !p.isScreenSharing && !(p.isLocal && p.isScreenSharing)) : []),
+    [pantallasEnMosaico, visibleParticipants],
+  );
+  // Fijada una pantalla en el Hub: volver al mosaico con un botón.
+  const puedeVolverAlMosaico = mosaicoDePantallas && !!pinnedSid && !effectiveCompact
+    && visibleParticipants.filter((p) => p.isScreenSharing && !p.isLocal).length >= 2;
 
   const room = lk.getRoom();
 
@@ -1179,6 +1260,26 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
           })}
         </div>
       )}
+      {avisoPantallaHub && (
+        <div role="alert" className="shrink-0 flex flex-wrap items-center justify-center gap-x-3 gap-y-1.5 py-2.5 px-3 bg-destructive/15 text-foreground text-sm font-medium text-center">
+          <MonitorUp className="h-4 w-4 shrink-0 text-destructive" aria-hidden />
+          <span>{t(avisoPantallaHub.titulo)}</span>
+          <span className="font-normal opacity-80">{t(avisoPantallaHub.detalle)}</span>
+          <button
+            type="button"
+            onClick={() => {
+              setPantallaApagadaAMano(false);
+              intentoPantallaRef.current.fallos = 0;
+              // Sin pantalla: se pide ya (en el navegador, este clic abre el
+              // diálogo). En negro: se corta y la app la vuelve a pedir sola.
+              void lk.toggleScreenShare();
+            }}
+            className="rounded-full bg-primary px-4 py-1.5 text-primary-foreground font-semibold hover:bg-primary/90"
+          >
+            {t("cowork.hubPantalla.compartir")}
+          </button>
+        </div>
+      )}
       {pantallaPendiente && (
         <div className="shrink-0 flex flex-wrap items-center justify-center gap-x-3 gap-y-1 py-2 px-3 bg-primary/15 text-foreground text-xs font-medium text-center">
           <span>{t("messenger.callView.volvisteDeLaPausa")}</span>
@@ -1215,6 +1316,16 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
 
       <div className="relative flex-1 flex overflow-hidden">
         <div className="call-ambiente relative flex-1 p-3 overflow-hidden">
+          {puedeVolverAlMosaico && (
+            <button
+              type="button"
+              onClick={() => setPinnedSid(null)}
+              className="vidrio absolute right-5 top-5 z-20 flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium text-foreground hover:bg-white/10"
+            >
+              <LayoutGrid className="h-3.5 w-3.5" aria-hidden />
+              {t("cowork.hubPantalla.verTodas")}
+            </button>
+          )}
           <div className="absolute left-5 top-5 z-20">
             <RecordingControl
               room={room}
@@ -1225,7 +1336,36 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
               compact={effectiveCompact}
             />
           </div>
-          {effectiveLayout === "grid" ? (
+          {pantallasEnMosaico ? (
+            <div className="flex h-full flex-col gap-2">
+              <div className={cn("grid min-h-0 flex-1 gap-2 mx-auto w-full max-w-[1800px] auto-rows-fr", columnasDelMosaico(pantallasEnMosaico.length))}>
+                {pantallasEnMosaico.map((p) => (
+                  <div
+                    key={`${p.identity}-${p.sid}`}
+                    role="button"
+                    tabIndex={0}
+                    title={t("cowork.hubPantalla.agrandar", { name: p.name })}
+                    aria-label={t("cowork.hubPantalla.agrandar", { name: p.name })}
+                    // Un clic agranda; los botones del recuadro (fijar, menú) siguen siendo suyos.
+                    onClick={(e) => { if (!(e.target as HTMLElement).closest("button")) handlePinParticipant(p.sid); }}
+                    onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); handlePinParticipant(p.sid); } }}
+                    className="min-h-0 cursor-zoom-in rounded-xl focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                  >
+                    <ParticipantTile participant={p} room={room} className="h-full" preferredAudioOutputDeviceId={audioOutputId} onMuteParticipant={lk.muteParticipant} onRemoveParticipant={lk.removeParticipant} onPinParticipant={handlePinParticipant} pinnedSid={pinnedSid} isAdmin={isAdmin} />
+                  </div>
+                ))}
+              </div>
+              {carasDelMosaico.length > 0 && (
+                <div className="flex h-24 shrink-0 justify-center gap-2 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                  {carasDelMosaico.map((p) => (
+                    <div key={`${p.identity}-${p.sid}`} className="aspect-video h-full shrink-0 overflow-hidden rounded-lg">
+                      <ParticipantTile compact participant={p} room={room} className="h-full" preferredAudioOutputDeviceId={audioOutputId} onMuteParticipant={lk.muteParticipant} onRemoveParticipant={lk.removeParticipant} onPinParticipant={handlePinParticipant} pinnedSid={pinnedSid} isAdmin={isAdmin} />
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          ) : effectiveLayout === "grid" ? (
             // Techo de ancho: en un monitor ultra-ancho, con una o dos personas
             // los cajones se volvian enormes y la cara quedaba perdida en el
             // medio. Centrado y con tope se ve como en Meet.
@@ -1394,7 +1534,7 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
         onToggleMic={salaCaida ? primeroReconectar : lk.toggleMic}
         estadoNC={lk.estadoNC}
         onToggleCam={salaCaida ? primeroReconectar : lk.toggleCam}
-        onToggleScreenShare={salaCaida ? primeroReconectar : lk.toggleScreenShare}
+        onToggleScreenShare={salaCaida ? primeroReconectar : alternarPantallaDesdeBoton}
         onToggleHand={lk.toggleHand}
         onToggleChat={() => { const w = !chatOpen; setChatOpen(w); if (w) { setParticipantsOpen(false); lk.clearUnreadChat(); } }}
         onToggleParticipants={() => { setParticipantsOpen(!participantsOpen); if (!participantsOpen) setChatOpen(false); }}

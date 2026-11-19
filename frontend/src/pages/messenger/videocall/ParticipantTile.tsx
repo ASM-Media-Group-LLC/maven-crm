@@ -408,6 +408,14 @@ const ParticipantTile = memo(function ParticipantTile({
                 : { transform: participant.isLocal ? "scaleX(-1)" : undefined }
             }
           />
+          {/* Una pantalla anunciada cuyo video todavía no llega: se dice, en vez
+              de un recuadro negro mudo (Alvaro, 18/11/2026: «se ven negras»). */}
+          {participant.esTileDePantalla && !participant.isLocal && !participant.hasVideoTrack && (
+            <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-2 text-center">
+              <Monitor className={cn("text-white/50", compact ? "h-4 w-4" : "h-7 w-7")} aria-hidden />
+              <p className={cn("text-white/70", compact ? "text-[10px]" : "text-xs")}>{t("messenger.tile.pantallaLlegando")}</p>
+            </div>
+          )}
         </div>
       ) : esMiPantalla ? (
         <div className="z-[1] flex max-w-[16rem] flex-col items-center gap-2 px-4 text-center">

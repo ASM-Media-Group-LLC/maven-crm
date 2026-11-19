@@ -62,6 +62,8 @@ import { leerPausaSupervisor, suscribirPausaSupervisor, esEstadoSupervisor } fro
 import { iniciarLatido, actualizarLatido, detenerLatido } from "@/lib/coworkLatido";
 import { juntarMedios, type MedioDeLlamada } from "@/lib/latidoDelSupervisor";
 import { fijarPantallaDelHub, pantallaDelHub, suscribirPantallaDelHub } from "@/lib/pantallaDelHub";
+import EstadoSupervisoresHub from "./EstadoSupervisoresHub";
+import AvisosEnElHub from "./AvisosEnElHub";
 import { marcarPausa } from "@/lib/coworkPausa";
 import type { useCoworkSession, CoworkRoom } from "@/hooks/useCoworkSession";
 import { useUserRole } from "@/hooks/useUserRole";
@@ -225,6 +227,10 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
   const camaraObligatoria = regla?.camaraObligatoria ?? false;
   // Quiénes ven en el Hub la pantalla de un vigilado: los admins.
   const venPantallasDelHub = useVenPantallasDelHub(vigilarAnfitrion);
+  // El dueño (y los admins libres) miran el Hub como en Meet: mosaico de
+  // pantallas y el estado de cada supervisor en vivo (Alvaro, 18/11/2026).
+  // Mientras la regla carga, nada: no se sabe todavía quién es quién.
+  const veHubComoDueno = regla !== null && !regla.vigilado;
   const puedeFinalizar = !!cowork.session && (cowork.session.created_by === userId || isAdmin);
   // Avisar: cualquier anfitrión de la sesión le avisa a un CHATTER (Alvaro,
   // 17/11/2026); un admin además puede avisarle a otro anfitrión. Se inserta
@@ -260,7 +266,9 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
   }, [cowork.memberships, cowork.profiles, userId, isAdmin, puedeAvisar]);
   // Recepción de avisos para ESTE supervisor: el dueño avisándole a un supervisor
   // no servía si el supervisor no lo oía. Mismo hook que CoworkParticipantView.
-  const { aviso: avisoRecibido, cerrar: cerrarAvisoRecibido } = useRecepcionAvisos(userId);
+  // Con el Hub conectado los recibe la llamada del Hub (AvisosEnElHub); acá solo
+  // si el Hub no está, para que nunca se escuchen dos veces.
+  const { aviso: avisoRecibido, cerrar: cerrarAvisoRecibido } = useRecepcionAvisos(hubConnected ? null : userId);
   const [copiandoEnlace, setCopiandoEnlace] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [hubMinimized, setHubMinimized] = useState(false);
@@ -1106,6 +1114,19 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
       // Hub»). Los supervisores no se la ven entre ellos: era otro espejo.
       pantallaSoloParaMi: vigilarAnfitrion,
       pantallaVisiblePara: venPantallasDelHub,
+      // Su señal al dueño (fuera, sin cámara, sin pantalla o en negro, con la
+      // causa) y la pantalla que, si la quita a mano, no vuelve sola.
+      hubDelSupervisor: vigilarAnfitrion && cowork.session?.id ? { sessionId: cowork.session.id } : null,
+      // El dueño: las pantallas en mosaico y el estado de cada supervisor.
+      mosaicoDePantallas: veHubComoDueno,
+      // Los avisos de «Avisar» llegan DENTRO del Hub (también en la ventanita
+      // flotante) y se quedan hasta «Entendido» (AvisosEnElHub).
+      encima: (
+        <>
+          {veHubComoDueno && <EstadoSupervisoresHub />}
+          <AvisosEnElHub userId={userId} />
+        </>
+      ),
       onFaceStateChange: (w) => actualizarLatido({ faceState: w.state, faceSince: w.since }),
       onMediaStateChange: (m) => {
         medioHubRef.current = { camOn: m.camOn, screenShareOn: m.screenShareOn, conexionSala: m.conexionSala ?? null };
@@ -1130,7 +1151,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
         onSwitch: (id: string) => cambiarDeSesionRef.current(id),
       },
     });
-  }, [hubRoom, hubKey, displayName, colgarHub, getHubToken, startCall, hubSilenciado, fijarHubSilencio, cowork.session?.id, vigilarAnfitrion, pantallaObligatoria, camaraObligatoria, venPantallasDelHub, empujarMedios]);
+  }, [hubRoom, hubKey, displayName, colgarHub, getHubToken, startCall, hubSilenciado, fijarHubSilencio, cowork.session?.id, vigilarAnfitrion, pantallaObligatoria, camaraObligatoria, venPantallasDelHub, empujarMedios, veHubComoDueno, userId]);
 
   // EL RELOJ DEL SUPERVISOR (Alvaro, 13/11/2026): con el Hub conectado late como
   // cualquiera en su sala, y su tiempo en el panel cuenta como trabajo. No se
@@ -1183,7 +1204,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
     // Solo cuando cambia el silencio o se sabe si se le vigila (el rol llega
     // después); conectarHub cambia de identidad justo por eso.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [hubSilenciado, vigilarAnfitrion, pantallaObligatoria, camaraObligatoria, venPantallasDelHub]);
+  }, [hubSilenciado, vigilarAnfitrion, pantallaObligatoria, camaraObligatoria, venPantallasDelHub, veHubComoDueno]);
 
   const getActiveRoomToken = useCallback(async () => {
     const result = activeMeetId

@@ -279,7 +279,7 @@ describe("4. Cowork más liviano: todo en vivo, menos cuadros", () => {
     const s = leer("hooks/useLiveKit.ts");
     expect(s).toContain("const topes = liviano ? topesLivianos(antes, ladoCorto, conPrueba) : topesDeCowork(antes);");
     expect(s).toContain("if (liviano || conPrueba) {");
-    expect(s).toContain("const pantalla = opcionesDePantalla(perfil, captura, pantallaDeTrabajoCowork(room.name));");
+    expect(s).toContain("const pantalla = opcionesDePantalla(perfil, captura, pantallaDeTrabajoCowork(room.name), esSalaDelHub(room.name));");
   });
 
   it("⚠️ quien habla o está fijado se sigue viendo nítido: la calidad por voz sigue en la vista", () => {
