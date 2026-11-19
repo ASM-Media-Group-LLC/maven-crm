@@ -22,7 +22,9 @@
 //  10. Cobros (20261120090000_cobros.sql): precios, eventos de Stripe una vez, bloqueo
 //      por pago tras la gracia, la pantalla de entrada, créditos del plan y recargas
 //      sin duplicar, el directorio de la puerta y su tope.
-//  11. Vuelta atrás de las tres y vuelta a cargar.
+//  10c. Quién soy (20261120120000_quien_soy.sql): dueño / Grace / admin del cliente / nadie,
+//      y la lista «Equipo de Maven» solo para la plataforma.
+//  11. Vuelta atrás de las cuatro y vuelta a cargar.
 //
 // Sale con código 1 si algo falla.
 import { PGlite } from "npm:@electric-sql/pglite@0.3";
@@ -37,6 +39,7 @@ const CONECTADAS = leer(MIGS + "20261111190000_agencias_conectadas.sql");
 const ARBOL = leer("../migraciones/20261119210000_arbol.sql");
 const FUNCIONES = leer("../migraciones/20261119211000_arbol_funciones.sql");
 const COBROS = leer("../migraciones/20261120090000_cobros.sql");
+const QUIEN_SOY = leer("../migraciones/20261120120000_quien_soy.sql");
 const vuelta = (sql: string) => sql.split("\n").filter((l) => l.startsWith("--|")).map((l) => l.replace(/^--\| ?/, "")).join("\n");
 
 /** Saca «create or replace function public.<nombre>(…) … $$;» tal cual de una migración. */
@@ -533,8 +536,27 @@ const topes = [];
 for (let i = 0; i < 4; i++) topes.push(await val("service_role", `select public.puerta_contar('ip:1', 3)`));
 check(JSON.stringify(topes) === "[true,true,true,false]", `el tope corta al cuarto intento (${JSON.stringify(topes)})`);
 
+// ════ 10c. Quién soy en la plataforma ════════════════════════════════════════
+try {
+  await aplicar(db, "quien_soy", QUIEN_SOY);
+  const yo = async (u: Quien) => (await como(u, `select public.quien_soy_en_la_plataforma() y`))[0].y;
+  const r = await yo(RUSIN), g = await yo(GRACE), a = await yo(AA), x = await yo(X);
+  check(r.tipo === "dueno" && r.correo.toLowerCase() === "rusin24@gmail.com", `rusin24 es «dueno» (${JSON.stringify(r)})`);
+  check(g.tipo === "admin_plataforma", `Grace es «admin_plataforma» (${g.tipo})`);
+  check(a.tipo === "admin_cliente" && a.organizacion_id === ORG_A, `el admin del cliente A es «admin_cliente» de A (${JSON.stringify(a)})`);
+  check(x.tipo === null, `alguien sin nada no es de la plataforma (${x.tipo})`);
+  const eq = (await como(GRACE, `select public.equipo_de_maven() e`))[0].e as Fila[];
+  check(eq.length === 2 && eq[0].nivel === "dueno", `el equipo de Maven: dueño primero (${eq.map((e) => e.nivel).join(",")})`);
+  await falla(AA, `select public.equipo_de_maven()`, /sin_permiso/, "el admin de un cliente no ve el equipo de Maven");
+  await falla(X, `select public.equipo_de_maven()`, /sin_permiso/, "un cualquiera no ve el equipo de Maven");
+} catch (e) {
+  check(false, `quien_soy: ${msg(e)}`);
+}
+
 // ════ 11. Vuelta atrás y vuelta a cargar ═════════════════════════════════════
 try {
+  await aplicar(db, "vuelta atrás de quien_soy", vuelta(QUIEN_SOY));
+  check((await q(`select to_regproc('public.equipo_de_maven') is null n`))[0].n === true, "la vuelta atrás de quien_soy borra lo suyo");
   await aplicar(db, "vuelta atrás de cobros", vuelta(COBROS));
   check((await q(`select to_regclass('public.precios_plataforma') is null n`))[0].n === true, "la vuelta atrás de cobros borra lo suyo");
   await aplicar(db, "vuelta atrás de arbol_funciones", vuelta(FUNCIONES));
@@ -550,7 +572,8 @@ try {
   await aplicar(db, "arbol (otra vez)", ARBOL);
   await aplicar(db, "arbol_funciones (otra vez)", FUNCIONES);
   await aplicar(db, "cobros (otra vez)", COBROS);
-  check(true, "después de la vuelta atrás, las tres vuelven a cargar");
+  await aplicar(db, "quien_soy (otra vez)", QUIEN_SOY);
+  check(true, "después de la vuelta atrás, las cuatro vuelven a cargar");
 } catch (e) {
   check(false, msg(e));
 }

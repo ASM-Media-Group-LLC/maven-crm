@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { DestinoDeTelemetria, FilaDeCorte, FilaDeSalud } from "@/lib/saludDeLlamada";
+import { SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY } from "@/lib/conexionSupabase";
 
 // Invitado SIN cuenta en Maven: golpea, espera que alguien de adentro lo admita,
 // y recién entonces recibe el token de LiveKit.
@@ -21,12 +22,12 @@ const POLL_MS = 3000;
 
 async function callMeetGuest(action: string, payload: Record<string, unknown>) {
   const res = await fetch(
-    `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/meet-guest`,
+    `${SUPABASE_URL}/functions/v1/meet-guest`,
     {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+        apikey: SUPABASE_PUBLISHABLE_KEY,
       },
       body: JSON.stringify({ action, ...payload }),
     }
@@ -40,10 +41,10 @@ async function callMeetGuest(action: string, payload: Record<string, unknown>) {
  *  salida por caída se manda justo al cerrarse). Nunca tira. */
 function enviarSinEsperar(action: string, payload: Record<string, unknown>): void {
   try {
-    void fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/meet-guest`, {
+    void fetch(`${SUPABASE_URL}/functions/v1/meet-guest`, {
       method: "POST",
       keepalive: true,
-      headers: { "Content-Type": "application/json", apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY },
+      headers: { "Content-Type": "application/json", apikey: SUPABASE_PUBLISHABLE_KEY },
       body: JSON.stringify({ action, ...payload }),
     }).catch(() => {});
   } catch { /* sin aviso, pero sin romper nada */ }

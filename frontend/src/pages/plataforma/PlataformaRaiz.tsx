@@ -1,10 +1,13 @@
-import { Suspense, useState, type ReactNode } from "react";
-import { Navigate, NavLink, Outlet, useLocation, useSearchParams } from "react-router-dom";
-import { Building2, Eye, EyeOff, Presentation, Undo2, Users, CreditCard, LayoutGrid, FlaskConical } from "lucide-react";
+import { Suspense, useMemo, useState, type ReactNode } from "react";
+import { Navigate, NavLink, Outlet, useLocation, useNavigate, useSearchParams } from "react-router-dom";
+import { Building2, Eye, EyeOff, Presentation, Undo2, Users, CreditCard, LayoutGrid, FlaskConical, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import Logo from "@/components/Logo";
 import { useLanguage } from "@/hooks/useLanguage";
-import { modoPlataforma, type TipoDeYo } from "@/lib/plataforma";
+import { claveDeError, modoPlataforma, type TipoDeYo } from "@/lib/plataforma";
+import { crearPlataformaSupabase, type ClienteDelEdificio } from "@/lib/plataforma/supabase";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
 import { destinoSinPermiso, type PantallaDePlataforma } from "@/lib/plataforma/acceso";
 import { cn } from "@/lib/utils";
 import { PlataformaProvider, usePlataforma } from "./contexto";
@@ -19,8 +22,25 @@ export default function PlataformaRaiz() {
   // Se decide una vez al montar: la app de Kash no cambia si no hay bandera.
   const [modo] = useState(modoPlataforma);
   if (modo === "apagada") return <Navigate to="/dashboard" replace />;
+  if (modo === "edificio") return <CasaDelEdificio />;
   return (
     <PlataformaProvider>
+      <Casa />
+    </PlataformaProvider>
+  );
+}
+
+/** Los datos REALES (pestaña conectada al edificio). Pide sesión; quién entra a qué lo
+ *  dice quien_soy_en_la_plataforma (Casa → errorYo «sin_permiso» = vuelve a /dashboard). */
+function CasaDelEdificio() {
+  const { user, loading } = useAuth();
+  const loc = useLocation();
+  // En una pestaña del edificio, este cliente YA es el del edificio (lib/conexionSupabase.ts).
+  const datos = useMemo(() => crearPlataformaSupabase(supabase as unknown as ClienteDelEdificio), []);
+  if (loading) return <div className="fondo-glass min-h-dvh"><Cargando /></div>;
+  if (!user) return <Navigate to={`/login?returnTo=${encodeURIComponent(loc.pathname + loc.search)}`} replace />;
+  return (
+    <PlataformaProvider datos={datos}>
       <Casa />
     </PlataformaProvider>
   );
@@ -35,10 +55,15 @@ function Casa() {
   const org = params.get("org");
   const conOrg = (ruta: string) => (org && p.esPlataforma ? `${ruta}?org=${org}` : ruta);
 
+  // MENÚ A LA IZQUIERDA (19/11/2026, Alvaro: «Clientes» en el menú izquierdo de la cuenta
+  // de la plataforma). En el teléfono va arriba, a lo ancho.
   const enlace = ({ isActive }: { isActive: boolean }) => cn(
-    "inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[13px] font-medium transition-colors",
-    isActive ? "bg-background/70 text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground",
+    "inline-flex items-center gap-2 rounded-xl px-3 py-2 text-[13px] font-medium transition-colors lg:flex lg:w-full",
+    isActive ? "sidebar-glass-active text-foreground" : "text-muted-foreground sidebar-glass-hover hover:text-foreground",
   );
+
+  // Ni plataforma ni admin de un cliente (cuenta del edificio de una agencia): su casa es el tablero.
+  if (claveDeError(p.errorYo) === "sin_permiso") return <Navigate to="/dashboard" replace />;
 
   return (
     <div className="fondo-glass min-h-dvh text-foreground">
@@ -62,15 +87,15 @@ function Casa() {
         </div>
       )}
 
-      <header className="mx-auto flex max-w-[1320px] flex-wrap items-center gap-3 px-4 pt-4 sm:px-6">
-        <div className="vidrio-barra flex w-full flex-wrap items-center gap-2 px-3 py-2">
-          <div className="flex items-center gap-2 pr-2">
+      <div className="mx-auto flex max-w-[1500px] flex-col gap-2 px-4 pt-4 sm:px-6 lg:flex-row lg:items-start lg:gap-5">
+        <aside className="vidrio-barra flex w-full flex-col gap-2 p-3 lg:sticky lg:top-4 lg:w-56 lg:shrink-0" data-menu-plataforma>
+          <div className="flex items-center gap-2 px-1 pb-1">
             <Logo size="xs" />
             <span className="text-[11px] font-semibold text-muted-foreground">
               {p.esPlataforma && !p.verComo ? t("plataforma.etiqueta") : t("plataforma.etiquetaCliente")}
             </span>
           </div>
-          <nav className="flex flex-wrap items-center gap-1">
+          <nav className="flex flex-wrap items-center gap-1 lg:flex-col lg:items-stretch">
             {p.esPlataforma && !p.verComo && (
               <NavLink to="/plataforma" end className={enlace}><LayoutGrid className="h-4 w-4" />{t("plataforma.nav.clientes")}</NavLink>
             )}
@@ -84,27 +109,40 @@ function Casa() {
               </>
             )}
           </nav>
-          <div className="ml-auto flex flex-wrap items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2 border-t border-border/50 pt-2 lg:flex-col lg:items-stretch">
             {p.esPlataforma && !p.verComo && (
               <Button size="sm" variant="outline" onClick={() => setVerComoAbierto(true)}>
                 <Eye className="mr-1.5 h-4 w-4" />{t("plataforma.verComo.boton")}
               </Button>
             )}
             {p.yo && (
-              <span className="hidden text-xs text-muted-foreground sm:inline" title={p.mostrandoACliente ? undefined : p.yo.correo}>
+              <span className="truncate px-1 text-xs text-muted-foreground" title={p.mostrandoACliente ? undefined : p.yo.correo}>
                 {p.yo.nombre}
               </span>
             )}
+            {!p.esMock && <BotonSalir />}
           </div>
-        </div>
-      </header>
+        </aside>
 
-      <div className="mx-auto max-w-[1320px] pb-16 pt-2" key={loc.pathname + (p.verComo?.quien ?? "")}>
-        {p.cargandoYo ? <Cargando /> : p.errorYo ? <ErrorConReintento error={p.errorYo} onReintentar={p.reintentarYo} /> : <Suspense fallback={<Cargando />}><Outlet /></Suspense>}
+        <main className="min-w-0 flex-1 pb-16" key={loc.pathname + (p.verComo?.quien ?? "")}>
+          {p.cargandoYo ? <Cargando /> : p.errorYo ? <ErrorConReintento error={p.errorYo} onReintentar={p.reintentarYo} /> : <Suspense fallback={<Cargando />}><Outlet /></Suspense>}
+        </main>
       </div>
 
       {verComoAbierto && <VerComoDialogo onClose={() => setVerComoAbierto(false)} />}
     </div>
+  );
+}
+
+/** Salir de la cuenta de la plataforma (solo con datos reales). */
+function BotonSalir() {
+  const { t } = useLanguage();
+  const { signOut } = useAuth();
+  const navigate = useNavigate();
+  return (
+    <Button size="sm" variant="ghost" className="justify-start text-muted-foreground" onClick={async () => { await signOut(); navigate("/login", { replace: true }); }}>
+      <LogOut className="mr-1.5 h-4 w-4" />{t("plataforma.salir")}
+    </Button>
   );
 }
 

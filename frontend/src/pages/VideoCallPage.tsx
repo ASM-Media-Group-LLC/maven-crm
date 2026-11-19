@@ -25,6 +25,7 @@ import { useLanguage } from "@/hooks/useLanguage";
 import { useAnunciarLlamada } from "@/hooks/useAnunciarLlamada";
 import { BloqueoSoloApp, useLlamadasSoloApp } from "@/components/CoworkSoloApp";
 import { salaPideApp } from "@/lib/coworkSoloApp";
+import { SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY } from "@/lib/conexionSupabase";
 
 export default function VideoCallPage() {
   const { t } = useLanguage();
@@ -155,12 +156,12 @@ export default function VideoCallPage() {
     queryFn: async () => {
       const { data: { session } } = await supabase.auth.getSession();
       const res = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/meet-room`,
+        `${SUPABASE_URL}/functions/v1/meet-room`,
         {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+            apikey: SUPABASE_PUBLISHABLE_KEY,
             Authorization: `Bearer ${session?.access_token}`,
           },
           body: JSON.stringify({ action: "resolve", livekitRoom: roomName }),

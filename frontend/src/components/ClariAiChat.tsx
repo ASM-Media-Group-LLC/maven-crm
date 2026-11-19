@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Send, Bot, User, Loader2, Mic, MicOff } from "lucide-react";
+import { SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY } from "@/lib/conexionSupabase";
 
 // Avatar de Clari renderizado desde /clari-avatar.svg con fallback a
 // Bot icon si la imagen no carga. Usado en las burbujas del chat y en
@@ -62,10 +63,10 @@ import { supabase } from "@/integrations/supabase/client";
 //   clari-help:    asistente de soporte de Maven (how-to + permisos).
 //                  Lo usa el FAB global.
 const ENDPOINT_URLS = {
-  "ai-sales-chat": `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ai-sales-chat`,
-  "clari-help": `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/clari-help`,
+  "ai-sales-chat": `${SUPABASE_URL}/functions/v1/ai-sales-chat`,
+  "clari-help": `${SUPABASE_URL}/functions/v1/clari-help`,
   // Orquestador cross-CRM (Clari con tools sobre todo el catálogo). Staff only.
-  "ai-orchestrator": `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ai-orchestrator`,
+  "ai-orchestrator": `${SUPABASE_URL}/functions/v1/ai-orchestrator`,
 } as const;
 
 type EndpointKey = keyof typeof ENDPOINT_URLS;
@@ -112,14 +113,14 @@ async function streamChat({
 }) {
   // Get the user's session token for authenticated access
   const { data: { session } } = await supabase.auth.getSession();
-  const token = session?.access_token || import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+  const token = session?.access_token || SUPABASE_PUBLISHABLE_KEY;
 
   const resp = await fetch(ENDPOINT_URLS[endpoint], {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       Authorization: `Bearer ${token}`,
-      apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+      apikey: SUPABASE_PUBLISHABLE_KEY,
     },
     // Solo role y content: la marca del saludo es de la pantalla, no del modelo.
     body: JSON.stringify({ messages: messages.map(({ role, content }) => ({ role, content })), config, userContext }),

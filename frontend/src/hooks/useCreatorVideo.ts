@@ -1,6 +1,7 @@
 import { useCallback, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY } from "@/lib/conexionSupabase";
 
 // Video de onboarding de la creadora. El archivo vive en Cloudflare R2; la
 // edge `creator-video` solo firma URLs que vencen.
@@ -27,12 +28,12 @@ export const TOPE_VIDEO_BYTES = 2 * 1024 * 1024 * 1024;
 async function llamar(action: string, payload: Record<string, unknown>) {
   const { data: { session } } = await supabase.auth.getSession();
   const res = await fetch(
-    `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/creator-video`,
+    `${SUPABASE_URL}/functions/v1/creator-video`,
     {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+        apikey: SUPABASE_PUBLISHABLE_KEY,
         Authorization: `Bearer ${session?.access_token}`,
       },
       body: JSON.stringify({ action, ...payload }),

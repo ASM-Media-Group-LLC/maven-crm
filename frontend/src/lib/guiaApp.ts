@@ -7,6 +7,7 @@
 // importa RUTA_GUIA_APP en vez de escribir la ruta a mano.
 
 import { DESCARGA_MAC, DESCARGA_WINDOWS } from "@/lib/coworkSoloApp";
+import { SUPABASE_URL_KASH } from "@/lib/conexionSupabase";
 
 /** La ruta de la guía. */
 export const RUTA_GUIA_APP = "/app";
@@ -29,7 +30,7 @@ export function archivoDeDescarga(sistema: SistemaGuia): string {
   return sistema === "mac" ? DESCARGA_MAC : DESCARGA_WINDOWS;
 }
 
-export function urlDeDescarga(sistema: SistemaGuia, base = import.meta.env.VITE_SUPABASE_URL as string | undefined): string {
+export function urlDeDescarga(sistema: SistemaGuia, base: string | undefined = SUPABASE_URL_KASH): string {
   return `${base ?? ""}/storage/v1/object/public/descargas/${archivoDeDescarga(sistema)}`;
 }
 

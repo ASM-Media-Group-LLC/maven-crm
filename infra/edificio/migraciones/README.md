@@ -170,3 +170,16 @@ Va DESPUÉS de las dos del árbol. Se aplica igual (MCP `apply_migration` con
 - `directorio_es_del_edificio(correo)` + `puerta_contar`: la puerta de app.maven-ai.me (solo sí/no, con tope).
 - `organizaciones_externas.fuente = 'kash'`: la fila que refresca `refrescar-externas` con la función
   de solo lectura de Kash (`kash-resumen`).
+
+## La puerta prendida · quién soy (19/11)
+
+| Archivo | Qué trae |
+|---|---|
+| `20261120120000_quien_soy.sql` | `quien_soy_en_la_plataforma()` (dueño / admin de plataforma / admin de un cliente / nada) y `equipo_de_maven()` (lista del Equipo de Maven, solo la plataforma); vuelve a correr el alta de rusin24 como dueño |
+
+Va después de las tres anteriores. Desde ahora se aplican con el workflow
+**«Edificio · árbol, cobros y quién soy»** (`.github/workflows/edificio-arbol.yml`):
+ensayo en un Postgres vacío (molde + al día + estas, una por una) y, con «aplicar»,
+solo las que el edificio todavía no tiene, cada una en su transacción y anotada en
+`supabase_migrations.schema_migrations`. El candado (`guarda-kash.sh solo_edificio`)
+corre antes de cada paso.

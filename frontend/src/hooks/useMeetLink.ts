@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY } from "@/lib/conexionSupabase";
 
 // Invitado SIN cuenta que entra por LINK DIRECTO (/unirse/<link>): escribe su
 // nombre y entra, sin sala de espera (Alvaro, 17/11/2026). La sala de espera
@@ -12,11 +13,11 @@ export type EstadoLink = "revisando" | "listo" | "entrando" | "adentro" | "inval
 interface Llamada { token: string; url: string; room: string }
 
 async function llamarMeetGuest(action: string, payload: Record<string, unknown>) {
-  const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/meet-guest`, {
+  const res = await fetch(`${SUPABASE_URL}/functions/v1/meet-guest`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+      apikey: SUPABASE_PUBLISHABLE_KEY,
     },
     body: JSON.stringify({ action, ...payload }),
   });

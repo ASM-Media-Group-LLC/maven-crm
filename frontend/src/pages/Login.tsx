@@ -14,7 +14,7 @@ import { escritorio } from "@/lib/escritorio";
 import { Eye, EyeOff, Loader2 } from "lucide-react";
 import {
   almacenDelNavegador, correoGuardado, destinoDeEstaPestana, destinoDeRespuesta, envDeLaApp, guardarDestino, olvidarDestino,
-  preguntarDirectorio, puertaActiva,
+  inicioTrasEntrar, preguntarDirectorio, puertaActiva,
 } from "@/lib/puerta";
 
 const Login = () => {
@@ -35,9 +35,12 @@ const Login = () => {
     (location.state as { from?: { pathname?: string; search?: string } } | null)?.from
       ? `${(location.state as { from: { pathname: string; search?: string } }).from.pathname}${(location.state as { from: { search?: string } }).from.search ?? ""}`
       : new URLSearchParams(location.search).get("returnTo");
+  // Sin returnTo: Kash va al tablero de siempre. Una pestaña del EDIFICIO va a la casa de
+  // la plataforma (19/11/2026): el dueño y su equipo a «Tus clientes», el admin de un
+  // cliente a /mi-empresa (lo reparte PlataformaRaiz) y cualquier otro de vuelta a /dashboard.
   const destino = crudo && crudo.startsWith("/") && !crudo.startsWith("//")
     ? crudo
-    : "/dashboard";
+    : inicioTrasEntrar(destinoDeEstaPestana());
   const { toast } = useToast();
   // LA PUERTA (vagón 7): prendida, el login pide primero el correo y el directorio del
   // edificio dice si va a Kash (lo de siempre) o al edificio. Apagada, esta pantalla es
@@ -99,7 +102,7 @@ const Login = () => {
     guardarDestino(almacenDelNavegador(), destinoBase, correo);
     if (destinoBase !== destinoDeEstaPestana()) {
       // Cambiar de base = arrancar de nuevo contra la otra (client.ts lee la elección al cargar).
-      const vuelta = destino !== "/dashboard" ? `?returnTo=${encodeURIComponent(destino)}` : "";
+      const vuelta = destino !== inicioTrasEntrar(destinoDeEstaPestana()) ? `?returnTo=${encodeURIComponent(destino)}` : "";
       window.location.replace(`/login${vuelta}`);
       return;
     }

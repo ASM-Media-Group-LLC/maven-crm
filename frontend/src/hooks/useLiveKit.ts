@@ -3005,12 +3005,12 @@ export function useLiveKit() {
     if (!room?.name) throw new Error(traducir("shared.call.notInCall"));
     const { data: { session } } = await supabase.auth.getSession();
     const res = await fetch(
-      `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/livekit-moderate`,
+      `${SUPABASE_URL}/functions/v1/livekit-moderate`,
       {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+          apikey: SUPABASE_PUBLISHABLE_KEY,
           Authorization: `Bearer ${session?.access_token}`,
         },
         body: JSON.stringify({ action, room: room.name, ...payload }),

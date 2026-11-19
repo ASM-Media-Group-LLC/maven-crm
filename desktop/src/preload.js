@@ -88,6 +88,8 @@ contextBridge.exposeInMainWorld("mavenEscritorio", {
     leer: () => ipcRenderer.invoke("maven:acceso-leer"),
     guardar: (correo, clave) => ipcRenderer.invoke("maven:acceso-guardar", String(correo ?? ""), String(clave ?? "")),
   },
+  /** Abre una página de Maven en el navegador del equipo (no en la app). Desde el 19/11/2026. */
+  abrirEnNavegador: (url) => ipcRenderer.invoke("maven:abrir-en-navegador", String(url ?? "")),
   /** Memoria: { app_mb, equipo_gb, libre_gb }. */
   memoria: () => ipcRenderer.invoke("maven:memoria"),
   /** Cada minuto: los tramos de app/página al frente (ver desktop/src/apps.js). */

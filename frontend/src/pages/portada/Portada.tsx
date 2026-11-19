@@ -14,6 +14,7 @@ import "./portada.css";
 import "./reinventada.css";
 
 import PedirDemo from "./secciones/PedirDemo";
+import { SUPABASE_URL_KASH } from "@/lib/conexionSupabase";
 
 // LA PORTADA DE MAVEN · rutas públicas /en, /es, /de, /fr, /it, /pt (y `/`,
 // que manda a la del idioma de quien entra). Todo el texto sale del
@@ -328,7 +329,7 @@ function VideoDeFondo() {
 
 // La app de computador (desktop/): los instaladores los sube el CI
 // (.github/workflows/app-escritorio.yml) al balde público `descargas`.
-const DESCARGAS = `${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/descargas`;
+const DESCARGAS = `${SUPABASE_URL_KASH}/storage/v1/object/public/descargas`;
 const DESCARGA_MAC = `${DESCARGAS}/Maven-Mac.dmg`;
 const DESCARGA_WINDOWS = `${DESCARGAS}/Maven-Windows.exe`;
 

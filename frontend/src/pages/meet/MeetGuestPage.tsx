@@ -10,6 +10,7 @@ import { docPipSupported } from "@/pages/cowork/usePipWindow";
 import { useMeetGuest } from "@/hooks/useMeetGuest";
 import { normalizeRoomCode } from "@/lib/coworkRoomCode";
 import { useLanguage } from "@/hooks/useLanguage";
+import { SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY } from "@/lib/conexionSupabase";
 
 // Ruta PÚBLICA (/entrar/:code). Es el ÚNICO link que hace falta compartir de una
 // reunión, porque atiende los dos casos como el modo "Trusted" de Google Meet:
@@ -48,12 +49,12 @@ export default function MeetGuestPage() {
       }
       try {
         const res = await fetch(
-          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/meet-room`,
+          `${SUPABASE_URL}/functions/v1/meet-room`,
           {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
-              apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+              apikey: SUPABASE_PUBLISHABLE_KEY,
               Authorization: `Bearer ${session.access_token}`,
             },
             body: JSON.stringify({ action: "joinByCode", code }),

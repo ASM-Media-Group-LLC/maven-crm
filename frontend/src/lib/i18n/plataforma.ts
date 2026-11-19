@@ -27,6 +27,11 @@ export const plataforma = {
 
   // Navegación
   "plataforma.nav.clientes": { es: "Clientes", en: "Clients" },
+  "plataforma.salir": { es: "Salir", en: "Sign out" },
+  "plataforma.disponibleCuando": {
+    es: "Disponible cuando se conecte la función que crea cuentas, manda correos y cobra (siguiente paso). Por ahora el panel solo muestra.",
+    en: "Available once the function that creates accounts, sends emails and charges is connected (next step). For now the panel is view-only.",
+  },
   "plataforma.nav.equipo": { es: "Equipo de Maven", en: "Maven team" },
   "plataforma.nav.miEmpresa": { es: "Mi empresa", en: "My company" },
   "plataforma.nav.miPlan": { es: "Mi plan y pagos", en: "My plan & billing" },
@@ -332,5 +337,8 @@ export const plataforma = {
   "plataforma.error.faltan_pendientes": { es: "Faltan pendientes: asigna el admin y el plan antes de activar.", en: "To-dos missing: assign the admin and the plan before activating." },
   "plataforma.error.cliente_bloqueado": { es: "La cuenta está bloqueada por falta de pago.", en: "The account is locked for non-payment." },
   "plataforma.error.solo_lectura": { es: "Estás en «Ver como»: es solo lectura. Vuelve a ser tú para cambiar algo.", en: "You're in «View as»: it's read-only. Go back to yourself to change anything." },
-  "plataforma.error.no_disponible": { es: "Esto todavía no está conectado.", en: "This isn't connected yet." },
+  "plataforma.error.no_disponible": {
+    es: "Disponible cuando se conecte la función que crea cuentas, manda correos y cobra (siguiente paso).",
+    en: "Available once the function that creates accounts, sends emails and charges is connected (next step).",
+  },
 } as const;

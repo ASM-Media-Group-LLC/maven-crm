@@ -1,16 +1,17 @@
-import { ErrorDePlataforma, type ClienteDelDueno, type EventoDelHistorial, type PanelDelDueno, type Persona, type PlataformaDatos, type PlanYPagos, type ResumenDeMiEmpresa, type RolDePersona, type Yo } from "./tipos";
+import { ErrorDePlataforma, type AdminDePlataforma, type ClienteDelDueno, type EventoDelHistorial, type PanelDelDueno, type Persona, type PlataformaDatos, type PlanYPagos, type ResumenDeMiEmpresa, type RolDePersona, type Yo } from "./tipos";
 
 // LA PLATAFORMA CONTRA EL EDIFICIO (maven-agencias, ezeigddgkaemxpshghmu).
 //
-// ⚠️ TODAVÍA NO SE USA. Se enciende el día del cliente (tanda 6), con un cliente
-// de Supabase PROPIO del edificio — NUNCA el de Kash (`@/integrations/supabase/client`,
-// base lsagslbkliprespbyhts, que no se toca). Por eso aquí no se importa ese
-// cliente: quien llame pasa el suyo.
+// Se usa cuando la pestaña está conectada al EDIFICIO (la puerta la mandó allá:
+// destinoDeEstaPestana() === "edificio") y quien entra es de la plataforma o admin de un
+// cliente (ver index.ts → modoPlataforma). El cliente de Supabase lo pasa quien llama
+// (contexto.tsx): en una pestaña del edificio, `@/integrations/supabase/client` YA es el
+// del edificio; en una de Kash este archivo nunca se carga en modo real.
 //
-// Cada método llama a las funciones de
-// infra/edificio/migraciones/20261119211000_arbol_funciones.sql. Lo que todavía
-// no tiene función (cuentas, correos, Stripe) va por la edge del edificio y está
-// marcado TODO: hoy tira `no_disponible` en vez de inventar.
+// Cada método llama a las funciones de infra/edificio/migraciones/ (arbol_funciones y
+// quien_soy). Lo que todavía no tiene función (crear cuentas, correos, Stripe) va por
+// la edge «plataforma» del edificio, que aún no existe: hoy tira `no_disponible`
+// («Disponible cuando…» en la pantalla) en vez de inventar.
 
 type Respuesta<T> = { data: T | null; error: { message?: string; code?: string } | null };
 
@@ -36,7 +37,8 @@ async function edge<T>(c: ClienteDelEdificio, accion: string, body: Record<strin
   // TODO(vagón 5): edge «plataforma» del edificio (crea cuentas, manda correos con Resend
   // desde noreply@envios.maven-ai.me, Stripe). Hasta que exista, no se finge nada.
   const { data, error } = await c.functions.invoke<{ ok: boolean; data?: T; error?: string }>("plataforma", { body: { accion, ...body } });
-  if (error) throw new Error(error.message || accion);
+  // Sin la edge (todavía no existe) o con un fallo de red: «no disponible», nunca un éxito falso.
+  if (error) throw new ErrorDePlataforma("no_disponible", accion);
   if (!data?.ok) throw new Error(data?.error || "no_disponible");
   return data.data as T;
 }
@@ -49,6 +51,18 @@ type ResumenCrudo = {
   argos: ResumenDeMiEmpresa["argos"]; necesita_de_ti: number;
   agencias: { id: string; nota_argos_hoy: number | null }[];
 };
+
+/** El resumen de Kash tal como lo guarda refrescar-externas, con lo que falte en cero / null. */
+function resumenExterno(r: Partial<PanelDelDueno["externas"][number]["resumen"]> | null | undefined): PanelDelDueno["externas"][number]["resumen"] {
+  const n = (v: unknown) => (typeof v === "number" && Number.isFinite(v) ? v : 0);
+  const o = (v: unknown) => (typeof v === "number" && Number.isFinite(v) ? v : null);
+  const x = (r ?? {}) as Record<string, unknown>;
+  return {
+    ...(x as object),
+    personas: n(x.personas), en_vivo: n(x.en_vivo), nota_argos_hoy: o(x.nota_argos_hoy),
+    argos_gastado_mes_usd: n(x.argos_gastado_mes_usd), argos_saldo_usd: o(x.argos_saldo_usd), necesita_de_ti: n(x.necesita_de_ti),
+  } as PanelDelDueno["externas"][number]["resumen"];
+}
 
 const ROL_DE_NIVEL: Record<string, RolDePersona> = { admin: "admin", supervisor: "supervisor" };
 
@@ -64,16 +78,25 @@ export function crearPlataformaSupabase(c: ClienteDelEdificio): PlataformaDatos 
 
   return {
     async quienSoy() {
-      // TODO(vagón 4): una función `quien_soy_en_la_plataforma()` (plataforma_admins.nivel /
-      // organizacion_admins). Mientras, se deduce de la marca de la organización.
-      const marca = await rpc<{ organizacion_id: string } | null>(c, "marca_de_mi_organizacion");
-      if (marca?.organizacion_id) return { user_id: "", nombre: "", correo: "", tipo: "admin_cliente", organizacion_id: marca.organizacion_id } satisfies Yo;
-      return noDisponible("quien_soy");
+      // infra/edificio/migraciones/20261120120000_quien_soy.sql
+      const r = await rpc<{ user_id: string; nombre: string; correo: string; tipo: Yo["tipo"] | null; organizacion_id: string | null } | null>(c, "quien_soy_en_la_plataforma");
+      // Ni plataforma ni admin de un cliente: esta casa no es la suya (vuelve a /dashboard).
+      if (!r?.tipo) throw new ErrorDePlataforma("sin_permiso", "fuera_de_la_plataforma");
+      return {
+        user_id: r.user_id, nombre: r.nombre, correo: r.correo, tipo: r.tipo,
+        ...(r.organizacion_id ? { organizacion_id: r.organizacion_id } : {}),
+      } satisfies Yo;
     },
 
     async organizacionesDelDueno() {
       const r = await rpc<{ clientes: (Omit<ClienteDelDueno, "admin_principal"> & { admin_principal?: ClienteDelDueno["admin_principal"] })[]; externas: PanelDelDueno["externas"]; ve_precios: boolean }>(c, "organizaciones_del_dueno");
-      return { ...r, clientes: r.clientes.map((x) => ({ ...x, admin_principal: x.admin_principal ?? null })) };
+      // Kash (organizaciones_externas) llega con lo que mandó kash-resumen: lo que falte va
+      // en cero/null, nunca inventado.
+      return {
+        ve_precios: !!r.ve_precios,
+        clientes: (r.clientes ?? []).map((x) => ({ ...x, admin_principal: x.admin_principal ?? null })),
+        externas: (r.externas ?? []).map((e) => ({ ...e, resumen: resumenExterno(e.resumen) })),
+      };
     },
 
     async crearOrganizacion(n) {
@@ -179,7 +202,8 @@ export function crearPlataformaSupabase(c: ClienteDelEdificio): PlataformaDatos 
       return edge<{ url: string }>(c, "recarga_argos_checkout", { organizacion_id: org });
     },
 
-    async equipoMaven() { return edge(c, "equipo_maven", {}); },
+    // La lista se lee directo (equipo_de_maven); agregar / quitar / reenviar van por la edge.
+    async equipoMaven() { return rpc<AdminDePlataforma[]>(c, "equipo_de_maven"); },
     async agregarAdminPlataforma(nombre, correo) { return edge(c, "agregar_admin_plataforma", { nombre, correo }); },
     async quitarAdminPlataforma(user) { await edge(c, "quitar_admin_plataforma", { user_id: user }); },
     async reenviarInvitacionAdmin(user) { await edge(c, "reenviar_invitacion_admin", { user_id: user }); },

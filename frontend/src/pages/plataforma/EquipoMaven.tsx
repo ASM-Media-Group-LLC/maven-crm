@@ -45,7 +45,7 @@ export default function EquipoMaven() {
         icon={<Users />}
         title={t("plataforma.equipo.titulo")}
         subtitle={t("plataforma.equipo.sub")}
-        actions={<Button onClick={() => setAgregar(true)}><UserPlus className="mr-1.5 h-4 w-4" />{t("plataforma.equipo.agregar")}</Button>}
+        actions={<Button onClick={() => setAgregar(true)} disabled={!p.escriturasListas} title={p.escriturasListas ? undefined : t("plataforma.disponibleCuando")}><UserPlus className="mr-1.5 h-4 w-4" />{t("plataforma.equipo.agregar")}</Button>}
       />
 
       {admins.isLoading ? <Cargando /> : admins.error ? <ErrorConReintento error={admins.error} onReintentar={() => admins.refetch()} /> : (

@@ -33,6 +33,9 @@ interface ContextoPlataforma {
   /** Precios y cobros a la vista (dueño o admin del cliente, y sin «Mostrar a un cliente»). */
   vePrecios: boolean;
   esPlataforma: boolean;
+  /** Crear clientes, invitar, cobrar: con datos reales esperan la edge «plataforma» del
+   *  edificio (aún no existe). Mientras, los botones van apagados con «Disponible cuando…». */
+  escriturasListas: boolean;
 }
 
 const Contexto = createContext<ContextoPlataforma | null>(null);
@@ -86,6 +89,7 @@ export function PlataformaProvider({ children, datos: datosDados }: { children: 
     verComo, entrarVerComo: setVerComo, salirVerComo: () => setVerComo(null),
     vePrecios: calcularVePrecios(yo, mostrandoACliente),
     esPlataforma,
+    escriturasListas: esMock,
   };
   return <Contexto.Provider value={valor}>{children}</Contexto.Provider>;
 }

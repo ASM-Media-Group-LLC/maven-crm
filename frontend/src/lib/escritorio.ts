@@ -47,6 +47,8 @@ export type MavenEscritorio = {
     leer: () => Promise<{ correo: string; clave: string } | null>;
     guardar: (correo: string, clave: string) => Promise<boolean>;
   };
+  /** Abre una página de Maven en el navegador del equipo, no en la app (versiones desde el 19/11/2026). */
+  abrirEnNavegador?: (url: string) => Promise<boolean>;
   /** ¿Alguien ve la ventana? (versiones de la app desde el 18/11/2026). */
   visible?: () => Promise<boolean>;
   alCambiarVisibilidad?: (cb: (visible: boolean) => void) => () => void;

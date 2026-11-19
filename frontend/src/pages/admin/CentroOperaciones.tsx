@@ -4,6 +4,7 @@ import { useLanguage } from "@/hooks/useLanguage";
 import { supabase } from "@/integrations/supabase/client";
 import { Page } from "@/components/ui/page";
 import { PageHeader } from "@/components/ui/page-header";
+import { SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY } from "@/lib/conexionSupabase";
 
 // EL CENTRO DE OPERACIONES (solo admin, detrás de AdminRoute).
 //
@@ -50,9 +51,9 @@ export default function CentroOperaciones() {
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session?.access_token) throw new Error("sin sesión");
-      const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/centro-operaciones`, {
+      const res = await fetch(`${SUPABASE_URL}/functions/v1/centro-operaciones`, {
         headers: {
-          apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+          apikey: SUPABASE_PUBLISHABLE_KEY,
           Authorization: `Bearer ${session.access_token}`,
         },
       });
