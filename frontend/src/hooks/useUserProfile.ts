@@ -32,16 +32,15 @@ export interface MyProfile {
 }
 
 export const useMyProfile = () => {
-  const qc = useQueryClient();
   const { user } = useAuth();
   return useQuery({
     queryKey: ["my-profile"],
-    queryFn: async (): Promise<MyProfile | null> => {
+    queryFn: async ({ client }): Promise<MyProfile | null> => {
       // Primera carga: el perfil propio ya vino en el arranque (lib/arranque.ts),
       // la misma petición que usan el skin y la presencia. Después de guardar
       // algo se invalida y esto ya va directo a la tabla.
-      if (user?.id && esPrimeraCarga(qc, ["my-profile"])) {
-        const p = (await leerArranque(qc, user.id))?.perfil;
+      if (user?.id && esPrimeraCarga(client, ["my-profile"])) {
+        const p = (await leerArranque(user.id))?.perfil;
         if (p) {
           return {
             id: p.id, full_name: p.full_name, avatar_url: p.avatar_url, avatar_seed: p.avatar_seed,

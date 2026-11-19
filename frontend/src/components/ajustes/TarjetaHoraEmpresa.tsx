@@ -5,7 +5,6 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { useLanguage } from "@/hooks/useLanguage";
 import { useEsDueno } from "@/hooks/useEsDueno";
-import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { leerArranque } from "@/lib/arranque";
@@ -60,7 +59,6 @@ export function TarjetaHoraEmpresa() {
 /** Al entrar: lee la hora que eligió el dueño y la aplica (y la vigila). */
 export function RelojDeLaEmpresa() {
   const { user } = useAuth();
-  const qc = useQueryClient();
   const uid = user?.id ?? null;
   useEffect(() => {
     // Sin sesión no hay qué leer (la RLS de app_flags es para autenticados).
@@ -73,7 +71,7 @@ export function RelojDeLaEmpresa() {
       try {
         // La primera lectura viene en la petición única del arranque
         // (lib/arranque.ts); las siguientes, y si el arranque falló, directo.
-        const a = primera ? await leerArranque(qc, uid) : null;
+        const a = primera ? await leerArranque(uid) : null;
         primera = false;
         const { data, error } = a && a.reloj_24h !== null
           ? { data: { enabled: a.reloj_24h }, error: null }
@@ -90,6 +88,6 @@ export function RelojDeLaEmpresa() {
     void leer();
     const id = window.setInterval(leer, 10 * 60_000);
     return () => { vivo = false; window.clearInterval(id); };
-  }, [qc, uid]);
+  }, [uid]);
   return null;
 }

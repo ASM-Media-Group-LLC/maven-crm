@@ -31,13 +31,15 @@ describe("el arranque va en una sola petición", () => {
 
   it("lib/arranque pide mi_arranque y comparte la petición por react-query", () => {
     expect(arranque).toMatch(/\.rpc\("mi_arranque"\)/);
-    expect(arranque).toMatch(/qc\.fetchQuery\(/);
+    expect(arranque).toMatch(/const enVuelo = new Map/);
   });
 
   it("cada lectura del arranque pasa por leerArranque", () => {
     for (const [n, src] of Object.entries(delArranque)) {
       expect(src, n).toMatch(/import \{[^}]*leerArranque[^}]*\} from "@\/lib\/arranque"/);
-      expect(src, n).toMatch(/leerArranque\(qc, /);
+      expect(src, n).toMatch(/leerArranque\(/);
+      // Sin QueryClient: las pruebas que mockean react-query no se rompen.
+      expect(src, n).not.toMatch(/leerArranque\(qc/);
     }
   });
 
@@ -58,7 +60,7 @@ describe("el arranque va en una sola petición", () => {
 
   it("solo en la primera carga: los refetch van directo a la tabla", () => {
     expect(arranque).toMatch(/export function esPrimeraCarga/);
-    for (const src of [rol, permisos, nivel, perfil]) expect(src).toMatch(/esPrimeraCarga\(qc, /);
+    for (const src of [rol, permisos, nivel, perfil]) expect(src).toMatch(/esPrimeraCarga\(client, /);
   });
 
   it("la función corre con la RLS de quien llama y solo para autenticados", () => {

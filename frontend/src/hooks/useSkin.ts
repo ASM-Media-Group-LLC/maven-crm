@@ -422,7 +422,6 @@ export const useSkin = () => {
 // ui_prefs y se lo pasa al LanguageProvider (useIdiomaDelPerfil).
 export const useSkinSync = () => {
   const { user } = useAuth();
-  const qc = useQueryClient();
   const { t } = useLanguage();
   const empezarLecturaDeIdioma = useIdiomaDelPerfil();
 
@@ -476,7 +475,7 @@ export const useSkinSync = () => {
     // el menú y la presencia; si falló, la lectura de siempre.
     const uid = user.id;
     const leer = async (): Promise<{ data: { ui_skin?: string | null; ui_prefs?: unknown } | null; error: unknown }> => {
-      const p = (await leerArranque(qc, uid))?.perfil;
+      const p = (await leerArranque(uid))?.perfil;
       if (p) return { data: { ui_skin: p.ui_skin, ui_prefs: p.ui_prefs }, error: null };
       return await supabase.from("profiles").select("ui_skin, ui_prefs").eq("id", uid).maybeSingle();
     };
@@ -508,5 +507,5 @@ export const useSkinSync = () => {
     return () => {
       cancelled = true;
     };
-  }, [user?.id, empezarLecturaDeIdioma, qc]);
+  }, [user?.id, empezarLecturaDeIdioma]);
 };

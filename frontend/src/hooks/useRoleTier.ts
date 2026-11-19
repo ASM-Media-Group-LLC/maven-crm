@@ -1,4 +1,4 @@
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { esPrimeraCarga, leerArranque } from "@/lib/arranque";
@@ -14,14 +14,13 @@ export type RoleTier = "member" | "supervisor" | "manager" | "admin";
 
 export const useRoleTier = () => {
   const { user } = useAuth();
-  const qc = useQueryClient();
 
   const { data, isLoading } = useQuery({
     queryKey: ["role-tier", user?.id],
-    queryFn: async (): Promise<RoleTier> => {
+    queryFn: async ({ client }): Promise<RoleTier> => {
       // Primera carga: rol y grupo ya vinieron en el arranque (lib/arranque.ts).
-      if (esPrimeraCarga(qc, ["role-tier", user?.id])) {
-        const a = await leerArranque(qc, user?.id);
+      if (esPrimeraCarga(client, ["role-tier", user?.id])) {
+        const a = await leerArranque(user?.id);
         if (a) {
           if (!a.rol || !a.grupo) return "member";
           if (a.grupo.is_admin) return "admin";

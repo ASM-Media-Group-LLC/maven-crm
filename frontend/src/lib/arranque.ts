@@ -11,8 +11,8 @@
 //  - Si la función falla o no existe, `leerArranque` devuelve null y cada hook
 //    sigue por su camino de siempre. Un fallo aquí NUNCA es «sin rol» ni «sin
 //    permisos» (CLAUDE.md: un fallo no es vacío).
-//  - Todas las piezas comparten la misma petición en vuelo (react-query
-//    deduplica por la clave), así que diez consumidores = una petición.
+//  - Todas las piezas comparten la misma petición en vuelo (caché del módulo,
+//    30 s), así que diez consumidores = una petición.
 import type { QueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -56,8 +56,6 @@ export interface Arranque {
   reloj_24h: boolean | null;
 }
 
-export const claveArranque = (uid: string) => ["mi-arranque", uid] as const;
-
 /** Lo que dura la respuesta para los consumidores de la primera carga: cubre la
  *  ráfaga de arranque (todos montan en el mismo segundo) y nada más. */
 const VIGENCIA_MS = 30_000;
@@ -74,21 +72,32 @@ async function pedir(uid: string): Promise<Arranque | null> {
   return a;
 }
 
+// La petición en vuelo (o recién resuelta) por persona. Caché propia del
+// módulo, sin depender del QueryClient: la usan también efectos que no son
+// consultas (presencia, skin, reloj) y pruebas que mockean react-query.
+const enVuelo = new Map<string, { promesa: Promise<Arranque | null>; desde: number }>();
+
 /** Una sola petición compartida. null si falla, si no hay rpc (pruebas) o si
  *  no hay usuario: quien llama sigue por su camino de siempre. */
-export async function leerArranque(qc: QueryClient, uid: string | null | undefined): Promise<Arranque | null> {
+export async function leerArranque(uid: string | null | undefined): Promise<Arranque | null> {
   if (!uid) return null;
-  try {
-    return await qc.fetchQuery({
-      queryKey: claveArranque(uid),
-      queryFn: () => pedir(uid),
-      staleTime: VIGENCIA_MS,
-      gcTime: VIGENCIA_MS,
-      retry: false,
-    });
-  } catch {
-    return null;
-  }
+  const ahora = Date.now();
+  const previa = enVuelo.get(uid);
+  if (previa && ahora - previa.desde < VIGENCIA_MS) return previa.promesa;
+  const promesa = (async () => {
+    try {
+      return await pedir(uid);
+    } catch {
+      return null;
+    }
+  })();
+  enVuelo.set(uid, { promesa, desde: ahora });
+  return promesa;
+}
+
+/** Solo para pruebas: olvida lo pedido. */
+export function olvidarArranque(): void {
+  enVuelo.clear();
 }
 
 /** ¿Es la primera carga de esta consulta? (sin datos todavía). Solo entonces se
