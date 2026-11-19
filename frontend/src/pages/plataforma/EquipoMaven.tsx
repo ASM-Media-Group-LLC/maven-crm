@@ -1,10 +1,12 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Crown, Loader2, Send, ShieldCheck, Trash2, UserPlus } from "lucide-react";
+import { Users, Crown, Loader2, Send, ShieldCheck, Trash2, UserPlus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { Page } from "@/components/ui/page";
+import { PageHeader } from "@/components/ui/page-header";
 import { Label } from "@/components/ui/label";
 import { useLanguage } from "@/hooks/useLanguage";
 import type { AdminDePlataforma } from "@/lib/plataforma";
@@ -37,15 +39,14 @@ export default function EquipoMaven() {
   });
 
   return (
+    <Page>
     <div className="flex flex-col gap-5">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">{t("plataforma.etiqueta")}</div>
-          <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">{t("plataforma.equipo.titulo")}</h1>
-          <p className="mt-1 max-w-2xl text-sm text-muted-foreground">{t("plataforma.equipo.sub")}</p>
-        </div>
-        <Button onClick={() => setAgregar(true)}><UserPlus className="mr-1.5 h-4 w-4" />{t("plataforma.equipo.agregar")}</Button>
-      </div>
+      <PageHeader
+        icon={<Users />}
+        title={t("plataforma.equipo.titulo")}
+        subtitle={t("plataforma.equipo.sub")}
+        actions={<Button onClick={() => setAgregar(true)}><UserPlus className="mr-1.5 h-4 w-4" />{t("plataforma.equipo.agregar")}</Button>}
+      />
 
       {admins.isLoading ? <Cargando /> : admins.error ? <ErrorConReintento error={admins.error} onReintentar={() => admins.refetch()} /> : (
         <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
@@ -68,7 +69,7 @@ export default function EquipoMaven() {
                   <Button size="sm" variant="ghost" onClick={() => reenviar.mutate(a.user_id)} disabled={reenviar.isPending}>
                     <Send className="mr-1 h-3.5 w-3.5" />{t("plataforma.persona.reenviar")}
                   </Button>
-                  <Button size="sm" variant="ghost" className="text-red-600 dark:text-red-300" onClick={() => setQuitar(a)}>
+                  <Button size="sm" variant="ghost" className="text-destructive" onClick={() => setQuitar(a)}>
                     <Trash2 className="mr-1 h-3.5 w-3.5" />{t("plataforma.persona.quitar")}
                   </Button>
                 </div>
@@ -94,6 +95,7 @@ export default function EquipoMaven() {
         </Dialog>
       )}
     </div>
+    </Page>
   );
 }
 

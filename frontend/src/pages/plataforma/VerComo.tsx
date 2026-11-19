@@ -57,7 +57,7 @@ export function VerComoDialogo({ onClose }: { onClose: () => void }) {
     <Dialog open onOpenChange={(v) => { if (!v) onClose(); }}>
       <DialogContent className="max-h-[86vh] overflow-y-auto sm:max-w-lg">
         <DialogHeader>
-          <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-primary">{t("plataforma.verComo.soloLectura")}</div>
+          <div className="text-[11px] font-semibold text-primary">{t("plataforma.verComo.soloLectura")}</div>
           <DialogTitle>{t("plataforma.verComo.titulo")}</DialogTitle>
           <DialogDescription>{t("plataforma.verComo.sub")}</DialogDescription>
         </DialogHeader>
@@ -65,7 +65,7 @@ export function VerComoDialogo({ onClose }: { onClose: () => void }) {
         <div className="flex gap-1 rounded-lg border border-border/70 p-1" role="tablist">
           {(["rol", "cliente", "persona"] as Pestana[]).map((k) => (
             <button key={k} role="tab" aria-selected={pestana === k} type="button" onClick={() => setPestana(k)}
-              className={cn("flex-1 rounded-md px-3 py-1.5 text-sm font-medium", pestana === k ? "bg-muted text-foreground" : "text-muted-foreground hover:text-foreground")}>
+              className={cn("flex-1 rounded-control px-3 py-1.5 text-sm font-medium", pestana === k ? "bg-muted text-foreground" : "text-muted-foreground hover:text-foreground")}>
               {t(`plataforma.verComo.tab.${k}`)}
             </button>
           ))}

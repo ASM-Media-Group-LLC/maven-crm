@@ -62,7 +62,7 @@ export function ListaDePersonas({ org, ocupadas, paquete, puedeEditar }: { org: 
         )}
       </div>
       {lleno && (
-        <div className="mb-3 flex items-center gap-2 rounded-xl border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-600 dark:text-red-300">
+        <div className="mb-3 flex items-center gap-2 rounded-xl border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive">
           <AlertTriangle className="h-3.5 w-3.5 shrink-0" />{t("plataforma.personas.llenoAviso", { total: paquete })}
         </div>
       )}
@@ -72,10 +72,34 @@ export function ListaDePersonas({ org, ocupadas, paquete, puedeEditar }: { org: 
       ) : lista.length === 0 ? (
         <p className="py-8 text-center text-sm text-muted-foreground">{q ? t("plataforma.personas.sinCoincidencias") : t("plataforma.personas.vacio")}</p>
       ) : (
-        <div className="overflow-x-auto">
+        <>
+        {/* Teléfono: tarjetas en vez de la tabla. */}
+        <ul className="flex flex-col gap-2 md:hidden">
+          {lista.map((x) => (
+            <li key={x.user_id} className="flex items-center gap-3 rounded-panel border border-border/50 bg-background/30 p-3">
+              <Inicial nombre={x.nombre} />
+              <div className="min-w-0 flex-1">
+                <div className="truncate text-sm font-medium">{x.nombre}</div>
+                <div className="truncate text-xs text-muted-foreground">{x.correo}</div>
+                <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                  <Chip tono={x.rol === "empleado" ? "neutro" : "acento"}>{t(`plataforma.rol.${x.rol}`)}</Chip>
+                  {x.en_vivo ? <Chip tono="bien" punto>{t("plataforma.estado.enVivo")}</Chip>
+                    : x.estado === "invitada" ? <Chip tono="alerta" punto>{t("plataforma.estado.invitada")}</Chip> : null}
+                  {x.nota_argos != null && <span className="text-xs font-semibold tabular-nums">{t("plataforma.personas.col.nota")} {x.nota_argos}</span>}
+                </div>
+              </div>
+              {puedeEditar && (
+                <Button size="icon" variant="ghost" onClick={() => setGestionar(x)} aria-label={t("plataforma.persona.gestionarDe", { nombre: x.nombre })}>
+                  <MoreHorizontal className="h-4 w-4" />
+                </Button>
+              )}
+            </li>
+          ))}
+        </ul>
+        <div className="hidden overflow-x-auto md:block">
           <table className="w-full min-w-[720px] text-sm">
             <thead>
-              <tr className="text-left text-[11px] uppercase tracking-wide text-muted-foreground">
+              <tr className="text-left text-[11px] text-muted-foreground">
                 <th className="pb-2 font-medium">{t("plataforma.personas.col.persona")}</th>
                 <th className="pb-2 font-medium">{t("plataforma.personas.col.rol")}</th>
                 <th className="pb-2 font-medium">{t("plataforma.personas.col.estado")}</th>
@@ -109,7 +133,7 @@ export function ListaDePersonas({ org, ocupadas, paquete, puedeEditar }: { org: 
                       <div className="flex items-center gap-2">
                         <span className="w-7 text-right font-semibold tabular-nums">{x.nota_argos}</span>
                         <span className="h-1.5 w-16 overflow-hidden rounded-full bg-muted">
-                          <span className={cn("block h-full rounded-full", x.nota_argos >= 80 ? "bg-emerald-500" : x.nota_argos >= 65 ? "bg-amber-500" : "bg-red-500")} style={{ width: `${x.nota_argos}%` }} />
+                          <span className={cn("block h-full rounded-full", x.nota_argos >= 80 ? "bg-success" : x.nota_argos >= 65 ? "bg-warning" : "bg-destructive")} style={{ width: `${x.nota_argos}%` }} />
                         </span>
                       </div>
                     )}
@@ -126,6 +150,7 @@ export function ListaDePersonas({ org, ocupadas, paquete, puedeEditar }: { org: 
             </tbody>
           </table>
         </div>
+        </>
       )}
 
       {agregar && <AgregarPersonaDialogo org={org} ocupadas={ocupadas} paquete={paquete} onClose={() => setAgregar(false)} />}
@@ -171,7 +196,7 @@ export function AgregarPersonaDialogo({ org, ocupadas, paquete, onClose }: { org
           <DialogDescription>{t("plataforma.persona.agregarSub")}</DialogDescription>
         </DialogHeader>
         {error && (
-          <div className="flex items-start gap-2 rounded-xl border border-red-500/35 bg-red-500/10 px-3 py-2.5 text-sm text-red-600 dark:text-red-300" role="alert" data-error>
+          <div className="flex items-start gap-2 rounded-xl border border-destructive/35 bg-destructive/10 px-3 py-2.5 text-sm text-destructive" role="alert" data-error>
             <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" /><span>{error}</span>
           </div>
         )}
@@ -247,7 +272,7 @@ function GestionarPersonaDialogo({ org, persona, onClose }: { org: string; perso
               {reenviar.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4 text-primary" />}{t("plataforma.persona.reenviar")}
             </button>
             <button type="button" className={opcion} onClick={() => setVista("rol")}><UserCog className="h-4 w-4 text-primary" />{t("plataforma.persona.cambiarRol")}</button>
-            <button type="button" className={cn(opcion, "text-red-600 dark:text-red-300")} onClick={() => setVista("quitar")}><Trash2 className="h-4 w-4" />{t("plataforma.persona.quitar")}</button>
+            <button type="button" className={cn(opcion, "text-destructive")} onClick={() => setVista("quitar")}><Trash2 className="h-4 w-4" />{t("plataforma.persona.quitar")}</button>
           </div>
         )}
         {vista === "rol" && (

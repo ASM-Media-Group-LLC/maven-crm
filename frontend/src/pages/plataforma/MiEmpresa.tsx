@@ -4,6 +4,8 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { AlertTriangle, ArrowLeft, ArrowUpRight, Brain, Clock, CreditCard, FileText, Lock, Mail, MessageSquare, MonitorPlay, Video, Wallet } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Page } from "@/components/ui/page";
+import { PageHeader } from "@/components/ui/page-header";
 import { useLanguage } from "@/hooks/useLanguage";
 import type { ResumenDeMiEmpresa } from "@/lib/plataforma";
 import { organizacionAMostrar } from "@/lib/plataforma/acceso";
@@ -41,16 +43,15 @@ export function CabeceraDeMarca({ r, children }: { r: ResumenDeMiEmpresa; childr
             ? <img src={o.marca.logo_url} alt={marca} className="max-h-10 max-w-[180px] object-contain" />
             : <span className="text-2xl font-semibold text-white">{marca.trim()[0]?.toUpperCase()}</span>}
         </div>
-        <div className="min-w-0 flex-1">
-          <h1 className="truncate text-2xl font-semibold tracking-tight">
-            {marca} <span className="text-base font-normal text-muted-foreground">· {t("plataforma.poweredBy")}</span>
-          </h1>
-          <div className="mt-1 flex flex-wrap items-center gap-1.5">
+        <PageHeader
+          className="min-w-0 flex-1"
+          title={<>{marca} <span className="text-base font-normal text-muted-foreground">· {t("plataforma.poweredBy")}</span></>}
+          subtitle={<span className="mt-1 flex flex-wrap items-center gap-1.5">
             {o.estado === "preparacion" && <Chip tono="alerta" punto>{t("plataforma.chip.preparacion")}</Chip>}
             {o.estado === "activa" && <Chip tono="bien" punto>{t("plataforma.chip.activa")}</Chip>}
             {o.es_demo && <Chip punto>{t("plataforma.chip.demo")}</Chip>}
-          </div>
-        </div>
+          </span>}
+        />
         {children}
       </div>
     </div>
@@ -75,6 +76,7 @@ export default function MiEmpresa() {
   const puedeEditar = !p.verComo && !bloqueado;
 
   return (
+    <Page>
     <div className="flex flex-col gap-5">
       {p.esPlataforma && !p.verComo && (
         <Link to="/plataforma" className="inline-flex w-fit items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground">
@@ -126,6 +128,7 @@ export default function MiEmpresa() {
 
       <ListaDePersonas org={org} ocupadas={r.ocupadas} paquete={r.paquete} puedeEditar={puedeEditar} />
     </div>
+    </Page>
   );
 }
 
@@ -181,8 +184,8 @@ export function AvisosDeCobro({ r }: { r: ResumenDeMiEmpresa }) {
       {avisos.map((a) => (
         <div key={a.k} role="alert" data-aviso={a.k}
           className={a.tono === "mal"
-            ? "flex flex-wrap items-center gap-3 rounded-2xl border border-red-500/35 bg-red-500/10 px-4 py-3 text-sm text-red-700 dark:text-red-200"
-            : "flex flex-wrap items-center gap-3 rounded-2xl border border-amber-500/35 bg-amber-500/10 px-4 py-3 text-sm text-amber-800 dark:text-amber-200"}>
+            ? "flex flex-wrap items-center gap-3 rounded-2xl border border-destructive/35 bg-destructive/10 px-4 py-3 text-sm text-destructive"
+            : "flex flex-wrap items-center gap-3 rounded-2xl border border-warning/35 bg-warning/10 px-4 py-3 text-sm text-warning"}>
           <a.icono className="h-4 w-4 shrink-0" />
           <span className="flex-1">{a.texto}</span>
           {a.accion && !p.mostrandoACliente && (
@@ -205,6 +208,7 @@ function VistaDeEquipo({ r, rol }: { r: ResumenDeMiEmpresa; rol: "empleado" | "s
     ...(rol === "supervisor" ? [{ icono: Brain, k: "plataforma.modulo.argosEquipo" }] : []),
   ];
   return (
+    <Page>
     <div className="flex flex-col gap-5">
       <CabeceraDeMarca r={r} />
       <section className="vidrio p-5">
@@ -224,5 +228,6 @@ function VistaDeEquipo({ r, rol }: { r: ResumenDeMiEmpresa; rol: "empleado" | "s
         <Baldosa etiqueta={t("plataforma.vista.sinPrecios")} valor={<Lock className="h-5 w-5 text-muted-foreground" />} pie={t("plataforma.vista.sinPreciosPie")} />
       </div>
     </div>
+    </Page>
   );
 }

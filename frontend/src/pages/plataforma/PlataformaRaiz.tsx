@@ -44,7 +44,7 @@ function Casa() {
     <div className="fondo-glass min-h-dvh text-foreground">
       {p.esMock && <BarraDeDemo />}
       {p.verComo && (
-        <div className="sticky top-0 z-40 flex flex-wrap items-center justify-center gap-3 border-b border-amber-500/40 bg-amber-500/90 px-4 py-2 text-sm font-medium text-black">
+        <div className="sticky top-0 z-40 flex flex-wrap items-center justify-center gap-3 border-b border-warning/40 bg-warning/90 px-4 py-2 text-sm font-medium text-black">
           <Eye className="h-4 w-4" />
           <span>{t("plataforma.verComo.banner", { quien: p.verComo.quien })}</span>
           <Button size="sm" variant="outline" className="h-7 border-black/30 bg-black/10 text-black hover:bg-black/20" onClick={p.salirVerComo}>
@@ -66,7 +66,7 @@ function Casa() {
         <div className="vidrio-barra flex w-full flex-wrap items-center gap-2 px-3 py-2">
           <div className="flex items-center gap-2 pr-2">
             <Logo size="xs" />
-            <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+            <span className="text-[11px] font-semibold text-muted-foreground">
               {p.esPlataforma && !p.verComo ? t("plataforma.etiqueta") : t("plataforma.etiquetaCliente")}
             </span>
           </div>
@@ -99,9 +99,9 @@ function Casa() {
         </div>
       </header>
 
-      <main className="mx-auto max-w-[1320px] px-4 pb-16 pt-6 sm:px-6" key={loc.pathname + (p.verComo?.quien ?? "")}>
+      <div className="mx-auto max-w-[1320px] pb-16 pt-2" key={loc.pathname + (p.verComo?.quien ?? "")}>
         {p.cargandoYo ? <Cargando /> : p.errorYo ? <ErrorConReintento error={p.errorYo} onReintentar={p.reintentarYo} /> : <Suspense fallback={<Cargando />}><Outlet /></Suspense>}
-      </main>
+      </div>
 
       {verComoAbierto && <VerComoDialogo onClose={() => setVerComoAbierto(false)} />}
     </div>
@@ -127,7 +127,7 @@ function BarraDeDemo() {
             key={o.k}
             type="button"
             onClick={() => p.cambiarIdentidadMock(o.k)}
-            className={cn("rounded-md px-2 py-0.5 font-medium", p.identidadMock === o.k ? "bg-muted text-foreground" : "text-muted-foreground hover:text-foreground")}
+            className={cn("rounded-control px-2 py-0.5 font-medium", p.identidadMock === o.k ? "bg-muted text-foreground" : "text-muted-foreground hover:text-foreground")}
           >
             {o.etiqueta}
           </button>

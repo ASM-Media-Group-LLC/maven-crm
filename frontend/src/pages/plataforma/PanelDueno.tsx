@@ -2,9 +2,11 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { AlertCircle, ChevronRight, ExternalLink, Plus, Presentation, Search, Sparkles, Wallet } from "lucide-react";
+import { AlertCircle, ChevronRight, LayoutGrid, ExternalLink, Plus, Presentation, Search, Sparkles, Wallet } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Page } from "@/components/ui/page";
+import { PageHeader } from "@/components/ui/page-header";
 import { useLanguage } from "@/hooks/useLanguage";
 import { enlaceDeApp } from "@/lib/abrirEnApp";
 import type { ClienteDelDueno, OrganizacionExterna } from "@/lib/plataforma";
@@ -35,19 +37,18 @@ export default function PanelDueno() {
   const totalPersonas = (panel.data?.clientes ?? []).reduce((n, c) => n + c.ocupadas, 0);
 
   return (
+    <Page>
     <div className="flex flex-col gap-6">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">{t("plataforma.etiqueta")}</div>
-          <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">{t("plataforma.dueno.titulo")}</h1>
-          <p className="mt-1 max-w-2xl text-sm text-muted-foreground">{t("plataforma.dueno.sub")}</p>
+      <PageHeader
+        icon={<LayoutGrid />}
+        title={t("plataforma.dueno.titulo")}
+        subtitle={<>
+          <span className="block max-w-2xl">{t("plataforma.dueno.sub")}</span>
           {panel.data && (
-            <p className="mt-1 text-xs text-muted-foreground">
-              {t("plataforma.dueno.conteo", { clientes: panel.data.clientes.length, personas: totalPersonas })}
-            </p>
+            <span className="mt-1 block text-xs">{t("plataforma.dueno.conteo", { clientes: panel.data.clientes.length, personas: totalPersonas })}</span>
           )}
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
+        </>}
+        actions={<>
           <div className="relative">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder={t("plataforma.dueno.buscar")} className="w-56 pl-9" aria-label={t("plataforma.dueno.buscar")} />
@@ -58,8 +59,8 @@ export default function PanelDueno() {
           {!p.mostrandoACliente && !p.verComo && (
             <Button onClick={() => setNuevoAbierto(true)}><Plus className="mr-1.5 h-4 w-4" />{t("plataforma.dueno.nuevo")}</Button>
           )}
-        </div>
-      </div>
+        </>}
+      />
 
       {panel.isLoading ? <Cargando /> : panel.error ? (
         <ErrorConReintento error={panel.error} onReintentar={() => panel.refetch()} />
@@ -107,6 +108,7 @@ export default function PanelDueno() {
         />
       )}
     </div>
+    </Page>
   );
 }
 
@@ -151,15 +153,15 @@ function TarjetaCliente({ c, vePrecios }: { c: ClienteDelDueno; vePrecios: boole
           </div>
         </div>
 
-        <div className="grid grid-cols-3 rounded-xl border border-border/60 bg-background/30">
+        <div className="flex rounded-xl border border-border/60 bg-background/30">
           {[
             { n: `${c.ocupadas}/${c.paquete || "—"}`, e: t("plataforma.tarjeta.personas"), mal: lleno },
             { n: c.en_vivo, e: t("plataforma.tarjeta.enVivo"), vivo: c.en_vivo > 0 },
             { n: c.nota_argos_hoy ?? "—", e: t("plataforma.tarjeta.notaArgos") },
           ].map((x, i) => (
-            <div key={i} className={`px-1 py-2.5 text-center ${i > 0 ? "border-l border-border/60" : ""}`}>
-              <div className={`inline-flex items-center gap-1.5 text-lg font-semibold tabular-nums leading-tight ${x.mal ? "text-red-500" : ""}`}>
-                {x.vivo && <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />}{x.n}
+            <div key={i} className={`min-w-0 flex-1 px-1 py-2.5 text-center ${i > 0 ? "border-l border-border/60" : ""}`}>
+              <div className={`inline-flex items-center gap-1.5 text-lg font-semibold tabular-nums leading-tight ${x.mal ? "text-destructive" : ""}`}>
+                {x.vivo && <span className="h-1.5 w-1.5 rounded-full bg-success" />}{x.n}
               </div>
               <div className="mt-0.5 text-[10.5px] leading-tight text-muted-foreground">{x.e}</div>
             </div>
@@ -168,7 +170,7 @@ function TarjetaCliente({ c, vePrecios }: { c: ClienteDelDueno; vePrecios: boole
         {c.paquete > 0 && <BarraDeUso usadas={c.ocupadas} total={c.paquete} />}
 
         <div className="flex flex-wrap items-center gap-2 text-xs">
-          <span className={`inline-flex items-center gap-1.5 ${c.argos.pausado ? "text-red-500" : "text-muted-foreground"}`}>
+          <span className={`inline-flex items-center gap-1.5 ${c.argos.pausado ? "text-destructive" : "text-muted-foreground"}`}>
             <Wallet className="h-3.5 w-3.5" />
             {c.argos.pausado ? t("plataforma.argos.pausado") : t("plataforma.argos.saldo", { usd: formatoUsd(c.argos.saldo_usd, 2) })}
           </span>
@@ -227,8 +229,8 @@ function TarjetaExterna({ e }: { e: OrganizacionExterna }) {
               { n: r.necesita_de_ti, e: t("plataforma.externa.necesita"), alerta: r.necesita_de_ti > 0 },
             ].map((x, i) => (
               <div key={i} className="rounded-xl border border-border/60 bg-background/30 px-3 py-2.5">
-                <div className={`inline-flex items-center gap-1.5 text-lg font-semibold tabular-nums ${x.alerta ? "text-amber-500" : ""}`}>
-                  {x.vivo && <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />}{x.n}
+                <div className={`inline-flex items-center gap-1.5 text-lg font-semibold tabular-nums ${x.alerta ? "text-warning" : ""}`}>
+                  {x.vivo && <span className="h-1.5 w-1.5 rounded-full bg-success" />}{x.n}
                 </div>
                 <div className="text-[10.5px] text-muted-foreground">{x.e}</div>
               </div>

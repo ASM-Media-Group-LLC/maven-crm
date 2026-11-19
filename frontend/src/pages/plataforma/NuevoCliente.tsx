@@ -132,7 +132,7 @@ export function NuevoClienteAsistente({ onClose, onCreado }: { onClose: () => vo
           {PASOS.map((s, i) => (
             <li key={s.k} className="flex flex-1 items-center gap-2">
               <span className={cn("flex h-7 w-7 shrink-0 items-center justify-center rounded-full border text-xs font-semibold",
-                i < paso ? "border-emerald-500/50 bg-emerald-500/15 text-emerald-500" : i === paso ? "border-primary/60 text-primary" : "border-border text-muted-foreground")}>
+                i < paso ? "border-success/50 bg-success/15 text-success" : i === paso ? "border-primary/60 text-primary" : "border-border text-muted-foreground")}>
                 {i < paso ? <Check className="h-3.5 w-3.5" /> : i + 1}
               </span>
               <span className={cn("text-xs font-medium", i === paso ? "text-foreground" : "text-muted-foreground")}>{t(`plataforma.nuevo.paso.${s.k}`)}</span>
@@ -248,7 +248,7 @@ export function NuevoClienteAsistente({ onClose, onCreado }: { onClose: () => vo
               </label>
               <label className="flex items-center gap-2 text-sm">
                 <span className="text-muted-foreground">{t("plataforma.marca.color")}</span>
-                <input type="color" value={color} onChange={(e) => setColor(e.target.value)} className="h-9 w-12 cursor-pointer rounded-md border border-border bg-transparent" />
+                <input type="color" value={color} onChange={(e) => setColor(e.target.value)} className="h-9 w-12 cursor-pointer rounded-control border border-border bg-transparent" />
               </label>
             </div>
             <div className="vidrio overflow-hidden">

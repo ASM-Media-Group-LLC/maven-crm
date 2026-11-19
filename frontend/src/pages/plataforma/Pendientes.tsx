@@ -83,7 +83,7 @@ export function PendientesDelCliente({ org, marca }: { org: string; marca: Marca
   if (hechos === items.length) return null;
 
   return (
-    <section className={cn("vidrio p-5", prep && "border-amber-500/40")} data-pendientes>
+    <section className={cn("vidrio p-5", prep && "border-warning/40")} data-pendientes>
       <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
@@ -98,7 +98,7 @@ export function PendientesDelCliente({ org, marca }: { org: string; marca: Marca
         {items.map((i) => (
           <div key={i.k} className="flex flex-wrap items-center gap-3 border-t border-border/60 py-2.5 sm:flex-nowrap" data-item={i.k} data-hecho={i.hecho}>
             <span className={cn("flex h-6 w-6 shrink-0 items-center justify-center rounded-full border",
-              i.hecho ? "border-emerald-500/50 bg-emerald-500/15 text-emerald-500" : "border-muted-foreground/40 text-transparent")}>
+              i.hecho ? "border-success/50 bg-success/15 text-success" : "border-muted-foreground/40 text-transparent")}>
               <Check className="h-3.5 w-3.5" />
             </span>
             <div className="min-w-0 flex-1">
@@ -150,7 +150,7 @@ function DialogoMarca({ org, marca, onClose }: { org: string; marca: MarcaOrgani
               <ImagePlus className="h-4 w-4 text-primary" />{logo ? t("plataforma.marca.cambiarLogo") : t("plataforma.marca.subirLogo")}
               <input type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml" className="hidden" onChange={(e) => elegir(e.target.files?.[0])} />
             </label>
-            <input type="color" value={color} onChange={(e) => setColor(e.target.value)} aria-label={t("plataforma.marca.color")} className="h-10 w-12 cursor-pointer rounded-md border border-border bg-transparent" />
+            <input type="color" value={color} onChange={(e) => setColor(e.target.value)} aria-label={t("plataforma.marca.color")} className="h-10 w-12 cursor-pointer rounded-control border border-border bg-transparent" />
           </div>
           <div className="overflow-hidden rounded-xl border border-border/60"><LogoDeCliente nombre={nombre || "?"} logo={logo} color={color} alto="h-[100px]" /></div>
           <div className="flex justify-end gap-2">

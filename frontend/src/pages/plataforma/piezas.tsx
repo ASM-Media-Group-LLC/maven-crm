@@ -16,13 +16,13 @@ export function Baldosa({ valor, etiqueta, vivo, tono, pie, className }: {
 }) {
   return (
     <div className={cn("vidrio p-4 min-w-0", className)}>
-      <div className="text-[11.5px] font-medium uppercase tracking-wide text-muted-foreground">{etiqueta}</div>
+      <div className="text-[11.5px] font-medium text-muted-foreground">{etiqueta}</div>
       <div className={cn(
         "mt-1 flex items-center gap-2 text-2xl font-semibold tabular-nums leading-tight",
-        tono === "alerta" && "text-amber-500",
-        tono === "mal" && "text-red-500",
+        tono === "alerta" && "text-warning",
+        tono === "mal" && "text-destructive",
       )}>
-        {vivo && <span className="h-2 w-2 rounded-full bg-emerald-500 shadow-[0_0_10px] shadow-emerald-500/70" aria-hidden />}
+        {vivo && <span className="h-2 w-2 rounded-full bg-success shadow-[0_0_10px] shadow-success/70" aria-hidden />}
         {valor}
       </div>
       {pie && <div className="mt-1.5 text-xs text-muted-foreground">{pie}</div>}
@@ -33,7 +33,7 @@ export function Baldosa({ valor, etiqueta, vivo, tono, pie, className }: {
 /** Barra de uso (personas del plan): verde → ámbar al 85 % → rojo lleno. */
 export function BarraDeUso({ usadas, total, className }: { usadas: number; total: number; className?: string }) {
   const pct = total > 0 ? Math.min(100, Math.round((usadas / total) * 100)) : 0;
-  const color = usadas >= total ? "bg-red-500" : pct >= 85 ? "bg-amber-500" : "bg-emerald-500";
+  const color = usadas >= total ? "bg-destructive" : pct >= 85 ? "bg-warning" : "bg-success";
   return (
     <div className={cn("h-2 w-full overflow-hidden rounded-full bg-muted", className)} role="progressbar" aria-valuenow={usadas} aria-valuemin={0} aria-valuemax={total}>
       <div className={cn("h-full rounded-full transition-[width]", color)} style={{ width: `${pct}%` }} />
@@ -46,12 +46,12 @@ export function Chip({ children, tono = "neutro", punto, className }: {
 }) {
   const tonos = {
     neutro: "border-border/70 text-muted-foreground bg-background/50",
-    bien: "border-emerald-500/30 text-emerald-600 dark:text-emerald-300 bg-emerald-500/10",
-    alerta: "border-amber-500/35 text-amber-700 dark:text-amber-300 bg-amber-500/10",
-    mal: "border-red-500/35 text-red-600 dark:text-red-300 bg-red-500/10",
+    bien: "border-success/30 text-success bg-success/10",
+    alerta: "border-warning/35 text-warning bg-warning/10",
+    mal: "border-destructive/35 text-destructive bg-destructive/10",
     acento: "border-primary/40 text-primary bg-background/50",
   } as const;
-  const puntos = { neutro: "bg-muted-foreground/60", bien: "bg-emerald-500", alerta: "bg-amber-500", mal: "bg-red-500", acento: "bg-primary" } as const;
+  const puntos = { neutro: "bg-muted-foreground/60", bien: "bg-success", alerta: "bg-warning", mal: "bg-destructive", acento: "bg-primary" } as const;
   return (
     <span className={cn("inline-flex items-center gap-1.5 rounded-full border px-2.5 py-[3px] text-[11px] font-semibold backdrop-blur-md", tonos[tono], className)}>
       {punto && <span className={cn("h-1.5 w-1.5 rounded-full", puntos[tono])} aria-hidden />}
@@ -94,7 +94,7 @@ export function ErrorConReintento({ error, onReintentar }: { error: unknown; onR
   const texto = useTextoDeError();
   return (
     <div className="vidrio flex flex-col items-start gap-3 p-6 text-sm" role="alert">
-      <div className="flex items-center gap-2 font-medium"><AlertTriangle className="h-4 w-4 text-amber-500" />{t("plataforma.cargaFallo")}</div>
+      <div className="flex items-center gap-2 font-medium"><AlertTriangle className="h-4 w-4 text-warning" />{t("plataforma.cargaFallo")}</div>
       <p className="text-muted-foreground">{texto(error)}</p>
       <Button variant="outline" size="sm" onClick={onReintentar}><RotateCw className="mr-1.5 h-3.5 w-3.5" />{t("plataforma.reintentar")}</Button>
     </div>

@@ -2,6 +2,7 @@ import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { ArrowLeft, CreditCard, Download, Lock, Receipt } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Page } from "@/components/ui/page";
 import { useLanguage } from "@/hooks/useLanguage";
 import { DIAS_DE_GRACIA, formatoUsd } from "@/lib/plataforma/planes";
 import { usePlataforma } from "./contexto";
@@ -31,6 +32,7 @@ export default function MiPlanYPagos() {
   const portalStripe = () => undefined;
 
   return (
+    <Page>
     <div className="flex flex-col gap-5" data-plan-y-pagos>
       <Link to={volver} className="inline-flex w-fit items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground">
         <ArrowLeft className="h-4 w-4" />{t("plataforma.nav.miEmpresa")}
@@ -85,10 +87,26 @@ export default function MiPlanYPagos() {
           {cobro.facturas.length === 0 ? (
             <p className="py-6 text-center text-sm text-muted-foreground">{t("plataforma.pagos.sinFacturas")}</p>
           ) : (
-            <div className="overflow-x-auto">
+            <>
+            {/* Teléfono: una tarjeta por factura. */}
+            <ul className="flex flex-col gap-2 md:hidden">
+              {cobro.facturas.map((f) => (
+                <li key={f.id} className="flex items-center justify-between gap-3 rounded-panel border border-border/50 bg-background/30 p-3 text-sm">
+                  <div className="min-w-0">
+                    <div className="font-medium">{t(`plataforma.pagos.concepto.${f.concepto}`)}</div>
+                    <div className="text-xs text-muted-foreground">{fechaCorta(f.fecha, language)}</div>
+                  </div>
+                  <div className="flex flex-col items-end gap-1">
+                    <span className="font-semibold tabular-nums">{formatoUsd(f.monto_usd)}</span>
+                    <Chip tono={f.estado === "pagada" ? "bien" : f.estado === "fallida" ? "mal" : "alerta"} punto>{t(`plataforma.pagos.estado.${f.estado}`)}</Chip>
+                  </div>
+                </li>
+              ))}
+            </ul>
+            <div className="hidden overflow-x-auto md:block">
               <table className="w-full min-w-[560px] text-sm">
                 <thead>
-                  <tr className="text-left text-[11px] uppercase tracking-wide text-muted-foreground">
+                  <tr className="text-left text-[11px] text-muted-foreground">
                     <th className="pb-2 font-medium">{t("plataforma.pagos.col.fecha")}</th>
                     <th className="pb-2 font-medium">{t("plataforma.pagos.col.concepto")}</th>
                     <th className="pb-2 font-medium">{t("plataforma.pagos.col.monto")}</th>
@@ -115,10 +133,12 @@ export default function MiPlanYPagos() {
                 </tbody>
               </table>
             </div>
+            </>
           )}
           <p className="mt-3 text-xs text-muted-foreground">{t("plataforma.pagos.pie")}</p>
         </section>
       )}
     </div>
+    </Page>
   );
 }
