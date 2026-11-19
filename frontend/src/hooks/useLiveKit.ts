@@ -1935,7 +1935,7 @@ export function useLiveKit() {
         if (roomRef.current !== room) { window.clearInterval(relojVoz); return; }
         if (room.localParticipant?.isSpeaking) anotarVoz();
       }, 1000);
-      room.once(RoomEvent.Disconnected, () => window.clearInterval(relojVoz));
+      room.on(RoomEvent.Disconnected, () => window.clearInterval(relojVoz));
 
       // El desbloqueo de ESTA Room, para que la libreria pueda levantar el
       // contexto de audio suspendido cuando llegue el gesto. Sin esto, el
