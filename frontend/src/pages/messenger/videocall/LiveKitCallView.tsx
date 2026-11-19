@@ -590,10 +590,10 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
           const calidad = ajustarYa
             ? calidadDeCamara({ fijado: p.sid === pinnedSid, hablando: p.isSpeaking, ultimaVezHablo: ultimaVez.get(p.sid), ahora })
             : VideoQuality.HIGH;
-          // App en un equipo de 8 GB o menos (lib/appLiviana.ts) o llamada que va
-          // por TCP porque la red bloquea UDP (lib/redBloqueada.ts): como mucho media.
-          const tope = modoLivianoActivo() || porRedBloqueada();
-          pub.setVideoQuality(tope && calidad === VideoQuality.HIGH ? VideoQuality.MEDIUM : calidad);
+          // App en un equipo de 8 GB o menos (lib/appLiviana.ts): como mucho media.
+          const conTope = modoLivianoActivo() && calidad === VideoQuality.HIGH ? VideoQuality.MEDIUM : calidad;
+          // Llamada por TCP porque la red bloquea UDP (lib/redBloqueada.ts): también media.
+          pub.setVideoQuality(porRedBloqueada() && conTope === VideoQuality.HIGH ? VideoQuality.MEDIUM : conTope);
         } catch { /* la calidad nunca rompe la llamada */ }
       });
     };

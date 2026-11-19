@@ -88,7 +88,7 @@ describe("por TCP el video va chico (guardas del código)", () => {
   });
 
   it("las cámaras ajenas se piden como mucho en la capa media por TCP", () => {
-    expect(vista).toMatch(/const tope = modoLivianoActivo\(\) \|\| porRedBloqueada\(\);/);
-    expect(vista).toMatch(/tope && calidad === VideoQuality\.HIGH \? VideoQuality\.MEDIUM : calidad/);
+    expect(vista).toContain("modoLivianoActivo() && calidad === VideoQuality.HIGH ? VideoQuality.MEDIUM : calidad");
+    expect(vista).toContain("pub.setVideoQuality(porRedBloqueada() && conTope === VideoQuality.HIGH ? VideoQuality.MEDIUM : conTope)");
   });
 });
