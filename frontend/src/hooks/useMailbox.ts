@@ -148,19 +148,56 @@ const SESION_IMAP = {
   refetchOnWindowFocus: false,
 } as const;
 
+// EL CORREO AL INSTANTE (19/11/2026). Antes, al abrir /correo, primero se
+// preguntaba «¿tengo buzón?» y RECIÉN con la respuesta salían las carpetas y la
+// bandeja: dos viajes en fila. Lo último que respondió esa pregunta queda en el
+// navegador (solo la dirección y si está activo: nada de claves; es lo mismo
+// que muestra la vista v_my_mailbox) y se usa de anticipo mientras llega la
+// respuesta de verdad, así la bandeja se pide EN PARALELO. Si el anticipo ya no
+// vale (buzón dado de baja), la respuesta real lo reemplaza enseguida.
+const claveBuzonGuardado = (uid: string) => `maven:buzon:${uid}`;
+
+export function buzonGuardado(uid: string | undefined): Mailbox | undefined {
+  if (!uid) return undefined;
+  try {
+    const crudo = localStorage.getItem(claveBuzonGuardado(uid));
+    if (!crudo) return undefined;
+    const b = JSON.parse(crudo) as Partial<Mailbox>;
+    return typeof b?.email_address === "string" && b.is_active === true ? (b as Mailbox) : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function guardarBuzon(uid: string, buzon: Mailbox | null) {
+  try {
+    if (buzon?.is_active) {
+      const { email_address, created_at, last_used_at, is_active, has_error } = buzon;
+      localStorage.setItem(claveBuzonGuardado(uid), JSON.stringify({ email_address, created_at, last_used_at, is_active, has_error }));
+    } else {
+      localStorage.removeItem(claveBuzonGuardado(uid));
+    }
+  } catch { /* sin almacenamiento: solo se pierde el anticipo */ }
+}
+
 /** ¿Tiene buzón este usuario? Se provisiona solo al crear la cuenta. */
 export function useMailbox() {
   const { user } = useAuth();
   return useQuery({
     queryKey: ["mailbox", user?.id],
     enabled: !!user,
+    // Anticipo: el buzón que respondió la última vez (ver arriba). Nunca pisa a
+    // la respuesta real, y un FALLO de la consulta se sigue viendo como fallo.
+    placeholderData: () => buzonGuardado(user?.id),
     queryFn: async (): Promise<Mailbox | null> => {
       const { data, error } = await supabase
         .from("v_my_mailbox")
-        .select("*")
+        .select("email_address, created_at, last_used_at, is_active, has_error")
         .maybeSingle();
       if (error) throw error;
-      return (data as Mailbox | null) ?? null;
+      const buzon = (data as Mailbox | null) ?? null;
+      if (user?.id) guardarBuzon(user.id, buzon);
+      return buzon;
     },
   });
 }

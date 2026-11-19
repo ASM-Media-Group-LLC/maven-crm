@@ -1,4 +1,4 @@
-import { Suspense, useEffect } from "react";
+import { lazy, Suspense, useEffect } from "react";
 import { useMiTurno } from "@/hooks/useMiTurno";
 import { AvisoNovedadTurno } from "@/components/turno/AvisoNovedadTurno";
 import type { CSSProperties } from "react";
@@ -15,7 +15,10 @@ import { ChatProvider } from "@/hooks/ChatProvider";
 import { useArgosEscritorio } from "@/hooks/useArgosEscritorio";
 import { TypingInboxProvider } from "@/hooks/useTypingInbox";
 import { MessengerDockProvider } from "@/components/messenger/MessengerDock";
-import AnnouncementPopup from "@/components/dashboard/AnnouncementPopup";
+// El aviso emergente trae react-markdown (~400 KB sin comprimir) y solo se
+// dibuja cuando hay un anuncio pendiente: baja recién ahí, no en el arranque
+// de toda la app (pantallas al instante, 19/11/2026).
+const AnnouncementPopup = lazy(() => import("@/components/dashboard/AnnouncementPopup"));
 import { ArgosVigilante } from "@/components/ArgosVigilante";
 import { AvisoNasCaido } from "@/components/oficina/AvisoNasCaido";
 import { AvisoFueraDeCowork } from "@/components/cowork/AvisoFueraDeCowork";
@@ -146,7 +149,7 @@ const AppShell = () => {
           </main>
         </div>
       </div>
-      {popups.length > 0 && <AnnouncementPopup popups={popups} />}
+      {popups.length > 0 && <Suspense fallback={null}><AnnouncementPopup popups={popups} /></Suspense>}
       {/* Argos vigilante: monitor a nivel de toda la app (cámara propia, sin
           LiveKit). El hook se autogatea (no-admin + interruptores); off por defecto. */}
       <ArgosVigilante />

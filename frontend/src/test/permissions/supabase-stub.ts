@@ -32,9 +32,9 @@ interface StoreState {
 
 // QueryBuilder que implementa la cadena exacta usada por los hooks de produccion:
 //   user_roles:      .select("role").eq("user_id", id).maybeSingle()
-//   roles_config:    .select("id").eq("name", role).eq("is_active", true).maybeSingle()
-//   role_permissions:.select("module, submodule, can_access, data_scope").eq("role_id", id)
-//   role_groups:     .select("is_admin, ...").eq("role_name", role).maybeSingle()
+//   role_permissions:.select("module, …, roles_config!inner(name, is_active)")
+//                     .eq("roles_config.name", role).eq("roles_config.is_active", true)
+//   role_groups:     .select("role_name, is_admin, ...")  (todas las filas, en paralelo al rol)
 class QueryBuilder {
   private filters: Array<[string, unknown]> = [];
 
@@ -52,18 +52,42 @@ class QueryBuilder {
     return this;
   }
 
+  // Un error de la tabla, o de una tabla embebida por la que se filtra
+  // (role_permissions con `roles_config!inner`).
+  private errorDeLaConsulta(): ErrorShape | undefined {
+    const propio = this.store.errors.get(this.table);
+    if (propio) return propio;
+    for (const [col] of this.filters) {
+      if (col.includes(".")) {
+        const e = this.store.errors.get(col.split(".")[0]);
+        if (e) return e;
+      }
+    }
+    return undefined;
+  }
+
   private resolve(): unknown[] {
-    const error = this.store.errors.get(this.table);
+    const error = this.errorDeLaConsulta();
     if (error) return [];
 
     const rows = (this.store as Record<string, unknown[]>)[this.table] ?? [];
     return rows.filter((row) =>
-      this.filters.every(([col, val]) => (row as Record<string, unknown>)[col] === val)
+      this.filters.every(([col, val]) => {
+        // Filtro sobre la tabla embebida: `roles_config.name` se resuelve por
+        // la FK role_permissions.role_id → roles_config.id.
+        if (col.includes(".")) {
+          const [rel, campo] = col.split(".");
+          const relacionadas = (this.store as unknown as Record<string, unknown[]>)[rel] ?? [];
+          const fila = relacionadas.find((r) => (r as Record<string, unknown>).id === (row as Record<string, unknown>).role_id);
+          return !!fila && (fila as Record<string, unknown>)[campo] === val;
+        }
+        return (row as Record<string, unknown>)[col] === val;
+      })
     );
   }
 
   async maybeSingle(): Promise<{ data: unknown; error: ErrorShape | null }> {
-    const tableError = this.store.errors.get(this.table);
+    const tableError = this.errorDeLaConsulta();
     if (tableError) return { data: null, error: tableError };
 
     const rows = this.resolve();
@@ -74,7 +98,7 @@ class QueryBuilder {
   then<T>(
     onfulfilled: (v: { data: unknown[]; error: ErrorShape | null }) => T
   ): Promise<T> {
-    const tableError = this.store.errors.get(this.table);
+    const tableError = this.errorDeLaConsulta();
     if (tableError) {
       return Promise.resolve(onfulfilled({ data: [], error: tableError }));
     }

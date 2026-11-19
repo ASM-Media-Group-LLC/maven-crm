@@ -1,4 +1,4 @@
-import { lazy, Suspense } from "react";
+import { lazy, Suspense, useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
 import { Loader2 } from "lucide-react";
 import { tableroDe } from "@/pages/dashboard/SelectorDeTablero";
@@ -10,13 +10,18 @@ import { usePermissions } from "@/hooks/usePermissions";
 import { useRoleTier } from "@/hooks/useRoleTier";
 import { useEsRh } from "@/hooks/useEsRh";
 
-const ChatterDashboard = lazy(() => import("@/pages/chatters/dashboard/ChatterDashboard"));
+// Los importadores sueltos sirven para PRECARGAR (ver el efecto del Dashboard):
+// lazy() y la precarga piden el mismo módulo, así que es el mismo chunk.
+const cargarChatter = () => import("@/pages/chatters/dashboard/ChatterDashboard");
+const cargarCentro = () => import("@/pages/centro/CentroDeOperaciones");
+const cargarRRHH = () => import("@/pages/dashboard/TableroRRHH");
+const ChatterDashboard = lazy(cargarChatter);
 const EquipoDashboard = lazy(() => import("@/pages/chatters/dashboard/EquipoDashboard"));
 const ManagerDashboard = lazy(() => import("@/pages/manager/ManagerDashboard"));
 const CloserDashboard = lazy(() => import("@/pages/closers/dashboard/CloserDashboard"));
 const DashboardVentas = lazy(() => import("@/pages/Dashboard2"));
-const CentroDeOperaciones = lazy(() => import("@/pages/centro/CentroDeOperaciones"));
-const TableroRRHH = lazy(() => import("@/pages/dashboard/TableroRRHH"));
+const CentroDeOperaciones = lazy(cargarCentro);
+const TableroRRHH = lazy(cargarRRHH);
 
 // Roles que ven el tablero del ADMIN aunque no sean admin. Es una decisión de
 // producto por rol, no una capacidad: Jhon pidió que "operation sales puede
@@ -50,6 +55,18 @@ const Dashboard = () => {
   const { tier, isLoading: tierCargando } = useRoleTier();
   const { esRh, cargando: rhCargando } = useEsRh();
   const [params] = useSearchParams();
+
+  // PANTALLAS AL INSTANTE (19/11/2026): el tablero de cada rol es su propio
+  // chunk y antes se pedía recién cuando llegaban LAS CUATRO consultas de abajo.
+  // Apenas una de ellas ya dice qué tablero toca (chatter, admin, RR. HH.), el
+  // chunk empieza a bajar en paralelo con las que faltan. Solo baja: qué se
+  // dibuja lo sigue decidiendo el repartidor de abajo, igual que antes.
+  useEffect(() => {
+    const precargar = (cargar: () => Promise<unknown>) => { cargar().catch(() => { /* bajará al dibujarse */ }); };
+    if (!isLoading && isChatter) precargar(cargarChatter);
+    else if (!tierCargando && tier === "admin" && !params.get("ver")) precargar(cargarCentro);
+    else if (esRh === true) precargar(cargarRRHH);
+  }, [isLoading, isChatter, tierCargando, tier, esRh, params]);
 
   if (isLoading || permisosCargando || tierCargando || rhCargando) return <Cargando />;
 

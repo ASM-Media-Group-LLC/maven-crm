@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { useCoworkSession, type AdminSessionRow, type SesionFinalizada, type CoworkSessionRow } from "@/hooks/useCoworkSession";
 import { useUserRole } from "@/hooks/useUserRole";
+import { useAuth } from "@/hooks/useAuth";
 import { useRoleTier } from "@/hooks/useRoleTier";
 import { usePermissions } from "@/hooks/usePermissions";
 import { supabase } from "@/integrations/supabase/client";
@@ -34,6 +35,28 @@ import { UserAvatar } from "@/components/UserAvatar";
 import { cn } from "@/lib/utils";
 import { ATASCO_MS, anotarAtasco, marcarRecargaPorAtasco, queHacerConElAtasco, tomarAtascoPrevio, ultimaRecargaPorAtasco } from "@/lib/coworkAtascado";
 
+type MiSesionActiva = { id: string; name: string; description: string | null; role: string; members: number; created_at: string; lastRoomId: string | null; createdBy: string | null };
+
+// LA PORTADA AL INSTANTE (19/11/2026). Lo último que se vio en la portada de
+// Cowork queda en memoria de la pestaña (no en el navegador: se va al cerrarla).
+// Al volver a /cowork se dibuja eso de una vez —y quien trabaja en un solo Cowork
+// entra al suyo sin ruedita— mientras la lista fresca se pide igual que siempre
+// y reemplaza a la guardada al llegar. Vence a los 10 minutos y es por persona.
+const PORTADA_VIGENTE_MS = 10 * 60_000;
+const portadaGuardada: {
+  uid: string | null; t: number;
+  mias: MiSesionActiva[] | null; finalizadas: SesionFinalizada[]; todas: AdminSessionRow[];
+} = { uid: null, t: 0, mias: null, finalizadas: [], todas: [] };
+function portadaDe(uid: string | null | undefined) {
+  if (!uid || portadaGuardada.uid !== uid || Date.now() - portadaGuardada.t > PORTADA_VIGENTE_MS) return null;
+  return portadaGuardada;
+}
+function guardarPortada(uid: string | null | undefined, cambio: Partial<Pick<typeof portadaGuardada, "mias" | "finalizadas" | "todas">>) {
+  if (!uid) return;
+  if (portadaGuardada.uid !== uid) Object.assign(portadaGuardada, { uid, mias: null, finalizadas: [], todas: [] });
+  Object.assign(portadaGuardada, cambio, { t: Date.now() });
+}
+
 export default function CoworkPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const sessionId = searchParams.get("session");
@@ -48,9 +71,12 @@ export default function CoworkPage() {
   const [autoJoinFailed, setAutoJoinFailed] = useState(false);
   
   const [userId, setUserId] = useState<string | null>(null);
-  const [mySessions, setMySessions] = useState<Array<{ id: string; name: string; description: string | null; role: string; members: number; created_at: string; lastRoomId: string | null; createdBy: string | null }>>([]);
-  const [finalizadas, setFinalizadas] = useState<SesionFinalizada[]>([]);
-  const [loadingSessions, setLoadingSessions] = useState(true);
+  // Quién es, para la portada guardada (ver portadaGuardada arriba).
+  const uidSesion = useAuth()?.user?.id ?? null;
+  const [guardada] = useState(() => portadaDe(uidSesion));
+  const [mySessions, setMySessions] = useState<MiSesionActiva[]>(guardada?.mias ?? []);
+  const [finalizadas, setFinalizadas] = useState<SesionFinalizada[]>(guardada?.finalizadas ?? []);
+  const [loadingSessions, setLoadingSessions] = useState(!guardada?.mias);
   const [roomCode, setRoomCode] = useState("");
   const [joiningByCode, setJoiningByCode] = useState(false);
 
@@ -63,7 +89,7 @@ export default function CoworkPage() {
   // esto era solo-admin y un rol con "Todos los datos" veía únicamente las suyas.
   const { dataScope, isLoading: alcanceCargando, hayError: alcanceFallo } = usePermissions();
   const veTodasLasSesiones = isAdmin || dataScope("Cowork") !== "self";
-  const [allSessions, setAllSessions] = useState<AdminSessionRow[]>([]);
+  const [allSessions, setAllSessions] = useState<AdminSessionRow[]>(guardada?.todas ?? []);
   const [enteringId, setEnteringId] = useState<string | null>(null);
 
   const cowork = useCoworkSession(sessionId);
@@ -90,18 +116,19 @@ export default function CoworkPage() {
   useEffect(() => {
     if (sessionId) return;
     let alive = true;
-    setLoadingSessions(true);
+    // Con la portada guardada no hay ruedita: se ve lo guardado y se refresca.
+    if (!portadaDe(uidSesion)?.mias) setLoadingSessions(true);
     cowork.listMyActiveSessions()
-      .then((s) => { if (alive) setMySessions(s); })
+      .then((s) => { if (alive) { setMySessions(s); guardarPortada(uidSesion, { mias: s }); } })
       .catch(() => { /* noop */ })
       .finally(() => { if (alive) setLoadingSessions(false); });
     // Y las finalizadas hace poco, con quién las finalizó: la pregunta que hoy
     // se hace por chat ("¿quién cerró la sala?") se contesta acá.
     cowork.listMyEndedSessions()
-      .then((s) => { if (alive) setFinalizadas(s); })
+      .then((s) => { if (alive) { setFinalizadas(s); guardarPortada(uidSesion, { finalizadas: s }); } })
       .catch(() => { /* si el RPC aún no existe, la sección no se dibuja */ });
     return () => { alive = false; };
-  }, [sessionId, cowork.listMyActiveSessions, cowork.listMyEndedSessions]);
+  }, [sessionId, cowork.listMyActiveSessions, cowork.listMyEndedSessions, uidSesion]);
 
   // Quien trabaja en UN solo Cowork (el de su departamento, 13/11/2026) no tiene
   // nada que elegir: se le abre el suyo directo. Los que ven varias (admins,
@@ -143,14 +170,14 @@ export default function CoworkPage() {
     let alive = true;
     const load = () => {
       cowork.adminListSessions()
-        .then((s) => { if (alive) setAllSessions(s); })
+        .then((s) => { if (alive) { setAllSessions(s); guardarPortada(uidSesion, { todas: s }); } })
         .catch(() => { /* sin permiso o edge caído: la sección no se dibuja */ });
     };
     load();
     // Solo refresca la lista de sesiones mientras se mira la pantalla.
     const t = setInterval(() => { if (document.visibilityState === "visible") load(); }, 30000);
     return () => { alive = false; clearInterval(t); };
-  }, [sessionId, veTodasLasSesiones, cowork.adminListSessions]);
+  }, [sessionId, veTodasLasSesiones, cowork.adminListSessions, uidSesion]);
 
   // La lista única. Para quien ve todas (admin, o data_scope de Cowork en
   // "todos"/"subordinados") la base es adminListSessions (con ocupación en vivo y
@@ -226,6 +253,7 @@ export default function CoworkPage() {
     try {
       await cowork.endSessionById(porFinalizar.id);
       setMySessions((prev) => prev.filter((s) => s.id !== porFinalizar.id));
+      guardarPortada(uidSesion, { mias: (portadaDe(uidSesion)?.mias ?? []).filter((s) => s.id !== porFinalizar.id) });
       toast.success(t("cowork.page.ended"));
       setPorFinalizar(null);
       cowork.listMyEndedSessions().then(setFinalizadas).catch(() => {});
@@ -247,6 +275,7 @@ export default function CoworkPage() {
     try {
       await cowork.leaveSessionById(porSalir.id);
       setMySessions((prev) => prev.filter((s) => s.id !== porSalir.id));
+      guardarPortada(uidSesion, { mias: (portadaDe(uidSesion)?.mias ?? []).filter((s) => s.id !== porSalir.id) });
       toast.success(t("cowork.page.left", { name: porSalir.name }));
       setPorSalir(null);
     } catch (e) {

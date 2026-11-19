@@ -16,6 +16,7 @@ import { instalarFormatoHora } from "./lib/formatoHora";
 import { irAlDominioCanonico } from "./lib/dominioCanonico";
 import { traducir, cargarIdioma } from "./lib/i18n";
 import { idiomaInicial } from "./hooks/useLanguage";
+import { precargarRutaActual } from "./lib/prefetchRutas";
 
 // Una sola URL: quien entre por maven-ai.me o www.maven-ai.me termina en
 // app.maven-ai.me con la misma ruta. Va PRIMERO, antes de aplicar tema o montar
@@ -161,5 +162,8 @@ if (isInIframe) {
 // Las traducciones van en un paquete por idioma (lib/i18n.ts). Se baja el de
 // esta persona ANTES de pintar, así la primera pantalla ya sale traducida. Si
 // falla la red, se pinta igual (t() muestra lo que haya).
+// El chunk de la sección donde arranca la app baja YA, en paralelo con la
+// sesión, el idioma y los permisos (lib/prefetchRutas → precargarRutaActual).
+precargarRutaActual();
 const raizDeLaApp = createRoot(document.getElementById("root")!);
 void cargarIdioma(idiomaInicial()).finally(() => raizDeLaApp.render(<App />));

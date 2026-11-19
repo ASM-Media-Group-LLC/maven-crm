@@ -18,9 +18,9 @@ describe("permisos: fallo ≠ vacío", () => {
     expect(permisos.length).toBeGreaterThan(500);
     expect(rol.length).toBeGreaterThan(500);
   });
-  it("la consulta a roles_config lanza si falla, antes de concluir 'sin configurar'", () => {
-    const i = permisos.indexOf("if (rcError) throw rcError;");
-    const j = permisos.indexOf("if (!roleConfig) return [];");
+  it("la consulta de permisos (con su roles_config) lanza si falla, antes de concluir 'sin configurar'", () => {
+    const i = permisos.indexOf("if (error) throw error;");
+    const j = permisos.indexOf("if (!data) return [];");
     expect(i).toBeGreaterThan(-1);
     expect(i).toBeLessThan(j);
   });
