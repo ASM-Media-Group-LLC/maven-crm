@@ -167,7 +167,7 @@ export default function () {
   let e = estado[vu];
   if (!e || !e.token || exec.vu.iterationInInstance % 40 === 39) {
     e = entrar(n, pos);
-    if (!e) { sleep(5); return; }
+    if (!e) { sleep(20 + Math.random() * 20); return; }
     estado[vu] = e;
     cargarApp(e, pos);
     if (PERFIL[pos].messenger_lista) ACCION.messenger_lista(e, pos);
