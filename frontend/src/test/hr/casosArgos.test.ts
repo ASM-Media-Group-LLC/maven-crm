@@ -111,3 +111,15 @@ describe("la base: casos, frase y avisos", () => {
     expect(sql).toMatch(/obligado'\) and not public\.es_dueno/);
   });
 });
+
+const carteles = import.meta.glob(["../../components/hr/CasosObligatorios.tsx", "../../components/horarios/HorariosObligatorios.tsx"], {
+  query: "?raw", import: "default", eager: true,
+}) as Record<string, string>;
+
+describe("los carteles no tapan «Marcar entrada»", () => {
+  it("esperan a que la persona esté en turno", () => {
+    const fuentes = Object.values(carteles);
+    expect(fuentes).toHaveLength(2);
+    for (const src of fuentes) expect(src).toMatch(/if \(!b\?\.debe \|\| !enTurno\) return null;/);
+  });
+});

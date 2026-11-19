@@ -1,6 +1,7 @@
 import { Gavel } from "lucide-react";
 import { useLanguage } from "@/hooks/useLanguage";
 import { useCasosBloqueo } from "@/hooks/useCasosArgos";
+import { useEnTurno } from "@/lib/turnoActivo";
 import { CasosPendientes } from "@/components/hr/RevisionCasos";
 
 // CARTEL QUE NO SE QUITA (Alvaro, 19/11/2026): a quien su puesto obliga a
@@ -8,12 +9,15 @@ import { CasosPendientes } from "@/components/hr/RevisionCasos";
 // tapa la pantalla mientras queden casos de días que ya terminaron sin juzgar.
 // Se juzga ahí mismo y se va solo al terminar. Si la consulta falla, no bloquea
 // a nadie (un fallo no es «tienes pendientes»). El dueño nunca lo ve.
+// Desde el 20/11 hay que marcar entrada: el cartel espera a que la persona esté
+// en turno, si no le taparía el botón de «Marcar entrada».
 
 export function CasosObligatorios() {
   const { t } = useLanguage();
   const q = useCasosBloqueo();
+  const enTurno = useEnTurno();
   const b = q.data;
-  if (!b?.debe) return null;
+  if (!b?.debe || !enTurno) return null;
   const listos = Math.max(0, b.total - b.pendientes);
   const pct = b.total > 0 ? Math.round((listos / b.total) * 100) : 0;
   return (
