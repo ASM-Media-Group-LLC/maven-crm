@@ -1,0 +1,118 @@
+name: Edificio · funciones (maven-agencias)
+
+# TREN DE AGENCIAS · VAGÓN 1 «EDIFICIO VIVO» (19/11/2026).
+# Publica en el EDIFICIO (maven-agencias, ezeigddgkaemxpshghmu) las funciones edge
+# que Maven necesita para clientes nuevos. La lista vive en
+# infra/casas/funciones-edificio.txt: quedan fuera las integraciones propias de Kash
+# (Blu, chatters, closers, promolog, scouter, WhatsApp, Telegram, Zoho, creadoras…).
+#
+# Igual que «Deploy Edge Functions» (que es el de Kash y no se toca), pero:
+#   · solo a mano (workflow_dispatch);
+#   · la base está escrita aquí y el candado aborta si fuera la de Kash;
+#   · solo publica funciones de la lista del edificio.
+# verify_jwt sale de supabase/config.toml, igual que en Kash.
+
+on:
+  workflow_dispatch:
+    inputs:
+      funciones:
+        description: 'Solo estas (separadas por espacio). Vacío = toda la lista del edificio'
+        required: false
+        default: ''
+
+concurrency:
+  group: edificio-funciones
+  cancel-in-progress: false
+
+env:
+  EDIFICIO_REF: ezeigddgkaemxpshghmu
+  SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
+jobs:
+  publicar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Candado — solo el edificio, nunca Kash
+        run: |
+          set -euo pipefail
+          source infra/casas/guarda-kash.sh
+          solo_edificio "$EDIFICIO_REF"
+          [ -n "${SUPABASE_ACCESS_TOKEN:-}" ] || { echo "::error::Falta el secret SUPABASE_ACCESS_TOKEN"; exit 1; }
+
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: 2.110.0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Deno
+        uses: denoland/setup-deno@v2
+        with:
+          deno-version: 2.9.5
+
+      # Las mismas guardas que en Kash: si fallan, no se publica nada.
+      - name: Guard — aislamiento entre agencias
+        run: deno test --allow-read --no-check supabase/functions/public-api/ supabase/functions/manage-api-keys/ supabase/functions/messenger-webhooks/
+      - name: Guard — salida de los webhooks
+        run: deno test --allow-read supabase/functions/_shared/webhook-salida.test.ts
+      - name: Guard — web-push
+        run: deno test --allow-read supabase/functions/web-push/ supabase/functions/_shared/push-notify.test.ts
+
+      - name: Qué funciones
+        id: cuales
+        env:
+          PEDIDAS: ${{ github.event.inputs.funciones }}
+        run: |
+          set -euo pipefail
+          LISTA="$(sed 's/#.*//' infra/casas/funciones-edificio.txt | tr -s ' \t' '\n' | grep -v '^$' | sort -u)"
+          if [ -z "${PEDIDAS// /}" ]; then
+            FUNCS="$LISTA"
+          else
+            FUNCS=""
+            for fn in $PEDIDAS; do
+              if ! grep -qx "$fn" <<< "$LISTA"; then
+                echo "::error::«$fn» no está en infra/casas/funciones-edificio.txt (es de Kash o no existe): no se publica."
+                exit 1
+              fi
+              FUNCS="$FUNCS $fn"
+            done
+          fi
+          for fn in $FUNCS; do
+            [ -f "supabase/functions/$fn/index.ts" ] || { echo "::error::No existe supabase/functions/$fn"; exit 1; }
+            grep -q "^\[functions\.$fn\]" supabase/config.toml || { echo "::error::$fn no tiene su bloque en supabase/config.toml"; exit 1; }
+          done
+          echo "funcs=$(echo $FUNCS | tr '\n' ' ')" >> "$GITHUB_OUTPUT"
+          echo "Se publican: $(echo $FUNCS | wc -w) funciones"
+
+      - name: Publicar en el edificio (nunca en Kash)
+        run: |
+          set -uo pipefail
+          source infra/casas/guarda-kash.sh
+          solo_edificio "$EDIFICIO_REF"
+          publicar() {
+            local fn="$1" intento
+            for intento in 1 2 3; do
+              if supabase functions deploy "$fn" --project-ref "$EDIFICIO_REF"; then return 0; fi
+              [ "$intento" -lt 3 ] && { echo "::warning::Falló $fn (intento $intento de 3)"; sleep $((intento * 15)); }
+            done
+            return 1
+          }
+          FALLARON=""
+          for fn in ${{ steps.cuales.outputs.funcs }}; do
+            echo "== $fn =="
+            publicar "$fn" || FALLARON="$FALLARON $fn"
+          done
+          if [ -n "${FALLARON// /}" ]; then echo "::error::No se publicaron:$FALLARON"; exit 1; fi
+
+      - name: Lo que quedó publicado en el edificio
+        if: always()
+        run: |
+          set -euo pipefail
+          curl -sS "https://api.supabase.com/v1/projects/$EDIFICIO_REF/functions" \
+            -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
+            | jq -r '.[] | "\(.slug)\tv\(.version)\tverify_jwt=\(.verify_jwt)"' | sort | tee -a "$GITHUB_STEP_SUMMARY"
