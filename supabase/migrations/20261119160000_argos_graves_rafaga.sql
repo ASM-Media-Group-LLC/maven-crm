@@ -158,9 +158,9 @@ declare
   r record;
   g public.argos_graves%rowtype;
   n integer := 0;
-  nombre text;
-  titulo text;
-  msg text;
+  v_nombre text;
+  v_titulo text;
+  v_msg text;
   min_txt text;
 begin
   -- Quién se mide: la app de computador reportó en los últimos 3 min, está en
@@ -208,13 +208,13 @@ begin
    group by user_id;
 
   -- 1) Cerrar lo que ya volvió (o quien ya no se mide: salió, pausa, fin de turno).
-  update public.argos_graves g
+  update public.argos_graves ag
      set cerrada_at = now()
-   where g.cerrada_at is null
+   where ag.cerrada_at is null
      and (
-       not exists (select 1 from _graves_medida m where m.user_id = g.user_id)
-       or (g.tipo = 'sin_actividad' and exists (select 1 from _graves_medida m where m.user_id = g.user_id and coalesce(m.ultimo_inac, 0) < 0.5))
-       or (g.tipo = 'fuera_del_trabajo' and exists (select 1 from _graves_medida m where m.user_id = g.user_id and m.aj10 < 0.3 * greatest(m.cub10, 1)))
+       not exists (select 1 from _graves_medida m where m.user_id = ag.user_id)
+       or (ag.tipo = 'sin_actividad' and exists (select 1 from _graves_medida m where m.user_id = ag.user_id and coalesce(m.ultimo_inac, 0) < 0.5))
+       or (ag.tipo = 'fuera_del_trabajo' and exists (select 1 from _graves_medida m where m.user_id = ag.user_id and m.aj10 < 0.3 * greatest(m.cub10, 1)))
      );
 
   -- 2) Abrir (o seguir) episodios.
@@ -226,7 +226,7 @@ begin
      where m.aj60 >= 3000 and m.aj10 >= 0.5 * greatest(m.cub10, 1)
        and public.tiene_funcion(m.user_id, 'N:argos.apps_ajenas') and not public.es_dueno(m.user_id)
   loop
-    select coalesce(nullif(btrim(p.full_name), ''), 'Alguien') into nombre from public.profiles p where p.id = r.user_id;
+    select coalesce(nullif(btrim(p.full_name), ''), 'Alguien') into v_nombre from public.profiles p where p.id = r.user_id;
     -- «found» mira la última consulta: por eso la del episodio va justo antes del if.
     select * into g from public.argos_graves
      where user_id = r.user_id and tipo = r.tipo and cerrada_at is null;
@@ -260,13 +260,13 @@ begin
       if g.escalada_at is null and g.abierta_at <= now() - interval '2 minutes' then
         update public.argos_graves set escalada_at = now() where id = g.id;
         min_txt := g.minutos::text;
-        titulo := case when r.tipo = 'sin_actividad'
-                       then 'Alerta grave: ' || nombre || ' lleva ' || min_txt || ' min sin actividad'
-                       else 'Alerta grave: ' || nombre || ' lleva ' || min_txt || ' min fuera de su trabajo' end;
-        msg := case when r.tipo = 'sin_actividad'
+        v_titulo := case when r.tipo = 'sin_actividad'
+                       then 'Alerta grave: ' || v_nombre || ' lleva ' || min_txt || ' min sin actividad'
+                       else 'Alerta grave: ' || v_nombre || ' lleva ' || min_txt || ' min fuera de su trabajo' end;
+        v_msg := case when r.tipo = 'sin_actividad'
                     then 'En turno, sin tocar teclado ni ratón. Ya se le avisó y no volvió. Tócalo para verlo en vivo.'
                     else coalesce(g.detalle, 'Apps ajenas') || '. Ya se le avisó y sigue. Tócalo para verlo en vivo.' end;
-        perform public.argos_caso_avisar(d.uid, 'argos_grave', titulo, msg, '/hr/en-vivo/' || r.user_id, g.id, 'high')
+        perform public.argos_caso_avisar(d.uid, 'argos_grave', v_titulo, v_msg, '/hr/en-vivo/' || r.user_id, g.id, 'high')
           from (
             select o.user_id as uid from public.tenant_owners o
               join public.tenant_members m on m.tenant_id = o.tenant_id
