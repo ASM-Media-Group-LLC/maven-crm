@@ -123,7 +123,8 @@ await foto(42, H0, "Maven · chat", { juzgada_por: "argos" });
 await app(40, "Microsoft Edge", "Mensajes — OnlyFans y 1 página más");
 const lista = await foto(40, H_LEJOS);
 await app(37, "Desktop management app built by Exoplanet", "Blu App");
-const blu = await foto(37, H0 + "");
+// Pantalla distinta de la anterior (si fuera igual, se copia: es lo mismo que ya se vio).
+const blu = await foto(37, H_LEJOS);
 await app(34, "Maven", "Maven");
 const maven = await foto(34, H_LEJOS);
 await app(31, "Brave Browser", "Rubius - YouTube");
