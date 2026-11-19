@@ -51,9 +51,10 @@ const browser = await chromium.launch({
     // «localhost» → el Maven de prueba en este mismo servidor (puerto 8080).
     `--host-resolver-rules=MAP localhost ${E.HOST_WEB || "172.17.0.1"}`,
     "--autoplay-policy=no-user-gesture-required", "--no-sandbox",
+    "--disable-gpu", "--disable-smooth-scrolling", "--disable-background-timer-throttling",
   ],
 });
-const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 }, permissions: ["camera", "microphone"] });
+const ctx = await browser.newContext({ viewport: { width: 1100, height: 700 }, permissions: ["camera", "microphone"] });
 await ctx.addInitScript(() => {
   window.__pcs = [];
   window.__estados = [];
@@ -69,24 +70,44 @@ await ctx.addInitScript(() => {
   window.RTCPeerConnection = P;
 });
 const page = await ctx.newPage();
+// Modo liviano (LIVIANO=1, por defecto): sin GPU, el vidrio borroso (backdrop-filter)
+// y las animaciones de Maven se comen la CPU del probador (3 Chrome = 95 % en 8
+// núcleos). Se apagan SOLO en este Chrome de prueba: lo que se mide —la llamada,
+// el video que llega, la red— no cambia.
+if ((E.LIVIANO || "1") === "1") {
+  await page.addInitScript(() => {
+    const css = "*,*::before,*::after{backdrop-filter:none!important;-webkit-backdrop-filter:none!important;animation:none!important;transition:none!important;filter:none!important}";
+    const poner = () => { const st = document.createElement("style"); st.textContent = css; (document.head || document.documentElement).appendChild(st); };
+    if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", poner); else poner();
+  });
+}
 if (E.MODO_PASE === "plan_b") {
-  const salaR = await fetch(`${E.SIM_URL}/rest/v1/cowork_rooms?select=livekit_room_name&id=eq.${E.ROOM}`,
-    { headers: { apikey: E.SIM_ANON, Authorization: `Bearer ${sesion.access_token}` } });
-  const salaLk = ((await salaR.json())[0] || {}).livekit_room_name;
+  // El nombre de la sala en LiveKit se busca AL MOMENTO del pase: antes de que
+  // Maven la una al Cowork, la base no le deja ver la sala (RLS) y salía vacío.
+  let salaLk = null;
+  const buscarSala = async () => {
+    if (salaLk) return salaLk;
+    const salaR = await fetch(`${E.SIM_URL}/rest/v1/cowork_rooms?select=livekit_room_name&id=eq.${E.ROOM}`,
+      { headers: { apikey: E.SIM_ANON, Authorization: `Bearer ${sesion.access_token}` } });
+    salaLk = ((await salaR.json().catch(() => []))[0] || {}).livekit_room_name || null;
+    return salaLk;
+  };
   const uid = sesion.user.id, nombre = (sesion.user.user_metadata || {}).full_name || EMAIL;
   const lkUrl = E.SIM_LK_URL || "ws://144.126.155.175:7880";
   await page.route("**/functions/v1/cowork-session", async (route) => {
     let b = {}; try { b = route.request().postDataJSON() || {}; } catch (_) {}
-    if (b.action === "issueLiveKitToken" && salaLk) {
+    const sala = b.action === "issueLiveKitToken" ? await buscarSala() : null;
+    if (b.action === "issueLiveKitToken" && b.purpose && b.purpose !== "join_room") console.log("pase pedido para", b.purpose);
+    if (b.action === "issueLiveKitToken" && sala) {
       return route.fulfill({ status: 200, contentType: "application/json", headers: { "access-control-allow-origin": "*" },
-        body: JSON.stringify({ token: pase(`${uid}_${b.clientId || "t"}`, nombre, salaLk), url: lkUrl, room: salaLk }) });
+        body: JSON.stringify({ token: pase(`${uid}_${b.clientId || "t"}`, nombre, sala), url: lkUrl, room: sala }) });
     }
     return route.continue();
   });
   await page.route("**/functions/v1/livekit-token", async (route) => {
     let b = {}; try { b = route.request().postDataJSON() || {}; } catch (_) {}
     return route.fulfill({ status: 200, contentType: "application/json", headers: { "access-control-allow-origin": "*" },
-      body: JSON.stringify({ token: pase(`${uid}_lk`, nombre, b.roomName || salaLk), url: lkUrl }) });
+      body: JSON.stringify({ token: pase(`${uid}_lk`, nombre, b.roomName || (await buscarSala())), url: lkUrl }) });
   });
 }
 const consola = [];

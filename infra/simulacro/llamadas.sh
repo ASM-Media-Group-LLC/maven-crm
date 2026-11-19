@@ -16,6 +16,8 @@ case "$SIM_URL" in *lsagslbkliprespbyhts*) echo "NUNCA contra producción"; exit
 R=/opt/simulacro/resultados/llamadas-$(date -u +%Y-%m-%d_%H%M)
 mkdir -p "$R"
 exec > >(tee -a "$R/bitacora.txt") 2>&1
+# Restos de una corrida anterior (mismos nombres de contenedor).
+docker rm -f $(docker ps -aq --filter name=sim-nav- --filter name=sim-sint-) >/dev/null 2>&1
 echo "== Llamadas — empieza $(date -u +%H:%M) UTC"
 declare -A RTT=( [frankfurt]=55 [londres]=45 [madrid]=60 [bogota]=30 [mexico]=20 [saopaulo]=65 [santiago]=75 [miami]=10 [nuevayork]=5 [losangeles]=30 )
 
@@ -23,7 +25,7 @@ declare -A RTT=( [frankfurt]=55 [londres]=45 [madrid]=60 [bogota]=30 [mexico]=20
 T=$(curl -s "$SIM_URL/auth/v1/token?grant_type=password" -H "apikey: $SIM_ANON" -H "Content-Type: application/json" \
   -d "{\"email\":\"sim0160@simulacro.maven.test\",\"password\":\"$SIM_PASS\"}" | python3 -c "import sys,json;print(json.load(sys.stdin)['access_token'])")
 SES=$(curl -s "$SIM_URL/functions/v1/cowork-session" -H "apikey: $SIM_ANON" -H "Authorization: Bearer $T" -H "Content-Type: application/json" \
-  -d '{"action":"createSession","name":"Simulacro llamadas","roomNames":["P1","P2","P3","P4","P5","P6","P7","Cowork 10","Sala 25","Larga 60"]}')
+  -d '{"action":"createSession","name":"Simulacro llamadas '"$(date -u +%H%M%S)"'","roomNames":["P1","P2","P3","P4","P5","P6","P7","Cowork 10","Sala 25","Larga 60"]}')
 echo "$SES" > "$R/sesion.json"
 SESSION=$(echo "$SES" | python3 -c "import sys,json;print(json.load(sys.stdin)['sessionId'])")
 sala() { echo "$SES" | python3 -c "import sys,json;print([r for r in json.load(sys.stdin)['rooms'] if r['name']=='$1'][0]['$2'])"; }
