@@ -42,14 +42,14 @@ describe("en Cowork, cámaras en baja si no habla", () => {
     expect(aplicaCalidadPorVoz("dm_abc")).toBe(false);
     expect(aplicaCalidadPorVoz(null)).toBe(false);
   });
-  it("callado → baja; hablando o fijado → nítida", () => {
-    expect(calidadDeCamara({ fijado: false, hablando: false, ultimaVezHablo: undefined, ahora })).toBe(VideoQuality.LOW);
+  it("callado → media (como Meet: los cuadritos chicos los baja adaptiveStream); hablando o fijado → nítida", () => {
+    expect(calidadDeCamara({ fijado: false, hablando: false, ultimaVezHablo: undefined, ahora })).toBe(VideoQuality.MEDIUM);
     expect(calidadDeCamara({ fijado: false, hablando: true, ultimaVezHablo: undefined, ahora })).toBe(VideoQuality.HIGH);
     expect(calidadDeCamara({ fijado: true, hablando: false, ultimaVezHablo: undefined, ahora })).toBe(VideoQuality.HIGH);
   });
-  it("sigue nítida unos segundos después de callarse, luego baja", () => {
+  it("sigue nítida unos segundos después de callarse, luego baja a media", () => {
     expect(calidadDeCamara({ fijado: false, hablando: false, ultimaVezHablo: ahora - 2_000, ahora })).toBe(VideoQuality.HIGH);
-    expect(calidadDeCamara({ fijado: false, hablando: false, ultimaVezHablo: ahora - NITIDO_TRAS_HABLAR_MS - 1, ahora })).toBe(VideoQuality.LOW);
+    expect(calidadDeCamara({ fijado: false, hablando: false, ultimaVezHablo: ahora - NITIDO_TRAS_HABLAR_MS - 1, ahora })).toBe(VideoQuality.MEDIUM);
   });
 });
 

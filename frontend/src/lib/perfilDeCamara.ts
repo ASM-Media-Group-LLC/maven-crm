@@ -80,16 +80,22 @@ export const CAMARA_LIVIANA: { alta: TopeDeCapa; media: TopeDeCapa; baja: TopeDe
 // La RESOLUCIÓN no baja: quien habla o está fijado se sigue viendo nítido
 // (lib/calidadPorVoz.ts le pide la capa de arriba). Meet con invitados no se toca:
 // ahí la cara importa más y la gente de afuera no es la del problema de subida.
-export const FPS_DE_COWORK = 10;
+//
+// 18/11/2026 (Alvaro: «se me traba la cámara»; eligió «como Meet»): el normal
+// sube a 15 fps, con el bitrate en la misma proporción: 720p@15 / 1 Mbps ·
+// 360p@15 / 350 kbps · 180p@15 / 120 kbps. A 10 fps la cara se veía a saltos.
+// El liviano (equipo flojo o subida lenta) se queda a 10 fps.
+export const FPS_DE_COWORK = 15;
+export const FPS_LIVIANO_COWORK = 10;
 export const CAMARA_COWORK: { alta: Omit<TopeDeCapa, "alto">; media: Omit<TopeDeCapa, "alto">; baja: Omit<TopeDeCapa, "alto"> } = {
-  alta: { maxBitrate: 700_000, maxFramerate: FPS_DE_COWORK },
-  media: { maxBitrate: 250_000, maxFramerate: FPS_DE_COWORK },
-  baja: { maxBitrate: 90_000, maxFramerate: FPS_DE_COWORK },
+  alta: { maxBitrate: 1_000_000, maxFramerate: FPS_DE_COWORK },
+  media: { maxBitrate: 350_000, maxFramerate: FPS_DE_COWORK },
+  baja: { maxBitrate: 120_000, maxFramerate: FPS_DE_COWORK },
 };
 export const CAMARA_LIVIANA_COWORK: { alta: TopeDeCapa; media: TopeDeCapa; baja: TopeDeCapa } = {
-  alta: { alto: 360, maxBitrate: 250_000, maxFramerate: FPS_DE_COWORK },
-  media: { alto: 360, maxBitrate: 220_000, maxFramerate: FPS_DE_COWORK },
-  baja: { alto: 180, maxBitrate: 80_000, maxFramerate: FPS_DE_COWORK },
+  alta: { alto: 360, maxBitrate: 250_000, maxFramerate: FPS_LIVIANO_COWORK },
+  media: { alto: 360, maxBitrate: 220_000, maxFramerate: FPS_LIVIANO_COWORK },
+  baja: { alto: 180, maxBitrate: 80_000, maxFramerate: FPS_LIVIANO_COWORK },
 };
 
 export type PerfilDeCamara = "normal" | "liviano";

@@ -804,22 +804,17 @@ export function useLiveKit() {
     const primera = window.setTimeout(() => { void tomar(); }, 15_000);
     const cada = window.setInterval(() => { void tomar(); }, MUESTRA_CADA_MS);
     // «Tu internet está débil» (lib/internetDebil.ts). Cada 2 s la calidad que
-    // mide LiveKit; cada 6 s, además, si el codificador está limitado por ancho
-    // de banda. Solo un aviso: no se apaga nada.
+    // mide LiveKit. El codificador limitado por ancho de banda ya NO cuenta
+    // (18/11/2026: es normal y hacía saltar el aviso a cada rato). Solo un
+    // aviso: no se apaga nada.
     let debil = DEBIL_INICIAL;
-    let limitadoPorRed = false;
-    let vueltas = 0;
     setInternetDebil(false);
     const vigiaDebil = window.setInterval(() => {
       void (async () => {
         try {
           if (roomRef.current !== room || room.state !== ConnectionState.Connected) return;
           const q = room.localParticipant.connectionQuality;
-          if (++vueltas % 3 === 0) {
-            const [cam, pant] = await Promise.all([leer(Track.Source.Camera), leer(Track.Source.ScreenShare)]);
-            limitadoPorRed = cam?.limite === "bandwidth" || pant?.limite === "bandwidth";
-          }
-          const mala = q === ConnectionQuality.Poor || q === ConnectionQuality.Lost || limitadoPorRed;
+          const mala = q === ConnectionQuality.Poor || q === ConnectionQuality.Lost;
           debil = siguienteDebil(debil, mala, Date.now());
           setInternetDebil(debil.mostrando);
         } catch { /* avisar jamás rompe la llamada */ }

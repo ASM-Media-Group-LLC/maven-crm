@@ -232,12 +232,12 @@ describe("4. Cowork más liviano: todo en vivo, menos cuadros", () => {
     { scaleResolutionDownBy: 1, maxBitrate: 1_700_000, maxFramerate: 30 },
   ];
 
-  it("la cámara normal en Cowork: misma resolución, 10 fps, bitrate en proporción", () => {
-    expect(FPS_DE_COWORK).toBe(10);
+  it("la cámara normal en Cowork: misma resolución, 15 fps, bitrate en proporción", () => {
+    expect(FPS_DE_COWORK).toBe(15);
     const t = topesDeCowork(normales720());
-    expect(t[2]).toEqual({ scaleResolutionDownBy: 1, maxBitrate: 700_000, maxFramerate: 10 });
-    expect(t[1]).toEqual({ scaleResolutionDownBy: 2, maxBitrate: 250_000, maxFramerate: 10 });
-    expect(t[0]).toEqual({ scaleResolutionDownBy: 4, maxBitrate: 90_000, maxFramerate: 10 });
+    expect(t[2]).toEqual({ scaleResolutionDownBy: 1, maxBitrate: 1_000_000, maxFramerate: 15 });
+    expect(t[1]).toEqual({ scaleResolutionDownBy: 2, maxBitrate: 350_000, maxFramerate: 15 });
+    expect(t[0]).toEqual({ scaleResolutionDownBy: 4, maxBitrate: 120_000, maxFramerate: 15 });
   });
 
   it("la cámara liviana en Cowork a 10 fps; fuera de Cowork (Meet) queda como estaba", () => {
@@ -289,7 +289,7 @@ describe("5. «Tu internet está débil»: solo un aviso", () => {
     return e;
   };
 
-  it("un bache corto no avisa; mala 10 s seguidos, sí", () => {
+  it("un bache corto no avisa; mala 20 s seguidos, sí", () => {
     expect(correr([[true, 0], [true, 4000], [false, 6000]]).mostrando).toBe(false);
     expect(correr([[true, 0], [true, 4000], [true, DEBIL_SOSTENIDO_MS]]).mostrando).toBe(true);
   });
@@ -310,7 +310,10 @@ describe("5. «Tu internet está débil»: solo un aviso", () => {
     const vigia = s.slice(s.indexOf("const vigiaDebil = window.setInterval"), s.indexOf("}, MIRAR_DEBIL_CADA_MS);"));
     expect(vigia).toContain("setInternetDebil(debil.mostrando)");
     expect(vigia).not.toMatch(/setCameraEnabled|setScreenShareEnabled|setMicrophoneEnabled|setParameters|disconnect/);
-    expect(vigia).toMatch(/ConnectionQuality\.Poor \|\| q === ConnectionQuality\.Lost \|\| limitadoPorRed/);
+    expect(vigia).toMatch(/const mala = q === ConnectionQuality\.Poor \|\| q === ConnectionQuality\.Lost;/);
+    // 18/11/2026: el codificador limitado por red ya no prende el aviso.
+    expect(vigia).not.toContain("limitadoPorRed");
+    expect(DEBIL_SOSTENIDO_MS).toBeGreaterThanOrEqual(20_000);
     expect(leer("videocall/LiveKitCallView.tsx")).toContain('t("messenger.callView.internetDebil")');
   });
 });
