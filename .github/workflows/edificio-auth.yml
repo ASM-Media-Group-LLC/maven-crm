@@ -1,0 +1,95 @@
+name: Edificio · entrada (auth de maven-agencias)
+
+# TREN DE AGENCIAS · VAGÓN 1 «EDIFICIO VIVO» (19/11/2026).
+# Deja la entrada (Supabase Auth) del EDIFICIO (maven-agencias, ezeigddgkaemxpshghmu)
+# igual que la de Maven: la app vive en https://app.maven-ai.me, nadie se registra
+# solo (las cuentas las crean el dueño y los admins), y los correos que mande
+# Supabase salen de Maven (noreply@envios.maven-ai.me, por Resend) y en español.
+# Ver docs/edificio-secretos.md, sección «Entrada».
+#
+# CANDADO: la base está escrita aquí y se aborta si fuera Kash (lsagslbkliprespbyhts).
+
+on:
+  workflow_dispatch:
+    inputs:
+      solo_mirar:
+        description: 'Solo mostrar la configuración actual (no cambia nada)'
+        type: boolean
+        default: true
+
+concurrency:
+  group: edificio-auth
+  cancel-in-progress: false
+
+env:
+  EDIFICIO_REF: ezeigddgkaemxpshghmu
+  SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
+jobs:
+  auth:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Candado — solo el edificio, nunca Kash
+        run: |
+          set -euo pipefail
+          source infra/casas/guarda-kash.sh
+          solo_edificio "$EDIFICIO_REF"
+          [ -n "${SUPABASE_ACCESS_TOKEN:-}" ] || { echo "::error::Falta el secret SUPABASE_ACCESS_TOKEN"; exit 1; }
+
+      - name: Configuración actual (sin claves)
+        run: |
+          set -euo pipefail
+          curl -sS -f "https://api.supabase.com/v1/projects/$EDIFICIO_REF/config/auth" \
+            -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
+            | jq '{site_url, uri_allow_list, disable_signup, external_email_enabled, mailer_autoconfirm,
+                   smtp_host, smtp_port, smtp_user, smtp_admin_email, smtp_sender_name,
+                   mailer_subjects_recovery, mailer_subjects_invite, jwt_exp}' | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - name: Aplicar la entrada de Maven
+        if: ${{ github.event.inputs.solo_mirar != 'true' }}
+        env:
+          RESEND: ${{ secrets.EDIFICIO_RESEND_API_KEY }}
+        run: |
+          set -euo pipefail
+          source infra/casas/guarda-kash.sh
+          solo_edificio "$EDIFICIO_REF"
+          RECUPERAR='<h2>Cambia tu contraseña</h2><p>Pediste cambiar tu contraseña de Maven. Toca el botón para crear una nueva:</p><p><a href="{{ .ConfirmationURL }}">Crear mi contraseña nueva</a></p><p>Si no lo pediste tú, ignora este correo.</p>'
+          INVITAR='<h2>Te dieron acceso a Maven</h2><p>Toca el botón para crear tu contraseña y entrar:</p><p><a href="{{ .ConfirmationURL }}">Crear mi contraseña</a></p>'
+          ENLACE='<h2>Tu enlace para entrar a Maven</h2><p><a href="{{ .ConfirmationURL }}">Entrar a Maven</a></p><p>Si no lo pediste tú, ignora este correo.</p>'
+          CAMBIO='<h2>Confirma tu correo nuevo</h2><p><a href="{{ .ConfirmationURL }}">Confirmar mi correo</a></p>'
+          CONFIRMAR='<h2>Confirma tu correo</h2><p><a href="{{ .ConfirmationURL }}">Confirmar mi correo</a></p>'
+          CUERPO="$(jq -n \
+            --arg rec "$RECUPERAR" --arg inv "$INVITAR" --arg enl "$ENLACE" --arg cam "$CAMBIO" --arg con "$CONFIRMAR" \
+            '{
+              site_url: "https://app.maven-ai.me",
+              uri_allow_list: "https://app.maven-ai.me/**,https://app.maven-ai.me/reset-password,http://localhost:8080/**",
+              disable_signup: true,
+              external_email_enabled: true,
+              mailer_autoconfirm: false,
+              mailer_secure_email_change_enabled: true,
+              mailer_subjects_recovery: "Cambia tu contraseña de Maven",
+              mailer_subjects_invite: "Te dieron acceso a Maven",
+              mailer_subjects_magic_link: "Tu enlace para entrar a Maven",
+              mailer_subjects_email_change: "Confirma tu correo nuevo en Maven",
+              mailer_subjects_confirmation: "Confirma tu correo en Maven",
+              mailer_templates_recovery_content: $rec,
+              mailer_templates_invite_content: $inv,
+              mailer_templates_magic_link_content: $enl,
+              mailer_templates_email_change_content: $cam,
+              mailer_templates_confirmation_content: $con
+            }')"
+          # Correo por Resend solo si el secret está (si no, Supabase usa su correo de prueba, con tope bajo).
+          if [ -n "${RESEND:-}" ]; then
+            CUERPO="$(jq --arg p "$RESEND" '. + {smtp_host: "smtp.resend.com", smtp_port: "465", smtp_user: "resend", smtp_pass: $p,
+                       smtp_admin_email: "noreply@envios.maven-ai.me", smtp_sender_name: "Maven", smtp_max_frequency: 30}' <<< "$CUERPO")"
+          else
+            echo "::warning::Falta EDIFICIO_RESEND_API_KEY: la entrada queda sin correo propio (Supabase manda los suyos con tope bajo)."
+          fi
+          curl -sS -f -X PATCH "https://api.supabase.com/v1/projects/$EDIFICIO_REF/config/auth" \
+            -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" -H "Content-Type: application/json" \
+            -d "$CUERPO" | jq '{site_url, uri_allow_list, disable_signup, smtp_host, smtp_admin_email, mailer_subjects_recovery}' \
+            | tee -a "$GITHUB_STEP_SUMMARY"
