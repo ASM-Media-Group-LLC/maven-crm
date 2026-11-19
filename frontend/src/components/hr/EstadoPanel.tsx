@@ -334,7 +334,7 @@ export function EstadoPanel() {
                       <div className="flex flex-wrap gap-1.5 pl-[1.375rem]">
                         {e?.escalado && <span className="rounded-full bg-destructive/15 px-2 py-0.5 text-[11px] font-medium text-foreground/90">{t("hr.estado.chip.escalado")}</span>}
                         {e?.reportado && <span className="rounded-full bg-destructive/15 px-2 py-0.5 text-[11px] font-medium text-foreground/90">{t("hr.estado.chip.reportado")}</span>}
-                        {(e?.llamados ?? 0) > 0 && <span className="rounded-full bg-foreground/10 px-2 py-0.5 text-[11px] text-foreground/85">{t("hr.estado.chip.llamados", { n: e!.llamados! })}</span>}
+                        {(e?.llamados ?? 0) > 0 && <span className="rounded-full bg-foreground/10 px-2 py-0.5 text-[11px] text-foreground/85">{e!.llamados === 1 ? t("hr.estado.chip.llamadoUno") : t("hr.estado.chip.llamados", { n: e!.llamados! })}</span>}
                         {e?.estado === "falta" && <span className="rounded-full bg-destructive/15 px-2 py-0.5 text-[11px] font-medium text-foreground/90">{t("hr.estado.chip.falta")}</span>}
                         {!varios && e?.clase === "ia" && e.detalle && <span className="min-w-0 text-[11px] italic text-muted-foreground">«{e.detalle}»</span>}
                       </div>

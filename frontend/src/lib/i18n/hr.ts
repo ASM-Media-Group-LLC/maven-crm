@@ -1727,6 +1727,7 @@ export const hr = {
   "hr.estado.chip.escalado": { es: "Se avisó a su supervisor", en: "Supervisor notified" },
   "hr.estado.chip.reportado": { es: "Reportado", en: "Reported" },
   "hr.estado.chip.llamados": { es: "Argos le llamó {n} veces", en: "Argos called them {n} times" },
+  "hr.estado.chip.llamadoUno": { es: "Argos le llamó una vez", en: "Argos called them once" },
   "hr.estado.chip.falta": { es: "Marcado como falta", en: "Marked as violation" },
   "hr.estado.pagina": { es: "{a}–{b} de {n}", en: "{a}–{b} of {n}" },
   "hr.estado.anterior": { es: "Anterior", en: "Previous" },
