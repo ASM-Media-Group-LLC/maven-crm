@@ -200,6 +200,13 @@ const CasoArgos = lazy(() => import("./pages/argos/CasoArgos"));
 const ResumenArgos = lazy(() => import("./pages/argos/ResumenArgos"));
 const HRExpediente = lazy(() => import("./pages/hr/HRExpediente"));
 const EnVivoPersona = lazy(() => import("./pages/hr/EnVivoPersona"));
+// La plataforma Maven (dueño → clientes → trabajadores). Apagada = manda a /dashboard.
+const PlataformaRaiz = lazy(() => import("./pages/plataforma/PlataformaRaiz"));
+const PlataformaGuarda = lazy(() => import("./pages/plataforma/PlataformaRaiz").then((m) => ({ default: m.Guarda })));
+const PanelDueno = lazy(() => import("./pages/plataforma/PanelDueno"));
+const EquipoMaven = lazy(() => import("./pages/plataforma/EquipoMaven"));
+const MiEmpresa = lazy(() => import("./pages/plataforma/MiEmpresa"));
+const MiPlanYPagos = lazy(() => import("./pages/plataforma/MiPlanYPagos"));
 const ArgosComparativo = lazy(() => import("./pages/hr/ArgosComparativo"));
 const ArgosAjustes = lazy(() => import("./pages/hr/ArgosAjustes"));
 const HRDirectoryLookup = lazy(() => import("./pages/hr/HRDirectoryLookup"));
@@ -374,6 +381,16 @@ const App = () => (
                 <Route path="pedidos" element={<PortalPedidos />} />
                 <Route path="ajustes" element={<PortalAjustes />} />
                 <Route path="*" element={<Navigate to="/portal" replace />} />
+              </Route>
+
+              {/* PLATAFORMA MAVEN (vagones 4–8): fuera del cascarón de Kash. Sin la
+                  bandera (lib/plataforma: VITE_PLATAFORMA o ?plataforma=mock en dev)
+                  está APAGADA y manda a /dashboard: la app de Kash no cambia. */}
+              <Route element={<PlataformaRaiz />}>
+                <Route path="/plataforma" element={<PlataformaGuarda pantalla="clientes"><PanelDueno /></PlataformaGuarda>} />
+                <Route path="/plataforma/equipo" element={<PlataformaGuarda pantalla="equipo"><EquipoMaven /></PlataformaGuarda>} />
+                <Route path="/mi-empresa" element={<PlataformaGuarda pantalla="mi_empresa"><MiEmpresa /></PlataformaGuarda>} />
+                <Route path="/mi-empresa/plan" element={<PlataformaGuarda pantalla="mi_plan"><MiPlanYPagos /></PlataformaGuarda>} />
               </Route>
 
               {/* Hoja/documento en su PROPIA ventana (Alvaro, 08/11): fuera del
