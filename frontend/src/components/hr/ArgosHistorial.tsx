@@ -88,7 +88,7 @@ function Barra({ label, valor, cuenta = true }: { label: string; valor: number |
     <div className="flex items-center gap-2 text-[11px]">
       <span className="w-[4.5rem] shrink-0 truncate text-muted-foreground">{label}</span>
       <span className="h-1.5 min-w-0 flex-1 overflow-hidden rounded-full bg-foreground/[0.07]">
-        <span className={`block h-full rounded-full ${v == null ? "bg-muted-foreground/25" : cuenta ? "bg-primary/35" : "bg-muted-foreground/35"}`} style={{ width: `${v ?? 0}%` }} />
+        <span className={`block h-full rounded-full ${v == null ? "bg-muted-foreground/25" : cuenta ? "bg-primary/20" : "bg-muted-foreground/35"}`} style={{ width: `${v ?? 0}%` }} />
       </span>
       <span className="flex w-11 shrink-0 items-center justify-end gap-1 tabular-nums text-foreground/85">
         {bajo && <span className="h-1.5 w-1.5 rounded-full bg-warning" aria-hidden />}
