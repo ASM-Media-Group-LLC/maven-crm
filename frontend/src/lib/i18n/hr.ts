@@ -1632,6 +1632,14 @@ export const hr = {
 
   // ─── Argos › Llamadas (13/11/2026): a quién se le corta la llamada hoy y por qué ───
   "hr.monia.tab.llamadas": { es: "Llamadas", en: "Calls" },
+  // Nota v3 (18/11/2026): las partes nuevas.
+  "hr.nota.llamados": { es: "Llamados de Argos", en: "Argos warnings" },
+  "hr.nota.puntualidad": { es: "Puntualidad", en: "Punctuality" },
+  "hr.nota.puesto": { es: "En su puesto", en: "At their post" },
+  "hr.nota.pruebaLlamados": { es: "{n} llamados de atención · {e} reportados al supervisor", en: "{n} warnings · {e} reported to the supervisor" },
+  "hr.nota.pruebaTarde": { es: "Llegó {n} min tarde", en: "Arrived {n} min late" },
+  "hr.nota.pruebaATiempo": { es: "Llegó a tiempo", en: "Arrived on time" },
+  "hr.nota.pruebaPuesto": { es: "{n} min fuera de su puesto en su turno", en: "{n} min away from their post during the shift" },
   "hr.llamadas.titulo": { es: "Cortes de llamada de hoy", en: "Today's call drops" },
   "hr.llamadas.sub": {
     es: "Quién tuvo cortes hoy, por qué y qué hacer. El internet es una prueba de velocidad real que se hace en Cowork al entrar y cada 30 minutos.",

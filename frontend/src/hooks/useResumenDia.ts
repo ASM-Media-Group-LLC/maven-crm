@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { calcularNota, fraccionJornada, type Nota } from "@/lib/notaEmpleado";
+import { calcularNota, fraccionConectado, type Nota } from "@/lib/notaEmpleado";
 import { cargarExoneracion, esExento } from "@/lib/exoneracionCamara";
 import { cargarHorarios, horarioDe } from "@/lib/horarioEmpleado";
 import { turnoDeEntrada } from "@/hooks/useTurnoPersonas";
@@ -155,8 +155,9 @@ export function useResumenDia(dia: string) {
         // Pantalla% y cámara% sobre la JORNADA de 8 h (pausa libre descontada): así
         // medio día ≈ 50 y las horas quedan metidas. Si el rol NO se califica
         // (supervisor, finanzas…), esos factores quedan en N/A: no cuentan.
-        const pantallaPct = calificado && m ? fraccionJornada(m.pantalla, h.jornadaHoras, h.exentoSeg) : undefined;
-        const camaraPct = calificado && m ? fraccionJornada(m.camara, h.jornadaHoras, h.exentoSeg) : undefined;
+        // Nota v3 (18/11/2026): sobre el tiempo CONECTADO, como Jornada y el expediente.
+        const pantallaPct = calificado && m ? fraccionConectado(m.pantalla, m.horas * 3600) : undefined;
+        const camaraPct = calificado && m ? fraccionConectado(m.camara, m.horas * 3600) : undefined;
         const atencionPct = at && at.n > 0 ? at.ok / at.n : undefined;
         const horas = m?.horas ?? 0;
         // Activo = estuvo en Maven ese día por CUALQUIER señal.

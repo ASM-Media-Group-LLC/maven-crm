@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { calcularNota, fraccionJornada, type Nota } from "@/lib/notaEmpleado";
+import { calcularNota, fraccionConectado, type Nota } from "@/lib/notaEmpleado";
 import { cargarExoneracion, esExento } from "@/lib/exoneracionCamara";
 import { cargarHorarios, horarioDe } from "@/lib/horarioEmpleado";
 import { a12 } from "@/lib/horaBogota";
@@ -30,6 +30,10 @@ export interface PersonaTurno {
   /** Minutos de tardanza respecto al horario asignado, pasada la tolerancia. null si
    *  no tiene horario asignado o no se registró ingreso. Positivo = llegó tarde. */
   tardeMin: number | null;
+  /** Llamados de atención de Argos en el turno (nota v3). */
+  llamados: number;
+  /** Minutos fuera de su puesto en el turno: fuera de Cowork + salir antes (nota v3). */
+  minFuera: number;
   /** Turno al que la persona está ASIGNADA por su horario (no por cuándo estuvo
    *  activa). "madrugada" 0-8, "am" 8-16, "pm" 16-24; null si no tiene horario. */
   turnoAsignado: "madrugada" | "am" | "pm" | null;
@@ -82,14 +86,13 @@ export function useTurnoPersonas(dia: string, hDesde: number, hHasta: number, ha
       if (error) throw new Error(error.message);
       const filas = (data ?? []) as FilaDia[];
       if (filas.length === 0) return [];
-      const horasJornada = Math.max(1, hHasta - hDesde);
 
       const ids = [...new Set(filas.map((f) => f.user_id))];
       // Rango del turno en Bogotá (para primer_ingreso / ultima_salida).
       const pad = (n: number) => String(n).padStart(2, "0");
       const inicioISO = `${dia}T${pad(hDesde)}:00:00-05:00`;
       const finISO = `${dia}T${pad(Math.min(hHasta, 23))}:${hHasta >= 24 ? "59" : "00"}:00-05:00`;
-      const [perfRes, rolesRes, cfgRes, exo, horarios, segRes] = await Promise.all([
+      const [perfRes, rolesRes, cfgRes, exo, horarios, segRes, nudgesRes, fueraRes] = await Promise.all([
         supabase.from("profiles").select("id, full_name, avatar_url, avatar_seed").in("id", ids),
         sinTipar.from("user_roles").select("user_id, role").in("user_id", ids),
         sinTipar.from("monitor_config").select("roles_calificados").eq("id", 1).maybeSingle(),
@@ -104,7 +107,27 @@ export function useTurnoPersonas(dia: string, hDesde: number, hHasta: number, ha
           .gte("started_at", inicioISO)
           .lt("started_at", finISO)
           .order("started_at", { ascending: true }),
+        // Nota v3 (18/11/2026): los llamados de atención de Argos…
+        sinTipar.from("argos_nudges").select("user_id, escalado_at").in("user_id", ids)
+          .gte("avisado_at", inicioISO).lt("avisado_at", finISO).limit(5000),
+        // …y los ratos fuera de Cowork en su turno.
+        sinTipar.from("cowork_fuera").select("user_id, desde, hasta").in("user_id", ids)
+          .gte("desde", inicioISO).lt("desde", finISO).limit(5000),
       ]);
+      const llamadosPor = new Map<string, { n: number; escalados: number }>();
+      for (const n of (nudgesRes.data ?? []) as Array<{ user_id: string; escalado_at: string | null }>) {
+        const c = llamadosPor.get(n.user_id) ?? { n: 0, escalados: 0 };
+        c.n++;
+        if (n.escalado_at) c.escalados++;
+        llamadosPor.set(n.user_id, c);
+      }
+      const minFueraPor = new Map<string, number>();
+      for (const x of (fueraRes.data ?? []) as Array<{ user_id: string; desde: string; hasta: string | null }>) {
+        const ini = Date.parse(x.desde);
+        const fin = x.hasta ? Date.parse(x.hasta) : Date.now();
+        if (!Number.isFinite(ini) || fin <= ini) continue;
+        minFueraPor.set(x.user_id, (minFueraPor.get(x.user_id) ?? 0) + Math.round((fin - ini) / 60_000));
+      }
       // Primer / último minuto trabajado por persona dentro del turno.
       const horariosPorPers = new Map<string, { primero: Date; ultimo: Date }>();
       for (const s of (segRes.data ?? []) as Array<{ user_id: string; started_at: string; seconds: number }>) {
@@ -141,19 +164,13 @@ export function useTurnoPersonas(dia: string, hDesde: number, hHasta: number, ha
         const juz = Number(f.juzgadas), juzOk = Number(f.juzgadas_ok);
         // Calificado en cámara/pantalla si su rol se califica Y no está exonerado.
         const calificado = esCalificado(f.user_id) && !esExento(exo, f.user_id, rolesPor.get(f.user_id));
-        // Denominador: el turno menos el baño+comida de esa persona (no cuenta en contra).
-        const exentoSeg = horarioDe(horarios, f.user_id).exentoSeg;
-        // El día COMPLETO (0–24) se mide sobre SU jornada, como el expediente
-        // (18/11/2026: la nota del inicio y la del expediente deben ser la misma;
-        // sobre 24 h, 8 h perfectas daban 33).
-        const horasDen = hDesde === 0 && hHasta >= 24 ? horarioDe(horarios, f.user_id).jornadaHoras : horasJornada;
-        const pantallaPct = calificado ? fraccionJornada(segPantalla, horasDen, exentoSeg) : undefined;
-        const camaraPct = calificado ? fraccionJornada(segCamara, horasDen, exentoSeg) : undefined;
-        const atencionPct = juz > 0 ? juzOk / juz : undefined;
-        const nota = calcularNota({ pantallaPct, camaraPct, atencionPct });
-        const perfil = perfilPor.get(f.user_id);
         // Horas de trabajo dentro del turno + entrada/salida.
         const segTrabajoTurno = Number(f.seg_activo) + Number(f.seg_sin_pantalla) + Number(f.seg_sin_camara) + Number(f.seg_fuera_camara);
+        // Nota v3 (18/11/2026): pantalla y cámara sobre el tiempo CONECTADO.
+        const pantallaPct = calificado ? fraccionConectado(segPantalla, segTrabajoTurno) : undefined;
+        const camaraPct = calificado ? fraccionConectado(segCamara, segTrabajoTurno) : undefined;
+        const atencionPct = juz > 0 ? juzOk / juz : undefined;
+        const perfil = perfilPor.get(f.user_id);
         const h = horariosPorPers.get(f.user_id);
         // Minutos tarde (si tiene horario asignado y se pasó la tolerancia).
         // Comparación SIEMPRE en hora Bogotá, no en la zona del navegador.
@@ -167,6 +184,29 @@ export function useTurnoPersonas(dia: string, hDesde: number, hHasta: number, ha
           const dif = realMin - asignadoMin;
           tardeMin = dif > horPers.toleranciaMin ? dif : null;
         }
+        // Salir antes: solo con el turno ya terminado (si sigue, puede volver).
+        let minSalioAntes = 0;
+        if (horPers.salida && h && hDesde === 0 && hHasta >= 24) {
+          const [sh, sm] = horPers.salida.split(":").map(Number);
+          const salidaMin = sh * 60 + (sm || 0);
+          const [eh2] = (horPers.entrada ?? "00:00").split(":").map(Number);
+          const nocturno = salidaMin <= eh2 * 60;
+          const ahoraMin = (() => { const [a, b] = hhmmBogota(new Date()).split(":").map(Number); return a * 60 + b; })();
+          const hoy = new Date().toLocaleDateString("en-CA", { timeZone: "America/Bogota" });
+          const terminado = dia !== hoy || (!nocturno && ahoraMin >= salidaMin);
+          if (terminado && !nocturno) {
+            const [uh, um] = hhmmBogota(h.ultimo).split(":").map(Number);
+            const antes = salidaMin - (uh * 60 + um);
+            if (antes > 5) minSalioAntes = antes;
+          }
+        }
+        const llamados = llamadosPor.get(f.user_id) ?? { n: 0, escalados: 0 };
+        const nota = calcularNota({
+          pantallaPct, camaraPct, atencionPct,
+          tardeMin: horPers.entrada ? tardeMin : undefined,
+          llamados: llamados.n, escalados: llamados.escalados,
+          minFuera: (minFueraPor.get(f.user_id) ?? 0) + minSalioAntes,
+        });
         return {
           userId: f.user_id,
           nombre: perfil?.full_name?.trim() || "",
@@ -174,8 +214,12 @@ export function useTurnoPersonas(dia: string, hDesde: number, hHasta: number, ha
           avatarSeed: perfil?.avatar_seed ?? null,
           equipo: equipoDeRoles(rolesPor.get(f.user_id)),
           nota,
+          // Sobre el tiempo CONECTADO (Alvaro, 18/11/2026: «si está conectado 10
+          // minutos y los 10 compartió, eso es 100 %»).
           pantallaPct: pantallaPct == null ? null : Math.round(pantallaPct * 100),
           camaraPct: camaraPct == null ? null : Math.round(camaraPct * 100),
+          llamados: llamados.n,
+          minFuera: (minFueraPor.get(f.user_id) ?? 0) + minSalioAntes,
           atencionPct: atencionPct == null ? null : Math.round(atencionPct * 100),
           horasTurno: segTrabajoTurno / 3600,
           entroHHMM: h ? a12(hhmmBogota(h.primero)) : null,

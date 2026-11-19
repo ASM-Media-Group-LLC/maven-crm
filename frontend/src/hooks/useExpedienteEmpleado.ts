@@ -1,7 +1,8 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
-import { calcularNota, fraccionJornada, type Nota } from "@/lib/notaEmpleado";
+import { calcularNota, fraccionConectado, type Nota } from "@/lib/notaEmpleado";
+import { minutoBogota, minutoDeHora, minutosTarde } from "@/lib/llegadas";
 import { cargarExoneracion, esExento } from "@/lib/exoneracionCamara";
 import { cargarHorarios, horarioDe } from "@/lib/horarioEmpleado";
 
@@ -33,6 +34,11 @@ export interface DiaExpediente {
   entroAt?: string | null;  // ISO
   salioAt?: string | null;  // ISO
   nota: Nota;
+  /** Nota v3 (18/11/2026): lo que pesa además de pantalla/cámara/atención. */
+  llamadosArgos?: number;
+  escaladosArgos?: number;
+  tardeMinNota?: number | null;
+  minFueraPuesto?: number;
 }
 export interface Expediente {
   nombre: string;
@@ -77,6 +83,10 @@ export function useExpedienteEmpleado(userId: string | null, anio: number, mes: 
       type FilaFuera = { desde: string; hasta: string | null };
       const fueraP = (supabase as unknown as { from: (t: string) => { select: (c: string) => { eq: (k: string, v: string) => { gte: (k: string, v: string) => { lte: (k: string, v: string) => { limit: (n: number) => Promise<{ data: FilaFuera[] | null }> } } } } } })
         .from("cowork_fuera").select("desde, hasta").eq("user_id", userId!).gte("desde", inicioISO).lte("desde", finISO).limit(1000);
+      // Nota v3 (18/11/2026): los llamados de atención de Argos del mes.
+      type FilaNudge = { avisado_at: string; escalado_at: string | null };
+      const nudgesP = (supabase as unknown as { from: (t: string) => { select: (c: string) => { eq: (k: string, v: string) => { gte: (k: string, v: string) => { lte: (k: string, v: string) => { limit: (n: number) => Promise<{ data: FilaNudge[] | null }> } } } } } })
+        .from("argos_nudges").select("avisado_at, escalado_at").eq("user_id", userId!).gte("avisado_at", inicioISO).lte("avisado_at", finISO).limit(3000);
       const [perfRes, tiempoRes, eventosRes, pausasRes, capturasRes, exo, rolesRes, horarioRes] = await Promise.all([
         supabase.from("profiles").select("full_name, avatar_url, avatar_seed").eq("id", userId!).maybeSingle(),
         db.rpc("cowork_tiempo_diario", { _desde: desde, _hasta: hasta, _user_id: userId, _limit: 100, _offset: 0 }),
@@ -88,6 +98,7 @@ export function useExpedienteEmpleado(userId: string | null, anio: number, mes: 
         cargarHorarios([userId!]),
       ]);
       const fueraRes = await fueraP;
+      const nudgesRes = await nudgesP;
       // ¿Exonerado de cámara/pantalla? (por persona o por rol) → no se califica en esos factores.
       const rolesUser = new Set(((rolesRes.data ?? []) as Array<{ role: string }>).map((r) => r.role));
       const exentoCamPant = esExento(exo, userId!, rolesUser);
@@ -142,6 +153,16 @@ export function useExpedienteEmpleado(userId: string | null, anio: number, mes: 
         asegura(f).capturas.push({ id: c.id, tipo: c.tipo, path: c.path, nasPath: c.nas_path, enNas: c.en_nas === true, fueraDeLugar: c.fuera_de_lugar, veredicto: c.veredicto, caraVisible: c.cara_visible, perdonado: c.perdonado === true, createdAt: c.created_at });
       }
 
+      const hoyExp = new Date().toLocaleDateString("en-CA", { timeZone: "America/Bogota" });
+      const llamadosPorDia = new Map<string, { n: number; escalados: number }>();
+      for (const n of (nudgesRes.data ?? [])) {
+        const f = diaDe(n.avisado_at);
+        const c = llamadosPorDia.get(f) ?? { n: 0, escalados: 0 };
+        c.n++;
+        if (n.escalado_at) c.escalados++;
+        llamadosPorDia.set(f, c);
+      }
+
       // nota por día (v2, Alvaro 05/11): pantalla 45 / cámara 35 / distracción 20.
       // Pantalla/cámara en SEGUNDOS sobre la jornada de 8 h (pausa libre descontada),
       // así las horas quedan metidas y medio día ≈ 50.
@@ -152,15 +173,38 @@ export function useExpedienteEmpleado(userId: string | null, anio: number, mes: 
         const segCamara = act + sinPant;              // cámara/cara bien
         const hayTiempo = (act + sinPant + sinCam + fueraCam) > 0;
         // Exonerado → no se califica en cámara/pantalla (quedan en N/A, se reparte el peso).
-        const pantallaPct = exentoCamPant || !hayTiempo ? undefined : fraccionJornada(segPantalla, horarioUser.jornadaHoras, horarioUser.exentoSeg);
-        const camaraPct = exentoCamPant || !hayTiempo ? undefined : fraccionJornada(segCamara, horarioUser.jornadaHoras, horarioUser.exentoSeg);
+        // v3 (18/11/2026): sobre el tiempo CONECTADO, no sobre el turno completo.
+        const conectado = act + sinPant + sinCam + fueraCam;
+        const pantallaPct = exentoCamPant || !hayTiempo ? undefined : fraccionConectado(segPantalla, conectado);
+        const camaraPct = exentoCamPant || !hayTiempo ? undefined : fraccionConectado(segCamara, conectado);
         // Distracción: de los pantallazos juzgados, cuántos en lo suyo. Las
         // PERDONADAS cuentan como en lo suyo (no bajan la nota).
         const juzgadas = d.capturas.filter((c) => c.tipo === "pantalla" && c.veredicto != null);
         const atencionPct = juzgadas.length > 0
           ? juzgadas.filter((c) => c.fueraDeLugar !== true || c.perdonado).length / juzgadas.length
           : undefined;
-        d.nota = calcularNota({ pantallaPct, camaraPct, atencionPct });
+        // v3: puntualidad, llamados de Argos y tiempo fuera de su puesto.
+        const ll = llamadosPorDia.get(d.fecha) ?? { n: 0, escalados: 0 };
+        let salioAntes = 0;
+        const salidaMin = minutoDeHora(horarioUser.salida);
+        const entradaMin = minutoDeHora(horarioUser.entrada);
+        const nocturno = salidaMin != null && entradaMin != null && salidaMin <= entradaMin;
+        const terminado = d.fecha < hoyExp || (salidaMin != null && minutoBogota(new Date().toISOString())! >= salidaMin);
+        if (d.salioAt && salidaMin != null && terminado && !nocturno) {
+          const s2 = minutoBogota(d.salioAt);
+          if (s2 != null && salidaMin - s2 > 5) salioAntes = salidaMin - s2;
+        }
+        d.llamadosArgos = ll.n;
+        d.escaladosArgos = ll.escalados;
+        d.tardeMinNota = horarioUser.entrada && d.entroAt ? minutosTarde(horarioUser.entrada, d.entroAt) : undefined;
+        d.minFueraPuesto = (d.minFueraCowork ?? 0) + salioAntes;
+        d.nota = calcularNota({
+          pantallaPct, camaraPct, atencionPct,
+          tardeMin: horarioUser.entrada && d.entroAt ? minutosTarde(horarioUser.entrada, d.entroAt) : undefined,
+          llamados: hayTiempo ? ll.n : undefined,
+          escalados: ll.escalados,
+          minFuera: hayTiempo ? (d.minFueraCowork ?? 0) + salioAntes : undefined,
+        });
       }
 
       const p = perfRes.data as { full_name: string | null; avatar_url: string | null; avatar_seed: string | null } | null;

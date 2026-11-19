@@ -434,6 +434,8 @@ function TiraDelDia({ capturas, t }: { capturas: CapturaDia[]; t: Tr }) {
 // Etiqueta y color de cada factor de la nota, para el desglose.
 const FACTOR_LBL: Record<string, TranslationKey> = {
   pantalla: "hr.resumen.pantalla", camara: "hr.resumen.camara", atencion: "hr.resumen.atencion", horas: "hr.panel.factorHoras",
+  // Nota v3 (18/11/2026)
+  llamados: "hr.nota.llamados", puntualidad: "hr.nota.puntualidad", puesto: "hr.nota.puesto",
 };
 
 // El CONTENIDO del desglose «Cómo se arma la nota» (Alvaro, 04/11). Responde
@@ -783,6 +785,9 @@ function DesgloseNotaContenido({ dia, atencion, t, compacto }: {
   const prueba = (clave: string): string | null => {
     if (clave === "camara") return momCamMedida > 0 ? t("hr.exp.pruebaCamara", { n: momCamMedida }) : t("hr.exp.pruebaCamaraNadie");
     if (clave === "atencion") return atencion ? t("hr.exp.pruebaAtencion", { ok: atencion.ok, n: atencion.n }) : t("hr.exp.pruebaAtencionSin");
+    if (clave === "llamados") return t("hr.nota.pruebaLlamados", { n: dia.llamadosArgos ?? 0, e: dia.escaladosArgos ?? 0 });
+    if (clave === "puntualidad") return dia.tardeMinNota ? t("hr.nota.pruebaTarde", { n: dia.tardeMinNota }) : t("hr.nota.pruebaATiempo");
+    if (clave === "puesto") return t("hr.nota.pruebaPuesto", { n: dia.minFueraPuesto ?? 0 });
     return null;
   };
 
