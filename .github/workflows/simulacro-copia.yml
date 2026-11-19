@@ -93,6 +93,6 @@ jobs:
             q "$PROD" leer.json | jq -c '.[0].d' > datos.json
             echo "$t: $(jq length datos.json) filas"
             jq -n --arg t "$t" --rawfile d datos.json \
-              '{query: ("alter table public." + $t + " disable trigger user; insert into public." + $t + " select * from json_populate_recordset(null::public." + $t + ", $1::json) on conflict do nothing; alter table public." + $t + " enable trigger user;"), parameters: [$d]}' > escribir.json
+              '{query: ("alter table public." + $t + " disable trigger user; insert into public." + $t + " select * from json_populate_recordset(null::public." + $t + ", $sim$" + $d + "$sim$::json) on conflict do nothing; alter table public." + $t + " enable trigger user;")}' > escribir.json
             q "$COPIA" escribir.json | head -c 300; echo
           done
