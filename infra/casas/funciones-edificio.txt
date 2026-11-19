@@ -64,3 +64,9 @@ conexiones-ping
 centro-operaciones
 clari-help
 ai-orchestrator
+
+# Cobros, la puerta y Kash para mirar (vagón 7). Solo del edificio: Kash no las publica
+# (funciones-solo-edificio.txt). kash-resumen NO va aquí: es la de Kash.
+cobros-stripe
+directorio
+refrescar-externas

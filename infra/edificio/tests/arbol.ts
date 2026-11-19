@@ -19,7 +19,10 @@
 //   6. Cliente en preparación: sin enlaces; enlaces de un solo uso y con vencimiento.
 //   7. El dueño de la plataforma ve todo; Grace (admin) todo menos precios y cobros.
 //   8. Avisos, historial, «Líder de {Marca}», tarjeta de Kash, saldo de Argos, socios y briefs.
-//   9. Vuelta atrás de las dos y vuelta a cargar.
+//  10. Cobros (20261120090000_cobros.sql): precios, eventos de Stripe una vez, bloqueo
+//      por pago tras la gracia, la pantalla de entrada, créditos del plan y recargas
+//      sin duplicar, el directorio de la puerta y su tope.
+//  11. Vuelta atrás de las tres y vuelta a cargar.
 //
 // Sale con código 1 si algo falla.
 import { PGlite } from "npm:@electric-sql/pglite@0.3";
@@ -33,6 +36,7 @@ const DOCS_DUENO = leer(MIGS + "20261114130000_documentos_dueno_ve_todo_y_pedir_
 const CONECTADAS = leer(MIGS + "20261111190000_agencias_conectadas.sql");
 const ARBOL = leer("../migraciones/20261119210000_arbol.sql");
 const FUNCIONES = leer("../migraciones/20261119211000_arbol_funciones.sql");
+const COBROS = leer("../migraciones/20261120090000_cobros.sql");
 const vuelta = (sql: string) => sql.split("\n").filter((l) => l.startsWith("--|")).map((l) => l.replace(/^--\| ?/, "")).join("\n");
 
 /** Saca «create or replace function public.<nombre>(…) … $$;» tal cual de una migración. */
@@ -450,8 +454,89 @@ await anda(RUSIN, `insert into public.briefs (empresa) values ('Del dueño')`, "
 check((await como(SOCIO, `select 1 from public.briefs`)).length === 1, "el socio ve solo los suyos");
 check((await como(GRACE, `select 1 from public.briefs`)).length === 2, "la plataforma ve todos");
 
+// ════ 10b. Cobros (Stripe, bloqueo, puerta) ══════════════════════════════════
+try {
+  await aplicar(db, "cobros", COBROS);
+  check(true, "la migración de cobros carga encima del árbol");
+} catch (e) {
+  console.error(msg(e));
+  Deno.exit(1);
+}
+check((await como(X, `select clave from public.precios_plataforma`)).length === 7, "los precios de la portada los lee cualquiera");
+check((await como(GRACE, `update public.precios_plataforma set valor = '{"precio_usd":1}' where clave = 'plan_equipo' returning 1`)).length === 0,
+  "Grace no cambia precios");
+check((await como(RUSIN, `update public.precios_plataforma set actualizado_at = now() where clave = 'plan_equipo' returning 1`)).length === 1,
+  "el dueño sí");
+check((await val("service_role", `select public.stripe_evento_tomar('evt_1', 'invoice.paid')`)) === "nuevo", "evento nuevo → se procesa");
+check((await val("service_role", `select public.stripe_evento_tomar('evt_1', 'invoice.paid')`)) === "reintento", "llegó otra vez sin cerrar → reintento");
+await anda("service_role", `select public.stripe_evento_cerrar('evt_1', '${ORG_B}', '{"ok":true}')`, "se cierra el evento");
+check((await val("service_role", `select public.stripe_evento_tomar('evt_1', 'invoice.paid')`)) === "repetido", "ya cerrado → repetido (no se hace dos veces)");
+await falla(AA, `select public.stripe_evento_tomar('evt_2', 'x')`, /permission denied/, "desde la app nadie toca los eventos");
+await falla(GRACE, `select public.cobros_actualizar('${ORG_B}', '{"estado_pago":"al_dia"}')`, /permission denied/, "Grace no toca el cobro");
+
+// Pago fallido: 7 días de gracia (aquí, ya vencida) → el reloj bloquea; B1O no entra.
+await anda("service_role", `select public.cobros_actualizar('${ORG_B}', '{"estado_pago":"pago_fallido","gracia_hasta":"2020-01-01T00:00:00Z","stripe_subscription_id":"sub_1"}')`,
+  "el webhook anota el pago fallido");
+const accB = (await como(B1O, `select public.cobros_mi_acceso() a`))[0].a;
+check(accB.bloqueada === true && accB.motivo === "pago" && accB.puedo_pagar === false,
+  `pasada la gracia, la gente del cliente no entra aunque el reloj no haya corrido (${JSON.stringify(accB)})`);
+check((await val("postgres", `select public.cobros_bloquear_vencidos()`)) === 1, "el reloj bloquea al que se pasó de la gracia");
+check((await val("postgres", `select estado from public.organizaciones where id = '${ORG_B}'`)) === "bloqueada", "B queda bloqueada");
+check((await val("postgres", `select public.cobros_bloquear_vencidos()`)) === 0, "y no lo vuelve a contar");
+const accBB = (await como(BB, `select public.cobros_mi_acceso() a`))[0].a;
+check(accBB.bloqueada === true && accBB.puedo_pagar === true, "su admin ve el bloqueo con el botón de pagar");
+check((await como(AA, `select public.cobros_mi_acceso() a`))[0].a.bloqueada === false, "el cliente A (al día) entra");
+check((await como(GRACE, `select public.cobros_mi_acceso() a`))[0].a.bloqueada === false, "la plataforma nunca queda bloqueada");
+// En gracia todavía: entra, con aviso.
+await anda("service_role", `select public.cobros_actualizar('${ORG_A}', jsonb_build_object('estado_pago', 'pago_fallido', 'gracia_hasta', now() + interval '7 days'))`,
+  "A falla un pago: 7 días de gracia");
+const accA = (await como(E1, `select public.cobros_mi_acceso() a`))[0].a;
+check(accA.bloqueada === false && accA.en_gracia === true, `en gracia entra con aviso (${JSON.stringify(accA)})`);
+check((await val("postgres", `select public.cobros_bloquear_vencidos()`)) === 0, "en gracia el reloj no bloquea");
+// Paga: invoice.paid → al día y activa otra vez; la gracia se borra.
+await anda("service_role", `select public.cobros_actualizar('${ORG_B}', '{"estado_pago":"al_dia","gracia_hasta":null,"bloqueada_at":null}', 'activa')`,
+  "pagó: el webhook la desbloquea");
+const cobB = (await como(BB, `select public.plan_de_organizacion('${ORG_B}') p`))[0].p.cobro;
+check((await val("postgres", `select estado from public.organizaciones where id = '${ORG_B}'`)) === "activa" && cobB.gracia_hasta === undefined && cobB.estado_pago === "al_dia",
+  `B vuelve a activa y sin gracia (${JSON.stringify(cobB)})`);
+await falla(GRACE, `select public.cobros_desbloquear('${ORG_B}')`, /solo_dueno/, "Grace no desbloquea (es cobro)");
+await anda(RUSIN, `select public.cobros_desbloquear('${ORG_B}', 3)`, "el dueño desbloquea a mano con días de gracia");
+// Un cliente pausado por Maven: Stripe no lo reactiva.
+await db.exec(`update public.organizaciones set estado = 'pausada' where id = '${ORG_C}'`);
+await anda("service_role", `select public.cobros_actualizar('${ORG_C}', '{"estado_pago":"al_dia"}', 'activa')`, "un pago de un cliente pausado");
+check((await val("postgres", `select estado from public.organizaciones where id = '${ORG_C}'`)) === "pausada", "pausado por Maven: Stripe no lo prende");
+// Falta la tarjeta (registro sin terminar el checkout).
+await anda("service_role", `select public.cobros_actualizar('${ORG_B}', '{"estado_pago":"pendiente_checkout"}')`, "registro sin tarjeta todavía");
+check((await como(BB, `select public.cobros_mi_acceso() a`))[0].a.motivo === "falta_tarjeta", "sin tarjeta: pide terminar el pago");
+await anda("service_role", `select public.cobros_actualizar('${ORG_B}', '{"estado_pago":"prueba"}')`, "con tarjeta: prueba de 14 días");
+
+// Créditos de Argos: plan del mes una vez; recarga de Stripe una vez.
+const sB0 = Number(await val("postgres", `select saldo_usd from public.argos_saldo where organizacion_id = '${ORG_B}'`));
+await db.exec(`update public.organizaciones set plan = plan || '{"argos_usd_mes":20}' where id = '${ORG_B}'`);
+const pl1 = (await como("service_role", `select public.argos_acreditar_plan_de('${ORG_B}', 'in_1') r`))[0].r;
+const pl2 = (await como("service_role", `select public.argos_acreditar_plan_de('${ORG_B}', 'in_2') r`))[0].r;
+check(pl1.acreditado === true && Number(pl1.saldo_usd) === sB0 + 20 && pl2.acreditado === false && Number(pl2.saldo_usd) === sB0 + 20,
+  `el crédito del plan entra una vez por mes y se acumula (${sB0} → ${pl1.saldo_usd} → ${pl2.saldo_usd})`);
+await anda("service_role", `select public.argos_acreditar('${ORG_B}', null, 'recarga', 50, 'cs_recarga_1')`, "recarga de Stripe: +50");
+await falla("service_role", `select public.argos_acreditar('${ORG_B}', null, 'recarga', 50, 'cs_recarga_1')`, /argos_mov_recarga_ref_idx|duplicate key/,
+  "la misma recarga no entra dos veces");
+check(Number(await val("postgres", `select saldo_usd from public.argos_saldo where organizacion_id = '${ORG_B}'`)) === sB0 + 70, "saldo = antes + 20 + 50");
+check((await val("service_role", `select public.argos_acreditar_planes_sin_stripe()`)) === 0, "este mes A ya tenía su crédito: no se repite");
+check((await val("service_role", `select public.argos_acreditar_planes_sin_stripe((now() + interval '1 month')::date)`)) === 1,
+  "día 1 del mes que viene: solo el cliente activo sin Stripe recibe su crédito (A; B paga por Stripe, C está pausado)");
+
+// La puerta: directorio (sí/no) y su tope.
+check((await val("service_role", `select public.directorio_es_del_edificio(' Lider@Cliente-B.test ')`)) === true, "un correo del edificio → sí");
+check((await val("service_role", `select public.directorio_es_del_edificio('alguien@kash.test')`)) === false, "uno que no → no");
+await falla(X, `select public.directorio_es_del_edificio('lider@cliente-b.test')`, /permission denied/, "desde la app nadie pregunta el directorio");
+const topes = [];
+for (let i = 0; i < 4; i++) topes.push(await val("service_role", `select public.puerta_contar('ip:1', 3)`));
+check(JSON.stringify(topes) === "[true,true,true,false]", `el tope corta al cuarto intento (${JSON.stringify(topes)})`);
+
 // ════ 11. Vuelta atrás y vuelta a cargar ═════════════════════════════════════
 try {
+  await aplicar(db, "vuelta atrás de cobros", vuelta(COBROS));
+  check((await q(`select to_regclass('public.precios_plataforma') is null n`))[0].n === true, "la vuelta atrás de cobros borra lo suyo");
   await aplicar(db, "vuelta atrás de arbol_funciones", vuelta(FUNCIONES));
   await aplicar(db, "vuelta atrás de arbol", vuelta(ARBOL));
   const quedan = await q(`select count(*)::int n from pg_tables where schemaname = 'public' and tablename in
@@ -464,7 +549,8 @@ try {
   check(JSON.stringify(await ids(K, `select tenant_id from public.argos_alertas`)) === t(SUELTA), "y el dueño suelto sigue viendo lo suyo");
   await aplicar(db, "arbol (otra vez)", ARBOL);
   await aplicar(db, "arbol_funciones (otra vez)", FUNCIONES);
-  check(true, "después de la vuelta atrás, las dos vuelven a cargar");
+  await aplicar(db, "cobros (otra vez)", COBROS);
+  check(true, "después de la vuelta atrás, las tres vuelven a cargar");
 } catch (e) {
   check(false, msg(e));
 }

@@ -176,6 +176,20 @@ jobs:
           else
             FUNCS="${{ steps.changes.outputs.funcs }}"
           fi
+          # Las funciones SOLO del edificio (cobros, puerta…) NUNCA se publican en Kash
+          # (tren de agencias, vagón 7). La lista: infra/casas/funciones-solo-edificio.txt.
+          SOLO_EDIFICIO="$(sed 's/#.*//' infra/casas/funciones-solo-edificio.txt | tr -s ' \t' '\n' | { grep -v '^$' || true; })"
+          if [ -n "$SOLO_EDIFICIO" ]; then
+            QUEDAN=""
+            for fn in $FUNCS; do
+              if grep -qx "$fn" <<< "$SOLO_EDIFICIO"; then
+                echo "skip $fn (solo del edificio: no va a Kash)"
+              else
+                QUEDAN="$QUEDAN $fn"
+              fi
+            done
+            FUNCS="$QUEDAN"
+          fi
           if [ -z "${FUNCS// /}" ]; then
             echo "Nada que deployar (no cambió ninguna función)."
             exit 0

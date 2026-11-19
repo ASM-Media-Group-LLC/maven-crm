@@ -226,6 +226,9 @@
 .pt.pr .pr-plan li { position: relative; padding-left: 1.4rem; color: var(--pr-gris); font-size: .9rem; line-height: 1.5; }
 .pt.pr .pr-plan li::before { content: "✓"; position: absolute; left: 0; color: var(--pr-acento); font-weight: 700; }
 .pt.pr .pr-plan .pr-btn { width: 100%; }
+/* «o pide una demo» bajo «Empieza 14 días gratis» (registro solo, vagón 7). */
+.pt.pr .pr-plan-demo { display: block; min-height: 44px; line-height: 44px; margin-top: -.4rem; text-align: center; color: var(--pr-gris); font-size: .82rem; text-decoration: underline; }
+.pt.pr .pr-plan-demo:hover { color: #fff; }
 .pt.pr .pr-precios-nota { margin: 1.6rem auto 0; max-width: 44rem; text-align: center; color: var(--pr-gris); font-size: .88rem; line-height: 1.7; }
 .pt.pr .pr-precios-nota b { color: var(--pr-acento); font-weight: 600; }
 

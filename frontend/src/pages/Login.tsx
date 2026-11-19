@@ -12,6 +12,10 @@ import { traducirErrorAuth } from "@/lib/authErrors";
 import { entrarConReintentos, esReintentableAlEntrar } from "@/lib/entrarConPaciencia";
 import { escritorio } from "@/lib/escritorio";
 import { Eye, EyeOff, Loader2 } from "lucide-react";
+import {
+  almacenDelNavegador, correoGuardado, destinoDeEstaPestana, destinoDeRespuesta, envDeLaApp, guardarDestino, olvidarDestino,
+  preguntarDirectorio, puertaActiva,
+} from "@/lib/puerta";
 
 const Login = () => {
   const { t } = useLanguage();
@@ -35,7 +39,14 @@ const Login = () => {
     ? crudo
     : "/dashboard";
   const { toast } = useToast();
-  const [email, setEmail] = useState("");
+  // LA PUERTA (vagón 7): prendida, el login pide primero el correo y el directorio del
+  // edificio dice si va a Kash (lo de siempre) o al edificio. Apagada, esta pantalla es
+  // exactamente la de siempre (paso «clave» con el correo editable).
+  const puerta = puertaActiva(envDeLaApp());
+  const recordado = puerta ? correoGuardado(almacenDelNavegador()) : null;
+  const [paso, setPaso] = useState<"correo" | "clave">(puerta && !recordado ? "correo" : "clave");
+  const [buscando, setBuscando] = useState(false);
+  const [email, setEmail] = useState(recordado ?? "");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -71,6 +82,40 @@ const Login = () => {
   if (user) {
     return <Navigate to={destino} replace />;
   }
+
+  const continuarConCorreo = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const correo = email.trim().toLowerCase();
+    if (!correo) {
+      toast({ title: t("auth.requiredFields"), description: t("auth.requiredFieldsDesc"), variant: "destructive" });
+      return;
+    }
+    setBuscando(true);
+    const respuesta = await preguntarDirectorio(correo, envDeLaApp());
+    setBuscando(false);
+    // Un fallo del directorio NO saca a nadie de Kash: sigue por la entrada de siempre.
+    if (respuesta === "error") toast({ title: t("cobros.puerta.sinRespuesta") });
+    const destinoBase = destinoDeRespuesta(respuesta);
+    guardarDestino(almacenDelNavegador(), destinoBase, correo);
+    if (destinoBase !== destinoDeEstaPestana()) {
+      // Cambiar de base = arrancar de nuevo contra la otra (client.ts lee la elección al cargar).
+      const vuelta = destino !== "/dashboard" ? `?returnTo=${encodeURIComponent(destino)}` : "";
+      window.location.replace(`/login${vuelta}`);
+      return;
+    }
+    setPaso("clave");
+  };
+
+  const usarOtroCorreo = () => {
+    olvidarDestino(almacenDelNavegador());
+    if (destinoDeEstaPestana() !== "kash") {
+      window.location.replace("/login");
+      return;
+    }
+    setEmail("");
+    setPassword("");
+    setPaso("correo");
+  };
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -109,7 +154,7 @@ const Login = () => {
           <p className="text-center text-sm text-white/50">{t("auth.loginSubtitle")}</p>
         </div>
 
-        <form onSubmit={handleLogin} className="space-y-5">
+        <form onSubmit={paso === "correo" ? continuarConCorreo : handleLogin} className="space-y-5">
           <div className="space-y-2">
             <Label htmlFor="email" className="text-white/70">{t("auth.email")}</Label>
             <Input
@@ -119,9 +164,16 @@ const Login = () => {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               autoComplete="email"
+              readOnly={puerta && paso === "clave"}
               className="bg-white/10 border-white/10 text-white placeholder:text-white/30"
             />
+            {puerta && paso === "clave" && (
+              <button type="button" onClick={usarOtroCorreo} className="text-xs text-white/50 hover:text-white hover:underline">
+                {t("cobros.puerta.otroCorreo")}
+              </button>
+            )}
           </div>
+          {paso === "clave" && (
           <div className="space-y-2">
             <Label htmlFor="password" className="text-white/70">{t("auth.password")}</Label>
             <div className="relative">
@@ -146,10 +198,18 @@ const Login = () => {
               </Button>
             </div>
           </div>
-          <Button type="submit" className="w-full" disabled={loading}>
-            {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            {t("auth.loginButton")}
-          </Button>
+          )}
+          {paso === "clave" ? (
+            <Button type="submit" className="w-full" disabled={loading}>
+              {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              {t("auth.loginButton")}
+            </Button>
+          ) : (
+            <Button type="submit" className="w-full" disabled={buscando}>
+              {buscando && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              {buscando ? t("cobros.puerta.buscando") : t("cobros.puerta.continuar")}
+            </Button>
+          )}
           {reintentando && (
             <p role="status" aria-live="polite" className="text-center text-sm text-white/60">
               {t("auth.muchaGenteReintentando")}

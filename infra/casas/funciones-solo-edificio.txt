@@ -1,0 +1,10 @@
+# Funciones edge que viven SOLO en el EDIFICIO (maven-agencias, ezeigddgkaemxpshghmu).
+# «Deploy Edge Functions» (el workflow de Kash) las SALTA: nunca se publican en Kash.
+# Cada una tiene que estar también en funciones-edificio.txt (la lista de lo que se
+# publica en el edificio) y tener su bloque en supabase/config.toml.
+# Lo vigila frontend/src/test/infra/edificioNoTocaKash.test.ts.
+
+# Vagón 7 (19/11/2026): cobros con Stripe, la puerta y la tarjeta de Kash para mirar.
+cobros-stripe
+directorio
+refrescar-externas
