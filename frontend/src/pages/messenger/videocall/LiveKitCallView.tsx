@@ -15,6 +15,7 @@ import RoomAudioSink from "./RoomAudioSink";
 import { useAutoPiP } from "./useAutoPiP";
 import AvisoCaidasSeguidas from "./AvisoCaidasSeguidas";
 import MiPantallaCompartida from "./MiPantallaCompartida";
+import MonitoreoActivo from "./MonitoreoActivo";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { suscribirOrdenesDePausa } from "@/lib/ordenesDePausa";
 
@@ -30,7 +31,6 @@ import { toast } from "sonner";
 import { useFaceWatch, faceStateLabel, type FaceWatch } from "@/hooks/useFaceWatch";
 import { useFaceNudge, useScreenShareNudge } from "@/hooks/useFaceNudge";
 import { useMonitorCamara } from "@/hooks/useMonitorCamara";
-import { useUltimoPantallazo } from "@/lib/monitorLocal";
 import { supabase } from "@/integrations/supabase/client";
 import { useArgosEscaleraClip } from "@/hooks/useArgosEscaleraClip";
 import { latirEnLlamada, salirDeLlamada, LATIDO_LLAMADA_MS, LATIDO_SERVIDOR_MS, latirLlamadaEnServidor, salirLlamadaEnServidor } from "@/lib/llamadaEnMaven";
@@ -192,6 +192,9 @@ function usePunteroGrueso(): boolean {
   });
   return grueso;
 }
+
+/** Gracia antes del aviso grande de «falta tu pantalla» en el Hub. */
+const GRACIA_PANTALLA_HUB_MS = 8_000;
 
 export default function LiveKitCallView({ roomName, displayName, callDisplayName, isAdmin = false, onLeave, initialMicOn = true, initialCamOn = true, initialScreenShareOn = false, initialAudioDeviceId, initialVideoDeviceId, initialAudioOutputDeviceId, initialBackgroundEffect = "none", hideShareLink, hideScreenShare, hideLeaveButton, leaveLabel, leaveIcon, suppressLeaveToast, compact, autoPip = true, autoLeaveOnEmpty, getToken, onMediaStateChange, onFaceStateChange, supervisorEncuadre, onLocalScreenTrack, pantallaSoloParaMi, pantallaVisiblePara, pantallaOpcional = false, camaraOpcional = false, pantallaPrestada = null, sinLatidoDeLlamada, incomingAudioMuted, roomSwitcher, recording, shareLink: shareLinkProp, accionesBarra, guardarChat, encima, hideEndForAll, controlesExtra, sinVideoAjeno = false, telemetria, sinVolverEnError = false, hubDelSupervisor = null, mosaicoDePantallas = false }: LiveKitCallViewProps) {
   // Lista de salas del navegador (solo Cowork supervisor+): estado del popup.
@@ -891,13 +894,6 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
     const id = window.setInterval(tic, 3000);
     return () => window.clearInterval(id);
   }, [pantallaSola]);
-  const ultimoPantallazo = useUltimoPantallazo();
-  const [ahoraMonitor, setAhoraMonitor] = useState(() => Date.now());
-  useEffect(() => {
-    if (!supervisorEncuadre) return;
-    const id = window.setInterval(() => setAhoraMonitor(Date.now()), 30_000);
-    return () => window.clearInterval(id);
-  }, [supervisorEncuadre]);
   useMonitorCamara({
     track: localCameraTrack,
     trackPantalla: localScreenTrack,
@@ -977,14 +973,19 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
     const id = window.setInterval(() => setSinPantallaDesde((d) => d ?? Date.now()), 5_000);
     return () => window.clearInterval(id);
   }, [faltaPantallaEnHub]);
-  const [ahoraHub, setAhoraHub] = useState(() => Date.now());
+  // Unos segundos de gracia: al entrar la app la está pidiendo sola. Un solo
+  // temporizador al vencer la gracia, no un reloj de 2 s que redibujaba la
+  // llamada entera mientras faltaba la pantalla (19/11/2026).
+  const [graciaPantallaVencida, setGraciaPantallaVencida] = useState(false);
   useEffect(() => {
-    if (sinPantallaDesde == null) return;
-    const id = window.setInterval(() => setAhoraHub(Date.now()), 2_000);
-    return () => window.clearInterval(id);
+    if (sinPantallaDesde == null) { setGraciaPantallaVencida(false); return; }
+    const falta = GRACIA_PANTALLA_HUB_MS - (Date.now() - sinPantallaDesde);
+    if (falta < 0) { setGraciaPantallaVencida(true); return; }
+    setGraciaPantallaVencida(false);
+    const id = window.setTimeout(() => setGraciaPantallaVencida(true), falta + 1);
+    return () => window.clearTimeout(id);
   }, [sinPantallaDesde]);
-  // Unos segundos de gracia: al entrar la app la está pidiendo sola.
-  const avisoPantallaHub = sinPantallaDesde != null && (pantallaNegra || pantallaApagadaAMano || !pantallaSola || ahoraHub - sinPantallaDesde > 8_000)
+  const avisoPantallaHub = sinPantallaDesde != null && (pantallaNegra || pantallaApagadaAMano || !pantallaSola || graciaPantallaVencida)
     ? textoDePantallaDelHub({ negra: pantallaNegra, apagadaAMano: pantallaApagadaAMano, fallo: lk.ultimoFalloDePantalla(), enLaApp: pantallaSola })
     : null;
   // Y que quede constancia: los mismos llamados, guardados. Va acá al lado de
@@ -1267,19 +1268,9 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
           </button>
         </div>
       )}
-      {/* «Monitoreo activo · pantallazo hace X»: se ve también en la ventanita
-          flotante y en la ventana del sistema, para que la persona sepa que el
-          monitoreo sigue aunque esté en otra app (Alvaro, 10/11). */}
-      {supervisorEncuadre && conSalaViva && ultimoPantallazo && ahoraMonitor - ultimoPantallazo < 5 * 60_000 && (
-        <div role="status" className="shrink-0 flex items-center justify-center gap-1.5 py-1 px-3 text-[11px] text-muted-foreground">
-          <span className="h-1.5 w-1.5 rounded-full bg-success" aria-hidden />
-          {t("messenger.callView.monitoreoActivo", {
-            hace: ahoraMonitor - ultimoPantallazo < 60_000
-              ? t("messenger.callView.monitoreoAhora")
-              : t("messenger.callView.monitoreoMin", { n: Math.floor((ahoraMonitor - ultimoPantallazo) / 60_000) }),
-          })}
-        </div>
-      )}
+      {/* «Monitoreo activo · pantallazo hace X». En su propio componente: el
+          pantallazo de cada minuto ya no redibuja la llamada entera. */}
+      {supervisorEncuadre && conSalaViva && <MonitoreoActivo />}
       {avisoPantallaHub && (
         <div role="alert" className="shrink-0 flex flex-wrap items-center justify-center gap-x-3 gap-y-1.5 py-2.5 px-3 bg-destructive/15 text-foreground text-sm font-medium text-center">
           <MonitorUp className="h-4 w-4 shrink-0 text-destructive" aria-hidden />

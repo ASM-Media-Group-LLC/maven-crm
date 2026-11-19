@@ -11,6 +11,7 @@ import { esOtraPestana } from "@/lib/sesionDuplicada";
 import { toast } from "sonner";
 import { useLanguage } from "@/hooks/useLanguage";
 import { traducir, type TranslationKey } from "@/lib/i18n";
+import { prestarAudioDeMonitores } from "@/lib/audioDeMonitores";
 
 interface Props {
   roomId: string;
@@ -344,6 +345,9 @@ function CoworkRoomMonitor({ roomId, roomName, issueToken, showVideo, hearOn, br
     // en 720p y se estiraba, pixeleada (Alvaro, 18/11/2026).
     afirmarRelojesDeLiveKit();
     const room = new Room({ adaptiveStream: { pixelDensity: "screen" }, dynacast: true });
+    // El AudioContext de todas las salas del Hub es UNO (lib/audioDeMonitores):
+    // crear uno por sala al conectar trababa la página apenas llegaba el token.
+    prestarAudioDeMonitores(room);
     roomRef.current = room;
 
     // Guarda la cámara o la pantalla de un participante en su casillero.

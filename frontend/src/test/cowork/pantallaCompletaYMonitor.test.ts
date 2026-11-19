@@ -16,10 +16,12 @@ const fuentes = (import.meta as unknown as {
   "/frontend/src/hooks/useLiveKit.ts",
   "/frontend/src/pages/messenger/videocall/LiveKitCallView.tsx",
   "/frontend/src/hooks/useMonitorCamara.ts",
+  "/frontend/src/pages/messenger/videocall/MonitoreoActivo.tsx",
 ], { query: "?raw", import: "default", eager: true });
 const liveKit = fuentes["/frontend/src/hooks/useLiveKit.ts"];
 const llamada = fuentes["/frontend/src/pages/messenger/videocall/LiveKitCallView.tsx"];
 const monitor = fuentes["/frontend/src/hooks/useMonitorCamara.ts"];
+const monitoreoActivo = fuentes["/frontend/src/pages/messenger/videocall/MonitoreoActivo.tsx"];
 
 describe("pantalla completa obligatoria en Cowork", () => {
   it("solo la pantalla completa pasa; si el navegador no lo dice, se acepta", () => {
@@ -73,6 +75,8 @@ describe("el monitor se nota también fuera de Maven", () => {
   it("cada pantallazo guardado se anota y al volver a Maven se avisa", () => {
     expect(monitor).toContain("if (guardoAlgo) anotarPantallazo();");
     expect(monitor).toContain('document.addEventListener("visibilitychange", alVolver)');
-    expect(llamada).toContain("messenger.callView.monitoreoActivo");
+    // La línea vive en su propio componente (no redibuja la llamada entera).
+    expect(llamada).toContain("<MonitoreoActivo />");
+    expect(monitoreoActivo).toContain("messenger.callView.monitoreoActivo");
   });
 });

@@ -82,6 +82,7 @@ import { alternarBlur, esBlur, guardarFondo, leerFondoGuardado, type BackgroundE
 import { precalentarFondo, soportaProcesadorDeFondo } from "@/lib/fondoFino/procesador";
 import { crearCamaraDelAnfitrion, type CamaraDelAnfitrion, type ResultadoDelFondo } from "@/lib/camaraDelAnfitrion";
 import { escritorio } from "@/lib/escritorio";
+import { conLista } from "@/lib/presenciaEstable";
 
 // Lo que vio el detector de encuadre, como CÓDIGO: se compara y se elige el
 // icono con esto, y el texto sale del diccionario en el idioma de quien mira.
@@ -1591,10 +1592,14 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
   const manejadoresDe = (roomId: string) => {
     let h = manejadoresMonitor.current[roomId];
     if (!h) {
+      // Con la MISMA lista se devuelve el mismo registro y React no redibuja el
+      // tablero: LiveKit avisa quién habla varias veces por segundo en cada sala
+      // y repite la lista de gente con cada pista que entra o sale. Antes cada
+      // aviso redibujaba el Hub entero aunque nada hubiera cambiado (19/11/2026).
       h = {
-        sharers: (_names, ids) => setRoomSharerIds((m) => ({ ...m, [roomId]: ids ?? [] })),
-        speaking: (names) => setRoomSpeakers((m) => ({ ...m, [roomId]: names })),
-        participants: (ids) => setRoomConectados((m) => ({ ...m, [roomId]: ids })),
+        sharers: (_names, ids) => setRoomSharerIds((m) => conLista(m, roomId, ids ?? [])),
+        speaking: (names) => setRoomSpeakers((m) => conLista(m, roomId, names)),
+        participants: (ids) => setRoomConectados((m) => conLista(m, roomId, ids)),
       };
       manejadoresMonitor.current[roomId] = h;
     }

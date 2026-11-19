@@ -70,15 +70,38 @@ export function vigilarPantallaNegra(
     return () => {};
   }
   const juez = juezDePantallaNegra(alCambiar);
+  let parado = false;
+  let midiendo = false;
+  const leerCuadro = () => juez(cuadroEsNegro(ctx.getImageData(0, 0, canvas.width, canvas.height).data));
+  // SIN TRABAR LA PÁGINA (19/11/2026). La medición de llamadas marcaba esta
+  // función («index.js:o», ~0,9 s de promedio y picos de varios segundos):
+  // `drawImage(video)` sobre un lienzo de lectura frecuente (que vive en la CPU)
+  // bajaba el cuadro ENTERO de la pantalla —en un Mac retina, 5K— al hilo
+  // principal para reducirlo a 64×36. Ahora la reducción la hace
+  // createImageBitmap, fuera del hilo principal, y aquí solo se dibuja el
+  // cuadrito ya reducido. El veredicto es el mismo.
   const mirar = () => {
-    if (track.readyState !== "live" || video.readyState < 2) return;
+    if (parado || midiendo || track.readyState !== "live" || video.readyState < 2) return;
+    if (typeof createImageBitmap === "function") {
+      midiendo = true;
+      createImageBitmap(video, { resizeWidth: canvas.width, resizeHeight: canvas.height, resizeQuality: "low" })
+        .then((cuadro) => {
+          try {
+            if (!parado) { ctx.drawImage(cuadro, 0, 0); leerCuadro(); }
+          } finally { cuadro.close(); }
+        })
+        .catch(() => { /* un cuadro que no se pudo leer no dice nada */ })
+        .finally(() => { midiendo = false; });
+      return;
+    }
     try {
       ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-      juez(cuadroEsNegro(ctx.getImageData(0, 0, canvas.width, canvas.height).data));
+      leerCuadro();
     } catch { /* un cuadro que no se pudo leer no dice nada */ }
   };
   const id = window.setInterval(mirar, cada);
   return () => {
+    parado = true;
     window.clearInterval(id);
     try { video.pause(); video.srcObject = null; } catch { /* noop */ }
   };

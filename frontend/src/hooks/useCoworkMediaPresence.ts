@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { esEstadoSupervisor, type EstadoSupervisor, leerDesdePausaSupervisor } from "@/lib/pausaSupervisor";
 import type { ConexionSala } from "@/lib/coworkTiempoRegla";
+import { registroEstable } from "@/lib/presenciaEstable";
 import { escritorio } from "@/lib/escritorio";
 import { equipoDeTrabajo, type EquipoDeTrabajo } from "@/lib/coworkSoloApp";
 
@@ -698,10 +699,13 @@ export function useCoworkMediaPresence(
     let cancelado = false;
     let entrada: CanalVivo | null = null;
 
+    // Lo que no cambió conserva su objeto y, si no cambió nada, el setState no
+    // redibuja (lib/presenciaEstable): cada persona re-publica cada ~10 s y cada
+    // re-publicación llega como tres avisos; antes cada uno redibujaba el Hub.
     const oyente = (estados: Record<string, MediaState>, sups: Record<string, EstadoSupervisor | null>, desdes: Record<string, number | null>) => {
-      setMediaStates(estados);
-      setSupervisores(sups);
-      setSupervisoresDesde(desdes);
+      setMediaStates((antes) => registroEstable(antes, estados));
+      setSupervisores((antes) => registroEstable(antes, sups));
+      setSupervisoresDesde((antes) => registroEstable(antes, desdes));
     };
     const engancharse = (e: CanalVivo) => {
       entrada = e;
@@ -709,9 +713,7 @@ export function useCoworkMediaPresence(
       e.oyentes.add(oyente);
       // Si el canal ya estaba abierto, arrancar con lo que ya sabe en vez de
       // esperar al próximo evento (si no, la lista aparece vacía un instante).
-      setMediaStates(leerEstados(e.canal));
-      setSupervisores(leerSupervisores(e.canal));
-      setSupervisoresDesde(leerSupervisoresDesde(e.canal));
+      oyente(leerEstados(e.canal), leerSupervisores(e.canal), leerSupervisoresDesde(e.canal));
     };
 
     const preparar = async () => {

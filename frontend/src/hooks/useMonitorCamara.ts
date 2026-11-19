@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
 import { toast } from "sonner";
-import { huellaDeCanvas } from "@/lib/huellaPantalla";
+import { huellaSinTrabas } from "@/lib/huellaPantalla";
 import { lienzoAJpegBase64 } from "@/lib/jpegSinTrabas";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -86,12 +86,14 @@ async function capturarJPEG(
         const ctx = canvas.getContext("2d");
         if (!ctx) { limpiar(); resolve(null); return; }
         ctx.drawImage(video, 0, 0, w, h);
-        // Argos a USD 15: huella gratis de la pantalla (lib/huellaPantalla.ts).
-        if (alHuella) alHuella(huellaDeCanvas(canvas));
         limpiar();
+        // Argos a USD 15: huella gratis de la pantalla (lib/huellaPantalla.ts),
+        // reducida fuera del hilo principal (huellaSinTrabas). Se espera antes
+        // de devolver la foto: quien guarda la fila necesita las dos.
+        const huella = alHuella ? huellaSinTrabas(canvas).then(alHuella, () => alHuella(null)) : Promise.resolve();
         // toBlob, no toDataURL: el JPEG (1600 px en la de pantalla) se codifica
         // fuera del hilo principal (lib/jpegSinTrabas.ts).
-        lienzoAJpegBase64(canvas, calidad).then(resolve, () => resolve(null));
+        Promise.all([lienzoAJpegBase64(canvas, calidad), huella]).then(([b64]) => resolve(b64), () => resolve(null));
       } catch {
         limpiar();
         resolve(null);
