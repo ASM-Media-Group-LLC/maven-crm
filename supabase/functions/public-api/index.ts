@@ -5,6 +5,8 @@
 // Recursos (Fase 1): datos de la AGENCIA (no data de fans de OF).
 //   GET /public-api/creators           scope creators:read
 //   GET /public-api/creators/:id        creators:read
+//   POST  /public-api/creators          creators:write  (crear; ver ./creadoras.ts)
+//   PATCH /public-api/creators/:id      creators:write  (cuentas de OnlyFans)
 //   GET /public-api/contacts            contacts:read   (+ contacts:phone para PII)
 //   GET /public-api/contacts/:id        contacts:read
 //   GET /public-api/employees           employees:read
@@ -79,6 +81,8 @@ import { servirContenido } from "./contenido.ts";
 import { rutaDeContenido } from "./contenido-logica.ts";
 import { cabecerasDeCupo, clientIp, CUERPO_MAX_BYTES, fetchSinReintentos, ipAllowed, leerCuerpo } from "./peticion.ts";
 import { idiomaDelPedido, msg, varyConIdioma } from "./mensajes.ts";
+import { servirCreadoras } from "./creadoras.ts";
+import { rutaDeCreadoras } from "./creadoras-logica.ts";
 import { esMetodo, leerCuerpoDeEscritura, leerIdempotencia, METODOS, type ObjetoJson, scopesDeLaRuta } from "./escritura-formato.ts";
 
 // Los plazos de los clientes en una escritura (sin reintentos escondidos: ver
@@ -170,7 +174,8 @@ function urlOnly(value: unknown): { url: string } | null {
 
 type Row = Record<string, unknown> & { id: string };
 
-function shapeCreator(c: Row, ofAccounts: Array<{ account_handle: string | null; onlyfans_url: string | null }>) {
+type CuentaDeOF = { account_handle: string | null; onlyfans_url: string | null; onlyfans_id?: string | null };
+function shapeCreator(c: Row, ofAccounts: CuentaDeOF[]) {
   const socials: Record<string, unknown> = {};
   const put = (k: string, v: unknown) => { if (v) socials[k] = v; };
   put("instagram", social("instagram", c.instagram_handle));
@@ -184,8 +189,9 @@ function shapeCreator(c: Row, ofAccounts: Array<{ account_handle: string | null;
   put("onlyfans", urlOnly(c.onlyfans_url));
   put("other", urlOnly(c.other_url ?? c.link_otras_plataformas));
   const of = ofAccounts
-    .map((a) => ({ handle: a.account_handle ?? null, url: urlOnly(a.onlyfans_url)?.url ?? null }))
-    .filter((a) => a.handle || a.url);
+    // onlyfans_id: el número de la cuenta (Backstage, 18/11/2026).
+    .map((a) => ({ onlyfans_id: a.onlyfans_id ?? null, handle: a.account_handle ?? null, url: urlOnly(a.onlyfans_url)?.url ?? null }))
+    .filter((a) => a.onlyfans_id || a.handle || a.url);
   return {
     id: c.id, name: c.name ?? null, artistic_name: c.artistic_name ?? null,
     category: c.category ?? null, status: c.status ?? null,
@@ -372,6 +378,8 @@ Deno.serve(async (req) => {
         { method: "GET", path: "/contenido/pedidos/{id}", scope: "contenido:write" },
         { path: "/creators", scope: "creators:read" },
         { path: "/creators/{id}", scope: "creators:read" },
+        { method: "POST", path: "/creators", scope: "creators:write" },
+        { method: "PATCH", path: "/creators/{id}", scope: "creators:write" },
         { path: "/contacts", scope: "contacts:read" },
         { path: "/contacts/{id}", scope: "contacts:read" },
         { path: "/employees", scope: "employees:read" },
@@ -411,11 +419,18 @@ Deno.serve(async (req) => {
     return json(req, { error: "forbidden", message: msg(idioma, "falta_scope", { scope: "contenido:write" }) }, 403);
   }
 
+  // /creators con POST/PATCH (Backstage, 18/11/2026): crear creadoras y cargar su ID
+  // de OnlyFans. Escribe con service_role atado a la agencia, como /contenido.
+  const esCreadorasEscritura = recursoClave === "creators" && metodo !== "GET";
+  if (esCreadorasEscritura && !need("creators:write")) {
+    return json(req, { error: "forbidden", message: msg(idioma, "falta_scope", { scope: "creators:write" }) }, 403);
+  }
+
   // ===== Escrituras: lo que se mira antes de tocar el recurso =====
   // (1) Solo los recursos como_usuario se escriben; los demás, 405 SIN leer el cuerpo.
   // La excepción es /contenido, que escribe con service_role atado a la agencia.
   if (metodo !== "GET" && !esComoUsuario(recursoClave)) {
-    if (!esContenido) {
+    if (!esContenido && !esCreadorasEscritura) {
       return json(req, {
         error: "method_not_allowed",
         message: msg(idioma, "metodo_no_permitido", { permitidos: "GET" }),
@@ -429,7 +444,9 @@ Deno.serve(async (req) => {
   const rutaDeContenidoPedida = esContenido ? rutaDeContenido(metodo, rest.slice(1)) : null;
   const rutaDeEscritura = rutaDeContenidoPedida
     ? { ok: rutaDeContenidoPedida.ok && (rutaDeContenidoPedida.accion === "crear" || rutaDeContenidoPedida.accion === "pedido_crear") }
-    : scopesDeLaRuta(recursoClave, metodo, rest.slice(1));
+    : esCreadorasEscritura
+      ? { ok: rutaDeCreadoras(metodo, rest.slice(1)).ok }
+      : scopesDeLaRuta(recursoClave, metodo, rest.slice(1));
   if ((metodo === "POST" || metodo === "PATCH") && rutaDeEscritura.ok) {
     const leido = await leerCuerpo(req, CUERPO_MAX_BYTES);
     if (!leido.ok && leido.estado === 413) return json(req, { error: "payload_too_large", message: msg(idioma, "cuerpo_muy_grande") }, 413);
@@ -478,6 +495,23 @@ Deno.serve(async (req) => {
         return json(req, { error: "outcome_unknown", message: msg(idioma, "resultado_incierto") }, 503, { "Retry-After": "5" });
       }
       return noDisponible(req, "/contenido", e);
+    }
+  }
+
+  // ===== /creators (escritura): crear y cargar el ID de OnlyFans =====
+  if (esCreadorasEscritura) {
+    try {
+      const leer = async (id: string) => {
+        const { data: c } = await admin.from("creators").select(CREATOR_COLUMNS).eq("id", id).eq("tenant_id", tenantId).maybeSingle();
+        if (!c) return null;
+        const { data: ofa } = await admin.from("creator_of_accounts").select("account_handle, onlyfans_url, onlyfans_id").eq("creator_id", id);
+        return shapeCreator(c as unknown as Row, (ofa ?? []) as CuentaDeOF[]);
+      };
+      const r = await servirCreadoras({ admin, agencia: tenantId, metodo, ruta: rest.slice(1), cuerpo, leer });
+      return json(req, r.cuerpo, r.estado, r.permitidos ? { "Allow": r.permitidos.join(", ") } : {});
+    } catch (e) {
+      console.error("[public-api] /creators escritura:", (e as { message?: string })?.message ?? e);
+      return json(req, { error: "outcome_unknown", message: msg(idioma, "resultado_incierto") }, 503, { "Retry-After": "5" });
     }
   }
 
@@ -544,7 +578,7 @@ Deno.serve(async (req) => {
       const { data: c, error } = await admin.from("creators").select(CREATOR_COLUMNS).eq("id", sub).maybeSingle();
       if (error) return json(req, { error: "server_error", message: error.message }, 500);
       if (!c) return json(req, { error: "not_found", message: msg(idioma, "creadora_no_encontrada") }, 404);
-      const { data: ofa } = await admin.from("creator_of_accounts").select("account_handle, onlyfans_url").eq("creator_id", sub);
+      const { data: ofa } = await admin.from("creator_of_accounts").select("account_handle, onlyfans_url, onlyfans_id").eq("creator_id", sub);
       return json(req, { object: "creator", data: shapeCreator(c as unknown as Row, ofa ?? []) });
     }
 
@@ -557,13 +591,13 @@ Deno.serve(async (req) => {
     if (error) return json(req, { error: "server_error", message: error.message }, 500);
 
     const ids = (rows ?? []).map((r) => (r as unknown as Row).id);
-    const ofByCreator = new Map<string, Array<{ account_handle: string | null; onlyfans_url: string | null }>>();
+    const ofByCreator = new Map<string, CuentaDeOF[]>();
     if (ids.length) {
-      const { data: ofa } = await admin.from("creator_of_accounts").select("creator_id, account_handle, onlyfans_url").in("creator_id", ids);
+      const { data: ofa } = await admin.from("creator_of_accounts").select("creator_id, account_handle, onlyfans_url, onlyfans_id").in("creator_id", ids);
       for (const a of ofa ?? []) {
         const cid = (a as { creator_id: string }).creator_id;
         if (!ofByCreator.has(cid)) ofByCreator.set(cid, []);
-        ofByCreator.get(cid)!.push(a as { account_handle: string | null; onlyfans_url: string | null });
+        ofByCreator.get(cid)!.push(a as CuentaDeOF);
       }
     }
     const data = (rows ?? []).map((r) => {
