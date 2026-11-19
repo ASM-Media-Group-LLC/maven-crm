@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react";
 import { supabase, SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY } from "@/integrations/supabase/client";
 import { estaEnPausa } from "@/lib/coworkPausa";
+import { estaEnMomentoPrivado } from "@/lib/momentoPrivado";
 import { estaEnLlamadaDeMaven } from "@/lib/llamadaEnMaven";
 import type { FaceWatch } from "@/hooks/useFaceWatch";
 import { esProblemaDeEncuadre } from "@/hooks/useFaceNudge";
@@ -247,7 +248,7 @@ export function useRegistrarLlamados({ faceWatch, compartiendo, activo, conectad
       // Cualquier motivo para dudar borra el reloj entero, no lo congela.
       // Una llamada de Maven en curso cuenta como motivo: la cámara está EN esa
       // llamada — anotarle "cámara apagada" sería registrar trabajo como falta.
-      if (!con || estaEnPausa() || estaEnLlamadaDeMaven()) {
+      if (!con || estaEnPausa() || estaEnMomentoPrivado() || estaEnLlamadaDeMaven()) {
         olvidar(TODOS);
         return;
       }

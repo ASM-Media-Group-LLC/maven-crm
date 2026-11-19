@@ -1400,7 +1400,9 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
   const salaCaidaEn = (ms: MediaState | undefined): boolean =>
     ms?.conexionSala === "desconectada" || ms?.relojEstado === "sin_conexion" || ms?.relojEstado === "sin_conexion_larga";
 
-  const sinPantalla = (ms: MediaState | undefined): boolean => ms?.exigePantalla !== false && !salaCaidaEn(ms) && debeAvisarSinPantalla(
+  const enMomentoPrivado = (ms: MediaState | undefined): boolean =>
+    typeof ms?.momentoPrivadoHasta === "number" && now < ms.momentoPrivadoHasta;
+  const sinPantalla = (ms: MediaState | undefined): boolean => ms?.exigePantalla !== false && !enMomentoPrivado(ms) && !salaCaidaEn(ms) && debeAvisarSinPantalla(
     ms, now,
     reglas.pantalla.activa && reglas.pantalla.supervisorSeg !== null ? reglas.pantalla.supervisorSeg * 1000 : null,
   );
@@ -1409,6 +1411,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
     if (!ms || !ms.faceState || !ms.faceSince) return null;
     if (ms.onBreak) return null;                   // ya sabemos que no está
     if (ms.exigeCamara === false) return null;     // su puesto no le pide cámara
+    if (enMomentoPrivado(ms)) return null;         // «Momento privado»: gasta su gracia
     if (salaCaidaEn(ms)) return null;              // se cayó la sala, no su cámara
     if (ms.faceState === "ok") return null;
     if (ms.faceState === "unavailable") return null; // el detector no cargó en su equipo

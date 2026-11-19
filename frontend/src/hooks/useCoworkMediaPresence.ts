@@ -55,6 +55,9 @@ export interface MediaState {
    *  supervisor; undefined = un Maven de antes: se le pide (como siempre). */
   exigeCamara?: boolean | null;
   exigePantalla?: boolean | null;
+  /** «Momento privado» (19/11/2026): hasta cuándo (epoch ms). Mientras dure, el
+   *  supervisor no recibe alarmas de su cámara ni de su pantalla. */
+  momentoPrivadoHasta?: number | null;
 }
 
 interface UseCoworkMediaPresenceResult {
