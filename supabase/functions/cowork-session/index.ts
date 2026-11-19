@@ -7,6 +7,7 @@ import {
 } from "../_shared/cowork-tiempo.ts";
 import { agenciaDePersona, agenciaDeSesion, esUuid, revisarPedido, topeDeLaTabla } from "./agencia.ts";
 import { decidirAsignarSala, elegirSalaPorDefecto, guardarSalaFija, leerSalaFija } from "./sala-fija.ts";
+import { urlDeLiveKit } from "../_shared/livekit-servidor.ts";
 
 const corsHeaders = (req: Request) => corsFor(req, { "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version" });
 
@@ -256,7 +257,7 @@ serve(async (req) => {
     const veredicto = await revisarPedido(admin, miAgencia, String(action ?? ""), body ?? {});
     if (!veredicto.ok) return err(req, veredicto.error, veredicto.status);
 
-    const lkUrl = Deno.env.get("LIVEKIT_URL")!;
+    const lkUrl = urlDeLiveKit(userId);
     const lkKey = Deno.env.get("LIVEKIT_API_KEY")!;
     const lkSecret = Deno.env.get("LIVEKIT_API_SECRET")!;
 

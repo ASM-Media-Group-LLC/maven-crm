@@ -2,6 +2,7 @@ import { corsFor } from "../_shared/cors.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { agenciaDePersona, revisarSala } from "../_shared/livekit-agencia.ts";
+import { urlDeLiveKit } from "../_shared/livekit-servidor.ts";
 
 const corsHeaders = (req: Request) => corsFor(req, { "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version" });
 
@@ -181,7 +182,7 @@ serve(async (req) => {
       }
     }
 
-    const livekitUrl = Deno.env.get("LIVEKIT_URL")!;
+    const livekitUrl = urlDeLiveKit(userId);
     const apiKey = Deno.env.get("LIVEKIT_API_KEY")!;
     const apiSecret = Deno.env.get("LIVEKIT_API_SECRET")!;
 
