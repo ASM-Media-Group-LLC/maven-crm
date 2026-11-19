@@ -50,8 +50,10 @@ const AVISO_ESTADO: Partial<Record<EstadoObservador, "vigilancia.vivo.conectando
   sin_permiso: "vigilancia.vivo.sinPermiso",
 };
 
-export function EscenarioEnVivo({ estado, pantalla, camara, audio, sala, escuchar, onEscuchar, onReintentar, t }: {
+export function EscenarioEnVivo({ estado, pantalla, camara, audio, sala, escuchar, onEscuchar, onReintentar, noEnTurno = false, t }: {
   estado: EstadoObservador;
+  /** Sin en vivo y fuera de su horario: se dice «No está en turno» (Alvaro, 19/11). */
+  noEnTurno?: boolean;
   pantalla: PistaAdjuntable | null;
   camara: PistaAdjuntable | null;
   audio: PistaAdjuntable | null;
@@ -75,7 +77,10 @@ export function EscenarioEnVivo({ estado, pantalla, camara, audio, sala, escucha
   const principal = camaraGrande ? camara ?? pantalla : pantalla ?? camara;
   const ventanita = principal === pantalla ? camara : principal === camara ? pantalla : null;
   const enVivo = estado === "en_vivo";
-  const aviso = enVivo ? (principal ? null : "vigilancia.vivo.sinNada") : AVISO_ESTADO[estado] ?? null;
+  const sinVivo = estado === "esperando" || estado === "sin_cowork" || estado === "no_disponible";
+  const aviso = enVivo
+    ? (principal ? null : "vigilancia.vivo.sinNada")
+    : (noEnTurno && sinVivo ? "vigilancia.vivo.noEnTurno" : AVISO_ESTADO[estado] ?? null);
 
   const pantallaCompleta = async () => {
     try {

@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { Camera, Check, CheckCheck, Film, Loader2, Megaphone, Radio } from "lucide-react";
+import { Camera, Check, CheckCheck, Loader2, Megaphone } from "lucide-react";
 import { FotoConZoom } from "@/components/hr/FotoConZoom";
 import { cn } from "@/lib/utils";
 import { minutosDesde } from "@/lib/motivosVivos";
@@ -207,17 +207,18 @@ function BotonesAccion({ acciones, t, className }: { acciones: AccionesVivo; t: 
 }
 
 export function EnVivoPersonaVista({
-  razon, razonNoEncontrada, otras, fotoRazon, puntos, modo, onModo, escenario, video, acciones, pie, nombre = "", t, lang,
+  razon, razonNoEncontrada, otras, fotoRazon, puntos, escenario, acciones, pie, nombre = "", t, lang,
 }: {
   razon: RazonEnVivo | null;
   razonNoEncontrada: boolean;
   otras: RazonEnVivo[];
   fotoRazon: string | null;
   puntos: number | null;
-  modo: ModoEscenario;
-  onModo: (m: ModoEscenario) => void;
+  /** Ya no se usan (desde el 19/11 solo hay en vivo); se aceptan por compatibilidad. */
+  modo?: ModoEscenario;
+  onModo?: (m: ModoEscenario) => void;
   escenario: ReactNode;
-  video: ReactNode;
+  video?: ReactNode;
   acciones: AccionesVivo;
   /** Debajo de todo (p. ej. «Ver su expediente»). */
   pie?: ReactNode;
@@ -226,22 +227,6 @@ export function EnVivoPersonaVista({
   t: Tr;
   lang: string;
 }) {
-  const tabs = (
-    <div role="tablist" aria-label={t("vigilancia.vivo.queVer")}
-      className="grid grid-cols-2 gap-1 rounded-panel border border-border/60 bg-foreground/[0.03] p-1">
-      {(["vivo", "video"] as const).map((m) => (
-        <button key={m} type="button" role="tab" aria-selected={modo === m} onClick={() => onModo(m)}
-          className={cn(
-            "inline-flex h-10 min-w-0 items-center justify-center gap-1.5 rounded-control px-2 text-sm font-semibold transition-colors",
-            modo === m ? "bg-foreground/10 text-foreground ring-1 ring-border" : "text-muted-foreground hover:text-foreground",
-          )}>
-          {m === "vivo" ? <Radio className="h-4 w-4 shrink-0" /> : <Film className="h-4 w-4 shrink-0" />}
-          <span className="truncate">{m === "vivo" ? t("vigilancia.vivo.tabVivo") : t("vigilancia.vivo.tabVideo")}</span>
-        </button>
-      ))}
-    </div>
-  );
-
   // Orden (Alvaro, 19/11/2026: «arriba el en vivo, donde dice En vivo, y abajo
   // el pantallazo»): 1) el EN VIVO a lo grande, con lo que pasó y las acciones
   // al lado; 2) debajo, el pantallazo que lo disparó y lo demás.
@@ -249,8 +234,10 @@ export function EnVivoPersonaVista({
     <div className="mt-3 flex flex-col gap-4">
       <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_360px]">
         <div className="flex min-w-0 flex-col gap-3">
-          {tabs}
-          {modo === "vivo" ? escenario : video}
+          {/* Solo el en vivo (Alvaro, 19/11: «what happened y la derecha son lo
+              mismo… quiero entrar directo a live»). Lo que pasó y la foto que
+              lo disparó están a la derecha. */}
+          {escenario}
         </div>
 
         <aside className="flex min-w-0 flex-col gap-3 lg:sticky lg:top-0">
