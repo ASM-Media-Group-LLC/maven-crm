@@ -7,6 +7,7 @@ import { useFormato } from "@/hooks/useFormato";
 import { useLanguage } from "@/hooks/useLanguage";
 import type { TranslationKey } from "@/lib/i18n";
 import { getModuleIcon, getTypeIcon, getPriorityDotClass } from "@/lib/notificationHelpers";
+import { AvisoCasoArgos, esAvisoDeCaso } from "./AvisoCasoArgos";
 
 // El chip del módulo de origen muestra `module_origin`, que es el valor guardado
 // en la base. En español se deja tal cual (como siempre); en inglés, los que
@@ -46,39 +47,8 @@ export default function NotificationItem({ notification: n, onClickNotification,
   const usaDiccionario = language === "en" && !!claveModulo;
   const nombreModulo = usaDiccionario && claveModulo ? t(claveModulo) : n.module_origin;
 
-  return (
-    <div
-      className={`group flex items-start gap-3 p-3 text-left hover:bg-muted/50 transition-colors cursor-pointer ${isUnread ? "bg-primary/5" : ""}`}
-      onClick={() => onClickNotification(n)}
-      role="button"
-      tabIndex={0}
-    >
-      {/* Priority dot */}
-      <span className={`mt-1.5 h-2 w-2 rounded-full shrink-0 ${isUnread ? dotClass : "bg-transparent"}`} />
-
-      {/* Module icon */}
-      <ModuleIcon className="h-4 w-4 text-muted-foreground shrink-0 mt-0.5" />
-
-      {/* Content */}
-      <div className="flex-1 min-w-0">
-        <p className={`text-sm leading-tight ${isUnread ? "font-semibold" : ""}`}>{n.title}</p>
-        {n.message && (
-          <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{n.message}</p>
-        )}
-        <div className="flex items-center gap-2 mt-1">
-          <p className="text-[11px] text-muted-foreground">
-            {formatDistanceToNow(new Date(n.created_at), { addSuffix: true, locale: f.fechas })}
-          </p>
-          {n.module_origin && (
-            <span className={`text-[10px] px-1.5 py-0 rounded bg-muted text-muted-foreground${usaDiccionario ? "" : " capitalize"}`}>
-              {nombreModulo}
-            </span>
-          )}
-        </div>
-      </div>
-
-      {/* Actions */}
-      <div className="flex items-center gap-1 shrink-0">
+  const acciones = (
+    <>
         {showArchive && onArchive && (
           <Tooltip>
             <TooltipTrigger asChild>
@@ -117,7 +87,47 @@ export default function NotificationItem({ notification: n, onClickNotification,
             <TooltipContent>{t("common.delete")}</TooltipContent>
           </Tooltip>
         )}
+          </>
+  );
+
+  // Revisión de RR. HH. (19/11/2026): tarjeta con color, foto y botón.
+  if (esAvisoDeCaso(n)) {
+    return <AvisoCasoArgos n={n} onClick={() => onClickNotification(n)} acciones={acciones} />;
+  }
+
+  return (
+    <div
+      className={`group flex items-start gap-3 p-3 text-left hover:bg-muted/50 transition-colors cursor-pointer ${isUnread ? "bg-primary/5" : ""}`}
+      onClick={() => onClickNotification(n)}
+      role="button"
+      tabIndex={0}
+    >
+      {/* Priority dot */}
+      <span className={`mt-1.5 h-2 w-2 rounded-full shrink-0 ${isUnread ? dotClass : "bg-transparent"}`} />
+
+      {/* Module icon */}
+      <ModuleIcon className="h-4 w-4 text-muted-foreground shrink-0 mt-0.5" />
+
+      {/* Content */}
+      <div className="flex-1 min-w-0">
+        <p className={`text-sm leading-tight ${isUnread ? "font-semibold" : ""}`}>{n.title}</p>
+        {n.message && (
+          <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{n.message}</p>
+        )}
+        <div className="flex items-center gap-2 mt-1">
+          <p className="text-[11px] text-muted-foreground">
+            {formatDistanceToNow(new Date(n.created_at), { addSuffix: true, locale: f.fechas })}
+          </p>
+          {n.module_origin && (
+            <span className={`text-[10px] px-1.5 py-0 rounded bg-muted text-muted-foreground${usaDiccionario ? "" : " capitalize"}`}>
+              {nombreModulo}
+            </span>
+          )}
+        </div>
       </div>
+
+      {/* Actions */}
+      <div className="flex items-center gap-1 shrink-0">{acciones}</div>
     </div>
   );
 }

@@ -1,5 +1,5 @@
 import { conEtiqueta } from "@/lib/etiquetaTraducida";
-import { Bell, CheckSquare, Users, Calendar, Briefcase, DollarSign, FileText, UserCheck, ShieldAlert, MessageSquare, ClipboardList, AlertTriangle, Clock, HelpCircle, type LucideIcon, AtSign } from "lucide-react";
+import { Bell, CheckSquare, Users, Calendar, Briefcase, DollarSign, FileText, UserCheck, ShieldAlert, MessageSquare, ClipboardList, AlertTriangle, Clock, HelpCircle, type LucideIcon, AtSign, Eye } from "lucide-react";
 
 // ─── Avisos de vigilancia de antes del 11/11 ──────────────────────
 // Hasta el 11/11 el aviso de Argos llevaba al expediente con fotos
@@ -60,6 +60,7 @@ export function resolveDeepLink(
 
 // ─── Module icon mapper ────────────────────────────────────────────
 const MODULE_ICONS: Record<string, LucideIcon> = {
+  argos: Eye,
   creadores: Users,
   tareas: CheckSquare,
   eventos: Calendar,

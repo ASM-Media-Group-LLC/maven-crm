@@ -2,18 +2,21 @@ import { CalendarClock } from "lucide-react";
 import { useLanguage } from "@/hooks/useLanguage";
 import { useHorariosBloqueo } from "@/hooks/useHorariosEquipo";
 import { ListaHorarios } from "@/components/horarios/ListaHorarios";
+import { useEnTurno } from "@/lib/turnoActivo";
 
 // CARTEL QUE NO SE QUITA (Alvaro, 19/11/2026: «bombardear a Andrea para que
 // reafirme los horarios»; eligió «cartel que no se quita»). A RR. HH. (que no es
 // admin ni dueño) le tapa Maven hasta que confirme el horario de cada persona;
 // se confirma ahí mismo y se va solo al terminar. Si la consulta falla, no
-// bloquea a nadie (un fallo no es «tienes pendientes»).
+// bloquea a nadie (un fallo no es «tienes pendientes»). Espera a que la persona
+// esté en turno: si no, le taparía el botón de «Marcar entrada» (20/11/2026).
 
 export function HorariosObligatorios() {
   const { t } = useLanguage();
   const q = useHorariosBloqueo();
+  const enTurno = useEnTurno();
   const b = q.data;
-  if (!b?.debe) return null;
+  if (!b?.debe || !enTurno) return null;
   const listos = Math.max(0, b.total - b.pendientes);
   const pct = b.total > 0 ? Math.round((listos / b.total) * 100) : 0;
   return (

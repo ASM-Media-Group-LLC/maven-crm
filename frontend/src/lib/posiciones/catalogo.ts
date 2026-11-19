@@ -89,6 +89,38 @@ export const CATALOGO_POSICIONES: SeccionCatalogo[] = [
             ]
           },
           {
+            "fila": "Revisión de RR. HH.",
+            "etiqueta": "posiciones.c.revision_de_rrhh",
+            "datos": "no",
+            "funciones": [
+              {
+                "clave": "N:argos.casos.juzgar",
+                "etiqueta": "posiciones.c.juzgar_casos_de_argos",
+                "nueva": true
+              },
+              {
+                "clave": "N:argos.casos.obligado",
+                "etiqueta": "posiciones.c.obligado_a_revisar",
+                "nueva": true
+              },
+              {
+                "clave": "N:argos.casos.corregir",
+                "etiqueta": "posiciones.c.corregir_veredicto",
+                "nueva": true
+              },
+              {
+                "clave": "N:argos.casos.reporte",
+                "etiqueta": "posiciones.c.recibir_reporte_rrhh",
+                "nueva": true
+              },
+              {
+                "clave": "N:argos.casos.jefe",
+                "etiqueta": "posiciones.c.aviso_atraso_y_graves",
+                "nueva": true
+              }
+            ]
+          },
+          {
             "fila": "Ajustes de Argos",
             "etiqueta": "posiciones.c.ajustes_de_argos",
             "datos": "no",

@@ -19,6 +19,7 @@ import BancoConexionEquipo from "./bancoConexionEquipo";
 import BancoCostos from "./bancoCostos";
 import BancoGracia from "./bancoGracia";
 import BancoTurno from "./bancoTurno";
+import BancoCasos from "./bancoCasos";
 import BancoGuiaConexion from "./bancoGuiaConexion";
 import { BancoGuiaApp, BancoAppDelEquipo } from "./bancoGuiaApp";
 import { BancoAppMedidor, prepararAppFalsa } from "./bancoAppMedidor";
@@ -139,6 +140,12 @@ void cargarIdioma(idiomaInicial()).finally(() => raiz.render(
   ver === "guia-conexion" ? (
     <StrictMode>
       <LanguageProvider><BancoGuiaConexion estado={params.get("estado") ?? "quieto"} /></LanguageProvider>
+    </StrictMode>
+  ) :
+  // /harness.html?ver=casos[&tema=claro] → revisión de RR. HH. (19/11/2026).
+  ver === "casos" ? (
+    <StrictMode>
+      <LanguageProvider><BancoCasos /></LanguageProvider>
     </StrictMode>
   ) :
   // /harness.html?ver=turno[&tema=claro] → marcar entrada / salida (19/11/2026).
