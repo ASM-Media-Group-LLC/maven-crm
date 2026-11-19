@@ -525,6 +525,9 @@ export const compartido = {
   "shared.notif.markAll": { es: "Marcar todas", en: "Mark all as read" },
   "shared.notif.seeAll": { es: "Ver todas las notificaciones", en: "See all notifications" },
   "shared.notif.archive": { es: "Archivar", en: "Archive" },
+  "shared.notif.caso.verCaso": { es: "Ver caso", en: "View case" },
+  "shared.notif.caso.verReporte": { es: "Ver reporte", en: "View report" },
+  "shared.notif.caso.revisar": { es: "Revisar", en: "Review" },
   // El chip del módulo de origen. En español se sigue mostrando el valor
   // guardado tal cual (module_origin); en inglés, estos nombres.
   "shared.notif.module.creadores": { es: "Creadoras", en: "Creators" },

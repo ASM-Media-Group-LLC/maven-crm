@@ -187,6 +187,10 @@ const NO_CARGAN_AQUI: Record<string, string> = {
     "Marcar entrada / pausa / salida (turno_marcas, en_turno). Entra a esta cadena solo porque rehace los vigías " +
     "que insertan avisos en notifications, pero usa monitor_config, cowork_breaks, las tablas de Argos y pg_cron, " +
     "que este fixture no trae; no toca nada del Messenger.",
+  "20261119140000_argos_casos_rrhh.sql":
+    "Argos: los casos que juzga RR. HH. (argos_casos, tiene_funcion). Entra a esta cadena solo porque sus avisos " +
+    "insertan en notifications, pero usa las posiciones, las tablas de Argos, storage y pg_cron, que este fixture " +
+    "no trae; no toca nada del Messenger.",
   "20261119011000_calidad_de_llamadas.sql":
     "Llamadas: el tablero de calidad del dueño y el aviso de audio malo. Entra a esta cadena solo porque su vigía " +
     "inserta avisos en notifications, pero usa llamada_salud y llamada_num (salud_de_llamada, que tampoco carga " +

@@ -13,6 +13,7 @@ import { AbrirEnApp } from "@/components/AbrirEnApp";
 import { AvisoActualizacionApp } from "@/components/AvisoActualizacionApp";
 import { CartelVersionNueva } from "@/components/CartelVersionNueva";
 import { HorariosObligatorios } from "@/components/horarios/HorariosObligatorios";
+import { CasosObligatorios } from "@/components/hr/CasosObligatorios";
 import { RelojDeLaEmpresa } from "@/components/ajustes/TarjetaHoraEmpresa";
 import { NovedadesApp } from "@/components/NovedadesApp";
 import { AppLiviana } from "@/components/AppLiviana";
@@ -194,6 +195,7 @@ const HROffboardingNew = lazy(() => import("./pages/hr/HROffboardingNew"));
 const HRMonitoring = lazy(() => import("./pages/hr/HRMonitoring"));
 const HRMonitorIA = lazy(() => import("./pages/hr/HRMonitorIA"));
 const HorariosEquipo = lazy(() => import("./pages/hr/HorariosEquipo"));
+const CasoArgos = lazy(() => import("./pages/argos/CasoArgos"));
 const HRExpediente = lazy(() => import("./pages/hr/HRExpediente"));
 const EnVivoPersona = lazy(() => import("./pages/hr/EnVivoPersona"));
 const ArgosComparativo = lazy(() => import("./pages/hr/ArgosComparativo"));
@@ -310,6 +312,8 @@ const App = () => (
             <CartelVersionNueva />
             {/* RR. HH.: confirmar el horario de cada persona, no se quita (19/11/2026). */}
             <HorariosObligatorios />
+            {/* RR. HH.: juzgar los casos de Argos de días que ya terminaron (19/11/2026). */}
+            <CasosObligatorios />
             {/* La hora que eligió el dueño (AM/PM o militar), 18/11/2026. */}
             <RelojDeLaEmpresa />
             <NovedadesApp />
@@ -477,6 +481,8 @@ const App = () => (
                 <Route path="/oficina/:id" element={<PermissionRoute module="Oficina"><DocumentoPage /></PermissionRoute>} />
                 <Route path="/settings" element={<Settings />} />
                 <Route path="/notificaciones" element={<Notificaciones />} />
+                {/* Un caso de Argos (19/11/2026): la base decide quién lo ve. */}
+                <Route path="/argos/caso/:id" element={<CasoArgos />} />
                 <Route path="/conexion" element={<GuiaConexionPage />} />
                 <Route path="/app" element={<GuiaAppPage />} />
                 <Route path="/ajustes/notificaciones" element={<NotificacionesSettings />} />

@@ -25,6 +25,9 @@ import { ArgosPanelDia } from "@/components/hr/ArgosPanelDia";
 import { ArgosHistorial } from "@/components/hr/ArgosHistorial";
 import { LlamadasPanel } from "@/components/hr/LlamadasPanel";
 import { TableroCalidadLlamadas } from "@/components/hr/TableroCalidadLlamadas";
+import { RevisionCasos } from "@/components/hr/RevisionCasos";
+import { useFuncionesCasos } from "@/hooks/useCasosArgos";
+import { veRevision } from "@/lib/casosArgos";
 import { HistorialHubPanel } from "@/components/hr/HistorialHubPanel";
 import { useEsDueno } from "@/hooks/useEsDueno";
 import { EstadoPanel } from "@/components/hr/EstadoPanel";
@@ -149,10 +152,10 @@ export default function HRMonitorIA() {
   // historial) a los nuevos para no romper links guardados.
   //   · Llamadas (13/11/2026) = a quién se le corta la llamada hoy y por qué.
   //   · Historial del Hub (19/11/2026) = qué quitaron los supervisores, cuándo y por qué.
-  type TabArgos = "donde" | "ahora" | "dia" | "llamadas" | "hub" | "ajustes";
+  type TabArgos = "donde" | "ahora" | "dia" | "llamadas" | "hub" | "revision" | "ajustes";
   const [searchParams, setSearchParams] = useSearchParams();
   const VIEJO_A_NUEVO: Record<string, TabArgos> = {
-    donde: "donde", ahora: "ahora", dia: "dia", llamadas: "llamadas", hub: "hub", ajustes: "ajustes",
+    donde: "donde", ahora: "ahora", dia: "dia", llamadas: "llamadas", hub: "hub", revision: "revision", ajustes: "ajustes",
     equipo: "ahora", envivo: "ahora", panel: "dia", historial: "dia", resumen: "dia", atencion: "ahora",
   };
   const tabURL = searchParams.get("t");
@@ -160,6 +163,11 @@ export default function HRMonitorIA() {
   // dónde está el empleado en todo momento»); antes era «El día» (08/11).
   const tab: TabArgos = (tabURL && VIEJO_A_NUEVO[tabURL]) || "donde";
   const setTab = (k: TabArgos) => setSearchParams((prev) => { const n = new URLSearchParams(prev); n.set("t", k); return n; }, { replace: true });
+
+  // Revisión de RR. HH. (19/11/2026): la ve quien tenga alguna función de la
+  // revisión en su puesto (o el dueño).
+  const funcionesCasos = useFuncionesCasos();
+  const veCasos = veRevision(funcionesCasos.data);
 
   const monitorOff = config ? !config.activo : false;
   const horariosEq = useHorariosEquipo();
@@ -203,6 +211,7 @@ export default function HRMonitorIA() {
           { k: "ahora", label: t("hr.monia.tab.ahora") },
           { k: "llamadas", label: t("hr.monia.tab.llamadas") },
           { k: "hub", label: t("hr.monia.tab.hub") },
+          ...(veCasos ? [{ k: "revision" as TabArgos, label: t("hr.monia.tab.revision") }] : []),
           ...(isAdmin ? [{ k: "ajustes" as TabArgos, label: t("hr.monia.tab.ajustes") }] : []),
         ];
         return (
@@ -263,6 +272,14 @@ export default function HRMonitorIA() {
       {tab === "hub" && (
         <div className="mt-5">
           <HistorialHubPanel />
+        </div>
+      )}
+
+      {/* REVISIÓN DE RR. HH. — un caso por persona y día: cometió, no cometió o
+          justificado, con su frase; y el reporte limpio (19/11/2026). */}
+      {tab === "revision" && veCasos && (
+        <div className="mt-5">
+          <RevisionCasos />
         </div>
       )}
 
