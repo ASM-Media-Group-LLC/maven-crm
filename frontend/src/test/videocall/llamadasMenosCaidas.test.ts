@@ -16,7 +16,7 @@
 // Casi nada de esto falla de forma ruidosa si se rompe (una caída de más, un
 // invitado que tiene que volver a golpear): por eso las guardas.
 import { describe, it, expect } from "vitest";
-import { ESPERAS_DE_REENTRADA_MS, MAX_REENTRADAS, esperaDeReentrada } from "@/lib/conexionSala";
+import { ESPERAS_DE_REENTRADA_MS, ESPERA_SIN_FIN_MS, MAX_REENTRADAS, esperaDeReentrada } from "@/lib/conexionSala";
 import { SALTO_DE_SUENO_MS, crearVigiaDelSueno, faseSegunSueno } from "@/lib/equipoDormido";
 import { BIEN_SOSTENIDO_MS, DEBIL_INICIAL, DEBIL_SOSTENIDO_MS, siguienteDebil, type EstadoDebil } from "@/lib/internetDebil";
 import { CAMARA_LIVIANA, FPS_DE_COWORK, topesDeCowork, topesLivianos, type TopeDeCodificacion } from "@/lib/perfilDeCamara";
@@ -69,11 +69,20 @@ describe("1. volver solo tras una caída: más paciente", () => {
   it("useLiveKit usa el tope nuevo, vuelve en el acto con `online` y sin red no gasta intentos", () => {
     const s = leer("hooks/useLiveKit.ts");
     const bloque = s.slice(s.indexOf("programarReentradaRef.current = (razon"), s.indexOf("esperarALaPersonaRef.current = (razon"));
-    expect(bloque).toContain("reentradasRef.current >= MAX_REENTRADAS");
-    expect(bloque).toContain("esperaDeReentrada(n)");
+    expect(bloque).toContain("reentradasRef.current === MAX_REENTRADAS");
+    expect(bloque).toContain("esperaDeReentrada(n) ?? ESPERA_SIN_FIN_MS");
     expect(bloque).toMatch(/addEventListener\("online", intentar\)/);
     expect(bloque).toMatch(/navigator\.onLine === false/);
     expect(bloque).not.toMatch(/>= 4\b/);
+  });
+
+  it("18/11/2026 — nunca saca a nadie: pasados los 10 intentos sigue cada 30 s", () => {
+    expect(ESPERA_SIN_FIN_MS).toBe(30_000);
+    const s = leer("hooks/useLiveKit.ts");
+    const bloque = s.slice(s.indexOf("programarReentradaRef.current = (razon"), s.indexOf("esperarALaPersonaRef.current = (razon"));
+    // No hay un return que corte los reintentos al agotarse.
+    expect(bloque).not.toMatch(/MAX_REENTRADAS\) \{[^}]*return/);
+    expect(bloque).toContain("setIsReconnecting(true)");
   });
 });
 
