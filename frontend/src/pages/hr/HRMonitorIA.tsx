@@ -25,6 +25,7 @@ import { ArgosHistorial } from "@/components/hr/ArgosHistorial";
 import { LlamadasPanel } from "@/components/hr/LlamadasPanel";
 import { TableroCalidadLlamadas } from "@/components/hr/TableroCalidadLlamadas";
 import { useEsDueno } from "@/hooks/useEsDueno";
+import { EstadoPanel } from "@/components/hr/EstadoPanel";
 import { ArgosAjustesContenido } from "@/pages/hr/ArgosAjustes";
 import type { TranslationKey } from "@/lib/i18n";
 
@@ -237,7 +238,9 @@ export default function HRMonitorIA() {
       {/* LLAMADAS — a quién se le corta la llamada hoy, por qué, su internet
           medido de verdad y si la cancelación de ruido le corre (13/11/2026). */}
       {tab === "llamadas" && (
-        <div className="mt-5 flex flex-col gap-6">
+        <div className="mt-5 flex flex-col gap-8">
+          {/* ESTADO (18/11/2026): todo lo que Argos reporta hoy, uno por uno. */}
+          <EstadoPanel />
           {/* ¿Las llamadas mejoran? Solo el dueño (18/11/2026). */}
           {esDueno === true && <TableroCalidadLlamadas />}
           <LlamadasPanel />

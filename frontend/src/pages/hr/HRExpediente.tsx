@@ -1,5 +1,5 @@
 import { formatUI } from "@/lib/formatoHora";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { enHoras } from "@/lib/duracion";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { format } from "date-fns";
@@ -13,7 +13,7 @@ import { Page } from "@/components/ui/page";
 import { PageHeader } from "@/components/ui/page-header";
 import { useExpedienteEmpleado, type DiaExpediente, type CapturaDia } from "@/hooks/useExpedienteEmpleado";
 import { usePerdonarCaptura, usePuedePerdonar } from "@/hooks/usePerdonarCaptura";
-import { urlCaptura, urlsDeNas } from "@/hooks/useMonitorEventos";
+import { urlCaptura, urlsDeNas, urlsDelBuzon } from "@/hooks/useMonitorEventos";
 import { LABEL_FALTA, type FaltaTipo } from "@/lib/monitorFaltas";
 import type { BandaNota } from "@/lib/notaEmpleado";
 import type { TranslationKey } from "@/lib/i18n";
@@ -100,6 +100,22 @@ function pasaFiltro(m: Momento, f: FiltroCaptura): boolean {
   return true;
 }
 
+/** Avisa una vez cuando la hora entra en pantalla (para cargar sus fotos). */
+function HoraQueSeVe({ ms, alVerse, children }: { ms: number; alVerse: (ms: number) => void; children: ReactNode }) {
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    if (typeof IntersectionObserver === "undefined") { alVerse(ms); return; }
+    const obs = new IntersectionObserver((entradas) => {
+      if (entradas.some((e) => e.isIntersecting)) { alVerse(ms); obs.disconnect(); }
+    }, { rootMargin: "600px 0px" });
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, [ms, alVerse]);
+  return <div ref={ref}>{children}</div>;
+}
+
 function TiraDelDia({ capturas, t }: { capturas: CapturaDia[]; t: Tr }) {
   const momentos = useMemo(() => construirMomentos(capturas), [capturas]);
   const [filtro, setFiltro] = useState<FiltroCaptura>("todos");
@@ -110,10 +126,10 @@ function TiraDelDia({ capturas, t }: { capturas: CapturaDia[]; t: Tr }) {
   }), [momentos]);
   const filtrados = useMemo(() => momentos.filter((m) => pasaFiltro(m, filtro)), [momentos, filtro]);
   // TODAS LAS HORAS (Alvaro, 18/11/2026: «necesito ver todas las horas»): una
-  // fila por hora, de la más nueva a la más vieja, con SEIS casillas de 10 min
-  // (modelo Hubstaff). Cada casilla, su primer pantallazo con la cámara pegada;
-  // en rojo si hubo algo fuera de lugar; tocarla abre el visor ahí y se recorre
-  // el día entero con las flechas. Las horas sin fotos en medio también salen.
+  // fila por hora, de la más nueva a la más vieja, con TODAS sus fotos en orden
+  // (18/11: «quiero ver todas»); en rojo si hubo algo fuera de lugar; tocar una
+  // abre el visor ahí y se recorre el día entero con las flechas. Las horas sin
+  // fotos en medio también salen (juntas en una línea).
   const visibles = filtrados;
   const horas = useMemo(() => {
     if (filtrados.length === 0) return [] as HoraDelDia[];
@@ -173,11 +189,18 @@ function TiraDelDia({ capturas, t }: { capturas: CapturaDia[]; t: Tr }) {
   // Se firma solo lo que se ve: la foto de cada casilla y el momento abierto en
   // el visor (con el anterior y el siguiente). Lo ya firmado no se repite.
   const [visorIdx, setVisorIdx] = useState<number | null>(null);
+  // TODAS las fotos de cada hora (Alvaro, 18/11/2026: «quiero ver todas»): se
+  // firman las de las horas que ya entraron en pantalla (y el visor), no el día
+  // entero de golpe.
+  const [horasVistas, setHorasVistas] = useState<Set<number>>(new Set());
+  const marcarHoraVista = useCallback((ms: number) => {
+    setHorasVistas((prev) => (prev.has(ms) ? prev : new Set(prev).add(ms)));
+  }, []);
   const aFirmar = useMemo(() => {
-    const lista: Momento[] = horas.flatMap((h) => h.casillas.map((c) => c.rep).filter((m): m is Momento => !!m));
+    const lista: Momento[] = horas.filter((h) => horasVistas.has(h.ms)).flatMap((h) => h.casillas.flatMap((c) => c.momentos));
     if (visorIdx !== null) for (const i of [visorIdx - 1, visorIdx, visorIdx + 1]) if (visibles[i]) lista.push(visibles[i]);
     return lista;
-  }, [horas, visorIdx, visibles]);
+  }, [horas, horasVistas, visorIdx, visibles]);
   useEffect(() => {
     let vivo = true;
     void (async () => {
@@ -195,11 +218,8 @@ function TiraDelDia({ capturas, t }: { capturas: CapturaDia[]; t: Tr }) {
         }
       }
       if (nas.size === 0 && buzon.size === 0) return;
-      const [nasUrls, buzonPairs] = await Promise.all([
-        urlsDeNas([...nas]),
-        Promise.all([...buzon].map(async (p) => [p, await urlCaptura(p)] as const)),
-      ]);
-      if (vivo) setUrls((prev) => ({ ...prev, ...nasUrls, ...Object.fromEntries(buzonPairs.filter(([, u]) => !!u) as [string, string][]) }));
+      const [nasUrls, buzonUrls] = await Promise.all([urlsDeNas([...nas]), urlsDelBuzon([...buzon])]);
+      if (vivo) setUrls((prev) => ({ ...prev, ...nasUrls, ...buzonUrls }));
     })();
     return () => { vivo = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -280,59 +300,44 @@ function TiraDelDia({ capturas, t }: { capturas: CapturaDia[]; t: Tr }) {
                 )}
               </div>
               {h.total > 0 && (
-                <div className="grid grid-cols-3 gap-2 sm:grid-cols-6">
-                  {h.casillas.map((c) => {
-                    const hora = a12(format(new Date(c.desde), "HH:mm"));
-                    if (!c.rep && c.desde > ahoraMs) {
-                      // Todavía no llega esa casilla.
-                      return <div key={c.desde} className="flex aspect-[16/10] items-end rounded-lg p-1 text-[9px] tabular-nums text-muted-foreground/40">{hora}</div>;
-                    }
-                    if (!c.rep) {
+                <HoraQueSeVe ms={h.ms} alVerse={marcarHoraVista}>
+                  <div className="grid grid-cols-3 gap-1.5 sm:grid-cols-5 lg:grid-cols-8 2xl:grid-cols-10">
+                    {h.casillas.flatMap((c) => c.momentos).map((m) => {
+                      const hora = a12(format(new Date(m.createdAt), "HH:mm"));
+                      const urlP = m.pantalla ? urls[claveFoto(m.pantalla)!] : undefined;
+                      const urlC = !m.pantalla && m.camara ? urls[claveFoto(m.camara)!] : undefined;
+                      const mala = m.fueraDeLugar === true && !m.perdonado;
                       return (
-                        <div key={c.desde} className="flex aspect-[16/10] flex-col items-center justify-center rounded-lg border border-dashed border-border/50 text-[10px] tabular-nums text-muted-foreground/70">
-                          <span>{hora}</span>
-                          <span>{t("hr.exp.horas.vacia")}</span>
-                        </div>
-                      );
-                    }
-                    const m = c.rep;
-                    const urlP = m.pantalla ? urls[claveFoto(m.pantalla)!] : undefined;
-                    const urlC = m.camara ? urls[claveFoto(m.camara)!] : undefined;
-                    return (
-                      <button
-                        key={c.desde}
-                        type="button"
-                        onClick={() => setVisorIdx(visibles.indexOf(m))}
-                        title={`${hora} · ${t("hr.exp.fotosN", { n: c.momentos.length })}${m.veredicto ? ` · ${m.veredicto}` : ""}`}
-                        className={`group relative aspect-[16/10] overflow-hidden rounded-lg border bg-muted/40 transition ${c.fuera > 0 ? "border-destructive/70 ring-1 ring-destructive/40" : "border-border/40 hover:border-primary/50"}`}
-                      >
-                        {m.pantalla ? (
-                          urlP ? <img src={urlP} alt={hora} loading="lazy" onError={() => reFirmar(m.pantalla)} className="h-full w-full object-cover" />
-                            : <div className="flex h-full w-full items-center justify-center text-muted-foreground"><Loader2 className="h-3.5 w-3.5 animate-spin" /></div>
-                        ) : (
-                          <div className="flex h-full w-full items-center justify-center bg-muted/30 text-muted-foreground"><ScreenShareOff className="h-4 w-4 opacity-60" /></div>
-                        )}
-                        <div className="absolute bottom-1 right-1 h-7 w-10 overflow-hidden rounded border border-background/80 shadow">
-                          {m.camara ? (
-                            urlC ? <img src={urlC} alt="" loading="lazy" onError={() => reFirmar(m.camara)} className="h-full w-full object-cover" />
-                              : <div className="h-full w-full bg-muted/60" />
+                        <button
+                          key={m.id}
+                          type="button"
+                          onClick={() => setVisorIdx(visibles.indexOf(m))}
+                          title={`${hora}${m.veredicto ? ` · ${m.veredicto}` : ""}`}
+                          className={`group relative aspect-[16/10] overflow-hidden rounded-md border bg-muted/40 transition ${mala ? "border-destructive/70 ring-1 ring-destructive/40" : "border-border/40 hover:border-primary/50"}`}
+                        >
+                          {urlP || urlC ? (
+                            <img src={(urlP ?? urlC)!} alt={hora} loading="lazy" onError={() => reFirmar(m.pantalla ?? m.camara)} className="h-full w-full object-cover" />
+                          ) : m.pantalla || m.camara ? (
+                            <div className="h-full w-full animate-pulse bg-foreground/[0.06]" />
                           ) : (
-                            <div className="flex h-full w-full items-center justify-center bg-destructive/20 text-destructive"><CameraOff className="h-3 w-3" /></div>
+                            <div className="flex h-full w-full items-center justify-center text-muted-foreground"><ScreenShareOff className="h-3.5 w-3.5 opacity-60" /></div>
                           )}
-                        </div>
-                        <span className="absolute bottom-1 left-1 rounded bg-black/60 px-1 py-px text-[9px] font-semibold tabular-nums text-white">{hora}</span>
-                        {c.momentos.length > 1 && (
-                          <span className="absolute right-1 top-1 rounded bg-black/60 px-1 py-px text-[9px] font-semibold tabular-nums text-white">{c.momentos.length}</span>
-                        )}
-                        {c.fuera > 0 && (
-                          <span className="absolute left-1 top-1 flex h-4 w-4 items-center justify-center rounded bg-destructive text-destructive-foreground" title={t("hr.exp.fueraN", { n: c.fuera })}>
-                            <AlertTriangle className="h-2.5 w-2.5" />
-                          </span>
-                        )}
-                      </button>
-                    );
-                  })}
-                </div>
+                          <span className="absolute bottom-0.5 left-0.5 rounded bg-black/60 px-1 text-[9px] font-semibold tabular-nums text-white">{hora}</span>
+                          {!m.camara && (
+                            <span className="absolute bottom-0.5 right-0.5 flex h-4 w-4 items-center justify-center rounded bg-black/60 text-white/85" title={t("hr.exp.camaraApagada")}>
+                              <CameraOff className="h-2.5 w-2.5" />
+                            </span>
+                          )}
+                          {mala && (
+                            <span className="absolute left-0.5 top-0.5 flex h-4 w-4 items-center justify-center rounded bg-destructive text-destructive-foreground" title={t("hr.exp.fueraDeLugar")}>
+                              <AlertTriangle className="h-2.5 w-2.5" />
+                            </span>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </HoraQueSeVe>
               )}
             </div>
           ); })())}
@@ -1094,7 +1099,7 @@ export default function HRExpediente() {
 
       {/* TODAS SUS HORAS, justo debajo del en vivo (Alvaro, 13/11 y 18/11/2026:
           «no puedo ver los pantallazos de todo el día», «necesito ver todas las
-          horas»): una fila por hora con sus casillas de 10 min. */}
+          horas», «todas las fotos de la hora»): una fila por hora con todas sus fotos. */}
       <section id="expediente-todo-el-dia" className="vidrio sube mt-5 scroll-mt-4 p-4 lg:p-5" style={{ animationDelay: "0.05s" }}>
         <div className="v-cont">
           <p className="mb-3 flex items-center gap-1.5 text-xs font-semibold text-muted-foreground">

@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { AlertTriangle, Check, ChevronDown, Loader2, MapPin, RefreshCw, Search, X } from "lucide-react";
 import { useLanguage } from "@/hooks/useLanguage";
@@ -155,6 +155,7 @@ export function DondeEstaPanel() {
   // 18/11/2026: «ahí debería haber un drop down con nombre alfabético»). Elegir
   // a alguien deja solo su tarjeta, esté en el estado o equipo que esté.
   const [elegido, setElegido] = useState<string | null>(null);
+  const navegar = useNavigate();
   const [abierto, setAbierto] = useState(false);
   const ahora = Date.now();
 
@@ -312,7 +313,12 @@ export function DondeEstaPanel() {
                           key={f.user_id}
                           value={`${nombre} ${f.user_id}`}
                           keywords={[f.puesto ?? "", f.equipo ?? ""]}
-                          onSelect={() => { setElegido(f.user_id); setAbierto(false); }}
+                          onSelect={() => {
+                            // Elegir a alguien abre su expediente (Alvaro, 18/11/2026):
+                            // en vivo arriba y todas sus horas con sus fotos.
+                            setAbierto(false);
+                            navegar(`/hr/expediente/${f.user_id}`, { state: { volverA: "/hr/monitor-ia?t=donde" } });
+                          }}
                           className="gap-2.5"
                         >
                           <span className="relative shrink-0">
