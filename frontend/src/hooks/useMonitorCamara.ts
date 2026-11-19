@@ -45,6 +45,9 @@ const LATIDO_MS = 60_000; // cada cuánto se deja el latido del rondín (monitor
 // (Alvaro, 13/11/2026: «cada minuto»; antes ~2 min, 90–150 s).
 const CAPTURA_MIN_MS = 45_000;
 const CAPTURA_RANGO_MS = 30_000;
+// Ráfaga (19/11/2026): foto cada 10 s mientras dure (2 min); se consulta cada 20 s.
+const RAFAGA_MS = 10_000;
+const RAFAGA_CONSULTA_MS = 20_000;
 const BUCKET_CAPTURAS = "monitor-capturas"; // buzón privado; luego se mueve al NAS
 
 // Avísale a la persona que se le tomó un pantallazo (transparencia, como Hubstaff),
@@ -317,13 +320,31 @@ export function useMonitorCamara({ track, trackPantalla = null, camaraRealOn, fa
       }
     };
     // Primer pantallazo a los ~8 s; luego cada ~1 min a HORA ALEATORIA (45–75 s).
+    // RÁFAGA (19/11/2026): si Argos vio algo raro, una cada 10 s por 2 minutos.
+    let rafagaHasta = 0;
+    const siguiente = () => (Date.now() < rafagaHasta ? RAFAGA_MS : CAPTURA_MIN_MS + Math.floor(Math.random() * CAPTURA_RANGO_MS));
     const agendar = (ms: number) => {
       timer = window.setTimeout(async () => {
         await tick();
-        if (!cancelado) agendar(CAPTURA_MIN_MS + Math.floor(Math.random() * CAPTURA_RANGO_MS));
+        if (!cancelado) agendar(siguiente());
       }, ms);
     };
     agendar(8000);
+    const leerRafaga = async () => {
+      try {
+        const { data, error } = await (supabase as unknown as { rpc: (f: string) => Promise<{ data: unknown; error: unknown }> }).rpc("mi_rafaga");
+        if (cancelado || error) return;
+        const hasta = typeof data === "string" ? Date.parse(data) : 0;
+        const empieza = hasta > Date.now() && rafagaHasta <= Date.now();
+        rafagaHasta = hasta || 0;
+        // Empieza una ráfaga: no se espera al próximo minuto, se arranca ya.
+        if (empieza && !guardandoRef.current) {
+          if (timer) window.clearTimeout(timer);
+          agendar(1000);
+        }
+      } catch { /* sin ráfaga no pasa nada: sigue la de cada minuto */ }
+    };
+    const ivRafaga = window.setInterval(() => { void leerRafaga(); }, RAFAGA_CONSULTA_MS);
     // «Cuando me voy a otro lado ya no me toma pantallazos» (Alvaro, 10/11): sí
     // los toma; el aviso solo se ve dentro de Maven. Al volver, se le dice cuántos.
     const alVolver = () => {
@@ -337,6 +358,7 @@ export function useMonitorCamara({ track, trackPantalla = null, camaraRealOn, fa
     return () => {
       cancelado = true;
       if (timer) window.clearTimeout(timer);
+      window.clearInterval(ivRafaga);
       document.removeEventListener("visibilitychange", alVolver);
     };
   }, [activoFree, user, t]);

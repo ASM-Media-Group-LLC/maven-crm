@@ -19,6 +19,7 @@ import AnnouncementPopup from "@/components/dashboard/AnnouncementPopup";
 import { ArgosVigilante } from "@/components/ArgosVigilante";
 import { AvisoNasCaido } from "@/components/oficina/AvisoNasCaido";
 import { AvisoFueraDeCowork } from "@/components/cowork/AvisoFueraDeCowork";
+import { AvisoAlertaGrave } from "@/components/hr/AvisoAlertaGrave";
 import { useCoworkObligatorio, debeIrACowork } from "@/hooks/useCoworkObligatorio";
 import { traducir } from "@/lib/i18n";
 import { useAnnouncementsByChannel } from "@/hooks/useAnnouncements";
@@ -134,6 +135,8 @@ const AppShell = () => {
           <AvisoNasCaido />
           {/* Argos: en su turno y fuera de Cowork → cartel + voz en cualquier página (13/11/2026). */}
           <AvisoFueraDeCowork />
+          {/* Argos: 10 min sin actividad o 1 h fuera del trabajo → cartel + voz (19/11/2026). */}
+          <AvisoAlertaGrave />
           {/* Desde el 20/11 se marca entrada, pausa y salida: el aviso, una vez. */}
           <AvisoNovedadTurno />
           <main className="vidrio-panel relative flex flex-1 flex-col min-h-0 overflow-hidden">

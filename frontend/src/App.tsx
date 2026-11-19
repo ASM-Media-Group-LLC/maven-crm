@@ -196,6 +196,7 @@ const HRMonitoring = lazy(() => import("./pages/hr/HRMonitoring"));
 const HRMonitorIA = lazy(() => import("./pages/hr/HRMonitorIA"));
 const HorariosEquipo = lazy(() => import("./pages/hr/HorariosEquipo"));
 const CasoArgos = lazy(() => import("./pages/argos/CasoArgos"));
+const ResumenArgos = lazy(() => import("./pages/argos/ResumenArgos"));
 const HRExpediente = lazy(() => import("./pages/hr/HRExpediente"));
 const EnVivoPersona = lazy(() => import("./pages/hr/EnVivoPersona"));
 const ArgosComparativo = lazy(() => import("./pages/hr/ArgosComparativo"));
@@ -483,6 +484,8 @@ const App = () => (
                 <Route path="/notificaciones" element={<Notificaciones />} />
                 {/* Un caso de Argos (19/11/2026): la base decide quién lo ve. */}
                 <Route path="/argos/caso/:id" element={<CasoArgos />} />
+                {/* Resumen del día y tendencia semanal (19/11/2026): cada quien ve a quien puede vigilar. */}
+                <Route path="/argos/resumen" element={<ResumenArgos />} />
                 <Route path="/conexion" element={<GuiaConexionPage />} />
                 <Route path="/app" element={<GuiaAppPage />} />
                 <Route path="/ajustes/notificaciones" element={<NotificacionesSettings />} />

@@ -98,6 +98,8 @@ export const posiciones = {
   "posiciones.c.dar_permisos": { es: "Dar permisos", en: "Set permissions" },
   "posiciones.c.ajustes_de_argos": { es: "Ajustes de Argos", en: "Argos settings" },
   "posiciones.c.revision_de_rrhh": { es: "Revisión de RR. HH.", en: "HR review" },
+  "posiciones.c.lo_que_argos_le_vigila": { es: "Lo que Argos le vigila", en: "What Argos watches" },
+  "posiciones.c.vigilar_apps_ajenas": { es: "Se le vigilan las apps ajenas (alerta grave a la hora; su trabajo cabe en la lista)", en: "Watch non-work apps (serious alert after one hour; their work fits the list)" },
   "posiciones.c.juzgar_casos_de_argos": { es: "Juzgar los casos de Argos (cometió, no cometió, justificado)", en: "Judge Argos cases (did it, didn't, justified)" },
   "posiciones.c.obligado_a_revisar": { es: "Tiene que revisar cada día (cartel si se atrasa)", en: "Must review every day (blocking banner if late)" },
   "posiciones.c.corregir_veredicto": { es: "Corregir un veredicto ya dado", en: "Change a verdict already given" },

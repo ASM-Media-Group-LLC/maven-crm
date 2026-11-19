@@ -89,7 +89,7 @@ export function ReporteRrhhVista({ dia }: { dia: string }) {
         const tono = tonoVeredicto(g.v);
         return (
           <div key={g.v ?? "sin"} className="flex flex-col">
-            <h4 className={`flex items-center gap-2 text-xs font-semibold uppercase tracking-wide ${tono.texto}`}>
+            <h4 className="flex items-center gap-2 text-sm font-semibold text-foreground">
               <span className={`h-1.5 w-1.5 rounded-full ${tono.punto}`} />{t(g.titulo)} · {filas.length}
             </h4>
             <ul className="divide-y divide-border/40">
