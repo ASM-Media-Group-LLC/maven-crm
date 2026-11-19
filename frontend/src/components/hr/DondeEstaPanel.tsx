@@ -194,9 +194,13 @@ export function DondeEstaPanel() {
     if (elegido) return filas.filter((f) => f.user_id === elegido);
     return delEquipo.filter((f) => pasaFiltro(f, filtro));
   }, [filas, delEquipo, filtro, elegido]);
+  // El desplegable sigue a las fichas (Alvaro, 18/11/2026: «si agarro On shift,
+  // solo los que están en turno; si pongo All, entonces sí todos»): misma
+  // situación y mismo equipo que lo de la pantalla, de la A a la Z.
   const alfabetico = useMemo(
-    () => [...filas].sort((a, b) => (a.nombre ?? "").localeCompare(b.nombre ?? "", "es", { sensitivity: "base" })),
-    [filas],
+    () => delEquipo.filter((f) => pasaFiltro(f, filtro))
+      .sort((a, b) => (a.nombre ?? "").localeCompare(b.nombre ?? "", "es", { sensitivity: "base" })),
+    [delEquipo, filtro],
   );
   const nombreElegido = elegido ? filas.find((f) => f.user_id === elegido)?.nombre ?? null : null;
 

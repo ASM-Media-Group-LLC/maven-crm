@@ -30,6 +30,8 @@ export interface PersonaTurno {
   /** Minutos de tardanza respecto al horario asignado, pasada la tolerancia. null si
    *  no tiene horario asignado o no se registró ingreso. Positivo = llegó tarde. */
   tardeMin: number | null;
+  /** ¿Pantalla y cámara cuentan en su nota? (su puesto se califica y no está exonerado). */
+  califica: boolean;
   /** Llamados de atención de Argos en el turno (nota v3). */
   llamados: number;
   /** Minutos fuera de su puesto en el turno: fuera de Cowork + salir antes (nota v3). */
@@ -167,8 +169,12 @@ export function useTurnoPersonas(dia: string, hDesde: number, hHasta: number, ha
         // Horas de trabajo dentro del turno + entrada/salida.
         const segTrabajoTurno = Number(f.seg_activo) + Number(f.seg_sin_pantalla) + Number(f.seg_sin_camara) + Number(f.seg_fuera_camara);
         // Nota v3 (18/11/2026): pantalla y cámara sobre el tiempo CONECTADO.
-        const pantallaPct = calificado ? fraccionConectado(segPantalla, segTrabajoTurno) : undefined;
-        const camaraPct = calificado ? fraccionConectado(segCamara, segTrabajoTurno) : undefined;
+        // Lo MEDIDO se ve siempre (Alvaro, 18/11/2026: Daniel Ospina comparte y
+        // salía «—»); a la nota solo entra si su puesto se califica.
+        const pantallaMedida = fraccionConectado(segPantalla, segTrabajoTurno);
+        const camaraMedida = fraccionConectado(segCamara, segTrabajoTurno);
+        const pantallaPct = calificado ? pantallaMedida : undefined;
+        const camaraPct = calificado ? camaraMedida : undefined;
         const atencionPct = juz > 0 ? juzOk / juz : undefined;
         const perfil = perfilPor.get(f.user_id);
         const h = horariosPorPers.get(f.user_id);
@@ -216,8 +222,9 @@ export function useTurnoPersonas(dia: string, hDesde: number, hHasta: number, ha
           nota,
           // Sobre el tiempo CONECTADO (Alvaro, 18/11/2026: «si está conectado 10
           // minutos y los 10 compartió, eso es 100 %»).
-          pantallaPct: pantallaPct == null ? null : Math.round(pantallaPct * 100),
-          camaraPct: camaraPct == null ? null : Math.round(camaraPct * 100),
+          pantallaPct: pantallaMedida == null ? null : Math.round(pantallaMedida * 100),
+          camaraPct: camaraMedida == null ? null : Math.round(camaraMedida * 100),
+          califica: calificado,
           llamados: llamados.n,
           minFuera: (minFueraPor.get(f.user_id) ?? 0) + minSalioAntes,
           atencionPct: atencionPct == null ? null : Math.round(atencionPct * 100),
