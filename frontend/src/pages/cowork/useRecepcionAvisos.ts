@@ -32,7 +32,18 @@ interface FilaAviso {
   created_at?: string;
 }
 
-export function useRecepcionAvisos(userId: string | null | undefined) {
+export function useRecepcionAvisos(
+  userId: string | null | undefined,
+  opciones: {
+    /** El cartel se queda hasta que la persona toca «Entendido» (el Hub del
+     *  supervisor: Alvaro, 18/11/2026 — «no se enteran de los avisos»). */
+    fijo?: boolean;
+    /** Además de cartel + campana + voz (p. ej. traer la app al frente). */
+    alLlegar?: () => void;
+  } = {},
+) {
+  const opcionesRef = useRef(opciones);
+  opcionesRef.current = opciones;
   const [aviso, setAviso] = useState<AvisoRecibido | null>(null);
   const avisosVistos = useRef<Set<string>>(new Set());
   const nombresAviso = useRef<Record<string, string | null>>({});
@@ -66,8 +77,9 @@ export function useRecepcionAvisos(userId: string | null | undefined) {
         setAviso((a) => (a && a.id === id ? { ...a, nombreDe: n } : a)),
       );
     }
+    try { opcionesRef.current.alLlegar?.(); } catch { /* un extra no frena el aviso */ }
     if (cierreAviso.current) window.clearTimeout(cierreAviso.current);
-    cierreAviso.current = window.setTimeout(() => setAviso(null), 15_000);
+    if (!opcionesRef.current.fijo) cierreAviso.current = window.setTimeout(() => setAviso(null), 15_000);
   };
 
   useEffect(() => () => { if (cierreAviso.current) window.clearTimeout(cierreAviso.current); }, []);

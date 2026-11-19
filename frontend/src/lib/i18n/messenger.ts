@@ -569,6 +569,7 @@ export const messenger = {
   "messenger.tile.anclado": { es: "Anclado", en: "Pinned" },
   "messenger.tile.compartiendoPantalla": { es: "Compartiendo pantalla", en: "Sharing screen" },
   "messenger.tile.tuPantalla": { es: "Estás compartiendo tu pantalla", en: "You're sharing your screen" },
+  "messenger.tile.pantallaLlegando": { es: "La pantalla está llegando…", en: "The screen is loading…" },
   "messenger.tile.tuPantallaDetalle": { es: "Los demás la ven. Aquí no se muestra para que no se repita sin fin.", en: "Everyone else sees it. It isn't shown here so it doesn't repeat endlessly." },
   "messenger.tile.soloAudio": { es: "Solo audio", en: "Audio only" },
   "messenger.tile.soloAudioDesc": {

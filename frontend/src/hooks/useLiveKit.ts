@@ -46,7 +46,9 @@ import {
 import type { ImagenDeFondo } from "@/lib/fondoDeLlamada";
 import { NoiseSuppresionTrackProcessor, supportsNoiseSuppression, loadNCPreference } from "@/lib/noise-suppression-processor";
 import { estadoDeNC, type EstadoNC } from "@/lib/estadoNC";
-import { PRUEBA_VIGENTE_MS, elegirPerfilDePantalla, opcionesDePantalla, pantallaDeTrabajoCowork } from "@/lib/perfilDePantalla";
+import { clasificarFalloDePantalla, pantallaSinPermiso, type FalloDePantalla } from "@/lib/fallosDePantalla";
+export type { FalloDePantalla } from "@/lib/fallosDePantalla";
+import { PRUEBA_VIGENTE_MS, elegirPerfilDePantalla, esSalaDelHub, opcionesDePantalla, pantallaDeTrabajoCowork } from "@/lib/perfilDePantalla";
 import { medirRed, salaConPrueba, tocaProbar, PRUEBA_CADA_MS, REINTENTO_TRAS_FALLO_MS, type PruebaDeRed } from "@/lib/pruebaDeRed";
 import { marcarConexionEnCurso, marcarLlamadaActiva, quitarLlamadaActiva } from "@/lib/llamadaActiva";
 import {
@@ -1005,6 +1007,12 @@ export function useLiveKit() {
       const pubs = Array.from(p.videoTrackPublications.values());
       const screenPub = pubs.find((t) => t.source === Track.Source.ScreenShare);
       const camPub = pubs.find((t) => t.source === Track.Source.Camera);
+      // PANTALLA QUE NO ME DEJAN VER (Alvaro, 18/11/2026: «muchas pantallas del
+      // Hub se ven negras»). En el Hub la pantalla de un supervisor solo la ven
+      // los admins (setTrackSubscriptionPermissions); a los demás LiveKit les
+      // anuncia la publicación pero no les manda nada, y el recuadro quedaba
+      // NEGRO. Sin permiso no se arma recuadro de pantalla: solo la persona.
+      if (pantallaSinPermiso(screenPub)) return [{ ...base, isScreenSharing: false, hasVideoTrack: !!camPub?.track && !camPub.isMuted }];
       return tilesDeParticipante(base, !!screenPub?.track && !screenPub.isMuted, !!camPub?.track && !camPub.isMuted);
     };
     result.push(...tilesDe(room.localParticipant, local));
@@ -1812,6 +1820,9 @@ export function useLiveKit() {
         }
       });
       room.on(RoomEvent.TrackUnsubscribed, debouncedRefresh);
+      // Me dieron o me quitaron el permiso de ver una pantalla (el Hub): se rearma
+      // la lista para no dejar un recuadro negro (pantallaSinPermiso).
+      room.on(RoomEvent.TrackSubscriptionPermissionChanged, debouncedRefresh);
       room.on(RoomEvent.TrackPublished, (_pub, participant) => {
         console.info("[LiveKit] Track published by:", participant.identity);
         ajustarVideoAjeno();
@@ -2671,6 +2682,12 @@ export function useLiveKit() {
   const exigirPantallaCompletaRef = useRef(false);
   const setExigirPantallaCompleta = useCallback((v: boolean) => { exigirPantallaCompletaRef.current = v; }, []);
 
+  // Por qué falló la ÚLTIMA vez que se pidió la pantalla (null = no falló). El
+  // Supervisor Hub lo manda en su señal para que el dueño sepa si fue el
+  // permiso del computador o una falla (lib/senalDelHub.ts).
+  const falloDePantallaRef = useRef<FalloDePantalla | null>(null);
+  const ultimoFalloDePantalla = useCallback(() => falloDePantallaRef.current, []);
+
   const toggleScreenShare = useCallback(async () => {
     const room = roomRef.current;
     if (!room) return;
@@ -2715,8 +2732,9 @@ export function useLiveKit() {
         limiteCam: ultimaMuestraRef.current?.limite_cam ?? null,
         limitePant: ultimaMuestraRef.current?.limite_pant ?? null,
       });
-      // En Cowork, la pantalla a 5 fps (perfilDePantalla.ts, PUBLICACION_DE_PANTALLA_COWORK).
-      const pantalla = opcionesDePantalla(perfil, captura, pantallaDeTrabajoCowork(room.name));
+      // En Cowork, la pantalla a 5 fps (perfilDePantalla.ts, PUBLICACION_DE_PANTALLA_COWORK);
+      // en el Supervisor Hub, como Meet (PUBLICACION_DE_PANTALLA_HUB).
+      const pantalla = opcionesDePantalla(perfil, captura, pantallaDeTrabajoCowork(room.name), esSalaDelHub(room.name));
       if (newState) console.info(`[LiveKit] compartiendo pantalla con el perfil ${perfil}`);
       await room.localParticipant.setScreenShareEnabled(newState, pantalla.captura, pantalla.publicacion);
       if (exigir) {
@@ -2735,11 +2753,13 @@ export function useLiveKit() {
         }
       }
       setIsScreenSharing(newState);
+      if (newState) falloDePantallaRef.current = null;
       debouncedRefresh();
     } catch (err) {
       // Antes esto era un console.error a secas: quien tocaba el botón no veía
       // NADA pasar, ni siquiera un mensaje de por qué.
       console.error("Screen share error:", err);
+      falloDePantallaRef.current = clasificarFalloDePantalla(err);
       const motivo = motivoDeFalloAlCompartir(err);
       if (motivo) toast.error(traducir("shared.call.screenShareFailed"), { description: motivo });
     }
@@ -3109,6 +3129,7 @@ export function useLiveKit() {
     toggleMic,
     toggleCam,
     toggleScreenShare,
+    ultimoFalloDePantalla,
     setExigirPantallaCompleta,
     toggleHand,
     sendReaction,
