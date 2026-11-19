@@ -911,9 +911,11 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
     const id = window.setInterval(tic, 3000);
     return () => window.clearInterval(id);
   }, [pantallaSola]);
+  // Argos solo mira lo que el PUESTO pide (19/11/2026): si comparte la pantalla
+  // o prende la cámara por su cuenta, eso no se le juzga.
   useMonitorCamara({
-    track: localCameraTrack,
-    trackPantalla: localScreenTrack,
+    track: camaraOpcional ? null : localCameraTrack,
+    trackPantalla: pantallaOpcional ? null : localScreenTrack,
     camaraRealOn,
     faceWatch,
     activo: !!supervisorEncuadre && conSalaViva && argosConCamara && enTurno,
@@ -925,8 +927,8 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
   // tick normal de IA de useMonitorCamara mientras esté activo (ese se apaga
   // solo al detectar trackPantalla).
   useArgosEscaleraClip({
-    trackCamara: localCameraTrack,
-    trackPantalla: localScreenTrack,
+    trackCamara: camaraOpcional ? null : localCameraTrack,
+    trackPantalla: pantallaOpcional ? null : localScreenTrack,
     faceWatch,
     activo: !!supervisorEncuadre && conSalaViva && argosConCamara && enTurno,
     roomNombre: roomName,

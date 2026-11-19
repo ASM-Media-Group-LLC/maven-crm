@@ -3,7 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { calcularNota, fraccionConectado, type Nota } from "@/lib/notaEmpleado";
 import { minutoBogota, minutoDeHora, minutosTarde } from "@/lib/llegadas";
-import { cargarExoneracion, esExento } from "@/lib/exoneracionCamara";
+import { calificaCamara, calificaPantalla, cargarExoneracion } from "@/lib/exoneracionCamara";
 import { cargarHorarios, horarioDe } from "@/lib/horarioEmpleado";
 
 // EL EXPEDIENTE del empleado (Argos): el mes día por día — qué hizo cada día,
@@ -101,7 +101,9 @@ export function useExpedienteEmpleado(userId: string | null, anio: number, mes: 
       const nudgesRes = await nudgesP;
       // ¿Exonerado de cámara/pantalla? (por persona o por rol) → no se califica en esos factores.
       const rolesUser = new Set(((rolesRes.data ?? []) as Array<{ role: string }>).map((r) => r.role));
-      const exentoCamPant = esExento(exo, userId!, rolesUser);
+      // Desde el 19/11/2026 por separado: solo se califica lo que su puesto pide.
+      const sinNotaCamara = !calificaCamara(exo, userId!, rolesUser);
+      const sinNotaPantalla = !calificaPantalla(exo, userId!, rolesUser);
       // Horario de la persona: jornada + baño/comida para el denominador de la nota.
       const horarioUser = horarioDe(horarioRes, userId!);
 
@@ -175,8 +177,8 @@ export function useExpedienteEmpleado(userId: string | null, anio: number, mes: 
         // Exonerado → no se califica en cámara/pantalla (quedan en N/A, se reparte el peso).
         // v3 (18/11/2026): sobre el tiempo CONECTADO, no sobre el turno completo.
         const conectado = act + sinPant + sinCam + fueraCam;
-        const pantallaPct = exentoCamPant || !hayTiempo ? undefined : fraccionConectado(segPantalla, conectado);
-        const camaraPct = exentoCamPant || !hayTiempo ? undefined : fraccionConectado(segCamara, conectado);
+        const pantallaPct = sinNotaPantalla || !hayTiempo ? undefined : fraccionConectado(segPantalla, conectado);
+        const camaraPct = sinNotaCamara || !hayTiempo ? undefined : fraccionConectado(segCamara, conectado);
         // Distracción: de los pantallazos juzgados, cuántos en lo suyo. Las
         // PERDONADAS cuentan como en lo suyo (no bajan la nota).
         const juzgadas = d.capturas.filter((c) => c.tipo === "pantalla" && c.veredicto != null);

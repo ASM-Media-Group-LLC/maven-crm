@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { calcularNota, fraccionConectado, type Nota } from "@/lib/notaEmpleado";
-import { cargarExoneracion, esExento } from "@/lib/exoneracionCamara";
+import { calificaCamara, calificaPantalla, cargarExoneracion } from "@/lib/exoneracionCamara";
 import { cargarHorarios, horarioDe } from "@/lib/horarioEmpleado";
 import { a12 } from "@/lib/horaBogota";
 
@@ -170,7 +170,9 @@ export function useTurnoPersonas(dia: string, hDesde: number, hHasta: number, ha
         const segCamara = Number(f.seg_activo) + Number(f.seg_sin_pantalla);
         const juz = Number(f.juzgadas), juzOk = Number(f.juzgadas_ok);
         // Calificado en cámara/pantalla si su rol se califica Y no está exonerado.
-        const calificado = esCalificado(f.user_id) && !esExento(exo, f.user_id, rolesPor.get(f.user_id));
+        // Por separado (19/11/2026): solo lo que su puesto pide.
+        const califCamara = esCalificado(f.user_id) && calificaCamara(exo, f.user_id, rolesPor.get(f.user_id));
+        const califPantalla = esCalificado(f.user_id) && calificaPantalla(exo, f.user_id, rolesPor.get(f.user_id));
         // Horas de trabajo dentro del turno + entrada/salida.
         const segTrabajoTurno = Number(f.seg_activo) + Number(f.seg_sin_pantalla) + Number(f.seg_sin_camara) + Number(f.seg_fuera_camara);
         // Nota v3 (18/11/2026): pantalla y cámara sobre el tiempo CONECTADO.
@@ -178,8 +180,8 @@ export function useTurnoPersonas(dia: string, hDesde: number, hHasta: number, ha
         // salía «—»); a la nota solo entra si su puesto se califica.
         const pantallaMedida = fraccionConectado(segPantalla, segTrabajoTurno);
         const camaraMedida = fraccionConectado(segCamara, segTrabajoTurno);
-        const pantallaPct = calificado ? pantallaMedida : undefined;
-        const camaraPct = calificado ? camaraMedida : undefined;
+        const pantallaPct = califPantalla ? pantallaMedida : undefined;
+        const camaraPct = califCamara ? camaraMedida : undefined;
         const atencionPct = juz > 0 ? juzOk / juz : undefined;
         const perfil = perfilPor.get(f.user_id);
         const h = horariosPorPers.get(f.user_id);
@@ -230,7 +232,7 @@ export function useTurnoPersonas(dia: string, hDesde: number, hHasta: number, ha
           // minutos y los 10 compartió, eso es 100 %»).
           pantallaPct: pantallaMedida == null ? null : Math.round(pantallaMedida * 100),
           camaraPct: camaraMedida == null ? null : Math.round(camaraMedida * 100),
-          califica: calificado,
+          califica: califCamara || califPantalla,
           llamados: llamados.n,
           minFuera: (minFueraPor.get(f.user_id) ?? 0) + minSalioAntes,
           atencionPct: atencionPct == null ? null : Math.round(atencionPct * 100),

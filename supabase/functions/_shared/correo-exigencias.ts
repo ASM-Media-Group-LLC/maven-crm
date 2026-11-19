@@ -133,11 +133,13 @@ export function correoExigenciasHTML(c: CambioExigencias): string {
     ? `<p style="margin:0;font-size:13.5px;color:${GRIS}">Hoy no le cambia a nadie (quienes están en ese puesto ya tenían esto por otro puesto).</p>`
     : `${nombres}${resto}`;
 
-  const { quita, pide } = movimientos(c);
-  const argos = quita.includes("pantalla")
-    ? "deja de vigilar a estas personas: sin pantalla no hay Argos. Si quieren, pueden compartir igual."
-    : pide.includes("pantalla")
-      ? "empieza a vigilarlas en el turno, porque ahora su puesto pide pantalla."
+  // Argos funciona con al menos una de las dos (cámara o pantalla).
+  const argosAntes = c.camara_antes || c.pantalla_antes;
+  const argosAhora = c.camara_despues || c.pantalla_despues;
+  const argos = argosAntes && !argosAhora
+    ? "deja de vigilar a estas personas: sin cámara ni pantalla no hay Argos. Si quieren, pueden compartir igual."
+    : !argosAntes && argosAhora
+      ? "empieza a vigilarlas en el turno, porque ahora su puesto pide cámara o pantalla."
       : null;
   const bloqueArgos = argos
     ? `<div style="margin:0 0 22px;padding:13px 16px;border-radius:12px;background:#f6f7fb;border:1px solid ${BORDE};font-size:13.5px;line-height:1.5;color:${TINTA}"><b>Argos</b> ${argos}</div>`

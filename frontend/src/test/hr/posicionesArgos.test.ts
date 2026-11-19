@@ -7,11 +7,12 @@ import { aplicarPosiciones, mapaDePosiciones } from "@/lib/posicionesArgos";
 // dueño y los deshabilitados no salen.
 
 const POS = [
-  { id: "d", nombre: "Dueño", orden: 0, activa: true, pide_pantalla: false },
-  { id: "a", nombre: "Admin", orden: 1, activa: true, pide_pantalla: false },
+  { id: "d", nombre: "Dueño", orden: 0, activa: true, pide_camara: false, pide_pantalla: false },
+  { id: "a", nombre: "Admin", orden: 1, activa: true, pide_camara: false, pide_pantalla: false },
   { id: "h", nombre: "HHRR", orden: 2, activa: true },
   { id: "c", nombre: "Closer", orden: 3, activa: true },
-  { id: "ce", nombre: "Closer externo", orden: 4, activa: true, pide_pantalla: false },
+  { id: "ce", nombre: "Closer externo", orden: 4, activa: true, pide_camara: false, pide_pantalla: false },
+  { id: "sc", nombre: "Solo cámara", orden: 5, activa: true, pide_camara: true, pide_pantalla: false },
   { id: "ch", nombre: "Chatter", orden: 6, activa: true },
   { id: "x", nombre: "Vieja", orden: 20, activa: false },
 ];
@@ -23,6 +24,7 @@ describe("mapaDePosiciones", () => {
     { user_id: "soloAdmin", posicion_id: "a" },
     { user_id: "pachas", posicion_id: "ce" },
     { user_id: "chat", posicion_id: "ch" },
+    { user_id: "cam", posicion_id: "sc" },
     { user_id: "yo", posicion_id: "d" },
     { user_id: "lore", posicion_id: "ch" },
     { user_id: "vieja", posicion_id: "x" },
@@ -39,6 +41,8 @@ describe("mapaDePosiciones", () => {
     expect(mapa.get("pachas")?.sinNota).toBe(true);
     expect(mapa.get("soloAdmin")).toMatchObject({ posicion: "Admin", sinNota: true });
     expect(mapa.get("chat")?.sinNota).toBe(false);
+    // Argos funciona con al menos una: solo cámara también tiene nota.
+    expect(mapa.get("cam")?.sinNota).toBe(false);
   });
   it("el dueño y los deshabilitados no salen; las posiciones apagadas no cuentan", () => {
     expect(mapa.get("yo")?.oculta).toBe(true);

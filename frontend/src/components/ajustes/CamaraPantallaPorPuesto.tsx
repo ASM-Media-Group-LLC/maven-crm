@@ -12,8 +12,8 @@ import {
 } from "@/hooks/useExigencias";
 
 // CÁMARA Y PANTALLA POR PUESTO (Alvaro, 19/11/2026). Cada puesto pide cámara y
-// pantalla por separado; sin pantalla no hay Argos (aunque la persona comparta
-// por su cuenta). Cada cambio avisa a la gente del puesto, a sus jefes y a
+// pantalla por separado; Argos funciona con al menos una de las dos (sin
+// ninguna no hay Argos, aunque la persona comparta por su cuenta). Cada cambio avisa a la gente del puesto, a sus jefes y a
 // RR. HH. y manda un correo al dueño, los admins y RR. HH.: por eso se confirma
 // antes de guardar.
 
@@ -65,13 +65,17 @@ function Confirmar({ p, onCancelar }: { p: Pendiente; onCancelar: () => void }) 
       onError: (e) => toast({ title: t("settings.exig.noSeGuardo"), description: (e as Error).message, variant: "destructive" }),
     },
   );
+  // Argos funciona con al menos una: entra o sale solo si cambia eso.
+  const argosAntes = p.puesto.pide_camara || p.puesto.pide_pantalla;
+  const argosDespues = camara || pantalla;
+  const lineaArgos = argosAntes === argosDespues ? null : argosDespues ? t("settings.exig.argosEntra") : t("settings.exig.argosSale");
   const textoBoton = guardar.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : t("settings.exig.confirmarBoton");
   return (
     <div className="mt-3 flex flex-col gap-3 rounded-xl border border-primary/30 bg-primary/5 p-3 text-sm sm:flex-row sm:items-center">
       <div className="min-w-0 flex-1">
         <p className="font-medium text-foreground">{t(clave, { puesto: p.puesto.nombre })}</p>
         <p className="mt-0.5 text-xs text-muted-foreground">
-          {p.cosa === "pantalla" && (p.valor ? t("settings.exig.argosEntra") : t("settings.exig.argosSale"))}{" "}
+          {lineaArgos}{" "}
           {t("settings.exig.avisa", { n: p.puesto.personas })}
         </p>
       </div>
@@ -131,8 +135,8 @@ export function CamaraPantallaPorPuesto() {
                   <p className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-muted-foreground">
                     <span className="tabular-nums">{t("settings.exig.personas", { n: p.personas })}</span>
                     <span className={cn("inline-flex items-center gap-1 rounded-full px-2 py-0.5",
-                      p.pide_pantalla ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground")}>
-                      <Eye className="h-3 w-3" />{p.pide_pantalla ? t("settings.exig.conArgos") : t("settings.exig.sinArgos")}
+                      p.pide_camara || p.pide_pantalla ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground")}>
+                      <Eye className="h-3 w-3" />{p.pide_camara || p.pide_pantalla ? t("settings.exig.conArgos") : t("settings.exig.sinArgos")}
                     </span>
                     {p.motivo && p.motivo !== "sin_funcion" && (
                       <span className="inline-flex items-center gap-1"><Lock className="h-3 w-3" />{t(MOTIVO[p.motivo])}</span>
