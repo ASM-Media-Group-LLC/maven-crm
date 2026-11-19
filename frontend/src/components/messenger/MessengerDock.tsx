@@ -33,6 +33,12 @@ const DockContext = createContext<DockApi>({ abrirChat: () => {} });
 /** Para que cualquier pantalla pueda abrir un chat en el muelle. */
 export const useMessengerDock = () => useContext(DockContext);
 
+// SIN BURBUJAS FLOTANTES (Alvaro, 19/11/2026: «no necesito esa mierda flotante…
+// ya tengo la parte de cómo dar los mensajes»). El muelle (nube de Mensajes +
+// Clari) ya no se dibuja y los chats se abren en Messenger. Para volverlo a
+// prender, poner esto en true.
+const MUELLE_VISIBLE = false;
+
 export function MessengerDockProvider({ children }: { children: ReactNode }) {
   const location = useLocation();
   const navigate = useNavigate();
@@ -59,17 +65,18 @@ export function MessengerDockProvider({ children }: { children: ReactNode }) {
   // sin salir de Cowork"): en las demás pantallas móviles taparía composers y
   // botones de abajo. En escritorio, en todas como siempre.
   const enCowork = location.pathname.startsWith("/cowork");
-  const mostrarMessenger = puedeMessenger && !enMessenger && (!isMobile || enCowork);
+  const mostrarMessenger = MUELLE_VISIBLE && puedeMessenger && !enMessenger && (!isMobile || enCowork);
   // En el teléfono, dentro del Messenger, el botón de Clari se montaba sobre la
   // barra del composer (grabar nota de voz quedaba debajo). Ahí no va.
-  const mostrarClari = isAdmin && !(isMobile && enMessenger);
+  const mostrarClari = MUELLE_VISIBLE && isAdmin && !(isMobile && enMessenger);
 
   const abrirChat = useCallback((id: string) => {
     // En el teléfono las ventanitas no tienen sentido: vamos a la pantalla.
     // Y YA EN /messenger tampoco: ahí las ventanitas no se dibujan, así que abrir
     // una era no hacer nada — Jhon tocó a María en la nube desde Messenger y el
     // chat no se abrió (16/09). La página ya sabe seleccionar por ?c=.
-    if (isMobile || !puedeMessenger || enMessenger) { navigate(`/messenger?c=${id}`); return; }
+    // Sin muelle no hay ventanitas flotantes: el chat se abre en Messenger.
+    if (!MUELLE_VISIBLE || isMobile || !puedeMessenger || enMessenger) { navigate(`/messenger?c=${id}`); return; }
     setMinimizadas((m) => m.filter((x) => x !== id));
     setAbiertas((a) => (a.includes(id) ? a : [id, ...a].slice(0, MAX_ABIERTAS)));
   }, [isMobile, puedeMessenger, enMessenger, navigate]);

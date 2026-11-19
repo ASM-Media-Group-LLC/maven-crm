@@ -15,6 +15,11 @@ describe("abrirChat del muelle", () => {
   it("en /messenger navega en vez de abrir ventanita", () => {
     // El muelle ya sabía si estaba en Messenger (location.pathname); el arreglo lo reutiliza.
     expect(c).toMatch(/enMessenger = (location\.)?pathname\.startsWith\("\/messenger"\)/);
-    expect(c).toMatch(/if \(isMobile \|\| !puedeMessenger \|\| enMessenger\) \{ navigate\(`\/messenger\?c=\$\{id\}`\); return; \}/);
+    expect(c).toMatch(/if \((!MUELLE_VISIBLE \|\| )?isMobile \|\| !puedeMessenger \|\| enMessenger\) \{ navigate\(`\/messenger\?c=\$\{id\}`\); return; \}/);
+  });
+  it("sin burbujas flotantes (Alvaro, 19/11/2026): ni nube ni Clari se dibujan", () => {
+    expect(c).toMatch(/const MUELLE_VISIBLE = false;/);
+    expect(c).toMatch(/const mostrarMessenger = MUELLE_VISIBLE && /);
+    expect(c).toMatch(/const mostrarClari = MUELLE_VISIBLE && /);
   });
 });
