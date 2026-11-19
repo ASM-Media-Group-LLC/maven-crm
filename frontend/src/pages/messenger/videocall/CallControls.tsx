@@ -9,7 +9,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { puedeCompartirPantalla } from "@/lib/compartirPantalla";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
-import { esBlur, type BackgroundEffect } from "@/lib/fondoDeLlamada";
+import { esBlur, leerNivelDeBlur, nivelDeEfecto, type BackgroundEffect, type NivelDeBlur } from "@/lib/fondoDeLlamada";
 import { useLanguage } from "@/hooks/useLanguage";
 import type { TranslationKey } from "@/lib/i18n";
 import { ncFunciona, type EstadoNC } from "@/lib/estadoNC";
@@ -79,6 +79,9 @@ interface CallControlsProps {
   onToggleCancelacionRuido?: () => void;
   backgroundEffect?: BackgroundEffect;
   onToggleBlurBackground?: () => void;
+  /** Elegir el nivel del difuminado («Leve» / «Fuerte»). Lo enciende con ese
+   *  nivel y lo deja guardado. Sin esto, el menú no muestra los niveles. */
+  onElegirNivelBlur?: (nivel: NivelDeBlur) => void;
   /** Mostrar las flechitas de micrófono y cámara. Por defecto, fuera del modo compacto. */
   flechas?: boolean;
   /** Un control más, a la derecha del chat. Lo usa el Supervisor Hub para la
@@ -364,6 +367,44 @@ function FilaMenu({ icon: Icon, label, onClick, activa }: {
   );
 }
 
+/** Los dos niveles del difuminado, al lado del botón de difuminar (19/11/2026).
+ *  Marca el nivel puesto o, con el difuminado apagado, el que se usará al
+ *  encenderlo (el último elegido; Fuerte si nunca eligió). */
+function NivelesDeBlur({ backgroundEffect, onElegir, className }: {
+  backgroundEffect?: BackgroundEffect; onElegir: (nivel: NivelDeBlur) => void; className?: string;
+}) {
+  const { t } = useLanguage();
+  const encendido = esBlur(backgroundEffect ?? "none");
+  const actual: NivelDeBlur = nivelDeEfecto(backgroundEffect ?? "none") ?? leerNivelDeBlur();
+  const opciones: { nivel: NivelDeBlur; label: string }[] = [
+    { nivel: "leve", label: t("messenger.call.blurLeve") },
+    { nivel: "fuerte", label: t("messenger.call.blurFuerte") },
+  ];
+  return (
+    <div role="group" aria-label={t("messenger.call.nivelDeDifuminado")} className={cn("flex items-center gap-0.5 rounded-full bg-card p-0.5", className)}>
+      {opciones.map(({ nivel, label }) => {
+        const marcado = actual === nivel;
+        return (
+          <button
+            key={nivel}
+            type="button"
+            aria-pressed={encendido && marcado}
+            data-nivel={nivel}
+            onClick={() => onElegir(nivel)}
+            className={cn(
+              "h-7 px-3 rounded-full text-xs transition-colors",
+              marcado && encendido ? "bg-primary/20 text-primary" :
+              marcado ? "bg-muted text-foreground" : "text-muted-foreground hover:bg-muted",
+            )}
+          >
+            {label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 /** Lista PLANA de dispositivos.
  *
  *  No se reusa `DevicePill`: abre su lista con `absolute bottom-full`, y acá
@@ -405,7 +446,7 @@ export default function CallControls({
   onSendReaction, onLeave,
   onAudioInputChange, onAudioOutputChange, onVideoInputChange,
   onOpenVideoSettings, onOpenMetrics, onOpenAdjustView, hideScreenShare, hideLeaveButton, leaveLabel, leaveIcon, compact, tactil, controlesExtra,
-  backgroundEffect, onToggleBlurBackground, flechas,
+  backgroundEffect, onToggleBlurBackground, onElegirNivelBlur, flechas,
 }: CallControlsProps) {
   const { t } = useLanguage();
   const [audioPopoverOpen, setAudioPopoverOpen] = useState(false);
@@ -548,6 +589,9 @@ export default function CallControls({
                     <Cloud className="h-3.5 w-3.5" />
                     <span>{t("messenger.call.fondoDifuminado")}</span>
                   </button>
+                  {onElegirNivelBlur && (
+                    <NivelesDeBlur backgroundEffect={backgroundEffect} onElegir={onElegirNivelBlur} />
+                  )}
                   <button
                     onClick={() => { setVideoPopoverOpen(false); onOpenVideoSettings(); }}
                     title={t("messenger.call.fondosYEfectos")}
@@ -681,6 +725,9 @@ export default function CallControls({
                   <FilaMenu icon={Cloud} label={t("messenger.call.difuminarFondo")}
                     activa={esBlur(backgroundEffect)}
                     onClick={cerrarY(onToggleBlurBackground)} />
+                  {onElegirNivelBlur && (
+                    <NivelesDeBlur backgroundEffect={backgroundEffect} onElegir={onElegirNivelBlur} className="ml-10 mb-1 w-fit" />
+                  )}
                   <FilaMenu icon={Sparkles} label={t("messenger.call.fondosYEfectos")} onClick={cerrarY(onOpenVideoSettings)} />
                   {onOpenAdjustView && (
                     <FilaMenu icon={LayoutGrid} label={t("messenger.call.ajustarVista")} onClick={cerrarY(onOpenAdjustView)} />

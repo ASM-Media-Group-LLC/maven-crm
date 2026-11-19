@@ -27,9 +27,11 @@ describe("niveles de difuminado", () => {
   // ser la SIGMA de un gaussiano en px a 720p de nuestro procesador
   // (lib/fondoFino). El 20 viejo equivalía a ~5 px de sigma: Alvaro dijo que
   // apenas difuminaba, así que «el nivel de siempre» ya no se conserva.
-  it("«un poco» difumina de verdad y «fuerte» bastante más", () => {
+  // 19/11/2026: «Leve» ≈ la mitad de «Fuerte».
+  it("«leve» difumina de verdad y «fuerte» es cerca del doble", () => {
     expect(radioDeBlur("blur")).toBeGreaterThanOrEqual(7);
-    expect(radioDeBlur("blur-strong")).toBeGreaterThanOrEqual(2.5 * radioDeBlur("blur"));
+    expect(radioDeBlur("blur-strong")).toBeGreaterThanOrEqual(1.8 * radioDeBlur("blur"));
+    expect(radioDeBlur("blur-strong")).toBeLessThanOrEqual(2.5 * radioDeBlur("blur"));
   });
 
   it("el fuerte cabe en el bucle del shader (sin recorte silencioso) y con costo topado", async () => {
@@ -228,8 +230,11 @@ describe("alternarBlur — el botón rápido no degrada el nivel", () => {
     expect(alternarBlur("tpl-office", "blur-strong")).toBe("blur-strong");
   });
 
-  it("si lo recordado no es un blur, cae al normal", () => {
-    expect(alternarBlur("none", "tpl-office")).toBe("blur");
+  // 19/11/2026: el nivel por defecto es «Fuerte» (antes el botón ponía «un poco»).
+  it("si lo recordado no es un blur, cae al nivel guardado (Fuerte por defecto)", () => {
+    expect(alternarBlur("none", "tpl-office")).toBe("blur-strong");
+    expect(alternarBlur("none", "none")).toBe("blur-strong");
+    guardarFondo("blur");
     expect(alternarBlur("none", "none")).toBe("blur");
   });
 });
