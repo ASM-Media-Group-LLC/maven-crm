@@ -55,6 +55,12 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABL
 
 const renovarSesion = crearRenovador(supabase.auth);
 
+/** El mismo fetch con renovación (401 → se renueva la sesión y se repite una
+ *  vez) para quien llama a una función con `fetch` a mano en vez de por el
+ *  cliente (19/11/2026: Cowork se saltaba la renovación y quedaba en
+ *  «Unauthorized» con la sesión vencida). */
+export const fetchConSesion: typeof fetch = conSesionRenovada((input, init) => fetch(input, init), (viejo) => renovarSesion(viejo));
+
 // 17/11/2026 («la plataforma se laguea»): Maven le preguntaba al servidor
 // «¿quién soy?» (auth.getUser) 77.759 veces al día, unas 2.000 por persona,
 // desde 80+ lugares del código. Cada vez es un viaje por internet que frena lo

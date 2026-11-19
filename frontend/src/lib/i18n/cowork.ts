@@ -935,4 +935,7 @@ export const cowork = {
   "cowork.turno.toast.salida": { es: "Salida marcada. Ya no se mira nada.", en: "Clocked out. Nothing is watched now." },
   "cowork.turno.toast.noSalida": { es: "No se pudo marcar la salida", en: "Couldn’t clock out" },
   "cowork.turno.novedad.entendido": { es: "Entendido", en: "Got it" },
+  "cowork.sesionVencida.titulo": { es: "Tu sesión de Maven venció", en: "Your Maven session expired" },
+  "cowork.sesionVencida.desc": { es: "La llamada sigue, pero Maven no recibe nada de ti: Argos te ve fuera de Cowork. Vuelve a entrar para arreglarlo.", en: "The call is still on, but Maven gets nothing from you: Argos sees you out of Cowork. Sign in again to fix it." },
+  "cowork.sesionVencida.volver": { es: "Volver a entrar", en: "Sign in again" },
 } as const satisfies Record<string, { es: string; en: string }>;
