@@ -24,6 +24,7 @@ import { useEsDueno } from "@/hooks/useEsDueno";
 import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
 import { CATALOGO_POSICIONES, type AlcanceDatos, type FilaCatalogo } from "@/lib/posiciones/catalogo";
+import { useModalidades } from "@/hooks/usePausas";
 
 // AJUSTES → POSICIONES (Alvaro, 18/11/2026): la estructura de Blu/Infloww
 // (Settings → Role Settings) con el diseño de Maven. Lista de posiciones →
@@ -39,6 +40,8 @@ interface Posicion {
   id: string; nombre: string; descripcion: string | null; activa: boolean;
   acceso_total: boolean; todas_creadoras: boolean;
   checks: Record<string, boolean>; alcances: Record<string, AlcanceDatos>; orden: number;
+  /** La modalidad de pausa que trae el puesto (19/11/2026). */
+  modalidad_id?: string | null;
 }
 interface Persona { id: string; full_name: string | null; avatar_url: string | null }
 interface Marca { user_id: string; protegido: boolean; sin_camara: boolean; deshabilitada: boolean }
@@ -467,6 +470,7 @@ function PermisosDe({ pos, personas, asignaciones, onVolver }: { pos: Posicion; 
   };
   const alternar = (id: string) => setAbiertos((s) => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n; });
   const bloqueado = pos.acceso_total;
+  const modalidades = useModalidades();
 
   return (
     <>
@@ -489,6 +493,25 @@ function PermisosDe({ pos, personas, asignaciones, onVolver }: { pos: Posicion; 
           </span>
         </label>
       ))}
+
+      {/* La pausa que trae el puesto (19/11/2026): sale de las modalidades de la empresa. */}
+      <div className="flex flex-wrap items-center gap-3 rounded-panel border border-border bg-card p-4">
+        <span className="min-w-0 flex-1">
+          <span className="block text-sm font-semibold">{t("posiciones.pausa")}</span>
+          <span className="block text-xs text-muted-foreground">{t("posiciones.pausaDesc")}</span>
+        </span>
+        <select
+          className="h-9 rounded-control border border-input bg-background px-2 text-sm"
+          value={pos.modalidad_id ?? ""}
+          onChange={(e) => guardar.mutate({ modalidad_id: e.target.value || null })}
+          aria-label={t("posiciones.pausa")}
+        >
+          <option value="">{t("posiciones.pausaSinDefinir")}</option>
+          {(modalidades.data?.modalidades ?? []).filter((m) => m.activa || m.id === pos.modalidad_id).map((m) => (
+            <option key={m.id} value={m.id}>{m.nombre} · {m.comida_min} + {m.bano_min} min</option>
+          ))}
+        </select>
+      </div>
 
       {CATALOGO_POSICIONES.map((sec) => {
         const clavesSec = sec.grupos.flatMap((g) => g.filas.flatMap((f) => f.funciones.map((x) => x.clave)));

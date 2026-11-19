@@ -7,6 +7,7 @@ import { UserAvatar } from "@/components/UserAvatar";
 import { useToast } from "@/hooks/use-toast";
 import { a12 } from "@/lib/horaBogota";
 import { useGuardarHorario, useHorariosEquipo } from "@/hooks/useHorariosEquipo";
+import { type PausaDePersona, usePausasDelEquipo } from "@/hooks/usePausas";
 import {
   type DiaHorario, type FilaEquipoHorario, alternarDia, cambio, hhmm, mismaHoraTodos, ponerHoraATodos, semanaInicial,
   trabaja, validarSemana,
@@ -26,7 +27,17 @@ type Filtro = "pendientes" | "confirmados" | "todos";
 
 const ENTRADA_HORA = "h-9 w-[7.25rem] rounded-lg border border-input bg-background/50 px-2 text-sm tabular-nums text-foreground focus:outline-none focus:ring-1 focus:ring-primary/50";
 
-function FilaHorario({ f, t }: { f: FilaEquipoHorario; t: Tr }) {
+// La pausa de la persona (19/11/2026): sale de su puesto; aquí solo se ve.
+// Para cambiarla se le cambia el puesto (Ajustes → Posiciones).
+function PausaDeLaFila({ pausa, t }: { pausa: PausaDePersona | undefined; t: Tr }) {
+  if (!pausa) return null;
+  const texto = pausa.modalidad
+    ? t("hr.pausas.deFila", { m: pausa.modalidad, a: pausa.comida_min, b: pausa.bano_min })
+    : t("hr.pausas.deFilaSinNombre", { a: pausa.comida_min, b: pausa.bano_min });
+  return <span className="text-[11px] text-muted-foreground">{texto}</span>;
+}
+
+function FilaHorario({ f, t, pausa }: { f: FilaEquipoHorario; t: Tr; pausa?: PausaDePersona }) {
   const { toast } = useToast();
   const guardar = useGuardarHorario();
   const inicial = useMemo(() => semanaInicial(f), [f]);
@@ -109,6 +120,8 @@ function FilaHorario({ f, t }: { f: FilaEquipoHorario; t: Tr }) {
           </div>
         )}
 
+        <PausaDeLaFila pausa={pausa} t={t} />
+
         <div className="flex flex-wrap items-center gap-2">
           <Button size="sm" className="h-9 rounded-lg" onClick={confirmar} disabled={!!error || guardar.isPending || (confirmado && !pendienteDeGuardar)}>
             {guardar.isPending ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Check className="mr-1.5 h-4 w-4" />}
@@ -127,6 +140,7 @@ function FilaHorario({ f, t }: { f: FilaEquipoHorario; t: Tr }) {
 }
 
 export function ListaHorarios({ obligatorio = false }: { obligatorio?: boolean }) {
+  const pausas = usePausasDelEquipo();
   const { t } = useLanguage();
   const q = useHorariosEquipo();
   const filas = useMemo(() => q.data ?? [], [q.data]);
@@ -190,7 +204,7 @@ export function ListaHorarios({ obligatorio = false }: { obligatorio?: boolean }
         <p className="p-6 text-sm text-muted-foreground">{filtro === "pendientes" && pendientes === 0 ? t("hr.horEq.todosListos") : t("hr.horEq.nadieFiltro")}</p>
       ) : (
         <ul className="divide-y divide-border/25">
-          {vistas.map((f) => <FilaHorario key={`${f.user_id}-${f.confirmado_at ?? "x"}`} f={f} t={t} />)}
+          {vistas.map((f) => <FilaHorario key={`${f.user_id}-${f.confirmado_at ?? "x"}`} f={f} t={t} pausa={pausas.data?.get(f.user_id)} />)}
         </ul>
       )}
     </div>

@@ -199,6 +199,10 @@ const NO_CARGAN_AQUI: Record<string, string> = {
     "Argos: resumen diario y tendencia semanal para jefes. Entra a esta cadena solo porque sus avisos insertan " +
     "en notifications, pero usa argos_uso_apps, argos_casos, las posiciones y pg_cron, que este fixture no trae; " +
     "no toca nada del Messenger.",
+  "20261119200000_pausas_por_modalidad_e_inactividad.sql":
+    "Turno: pausas por modalidad de cada empresa, quién cambia a quién e inactividad. Entra a esta cadena solo " +
+    "porque sus avisos insertan en notifications, pero usa las posiciones, el turno, Cowork y Argos, que este " +
+    "fixture no trae; no toca nada del Messenger.",
   "20261119011000_calidad_de_llamadas.sql":
     "Llamadas: el tablero de calidad del dueño y el aviso de audio malo. Entra a esta cadena solo porque su vigía " +
     "inserta avisos en notifications, pero usa llamada_salud y llamada_num (salud_de_llamada, que tampoco carga " +

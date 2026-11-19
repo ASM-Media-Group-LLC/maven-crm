@@ -192,6 +192,19 @@ function normalizarReglas(raw: unknown): ReglasCowork {
 
 /** Tope de pausa (minutos) que fija la SESIÓN, o null si no tiene reglas de
  *  pausas propias y rige la tabla cowork_break_limits como hasta ahora. */
+// El tope de la pausa sale de la MODALIDAD de la persona (19/11/2026: «todo eso
+// tiene que estar en el rol»): lo que le queda hoy de baño (cupo total del
+// turno) o de almuerzo/break. Si la consulta falla, se usa lo de antes.
+async function topeDeLaPersona(admin: { rpc: (f: string, a?: Record<string, unknown>) => PromiseLike<{ data: unknown; error: unknown }> }, userId: string, kind: string): Promise<number | null> {
+  try {
+    const { data, error } = await admin.rpc("pausa_restante_min", { _uid: userId, _kind: kind });
+    if (error || typeof data !== "number") return null;
+    return data;
+  } catch {
+    return null;
+  }
+}
+
 function minutosDePausaDeSesion(alertRules: unknown, kind: string): number | null {
   const pausas = alertRules && typeof alertRules === "object"
     ? (alertRules as Record<string, unknown>).pausas
@@ -1700,7 +1713,8 @@ serve(async (req) => {
         .select("alert_rules").eq("id", asignacion.session_id).maybeSingle();
       const topeSesion = minutosDePausaDeSesion(sesion?.alert_rules, kind);
       const limite = await topeDeLaTabla(admin, kind, await agenciaDeSesion(admin, asignacion.session_id));
-      return json(req, { break: pausa, limiteMinutos: topeSesion ?? limite?.minutos ?? null, label: limite?.label ?? kind });
+      const dePersona = await topeDeLaPersona(admin, userId, kind);
+      return json(req, { break: pausa, limiteMinutos: dePersona ?? topeSesion ?? limite?.minutos ?? null, label: limite?.label ?? kind });
     }
 
     // ═══════════════════════════════════════════════════════════════
@@ -1731,7 +1745,10 @@ serve(async (req) => {
         .select("alert_rules").eq("id", pausa.session_id).maybeSingle();
       const topeSesion = minutosDePausaDeSesion(sesion?.alert_rules, pausa.kind);
       const limite = await topeDeLaTabla(admin, pausa.kind, await agenciaDeSesion(admin, pausa.session_id));
-      return json(req, { pausa, limiteMinutos: topeSesion ?? limite?.minutos ?? null, label: limite?.label ?? pausa.kind });
+      // Al rehidratar: lo que le quedaba al ARRANCAR esta pausa (no se descuenta
+      // la que está abierta: pausa_restante_min solo suma las cerradas).
+      const dePersona = await topeDeLaPersona(admin, userId, pausa.kind);
+      return json(req, { pausa, limiteMinutos: dePersona ?? topeSesion ?? limite?.minutos ?? null, label: limite?.label ?? pausa.kind });
     }
 
     if (action === "endBreak") {

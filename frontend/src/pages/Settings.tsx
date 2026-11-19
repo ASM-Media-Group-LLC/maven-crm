@@ -51,6 +51,7 @@ import ChangePasswordModal from "@/components/dashboard/ChangePasswordModal";
 import { TarjetaDeApariencia } from "@/components/ajustes/TarjetaDeApariencia";
 import { TarjetaHoraEmpresa } from "@/components/ajustes/TarjetaHoraEmpresa";
 import { TarjetaPosiciones } from "@/components/ajustes/TarjetaPosiciones";
+import { TarjetaEmpresa } from "@/components/ajustes/TarjetaEmpresa";
 
 // Settings page — left rail with the user's role banner + tab list,
 // right side renders the active section. Layout matches the screenshot
@@ -263,6 +264,7 @@ const MyAccountTab = () => {
       <TarjetaHoraEmpresa />
       {/* Posiciones y permisos al estilo Blu (borrador, solo el dueño). */}
       <TarjetaPosiciones />
+      <TarjetaEmpresa />
 
       <WhatsappPhoneCard
         currentValue={profileQ.data?.phone_e164 ?? null}

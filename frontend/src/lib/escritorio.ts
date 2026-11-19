@@ -1,3 +1,4 @@
+import { segundosDeVozEntre } from "@/lib/vozPropia";
 // LA APP DE COMPUTADOR (desktop/, Electron).
 //
 // Cuando Maven corre dentro de la app de Mac o Windows, su preload expone
@@ -58,7 +59,9 @@ export function escritorio(): MavenEscritorio | null {
   return e && e.esApp ? (e as MavenEscritorio) : null;
 }
 
-/** Pasa los tramos de la app al formato de la tabla argos_uso_apps (descarta lo inválido). */
+/** Pasa los tramos de la app al formato de la tabla argos_uso_apps (descarta lo inválido).
+ *  Hablar en la llamada cuenta como actividad: se le restan a lo «inactivo» los
+ *  segundos de voz de ese tramo (lib/vozPropia.ts, 19/11/2026). */
 export function filasDeUso(lote: TramoDeApp[], plataforma: string | undefined) {
   const recorta = (s: unknown, n: number) => (typeof s === "string" ? s.slice(0, n) : "");
   return lote
@@ -70,7 +73,8 @@ export function filasDeUso(lote: TramoDeApp[], plataforma: string | undefined) {
       desde: t.desde,
       hasta: t.hasta,
       segundos: Math.min(3600, Math.round(t.segundos)),
-      segundos_inactivo: Math.max(0, Math.min(3600, Math.round(t.inactivos || 0), Math.round(t.segundos))),
+      segundos_inactivo: Math.max(0, Math.min(3600, Math.round(t.inactivos || 0), Math.round(t.segundos))
+        - segundosDeVozEntre(t.desde, t.hasta)),
       plataforma: plataforma === "mac" || plataforma === "windows" || plataforma === "linux" ? plataforma : null,
     }));
 }

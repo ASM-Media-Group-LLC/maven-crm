@@ -43,6 +43,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { useEnTurno } from "@/lib/turnoActivo";
 
 interface Props {
   cowork: ReturnType<typeof useCoworkSession>;
@@ -480,6 +481,17 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
     if (window.location.pathname.startsWith("/cowork")) navigate("/dashboard");
   }, [cowork, navigate, endCall]);
   salirDeLaSalaRef.current = handleLeaveRoom;
+  // Si el turno se cierra solo (20 min sin actividad, olvido de salida o fin del
+  // horario antes del corte), sale de la sala: fuera del turno nadie la ve
+  // (19/11/2026). Solo en el paso de «en turno» a «fuera»: si alguien vuelve a
+  // entrar a la sala estando fuera, no se le saca en bucle.
+  const enTurnoAhora = useEnTurno();
+  const enTurnoAntesRef = useRef(enTurnoAhora);
+  useEffect(() => {
+    const antes = enTurnoAntesRef.current;
+    enTurnoAntesRef.current = enTurnoAhora;
+    if (antes && !enTurnoAhora) void salirDeLaSalaRef.current?.();
+  }, [enTurnoAhora]);
 
   // La config de la llamada se arma UNA vez por sala. Los callbacks se leen por
   // ref: si fueran dependencias, cualquier cambio de estado del componente

@@ -89,6 +89,23 @@ export const CATALOGO_POSICIONES: SeccionCatalogo[] = [
             ]
           },
           {
+            "fila": "Horarios y pausas",
+            "etiqueta": "posiciones.c.horarios_y_pausas",
+            "datos": "no",
+            "funciones": [
+              {
+                "clave": "N:horarios.gestionar",
+                "etiqueta": "posiciones.c.gestionar_horario_y_pausa",
+                "nueva": true
+              },
+              {
+                "clave": "N:empresa.configurar",
+                "etiqueta": "posiciones.c.configurar_la_empresa",
+                "nueva": true
+              }
+            ]
+          },
+          {
             "fila": "Lo que Argos le vigila",
             "etiqueta": "posiciones.c.lo_que_argos_le_vigila",
             "datos": "no",
