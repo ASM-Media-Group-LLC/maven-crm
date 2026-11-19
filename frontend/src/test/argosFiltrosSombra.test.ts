@@ -37,7 +37,8 @@ describe("huella del pantallazo (¿cambió la pantalla?)", () => {
   });
 
   it("el pantallazo guarda su huella en monitor_capturas", () => {
-    expect(camara).toMatch(/alHuella\(huellaDeCanvas\(canvas\)\)/);
+    // Reducida fuera del hilo principal (19/11/2026: trababa la página).
+    expect(camara).toMatch(/huellaSinTrabas\(canvas\)\.then\(alHuella/);
     expect(camara).toMatch(/cara_visible: caraVisible,[\s\S]{0,120}huella,/);
   });
 });

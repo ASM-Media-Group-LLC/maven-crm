@@ -50,6 +50,28 @@ export function distanciaHuellas(a: string, b: string): number {
   return d;
 }
 
+/**
+ * La misma huella SIN TRABAR LA PÁGINA (19/11/2026). La medición de llamadas
+ * marcaba el temporizador de los pantallazos («index.js:TimerHandler:setInterval»,
+ * ~0,5 s de promedio): dibujar el lienzo de 1600 px (que vive en la tarjeta de
+ * video) en el lienzo chiquito de lectura (que vive en la CPU) obligaba a bajar
+ * la imagen ENTERA al hilo principal. Aquí createImageBitmap la reduce a 17×16
+ * antes, y al hilo principal solo bajan esos 272 puntos. Sin createImageBitmap,
+ * la de siempre.
+ */
+export async function huellaSinTrabas(origen: HTMLCanvasElement): Promise<string | null> {
+  if (typeof createImageBitmap !== "function") return huellaDeCanvas(origen);
+  let chica: ImageBitmap | null = null;
+  try {
+    chica = await createImageBitmap(origen, { resizeWidth: HUELLA_ANCHO, resizeHeight: HUELLA_ALTO, resizeQuality: "low" });
+    return huellaDeCanvas(chica);
+  } catch {
+    return huellaDeCanvas(origen);
+  } finally {
+    chica?.close();
+  }
+}
+
 /** Huella de lo que hay dibujado en un canvas (o null si el navegador no deja). */
 export function huellaDeCanvas(origen: CanvasImageSource): string | null {
   try {
