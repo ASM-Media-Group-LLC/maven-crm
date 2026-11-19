@@ -12,6 +12,7 @@ export type Tono = "grave" | "aviso" | "suave";
 
 export interface ResumenCaso {
   alertas?: Record<string, { n: number; min: number }>;
+  graves?: { sin_actividad?: number; fuera_del_trabajo?: number };
   min_marcados?: number;
   fotos_malas?: number;
   reportes_n?: number;
@@ -117,6 +118,8 @@ export function chipsDelCaso(r: ResumenCaso | null | undefined): Chip[] {
     const x = a[tipo];
     if (x && (n(x.min) > 0 || n(x.n) > 0)) out.push({ clave: tipo, etiqueta, vars: { n: n(x.n), min: n(x.min) }, tono });
   };
+  if (n(r.graves?.sin_actividad) > 0) out.push({ clave: "grave_sin_actividad", etiqueta: "hr.casos.chip.graveSinActividad", vars: { n: n(r.graves?.sin_actividad) }, tono: "grave" });
+  if (n(r.graves?.fuera_del_trabajo) > 0) out.push({ clave: "grave_fuera", etiqueta: "hr.casos.chip.graveFuera", vars: { n: n(r.graves?.fuera_del_trabajo) }, tono: "grave" });
   if (r.no_entro) out.push({ clave: "no_entro", etiqueta: "hr.casos.chip.noEntro", vars: {}, tono: "grave" });
   alerta("celular", "hr.casos.chip.celular", "grave");
   alerta("fuera_de_lugar", "hr.casos.chip.fueraDeLugar", "grave");
@@ -194,7 +197,8 @@ export function hoyBogota(ahora: Date = new Date()): string {
 
 /** Tipo de aviso de la campana → color de la tarjeta. */
 export function tonoAviso(tipo: string): Veredicto | "info" | "atencion" {
-  if (tipo === "argos_caso_cometio" || tipo === "argos_caso_equipo" || tipo === "argos_caso_grave") return "cometio";
+  if (tipo === "argos_caso_cometio" || tipo === "argos_caso_equipo" || tipo === "argos_caso_grave"
+    || tipo === "argos_grave" || tipo === "argos_grave_persona") return "cometio";
   if (tipo === "argos_caso_limpio") return "no_cometio";
   if (tipo === "argos_caso_justificado") return "justificado";
   if (tipo === "argos_casos_del_dia" || tipo === "argos_casos_atraso") return "atencion";

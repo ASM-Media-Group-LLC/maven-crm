@@ -89,6 +89,18 @@ export const CATALOGO_POSICIONES: SeccionCatalogo[] = [
             ]
           },
           {
+            "fila": "Lo que Argos le vigila",
+            "etiqueta": "posiciones.c.lo_que_argos_le_vigila",
+            "datos": "no",
+            "funciones": [
+              {
+                "clave": "N:argos.apps_ajenas",
+                "etiqueta": "posiciones.c.vigilar_apps_ajenas",
+                "nueva": true
+              }
+            ]
+          },
+          {
             "fila": "Revisión de RR. HH.",
             "etiqueta": "posiciones.c.revision_de_rrhh",
             "datos": "no",

@@ -528,6 +528,8 @@ export const compartido = {
   "shared.notif.caso.verCaso": { es: "Ver caso", en: "View case" },
   "shared.notif.caso.verReporte": { es: "Ver reporte", en: "View report" },
   "shared.notif.caso.revisar": { es: "Revisar", en: "Review" },
+  "shared.notif.caso.verEnVivo": { es: "Ver en vivo", en: "Watch live" },
+  "shared.notif.caso.volver": { es: "Volver al trabajo", en: "Back to work" },
   // El chip del módulo de origen. En español se sigue mostrando el valor
   // guardado tal cual (module_origin); en inglés, estos nombres.
   "shared.notif.module.creadores": { es: "Creadoras", en: "Creators" },

@@ -14,7 +14,8 @@ import { tonoAviso, tonoVeredicto } from "@/lib/casosArgos";
 // llegan desde NotificationItem para que se comporte igual que las demás.
 
 export function esAvisoDeCaso(n: Pick<Notification, "reference_type" | "type">): boolean {
-  return n.reference_type === "argos_caso" || n.type.startsWith("argos_caso") || n.type === "argos_reporte_rrhh";
+  return n.reference_type === "argos_caso" || n.type.startsWith("argos_caso") || n.type === "argos_reporte_rrhh"
+    || n.type.startsWith("argos_grave");
 }
 
 export function AvisoCasoArgos({ n, onClick, acciones }: { n: Notification; onClick: () => void; acciones?: ReactNode }) {
@@ -27,12 +28,15 @@ export function AvisoCasoArgos({ n, onClick, acciones }: { n: Notification; onCl
       ? { franja: "bg-warning", boton: "text-warning" }
       : { franja: tonoVeredicto(tono).punto, boton: tonoVeredicto(tono).texto };
   // La foto solo en los avisos de UN caso (no en el reporte ni en el de pendientes).
-  const caso = useCaso(n.reference_id && n.type !== "argos_reporte_rrhh" ? n.reference_id : null);
+  const esGrave = n.type.startsWith("argos_grave");
+  const caso = useCaso(n.reference_id && n.type !== "argos_reporte_rrhh" && !esGrave ? n.reference_id : null);
   const foto = caso.data?.foto_path ?? null;
   const fotos = useFotosCaso(foto ? [foto] : []);
   const url = foto ? fotos.data?.[foto] : undefined;
   const sinLeer = n.status === "new" || (!n.status && !n.is_read);
-  const boton = n.type === "argos_reporte_rrhh" ? t("shared.notif.caso.verReporte")
+  const boton = n.type === "argos_grave" ? t("shared.notif.caso.verEnVivo")
+    : n.type === "argos_grave_persona" ? t("shared.notif.caso.volver")
+    : n.type === "argos_reporte_rrhh" ? t("shared.notif.caso.verReporte")
     : n.type === "argos_casos_del_dia" || n.type === "argos_casos_atraso" ? t("shared.notif.caso.revisar")
       : t("shared.notif.caso.verCaso");
 
