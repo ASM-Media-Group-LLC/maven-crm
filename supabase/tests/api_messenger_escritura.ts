@@ -213,6 +213,10 @@ const NO_CARGAN_AQUI: Record<string, string> = {
     "Argos: alerta grave y ráfaga (argos_graves, argos_rafagas). Entra a esta cadena solo porque sus avisos " +
     "insertan en notifications, pero usa argos_uso_apps, el turno, las posiciones y pg_cron, que este fixture " +
     "no trae; no toca nada del Messenger.",
+  "20261119170000_argos_resumenes_jefes.sql":
+    "Argos: resumen diario y tendencia semanal para jefes. Entra a esta cadena solo porque sus avisos insertan " +
+    "en notifications, pero usa argos_uso_apps, argos_casos, las posiciones y pg_cron, que este fixture no trae; " +
+    "no toca nada del Messenger.",
   "20261119011000_calidad_de_llamadas.sql":
     "Llamadas: el tablero de calidad del dueño y el aviso de audio malo. Usa llamada_salud y llamada_num " +
     "(salud_de_llamada, que tampoco carga aquí), destinatarios_de_aviso y pg_cron; se prueba en " +

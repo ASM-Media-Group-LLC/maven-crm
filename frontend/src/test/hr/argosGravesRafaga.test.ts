@@ -69,3 +69,24 @@ describe("ráfaga", () => {
     expect(sql).toContain("after update of fuera_de_lugar on public.monitor_capturas");
   });
 });
+
+const resumenes = import.meta.glob("../../../../supabase/migrations/20261119170000_argos_resumenes_jefes.sql", {
+  query: "?raw", import: "default", eager: true,
+}) as Record<string, string>;
+const sqlResumen = Object.values(resumenes)[0] ?? "";
+
+describe("resúmenes para jefes", () => {
+  it("11:55 pm a cada jefe directo con su equipo; lunes 7 am la tendencia", () => {
+    expect(sqlResumen).toContain("cron.schedule('argos-resumen-dia', '55 4 * * *'");
+    expect(sqlResumen).toContain("cron.schedule('argos-tendencia-semana', '0 12 * * 1'");
+    expect(sqlResumen).toContain("public.jefes_directos(a.user_id)");
+  });
+
+  it("cada quien ve solo a quien puede vigilar", () => {
+    expect(sqlResumen).toMatch(/argos_resumen_de\(coalesce\(array_agg\(v\.user_id\), '\{\}'\), _dia\)\s+from public\.argos_vigilables\(\) v/);
+  });
+
+  it("la tendencia compara minutos marcados por hora trabajada con 5 h mínimas", () => {
+    expect(sqlResumen).toContain("a.medido_min >= 300 and b.medido_min >= 300");
+  });
+});
