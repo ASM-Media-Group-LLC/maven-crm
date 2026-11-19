@@ -51,6 +51,9 @@ const FUERA_DEL_SHELL = new Set([
   // Subida pública por link (/aportar/:token): la abre gente SIN cuenta, no lleva
   // el shell de la app. Como la portada y el Portal de creadoras.
   "PaginaAportar",
+  // Registro solo desde la portada (/empezar) y la vuelta de Stripe (/bienvenido):
+  // públicas, con el marco de las pantallas de entrar (vagón 7, 19/11/2026).
+  "Empezar", "Bienvenido",
 ]);
 
 /**

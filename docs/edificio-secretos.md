@@ -98,6 +98,21 @@ apagados en el edificio (las funciones fallan sin tocar nada) y sus relojes nace
 `MAIL_CRED_KEY`, `MAIL_TEAM_DOMAIN`, `WHATSAPP_EVOLUTION_URL`, `TELEGRAM_GW_URL`, `BOT_LIDS`,
 `NOTIFICATION_ALLOWED_DOMAINS` (vacío = solo correos de la propia agencia).
 
+### 1.h Cobros con Stripe y la tarjeta de Kash (vagón 7, 19/11/2026)
+
+Los pone Alvaro a mano (nadie más los lee). Solo en el **edificio**, salvo el último.
+
+| Secreto | Dónde | Para qué |
+|---|---|---|
+| `STRIPE_SECRET_KEY` | edificio | Restricted key de la cuenta de Stripe de Lumina (permisos en el PR del vagón 7). La usa `cobros-stripe`. |
+| `STRIPE_WEBHOOK_SECRET` | edificio | El `whsec_…` del endpoint `https://ezeigddgkaemxpshghmu.supabase.co/functions/v1/cobros-stripe`. |
+| `KASH_RESUMEN_TOKEN` | edificio **y** Kash (mismo valor) | Llave dedicada para leer el resumen de Kash (`kash-resumen`, solo lectura). Valor largo al azar: `openssl rand -hex 32`. |
+| `KASH_RESUMEN_URL`, `KASH_APP_URL` | edificio (opcionales) | La dirección de `kash-resumen` y a dónde lleva «Entrar» en la tarjeta de Kash. |
+
+Front (Dokploy, contenedor de app.maven-ai.me): `VITE_PUERTA_EDIFICIO` (vacío = apagada; `1` = prendida),
+`VITE_EDIFICIO_URL` (`https://ezeigddgkaemxpshghmu.supabase.co`) y `VITE_EDIFICIO_ANON_KEY` (la llave
+pública del edificio). Sin `VITE_PUERTA_EDIFICIO=1` todo sigue yendo a Kash.
+
 ### Comando a mano (si no se usa el workflow)
 
 ```bash

@@ -20,6 +20,11 @@ const alDia = leer(import.meta.glob("../../../../infra/casas/al-dia.sh", { query
 const relojes = leer(import.meta.glob("../../../../infra/casas/edificio-migraciones/20261119230000_edificio_crons.sql", { query: "?raw", import: "default", eager: true }));
 const listaFunciones = leer(import.meta.glob("../../../../infra/casas/funciones-edificio.txt", { query: "?raw", import: "default", eager: true }));
 const migracionesDeKash = import.meta.glob("../../../../supabase/migrations/*.sql", { query: "?raw", import: "default", eager: true });
+const soloEdificio = leer(import.meta.glob("../../../../infra/casas/funciones-solo-edificio.txt", { query: "?raw", import: "default", eager: true }));
+const deployDeKash = leer(import.meta.glob("../../../../.github/workflows/deploy-edge-functions.yml", { query: "?raw", import: "default", eager: true }));
+const configToml = leer(import.meta.glob("../../../../supabase/config.toml", { query: "?raw", import: "default", eager: true }));
+const migracionCobros = leer(import.meta.glob("../../../../infra/edificio/migraciones/20261120090000_cobros.sql", { query: "?raw", import: "default", eager: true }));
+const lista = (txt: string) => txt.split("\n").map((l) => l.replace(/#.*/, "").trim()).filter(Boolean);
 
 describe("el edificio nunca toca Kash", () => {
   it.each(Object.entries(flujos))("el workflow %s apunta solo al edificio y pasa por el candado", (_n, yml) => {
@@ -58,6 +63,33 @@ describe("el edificio nunca toca Kash", () => {
     for (const [ruta, sql] of Object.entries(migracionesDeKash)) {
       expect(ruta).not.toMatch(/edificio_crons/);
       expect(sql as string).not.toContain("public.edificio_llamar(");
+    }
+  });
+
+  // Vagón 7 (cobros, puerta): esas funciones viven SOLO en el edificio. Si el deploy de
+  // Kash dejara de saltarlas, al fundir se publicarían en Kash.
+  it("las funciones solo del edificio no se publican en Kash", () => {
+    const solo = lista(soloEdificio);
+    expect(solo).toEqual(expect.arrayContaining(["cobros-stripe", "directorio", "refrescar-externas"]));
+    const delEdificio = lista(listaFunciones);
+    for (const f of solo) {
+      expect(delEdificio).toContain(f);
+      expect(configToml).toMatch(new RegExp(`^\\[functions\\.${f}\\]\\nverify_jwt = false`, "m"));
+    }
+    expect(deployDeKash).toContain("infra/casas/funciones-solo-edificio.txt");
+    expect(deployDeKash).toMatch(/skip \$fn \(solo del edificio: no va a Kash\)/);
+    // kash-resumen es la de Kash (solo lectura): no va al edificio.
+    expect(delEdificio).not.toContain("kash-resumen");
+    expect(solo).not.toContain("kash-resumen");
+    expect(configToml).toMatch(/^\[functions\.kash-resumen\]\nverify_jwt = false/m);
+  });
+
+  it("la migración de cobros es del edificio y trae su candado", () => {
+    expect(migracionCobros).toContain("30869615-f579-4981-8a1f-dbebc61eae2d");
+    expect(migracionCobros).not.toContain(KASH);
+    for (const [ruta, sql] of Object.entries(migracionesDeKash)) {
+      expect(ruta).not.toMatch(/20261120090000_cobros\.sql$/);
+      expect(sql as string).not.toMatch(/create table public\.(stripe_eventos|precios_plataforma|puerta_intentos)/);
     }
   });
 

@@ -30,6 +30,11 @@ substitute "__RUNTIME_VITE_GIPHY_API_KEY__"           "${VITE_GIPHY_API_KEY:-}"
 # se queda tal cual en el bundle y el editor funciona de a uno: `substitute` no
 # hace nada con un valor vacío, y el frontend trata `__RUNTIME_` como "apagado".
 substitute "__RUNTIME_VITE_DOCS_SYNC_URL__"           "${VITE_DOCS_SYNC_URL:-}"
+# La puerta Kash/edificio (tren de agencias, vagón 7). Sin VITE_PUERTA_EDIFICIO=1 el
+# placeholder se queda y la app sigue 100 % en Kash, como siempre (lib/puerta.ts).
+substitute "__RUNTIME_VITE_PUERTA_EDIFICIO__"         "${VITE_PUERTA_EDIFICIO:-}"
+substitute "__RUNTIME_VITE_EDIFICIO_URL__"            "${VITE_EDIFICIO_URL:-}"
+substitute "__RUNTIME_VITE_EDIFICIO_ANON_KEY__"       "${VITE_EDIFICIO_ANON_KEY:-}"
 
 echo "[entrypoint] Runtime env applied: VITE_SUPABASE_URL=${VITE_SUPABASE_URL:-(unset)} VITE_PUBLIC_URL=${VITE_PUBLIC_URL:-(unset)}"
 
