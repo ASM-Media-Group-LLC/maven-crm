@@ -439,6 +439,13 @@ export const compartido = {
   "shared.floatCall.muteForMe": { es: "Silenciar para mí", en: "Mute for me" },
   "shared.floatCall.popOut": { es: "Sacar del navegador", en: "Pop out of the browser" },
   "shared.floatCall.hangUp": { es: "Colgar", en: "Hang up" },
+  "shared.floatCall.backToCowork": { es: "Volver a Cowork", en: "Back to Cowork" },
+  "shared.floatCall.backToCoworkHint": { es: "Volver a Cowork (o doble clic en el video)", en: "Back to Cowork (or double-click the video)" },
+  "shared.floatCall.size": { es: "Cambiar tamaño: {tamano}", en: "Change size: {tamano}" },
+  "shared.floatCall.sizeSmall": { es: "chica", en: "small" },
+  "shared.floatCall.sizeMedium": { es: "mediana", en: "medium" },
+  "shared.floatCall.sizeLarge": { es: "grande", en: "large" },
+  "shared.floatCall.resize": { es: "Arrastra para cambiar el tamaño", en: "Drag to resize" },
 
   // Elegir varias personas del equipo (components/SelectorDePersonas.tsx)
   "shared.people.searchTeam": { es: "Buscar en el equipo…", en: "Search the team…" },

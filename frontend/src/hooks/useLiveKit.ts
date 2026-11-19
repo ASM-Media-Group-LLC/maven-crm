@@ -23,7 +23,7 @@ import { pausarVideoConAppEscondida } from "@/lib/videoEscondido";
 import { MEDIR_REGIONES_CADA, medirRegiones } from "@/lib/pingRegiones";
 import { ESPERA_SIN_FIN_MS, esperaDeReentrada, fueUnaCaida, MAX_REENTRADAS } from "@/lib/conexionSala";
 import { faseSegunSueno, vigiaDelSueno } from "@/lib/equipoDormido";
-import { DEBIL_INICIAL, MIRAR_DEBIL_CADA_MS, siguienteDebil } from "@/lib/internetDebil";
+import { DEBIL_INICIAL, MIRAR_DEBIL_CADA_MS, llamadaCaida, siguienteDebil } from "@/lib/internetDebil";
 import { registrarCorteParaElAviso } from "@/lib/caidasSeguidas";
 import {
   reproducirAudiosPausados, reanudarAudioConGesto, dejarDeEsperarGesto, registrarDesbloqueo,
@@ -837,18 +837,18 @@ export function useLiveKit() {
     };
     const primera = window.setTimeout(() => { void tomar(); }, 15_000);
     const cada = window.setInterval(() => { void tomar(); }, MUESTRA_CADA_MS);
-    // «Tu internet está débil» (lib/internetDebil.ts). Cada 2 s la calidad que
-    // mide LiveKit. El codificador limitado por ancho de banda ya NO cuenta
-    // (18/11/2026: es normal y hacía saltar el aviso a cada rato). Solo un
-    // aviso: no se apaga nada.
+    // «Tu internet está débil» (lib/internetDebil.ts). Cada 2 s se mira si la
+    // llamada está caída de verdad (reconectando o en LOST). El codificador
+    // limitado por ancho de banda y el bajón a POOR ya NO cuentan (18 y
+    // 19/11/2026: hacían saltar el aviso a cada rato). Solo un aviso: no se
+    // apaga nada.
     let debil = DEBIL_INICIAL;
     setInternetDebil(false);
     const vigiaDebil = window.setInterval(() => {
       void (async () => {
         try {
-          if (roomRef.current !== room || room.state !== ConnectionState.Connected) return;
-          const q = room.localParticipant.connectionQuality;
-          const mala = q === ConnectionQuality.Poor || q === ConnectionQuality.Lost;
+          if (roomRef.current !== room) return;
+          const mala = llamadaCaida(room.state, room.localParticipant.connectionQuality);
           debil = siguienteDebil(debil, mala, Date.now());
           setInternetDebil(debil.mostrando);
         } catch { /* avisar jamás rompe la llamada */ }

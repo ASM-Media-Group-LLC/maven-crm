@@ -319,7 +319,8 @@ describe("5. «Tu internet está débil»: solo un aviso", () => {
     const vigia = s.slice(s.indexOf("const vigiaDebil = window.setInterval"), s.indexOf("}, MIRAR_DEBIL_CADA_MS);"));
     expect(vigia).toContain("setInternetDebil(debil.mostrando)");
     expect(vigia).not.toMatch(/setCameraEnabled|setScreenShareEnabled|setMicrophoneEnabled|setParameters|disconnect/);
-    expect(vigia).toMatch(/const mala = q === ConnectionQuality\.Poor \|\| q === ConnectionQuality\.Lost;/);
+    // 19/11/2026: solo la llamada caída de verdad (reconectando o LOST), no POOR.
+    expect(vigia).toContain("const mala = llamadaCaida(room.state, room.localParticipant.connectionQuality);");
     // 18/11/2026: el codificador limitado por red ya no prende el aviso.
     expect(vigia).not.toContain("limitadoPorRed");
     expect(DEBIL_SOSTENIDO_MS).toBeGreaterThanOrEqual(20_000);
