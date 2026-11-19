@@ -13,6 +13,7 @@ import { UserAvatar } from "@/components/UserAvatar";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { horaUI } from "@/lib/formatoHora";
 import { useEstadoHoy } from "@/hooks/useEstadoHoy";
 import { useDondeEsta } from "@/hooks/useDondeEsta";
@@ -35,6 +36,9 @@ import {
 //   · Tocar el nombre abre su expediente; tocar una foto la abre en grande.
 
 const POR_PAGINA = 20;
+/** Cuántas fotos se ven en el renglón (el resto, «+N», en el visor). */
+const MAX_FOTOS = 4;
+const TODOS = "__todos";
 
 const CAT: Record<Categoria, { k: TranslationKey; Icono: typeof BellRing; punto: string }> = {
   llamado: { k: "hr.estado.cat.llamado", Icono: BellRing, punto: "bg-warning" },
@@ -51,11 +55,6 @@ const LLAMADO: Record<string, TranslationKey> = {
   sin_pantalla: "hr.estado.llamado.sin_pantalla",
   fuera_cuadro: "hr.estado.llamado.fuera_cuadro",
 };
-
-const FICHA = (activa: boolean) =>
-  `inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border px-2.5 py-1 text-xs font-medium transition-colors ${
-    activa ? "border-foreground/30 bg-foreground/10 text-foreground" : "border-border/40 bg-card/30 text-muted-foreground hover:bg-card/50"
-  }`;
 
 type Tr = (k: TranslationKey, p?: Record<string, string | number>) => string;
 
@@ -171,7 +170,7 @@ export function EstadoPanel() {
   const [urls, setUrls] = useState<Record<string, string>>({});
   const [visor, setVisor] = useState<{ item: ItemEstado; i: number } | null>(null);
   const clavesPagina = useMemo(() => [
-    ...enPagina.flatMap((i) => fotosDe(i).slice(0, 8)),
+    ...enPagina.flatMap((i) => fotosDe(i).slice(0, MAX_FOTOS)),
     ...(visor ? fotosDe(visor.item).slice(Math.max(0, visor.i - 1), visor.i + 2) : []),
   ], [enPagina, visor]);
   useEffect(() => {
@@ -209,23 +208,40 @@ export function EstadoPanel() {
   const fotosVisor = visor ? fotosDe(visor.item) : [];
   const fotoVisor = visor ? fotosVisor[visor.i] : null;
 
+  const thumbs = (item: ItemEstado, fs: ReturnType<typeof fotosDe>, varios: boolean) => (
+    <div className="flex shrink-0 gap-1.5">
+      {fs.slice(0, MAX_FOTOS).map((f, i) => {
+        const u = urls[claveDeFoto(f)];
+        const resto = fs.length - MAX_FOTOS;
+        return (
+          <button key={claveDeFoto(f)} type="button" onClick={() => setVisor({ item, i })}
+            className="relative aspect-[16/10] w-[5.5rem] shrink-0 overflow-hidden rounded-md border border-border/40 bg-muted/40 transition-colors hover:border-primary/60"
+            title={horaUI(f.cuando)}>
+            {u ? <img src={u} alt={horaUI(f.cuando)} loading="lazy" className="h-full w-full object-cover" />
+              : <div className="h-full w-full animate-pulse bg-foreground/[0.06]" />}
+            {varios && (
+              <span className="absolute bottom-0.5 left-0.5 rounded bg-black/65 px-1 text-[9px] font-semibold tabular-nums text-white">{horaUI(f.cuando)}</span>
+            )}
+            {i === MAX_FOTOS - 1 && resto > 0 && (
+              <span className="absolute inset-0 flex items-center justify-center bg-black/60 text-xs font-semibold text-white">+{resto}</span>
+            )}
+          </button>
+        );
+      })}
+    </div>
+  );
+
   return (
     <div className="flex flex-col gap-3">
-      <div className="flex flex-wrap items-start gap-2">
-        <div className="flex min-w-0 flex-1 flex-col gap-1">
-          <h2 className="flex items-center gap-2 text-base font-semibold">
-            <span className="relative flex h-2 w-2" aria-hidden>
-              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-success/60" />
-              <span className="relative inline-flex h-2 w-2 rounded-full bg-success" />
-            </span>
-            {t("hr.estado.titulo")}
-          </h2>
-          <p className="text-xs text-muted-foreground">{t("hr.estado.sub")}</p>
-        </div>
-        <Button variant="outline" size="sm" className="rounded-full" onClick={() => void q.refetch()} disabled={q.isFetching}>
-          <RefreshCw className={`h-3.5 w-3.5 sm:mr-1.5 ${q.isFetching ? "animate-spin" : ""}`} />
-          <span className="hidden sm:inline">{t("hr.llamadas.actualizar")}</span>
-        </Button>
+      <div className="flex min-w-0 flex-col gap-1">
+        <h2 className="flex items-center gap-2 text-base font-semibold">
+          <span className="relative flex h-2 w-2" aria-hidden>
+            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-success/60" />
+            <span className="relative inline-flex h-2 w-2 rounded-full bg-success" />
+          </span>
+          {t("hr.estado.titulo")}
+        </h2>
+        <p className="text-xs text-muted-foreground">{t("hr.estado.sub")}</p>
       </div>
 
       {hoyEquipo.fallo && (
@@ -235,32 +251,23 @@ export function EstadoPanel() {
       )}
 
       <section className="vidrio flex flex-col gap-0 overflow-hidden p-0">
-        {/* Filtros */}
-        <div className="flex flex-col gap-2 border-b border-border/40 p-3">
-          <div className="-mx-1 flex gap-1.5 overflow-x-auto px-1 [scrollbar-width:none] sm:flex-wrap sm:overflow-visible" role="group" aria-label={t("hr.estado.filtro.tipo")}>
-            <button type="button" onClick={() => cambiar(() => setCat(null))} aria-pressed={!cat} className={FICHA(!cat)}>
-              {t("hr.estado.cat.todo")}<span className="tabular-nums opacity-70">{deLaPersonaYEquipo.length}</span>
-            </button>
-            {CATEGORIAS.filter((c) => conteos[c] > 0 || cat === c).map((c) => (
-              <button key={c} type="button" onClick={() => cambiar(() => setCat(c))} aria-pressed={cat === c} className={FICHA(cat === c)}>
-                <span className={`h-1.5 w-1.5 rounded-full ${CAT[c].punto}`} aria-hidden />
-                {t(CAT[c].k)}<span className="tabular-nums opacity-70">{conteos[c]}</span>
-              </button>
-            ))}
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
+        {/* Barra de arriba, ordenada (Alvaro, 18/11/2026: «quiero más orden»):
+            1) buscar persona + equipo + actualizar, en una sola línea;
+            2) los tipos, como un selector segmentado de una sola fila. */}
+        <div className="flex flex-col gap-3 border-b border-border/40 p-3 sm:p-4">
+          <div className="flex items-center gap-2">
             <Popover open={abierto} onOpenChange={setAbierto}>
-              <div className="relative w-full sm:w-60">
+              <div className="relative min-w-0 flex-1 sm:w-72 sm:flex-none">
                 <PopoverTrigger asChild>
                   <button type="button" role="combobox" aria-expanded={abierto} aria-label={t("hr.llamadas.filtro.buscar")}
-                    className="flex h-8 w-full items-center gap-2 rounded-md border border-input bg-background/40 pl-2.5 pr-8 text-left text-sm transition-colors hover:bg-foreground/[0.04]">
+                    className="flex h-9 w-full items-center gap-2 rounded-lg border border-input bg-background/40 pl-3 pr-8 text-left text-sm transition-colors hover:bg-foreground/[0.04]">
                     <Search className="h-4 w-4 shrink-0 text-muted-foreground" />
                     <span className={`min-w-0 flex-1 truncate ${nombreElegido ? "text-foreground" : "text-muted-foreground"}`}>{nombreElegido ?? t("hr.llamadas.filtro.buscar")}</span>
                   </button>
                 </PopoverTrigger>
                 {elegido ? (
                   <button type="button" onClick={() => cambiar(() => setElegido(null))} aria-label={t("hr.llamadas.filtro.quitar")}
-                    className="absolute right-1 top-1/2 flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-full text-muted-foreground hover:bg-foreground/10 hover:text-foreground">
+                    className="absolute right-1.5 top-1/2 flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-full text-muted-foreground hover:bg-foreground/10 hover:text-foreground">
                     <X className="h-3.5 w-3.5" />
                   </button>
                 ) : (
@@ -287,80 +294,99 @@ export function EstadoPanel() {
                 </Command>
               </PopoverContent>
             </Popover>
+            {equipos.length > 1 && (
+              <Select value={equipo ?? TODOS} onValueChange={(v) => cambiar(() => setEquipo(v === TODOS ? null : v))}>
+                <SelectTrigger className="h-9 w-auto max-w-[45%] shrink-0 gap-2 rounded-lg bg-background/40 text-sm sm:w-56 sm:max-w-none" aria-label={t("hr.llamadas.filtro.porEquipo")}>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={TODOS}>{t("hr.llamadas.filtro.todosEquipos")}</SelectItem>
+                  {equipos.map(([e, n]) => (
+                    <SelectItem key={e} value={e}>{e} · {n}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+            <Button variant="ghost" size="sm" className="ml-auto h-9 w-9 shrink-0 rounded-lg p-0 sm:w-auto sm:px-3" onClick={() => void q.refetch()} disabled={q.isFetching} aria-label={t("hr.llamadas.actualizar")}>
+              <RefreshCw className={`h-4 w-4 sm:mr-1.5 ${q.isFetching ? "animate-spin" : ""}`} />
+              <span className="hidden sm:inline">{t("hr.llamadas.actualizar")}</span>
+            </Button>
           </div>
-          {equipos.length > 1 && (
-            <div className="-mx-1 flex gap-1.5 overflow-x-auto px-1 [scrollbar-width:none] sm:flex-wrap sm:overflow-visible" role="group" aria-label={t("hr.llamadas.filtro.porEquipo")}>
-              <button type="button" onClick={() => cambiar(() => setEquipo(null))} aria-pressed={!equipo} className={FICHA(!equipo)}>{t("hr.llamadas.filtro.todosEquipos")}</button>
-              {equipos.map(([e, n]) => (
-                <button key={e} type="button" onClick={() => cambiar(() => setEquipo(e))} aria-pressed={equipo === e} className={FICHA(equipo === e)}>
-                  {e}<span className="tabular-nums opacity-70">{n}</span>
-                </button>
-              ))}
+          <div className="-mx-3 overflow-x-auto px-3 [scrollbar-width:none] sm:mx-0 sm:px-0">
+            <div className="inline-flex min-w-full gap-1 rounded-xl bg-foreground/[0.045] p-1 sm:min-w-0" role="group" aria-label={t("hr.estado.filtro.tipo")}>
+              {([null, ...CATEGORIAS.filter((c) => conteos[c] > 0 || cat === c)] as Array<Categoria | null>).map((c) => {
+                const activa = cat === c;
+                return (
+                  <button key={c ?? "todo"} type="button" onClick={() => cambiar(() => setCat(c))} aria-pressed={activa}
+                    className={`inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${
+                      activa ? "bg-background/80 text-foreground shadow-sm ring-1 ring-border/50" : "text-muted-foreground hover:text-foreground"}`}>
+                    {c && <span className={`h-1.5 w-1.5 rounded-full ${CAT[c].punto}`} aria-hidden />}
+                    {c ? t(CAT[c].k) : t("hr.estado.cat.todo")}
+                    <span className="tabular-nums opacity-60">{c ? conteos[c] : deLaPersonaYEquipo.length}</span>
+                  </button>
+                );
+              })}
             </div>
-          )}
+          </div>
         </div>
 
-        {/* La lista */}
+        {/* La lista: hora | quién y qué pasó | fotos — cada cosa en su columna. */}
         {vistos.length === 0 ? (
           <p className="p-6 text-sm text-muted-foreground">{items.length === 0 ? t("hr.estado.vacio") : t("hr.estado.vacioFiltro")}</p>
         ) : (
-          <ul className="divide-y divide-border/30">
+          <ul className="divide-y divide-border/25">
             {enPagina.map((item) => {
               const { Icono, punto } = CAT[item.categoria];
               const e = item.eventos[0];
               const fs = fotosDe(item);
               const nombre = nombreDe(item.userId);
               const varios = item.eventos.length > 1;
+              const eq = equipoDe(item.userId);
+              const chips = [
+                e?.escalado ? { k: "esc", txt: t("hr.estado.chip.escalado"), fuerte: true } : null,
+                e?.reportado ? { k: "rep", txt: t("hr.estado.chip.reportado"), fuerte: true } : null,
+                (e?.llamados ?? 0) > 0 ? { k: "lla", txt: e!.llamados === 1 ? t("hr.estado.chip.llamadoUno") : t("hr.estado.chip.llamados", { n: e!.llamados! }), fuerte: false } : null,
+                e?.estado === "falta" ? { k: "fal", txt: t("hr.estado.chip.falta"), fuerte: true } : null,
+              ].filter(Boolean) as Array<{ k: string; txt: string; fuerte: boolean }>;
               return (
-                <li key={item.clave} className="flex flex-col gap-2 px-3 py-3 sm:flex-row sm:items-start sm:gap-3 sm:px-4">
-                  <div className="flex min-w-0 flex-1 items-start gap-2.5">
+                <li key={item.clave} className="flex flex-col gap-2 px-3 py-3 transition-colors hover:bg-foreground/[0.025] sm:grid sm:grid-cols-[6.75rem_minmax(0,1fr)_auto] sm:items-center sm:gap-4 sm:px-4">
+                  <div className="hidden whitespace-nowrap text-xs leading-tight tabular-nums text-muted-foreground sm:block">
+                    {varios ? (<><span className="text-foreground/80">{horaUI(item.cuando)}</span><br /><span className="opacity-70">{t("hr.estado.desde", { h: horaUI(item.desde) })}</span></>)
+                      : <span className="text-foreground/80">{horaUI(item.cuando)}</span>}
+                  </div>
+                  <div className="flex min-w-0 items-start gap-3">
                     <Link to={`/hr/expediente/${item.userId}`} state={{ volverA: "/hr/monitor-ia?t=llamadas" }} className="shrink-0">
                       <UserAvatar name={nombre} src={fotos[item.userId]?.foto ?? undefined} seed={fotos[item.userId]?.seed ?? undefined} size="sm" />
                     </Link>
-                    <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+                    <div className="flex min-w-0 flex-1 flex-col gap-1">
                       <div className="flex min-w-0 items-baseline gap-2">
                         <Link to={`/hr/expediente/${item.userId}`} state={{ volverA: "/hr/monitor-ia?t=llamadas" }}
                           className="min-w-0 truncate text-sm font-semibold text-foreground hover:underline">{nombre}</Link>
-                        {equipoDe(item.userId) && <span className="hidden shrink-0 truncate text-[11px] text-muted-foreground sm:inline">{equipoDe(item.userId)}</span>}
-                        <span className="ml-auto shrink-0 text-xs tabular-nums text-muted-foreground">
+                        {eq && <span className="hidden shrink-0 rounded-full bg-foreground/[0.06] px-2 py-px text-[10px] font-medium text-muted-foreground sm:inline">{eq}</span>}
+                        <span className="ml-auto shrink-0 text-xs tabular-nums text-muted-foreground sm:hidden">
                           {varios ? `${horaUI(item.desde)} – ${horaUI(item.cuando)}` : horaUI(item.cuando)}
                         </span>
                       </div>
-                      <p className="flex items-start gap-1.5 text-sm text-foreground/90">
-                        <span className={`mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full ${punto}`} aria-hidden />
-                        <Icono className="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-hidden />
+                      <p className="flex min-w-0 items-center gap-2 text-[13px] leading-snug text-foreground/85">
+                        <span className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-md bg-foreground/[0.06]`} aria-hidden>
+                          <Icono className="h-3 w-3 text-muted-foreground" />
+                        </span>
+                        <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${punto}`} aria-hidden />
                         <span className="min-w-0">{fraseDe(item, t)}</span>
                       </p>
-                      <div className="flex flex-wrap gap-1.5 pl-[1.375rem]">
-                        {e?.escalado && <span className="rounded-full bg-destructive/15 px-2 py-0.5 text-[11px] font-medium text-foreground/90">{t("hr.estado.chip.escalado")}</span>}
-                        {e?.reportado && <span className="rounded-full bg-destructive/15 px-2 py-0.5 text-[11px] font-medium text-foreground/90">{t("hr.estado.chip.reportado")}</span>}
-                        {(e?.llamados ?? 0) > 0 && <span className="rounded-full bg-foreground/10 px-2 py-0.5 text-[11px] text-foreground/85">{e!.llamados === 1 ? t("hr.estado.chip.llamadoUno") : t("hr.estado.chip.llamados", { n: e!.llamados! })}</span>}
-                        {e?.estado === "falta" && <span className="rounded-full bg-destructive/15 px-2 py-0.5 text-[11px] font-medium text-foreground/90">{t("hr.estado.chip.falta")}</span>}
-                        {!varios && e?.clase === "ia" && e.detalle && <span className="min-w-0 text-[11px] italic text-muted-foreground">«{e.detalle}»</span>}
-                      </div>
+                      {(chips.length > 0 || (!varios && e?.clase === "ia" && e.detalle)) && (
+                        <div className="flex flex-wrap items-center gap-1.5 pl-7">
+                          {chips.map((c) => (
+                            <span key={c.k} className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${c.fuerte ? "bg-destructive/15 text-foreground/90" : "bg-foreground/[0.07] text-foreground/80"}`}>{c.txt}</span>
+                          ))}
+                          {!varios && e?.clase === "ia" && e.detalle && <span className="min-w-0 text-[11px] italic text-muted-foreground">«{e.detalle}»</span>}
+                        </div>
+                      )}
                     </div>
                   </div>
-                  {fs.length > 0 && (
-                    <div className="flex shrink-0 gap-1.5 overflow-x-auto pl-[2.875rem] [scrollbar-width:none] sm:max-w-[22rem] sm:pl-0">
-                      {fs.slice(0, 8).map((f, i) => {
-                        const u = urls[claveDeFoto(f)];
-                        return (
-                          <button key={claveDeFoto(f)} type="button" onClick={() => setVisor({ item, i })}
-                            className="relative aspect-[16/10] w-28 shrink-0 overflow-hidden rounded-md border border-border/40 bg-muted/40 hover:border-primary/50 sm:w-32"
-                            title={horaUI(f.cuando)}>
-                            {u ? <img src={u} alt={horaUI(f.cuando)} loading="lazy" className="h-full w-full object-cover" />
-                              : <div className="h-full w-full animate-pulse bg-foreground/[0.06]" />}
-                            {(fs.length > 1 || varios) && (
-                              <span className="absolute bottom-0.5 left-0.5 rounded bg-black/60 px-1 text-[9px] font-semibold tabular-nums text-white">{horaUI(f.cuando)}</span>
-                            )}
-                            {i === 7 && fs.length > 8 && (
-                              <span className="absolute inset-0 flex items-center justify-center bg-black/55 text-xs font-semibold text-white">+{fs.length - 8}</span>
-                            )}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  )}
+                  {fs.length > 0 ? (
+                    <div className="overflow-x-auto pl-11 [scrollbar-width:none] sm:pl-0">{thumbs(item, fs, varios)}</div>
+                  ) : <div className="hidden sm:block" />}
                 </li>
               );
             })}
