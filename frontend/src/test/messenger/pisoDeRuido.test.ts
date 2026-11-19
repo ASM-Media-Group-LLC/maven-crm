@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
-  actualizarPiso, coeficienteSubida, PISO_MINIMO, RATIO_PUERTA, type EstadoPiso,
+  actualizarPiso, coeficienteSubida, GANANCIA_MINIMA, PISO_MINIMO, RATIO_PUERTA, SEGUNDOS_CIERRE, SEGUNDOS_SOSTEN, type EstadoPiso,
 } from "@/lib/pisoDeRuido";
 
 // EL BUG (01/09/2026): el piso de ruido de la puerta del NC solo se adaptaba
@@ -71,7 +71,25 @@ describe("lo que ya funcionaba sigue igual", () => {
     expect(e.piso).toBeGreaterThanOrEqual(PISO_MINIMO);
   });
 
-  it("el umbral de la puerta sigue siendo piso × ratio", () => {
-    expect(RATIO_PUERTA).toBe(2.0);
+  it("el umbral de la puerta sigue siendo piso × ratio (afinado a 1,6 el 18/11/2026)", () => {
+    expect(RATIO_PUERTA).toBe(1.6);
+  });
+});
+
+describe("puerta afinada (18/11/2026): no corta palabras", () => {
+  const worklet = Object.values(
+    import.meta.glob("../../../public/worklets/noise-suppression-worklet.js", { query: "?raw", import: "default", eager: true }),
+  )[0] as string;
+  it("abre más fácil, aguanta más y nunca deja la voz muda", () => {
+    expect(RATIO_PUERTA).toBeLessThanOrEqual(1.6);
+    expect(SEGUNDOS_SOSTEN).toBeGreaterThanOrEqual(0.4);
+    expect(SEGUNDOS_CIERRE).toBeGreaterThanOrEqual(0.15);
+    expect(GANANCIA_MINIMA).toBeGreaterThanOrEqual(0.1);
+  });
+  it("el worklet lleva los mismos números (port fiel)", () => {
+    expect(worklet).toContain(`this._gateRatio = ${RATIO_PUERTA};`);
+    expect(worklet).toContain(`Math.floor(${SEGUNDOS_SOSTEN} * sampleRate)`);
+    expect(worklet).toContain(`(${SEGUNDOS_CIERRE} * sampleRate)`);
+    expect(worklet).toContain(`Math.max(ratio * ratio, ${GANANCIA_MINIMA})`);
   });
 });
