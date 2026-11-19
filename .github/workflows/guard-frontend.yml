@@ -64,6 +64,9 @@ on:
       - "supabase/tests/chat_programados.ts"
       - "supabase/tests/chat_agencia_y_huecos.ts"
       - "infra/nas-drive/**"
+      # El edificio (edificioNoTocaKash.test.ts lee sus scripts y workflows).
+      - "infra/casas/**"
+      - ".github/workflows/edificio-*.yml"
       - "nginx.conf"
       # La app de computador (permisoPantallaMac.test.ts lee su código).
       - "desktop/src/**"
