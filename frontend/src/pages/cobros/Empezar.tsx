@@ -41,7 +41,7 @@ export default function Empezar() {
       return;
     }
     setEnviando(false);
-    setError(r.error);
+    setError("error" in r ? r.error : "general");
   };
 
   const opcion = (id: PlanRegistro, clave: TranslationKey) => (
