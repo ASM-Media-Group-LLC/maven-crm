@@ -69,6 +69,7 @@ export const vigilancia = {
   "vigilancia.vivo.conectando": { es: "Conectando con su sala…", en: "Connecting to their room…" },
   "vigilancia.vivo.esperando": { es: "No está conectado a su sala ahora mismo.", en: "They're not in their room right now." },
   "vigilancia.vivo.reconectando": { es: "Se cortó la imagen. Reconectando…", en: "The feed dropped. Reconnecting…" },
+  "vigilancia.vivo.noEnTurno": { es: "No está en turno ahora.", en: "They're not on shift right now." },
   "vigilancia.vivo.sinCowork": { es: "No está en Cowork ahora mismo.", en: "They're not in Cowork right now." },
   "vigilancia.vivo.noDisponible": { es: "El en vivo no está disponible. Mira el video de esos minutos.", en: "Live view isn't available. Watch the video of those minutes." },
   "vigilancia.vivo.sinPermiso": { es: "No tienes acceso al en vivo de esta persona.", en: "You can't watch this person live." },
