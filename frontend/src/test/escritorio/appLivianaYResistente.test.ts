@@ -42,10 +42,17 @@ describe("refresco por memoria, solo en un momento quieto", () => {
     expect(debeRefrescarPorMemoria({ ...quieto, ramAppMb: TOPE_MEMORIA_MB })).toBe(false);
     expect(debeRefrescarPorMemoria({ ...quieto, ramAppMb: null })).toBe(false);
   });
-  it("en llamada no, salvo en pausa; escribiendo nunca", () => {
+  it("en llamada nunca (tampoco en pausa ni en Cowork reconectando); escribiendo nunca", () => {
     expect(debeRefrescarPorMemoria({ ...quieto, enLlamada: true })).toBe(false);
-    expect(debeRefrescarPorMemoria({ ...quieto, enLlamada: true, enPausa: true })).toBe(true);
+    expect(debeRefrescarPorMemoria({ ...quieto, enLlamada: true, enPausa: true })).toBe(false);
+    expect(debeRefrescarPorMemoria({ ...quieto, enCowork: true })).toBe(false);
     expect(debeRefrescarPorMemoria({ ...quieto, escribiendo: true })).toBe(false);
+  });
+  it("en equipos de más de 8 GB solo si pasa de 3 GB y queda poca memoria libre (19/11: 82 de 87 recargas eran innecesarias)", () => {
+    expect(debeRefrescarPorMemoria({ ...quieto, ramAppMb: 1600, equipoGb: 16, libreGb: 4.7 })).toBe(false);
+    expect(debeRefrescarPorMemoria({ ...quieto, ramAppMb: 3200, equipoGb: 16, libreGb: 4.7 })).toBe(false);
+    expect(debeRefrescarPorMemoria({ ...quieto, ramAppMb: 3200, equipoGb: 16, libreGb: 1.2 })).toBe(true);
+    expect(debeRefrescarPorMemoria({ ...quieto, ramAppMb: 1300, equipoGb: 8, libreGb: 1.5 })).toBe(true);
   });
   it("nunca en bucle: como mucho una vez cada media hora", () => {
     expect(debeRefrescarPorMemoria({ ...quieto, ultimoRefresco: quieto.ahora - 60_000 })).toBe(false);
