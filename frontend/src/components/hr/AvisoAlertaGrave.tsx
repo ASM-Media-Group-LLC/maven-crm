@@ -14,7 +14,7 @@ import { VOZ_ARGOS } from "@/lib/argosNudge";
 // al dueño, y el cartel lo dice. Un fallo al consultar no es «ya volvió»: se deja
 // lo último que se supo y se reintenta.
 
-interface Alerta { id: string; tipo: "sin_actividad" | "fuera_del_trabajo"; desde: string; minutos: number; detalle: string | null; escalada: boolean }
+interface Alerta { id: string; tipo: "sin_actividad" | "fuera_del_trabajo"; desde: string; minutos: number; detalle: string | null; escalada: boolean; obligatorio?: boolean }
 
 const CADA_MS = 30_000;
 const db = supabase as unknown as { rpc: (f: string) => Promise<{ data: unknown; error: unknown }> };
@@ -67,6 +67,7 @@ export function AvisoAlertaGrave() {
         <p className="text-xs text-muted-foreground">
           {alerta.tipo === "fuera_del_trabajo" && alerta.detalle ? `${alerta.detalle} · ` : ""}
           {alerta.escalada ? <span className="font-semibold text-destructive">{t("hr.grave.yaAviso")}</span> : t("hr.grave.antesDeAvisar")}
+          {alerta.obligatorio && alerta.tipo === "sin_actividad" && <span className="ml-1">{t("hr.grave.noSePaga")}</span>}
         </p>
       </div>
     </div>

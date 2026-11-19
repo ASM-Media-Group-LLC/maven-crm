@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { esPrimeraCarga, leerArranque } from "@/lib/arranque";
 
 export type AppRole =
   | "admin" | "manager" | "employee" | "agent" | "closer" | "supervisor" | "spammer"
@@ -41,10 +42,21 @@ export const useUserRole = () => {
   // reintentos de verdad.
   const { data: roleData, isLoading, isError, refetch } = useQuery({
     queryKey: ["user-role", user?.id],
-    queryFn: async () => {
+    queryFn: async ({ client }) => {
       if (!user?.id) return null;
-      // EN PARALELO (pantallas al instante, 19/11/2026): el rol y los grupos de
-      // rol salen a la vez. Antes iban en fila (rol → su grupo) y eran dos viajes
+
+      // Primera carga: el rol y su grupo vienen en la petición única del
+      // arranque (lib/arranque.ts). Si falló, sigue por el camino de siempre.
+      if (esPrimeraCarga(client, ["user-role", user.id])) {
+        const a = await leerArranque(user.id);
+        if (a) {
+          if (!a.rol) return null;
+          return { role: a.rol as AppRole, isSupervisorGroup: !!a.grupo?.is_supervisor_or_above };
+        }
+      }
+
+      // Si el arranque falló, o en las recargas: rol y grupos EN PARALELO
+      // (pantallas al instante, 19/11/2026). Antes iban en fila (rol → su grupo) y eran dos viajes
       // a Supabase antes de poder dibujar cualquier pantalla con permisos. Los
       // grupos son pocas filas (una por rol de la agencia; la RLS ya filtra por
       // agencia), así que se traen todos y se busca el del rol acá.

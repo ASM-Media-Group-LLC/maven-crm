@@ -43,7 +43,7 @@ jobs:
           git fetch --no-tags origin "${{ github.base_ref }}"
           ARCHIVOS=$(git diff --name-only "origin/${{ github.base_ref }}...HEAD")
           echo "Archivos del PR:"; echo "$ARCHIVOS"
-          if echo "$ARCHIVOS" | grep -qE '^(supabase/functions/|supabase/config\.toml$|supabase/migrations/|supabase/tests/|infra/nas-drive/|\.github/workflows/(deploy|guard)-edge-functions\.yml$)'; then
+          if echo "$ARCHIVOS" | grep -qE '^(supabase/functions/|supabase/config\.toml$|supabase/migrations/|supabase/tests/|infra/nas-drive/|infra/edificio/|\.github/workflows/(deploy|guard)-edge-functions\.yml$)'; then
             echo "Hay cambios de backend → corre la guarda completa."
             echo "correr=true" >> "$GITHUB_OUTPUT"
           else
@@ -132,6 +132,14 @@ jobs:
         run: |
           deno run -A --node-modules-dir=none --no-lock supabase/tests/argos_embudo.ts
           deno check supabase/functions/argos-mirar/embudo.ts
+
+      # El árbol del edificio maven-agencias (vagón 3): clientes → agencias → personas,
+      # sillas que bloquean, el admin del cliente que ve sus agencias como dueño (y nunca
+      # las de otro cliente), precios solo del dueño, enlaces y saldo de Argos. Solo
+      # edificio: estas migraciones NUNCA van a Kash.
+      - name: Banco — árbol del edificio (PGlite)
+        if: steps.cambios.outputs.correr == 'true'
+        run: deno run -A --node-modules-dir=none --no-lock infra/edificio/tests/arbol.ts
 
       - name: Tipos — mail-fetch
         if: steps.cambios.outputs.correr == 'true'

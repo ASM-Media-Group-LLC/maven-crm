@@ -1,0 +1,66 @@
+# Funciones edge que se publican en el EDIFICIO (maven-agencias, ezeigddgkaemxpshghmu).
+# Una por línea; lo que va después de «#» es comentario. Las que NO están aquí no se
+# publican en el edificio: son integraciones propias de Kash (Blu, chatters, closers,
+# promolog, scouter, WhatsApp, Telegram, Zoho/correo de Kash, creadoras, parrilla…).
+# Lo usa el workflow «Edificio · funciones» (edificio-funciones.yml). Kash no se toca.
+
+# Cuentas y entrada
+admin-user-actions
+manage-user-roles
+forgot-password
+
+# Llamadas: Cowork, Meet, grabaciones
+livekit-token
+livekit-moderate
+livekit-webhook
+cowork-session
+meet-room
+meet-guest
+send-call-invitation
+recordings
+prueba-de-red
+
+# Argos y monitoreo del equipo
+argos-cara
+argos-escalar-persona
+argos-foto
+argos-mirar
+argos-vigia
+monitor-vision
+equipo-vigilante
+detectar-tardanzas
+
+# Avisos (correo por Resend, push, voz)
+send-notification-email
+notification-automations
+web-push
+push-entregado
+anuncio-tts
+ticket-notify
+send-report
+dispatch-reports
+
+# API pública y webhooks
+public-api
+manage-api-keys
+messenger-webhooks
+
+# Oficina y Drive (el código se publica; el NAS solo se conecta si Alvaro pone sus secretos)
+oficina-doc
+document-convert
+drive
+drive-aporte
+drive-aporte-nas
+argos-al-nas
+salud-nas-ping
+grabaciones-al-drive
+
+# Salud, limpieza y asistentes
+limpieza-storage
+storage-retencion
+salud-diagnostico
+salud-vigilante
+conexiones-ping
+centro-operaciones
+clari-help
+ai-orchestrator

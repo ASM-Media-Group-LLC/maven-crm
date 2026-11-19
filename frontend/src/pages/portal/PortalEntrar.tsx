@@ -10,6 +10,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useLanguage } from "@/hooks/useLanguage";
 import { useToast } from "@/hooks/use-toast";
 import { traducirErrorAuth } from "@/lib/authErrors";
+import { entrarConReintentos } from "@/lib/entrarConPaciencia";
 import { esCuentaDeCreadora } from "@/lib/portal/cuenta";
 
 // Entrar al portal de creadoras: su correo personal y su contraseña. La cuenta la
@@ -42,7 +43,10 @@ export default function PortalEntrar() {
       return;
     }
     setEntrando(true);
-    const { data, error } = await supabase.auth.signInWithPassword({ email: correo.trim(), password: clave });
+    // Si el servidor dice «espera» (429/5xx), se reintenta solo (lib/entrarConPaciencia).
+    const { data, error } = await entrarConReintentos(() =>
+      supabase.auth.signInWithPassword({ email: correo.trim(), password: clave }),
+    );
     setEntrando(false);
     if (error) {
       toast({ title: t("portal.entrar.error"), description: traducirErrorAuth(error), variant: "destructive" });

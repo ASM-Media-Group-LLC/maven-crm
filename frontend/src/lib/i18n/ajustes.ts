@@ -223,4 +223,10 @@ export const ajustes = {
   "settings.apiKeysDesc": { es: "Acceso programático de solo-lectura (creadoras y sus redes).", en: "Programmatic read-only access (creators and their socials)." },
   "settings.controlPanelDesc": { es: "Funnel operativo en tiempo real: del contacto LLG al ingreso en el CRM.", en: "Real-time operational funnel: from the LLG contact to entry in the CRM." },
   // <<< i18n ola 3 (paginas-a)
+  "settings.empresa.titulo": { es: "Empresa", en: "Company" },
+  "settings.empresa.sub": { es: "Lo que es de toda la empresa y no de un puesto. Así cualquier empresa configura Maven sola.", en: "Company-wide settings that don't belong to a single position, so any company can set up Maven on its own." },
+  "settings.empresa.tarjeta": { es: "Modalidades de pausa y lo que es de toda la empresa.", en: "Break plans and company-wide settings." },
+  "settings.empresa.abrir": { es: "Abrir", en: "Open" },
+  "settings.empresa.sinPermiso": { es: "Tu puesto no tiene la función «Configurar la empresa».", en: "Your position doesn't have the “Configure the company” function." },
+  "settings.empresa.volver": { es: "Volver a Ajustes", en: "Back to Settings" },
 } as const satisfies Record<string, { es: string; en: string }>;

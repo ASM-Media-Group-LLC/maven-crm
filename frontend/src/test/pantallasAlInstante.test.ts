@@ -30,6 +30,14 @@ describe("pantallas al instante", () => {
     }
   });
 
+  it("la primera carga sigue saliendo del arranque único (mi_arranque); el respaldo va en paralelo", () => {
+    for (const f of [rol, nivel, permisos]) {
+      const arranque = f.indexOf("leerArranque(");
+      expect(arranque).toBeGreaterThan(-1);
+      expect(arranque).toBeLessThan(f.indexOf("await supabase") === -1 ? f.indexOf("Promise.all") : Math.min(...[f.indexOf("await supabase"), f.indexOf("Promise.all")].filter((i) => i > -1)));
+    }
+  });
+
   it("rol y grupo del rol salen a la vez, no en fila", () => {
     for (const f of [rol, nivel]) {
       expect(f).toMatch(/await Promise\.all\(\[\s*supabase\s*\.from\("user_roles"\)[\s\S]*?\.from\("role_groups"\)/);

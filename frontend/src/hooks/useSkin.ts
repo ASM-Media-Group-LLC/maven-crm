@@ -8,6 +8,7 @@ import { useSaveSkin } from "@/hooks/useUserProfile";
 import { aaLightnessForHue, CUSTOM_SKIN_SATURATION } from "@/lib/wcag";
 import type { TranslationKey } from "@/lib/i18n";
 import { conEtiqueta } from "@/lib/etiquetaTraducida";
+import { leerArranque } from "@/lib/arranque";
 
 // Skins de Maven — presets de ACENTO por usuario (Settings → Mi cuenta →
 // Apariencia). Un skin solo cambia primary/accent/ring/sidebar-primary/
@@ -470,11 +471,15 @@ export const useSkinSync = () => {
     if (!user?.id) return;
     let cancelled = false;
     const adoptarIdioma = empezarLecturaDeIdioma();
-    void supabase
-      .from("profiles")
-      .select("ui_skin, ui_prefs")
-      .eq("id", user.id)
-      .maybeSingle()
+    // Primero la petición única del arranque (lib/arranque.ts), la misma que usan
+    // el menú y la presencia; si falló, la lectura de siempre.
+    const uid = user.id;
+    const leer = async (): Promise<{ data: { ui_skin?: string | null; ui_prefs?: unknown } | null; error: unknown }> => {
+      const p = (await leerArranque(uid))?.perfil;
+      if (p) return { data: { ui_skin: p.ui_skin, ui_prefs: p.ui_prefs }, error: null };
+      return await supabase.from("profiles").select("ui_skin, ui_prefs").eq("id", uid).maybeSingle();
+    };
+    void leer()
       .then(({ data, error }) => {
         if (cancelled || error) return;
         const raw = data?.ui_skin;
