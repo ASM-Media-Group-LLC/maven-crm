@@ -56,6 +56,17 @@ export function pesosGaussianos(sigma: number): number[] {
 /** Factor con cambio chico y con cambio grande, cuando se segmenta en cada cuadro. */
 export const SUAVIZADO_MIN = 0.35;
 export const SUAVIZADO_MAX = 0.95;
+/**
+ * Tope del factor cuando la persona BAJA (el detector dice «menos persona» que
+ * antes). 18/11/2026, Alvaro: «se borra la cara, el fondo aparece y
+ * desaparece». El detector, con una mano frente a la cara, con poca luz o con
+ * el movimiento, a veces pierde a la persona UN cuadro; con el factor de subida
+ * (0,95) ese cuadro malo pasaba entero y la cara desaparecía un instante. Ahora
+ * es asimétrico: la persona APARECE al momento (0,95) pero DESAPARECE en ~2
+ * cuadros. Un cuadro malo suelto no alcanza a borrarla; si de verdad te fuiste,
+ * el rastro dura ~70 ms.
+ */
+export const SUAVIZADO_BAJADA_MAX = 0.45;
 /** Entre estos dos cambios (0..1) el factor pasa del mínimo al máximo. */
 export const CAMBIO_CHICO = 0.08;
 export const CAMBIO_GRANDE = 0.4;
@@ -65,14 +76,25 @@ function smoothstep(a: number, b: number, x: number): number {
   return t * t * (3 - 2 * t);
 }
 
+/** El factor escalado a cada cuántos cuadros se segmenta (el shader recibe estos dos). */
+export function factoresPorRitmo(cadaCuantos = 1): { min: number; bajadaMax: number } {
+  const k = Math.max(1, cadaCuantos);
+  return {
+    min: 1 - Math.pow(1 - SUAVIZADO_MIN, k),
+    bajadaMax: 1 - Math.pow(1 - SUAVIZADO_BAJADA_MAX, k),
+  };
+}
+
 /**
- * Factor de mezcla de la máscara nueva. `cadaCuantos` es cada cuántos cuadros se
+ * Factor de mezcla de la máscara nueva. `cambio` es detectada − anterior (con
+ * signo: positivo = aparece persona). `cadaCuantos` es cada cuántos cuadros se
  * segmenta: si se segmenta uno sí y uno no, cada máscara nueva tiene que pesar
  * más (si no, la silueta tardaría el doble en alcanzarte).
  */
 export function factorDeSuavizado(cambio: number, cadaCuantos = 1): number {
-  const min = 1 - Math.pow(1 - SUAVIZADO_MIN, Math.max(1, cadaCuantos));
-  return min + (SUAVIZADO_MAX - min) * smoothstep(CAMBIO_CHICO, CAMBIO_GRANDE, Math.abs(cambio));
+  const { min, bajadaMax } = factoresPorRitmo(cadaCuantos);
+  const max = cambio >= 0 ? SUAVIZADO_MAX : Math.max(min, bajadaMax);
+  return min + (max - min) * smoothstep(CAMBIO_CHICO, CAMBIO_GRANDE, Math.abs(cambio));
 }
 
 /** Un paso del suavizado para un píxel (el shader hace exactamente esto). */
@@ -82,13 +104,35 @@ export function suavizarPixel(anterior: number, detectada: number, cadaCuantos =
 
 // ── El borde ────────────────────────────────────────────────────────────────
 //
-// Tras el filtro guiado por color, la máscara se «aprieta» con una curva suave
-// (y en el shader, además, la transición nunca pasa de ~3 píxeles de pantalla):
+// Tras el filtro guiado por color, la máscara se «aprieta» con una curva suave:
 // por debajo de `desde` es fondo puro, por encima de `hasta` persona pura. Con
 // la imagen virtual la curva es más cerrada: ahí un halo del cuarto real se nota
 // mucho más que sobre el mismo cuarto borroso.
-export const CURVA_BORDE_BLUR = { desde: 0.38, hasta: 0.62 } as const;
-export const CURVA_BORDE_IMAGEN = { desde: 0.45, hasta: 0.68 } as const;
+//
+// 18/11/2026: con el desenfoque el centro de la curva queda POR DEBAJO de 0,5
+// (como Meet: ante la duda, persona). Un poquito de pared nítida junto al hombro
+// casi no se ve sobre el fondo borroso; un pedazo de hombro o de mano borrado,
+// sí.
+export const CURVA_BORDE_BLUR = { desde: 0.3, hasta: 0.6 } as const;
+export const CURVA_BORDE_IMAGEN = { desde: 0.42, hasta: 0.68 } as const;
+
+/**
+ * Ancho mínimo de la transición del borde (en unidades de la máscara, a cada
+ * lado del centro). El shader angosta la curva a ~3 píxeles de pantalla
+ * (fwidth) para que no quede niebla; pero donde el detector duda la máscara es
+ * casi plana, fwidth ≈ 0 y el borde se volvía un CORTE a tijera en el centro:
+ * un temblor de ±0,02 del detector hacía aparecer y desaparecer pedazos de
+ * hombro o pelo cuadro a cuadro («el fondo aparece y desaparece»). Con este
+ * piso el mismo temblor mueve la «a» un poco, no de 0 a 1.
+ */
+export const ANCHO_MIN_DEL_BORDE = 0.08;
+
+/** La «a» del borde tal como la calcula el shader (fwidth = cuánto cambia la máscara entre píxeles). */
+export function alfaDelBordeEnPantalla(valor: number, curva: { desde: number; hasta: number }, fwidth: number): number {
+  const centro = 0.5 * (curva.desde + curva.hasta);
+  const ancho = Math.max(1.5 * Math.max(fwidth, 1e-4), ANCHO_MIN_DEL_BORDE);
+  return smoothstep(Math.max(curva.desde, centro - ancho), Math.min(curva.hasta, centro + ancho), valor);
+}
 
 export function alfaDelBorde(valor: number, curva: { desde: number; hasta: number }): number {
   return smoothstep(curva.desde, curva.hasta, valor);
@@ -173,7 +217,6 @@ export function pesoDeFranja(fraccionPersona: number, fraccionFondo: number): nu
   return smoothstep(FRANJA.desde, FRANJA.hasta, fraccionPersona) * smoothstep(FRANJA.desde, FRANJA.hasta, fraccionFondo);
 }
 
-/** La «a» final del borde: la de la máscara, corregida por el color donde se puede. */
 /**
  * Cuánto puede SUBIR la «a» el color por encima de la máscara. Bajar, todo lo
  * que haga falta (los huecos del pelo con la pared vieja); subir, poco y solo
@@ -183,13 +226,25 @@ export function pesoDeFranja(fraccionPersona: number, fraccionFondo: number): nu
 export const SUBIDA_MAX_DEL_COLOR = 0.15;
 
 /**
+ * Y cuánto puede BAJARLA (18/11/2026). Antes era sin límite y el color se
+ * calcula con la cámara cruda de cada cuadro (con su ruido): en la franja del
+ * borde la cara, la oreja o la mano con un color parecido a la pared se
+ * «comían» y titilaban. Ahora baja como mucho esto…
+ */
+export const BAJADA_MAX_DEL_COLOR = 0.5;
+/** …y nada donde la máscara está segura de que es persona (entre estos dos valores se apaga). */
+export const PERSONA_SEGURA = { desde: 0.85, hasta: 0.98 } as const;
+
+/**
  * La «a» final del borde: la de la máscara (`alfaMascara`, ya con la curva),
  * corregida por el color donde se puede. `mascara` es la confianza refinada.
  */
 export function alfaFinal(alfaMascara: number, mascara: number, i: RGB, f: RGB, b: RGB, franja: number): number {
-  const w = franja * confianzaDelColor(f, b) * FUERZA_DEL_MATE;
+  const proteger = 1 - smoothstep(PERSONA_SEGURA.desde, PERSONA_SEGURA.hasta, mascara);
+  const w = franja * confianzaDelColor(f, b) * FUERZA_DEL_MATE * proteger;
   const tope = alfaMascara + SUBIDA_MAX_DEL_COLOR * smoothstep(0.02, 0.2, mascara);
-  return alfaMascara + w * (Math.min(alfaPorColor(i, f, b), tope) - alfaMascara);
+  const piso = alfaMascara - BAJADA_MAX_DEL_COLOR;
+  return alfaMascara + w * (Math.max(piso, Math.min(alfaPorColor(i, f, b), tope)) - alfaMascara);
 }
 
 /** Por debajo de esta «a» no se divide (amplificaría el ruido de la cámara). */
@@ -247,3 +302,40 @@ export function tocaMulticlase(cuadro: number, cada = CADA_CUANTOS_MULTICLASE): 
 
 /** El multiclase de ayuda queda apagado por defecto (ver MODELOS en procesador.ts). */
 export const FUSION_POR_DEFECTO = false;
+
+// ── El ritmo del detector según lo que aguanta el equipo (18/11/2026) ────────
+//
+// «Se traba la cámara» (Alvaro). Todo el fondo corre en el hilo principal de la
+// pestaña, el mismo de React: si un cuadro tarda más de lo que hay entre
+// cuadros, la cámara se atrasa y la página entera se pone pesada. La regla de
+// los 8 núcleos (equipoAguantaFondoHD) adivina por la CPU, pero lo que cuesta
+// es la GPU, y una laptop de 8 hilos con gráfica integrada no da. Ahora el
+// procesador MIDE cuánto tarda el detector y el dibujo y ajusta solo:
+//   · corre el detector cada 1, 2 o 3 cuadros (lo que entre en el presupuesto);
+//   · si ni así entra, apaga el borde por color (las pasadas más caras del
+//     dibujo después del detector).
+// Entre detecciones la máscara se reusa y se suaviza, así que no se nota.
+
+/** Milisegundos por cuadro que el fondo puede usar del hilo principal. */
+export const PRESUPUESTO_MS = 12;
+/** Con el detector cada 3 y aun así por encima de esto, se apaga el borde por color. */
+export const PRESUPUESTO_SIN_MATE_MS = 18;
+/** Nunca se segmenta menos que uno de cada tantos (con cámara a 30 son 10 por segundo). */
+export const CADA_CUANTOS_MAX = 3;
+/** Cada cuántos cuadros se revisa el ritmo, y cuántos se ignoran al arrancar (compilar shaders). */
+export const REVISAR_RITMO_CADA = 30;
+export const CUADROS_DE_CALENTAMIENTO = 15;
+
+export function ritmoDelDetector(costo: { detectorMs: number; dibujoMs: number; base: number }): { cadaCuantos: number; mate: boolean } {
+  const base = Math.min(CADA_CUANTOS_MAX, Math.max(1, Math.floor(costo.base) || 1));
+  const porCuadro = (k: number) => costo.dibujoMs + costo.detectorMs / k;
+  let k = base;
+  while (k < CADA_CUANTOS_MAX && porCuadro(k) > PRESUPUESTO_MS) k++;
+  return { cadaCuantos: k, mate: porCuadro(k) <= PRESUPUESTO_SIN_MATE_MS };
+}
+
+/** Promedio móvil de un costo (los picos sueltos no cambian el ritmo). */
+export function promedioMovil(anterior: number, nuevo: number, peso = 0.1): number {
+  if (!(anterior > 0)) return nuevo;
+  return anterior + peso * (nuevo - anterior);
+}

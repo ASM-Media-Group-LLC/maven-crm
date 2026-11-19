@@ -38,8 +38,8 @@
 
 import {
   CURVA_BORDE_BLUR, CURVA_BORDE_IMAGEN, MUESTRAS_MAX_POR_LADO, REDUCCION_DE_LA_MASCARA,
-  REDUCCION_DEL_DESENFOQUE, SUAVIZADO_MAX, SUAVIZADO_MIN, CAMBIO_CHICO, CAMBIO_GRANDE,
-  CONFIANZA_COLOR, FRANJA, FUERZA_DEL_MATE, PISO_DEL_DESPEJE, SUBIDA_MAX_DEL_COLOR, RADIO_CERCA_TEXELES, SIGMA_DEL_MATE_720,
+  REDUCCION_DEL_DESENFOQUE, SUAVIZADO_MAX, CAMBIO_CHICO, CAMBIO_GRANDE, factoresPorRitmo,
+  CONFIANZA_COLOR, FRANJA, FUERZA_DEL_MATE, ANCHO_MIN_DEL_BORDE, BAJADA_MAX_DEL_COLOR, PERSONA_SEGURA, PISO_DEL_DESPEJE, SUBIDA_MAX_DEL_COLOR, RADIO_CERCA_TEXELES, SIGMA_DEL_MATE_720,
   muestrasPorLado, pasoDeMuestreo, sigmaEnTextura, uvParaCubrir,
 } from "./parametros";
 
@@ -64,6 +64,9 @@ uniform sampler2D previa;
 uniform bool invertir;
 uniform bool primera;
 uniform float suavMin;
+// Tope del factor cuando la persona BAJA (asimétrico: aparece al momento,
+// desaparece en ~2 cuadros; ver SUAVIZADO_BAJADA_MAX en parametros.ts).
+uniform float bajadaMax;
 // Fusión con el multiclase (ver personaFusionada en parametros.ts): su persona
 // ya copiada a nuestra textura «fina»; solo SUMA, y solo cerca del contorno.
 uniform sampler2D fina;
@@ -93,8 +96,9 @@ void main() {
   }
   if (primera) { color = vec4(detectada); return; }
   float anterior = texture(previa, uv).r;
-  float cambio = abs(detectada - anterior);
-  float factor = mix(suavMin, ${SUAVIZADO_MAX.toFixed(3)}, smoothstep(${CAMBIO_CHICO.toFixed(3)}, ${CAMBIO_GRANDE.toFixed(3)}, cambio));
+  float cambio = detectada - anterior;
+  float tope = cambio >= 0.0 ? ${SUAVIZADO_MAX.toFixed(3)} : max(suavMin, bajadaMax);
+  float factor = mix(suavMin, tope, smoothstep(${CAMBIO_CHICO.toFixed(3)}, ${CAMBIO_GRANDE.toFixed(3)}, abs(cambio)));
   color = vec4(mix(anterior, detectada, factor));
 }`;
 
@@ -194,12 +198,14 @@ out vec4 color;
 void main() {
   vec3 persona = texture(cuadro, uv).rgb;
   // Borde nítido pero sin escalones: la transición dura lo que diga la curva,
-  // pero nunca más de ~3 píxeles de pantalla (fwidth = cuánto cambia la máscara
-  // de un píxel al vecino). Sin este tope, donde el detector duda (camisa oscura
-  // contra pared oscura) el borde quedaba como una niebla de 15-20 píxeles.
+  // pero no mucho más de ~3 píxeles de pantalla (fwidth = cuánto cambia la
+  // máscara de un píxel al vecino). Sin ese tope, donde el detector duda (camisa
+  // oscura contra pared oscura) el borde quedaba como una niebla de 15-20 px.
+  // Con un PISO (ANCHO_MIN_DEL_BORDE): sin él, donde la máscara es casi plana el
+  // borde era un corte a tijera y el temblor del detector lo hacía titilar.
   float m = texture(mascara, uv).r;
   float centro = 0.5 * (curva.x + curva.y);
-  float ancho = 1.5 * max(fwidth(m), 1e-4);
+  float ancho = max(1.5 * max(fwidth(m), 1e-4), ${ANCHO_MIN_DEL_BORDE.toFixed(3)});
   float a = smoothstep(max(curva.x, centro - ancho), min(curva.y, centro + ancho), m);
   vec3 atras;
   if (modo == 1) {
@@ -223,7 +229,11 @@ void main() {
   // El color puede SACAR fondo sin límite (los huecos del pelo), pero solo
   // puede AGREGAR un poco, y solo donde la máscara ya ve algo de persona.
   ac = min(ac, a + ${SUBIDA_MAX_DEL_COLOR.toFixed(2)} * smoothstep(0.02, 0.2, m));
-  a += franja * confianza * ${FUERZA_DEL_MATE.toFixed(3)} * (ac - a);
+  // Y bajar, con tope y nunca donde la máscara está segura de que es persona
+  // (la cara o la mano de un color parecido a la pared ya no se borran).
+  ac = max(ac, a - ${BAJADA_MAX_DEL_COLOR.toFixed(2)});
+  float proteger = 1.0 - smoothstep(${PERSONA_SEGURA.desde.toFixed(3)}, ${PERSONA_SEGURA.hasta.toFixed(3)}, m);
+  a += franja * confianza * proteger * ${FUERZA_DEL_MATE.toFixed(3)} * (ac - a);
   // Color de la persona SIN el fondo viejo (ver colorDePersona en parametros.ts):
   // de I = a·F + (1 − a)·B se despeja F. Lejos del borde B → I y F = I.
   vec3 be = mix(persona, B, franja);
@@ -253,6 +263,8 @@ export interface PipelineFondo {
   ponerImagen(imagen: ImageBitmap | null): void;
   /** Olvida la máscara (al cambiar de cámara): el próximo cuadro arranca de cero. */
   reiniciarMascara(): void;
+  /** ¿Ya hay una máscara para el tamaño actual? Sin ella todo el cuadro sería «fondo». */
+  tieneMascara(): boolean;
   destruir(): void;
 }
 
@@ -304,7 +316,7 @@ export function crearPipelineFondo(canvas: OffscreenCanvas | HTMLCanvasElement):
   const conFlotante = !!gl.getExtension("EXT_color_buffer_float") || !!gl.getExtension("EXT_color_buffer_half_float");
 
   const vs = compilar(gl, gl.VERTEX_SHADER, VERTICES);
-  const pSuav = programa(gl, vs, SUAVIZADO, ["mascaraMP", "previa", "invertir", "primera", "suavMin", "fina", "usarFina"]);
+  const pSuav = programa(gl, vs, SUAVIZADO, ["mascaraMP", "previa", "invertir", "primera", "suavMin", "bajadaMax", "fina", "usarFina"]);
   const pRefinar = programa(gl, vs, REFINAR, ["mascara", "cuadro", "paso"]);
   const pReducir = programa(gl, vs, REDUCIR, ["cuadro", "mascara", "pasoFuente", "pesarPersona"]);
   const pGauss = programa(gl, vs, GAUSS, ["fuente", "direccion", "sigma", "muestras", "paso"]);
@@ -432,7 +444,9 @@ export function crearPipelineFondo(canvas: OffscreenCanvas | HTMLCanvasElement):
     unir(1, ema[emaLeer].tex, pSuav.u.previa);
     gl!.uniform1i(pSuav.u.invertir, invertir ? 1 : 0);
     gl!.uniform1i(pSuav.u.primera, hayMascara ? 0 : 1);
-    gl!.uniform1f(pSuav.u.suavMin, 1 - Math.pow(1 - SUAVIZADO_MIN, Math.max(1, cadaCuantos)));
+    const factores = factoresPorRitmo(cadaCuantos);
+    gl!.uniform1f(pSuav.u.suavMin, factores.min);
+    gl!.uniform1f(pSuav.u.bajadaMax, factores.bajadaMax);
     unir(2, fina ? fina.tex : texCuadro, pSuav.u.fina);
     gl!.uniform1i(pSuav.u.usarFina, hayFina ? 1 : 0);
     dibujarQuad();
@@ -451,6 +465,7 @@ export function crearPipelineFondo(canvas: OffscreenCanvas | HTMLCanvasElement):
     gl!.uniform1i(pSuav.u.primera, 1);
     gl!.uniform1i(pSuav.u.usarFina, 0);
     gl!.uniform1f(pSuav.u.suavMin, 1);
+    gl!.uniform1f(pSuav.u.bajadaMax, 1);
     dibujarQuad();
     hayFina = true;
   }
@@ -583,6 +598,7 @@ export function crearPipelineFondo(canvas: OffscreenCanvas | HTMLCanvasElement):
     dibujar,
     ponerImagen,
     reiniciarMascara: () => { hayMascara = false; },
+    tieneMascara: () => hayMascara,
     destruir,
   };
 }
