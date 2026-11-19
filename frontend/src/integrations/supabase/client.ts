@@ -8,6 +8,7 @@
 import { createClient } from '@supabase/supabase-js';
 import type { Database } from './types';
 import { conSesionRenovada, crearRenovador } from '@/lib/sesionVencida';
+import { alLatidoDelSocket, LATIDO_REALTIME_MS } from '@/lib/latidoDelRealtime';
 
 const PROD_URL =
   "https://lsagslbkliprespbyhts.supabase.co";
@@ -50,7 +51,14 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABL
   // los relojes de la pestaña, el latido no salía y el servidor cortaba la
   // conexión: llegaban tarde los mensajes y los avisos.
   // Solo si el navegador tiene Workers: si no, realtime-js tira y Maven no abriría.
-  realtime: { worker: typeof window !== "undefined" && typeof Worker !== "undefined" },
+  // 19/11/2026 (simulacro v2, 1 de cada 20 mensajes ~40 s tarde): el latido va
+  // cada 10 s (no 25) y avisa a la salud del chat si no contesta, para que el
+  // socket muerto en silencio se note en segundos. Ver lib/latidoDelRealtime.ts.
+  realtime: {
+    worker: typeof window !== "undefined" && typeof Worker !== "undefined",
+    heartbeatIntervalMs: LATIDO_REALTIME_MS,
+    heartbeatCallback: alLatidoDelSocket,
+  },
 });
 
 const renovarSesion = crearRenovador(supabase.auth);

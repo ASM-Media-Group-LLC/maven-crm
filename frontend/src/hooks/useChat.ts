@@ -8,7 +8,7 @@ import {
 } from "@/hooks/useTypingInbox";
 import { useAuth } from "@/hooks/useAuth";
 import { useReanudarAlVolver } from "@/hooks/useReanudarAlVolver";
-import { registrarEnElCanalDelChat, useSaludDelChat, reportarSaludDelChat } from "@/hooks/canalDelChat";
+import { registrarEnElCanalDelChat, useEscuchaDelChat, useSaludDelChat, reportarSaludDelChat } from "@/hooks/canalDelChat";
 import { cerrarNotificacionesDeChat } from "@/lib/insigniaDeLaApp";
 import {
   ChatConversation,
@@ -811,6 +811,58 @@ const PAGE_SIZE = 50;
  *  mensajes llegan igual en ≤4 s. En vivo no corre (el realtime ya los trae). */
 export const REPASO_CAIDO_MS = 4000;
 
+/** EL GUARDIÁN de la conversación abierta (simulacro v2, 19/11/2026: 1 de cada
+ *  20 mensajes llegaba ~40 s tarde porque su evento en vivo se perdió y nada lo
+ *  buscaba). Mientras la conversación está "tibia" (alguien escribió, tecleó o
+ *  la abrió hace menos de CONVERSACION_TIBIA_MS) y se ve en pantalla, se pide
+ *  "lo nuevo desde el último mensaje" cada REPASO_ABIERTO_MS aunque la salud
+ *  diga "en-vivo". Es una lectura chica (casi siempre vuelve vacía) y solo de la
+ *  conversación abierta: un evento perdido llega en ≤5 s, no en 40. */
+export const REPASO_ABIERTO_MS = 5000;
+export const CONVERSACION_TIBIA_MS = 120_000;
+
+/**
+ * Mezcla filas que llegaron (por el canal en vivo, por el canal de la lista o
+ * por un repaso) con lo que hay en pantalla. UNA sola regla para todas las
+ * rutas, así un mensaje que llega por dos lados no se duplica nunca:
+ *  - si el id ya está, se ignora;
+ *  - si es una fila real MÍA (no de una integración) que coincide con una
+ *    burbuja optimista (mismo texto, ±5 s), la reemplaza;
+ *  - si no, se agrega al final.
+ * `optimistas` se actualiza en el lugar (se saca el id reemplazado).
+ * Devuelve el MISMO arreglo si no cambió nada (React no re-renderiza).
+ */
+export function mezclarMensajesNuevos(
+  prev: ChatMessage[],
+  entrantes: ChatMessage[],
+  optimistas: Set<string>,
+): ChatMessage[] {
+  const tengo = new Set(prev.map((m) => m.id));
+  const difMs = (a: string, b: string) => Math.abs(new Date(a).getTime() - new Date(b).getTime());
+  let out = prev;
+  for (const entrante of entrantes) {
+    if (!entrante?.id || tengo.has(entrante.id)) continue;
+    // El optimista solo lo puede reemplazar la fila que escribí desde la app: un
+    // mensaje que mandó MI integración en el mismo instante y con el mismo texto
+    // también trae mi sender_id, y si lo tomara, el mío quedaría pintado como
+    // «BLU» y el de la integración desaparecería.
+    const opt = entrante.api_key_id != null ? undefined : out.find(
+      (m) => optimistas.has(m.id) &&
+        m.sender_id === entrante.sender_id &&
+        m.content === entrante.content &&
+        difMs(m.created_at, entrante.created_at) < 5000,
+    );
+    tengo.add(entrante.id);
+    if (opt) {
+      optimistas.delete(opt.id);
+      out = out.map((m) => (m.id === opt.id ? entrante : m));
+    } else {
+      out = [...out, entrante];
+    }
+  }
+  return out;
+}
+
 export function useMessages(
   conversationId: string | null,
   onNewMessage?: (msg: ChatMessage) => void,
@@ -836,6 +888,9 @@ export function useMessages(
   const onNewMessageRef = useRef(onNewMessage);
   const loadMessagesRef = useRef<() => Promise<void>>();
   const optimisticIdsRef = useRef<Set<string>>(new Set());
+  // Última vez que hubo movimiento en la conversación abierta (abrirla, un
+  // mensaje que entra o sale, el otro tecleando). Decide si el guardián repasa.
+  const ultimaActividadRef = useRef(0);
   const [messagesRealtimeVersion, setMessagesRealtimeVersion] = useState(0);
   // Al volver del segundo plano: canal nuevo + recarga para traer lo que llegó
   // mientras el socket estaba muerto (el canal de mensajes no recarga solo).
@@ -903,6 +958,7 @@ export function useMessages(
       }
       intentosCargaRef.current = 0;
       cargaFallidaRef.current = false;
+      ultimaActividadRef.current = Date.now();
       const data = res.data;
       const sorted = ((data as ChatMessage[]) || []).reverse();
       setMessages(sorted);
@@ -985,30 +1041,8 @@ export function useMessages(
     if (queHacerConLaCarga(res) === "abortar") return;
     const entrantes = (res.data as ChatMessage[]) || [];
     if (entrantes.length === 0) return;
-    setMessages((prev) => {
-      const tengo = new Set(prev.map((m) => m.id));
-      let out = prev;
-      for (const entrante of entrantes) {
-        if (tengo.has(entrante.id)) continue;
-        // Mismo reemplazo de optimista que el canal en vivo: una fila real mía que
-        // coincide reemplaza a su burbuja optimista en lugar de duplicarla.
-        const difMs = (a: string, b: string) => Math.abs(new Date(a).getTime() - new Date(b).getTime());
-        const opt = entrante.api_key_id != null ? undefined : out.find(
-          (m) => optimisticIdsRef.current.has(m.id) &&
-            m.sender_id === entrante.sender_id &&
-            m.content === entrante.content &&
-            difMs(m.created_at, entrante.created_at) < 5000,
-        );
-        if (opt) {
-          optimisticIdsRef.current.delete(opt.id);
-          out = out.map((m) => (m.id === opt.id ? entrante : m));
-        } else {
-          tengo.add(entrante.id);
-          out = [...out, entrante];
-        }
-      }
-      return out;
-    });
+    ultimaActividadRef.current = Date.now();
+    setMessages((prev) => mezclarMensajesNuevos(prev, entrantes, optimisticIdsRef.current));
     // "Entregado" SOLO para los que de verdad llegaron de otros (barato y correcto,
     // como el canal en vivo): sin mensajes nuevos no escribe nada.
     if (user) {
@@ -1121,28 +1155,8 @@ export function useMessages(
         },
         (payload) => {
           const newMsg = payload.new as ChatMessage;
-          setMessages((prev) => {
-            if (prev.find((m) => m.id === newMsg.id)) return prev;
-
-            // El optimista solo lo puede reemplazar la fila que escribí desde la
-            // app: un mensaje que mandó MI integración en el mismo instante y con
-            // el mismo texto también trae mi sender_id, y si lo tomara, el mío
-            // quedaría pintado como «BLU» y el de la integración desaparecería.
-            const optimisticMatch = newMsg.api_key_id != null ? undefined : prev.find(
-              (m) =>
-                optimisticIdsRef.current.has(m.id) &&
-                m.sender_id === newMsg.sender_id &&
-                m.content === newMsg.content &&
-                Math.abs(new Date(m.created_at).getTime() - new Date(newMsg.created_at).getTime()) < 5000
-            );
-
-            if (optimisticMatch) {
-              optimisticIdsRef.current.delete(optimisticMatch.id);
-              return prev.map((m) => (m.id === optimisticMatch.id ? newMsg : m));
-            }
-
-            return [...prev, newMsg];
-          });
+          ultimaActividadRef.current = Date.now();
+          setMessages((prev) => mezclarMensajesNuevos(prev, [newMsg], optimisticIdsRef.current));
 
           if (newMsg.sender_id !== userId) {
             onNewMessageRef.current?.(newMsg);
@@ -1209,6 +1223,8 @@ export function useMessages(
 
     // Mark as read when window regains focus
     const handleFocus = () => {
+      // Volver a la ventana = ponerse al día de una (si un evento se perdió).
+      void traerNuevosRef.current?.();
       void cerrarNotificacionesDeChat(conversationId);
       supabase
         .from("chat_participants")
@@ -1251,6 +1267,46 @@ export function useMessages(
     return () => {
       window.clearInterval(id);
       document.removeEventListener("visibilitychange", alVolverAVer);
+    };
+  }, [conversationId, salud]);
+
+  // ── EL GUARDIÁN · que ningún mensaje llegue más de ~5 s tarde ──────────────
+  //
+  // El poll de arriba solo corre cuando se SABE que el realtime cayó. Pero un
+  // evento también se pierde con el canal "en vivo" (el socket muerto en
+  // silencio antes de que el latido lo note, o un evento que el servidor no
+  // entregó): en el simulacro v2 eso era 1 de cada 20 mensajes, ~40 s tarde.
+  // Tres redes, de la más barata a la más cara:
+  //  1. el canal de la LISTA (ya abierto en el AppShell, sin costo extra) también
+  //     recibe cada mensaje: si es de esta conversación, se mezcla por id;
+  //  2. al volver la red o la ventana, repaso inmediato;
+  //  3. con la conversación tibia y a la vista, repaso cada REPASO_ABIERTO_MS.
+  useEscuchaDelChat(user?.id, {
+    "chat_messages:INSERT": ({ new: fila }) => {
+      const msg = fila as ChatMessage;
+      if (!msg?.id || msg.conversation_id !== currentConvRef.current) return;
+      ultimaActividadRef.current = Date.now();
+      setMessages((prev) => mezclarMensajesNuevos(prev, [msg], optimisticIdsRef.current));
+    },
+  });
+
+  useEffect(() => {
+    if (!conversationId) return;
+    const alVolverLaRed = () => void traerNuevosRef.current?.();
+    window.addEventListener("online", alVolverLaRed);
+    // Si el realtime está caído ya repasa el poll de arriba (cada 4 s): no doblar.
+    if (salud === "reconectando") return () => window.removeEventListener("online", alVolverLaRed);
+    const id = window.setInterval(() => {
+      if (document.visibilityState !== "visible") return;
+      if (Date.now() - ultimaActividadRef.current > CONVERSACION_TIBIA_MS) return;
+      // Sin un mensaje real de ancla, traerNuevos recargaría todo (y marcaría
+      // leído): en un chat vacío quedan el canal en vivo y el de la lista.
+      if (!messagesRef.current.some((m) => !optimisticIdsRef.current.has(m.id))) return;
+      void traerNuevosRef.current?.();
+    }, REPASO_ABIERTO_MS);
+    return () => {
+      window.clearInterval(id);
+      window.removeEventListener("online", alVolverLaRed);
     };
   }, [conversationId, salud]);
 
@@ -1329,6 +1385,7 @@ export function useMessages(
           return;
         }
 
+        ultimaActividadRef.current = Date.now();
         setTypingUsers((prev) => (prev.includes(quien) ? prev : [...prev, quien]));
         vencimientos.set(
           quien,
@@ -1443,6 +1500,7 @@ export function useMessages(
         is_edited: false, is_deleted: false,
         created_at: now, updated_at: now, _localStatus: "sending",
       };
+      ultimaActividadRef.current = Date.now();
       setMessages((prev) => [...prev, optimisticMsg]);
       // Persistir ANTES de intentar: si no se confirma (offline/error/recarga), sobrevive.
       addPending(user.id, { optimisticId, conversationId, content, type, fileUrl, fileName, replyToId, albumId, isThreadReply, contentRich, createdAt: now });
