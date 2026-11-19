@@ -1362,12 +1362,18 @@ All colors MUST be HSL. Light mode in :root, dark mode in .dark.
    clase en el contenedor scrolleable de una pantalla; el fondo queda FIJO
    (no scrollea) para dar sensación de profundidad. Un guiño de "ventanales"
    con las líneas verticales tenues. Todo deriva de --background (tema). */
+/* .vidrio va fuera de las capas de Tailwind, así que su `position: relative`
+   le ganaba a `fixed`/`absolute`/`sticky` puestos en el mismo elemento. El
+   cartel «Abrir en la app» (fixed arriba a la derecha) caía arriba a la
+   IZQUIERDA, encima del menú, y su vidrio borroso parpadeaba al pasar el
+   mouse por los botones de abajo (Alvaro, 19/11). Ahora relative solo si
+   el elemento no pide otra posición. */
+.vidrio:not(.fixed):not(.absolute):not(.sticky) { position: relative; }
 /* TARJETA DE VIDRIO reutilizable (lenguaje exacto del mockup "Maven Glass").
    CLARO = blanco translúcido casi opaco con filo de luz; OSCURO = frost tenue
    que LEVANTA con sombra profunda + filo de luz arriba. Radio grande (22px).
    Un lever global: .vidrio reemplaza a "border bg-card" donde se quiera vidrio. */
 .vidrio {
-  position: relative;
   border-radius: 22px;
   background: linear-gradient(160deg, rgba(255,255,255,.74), rgba(255,255,255,.52));
   border: 1px solid rgba(20,30,60,.1);
