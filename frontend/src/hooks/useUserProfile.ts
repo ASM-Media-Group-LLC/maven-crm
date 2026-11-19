@@ -3,6 +3,8 @@ import { supabase } from "@/integrations/supabase/client";
 import type { Json } from "@/integrations/supabase/types";
 // Solo el TIPO (import type = sin ciclo en runtime; useSkin.ts importa de acá).
 import type { UiPrefs } from "@/hooks/useSkin";
+import { useAuth } from "@/hooks/useAuth";
+import { esPrimeraCarga, leerArranque } from "@/lib/arranque";
 
 // Helpers for the signed-in user's own profile row in `profiles`. The
 // existing useAdminUsers hook covers admin-side fetching of every user;
@@ -29,10 +31,25 @@ export interface MyProfile {
   whatsapp_verified_at: string | null;
 }
 
-export const useMyProfile = () =>
-  useQuery({
+export const useMyProfile = () => {
+  const qc = useQueryClient();
+  const { user } = useAuth();
+  return useQuery({
     queryKey: ["my-profile"],
     queryFn: async (): Promise<MyProfile | null> => {
+      // Primera carga: el perfil propio ya vino en el arranque (lib/arranque.ts),
+      // la misma petición que usan el skin y la presencia. Después de guardar
+      // algo se invalida y esto ya va directo a la tabla.
+      if (user?.id && esPrimeraCarga(qc, ["my-profile"])) {
+        const p = (await leerArranque(qc, user.id))?.perfil;
+        if (p) {
+          return {
+            id: p.id, full_name: p.full_name, avatar_url: p.avatar_url, avatar_seed: p.avatar_seed,
+            phone_e164: p.phone_e164, ui_skin: p.ui_skin, ui_prefs: (p.ui_prefs ?? null) as Json | null,
+            whatsapp_push_name: p.whatsapp_push_name, whatsapp_verified_at: p.whatsapp_verified_at,
+          };
+        }
+      }
       const { data: userData } = await supabase.auth.getUser();
       const uid = userData.user?.id;
       if (!uid) return null;
@@ -45,6 +62,7 @@ export const useMyProfile = () =>
       return (data as MyProfile | null) ?? null;
     },
   });
+};
 
 // Pide un código de verificación NUEVO. Flujo iniciado por el usuario: la edge
 // genera el código y lo devuelve (junto con el link wa.me al bot) — el USUARIO

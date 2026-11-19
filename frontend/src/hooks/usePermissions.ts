@@ -1,8 +1,9 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useUserRole } from "@/hooks/useUserRole";
 import { moduloEstaOculto } from "@/lib/modulosOcultos";
+import { esPrimeraCarga, leerArranque } from "@/lib/arranque";
 
 interface Permission {
   module: string;
@@ -23,6 +24,8 @@ export const UNIVERSAL_MODULES = ["Dashboard", "Messenger", "Cowork", "Meet", "C
 
 export const usePermissions = () => {
   const { role, isAdmin, isLoading: roleLoading, isError: roleError, roleConocido, recargarRol } = useUserRole();
+  const { user } = useAuth();
+  const qc = useQueryClient();
 
   const {
     data: permissionsData, isLoading: permsLoading, isError: permsError, refetch: recargarPermisos,
@@ -30,6 +33,14 @@ export const usePermissions = () => {
     queryKey: ["user-permissions", role],
     queryFn: async () => {
       if (!role) return [];
+
+      // Primera carga: los permisos vienen en la petición única del arranque
+      // (lib/arranque.ts), solo si son del MISMO rol. `permisos: null` o un
+      // fallo → el camino de siempre, que distingue error de vacío.
+      if (esPrimeraCarga(qc, ["user-permissions", role])) {
+        const a = await leerArranque(qc, user?.id);
+        if (a && a.rol === role && a.permisos) return a.permisos as Permission[];
+      }
 
       // Find the roles_config entry matching the user's role name
       const { data: roleConfig, error: rcError } = await supabase
@@ -66,12 +77,15 @@ export const usePermissions = () => {
   // Examinador agregado o sacado A MANO en Chatter Evaluator → Admin (Grace,
   // 05/11/2026): manda sobre el rol, solo para Chatters → Evaluator (igual que
   // has_chatter_evaluator_access en la base).
-  const { user } = useAuth();
   const { data: examinadorAMano } = useQuery({
     queryKey: ["chatter-examinador-yo", user?.id],
     enabled: !!user?.id && !isAdmin,
     staleTime: 5 * 60 * 1000,
     queryFn: async (): Promise<boolean | null> => {
+      if (esPrimeraCarga(qc, ["chatter-examinador-yo", user?.id])) {
+        const a = await leerArranque(qc, user?.id);
+        if (a) return a.examinador;
+      }
       const { data, error } = await supabase
         .from("chatter_examinadores" as never)
         .select("permitido")

@@ -171,8 +171,12 @@ export function useSidebarBadges() {
       return { promologCount, leadgenCount, closersCount, waInboxCount, tgInboxCount, coworkRequestsCount, correoUnreadCount };
     },
     enabled: !!user && !permsLoading,
-    staleTime: 60_000,
-    refetchInterval: 60_000,
+    // 2 min (era 1): Cowork y Correo —los badges que casi todos ven— ya llegan
+    // al instante por el realtime de arriba; el resto (Promolog, LeadGen,
+    // Closers, bandejas) puede esperar un minuto más. Simulacro 19/11: con mil
+    // personas, cada poll de esto eran 2–8 peticiones por persona por minuto.
+    staleTime: 120_000,
+    refetchInterval: 120_000,
   });
 
   return {

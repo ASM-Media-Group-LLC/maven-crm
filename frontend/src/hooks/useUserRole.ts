@@ -1,6 +1,7 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { esPrimeraCarga, leerArranque } from "@/lib/arranque";
 
 export type AppRole =
   | "admin" | "manager" | "employee" | "agent" | "closer" | "supervisor" | "spammer"
@@ -27,6 +28,7 @@ const SUPERVISOR_ROLES: readonly string[] = [
 
 export const useUserRole = () => {
   const { user } = useAuth();
+  const qc = useQueryClient();
 
   // ⚠️ `data === null` significa "esta persona NO tiene rol" (caso legítimo).
   // `isError` significa "no pudimos averiguarlo". Antes las dos cosas acababan
@@ -43,6 +45,17 @@ export const useUserRole = () => {
     queryKey: ["user-role", user?.id],
     queryFn: async () => {
       if (!user?.id) return null;
+
+      // Primera carga: el rol y su grupo vienen en la petición única del
+      // arranque (lib/arranque.ts). Si falló, sigue por el camino de siempre.
+      if (esPrimeraCarga(qc, ["user-role", user.id])) {
+        const a = await leerArranque(qc, user.id);
+        if (a) {
+          if (!a.rol) return null;
+          return { role: a.rol as AppRole, isSupervisorGroup: !!a.grupo?.is_supervisor_or_above };
+        }
+      }
+
       const { data, error } = await supabase
         .from("user_roles")
         .select("role")

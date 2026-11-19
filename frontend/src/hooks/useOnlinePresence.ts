@@ -1,6 +1,8 @@
 import { createContext, useContext, useEffect, useState, useCallback, useRef, ReactNode } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { useQueryClient } from "@tanstack/react-query";
+import { leerArranque } from "@/lib/arranque";
 import { esCuentaDeCreadora } from "@/lib/portal/cuenta";
 import React from "react";
 import { BUILD_PROPIO, versionesDesdePresencia, type PersonaConVersionVieja } from "@/lib/versionDelBundle";
@@ -62,6 +64,7 @@ export function OnlinePresenceProvider({ children }: { children: ReactNode }) {
   // tiene por qué aparecer como «en línea» en el Messenger ni en Cowork.
   const { user: cuenta } = useAuth();
   const user = esCuentaDeCreadora(cuenta) ? null : cuenta;
+  const qc = useQueryClient();
   const [onlineUsers, setOnlineUsers] = useState<Set<string>>(new Set());
   const [userStatuses, setUserStatuses] = useState<Record<string, UserStatus>>({});
   const [statusTexts, setStatusTexts] = useState<Record<string, string>>({});
@@ -160,11 +163,16 @@ export function OnlinePresenceProvider({ children }: { children: ReactNode }) {
     if (!user?.id) return;
     let cancelled = false;
     void (async () => {
-      const { data } = await supabase
-        .from("profiles")
-        .select("status, status_color, status_text, status_expires_at")
-        .eq("id", user.id)
-        .maybeSingle();
+      // Primero la petición única del arranque (lib/arranque.ts); si falló, la
+      // lectura de siempre.
+      const p = (await leerArranque(qc, user.id))?.perfil;
+      const { data } = p
+        ? { data: { status: p.status, status_color: p.status_color, status_text: p.status_text, status_expires_at: p.status_expires_at } }
+        : await supabase
+          .from("profiles")
+          .select("status, status_color, status_text, status_expires_at")
+          .eq("id", user.id)
+          .maybeSingle();
       if (cancelled || !data) return;
       const row = data as {
         status?: string | null;
@@ -194,7 +202,7 @@ export function OnlinePresenceProvider({ children }: { children: ReactNode }) {
       if (luz !== "available" || vigente || color) track();
     })();
     return () => { cancelled = true; };
-  }, [user?.id, track]);
+  }, [user?.id, track, qc]);
 
   // Presencia HONESTA: "Disponible" solo mientras la pestaña está visible.
   // Al pasar a segundo plano (cambiar de app, bloquear el celular, otra pestaña) se

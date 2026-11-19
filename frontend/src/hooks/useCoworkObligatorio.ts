@@ -54,8 +54,15 @@ export function useCoworkObligatorio(): { estado: EstadoCowork | null; enSalaAqu
       if (fila) setEstado({ debe: fila.debe === true, presente: fila.presente === true });
     };
     void leer();
-    const id = window.setInterval(() => { void leer(); }, CADA_MS);
-    return () => { vivo = false; window.clearInterval(id); };
+    // Abrir Maven liviano (simulacro 19/11): con la pestaña escondida no se
+    // pregunta (no hay pantalla que bloquear); al volver a verla se pregunta al
+    // instante. El intervalo lleva unos segundos al azar para que mil pestañas
+    // abiertas a la misma hora no pregunten todas en el mismo segundo.
+    const cada = CADA_MS + Math.floor(Math.random() * 5_000);
+    const id = window.setInterval(() => { if (document.visibilityState !== "hidden") void leer(); }, cada);
+    const alVolver = () => { if (document.visibilityState === "visible") void leer(); };
+    document.addEventListener("visibilitychange", alVolver);
+    return () => { vivo = false; window.clearInterval(id); document.removeEventListener("visibilitychange", alVolver); };
   }, [user]);
 
   // En ESTA pestaña se sabe al instante si está en la sala (el latido corre).

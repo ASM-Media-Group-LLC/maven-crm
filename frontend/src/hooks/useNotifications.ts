@@ -82,7 +82,10 @@ export function useNotifications(options: UseNotificationsOptions = {}) {
       return (data ?? []) as Notification[];
     },
     enabled: !!user,
-    refetchInterval: 60000, // Fallback polling; Realtime is primary
+    // Respaldo: lo principal es el realtime (canal que revive y recarga al
+    // revivir). 2 min (era 1) para no cargar PostgREST con mil personas
+    // (simulacro 19/11); react-query ya lo pausa con la pestaña escondida.
+    refetchInterval: 120_000,
   });
 
   // ─── Realtime: un canal que revive ───────────────────────────────

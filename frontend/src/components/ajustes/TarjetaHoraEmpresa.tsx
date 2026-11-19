@@ -5,7 +5,10 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { useLanguage } from "@/hooks/useLanguage";
 import { useEsDueno } from "@/hooks/useEsDueno";
+import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
+import { leerArranque } from "@/lib/arranque";
 import { hayLlamadaActiva } from "@/lib/llamadaActiva";
 import { alCambiarReloj, fijarReloj24, horaUI, usaReloj24 } from "@/lib/formatoHora";
 
@@ -56,11 +59,25 @@ export function TarjetaHoraEmpresa() {
 
 /** Al entrar: lee la hora que eligió el dueño y la aplica (y la vigila). */
 export function RelojDeLaEmpresa() {
+  const { user } = useAuth();
+  const qc = useQueryClient();
+  const uid = user?.id ?? null;
   useEffect(() => {
+    // Sin sesión no hay qué leer (la RLS de app_flags es para autenticados).
+    if (!uid) return;
     let vivo = true;
+    let primera = true;
     const leer = async () => {
+      // Con la pestaña escondida no se pregunta: se mira en la próxima vuelta.
+      if (!primera && document.visibilityState === "hidden") return;
       try {
-        const { data, error } = await sinTipar.from("app_flags").select("enabled").eq("key", "reloj_24h").maybeSingle();
+        // La primera lectura viene en la petición única del arranque
+        // (lib/arranque.ts); las siguientes, y si el arranque falló, directo.
+        const a = primera ? await leerArranque(qc, uid) : null;
+        primera = false;
+        const { data, error } = a && a.reloj_24h !== null
+          ? { data: { enabled: a.reloj_24h }, error: null }
+          : await sinTipar.from("app_flags").select("enabled").eq("key", "reloj_24h").maybeSingle();
         if (!vivo || error || !data) return; // un fallo no cambia nada: queda lo guardado
         const nuevo = !!data.enabled;
         if (nuevo === usaReloj24()) return;
@@ -73,6 +90,6 @@ export function RelojDeLaEmpresa() {
     void leer();
     const id = window.setInterval(leer, 10 * 60_000);
     return () => { vivo = false; window.clearInterval(id); };
-  }, []);
+  }, [qc, uid]);
   return null;
 }
