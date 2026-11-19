@@ -46,6 +46,12 @@ export function fueUnaCaida(razon?: DisconnectReason | number | null): boolean {
 export const ESPERAS_DE_REENTRADA_MS = [2000, 4000, 6000, 8000, 10000, 12000, 15000, 18000, 20000, 25000] as const;
 export const MAX_REENTRADAS = ESPERAS_DE_REENTRADA_MS.length;
 
+// 18/11/2026 (Alvaro: «nunca lo saca»): pasados los 10 intentos ya NO se queda
+// afuera con el cartel. Sigue intentando cada 30 s, con «reconectando…», hasta
+// que vuelva el internet o la persona salga. Lo de arriba sigue igual: a los 10
+// se anota «reentrada_agotada» (una vez) para las estadísticas.
+export const ESPERA_SIN_FIN_MS = 30_000;
+
 /** Cuánto esperar antes del intento `n` (desde 1). Null si ya no quedan. */
 export function esperaDeReentrada(n: number): number | null {
   return Number.isInteger(n) && n >= 1 && n <= MAX_REENTRADAS ? ESPERAS_DE_REENTRADA_MS[n - 1] : null;

@@ -20,7 +20,7 @@ import {
 } from "@/lib/sesionDuplicada";
 import { escritorio } from "@/lib/escritorio";
 import { pausarVideoConAppEscondida } from "@/lib/videoEscondido";
-import { esperaDeReentrada, fueUnaCaida, MAX_REENTRADAS } from "@/lib/conexionSala";
+import { ESPERA_SIN_FIN_MS, esperaDeReentrada, fueUnaCaida, MAX_REENTRADAS } from "@/lib/conexionSala";
 import { faseSegunSueno, vigiaDelSueno } from "@/lib/equipoDormido";
 import { DEBIL_INICIAL, MIRAR_DEBIL_CADA_MS, siguienteDebil } from "@/lib/internetDebil";
 import { registrarCorteParaElAviso } from "@/lib/caidasSeguidas";
@@ -2198,12 +2198,11 @@ export function useLiveKit() {
     const datos = ultimaConexionRef.current;
     if (!datos) return; // salió a propósito: no hay a dónde volver
     soltarEsperaDeRed(esperaDeRedRef);
-    if (reentradasRef.current >= MAX_REENTRADAS) {
-      anotarCorte("reentrada_agotada", datos.roomName, razon);
-      return; // se queda el cartel con su botón, como hasta hoy
-    }
+    // Nunca se rinde (18/11/2026): a los 10 intentos se anota una vez y sigue
+    // cada 30 s con «reconectando…» (ESPERA_SIN_FIN_MS).
+    if (reentradasRef.current === MAX_REENTRADAS) anotarCorte("reentrada_agotada", datos.roomName, razon);
     const n = ++reentradasRef.current;
-    const espera = esperaDeReentrada(n) ?? 20_000; // 2 s, 4 s, 6 s… 25 s: ~2 min en total
+    const espera = esperaDeReentrada(n) ?? ESPERA_SIN_FIN_MS; // 2 s, 4 s… 25 s (~2 min) y luego cada 30 s
     console.info(`[LiveKit] Caída (razón ${String(razon)}): volviendo solo, intento ${n}/${MAX_REENTRADAS} en ${espera} ms`);
     setIsReconnecting(true);
     const intentar = () => {
