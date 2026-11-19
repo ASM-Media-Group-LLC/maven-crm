@@ -192,13 +192,18 @@ export function AvisoEntrada({ primeraVez, horario, onAceptar, onCancelar, t }: 
               <p>{t("cowork.turno.terminos.p2")}</p>
               <p>{t("cowork.turno.terminos.p3")}</p>
             </div>
-            <label className={`mt-3 flex cursor-pointer items-center gap-3 rounded-xl border p-3 text-sm transition ${acepta ? "border-success/40 bg-success/[0.07] text-foreground" : "border-border/50 text-foreground/90 hover:bg-foreground/[0.03]"}`}>
-              <input type="checkbox" checked={acepta} onChange={(e) => setAcepta(e.target.checked)} className="h-[18px] w-[18px] shrink-0 accent-[hsl(var(--success))]" />
-              <span className="font-medium">{t("cowork.turno.terminos.acepto")}</span>
-            </label>
           </div>
         )}
       </div>
+      {/* La casilla va pegada al botón, SIEMPRE a la vista (Alvaro, 19/11: Valentina
+          Duarte no podía marcar entrada — en su pantalla la casilla quedaba abajo,
+          dentro del recuadro que se desliza, y el botón parecía muerto). */}
+      {primeraVez && (
+        <label className={`mx-6 mt-3 flex cursor-pointer items-center gap-3 rounded-xl border p-3 text-sm transition ${acepta ? "border-success/40 bg-success/[0.07] text-foreground" : "border-warning/50 bg-warning/[0.06] text-foreground hover:bg-warning/[0.1]"}`}>
+          <input type="checkbox" checked={acepta} onChange={(e) => setAcepta(e.target.checked)} className="h-5 w-5 shrink-0 accent-[hsl(var(--success))]" />
+          <span className="font-medium">{t("cowork.turno.terminos.acepto")}</span>
+        </label>
+      )}
       <div className="flex flex-col-reverse gap-2 border-t border-border/40 px-6 py-4 sm:flex-row sm:items-center sm:justify-end">
         <button type="button" onClick={onCancelar} className="h-11 rounded-xl px-4 text-sm font-medium text-muted-foreground transition hover:text-foreground">{t("cowork.turno.ahoraNo")}</button>
         <BotonVerde onClick={onAceptar} disabled={primeraVez && !acepta} className="h-12 px-7 text-[15px]">
