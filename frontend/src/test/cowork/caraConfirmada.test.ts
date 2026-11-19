@@ -4,8 +4,11 @@ import { tocaPreguntar, estadoConfirmado, IA_CADA_MS, IA_VALE_MS } from "@/lib/c
 // Alvaro, 17/11/2026: «No se te ve la cara» salía aunque la persona estuviera
 // ahí. El detector chico solo sospecha; la IA confirma antes de acusar.
 
+// El análisis del cuadro vive en lib/detectorDeCaras.ts desde que corre en un
+// hilo aparte (18/11/2026); se leen los dos archivos juntos.
 const fuentes = import.meta.glob("../../hooks/useFaceWatch.ts", { query: "?raw", import: "default", eager: true }) as Record<string, string>;
-const detector = Object.values(fuentes)[0];
+const fuentesLib = import.meta.glob("../../lib/detectorDeCaras.ts", { query: "?raw", import: "default", eager: true }) as Record<string, string>;
+const detector = Object.values(fuentes)[0] + Object.values(fuentesLib)[0];
 
 describe("la IA confirma antes de decir «no se te ve la cara»", () => {
   const ahora = 1_000_000;

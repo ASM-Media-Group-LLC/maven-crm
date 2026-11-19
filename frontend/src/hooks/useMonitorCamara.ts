@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react";
 import { toast } from "sonner";
 import { huellaDeCanvas } from "@/lib/huellaPantalla";
+import { lienzoAJpegBase64 } from "@/lib/jpegSinTrabas";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useLanguage } from "@/hooks/useLanguage";
@@ -87,9 +88,10 @@ async function capturarJPEG(
         ctx.drawImage(video, 0, 0, w, h);
         // Argos a USD 15: huella gratis de la pantalla (lib/huellaPantalla.ts).
         if (alHuella) alHuella(huellaDeCanvas(canvas));
-        const dataUrl = canvas.toDataURL("image/jpeg", calidad);
         limpiar();
-        resolve(dataUrl.split(",")[1] ?? null);
+        // toBlob, no toDataURL: el JPEG (1600 px en la de pantalla) se codifica
+        // fuera del hilo principal (lib/jpegSinTrabas.ts).
+        lienzoAJpegBase64(canvas, calidad).then(resolve, () => resolve(null));
       } catch {
         limpiar();
         resolve(null);

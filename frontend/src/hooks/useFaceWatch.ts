@@ -4,6 +4,11 @@ import { supabase } from "@/integrations/supabase/client";
 import {
   MUESTRAS_PARA_SOSPECHAR, tocaPreguntar, estadoConfirmado, type RespuestaIA,
 } from "@/lib/caraConfirmada";
+import {
+  ANCHO_MUESTRA, analizarCuadro, crearDetector, recorteDelZoom,
+  type DetectorDeCaras, type LecturaDeCuadro, type PedidoAlHilo, type RespuestaDelHilo,
+} from "@/lib/detectorDeCaras";
+import { lienzoAJpegBase64 } from "@/lib/jpegSinTrabas";
 
 // Vigilancia de encuadre: ¿se le ve la cara a quien está en la llamada?
 //
@@ -16,7 +21,8 @@ import {
 // dashboard del coordinador no serviría: ahí las miniaturas llegan en calidad
 // baja (adaptiveStream) y analizar nueve a la vez le quemaría la CPU.
 //
-// COSTO: una muestra cada pocos segundos sobre un canvas de 192px. El modelo
+// COSTO: una muestra cada pocos segundos sobre un canvas de 192px, en un HILO
+// APARTE (18/11/2026, ver lib/detectorDeCaras.ts) para no trabar la llamada. El modelo
 // (BlazeFace corto, ~230 KB) se descarga de los mismos servidores de MediaPipe
 // que ya usa el desenfoque de fondo.
 //
@@ -41,73 +47,74 @@ const SAMPLE_MS = 3000;
 const MAX_SIN_CUADROS = 5;
 // Debajo de esto la cara ocupa tan poco cuadro que no sirve para supervisar.
 const MIN_FACE_RATIO = 0.035;
-// Luminancia media (0-255) por debajo de la cual la imagen es una sombra.
-const MIN_BRIGHTNESS = 24;
+// Si el hilo no contesta en este tiempo (la primera vez carga el WASM y el
+// modelo), ese muestreo se da por perdido: no cambia el estado.
+const ESPERA_DEL_HILO_MS = 30_000;
 
-const WASM_BASE = "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm";
-// ⚠️ OJO: esta URL YA SE ROMPIÓ UNA VEZ. Estuvo apuntando a
-// `.../float16/1/blaze_face_short_range.task` y Google cambió la extensión a
-// `.tflite`: devolvía 404, el detector nunca se creaba y —como el error se
-// tragaba -- el supervisor de encuadre estuvo MUERTO sin que nadie se enterara.
-// Nadie reportó "falla el supervisor"; se reportó "no me dice nada".
-// Si vuelve a pasar, la consola ahora lo grita (ver getDetector).
-const MODEL_URL =
-  "https://storage.googleapis.com/mediapipe-models/face_detector/blaze_face_short_range/float16/latest/blaze_face_short_range.tflite";
+// ── El detector corre en un HILO APARTE (lib/detectorDeCaras.ts: por qué) ──
+// Uno solo para toda la pestaña. Si el navegador no deja abrirlo, o se cae, se
+// usa el detector en el hilo principal como antes: la supervisión no se pierde.
+let hilo: Worker | null = null;
+let hiloRoto = false;
+let siguienteId = 0;
+const esperando = new Map<number, (r: RespuestaDelHilo | null) => void>();
 
-// Un solo detector para toda la pestaña: cargarlo es lo caro, usarlo no.
-let detectorPromise: Promise<any | null> | null = null;
-
-async function getDetector(): Promise<any | null> {
-  if (!detectorPromise) {
-    detectorPromise = (async () => {
-      try {
-        const vision = await import("@mediapipe/tasks-vision");
-        const fileset = await vision.FilesetResolver.forVisionTasks(WASM_BASE);
-        // CPU, no GPU — a propósito (02/09/2026, crash reportado por Grace).
-        //
-        // Chrome pone las pestañas del MISMO sitio en el MISMO proceso: la del
-        // Meet (/call/...) y la de Cowork comparten renderer. Con delegate GPU,
-        // arrancar este detector (WASM + WebGL) en la pestaña de Cowork mientras
-        // la del Meet ya tiene su propio pipeline de video con WebGL (el fondo
-        // borroso también es MediaPipe) tumbaba el proceso entero — SIGSEGV,
-        // "No se puede abrir esta página · código 11" — y la persona salía de la
-        // llamada sin haber tocado nada en esa pestaña.
-        //
-        // El modelo es BlazeFace short-range sobre un cuadro de 192px, una vez
-        // cada 3 segundos: en CPU sobra, y saca a MediaPipe de la pelea por la
-        // GPU. Si algún día hace falta más, medir antes de volver a GPU.
-        return await vision.FaceDetector.createFromOptions(fileset, {
-          baseOptions: { modelAssetPath: MODEL_URL, delegate: "CPU" },
-          runningMode: "IMAGE",
-          // 0.35 y no 0.5 (17/11/2026): con audífonos, de lado o con luz detrás la
-          // confianza baja y se perdían caras de gente que estaba ahí.
-          minDetectionConfidence: 0.35,
-        });
-      } catch (e) {
-        // NO se traga el error en silencio. La versión anterior hacía
-        // `catch { return null }` y eso convirtió un 404 de una URL externa en
-        // una función que simplemente no existía: el chatter creía que lo
-        // estaban supervisando y el coordinador creía que le iban a avisar.
-        // Un aviso que nunca llega es peor que no tener aviso.
-        console.error(
-          "[encuadre] no se pudo cargar el detector de rostros: el supervisor NO va a avisar. " +
-          "Revisar que respondan 200:\n  " + WASM_BASE + "\n  " + MODEL_URL,
-          e,
-        );
-        return null;
-      }
-    })();
+function abrirHilo(): Worker | null {
+  if (hilo || hiloRoto) return hilo;
+  if (typeof Worker === "undefined" || typeof createImageBitmap !== "function" || typeof OffscreenCanvas === "undefined") {
+    hiloRoto = true;
+    return null;
   }
-  return detectorPromise;
+  try {
+    // Worker CLÁSICO, no de módulo: MediaPipe necesita importScripts().
+    hilo = new Worker(new URL("../workers/detectorDeCaras.worker.ts", import.meta.url));
+    hilo.onmessage = (e: MessageEvent<RespuestaDelHilo>) => {
+      const fin = esperando.get(e.data.id);
+      if (fin) { esperando.delete(e.data.id); fin(e.data); }
+    };
+    hilo.onerror = (e) => {
+      console.error("[encuadre] el hilo del detector falló; sigue en el hilo principal", e);
+      hiloRoto = true;
+      try { hilo?.terminate(); } catch { /* noop */ }
+      hilo = null;
+      for (const fin of esperando.values()) fin(null);
+      esperando.clear();
+    };
+  } catch (e) {
+    console.error("[encuadre] no se pudo abrir el hilo del detector; sigue en el hilo principal", e);
+    hiloRoto = true;
+    hilo = null;
+  }
+  return hilo;
 }
 
-function averageBrightness(data: Uint8ClampedArray): number {
-  let sum = 0;
-  // Un pixel de cada 16: alcanza para saber si está a oscuras y cuesta 16x menos.
-  for (let i = 0; i < data.length; i += 64) {
-    sum += (data[i] + data[i + 1] + data[i + 2]) / 3;
-  }
-  return sum / (data.length / 64);
+/** null = el hilo no sirvió (se usa el respaldo); "perdido" = no contestó a tiempo. */
+async function leerEnElHilo(video: HTMLVideoElement, w: number, h: number): Promise<RespuestaDelHilo | "perdido" | null> {
+  const h1 = abrirHilo();
+  if (!h1) return null;
+  // createImageBitmap reduce el cuadro sin bloquear y el bitmap viaja al hilo
+  // sin copiarse (transferible).
+  const [sx, sy, sw, sh] = recorteDelZoom(video.videoWidth, video.videoHeight);
+  const opciones: ImageBitmapOptions = { resizeWidth: w, resizeHeight: h, resizeQuality: "low" };
+  const [completo, zoom] = await Promise.all([
+    createImageBitmap(video, opciones),
+    createImageBitmap(video, sx, sy, sw, sh, opciones),
+  ]);
+  if (!hilo) { completo.close(); zoom.close(); return null; }
+  const id = ++siguienteId;
+  return await new Promise((resolve) => {
+    const reloj = window.setTimeout(() => { esperando.delete(id); resolve("perdido"); }, ESPERA_DEL_HILO_MS);
+    esperando.set(id, (r) => { window.clearTimeout(reloj); resolve(r); });
+    const pedido: PedidoAlHilo = { id, completo, zoom, w, h };
+    hilo!.postMessage(pedido, [completo, zoom]);
+  });
+}
+
+// Respaldo en el hilo principal (navegadores sin workers / hilo caído).
+let detectorPromise: Promise<DetectorDeCaras | null> | null = null;
+function getDetector(): Promise<DetectorDeCaras | null> {
+  if (!detectorPromise) detectorPromise = crearDetector(() => import("@mediapipe/tasks-vision"));
+  return detectorPromise;
 }
 
 /** Qué decir de un cuadro. Puro, para poder probarlo sin cámara.
@@ -174,7 +181,8 @@ export function useFaceWatch(track: MediaStreamTrack | null, enabled: boolean): 
         foto.width = fw;
         foto.height = Math.max(1, Math.round((video.videoHeight / video.videoWidth) * fw));
         foto.getContext("2d")?.drawImage(video, 0, 0, foto.width, foto.height);
-        const imagen = foto.toDataURL("image/jpeg", 0.6).split(",")[1] ?? "";
+        // toBlob y no toDataURL: el JPEG se codifica fuera del hilo principal.
+        const imagen = (await lienzoAJpegBase64(foto, 0.6)) ?? "";
         const { data, error } = await supabase.functions.invoke("argos-cara", { body: { imagen } });
         const persona = !error && typeof (data as { persona?: unknown } | null)?.persona === "boolean"
           ? (data as { persona: boolean }).persona : null;
@@ -197,11 +205,28 @@ export function useFaceWatch(track: MediaStreamTrack | null, enabled: boolean): 
     // perfectamente frente a la cámara.
     const asegurarReproduccion = () => { if (video.paused) video.play().catch(() => {}); };
     asegurarReproduccion();
-    const canvas = document.createElement("canvas");
-    const ctx = canvas.getContext("2d", { willReadFrequently: true });
+    // Lienzos del respaldo (hilo principal), creados una sola vez.
+    let canvas: HTMLCanvasElement | null = null;
+    let zoomCanvas: HTMLCanvasElement | null = null;
+    const leerAqui = async (w: number, h: number): Promise<LecturaDeCuadro | "sin_detector"> => {
+      const detector = await getDetector();
+      if (!detector) return "sin_detector";
+      canvas ??= document.createElement("canvas");
+      zoomCanvas ??= document.createElement("canvas");
+      const ctx = canvas.getContext("2d", { willReadFrequently: true });
+      if (!ctx) throw new Error("sin lienzo");
+      canvas.width = w; canvas.height = h;
+      ctx.drawImage(video, 0, 0, w, h);
+      // Segunda pasada con ZOOM al centro (ver analizarCuadro).
+      zoomCanvas.width = w; zoomCanvas.height = h;
+      zoomCanvas.getContext("2d")?.drawImage(video, ...recorteDelZoom(video.videoWidth, video.videoHeight), 0, 0, w, h);
+      return analizarCuadro(detector, canvas, zoomCanvas, ctx, w, h);
+    };
 
+    // Un muestreo a la vez: si el anterior sigue esperando al hilo, este se salta.
+    let enCurso = false;
     const sample = async () => {
-      if (cancelled || !ctx) return;
+      if (cancelled || enCurso) return;
       // En una llamada de Maven (Messenger, Meet, 1:1) ni se carga ni se evalúa
       // el detector: los avisos de encuadre están silenciados de todas formas en
       // ese caso (useFaceNudge), así que sería gastar un pipeline WASM entero
@@ -209,12 +234,7 @@ export function useFaceWatch(track: MediaStreamTrack | null, enabled: boolean): 
       // ya corre su video con WebGL es exactamente el momento del crash. El
       // muestreo sigue latiendo cada 3 s: al colgar la llamada retoma solo.
       if (estaEnLlamadaDeMaven()) return;
-      const detector = await getDetector();
-      if (cancelled) return;
-      if (!detector) {
-        setState("unavailable");
-        return; // sin detector no reintentamos: no hay nada que mejore solo
-      }
+      enCurso = true;
       try {
         if (video.readyState < 2 || !video.videoWidth) {
           asegurarReproduccion();
@@ -228,38 +248,27 @@ export function useFaceWatch(track: MediaStreamTrack | null, enabled: boolean): 
         sinCuadros = 0;
         // 192px de ancho: BlazeFace corto trabaja con entradas chicas y así el
         // muestreo no compite con el encoder de la llamada.
-        const w = 192;
+        const w = ANCHO_MUESTRA;
         const h = Math.max(1, Math.round((video.videoHeight / video.videoWidth) * w));
-        canvas.width = w;
-        canvas.height = h;
-        ctx.drawImage(video, 0, 0, w, h);
 
-        const frame = ctx.getImageData(0, 0, w, h);
-        const oscuro = averageBrightness(frame.data) < MIN_BRIGHTNESS;
-
-        // Antes, con poca luz, se decía "too_dark" y NO se buscaba la cara. Eso
-        // mezclaba dos cosas distintas (Jhon, 07/09): la persona está pero con
-        // mala luz —alerta de encuadre, el reloj sigue— y la imagen es negra y
-        // no se ve a NADIE —es "fuera de cámara", el reloj se detiene—. Ahora
-        // la cara se busca siempre; la oscuridad solo califica el resultado.
-        let caras = detector.detect(canvas)?.detections ?? [];
-        // Segunda pasada con ZOOM al centro: el modelo es de distancia corta y
-        // una persona un poco lejos le queda chica en el cuadro entero.
-        if (!caras.length) {
-          const zoom = document.createElement("canvas");
-          zoom.width = w; zoom.height = h;
-          const sx = video.videoWidth * 0.2, sy = video.videoHeight * 0.1;
-          zoom.getContext("2d")?.drawImage(video, sx, sy, video.videoWidth * 0.6, video.videoHeight * 0.6, 0, 0, w, h);
-          caras = detector.detect(zoom)?.detections ?? [];
+        // Primero el hilo aparte; si no sirve, el detector aquí, como antes.
+        let lectura: LecturaDeCuadro | "sin_detector" | null = null;
+        const delHilo = await leerEnElHilo(video, w, h).catch(() => null);
+        if (cancelled || delHilo === "perdido") return;
+        if (delHilo?.tipo === "lectura") lectura = delHilo.lectura;
+        else if (delHilo?.tipo === "fallo") return; // un cuadro que falla: al siguiente
+        else {
+          // Sin hilo, o el hilo no pudo cargar el detector: se prueba aquí antes
+          // de rendirse, para no perder la supervisión por culpa del hilo.
+          if (delHilo?.tipo === "sin_detector") { hiloRoto = true; hilo?.terminate(); hilo = null; }
+          lectura = await leerAqui(w, h);
         }
-        const mayor = caras.length ? caras.reduce((best: any, d: any) => {
-          const area = (d.boundingBox?.width ?? 0) * (d.boundingBox?.height ?? 0);
-          const bestArea = (best?.boundingBox?.width ?? 0) * (best?.boundingBox?.height ?? 0);
-          return area > bestArea ? d : best;
-        }, caras[0]) : null;
-        const bb = mayor?.boundingBox;
-        const ratio = mayor ? ((bb?.width ?? 0) * (bb?.height ?? 0)) / (w * h) : 0;
-        const local = clasificarCuadro({ oscuro, hayCara: !!mayor, ratio });
+        if (cancelled) return;
+        if (lectura === "sin_detector") {
+          setState("unavailable");
+          return; // sin detector no hay nada que mejore solo
+        }
+        const local = clasificarCuadro(lectura);
         // El detector solo SOSPECHA; «no_face» sale si la IA lo confirma.
         seguidasSinCara = local === "no_face" ? seguidasSinCara + 1 : 0;
         if (local !== "no_face") ultimaIA = null;
@@ -268,6 +277,8 @@ export function useFaceWatch(track: MediaStreamTrack | null, enabled: boolean): 
         setState(estadoConfirmado(sospecha ? local : (local === "no_face" ? "ok" : local), ultimaIA, Date.now()));
       } catch {
         /* un frame que falla no cambia el estado: se reintenta al siguiente */
+      } finally {
+        enCurso = false;
       }
     };
 
