@@ -2,10 +2,10 @@ import { describe, it, expect, beforeEach } from "vitest";
 import { loadNCPreference } from "@/lib/noise-suppression-processor";
 import { estadoDeNC, ncFunciona } from "@/lib/estadoNC";
 
-// LA CANCELACIÓN DE RUIDO ES OBLIGATORIA (Alvaro, 13/11/2026). Antes arrancaba
-// activada pero respetaba a quien la apagaba (y quedaba apagada para siempre en
-// ese navegador). Ahora: siempre se arma, un «false» guardado de antes no cuenta
-// (y se borra), y lo que se mide es si DE VERDAD está corriendo.
+// LA CANCELACIÓN DE RUIDO, PRENDIDA POR DEFECTO. Fue obligatoria del 13/11 al
+// 19/11/2026; desde el 19/11 vuelve el interruptor (ver interruptorRuido.test.ts)
+// con una clave NUEVA. Un «false» de la clave VIEJA sigue sin contar (y se
+// borra), y lo que se mide es si DE VERDAD está corriendo.
 const fuentes = import.meta.glob(
   ["/frontend/src/hooks/useLiveKit.ts", "/frontend/src/pages/messenger/videocall/CallControls.tsx"],
   { query: "?raw", import: "default", eager: true },
@@ -13,7 +13,7 @@ const fuentes = import.meta.glob(
 const liveKit = fuentes["/frontend/src/hooks/useLiveKit.ts"];
 const controles = fuentes["/frontend/src/pages/messenger/videocall/CallControls.tsx"];
 
-describe("cancelación de ruido obligatoria", () => {
+describe("cancelación de ruido prendida por defecto", () => {
   beforeEach(() => localStorage.clear());
 
   it("quien nunca eligió la tiene", () => {
@@ -31,11 +31,10 @@ describe("cancelación de ruido obligatoria", () => {
     expect(controles?.length).toBeGreaterThan(1000);
   });
 
-  it("no queda ningún interruptor para apagarla: ni en el hook ni en la barra de la llamada", () => {
+  it("el interruptor viejo (toggleNoiseCancellation) no vuelve: el nuevo es toggleCancelacionRuido", () => {
     expect(liveKit).not.toContain("toggleNoiseCancellation");
-    expect(liveKit).not.toContain("saveNCPreference");
     expect(controles).not.toContain("onToggleNoiseCancellation");
-    expect(controles).not.toMatch(/role="switch"[^>]*cancelacionRuido/);
+    expect(liveKit).toContain("toggleCancelacionRuido");
   });
 
   it("cada muestra de la llamada dice si de verdad está corriendo (datos.nc)", () => {

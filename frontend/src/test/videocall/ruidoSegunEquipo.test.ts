@@ -1,8 +1,7 @@
 // CANCELACIÓN DE RUIDO SEGÚN EL EQUIPO (Alvaro, 19/11/2026, opción B).
 //
-// ⚠️ POR AHORA ES PRUEBA VOLUNTARIA: solo arma DeepFilterNet quien puso
-// localStorage "maven.deepfilter" = "si" en ese navegador. Todos los demás,
-// aunque tengan equipo fuerte, siguen como hoy: RNNoise + puerta.
+// Desde el 19/11/2026 para todos (primero fue prueba voluntaria unas horas), y
+// cada persona puede apagarla con el interruptor (interruptorRuido.test.ts).
 //
 //   · Computador fuerte (8+ núcleos Y 8+ GB, no celular) → DeepFilterNet, tras
 //     una prueba de carga que nadie oye.
@@ -53,37 +52,23 @@ afterEach(() => {
   try { localStorage.clear(); } catch { /* noop */ }
 });
 
-const pedirPrueba = () => localStorage.setItem("maven.deepfilter", "si");
-
-describe("prueba voluntaria: por defecto, nadie arma DeepFilterNet", () => {
-  it("usuario normal con equipo fuerte → RNNoise (igual que hoy)", () => {
+describe("para todos desde el 19/11/2026: ya no hace falta pedir la prueba", () => {
+  it("usuario normal con equipo fuerte → DeepFilterNet, sin tocar nada", () => {
     equipo(16, 8);
-    expect(m.motivoSinDeepFilter()).toBe("sin_prueba");
-    expect(m.deepFilterPermitido()).toBe(false);
-  });
-  it("solo el valor exacto «si» lo prende", () => {
-    equipo(16, 8);
-    for (const v of ["no", "true", "1", "SI", ""]) {
-      localStorage.setItem("maven.deepfilter", v);
-      expect(m.deepFilterPermitido(), v).toBe(false);
-    }
-    pedirPrueba();
+    expect(m.motivoSinDeepFilter()).toBeNull();
     expect(m.deepFilterPermitido()).toBe(true);
   });
-  it("si el storage tira, no se prende (y no revienta)", () => {
-    equipo(16, 8);
-    vi.spyOn(Storage.prototype, "getItem").mockImplementation(() => { throw new Error("bloqueado"); });
-    expect(m.pruebaDeepFilterPedida()).toBe(false);
-    expect(m.deepFilterPermitido()).toBe(false);
+  it("la compuerta de la prueba voluntaria ya no existe", () => {
+    expect(df).not.toContain("sin_prueba");
+    expect(df).not.toContain("pruebaDeepFilterPedida");
   });
-  it("sin prueba, la cadena se crea como hoy (sin latencia «balanced»): solo cambia si DeepFilterNet arma", () => {
+  it("la cadena solo cambia la latencia si DeepFilterNet arma", () => {
     expect(cadena).toMatch(/const conDF = motivoSinDF === null;/);
     expect(cadena).toMatch(/new AudioContext\(conDF \? \{[^}]*\} : \{ sampleRate: 48000 \}\)/);
   });
 });
 
-describe("equipo fuerte con la prueba pedida → DeepFilterNet", () => {
-  beforeEach(() => { pedirPrueba(); });
+describe("equipo fuerte → DeepFilterNet", () => {
   it("8 núcleos y 8 GB en un computador: puede usar DeepFilterNet", () => {
     equipo(8, 8);
     expect(m.motivoSinDeepFilter()).toBeNull();
@@ -111,8 +96,7 @@ describe("equipo fuerte con la prueba pedida → DeepFilterNet", () => {
   });
 });
 
-describe("equipo débil → RNNoise (aunque pida la prueba)", () => {
-  beforeEach(() => { pedirPrueba(); });
+describe("equipo débil → RNNoise", () => {
   it("menos de 8 núcleos, aunque sobre memoria", () => {
     for (const n of [2, 4, 6, 7]) { equipo(n, 8); expect(m.motivoSinDeepFilter(), `${n} núcleos`).toBe("equipo"); }
   });
@@ -160,7 +144,6 @@ describe("si algo falla → el filtro del navegador", () => {
   });
 
   it("si DeepFilterNet no carga, sigue RNNoise (y no se reintenta en la pestaña)", () => {
-    pedirPrueba();
     const relevo = cadena.slice(cadena.indexOf("const subirADeepFilter"), cadena.indexOf("const relevoDF"));
     expect(relevo).toMatch(/catch \(e\) \{[\s\S]*descartarDeepFilterEnPestana\(\);[\s\S]*sinDF = "no_cargo";/);
     equipo(16, 8);
@@ -213,7 +196,7 @@ describe("la voz robotizada no vuelve", () => {
 describe("llamada_salud anota qué filtro corre y por qué", () => {
   it("cada muestra lleva nc (el motor) y nc_info (por qué no DeepFilterNet, carga, filtro del navegador)", () => {
     expect(livekit).toContain("const ncInfo = leerInfoNC(room);");
-    expect(livekit).toContain("...(ncInfo ? { nc_info: ncInfo } : {})");
+    expect(livekit).toContain("nc_info: { ...(ncInfo ?? {}), ruido_usuario:");
     expect(cadena).toMatch(/get info\(\): InfoNC \{ return \{ sin_df:/);
   });
 });

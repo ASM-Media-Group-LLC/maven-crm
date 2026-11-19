@@ -16,16 +16,21 @@
  *  · fallo        hay micrófono pero el filtro no arrancó o se trabó (sale crudo).
  *  · no_soportada el navegador no tiene AudioWorklet.
  *  · sin_micro    todavía no hay micrófono publicado (en Cowork se entra silenciado).
+ *  · apagada      la persona la apagó con el interruptor (desde el 19/11/2026):
+ *                 el micro sale con el filtro del navegador.
  */
-export type EstadoNC = "fuerte" | "activa" | "solo_puerta" | "fallo" | "no_soportada" | "sin_micro";
+export type EstadoNC = "fuerte" | "activa" | "solo_puerta" | "fallo" | "no_soportada" | "sin_micro" | "apagada";
 
 export function estadoDeNC(p: {
   soportada: boolean;
   hayMicro: boolean;
   /** El motor del procesador enganchado al micrófono, o null si no hay ninguno funcionando. */
   motor: "deepfilter+puerta" | "rnnoise+puerta" | "puerta" | null;
+  /** La persona la quiere (interruptor). Si no se dice, se asume que sí. */
+  deseada?: boolean;
 }): EstadoNC {
   if (!p.soportada) return "no_soportada";
+  if (p.deseada === false) return "apagada";
   if (!p.hayMicro) return "sin_micro";
   if (p.motor === "deepfilter+puerta") return "fuerte";
   if (p.motor === "rnnoise+puerta") return "activa";
@@ -35,5 +40,5 @@ export function estadoDeNC(p: {
 
 /** ¿El filtro está haciendo su trabajo (aunque sea a medias)? Para el aviso de la llamada. */
 export function ncFunciona(e: EstadoNC): boolean {
-  return e === "fuerte" || e === "activa" || e === "solo_puerta" || e === "sin_micro";
+  return e === "fuerte" || e === "activa" || e === "solo_puerta" || e === "sin_micro" || e === "apagada";
 }

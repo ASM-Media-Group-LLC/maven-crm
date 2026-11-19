@@ -46,7 +46,7 @@ import {
   resolverImagenDeFondo, leerFondoGuardado, guardarFondo,
 } from "@/lib/fondoDeLlamada";
 import type { ImagenDeFondo } from "@/lib/fondoDeLlamada";
-import { NoiseSuppresionTrackProcessor, supportsNoiseSuppression, loadNCPreference, type InfoNC } from "@/lib/noise-suppression-processor";
+import { NoiseSuppresionTrackProcessor, supportsNoiseSuppression, loadNCPreference, saveNCPreference, type InfoNC } from "@/lib/noise-suppression-processor";
 import { estadoDeNC, type EstadoNC } from "@/lib/estadoNC";
 import { clasificarFalloDePantalla, pantallaSinPermiso, type FalloDePantalla } from "@/lib/fallosDePantalla";
 export type { FalloDePantalla } from "@/lib/fallosDePantalla";
@@ -607,7 +607,7 @@ export function useLiveKit() {
   }, []);
 
   type InsertaSalud = (tabla: "llamada_salud") => {
-    insert: (fila: { sala: string; datos: MuestraDeLlamada & MemoriaDelEquipo & { ahorro: boolean; nc: EstadoNC; nc_info?: InfoNC; prueba?: PruebaDeRed; perfil_cam: PerfilDeCamara; transporte: Transporte | null; trabas?: Traba[]; audio?: AudioDeLaMuestra } }) =>
+    insert: (fila: { sala: string; datos: MuestraDeLlamada & MemoriaDelEquipo & { ahorro: boolean; nc: EstadoNC; nc_info?: Partial<InfoNC> & { ruido_usuario: "si" | "no" }; prueba?: PruebaDeRed; perfil_cam: PerfilDeCamara; transporte: Transporte | null; trabas?: Traba[]; audio?: AudioDeLaMuestra } }) =>
       PromiseLike<{ error: { message: string } | null }>;
   };
   // Si el componente se desmonta sin colgar, el reloj de muestras no queda vivo.
@@ -845,7 +845,7 @@ export function useLiveKit() {
         const memoria = await leerMemoria();
         // Cada 10 minutos: qué tan lejos queda cada servidor de llamadas (lib/pingRegiones.ts).
         const regiones = (vueltaRegiones++ % MEDIR_REGIONES_CADA === 0) ? await medirRegiones() : null;
-        const filaDeSalud = { sala: room.name, datos: { ...muestra, ...memoria, ahorro: ahorro.activo, nc, ...(ncInfo ? { nc_info: ncInfo } : {}), perfil_cam: perfilCam, transporte: transporteDeLaLlamada(), ...(prueba ? { prueba } : {}), ...(trabasDelMinuto.length ? { trabas: trabasDelMinuto } : {}), ...(audio ? { audio } : {}), ...(regiones ? { regiones } : {}) } };
+        const filaDeSalud = { sala: room.name, datos: { ...muestra, ...memoria, ahorro: ahorro.activo, nc, nc_info: { ...(ncInfo ?? {}), ruido_usuario: ncUsuarioRef.current ? "si" as const : "no" as const }, perfil_cam: perfilCam, transporte: transporteDeLaLlamada(), ...(prueba ? { prueba } : {}), ...(trabasDelMinuto.length ? { trabas: trabasDelMinuto } : {}), ...(audio ? { audio } : {}), ...(regiones ? { regiones } : {}) } };
         if (telemetriaRef.current) telemetriaRef.current.salud(filaDeSalud);
         else void (supabase.from as unknown as InsertaSalud)("llamada_salud")
           .insert(filaDeSalud)
@@ -980,11 +980,15 @@ export function useLiveKit() {
     return () => window.clearInterval(id);
   }, []);
   // ── Noise cancellation ──────────────────────────────────────────
-  // OBLIGATORIA desde el 13/11/2026: no hay botón para apagarla. `ncEnabledRef`
-  // dice si se quiere (siempre que el navegador la soporte) y `estadoNC` si de
+  // Prendida por defecto para todos; desde el 19/11/2026 cada persona la puede
+  // apagar con el interruptor del menú del micrófono (se guarda por navegador en
+  // "maven.ruido"). `ncUsuarioRef` es lo que eligió la persona, `ncEnabledRef`
+  // si se arma (lo que eligió y que el navegador la soporte) y `estadoNC` si de
   // verdad está corriendo (lib/estadoNC.ts): eso va en cada muestra de la
   // llamada y lo muestra Argos › Llamadas.
   const [estadoNC, setEstadoNC] = useState<EstadoNC>("sin_micro");
+  const [ncActivada, setNcActivada] = useState<boolean>(() => loadNCPreference());
+  const ncUsuarioRef = useRef<boolean>(ncActivada);
   const ncProcessorRef = useRef<NoiseSuppresionTrackProcessor | null>(null);
   const ncEnabledRef = useRef(false);
   // El aviso de «se apagó por fallo» sale UNA vez por llamada: como ahora se
@@ -998,7 +1002,7 @@ export function useLiveKit() {
       : undefined;
     const t = micPub?.track as (LocalAudioTrack & { getProcessor?: () => unknown }) | undefined;
     const proc = t?.getProcessor?.() as { motor?: "deepfilter+puerta" | "rnnoise+puerta" | "puerta" | null } | undefined;
-    return estadoDeNC({ soportada: supportsNoiseSuppression(), hayMicro: !!t, motor: proc?.motor ?? null });
+    return estadoDeNC({ soportada: supportsNoiseSuppression(), hayMicro: !!t, motor: proc?.motor ?? null, deseada: ncUsuarioRef.current });
   }, []);
   /** Qué filtro corre y por qué (lib/noise-suppression-processor.ts › InfoNC), o null sin procesador. */
   const leerInfoNC = useCallback((room: Room | null): InfoNC | null => {
@@ -2211,9 +2215,11 @@ export function useLiveKit() {
       // después `reapplyNC` no hacía nada porque miraba esa bandera. El
       // procesador en sí se engancha cuando hay un track de micro: ahora si
       // entra encendido, o en `reapplyNC` cuando lo prenda.
-      // Desde el 13/11/2026 es obligatoria: loadNCPreference() siempre dice que
-      // sí; solo queda afuera el navegador que no la soporta.
-      const ncDeseado = loadNCPreference() && supportsNoiseSuppression();
+      // Prendida salvo que la persona la haya apagado con el interruptor
+      // (loadNCPreference, por defecto sí); afuera el navegador que no la soporta.
+      ncUsuarioRef.current = loadNCPreference();
+      setNcActivada(ncUsuarioRef.current);
+      const ncDeseado = ncUsuarioRef.current && supportsNoiseSuppression();
       ncEnabledRef.current = ncDeseado;
       ncFalloAvisadoRef.current = false;
 
@@ -2686,8 +2692,36 @@ export function useLiveKit() {
     }
   }, [refreshParticipants, reapplyNC, vigilarMicro, avisarMicroIrrecuperable]);
 
-  // (El interruptor de la cancelación de ruido se quitó el 13/11/2026: es
-  // obligatoria. Ver noise-suppression-processor.ts › loadNCPreference.)
+  // ── Interruptor de la cancelación de ruido (vuelve el 19/11/2026) ──
+  // Se aplica EN VIVO, sin salir de la llamada. Apagar = se para el procesador
+  // y LiveKit vuelve a publicar el micrófono tal cual (capturado con el
+  // noiseSuppression del navegador; si DeepFilterNet lo había apagado, la
+  // cadena se lo devuelve al destruirse). Prender = se engancha el procesador
+  // al micrófono vigente (reapplyNC). Se guarda por navegador.
+  const toggleCancelacionRuido = useCallback(async () => {
+    const prender = !ncUsuarioRef.current;
+    ncUsuarioRef.current = prender;
+    setNcActivada(prender);
+    saveNCPreference(prender);
+    const room = roomRef.current;
+    if (!room) return;
+    ncEnabledRef.current = prender && supportsNoiseSuppression();
+    if (prender) {
+      ncFalloAvisadoRef.current = false;
+      await reapplyNC();
+    } else {
+      try {
+        const micPub = Array.from(room.localParticipant.audioTrackPublications.values()).find(
+          (p) => p.source === Track.Source.Microphone,
+        );
+        await (micPub?.track as LocalAudioTrack | undefined)?.stopProcessor?.();
+      } catch { /* ya no había procesador */ }
+      if (ncProcessorRef.current) { try { await ncProcessorRef.current.destroy(); } catch { /* noop */ } }
+      ncProcessorRef.current = null;
+      console.info("[LiveKit] cancelación de ruido apagada por la persona");
+    }
+    setEstadoNC(leerEstadoNC(room));
+  }, [reapplyNC, leerEstadoNC]);
 
   // ── Camera toggle ─────────────────────────────────────────────
   const toggleCam = useCallback(async () => {
@@ -3249,5 +3283,7 @@ export function useLiveKit() {
     switchAudioOutput,
     switchVideoInput,
     estadoNC,
+    ncActivada,
+    toggleCancelacionRuido,
   };
 }
