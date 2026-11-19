@@ -183,6 +183,12 @@ function usePunteroGrueso(): boolean {
 export default function LiveKitCallView({ roomName, displayName, callDisplayName, isAdmin = false, onLeave, initialMicOn = true, initialCamOn = true, initialScreenShareOn = false, initialAudioDeviceId, initialVideoDeviceId, initialAudioOutputDeviceId, initialBackgroundEffect = "none", hideShareLink, hideScreenShare, hideLeaveButton, leaveLabel, leaveIcon, suppressLeaveToast, compact, autoPip = true, autoLeaveOnEmpty, getToken, onMediaStateChange, onFaceStateChange, supervisorEncuadre, onLocalScreenTrack, pantallaSoloParaMi, pantallaVisiblePara, pantallaOpcional = false, camaraOpcional = false, pantallaPrestada = null, sinLatidoDeLlamada, incomingAudioMuted, roomSwitcher, recording, shareLink: shareLinkProp, accionesBarra, guardarChat, encima, hideEndForAll, controlesExtra, sinVideoAjeno = false, telemetria, sinVolverEnError = false }: LiveKitCallViewProps) {
   // Lista de salas del navegador (solo Cowork supervisor+): estado del popup.
   const [salasAbiertas, setSalasAbiertas] = useState(false);
+  // ⚠️ `lk` es un objeto NUEVO en cada dibujo (cambia con cada participante que
+  // habla). En las dependencias de un efecto va la función estable que se usa
+  // (`lk.getRoom`, `lk.disconnect`…), NUNCA `lk` entero: con `lk` el efecto se
+  // deshacía y rehacía en cada dibujo. En el Hub eso cambiaba los permisos de la
+  // pantalla en el servidor y, con la pantalla prestada, la volvía a publicar,
+  // varias veces por segundo (18/11/2026, guarda: test/videocall/llamadaSinTrabas).
   const lk = useLiveKit();
   const { t } = useLanguage();
 
@@ -210,7 +216,7 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
       room.off(RoomEvent.ParticipantConnected, aplicar);
       room.off(RoomEvent.TrackSubscribed, aplicar);
     };
-  }, [incomingAudioMuted, lk, lk.connectionState]);
+  }, [incomingAudioMuted, lk.getRoom, lk.connectionState]);
   const [viewSettings, setViewSettings] = useState<ViewSettings>(DEFAULT_VIEW_SETTINGS);
 
   // ── Pausa de Cowork: apagar todo al pausar, reencender al volver ─────────
@@ -478,7 +484,7 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
     const h = () => { lk.disconnect(); };
     window.addEventListener("beforeunload", h);
     return () => window.removeEventListener("beforeunload", h);
-  }, [lk]);
+  }, [lk.disconnect]);
 
   const handleLeave = useCallback(() => {
     // Si ESTA persona está grabando, no se va sin parar: la grabación se
@@ -497,7 +503,7 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
     // «la tiene otro lado» de un corte anterior).
     olvidarSalaSoltada(roomName);
     lk.disconnect(); onLeave(); if (!suppressLeaveToast) toast.info(t("messenger.callView.llamadaFinalizada"));
-  }, [lk, onLeave, suppressLeaveToast, roomName, t]);
+  }, [lk.disconnect, onLeave, suppressLeaveToast, roomName, t]);
 
   // Una acción de moderación puede volver con 403 del servidor (no eres
   // anfitrión, o intentás moderar al anfitrión): mostramos el motivo. Con el
@@ -519,9 +525,9 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
     [runModeration],
   );
 
-  const handleAudioInputChange = useCallback((id: string) => { setAudioInputId(id); lk.switchAudioInput?.(id); }, [lk]);
-  const handleAudioOutputChange = useCallback((id: string) => { setAudioOutputId(id); lk.switchAudioOutput?.(id); }, [lk]);
-  const handleVideoInputChange = useCallback((id: string) => { setVideoInputId(id); lk.switchVideoInput?.(id); }, [lk]);
+  const handleAudioInputChange = useCallback((id: string) => { setAudioInputId(id); lk.switchAudioInput?.(id); }, [lk.switchAudioInput]);
+  const handleAudioOutputChange = useCallback((id: string) => { setAudioOutputId(id); lk.switchAudioOutput?.(id); }, [lk.switchAudioOutput]);
+  const handleVideoInputChange = useCallback((id: string) => { setVideoInputId(id); lk.switchVideoInput?.(id); }, [lk.switchVideoInput]);
 
   const handlePinParticipant = useCallback((sid: string) => {
     setPinnedSid((prev) => prev === sid ? null : sid);
@@ -629,7 +635,7 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
     mirar();
     const id = window.setInterval(mirar, 1000);
     return () => window.clearInterval(id);
-  }, [lk]);
+  }, [lk.getRoom]);
   const onLocalScreenTrackRef = useRef(onLocalScreenTrack);
   onLocalScreenTrackRef.current = onLocalScreenTrack;
   useEffect(() => { onLocalScreenTrackRef.current?.(localScreenTrack); }, [localScreenTrack]);
@@ -669,7 +675,7 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
       eventos.forEach((e) => room.off(e, aplicar));
       try { room.localParticipant.setTrackSubscriptionPermissions(true); } catch { /* ya colgó */ }
     };
-  }, [pantallaSoloParaMi, salaLista, lk, quienesVen]);
+  }, [pantallaSoloParaMi, salaLista, lk.getRoom, quienesVen]);
   // PANTALLA PRESTADA (Alvaro, 18/11/2026): el supervisor que entra a la sala de
   // un chatter le muestra la pantalla que ya comparte en el Hub, sin pedir otra.
   // Se publica un CLON (el original sigue en el Hub) y se retira al apagarla, al
@@ -691,7 +697,7 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
       try { room.localParticipant.unpublishTrack(clon, true); } catch { /* ya colgó */ }
       try { clon.stop(); } catch { /* noop */ }
     };
-  }, [pantallaPrestada, salaLista, lk]);
+  }, [pantallaPrestada, salaLista, lk.getRoom]);
   // La lista se sigue usando para DIBUJAR (el tile de pantalla), que es su
   // trabajo. Para decidir si se le reclama a alguien, manda el estado real.
   const localScreenShare = compartiendoReal;
@@ -793,7 +799,7 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
     buscar();
     const id = window.setInterval(buscar, 1000);
     return () => window.clearInterval(id);
-  }, [lk, localCamOn, lk.connectionState]);
+  }, [lk.getRoom, localCamOn, lk.connectionState]);
   // `enabled` NO incluye localCamOn: con la cámara apagada queremos que reporte
   // `cam_off`, no que se congele en el último estado.
   const faceWatch = useFaceWatch(localCameraTrack, !!onFaceStateChange && camaraRealOn);

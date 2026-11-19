@@ -4,6 +4,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useMonitorEstado } from "@/hooks/useMonitorEstado";
 import type { FaceWatch } from "@/hooks/useFaceWatch";
 import { debePreguntarIA } from "@/lib/ojoDeIA";
+import { lienzoAJpegBase64 } from "@/lib/jpegSinTrabas";
 
 // Argos — ESCALERA de muestreo + grabación al distraerse (Alvaro, 08/11/2026).
 //
@@ -61,7 +62,8 @@ async function capturarJPEG(track: MediaStreamTrack, maxAncho = 640, calidad = 0
         canvas.width = w; canvas.height = h;
         canvas.getContext("2d")!.drawImage(video, 0, 0, w, h);
         limpiar();
-        resolve(canvas.toDataURL("image/jpeg", calidad).split(",")[1] || null);
+        // toBlob, no toDataURL: el JPEG se codifica fuera del hilo principal.
+        lienzoAJpegBase64(canvas, calidad).then((b64) => resolve(b64 || null), () => resolve(null));
       } catch { limpiar(); resolve(null); }
     };
     video.play().catch(() => {});
