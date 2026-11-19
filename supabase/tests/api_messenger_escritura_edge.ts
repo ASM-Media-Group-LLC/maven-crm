@@ -167,6 +167,10 @@ const NO_CARGAN_AQUI: Record<string, string> = {
     "Cowork: un episodio de «fuera de Cowork» no se pisa con el anterior (mismo vigía, solo cambia desde). " +
     "Entra a esta cadena solo porque su vigía inserta avisos en notifications, pero usa las tablas del reloj de " +
     "Cowork y es_admin_o_dueno, que este fixture no trae; no toca nada del Messenger.",
+  "20261119011000_calidad_de_llamadas.sql":
+    "Llamadas: el tablero de calidad del dueño y el aviso de audio malo. Usa llamada_salud y llamada_num " +
+    "(salud_de_llamada, que tampoco carga aquí), destinatarios_de_aviso y pg_cron; se prueba en " +
+    "supabase/tests/calidad_de_llamadas.ts. No toca nada del Messenger.",
   "20261111080000_salud_de_llamada.sql":
     "Llamadas: por qué se cae la llamada (llamada_salud, diagnóstico y aviso a la persona y su supervisor). " +
     "Entra a esta cadena solo porque su vigía inserta avisos en notifications, pero usa es_admin_o_dueno, " +
