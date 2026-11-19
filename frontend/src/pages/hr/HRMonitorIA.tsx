@@ -24,6 +24,7 @@ import { ArgosPanelDia } from "@/components/hr/ArgosPanelDia";
 import { ArgosHistorial } from "@/components/hr/ArgosHistorial";
 import { LlamadasPanel } from "@/components/hr/LlamadasPanel";
 import { TableroCalidadLlamadas } from "@/components/hr/TableroCalidadLlamadas";
+import { HistorialHubPanel } from "@/components/hr/HistorialHubPanel";
 import { useEsDueno } from "@/hooks/useEsDueno";
 import { EstadoPanel } from "@/components/hr/EstadoPanel";
 import { ArgosAjustesContenido } from "@/pages/hr/ArgosAjustes";
@@ -146,10 +147,11 @@ export default function HRMonitorIA() {
   // perfil y pulsar atrás. Mapeamos los nombres viejos (panel/equipo/envivo/
   // historial) a los nuevos para no romper links guardados.
   //   · Llamadas (13/11/2026) = a quién se le corta la llamada hoy y por qué.
-  type TabArgos = "donde" | "ahora" | "dia" | "llamadas" | "ajustes";
+  //   · Historial del Hub (19/11/2026) = qué quitaron los supervisores, cuándo y por qué.
+  type TabArgos = "donde" | "ahora" | "dia" | "llamadas" | "hub" | "ajustes";
   const [searchParams, setSearchParams] = useSearchParams();
   const VIEJO_A_NUEVO: Record<string, TabArgos> = {
-    donde: "donde", ahora: "ahora", dia: "dia", llamadas: "llamadas", ajustes: "ajustes",
+    donde: "donde", ahora: "ahora", dia: "dia", llamadas: "llamadas", hub: "hub", ajustes: "ajustes",
     equipo: "ahora", envivo: "ahora", panel: "dia", historial: "dia", resumen: "dia", atencion: "ahora",
   };
   const tabURL = searchParams.get("t");
@@ -192,6 +194,7 @@ export default function HRMonitorIA() {
           { k: "dia", label: t("hr.monia.tab.dia") },
           { k: "ahora", label: t("hr.monia.tab.ahora") },
           { k: "llamadas", label: t("hr.monia.tab.llamadas") },
+          { k: "hub", label: t("hr.monia.tab.hub") },
           ...(isAdmin ? [{ k: "ajustes" as TabArgos, label: t("hr.monia.tab.ajustes") }] : []),
         ];
         return (
@@ -244,6 +247,14 @@ export default function HRMonitorIA() {
           {/* ¿Las llamadas mejoran? Solo el dueño (18/11/2026). */}
           {esDueno === true && <TableroCalidadLlamadas />}
           <LlamadasPanel />
+        </div>
+      )}
+
+      {/* HISTORIAL DEL HUB — cada vez que un supervisor quitó la pantalla, apagó
+          la cámara o salió del Hub, con la causa: a propósito o falla (19/11/2026). */}
+      {tab === "hub" && (
+        <div className="mt-5">
+          <HistorialHubPanel />
         </div>
       )}
 

@@ -3,11 +3,28 @@
 // dueño se entere a los 2 minutos, con la causa, si se sale, apaga la cámara o
 // deja de compartir. Lo usa LiveKitCallView solo en la llamada del Hub.
 import { useEffect, useRef, useState } from "react";
+import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { useLanguage } from "@/hooks/useLanguage";
+import type { TranslationKey } from "@/lib/i18n";
 import type { ConexionSala } from "@/lib/coworkTiempoRegla";
 import type { FalloDePantalla } from "@/lib/fallosDePantalla";
 import { vigilarPantallaNegra } from "@/lib/pantallaNegra";
-import { despedirseDelHub, estadoDePantallaDelHub, mandarSenalDelHub, SENAL_CADA_MS, type SenalDelHub } from "@/lib/senalDelHub";
+import {
+  AVISO_ANOTADO_MS, cambiosAnotados, despedirseDelHub, estadoDePantallaDelHub, mandarSenalDelHub, SENAL_CADA_MS,
+  type CambioAnotado, type SenalDelHub,
+} from "@/lib/senalDelHub";
+
+const TEXTO_ANOTADO: Record<CambioAnotado | "salida", TranslationKey> = {
+  pantalla: "cowork.hubAnotado.pantalla",
+  camara: "cowork.hubAnotado.camara",
+  salida: "cowork.hubAnotado.salida",
+};
+
+/** El aviso discreto: abajo a la derecha, sin sonido, se va solo a los 6 s. */
+function avisarAnotado(texto: string, cual: CambioAnotado | "salida") {
+  toast(texto, { id: `hub-anotado-${cual}`, duration: AVISO_ANOTADO_MS, position: "bottom-right" });
+}
 
 export interface EntradaHubDelSupervisor {
   /** null = no es el Hub de un supervisor vigilado: no hace nada. */
@@ -25,6 +42,9 @@ export interface EntradaHubDelSupervisor {
 
 export function useHubDelSupervisor(e: EntradaHubDelSupervisor): { negra: boolean } {
   const activo = !!e.sessionId;
+  const { t } = useLanguage();
+  const tRef = useRef(t);
+  tRef.current = t;
   const [negra, setNegra] = useState(false);
   const alQuedarNegraRef = useRef(e.alQuedarNegra);
   alQuedarNegraRef.current = e.alQuedarNegra;
@@ -66,6 +86,16 @@ export function useHubDelSupervisor(e: EntradaHubDelSupervisor): { negra: boolea
   const tokenRef = useRef<string | null>(null);
   const clave = senal ? `${senal.camOn}|${senal.pantalla}|${senal.conexion}|${senal.enPausa}` : "";
 
+  // 2b) Lo que quitó él mismo: se le dice con calma que queda anotado, en el
+  //     mismo momento en que la señal lo anota en la base.
+  const antesRef = useRef<SenalDelHub | null>(null);
+  useEffect(() => {
+    if (!activo || !senal) { antesRef.current = null; return; }
+    for (const c of cambiosAnotados(antesRef.current, { ...senal, enPausa: e.enPausa() })) avisarAnotado(tRef.current(TEXTO_ANOTADO[c]), c);
+    antesRef.current = senal;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activo, clave]);
+
   useEffect(() => {
     if (!activo) return;
     const mandar = () => {
@@ -89,8 +119,9 @@ export function useHubDelSupervisor(e: EntradaHubDelSupervisor): { negra: boolea
     window.addEventListener("pagehide", despedir);
     return () => {
       window.removeEventListener("pagehide", despedir);
-      // Se desmonta la llamada del Hub (colgó o cambió de sesión).
+      // Se desmonta la llamada del Hub (colgó o cambió de sesión): salió él.
       despedir();
+      avisarAnotado(tRef.current(TEXTO_ANOTADO.salida), "salida");
     };
   }, [activo]);
 

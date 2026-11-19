@@ -866,4 +866,8 @@ export const cowork = {
   "cowork.hubEstado.permiso_pantalla": { es: "Sin permiso de pantalla", en: "No screen permission" },
   "cowork.hubEstado.pantalla_falla": { es: "Falla al compartir", en: "Sharing failed" },
   "cowork.hubEstado.pantalla_sin_compartir": { es: "No comparte", en: "Not sharing" },
+  // El aviso discreto al supervisor cuando él mismo quita algo (19/11/2026).
+  "cowork.hubAnotado.pantalla": { es: "Quitaste la pantalla compartida. Queda anotado en el historial del Hub.", en: "You stopped sharing your screen. It's noted in the Hub history." },
+  "cowork.hubAnotado.camara": { es: "Apagaste la cámara. Queda anotado en el historial del Hub.", en: "You turned your camera off. It's noted in the Hub history." },
+  "cowork.hubAnotado.salida": { es: "Saliste del Supervisor Hub. Queda anotado en el historial del Hub.", en: "You left the Supervisor Hub. It's noted in the Hub history." },
 } as const satisfies Record<string, { es: string; en: string }>;
