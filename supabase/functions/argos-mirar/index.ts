@@ -1,6 +1,19 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { encodeBase64 } from "jsr:@std/encoding@1/base64";
+import {
+  camposArgos,
+  type Chica,
+  configEmbudo,
+  despuesDeChica,
+  type FiltroFoto,
+  type Paso,
+  parsearChica,
+  pasoInicial,
+  presupuestoDe,
+  type Salto,
+  saltoSinPresupuesto,
+} from "./embudo.ts";
 
 // argos-mirar — el CEREBRO de la muralla en vivo de Argos (Álvaro, 01/11).
 //
@@ -25,6 +38,15 @@ import { encodeBase64 } from "jsr:@std/encoding@1/base64";
 // apagado, veredicto fresco cada REJUZGAR_MIN); OpenRouter y Anthropic de
 // respaldo (muertas desde el 01/10; reviven solas con llave nueva). Huella en
 // argos_diag. Costo estimado del ritmo por defecto: ~$1–2/día con ~20 personas.
+//
+// EL EMBUDO (Alvaro, 19/11/2026: «prender ya así»; detalle en embudo.ts y en la
+// migración 20261119083000_argos_embudo_prendido). Antes de pagar la mirada
+// detallada, cada foto pasa por: 1) ¿cambió la pantalla? (huella) → copia;
+// 2) app de la lista aprobada → trabajo; 3) IA chica (Flash-Lite, resolución
+// baja) sí/no/no sé → «sí» es trabajo; 4) Argos detallado para «no», «no sé» y
+// una revisión al azar (10 %). Cada fila dice quién decidió (juzgada_por).
+// TOPE: monitor_config.argos_tope_dia_usd (USD 1,50/día) nunca se pasa.
+// Interruptor: monitor_config.argos_filtros_activos=false → todo a Argos detallado.
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -37,6 +59,8 @@ const MODELO_OPENROUTER = Deno.env.get("MONITOR_LLM_MODEL") ?? "openai/gpt-4o-mi
 const MODELO_ANTHROPIC = Deno.env.get("ARGOS_ANTHROPIC_MODEL") ?? "claude-haiku-4-5";
 // gemini-2.5-flash quedó cerrado para cuentas nuevas (404 el 02/11): va el 3.8.
 const MODELO_GEMINI = Deno.env.get("ARGOS_GEMINI_MODEL") ?? "gemini-3.8-flash";
+// La IA chica del embudo: el mismo Flash-Lite que ya usa la cámara (monitor-vision).
+const MODELO_CHICA = Deno.env.get("ARGOS_GEMINI_CHICA") ?? Deno.env.get("MONITOR_GEMINI_MODEL") ?? "gemini-3.1-flash-lite";
 const LLM_TIMEOUT_MS = 20_000;
 const VENTANA_MIN = 7;
 // Ritmo (Alvaro, 13/11/2026): fotos cada ~1 min y la IA revisa 1 de cada 2 → a
@@ -99,6 +123,17 @@ REGLAS:
 - Español neutro, sin voseo, máximo una frase en "actividad".`;
 }
 
+/** La pregunta de la IA chica: una sola palabra, con el contexto de la empresa. */
+function armarPromptChica(c: Contexto): string {
+  return `Miras un pantallazo del computador de una persona que trabaja en ${c.descripcion.trim() || CONTEXTO_GENERICO.descripcion}
+Juzga SOLO qué aplicación o sitio se ve, nunca el contenido.
+Trabajo: ${c.es_trabajo.trim() || CONTEXTO_GENERICO.es_trabajo}
+No es trabajo: ${c.fuera_de_lugar.trim() || CONTEXTO_GENERICO.fuera_de_lugar}
+¿Lo que se ve es una herramienta de trabajo de esta empresa?
+Devuelve SOLO este JSON: { "trabajo": "si" | "no" | "no_se", "sistema": "nombre corto de la app o sitio" }
+"si" solo si es evidente que es trabajo; "no" solo si es evidente que no lo es; ante cualquier duda, "no_se".`;
+}
+
 interface Veredicto {
   sistema: string;
   actividad: string;
@@ -155,6 +190,52 @@ async function pedirGemini(prompt: string, b64: string): Promise<Respuesta> {
     return text ? { text } : { error: `vacio (${data.candidates?.[0]?.finishReason ?? "?"})`, reintentable: true };
   } catch (e) {
     return { error: (e as Error).name === "AbortError" ? "timeout" : (e as Error).message, reintentable: true };
+  }
+}
+
+// La IA chica pide la imagen en resolución baja (menos tokens = más barata). Si
+// el modelo no acepta el campo, se vuelve a pedir sin él y no se insiste.
+let chicaSinResolucionBaja = false;
+
+async function pedirChica(prompt: string, b64: string): Promise<Respuesta> {
+  if (!GEMINI_API_KEY) return { error: "sin-llave" };
+  const pedir = async (baja: boolean) => {
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(MODELO_CHICA)}:generateContent?key=${GEMINI_API_KEY}`;
+    return await conTimeout(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: prompt }, { inline_data: { mime_type: "image/jpeg", data: b64 } }] }],
+        generationConfig: {
+          temperature: 0,
+          maxOutputTokens: 60,
+          responseMimeType: "application/json",
+          thinkingConfig: { thinkingBudget: 0 },
+          ...(baja ? { mediaResolution: "MEDIA_RESOLUTION_LOW" } : {}),
+        },
+        safetySettings: [
+          { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_NONE" },
+          { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_NONE" },
+          { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_NONE" },
+          { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_NONE" },
+        ],
+      }),
+    });
+  };
+  try {
+    let resp = await pedir(!chicaSinResolucionBaja);
+    if (resp.status === 400 && !chicaSinResolucionBaja) {
+      const cuerpo = await resp.text().catch(() => "");
+      if (!/media.?resolution/i.test(cuerpo)) return { error: `400: ${cuerpo.slice(0, 200)}` };
+      chicaSinResolucionBaja = true;
+      resp = await pedir(false);
+    }
+    if (!resp.ok) return { error: await cuerpoError(resp) };
+    const data = await resp.json() as { candidates?: Array<{ content?: { parts?: Array<{ text?: string }> }; finishReason?: string }> };
+    const text = data.candidates?.[0]?.content?.parts?.map((p) => p.text ?? "").join("") ?? "";
+    return text ? { text } : { error: `vacio (${data.candidates?.[0]?.finishReason ?? "?"})` };
+  } catch (e) {
+    return { error: (e as Error).name === "AbortError" ? "timeout" : (e as Error).message };
   }
 }
 
@@ -293,8 +374,12 @@ Deno.serve(async (req: Request) => {
   if (!OPENROUTER_API_KEY && !ANTHROPIC_API_KEY && !GEMINI_API_KEY) { await diag("sin_llaves"); return json({ ok: false, error: "no-key" }, 503); }
 
   // 2) Monitor apagado → no se gasta IA.
-  const { data: cfg } = await admin.from("monitor_config").select("activo").eq("id", 1).maybeSingle();
+  //    select * a propósito: si la migración del embudo aún no está, no rompe y
+  //    el embudo queda apagado (todo a Argos detallado, como antes).
+  const { data: cfg } = await admin.from("monitor_config").select("*").eq("id", 1).maybeSingle();
   if (cfg && cfg.activo === false) { await diag("apagado"); return json({ ok: true, analizadas: 0, skip: "off" }); }
+  const cfgFila = cfg as Record<string, unknown> | null;
+  const embudo = configEmbudo(cfgFila);
 
   // 3) Pantallazos recientes SIN veredicto; el más reciente de cada persona; se
   //    saltan las personas juzgadas hace menos de REJUZGAR_MIN (cuota).
@@ -340,11 +425,33 @@ Deno.serve(async (req: Request) => {
   }
   const contextoDe = new Map<string, Contexto>();
   for (const c of (contextos ?? []) as Array<Contexto & { tenant_id: string }>) contextoDe.set(c.tenant_id, c);
-  const promptDe = (userId: string): string => {
+  const contextoDeUsuario = (userId: string): Contexto => {
     const t = tenantDe.get(userId);
-    return armarPrompt((t && contextoDe.get(t)) || CONTEXTO_GENERICO);
+    return (t && contextoDe.get(t)) || CONTEXTO_GENERICO;
   };
+  const promptDe = (userId: string): string => armarPrompt(contextoDeUsuario(userId));
   await diag("contexto", { empresas: contextoDe.size, con_empresa: ids.filter((id) => tenantDe.has(id)).length, sin_empresa: ids.filter((id) => !tenantDe.has(id)).length });
+
+  // 4b) El embudo: filtros 1 y 2 (gratis) para todas las fotos de la ronda, en
+  //     una sola consulta. Si falla, nada se salta (van a la IA chica / Argos).
+  const filtros = new Map<string, FiltroFoto>();
+  if (embudo.activos) {
+    const { data: fs, error: fErr } = await admin.rpc("argos_embudo_filtros", { p_ids: pendientes.map((f) => f.id) });
+    if (fErr) await diag("embudo_error", { error: fErr.message });
+    for (const r of (fs ?? []) as FiltroFoto[]) filtros.set(r.id, r);
+  }
+  // 4c) El tope del día: lo gastado hoy (solo con la migración puesta). Si la
+  //     consulta falla y hay tope, se toma como alcanzado: no se gasta a ciegas.
+  let gastoHoy: Record<string, unknown> | null = null;
+  if (embudo.listo) {
+    const { data: g, error: gErr } = await admin.rpc("argos_gasto_hoy");
+    if (gErr) await diag("tope_error", { error: gErr.message });
+    else gastoHoy = g as Record<string, unknown>;
+  }
+  const { presupuesto, precioFoto, precioChica } = presupuestoDe(gastoHoy, embudo.listo ? cfgFila : null);
+  await diag("embudo", { activo: embudo.activos, azar: embudo.azar, filtradas: filtros.size, gasto_hoy: presupuesto.usd, tope: presupuesto.tope, ahorro: presupuesto.ahorro });
+  const etapas: Record<string, number> = {};
+  const contar = (k: string) => { etapas[k] = (etapas[k] ?? 0) + 1; };
 
   // 5) Juzgar las fotos una a una con pausa corta. El primer
   //    proveedor que responde se queda para el resto de la ronda. Un 429/vacío se
@@ -372,22 +479,87 @@ Deno.serve(async (req: Request) => {
     return null;
   };
 
+  /** IA chica: null si no respondió o no se entendió (entonces decide Argos). */
+  const juzgarChica = async (c: Contexto, b64: string): Promise<Chica | null> => {
+    const r = await pedirChica(armarPromptChica(c), b64);
+    if ("error" in r) { fallas.gemini_chica = r.error; return null; }
+    const v = parsearChica(r.text);
+    if (!v) fallas.gemini_chica = `json-invalido: ${r.text.slice(0, 160)}`;
+    return v;
+  };
+
   let analizadas = 0;
+  let saltadas = 0;
+  let sinJuzgarPorTope = 0;
   const errores: string[] = [];
+
+  /** Escribe el veredicto que decidió el embudo, sin Argos detallado. */
+  const guardarSalto = async (f: Fila, s: Salto, extra: Record<string, unknown> = {}): Promise<void> => {
+    const { error: upErr } = await admin
+      .from("monitor_capturas")
+      .update({ veredicto: s.veredicto, fuera_de_lugar: s.fuera_de_lugar, analizado: true, juzgada_por: s.juzgada_por, filtro_decia: s.filtro_decia })
+      .eq("id", f.id);
+    if (upErr) { errores.push(`update: ${upErr.message}`); await diag("update_error", { id: f.id, error: upErr.message }); return; }
+    saltadas++;
+    contar(s.juzgada_por);
+    // La IA chica es una mirada real de Gemini: cuenta como «ok» (Gemini vivo).
+    if (s.juzgada_por === "ia_chica") {
+      await diag("ok", { id: f.id, user: f.user_id, proveedor: "gemini", etapa: "ia_chica", modelo: MODELO_CHICA, filtro_decia: s.filtro_decia, veredicto: s.veredicto, fuera: s.fuera_de_lugar, ...extra });
+    } else {
+      await diag("salto", { id: f.id, user: f.user_id, etapa: s.juzgada_por, fuera: s.fuera_de_lugar, ...extra });
+    }
+  };
+  // Sin fila de diag por foto (se reintenta cada ronda): solo se cuenta en «fin».
+  const sinPresupuesto = (etapa: string): void => {
+    sinJuzgarPorTope++;
+    contar(`tope_${etapa}`);
+  };
   // Si en la PRIMERA foto no responde ningún proveedor, se corta la ronda.
   let cortar = false;
   const procesar = async (f: (typeof pendientes)[number]): Promise<void> => {
+    // Filtros 1 y 2: sin bajar la foto ni llamar a ninguna IA.
+    let paso: Paso = pasoInicial(embudo, filtros.get(f.id), Math.random(), presupuesto.ahorro);
+    if (paso.tipo === "saltar") { await guardarSalto(f, paso.salto); return; }
+    // La primera mirada se reserva ANTES de bajar la foto: si no cabe en el
+    // tope, ni se baja. Si la bajada falla, la reserva se devuelve.
+    const reserva = paso.tipo === "ia_chica" ? precioChica : precioFoto;
+    if (!presupuesto.reservar(reserva)) {
+      const salto = paso.tipo === "argos" ? saltoSinPresupuesto(paso, null) : null;
+      if (salto) await guardarSalto(f, salto, { tope: true });
+      else sinPresupuesto(paso.tipo);
+      return;
+    }
     const ruta = f.en_nas ? f.nas_path : f.path;
-    if (!ruta) { errores.push("sin-ruta"); return; }
+    if (!ruta) { presupuesto.liberar(reserva); errores.push("sin-ruta"); return; }
     const dl = await admin.storage.from("monitor-capturas").download(ruta);
     if (dl.error || !dl.data) {
+      presupuesto.liberar(reserva);
       errores.push(`bajar: ${dl.error?.message ?? "vacio"}`);
       await diag("bajar_error", { id: f.id, ruta, error: dl.error?.message ?? null });
       return;
     }
     const bytes = new Uint8Array(await dl.data.arrayBuffer());
-    const res = await juzgar(promptDe(f.user_id), encodeBase64(bytes));
+    const b64 = encodeBase64(bytes);
+    // Filtro 3: la IA chica (ya reservada). «Sí» → listo; si no, a Argos detallado.
+    let chica: Chica | null = null;
+    if (paso.tipo === "ia_chica") {
+      chica = await juzgarChica(contextoDeUsuario(f.user_id), b64);
+      if (!chica) presupuesto.liberar(precioChica);
+      paso = despuesDeChica(embudo, chica, Math.random(), presupuesto.ahorro);
+      if (paso.tipo === "saltar") { await guardarSalto(f, paso.salto, { bytes: bytes.length }); return; }
+      // Filtro 4 después de la chica: Argos detallado solo si cabe en el tope.
+      // Si no cabe, queda lo que dijo la chica; si nadie la miró, sin juzgar.
+      if (paso.tipo === "argos" && !presupuesto.reservar(precioFoto)) {
+        const salto = saltoSinPresupuesto(paso, chica);
+        if (salto) await guardarSalto(f, salto, { bytes: bytes.length, tope: true });
+        else sinPresupuesto("argos");
+        return;
+      }
+    }
+    if (paso.tipo !== "argos") return;
+    const res = await juzgar(promptDe(f.user_id), b64);
     if (!res) {
+      presupuesto.liberar(precioFoto);
       errores.push("sin-proveedor");
       await diag("vision_error", { id: f.id, bytes: bytes.length, fallas });
       if (!proveedorVivo) cortar = true;
@@ -396,11 +568,12 @@ Deno.serve(async (req: Request) => {
     const veredicto = textoVeredicto(res.v);
     const { error: upErr } = await admin
       .from("monitor_capturas")
-      .update({ veredicto, fuera_de_lugar: res.v.fuera_de_lugar, analizado: true })
+      .update({ veredicto, fuera_de_lugar: res.v.fuera_de_lugar, analizado: true, ...camposArgos(embudo, paso) })
       .eq("id", f.id);
     if (upErr) { errores.push(`update: ${upErr.message}`); await diag("update_error", { id: f.id, error: upErr.message }); return; }
     analizadas++;
-    await diag("ok", { id: f.id, user: f.user_id, bytes: bytes.length, proveedor: res.proveedor, sistema: res.v.sistema, actividad: res.v.actividad, fuera: res.v.fuera_de_lugar });
+    contar(paso.juzgada_por);
+    await diag("ok", { id: f.id, user: f.user_id, bytes: bytes.length, proveedor: res.proveedor, etapa: paso.juzgada_por, filtro_decia: paso.filtro_decia, sistema: res.v.sistema, actividad: res.v.actividad, fuera: res.v.fuera_de_lugar });
   };
   if (pendientes.length > 0) {
     // La primera sola: fija el proveedor que responde. El resto, de a CONCURRENCIA.
@@ -417,6 +590,6 @@ Deno.serve(async (req: Request) => {
     if (!cortar) await Promise.all(Array.from({ length: CONCURRENCIA }, trabajador));
   }
 
-  await diag("fin", { via: esCron ? "cron" : "usuario", analizadas, proveedor: proveedorVivo, fallas, errores: errores.slice(0, 5) });
-  return json({ ok: true, analizadas, proveedor: proveedorVivo, fallas });
+  await diag("fin", { via: esCron ? "cron" : "usuario", analizadas, saltadas, sin_juzgar_tope: sinJuzgarPorTope, embudo: embudo.activos, etapas, gasto_hoy: presupuesto.usd, proveedor: proveedorVivo, fallas, errores: errores.slice(0, 5) });
+  return json({ ok: true, analizadas, saltadas, sin_juzgar_tope: sinJuzgarPorTope, etapas, proveedor: proveedorVivo, fallas });
 });

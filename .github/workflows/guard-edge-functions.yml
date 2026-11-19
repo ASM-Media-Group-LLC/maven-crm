@@ -123,6 +123,16 @@ jobs:
           deno run -A --node-modules-dir=none --no-lock supabase/tests/contacto_entre_chatters.ts
           deno test --allow-read supabase/functions/_shared/correo-primer-contacto.test.ts
 
+      # El embudo de Argos prendido (Alvaro, 19/11): huella → lista → IA chica →
+      # Argos detallado, escritorio remoto nunca por el nombre, el tope del día y
+      # el saldo que solo cobra las miradas de verdad. Y el embudo, con tipos
+      # (index.ts no: edge-runtime.d.ts pide npm:openai y en CI no hay node_modules).
+      - name: Banco — embudo de Argos (PGlite) y embudo con tipos
+        if: steps.cambios.outputs.correr == 'true'
+        run: |
+          deno run -A --node-modules-dir=none --no-lock supabase/tests/argos_embudo.ts
+          deno check supabase/functions/argos-mirar/embudo.ts
+
       - name: Tipos — mail-fetch
         if: steps.cambios.outputs.correr == 'true'
         run: deno check supabase/functions/mail-fetch/index.ts supabase/functions/mail-fetch/programados.test.ts supabase/functions/mail-fetch/reacciones.test.ts
