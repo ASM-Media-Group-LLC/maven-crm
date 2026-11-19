@@ -96,10 +96,24 @@ export async function servirCreadoras(ctx: ContextoDeCreadoras): Promise<Respues
       name: n.name, artistic_name: n.artistic_name, email: n.email, status: n.status, tenant_id: ctx.agencia,
     }).select("id").single();
     if (e) throw e;
-    const problema = await ponerCuenta(ctx, nueva.id, n.cuenta);
-    if (problema) {
-      // Sin su cuenta no se deja la creadora a medias.
+    // Sin su cuenta no se deja la creadora a medias — TAMBIÉN si ponerCuenta
+    // lanza (19/11/2026: el insert fallaba, la limpieza no corría, y cada
+    // reintento de Backstage dejaba otra creadora sin ID: Loveratho ×4).
+    let problema: RespuestaDeCreadoras | null;
+    try {
+      problema = await ponerCuenta(ctx, nueva.id, n.cuenta);
+    } catch (falla) {
       await ctx.admin.from("creators").delete().eq("id", nueva.id).eq("tenant_id", ctx.agencia);
+      throw falla;
+    }
+    if (problema) {
+      await ctx.admin.from("creators").delete().eq("id", nueva.id).eq("tenant_id", ctx.agencia);
+      // Dos POST iguales a la vez: el segundo pierde en el índice único del ID de
+      // OnlyFans. No es un error: se devuelve la que ganó (idempotente).
+      const ganadora = await cuentaPorId(ctx, n.cuenta.onlyfans_id);
+      if (ganadora && !ganadora.ajena) {
+        return { estado: 200, cuerpo: { object: "creator", created: false, data: await ctx.leer(ganadora.creator_id) } };
+      }
       return problema;
     }
     return { estado: 201, cuerpo: { object: "creator", created: true, data: await ctx.leer(nueva.id) } };

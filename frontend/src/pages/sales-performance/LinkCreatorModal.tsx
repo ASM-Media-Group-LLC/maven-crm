@@ -60,7 +60,8 @@ const LinkCreatorModal = ({ open, onOpenChange, pendingCreator, earningsRowId }:
       if (accountsRes.data) {
         for (const acc of accountsRes.data as any[]) {
           const list = accountsByCreator.get(acc.creator_id) || [];
-          list.push(acc.account_handle);
+          // Desde el 19/11 una cuenta puede venir sin usuario (solo el ID de OnlyFans).
+          if (acc.account_handle) list.push(acc.account_handle);
           accountsByCreator.set(acc.creator_id, list);
         }
       }
