@@ -519,12 +519,18 @@ All colors MUST be HSL. Light mode in :root, dark mode in .dark.
 }
 
 /* Sidebar glass hover effect */
+/* Sin animación del botón activo (Alvaro, 19/11: «al pasar de Cowork a Argos
+   el botón rebota, como si agarrara los dos»). Con transition-all la barrita
+   se desvanecía 200 ms de un botón al otro — y si la página nueva tardaba en
+   montar, los dos se veían prendidos a medias. Ahora el cambio es instantáneo;
+   solo el color del texto al pasar el mouse se suaviza. Tampoco va
+   backdrop-filter aquí: un vidrio dentro del vidrio del riel parpadea en Chrome. */
 .sidebar-glass-hover {
-  @apply transition-all duration-200 border border-transparent text-foreground/85;
+  @apply border border-transparent text-foreground/85;
+  transition: color 120ms ease;
 }
 .sidebar-glass-hover:hover {
   background: linear-gradient(135deg, hsl(var(--primary) / 0.08), hsl(var(--accent) / 0.08));
-  backdrop-filter: blur(12px);
   border-color: hsl(0 0% 100% / 0.06);
   /* Keep the label readable on the tinted background — the previous
      value let it inherit muted foreground which made the text disappear
