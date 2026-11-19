@@ -60,8 +60,9 @@ function tiposFallaDe(p: PersonaTurno): TipoFalla[] {
   const out: TipoFalla[] = [];
   if ((p.atencionPct ?? sub("atencion") ?? 100) < 95) out.push("fuera");
   // Cámara y pantalla: sobre el tiempo CONECTADO (18/11/2026), como las barras.
-  if ((p.camaraPct ?? 100) < BAJO_DESDE) out.push("camara");
-  if ((p.pantallaPct ?? 100) < BAJO_DESDE) out.push("pantalla");
+  // Si su puesto no se califica en cámara/pantalla, no es falla.
+  if (p.califica && (p.camaraPct ?? 100) < BAJO_DESDE) out.push("camara");
+  if (p.califica && (p.pantallaPct ?? 100) < BAJO_DESDE) out.push("pantalla");
   return out;
 }
 const FLAG_LBL: Record<TipoFalla, TranslationKey> = { fuera: "hr.hist.flagFuera", camara: "hr.hist.flagCamara", pantalla: "hr.hist.flagPantalla" };
@@ -76,14 +77,14 @@ function fallasDe(p: PersonaTurno, t: Tr): string[] {
 // «bajo» desde menos de 80 %): la barra siempre en el color de Maven; lo que va
 // bajo lleva un puntito ámbar junto a la cifra.
 const BAJO_DESDE = 80;
-function Barra({ label, valor }: { label: string; valor: number | null }) {
+function Barra({ label, valor, cuenta = true }: { label: string; valor: number | null; cuenta?: boolean }) {
   const v = valor == null ? null : Math.max(0, Math.min(100, valor));
-  const bajo = v != null && v < BAJO_DESDE;
+  const bajo = cuenta && v != null && v < BAJO_DESDE;
   return (
     <div className="flex items-center gap-2 text-[11px]">
       <span className="w-[4.5rem] shrink-0 truncate text-muted-foreground">{label}</span>
       <span className="h-1.5 min-w-0 flex-1 overflow-hidden rounded-full bg-foreground/10">
-        <span className={`block h-full rounded-full ${v == null ? "bg-muted-foreground/30" : "bg-primary/70"}`} style={{ width: `${v ?? 0}%` }} />
+        <span className={`block h-full rounded-full ${v == null ? "bg-muted-foreground/30" : cuenta ? "bg-primary/70" : "bg-muted-foreground/45"}`} style={{ width: `${v ?? 0}%` }} />
       </span>
       <span className="flex w-11 shrink-0 items-center justify-end gap-1 tabular-nums text-foreground/85">
         {bajo && <span className="h-1.5 w-1.5 rounded-full bg-warning" aria-hidden />}
@@ -123,9 +124,10 @@ function PersonaTarjeta({ p, t, onClick }: { p: PersonaTurno; t: Tr; onClick: ()
         </div>
       </div>
       <div className="flex flex-col gap-1.5">
-        <Barra label={t("hr.resumen.pantalla")} valor={p.pantallaPct ?? f("pantalla")} />
-        <Barra label={t("hr.resumen.camara")} valor={p.camaraPct ?? f("camara")} />
+        <Barra label={t("hr.resumen.pantalla")} valor={p.pantallaPct ?? f("pantalla")} cuenta={p.califica} />
+        <Barra label={t("hr.resumen.camara")} valor={p.camaraPct ?? f("camara")} cuenta={p.califica} />
         <Barra label={t("hr.resumen.atencion")} valor={p.atencionPct ?? f("atencion")} />
+        {!p.califica && <p className="text-[10px] text-muted-foreground">{t("hr.hist.noCuentaPuesto")}</p>}
       </div>
       {fallas.length > 0 && (
         <div className="flex flex-wrap gap-1.5">

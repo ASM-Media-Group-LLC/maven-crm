@@ -1067,7 +1067,7 @@ export const hr = {
   "hr.donde.ultimaHace": { es: "Última {h} · {d}", en: "Last {h} · {d}" },
   "hr.donde.escribeNombre": { es: "Escribe un nombre…", en: "Type a name…" },
   "hr.donde.nadieConEseNombre": { es: "Nadie con ese nombre.", en: "No one with that name." },
-  "hr.donde.todosAZ": { es: "Todos, de la A a la Z · {n}", en: "Everyone, A to Z · {n}" },
+  "hr.donde.todosAZ": { es: "De la A a la Z · {n}", en: "A to Z · {n}" },
   "hr.donde.verTodos": { es: "Quitar y ver a todos", en: "Clear and see everyone" },
   "hr.donde.filtro.all": { es: "Todos", en: "All" },
   "hr.donde.filtro.fuera": { es: "Fuera de Cowork", en: "Out of Cowork" },
@@ -1633,6 +1633,7 @@ export const hr = {
   // ─── Argos › Llamadas (13/11/2026): a quién se le corta la llamada hoy y por qué ───
   "hr.monia.tab.llamadas": { es: "Llamadas", en: "Calls" },
   // Nota v3 (18/11/2026): las partes nuevas.
+  "hr.hist.noCuentaPuesto": { es: "Pantalla y cámara no cuentan en su nota: su puesto no se califica (Ajustes).", en: "Screen and camera don't count toward their score: their role isn't graded (Settings)." },
   "hr.nota.llamados": { es: "Llamados de Argos", en: "Argos warnings" },
   "hr.nota.puntualidad": { es: "Puntualidad", en: "Punctuality" },
   "hr.nota.puesto": { es: "En su puesto", en: "At their post" },
