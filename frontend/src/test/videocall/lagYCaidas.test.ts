@@ -21,7 +21,11 @@ describe("llamada estable con Maven en segundo plano", () => {
     }
   });
   it("⚠️ el latido de la conexión en vivo corre en un Worker", () => {
-    expect(fuentes["/frontend/src/integrations/supabase/client.ts"]).toContain(`realtime: { worker: typeof window !== "undefined" && typeof Worker !== "undefined" }`);
+    // Mismo freno, sin atarlo a una sola línea: el bloque realtime ahora también
+    // trae el latido de 10 s y su aviso (mensajes sin atraso, 19/11).
+    expect(fuentes["/frontend/src/integrations/supabase/client.ts"]).toMatch(
+      /realtime: \{[^}]*worker: typeof window !== "undefined" && typeof Worker !== "undefined"[^}]*\}/,
+    );
   });
 });
 
