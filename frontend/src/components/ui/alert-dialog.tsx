@@ -26,12 +26,15 @@ const AlertDialogOverlay = React.forwardRef<
 ));
 AlertDialogOverlay.displayName = AlertDialogPrimitive.Overlay.displayName;
 
+// `container`: dónde se dibuja (p. ej. el documento de la ventana del sistema
+// de una llamada). `overlayClassName`: para subir el fondo por encima de una
+// ventana flotante con z-index alto. Los dos son opcionales.
 const AlertDialogContent = React.forwardRef<
   React.ElementRef<typeof AlertDialogPrimitive.Content>,
-  React.ComponentPropsWithoutRef<typeof AlertDialogPrimitive.Content>
->(({ className, ...props }, ref) => (
-  <AlertDialogPortal>
-    <AlertDialogOverlay />
+  React.ComponentPropsWithoutRef<typeof AlertDialogPrimitive.Content> & { container?: HTMLElement | null; overlayClassName?: string }
+>(({ className, container, overlayClassName, ...props }, ref) => (
+  <AlertDialogPortal container={container ?? undefined}>
+    <AlertDialogOverlay className={overlayClassName} />
     <AlertDialogPrimitive.Content
       ref={ref}
       className={cn(

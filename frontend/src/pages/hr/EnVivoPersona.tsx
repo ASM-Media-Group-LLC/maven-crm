@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { ArrowLeft, Loader2, Radio, RefreshCw, ShieldAlert } from "lucide-react";
 import { toast } from "sonner";
@@ -10,12 +10,11 @@ import { useLanguage } from "@/hooks/useLanguage";
 import { useVigilancia } from "@/hooks/useVigilancia";
 import { useEnVivoPersona, useFotoDeLaRazon } from "@/hooks/useEnVivoPersona";
 import { useObservadorEnVivo } from "@/hooks/useObservadorEnVivo";
-import { useVideoDeEsosMinutos } from "@/hooks/useVideoDeEsosMinutos";
 import { useRondinVivo } from "@/hooks/useRondinVivo";
 import { PUNTOS_VIVOS } from "@/lib/motivosVivos";
-import { EnVivoPersonaVista, type ModoEscenario } from "@/components/vigilancia/EnVivoPersonaVista";
+import { EnVivoPersonaVista } from "@/components/vigilancia/EnVivoPersonaVista";
 import { EscenarioEnVivo } from "@/components/vigilancia/EscenarioEnVivo";
-import { VideoDeEsosMinutosVista } from "@/components/vigilancia/VideoDeEsosMinutos";
+import { useDondeEsta } from "@/hooks/useDondeEsta";
 import AvisarleDialogo from "@/components/vigilancia/AvisarleDialogo";
 
 // LA VISTA EN VIVO DE UNA PERSONA (Alvaro, 11/11/2026): /hr/en-vivo/:userId
@@ -27,14 +26,13 @@ import AvisarleDialogo from "@/components/vigilancia/AvisarleDialogo";
 // con la foto que lo disparó; abajo, su pantalla y su cámara EN VIVO (observador
 // oculto de su sala de Cowork, ver useObservadorEnVivo), con «Avisarle» (el aviso
 // de Cowork con la voz de Mario) y «Revisado ✓». Si la alerta ya se cerró o la
-// persona no está conectada, en lugar del en vivo sale el video de esos minutos.
+// persona no está conectada, el en vivo lo dice («No está en turno» fuera de
+// su horario). Desde el 19/11 solo hay en vivo: la foto y lo que pasó van al lado.
 //
 // La ven el dueño, RR. HH. y los supervisores (su equipo): la ruta pide
 // useVigilancia y la base vuelve a decidir persona por persona (puede_vigilar,
 // RLS de argos_alertas / monitor_capturas / argos_clips, y el edge del en vivo).
 
-/** Estados del observador en los que el en vivo no tiene nada que mostrar. */
-const SIN_VIVO = new Set(["esperando", "sin_cowork", "no_disponible", "sin_permiso"]);
 
 export default function EnVivoPersona() {
   const { userId = "" } = useParams();
@@ -50,35 +48,17 @@ export default function EnVivoPersona() {
 
   const { datos, cargando, error, reintentar } = useEnVivoPersona(userId || null, pedido);
   const razon = datos?.razon ?? null;
-  const abierta = !razon || (razon.fuente !== "clip" && razon.hasta == null);
 
-  // Modo: lo elige quien mira; si no, en vivo mientras siga pasando y el video
-  // cuando ya se cerró (o la persona no está conectada).
-  const [modoElegido, setModoElegido] = useState<ModoEscenario | null>(null);
-  useEffect(() => { setModoElegido(null); }, [userId, pedido.alertaId, pedido.fueraId, pedido.clipId]);
   const [escuchar, setEscuchar] = useState(false);
   const permitido = datos?.puedeVer !== false;
-  const observarActivo = permitido && !!datos && (modoElegido === "vivo" || (modoElegido === null && abierta));
+  // Siempre en vivo (Alvaro, 19/11: «quiero ver qué está haciendo cuando entro»).
+  const observarActivo = permitido && !!datos;
   const obs = useObservadorEnVivo(userId || null, observarActivo, escuchar);
-  // Si el en vivo no tiene nada que mostrar, se pasa al video y AHÍ se queda
-  // hasta que la persona aparezca de verdad en su sala: el observador vuelve a
-  // preguntar cada 45 s y, sin esto, cada «conectando…» saltaba al en vivo y de
-  // vuelta. El observador sigue escuchando detrás: si entra, vuelve solo.
-  const [cayoAlVideo, setCayoAlVideo] = useState(false);
-  useEffect(() => { setCayoAlVideo(false); }, [userId, pedido.alertaId, pedido.fueraId, pedido.clipId]);
-  useEffect(() => {
-    if (SIN_VIVO.has(obs.estado)) setCayoAlVideo(true);
-    else if (obs.estado === "en_vivo") setCayoAlVideo(false);
-  }, [obs.estado]);
-  const modo: ModoEscenario = modoElegido ?? (abierta && !cayoAlVideo && !SIN_VIVO.has(obs.estado) ? "vivo" : "video");
+  // ¿Está en su horario? Si no lo sabemos (falló la consulta), no se afirma nada.
+  const donde = useDondeEsta(permitido);
+  const filaDonde = donde.data?.find((f) => f.user_id === userId);
+  const noEnTurno = !!filaDonde && !filaDonde.en_turno;
 
-  const video = useVideoDeEsosMinutos(
-    userId || null,
-    razon?.desde ?? null,
-    razon ? razon.hasta : null,
-    razon?.fuente === "clip" ? razon.id : null,
-    modo === "video" && !!razon,
-  );
   const foto = useFotoDeLaRazon(razon?.capturaPath ?? null);
   const rondin = useRondinVivo(permitido);
   const persona = rondin.personas.find((p) => p.userId === userId);
@@ -160,8 +140,6 @@ export default function EnVivoPersona() {
           otras={datos?.otras ?? []}
           fotoRazon={foto.url}
           puntos={puntos ?? null}
-          modo={modo}
-          onModo={setModoElegido}
           t={t}
           lang={language}
           escenario={
@@ -174,17 +152,9 @@ export default function EnVivoPersona() {
               escuchar={escuchar}
               onEscuchar={setEscuchar}
               onReintentar={obs.reintentar}
+              noEnTurno={noEnTurno}
               t={t}
             />
-          }
-          video={
-            razon ? (
-              <VideoDeEsosMinutosVista video={video.video} cargando={video.cargando} error={video.error} onReintentar={video.reintentar} t={t} lang={language} />
-            ) : (
-              <div className="flex aspect-video w-full items-center justify-center rounded-panel bg-black/85 px-6 text-center text-sm text-white/75 ring-1 ring-white/10">
-                {t("vigilancia.video.sinRazon")}
-              </div>
-            )
           }
           acciones={{
             avisar: {
