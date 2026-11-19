@@ -38,6 +38,27 @@ export function estadoDePantallaDelHub(s: {
   return "sin_pedir";
 }
 
+/** Lo que el supervisor quitó ÉL MISMO entre una señal y otra (Alvaro,
+ *  19/11/2026): se le avisa con calma, en una esquina, que queda anotado en el
+ *  historial del Hub. Solo lo que hizo él: una pantalla que falló, llega en
+ *  negro o le falta el permiso no es «quitaste», y apagar la cámara al tomar
+ *  una pausa tampoco. */
+export type CambioAnotado = "pantalla" | "camara";
+
+export function cambiosAnotados(
+  antes: Pick<SenalDelHub, "camOn" | "pantalla"> | null,
+  ahora: Pick<SenalDelHub, "camOn" | "pantalla" | "enPausa">,
+): CambioAnotado[] {
+  if (!antes) return [];
+  const out: CambioAnotado[] = [];
+  if (antes.pantalla !== "apagada" && ahora.pantalla === "apagada") out.push("pantalla");
+  if (antes.camOn && !ahora.camOn && !ahora.enPausa) out.push("camara");
+  return out;
+}
+
+/** Cuánto se ve el aviso discreto. */
+export const AVISO_ANOTADO_MS = 6_000;
+
 /** Cada cuánto se repite la señal aunque no cambie nada (el vigía la da por
  *  muerta a los 90 s). */
 export const SENAL_CADA_MS = 30_000;
