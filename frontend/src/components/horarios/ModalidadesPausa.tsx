@@ -6,9 +6,9 @@ import { useLanguage } from "@/hooks/useLanguage";
 import { type Modalidad, useGuardarModalidad, useModalidades } from "@/hooks/usePausas";
 
 // LAS MODALIDADES DE PAUSA DE LA EMPRESA (Alvaro, 19/11/2026): «en mi empresa
-// van a haber 1 hora y de 30, 2 seteos». Las ve todo el que entra a Horarios
-// del equipo; solo el dueño y quien tenga N:pausas.modalidades (Admin) las crea
-// o les cambia los minutos. El baño es un cupo total por turno.
+// van a haber 1 hora y de 30, 2 seteos». Viven en Ajustes → Empresa: las crea
+// o cambia quien tenga N:empresa.configurar (hoy dueño y Admin). Cada puesto
+// trae una (Ajustes → Posiciones). El baño es un cupo total por turno.
 
 const CAMPO = "h-9 w-16 rounded-lg border border-input bg-background/50 px-2 text-sm tabular-nums text-foreground focus:outline-none focus:ring-1 focus:ring-primary/50";
 

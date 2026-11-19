@@ -100,7 +100,7 @@ export const posiciones = {
   "posiciones.c.revision_de_rrhh": { es: "Revisión de RR. HH.", en: "HR review" },
   "posiciones.c.horarios_y_pausas": { es: "Horarios y pausas", en: "Schedules and breaks" },
   "posiciones.c.gestionar_horario_y_pausa": { es: "Cambiar el horario y la pausa de su gente (nunca la propia, ni a admins ni al dueño)", en: "Change their people's schedule and break (never their own, nor admins or the owner)" },
-  "posiciones.c.crear_modalidades_de_pausa": { es: "Crear y cambiar las modalidades de pausa de la empresa", en: "Create and edit the company's break plans" },
+  "posiciones.c.configurar_la_empresa": { es: "Configurar la empresa (Ajustes → Empresa: modalidades de pausa y lo que es de toda la empresa)", en: "Configure the company (Settings → Company: break plans and company-wide settings)" },
   "posiciones.c.lo_que_argos_le_vigila": { es: "Lo que Argos le vigila", en: "What Argos watches" },
   "posiciones.c.vigilar_apps_ajenas": { es: "Se le vigilan las apps ajenas (alerta grave a la hora; su trabajo cabe en la lista)", en: "Watch non-work apps (serious alert after one hour; their work fits the list)" },
   "posiciones.c.juzgar_casos_de_argos": { es: "Juzgar los casos de Argos (cometió, no cometió, justificado)", en: "Judge Argos cases (did it, didn't, justified)" },
@@ -285,6 +285,6 @@ export const posiciones = {
   "posiciones.c.whatsapp": { es: "WhatsApp", en: "WhatsApp" },
   "posiciones.c.workspace": { es: "Workspace", en: "Workspace" },
   "posiciones.pausa": { es: "Pausa del puesto", en: "Position break plan" },
-  "posiciones.pausaDesc": { es: "Los minutos de almuerzo y baño pagados que trae este puesto. RR. HH. puede ponerle otra a una persona.", en: "The paid lunch and bathroom minutes this position comes with. HR can give a person a different one." },
+  "posiciones.pausaDesc": { es: "Los minutos de almuerzo y baño pagados de este puesto. Las modalidades se crean en Ajustes → Empresa.", en: "The paid lunch and bathroom minutes of this position. Break plans are created in Settings → Company." },
   "posiciones.pausaSinDefinir": { es: "Sin definir (la de antes)", en: "Not set (the previous one)" },
 } as const;

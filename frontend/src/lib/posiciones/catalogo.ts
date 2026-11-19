@@ -99,8 +99,8 @@ export const CATALOGO_POSICIONES: SeccionCatalogo[] = [
                 "nueva": true
               },
               {
-                "clave": "N:pausas.modalidades",
-                "etiqueta": "posiciones.c.crear_modalidades_de_pausa",
+                "clave": "N:empresa.configurar",
+                "etiqueta": "posiciones.c.configurar_la_empresa",
                 "nueva": true
               }
             ]

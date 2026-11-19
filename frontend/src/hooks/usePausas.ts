@@ -2,8 +2,9 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 
 // MODALIDADES DE PAUSA (Alvaro, 19/11/2026): cada empresa define las suyas
-// (almuerzo + baño); el puesto trae una y a una persona se le puede poner otra.
-// Quién puede qué lo decide la base (puede_gestionar_a, N:pausas.modalidades).
+// (almuerzo + baño) en Ajustes → Empresa; cada PUESTO trae una y la pausa de una
+// persona sale solo de su puesto («nada a mano, todo en los roles»). Quién
+// configura la empresa lo decide la función del puesto N:empresa.configurar.
 // Un fallo es un fallo: se dice, nunca «no hay modalidades».
 
 type RpcDb = { rpc: (f: string, a?: unknown) => Promise<{ data: unknown; error: { message: string } | null }> };
@@ -17,8 +18,7 @@ export interface PausaDePersona {
   modalidad: string | null;
   comida_min: number;
   bano_min: number;
-  origen: "persona" | "puesto" | "base";
-  puede_cambiar: boolean;
+  origen: "puesto" | "base";
 }
 
 export function useModalidades() {
@@ -45,21 +45,6 @@ export function usePausasDelEquipo() {
   });
 }
 
-export function useAsignarPausa() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: async ({ userId, modalidadId }: { userId: string; modalidadId: string | null }) => {
-      const { error } = await db.rpc("pausas_asignar", { _user_id: userId, _modalidad_id: modalidadId });
-      if (error) throw new Error(error.message);
-    },
-    onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: ["pausas-del-equipo"] });
-      void qc.invalidateQueries({ queryKey: ["pausas-modalidades"] });
-      void qc.invalidateQueries({ queryKey: ["mi-turno"] });
-    },
-  });
-}
-
 export function useGuardarModalidad() {
   const qc = useQueryClient();
   return useMutation({
@@ -72,6 +57,19 @@ export function useGuardarModalidad() {
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ["pausas-modalidades"] });
       void qc.invalidateQueries({ queryKey: ["pausas-del-equipo"] });
+    },
+  });
+}
+
+/** ¿Puede entrar a Ajustes → Empresa? (dueño o función del puesto). Un fallo = no. */
+export function usePuedoConfigurarEmpresa() {
+  return useQuery<boolean>({
+    queryKey: ["puedo-configurar-empresa"],
+    staleTime: 5 * 60_000,
+    queryFn: async () => {
+      const { data, error } = await db.rpc("puedo_configurar_empresa");
+      if (error) return false;
+      return data === true;
     },
   });
 }

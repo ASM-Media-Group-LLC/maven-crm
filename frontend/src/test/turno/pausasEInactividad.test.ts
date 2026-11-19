@@ -9,6 +9,9 @@ import { CATALOGO_POSICIONES } from "@/lib/posiciones/catalogo";
 const sql = Object.values(import.meta.glob("../../../../supabase/migrations/20261119200000_pausas_por_modalidad_e_inactividad.sql", {
   query: "?raw", import: "default", eager: true,
 }) as Record<string, string>)[0] ?? "";
+const soloPuesto = Object.values(import.meta.glob("../../../../supabase/migrations/20261119210000_pausas_solo_por_puesto.sql", {
+  query: "?raw", import: "default", eager: true,
+}) as Record<string, string>)[0] ?? "";
 const fuentes = import.meta.glob(["../../../../supabase/functions/cowork-session/index.ts", "../../pages/cowork/CoworkParticipantView.tsx"], {
   query: "?raw", import: "default", eager: true,
 }) as Record<string, string>;
@@ -16,14 +19,20 @@ const cowork = Object.entries(fuentes).find(([k]) => k.endsWith("index.ts"))?.[1
 const sala = Object.entries(fuentes).find(([k]) => k.endsWith("CoworkParticipantView.tsx"))?.[1] ?? "";
 
 describe("modalidades por empresa", () => {
-  it("cada empresa tiene las suyas; las cambian solo dueño y admin", () => {
+  it("cada empresa tiene las suyas", () => {
     expect(sql).toContain("tenant_id uuid not null");
     expect(sql).toContain("unique (tenant_id, nombre)");
-    expect(sql).toMatch(/pausas_modalidad_guardar[\s\S]*N:pausas\.modalidades/);
   });
 
-  it("persona → puesto → lo de antes", () => {
-    expect(sql).toMatch(/'persona'::text as origen, 1 as prioridad[\s\S]*'puesto', 2[\s\S]*'base', 3/);
+  it("nada a mano: la pausa sale solo del puesto (sin pausa por persona)", () => {
+    expect(soloPuesto).toContain("drop table if exists public.pausas_persona;");
+    expect(soloPuesto).toContain("drop function if exists public.pausas_asignar(uuid, uuid);");
+    expect(soloPuesto).toMatch(/function public\.argos_pausas_de[\s\S]*'puesto'::text as origen, 1 as prioridad[\s\S]*'base', 2/);
+  });
+
+  it("lo de toda la empresa se configura con la función del puesto", () => {
+    expect(soloPuesto).toContain("tiene_funcion((select auth.uid()), 'N:empresa.configurar')");
+    expect(soloPuesto).toMatch(/pausas_modalidad_guardar[\s\S]*puedo_configurar_empresa\(\)/);
   });
 
   it("la de esta empresa: 30 + 10 para chatters, supervisores y editores; 1 hora el resto; freelance sin pausa", () => {
@@ -48,7 +57,8 @@ describe("quién cambia a quién", () => {
   it("las dos funciones están en Ajustes → Posiciones", () => {
     const claves = CATALOGO_POSICIONES.flatMap((s) => s.grupos.flatMap((g) => g.filas.flatMap((f) => f.funciones.map((x) => x.clave))));
     expect(claves).toContain("N:horarios.gestionar");
-    expect(claves).toContain("N:pausas.modalidades");
+    expect(claves).toContain("N:empresa.configurar");
+    expect(claves).not.toContain("N:pausas.modalidades");
   });
 });
 

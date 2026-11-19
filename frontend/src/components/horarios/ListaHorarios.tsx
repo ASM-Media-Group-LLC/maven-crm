@@ -7,7 +7,7 @@ import { UserAvatar } from "@/components/UserAvatar";
 import { useToast } from "@/hooks/use-toast";
 import { a12 } from "@/lib/horaBogota";
 import { useGuardarHorario, useHorariosEquipo } from "@/hooks/useHorariosEquipo";
-import { type Modalidad, type PausaDePersona, useAsignarPausa, useModalidades, usePausasDelEquipo } from "@/hooks/usePausas";
+import { type PausaDePersona, usePausasDelEquipo } from "@/hooks/usePausas";
 import {
   type DiaHorario, type FilaEquipoHorario, alternarDia, cambio, hhmm, mismaHoraTodos, ponerHoraATodos, semanaInicial,
   trabaja, validarSemana,
@@ -27,41 +27,17 @@ type Filtro = "pendientes" | "confirmados" | "todos";
 
 const ENTRADA_HORA = "h-9 w-[7.25rem] rounded-lg border border-input bg-background/50 px-2 text-sm tabular-nums text-foreground focus:outline-none focus:ring-1 focus:ring-primary/50";
 
-// La pausa de la persona (19/11/2026): la de su puesto o una puesta a mano.
-// Solo quien puede gestionarla la cambia (nunca la propia, ni a admins ni al dueño).
-function PausaDeLaFila({ userId, pausa, modalidades, t }: { userId: string; pausa: PausaDePersona | undefined; modalidades: Modalidad[]; t: Tr }) {
-  const { toast } = useToast();
-  const asignar = useAsignarPausa();
+// La pausa de la persona (19/11/2026): sale de su puesto; aquí solo se ve.
+// Para cambiarla se le cambia el puesto (Ajustes → Posiciones).
+function PausaDeLaFila({ pausa, t }: { pausa: PausaDePersona | undefined; t: Tr }) {
   if (!pausa) return null;
   const texto = pausa.modalidad
     ? t("hr.pausas.deFila", { m: pausa.modalidad, a: pausa.comida_min, b: pausa.bano_min })
     : t("hr.pausas.deFilaSinNombre", { a: pausa.comida_min, b: pausa.bano_min });
-  if (!pausa.puede_cambiar) {
-    return <span className="text-[11px] text-muted-foreground">{texto}</span>;
-  }
-  const valor = pausa.origen === "persona" && pausa.modalidad_id ? pausa.modalidad_id : "";
-  return (
-    <label className="flex flex-wrap items-center gap-1.5 text-[11px] text-muted-foreground">
-      {t("hr.pausas.pausa")}
-      <select
-        className="h-8 rounded-lg border border-input bg-background/50 px-2 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary/50"
-        value={valor}
-        disabled={asignar.isPending}
-        onChange={(e) => asignar.mutate({ userId, modalidadId: e.target.value || null }, {
-          onSuccess: () => toast({ title: t("hr.pausas.asignada") }),
-          onError: (err) => toast({ title: t("hr.pausas.noSeGuardo"), description: (err as Error).message, variant: "destructive" }),
-        })}
-      >
-        <option value="">{t("hr.pausas.laDelPuesto")}{pausa.origen !== "persona" && pausa.modalidad ? ` (${pausa.modalidad})` : ""}</option>
-        {modalidades.filter((m) => m.activa).map((m) => (
-          <option key={m.id} value={m.id}>{m.nombre} · {t("hr.pausas.minutos", { a: m.comida_min, b: m.bano_min })}</option>
-        ))}
-      </select>
-    </label>
-  );
+  return <span className="text-[11px] text-muted-foreground">{texto}</span>;
 }
 
-function FilaHorario({ f, t, pausa, modalidades }: { f: FilaEquipoHorario; t: Tr; pausa?: PausaDePersona; modalidades: Modalidad[] }) {
+function FilaHorario({ f, t, pausa }: { f: FilaEquipoHorario; t: Tr; pausa?: PausaDePersona }) {
   const { toast } = useToast();
   const guardar = useGuardarHorario();
   const inicial = useMemo(() => semanaInicial(f), [f]);
@@ -144,7 +120,7 @@ function FilaHorario({ f, t, pausa, modalidades }: { f: FilaEquipoHorario; t: Tr
           </div>
         )}
 
-        <PausaDeLaFila userId={f.user_id} pausa={pausa} modalidades={modalidades} t={t} />
+        <PausaDeLaFila pausa={pausa} t={t} />
 
         <div className="flex flex-wrap items-center gap-2">
           <Button size="sm" className="h-9 rounded-lg" onClick={confirmar} disabled={!!error || guardar.isPending || (confirmado && !pendienteDeGuardar)}>
@@ -165,7 +141,6 @@ function FilaHorario({ f, t, pausa, modalidades }: { f: FilaEquipoHorario; t: Tr
 
 export function ListaHorarios({ obligatorio = false }: { obligatorio?: boolean }) {
   const pausas = usePausasDelEquipo();
-  const modalidades = useModalidades();
   const { t } = useLanguage();
   const q = useHorariosEquipo();
   const filas = useMemo(() => q.data ?? [], [q.data]);
@@ -229,7 +204,7 @@ export function ListaHorarios({ obligatorio = false }: { obligatorio?: boolean }
         <p className="p-6 text-sm text-muted-foreground">{filtro === "pendientes" && pendientes === 0 ? t("hr.horEq.todosListos") : t("hr.horEq.nadieFiltro")}</p>
       ) : (
         <ul className="divide-y divide-border/25">
-          {vistas.map((f) => <FilaHorario key={`${f.user_id}-${f.confirmado_at ?? "x"}`} f={f} t={t} pausa={pausas.data?.get(f.user_id)} modalidades={modalidades.data?.modalidades ?? []} />)}
+          {vistas.map((f) => <FilaHorario key={`${f.user_id}-${f.confirmado_at ?? "x"}`} f={f} t={t} pausa={pausas.data?.get(f.user_id)} />)}
         </ul>
       )}
     </div>
