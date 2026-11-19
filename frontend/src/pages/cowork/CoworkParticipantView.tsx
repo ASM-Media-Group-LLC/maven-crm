@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from "react";
+import { escucharPedidos } from "@/lib/pedidoACowork";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -434,6 +435,15 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
       toast.error(traducir("cowork.participant.pauseError"), { description: (e as Error).message });
     }
   }, [breakStartedAt, trackMediaState, cowork]);
+
+  // La tarjeta del turno (menú) pide pausa / volver / salida (19/11/2026).
+  useEffect(() => escucharPedidos((p) => {
+    if (p.tipo === "pausar") { if (!breakStartedAt) void toggleBreak(p.kind); return true; }
+    if (p.tipo === "volver") { if (breakStartedAt) void toggleBreak(); return true; }
+    // Salida: el servidor ya cerró la pausa; aquí solo se limpia lo local.
+    setBreakStartedAt(null); setBreakKind(null); setBreakLimite(null);
+    return true;
+  }), [breakStartedAt, toggleBreak]);
 
   const { startCall, endCall } = usePersistentCall();
 

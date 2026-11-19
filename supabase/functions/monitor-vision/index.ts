@@ -159,6 +159,11 @@ Deno.serve(async (req: Request) => {
   const { data: cfg } = await admin.from("monitor_config").select("activo").eq("id", 1).maybeSingle();
   if (cfg && cfg.activo === false) return json({ ok: true, skip: "off" });
 
+  // Marcar entrada (19/11/2026): fuera de turno no se mira nada. Antes de la
+  // fecha de corte en_turno devuelve true, así que nada cambia hasta entonces.
+  const { data: enTurno } = await admin.rpc("en_turno", { _uid: user.id });
+  if (enTurno === false) return json({ ok: true, skip: "fuera_de_turno" });
+
   // 4) Frame.
   const body = await req.json().catch(() => ({})) as {
     imagen_base64?: string; mime?: string; room_nombre?: string; session_id?: string;

@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useMemo, useRef, type ReactNode } from "react";
+import { useEnTurno } from "@/lib/turnoActivo";
 import { ConnectionState, CriticalTimers, RoomEvent, Track, VideoQuality } from "livekit-client";
 import { useLiveKit } from "@/hooks/useLiveKit";
 import CallTopBar from "./CallTopBar";
@@ -823,6 +824,8 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
   // enterarse de que se cayó la sala (para eso está el cartel).
   // Con la cámara opcional, Argos le habla solo con la cámara prendida.
   const argosConCamara = !camaraOpcional || camaraRealOn;
+  // Fuera de turno no se toman fotos ni se juzga (Marcar entrada, 19/11/2026).
+  const enTurno = useEnTurno();
   useFaceNudge(supervisorEncuadre && conSalaViva && argosConCamara ? faceWatch : null);
   // Monitor de cámara de RRHH: vive JUSTO acá, pegado al supervisor de encuadre,
   // porque comparte su mismo track y estado y su misma vida (sobrevive a la
@@ -894,7 +897,7 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
     trackPantalla: localScreenTrack,
     camaraRealOn,
     faceWatch,
-    activo: !!supervisorEncuadre && conSalaViva && argosConCamara,
+    activo: !!supervisorEncuadre && conSalaViva && argosConCamara && enTurno,
     roomNombre: roomName,
   });
   // Argos — escalera de muestreo + grabación al distraerse (Alvaro, 08/11).
@@ -906,7 +909,7 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
     trackCamara: localCameraTrack,
     trackPantalla: localScreenTrack,
     faceWatch,
-    activo: !!supervisorEncuadre && conSalaViva && argosConCamara,
+    activo: !!supervisorEncuadre && conSalaViva && argosConCamara && enTurno,
     roomNombre: roomName,
   });
   // El aviso de voz a la persona + su registro en el expediente los hace el
@@ -987,7 +990,7 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
     // pantalla no es un llamado; sin cámara obligatoria, solo cuenta con la
     // cámara prendida.
     compartiendo: pantallaOpcional ? true : localScreenShare,
-    activo: !!supervisorEncuadre && argosConCamara,
+    activo: !!supervisorEncuadre && argosConCamara && enTurno,
     // Con la sala caída, LiveKit vacía la lista de participantes y la cámara de
     // todo el mundo se ve apagada aunque esté prendida. Sin esto, una caída de
     // veinte minutos le anotaba a cada persona veinte minutos de "cámara
