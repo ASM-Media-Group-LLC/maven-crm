@@ -10,8 +10,12 @@
 // Tiene que DURAR para que salga el cartel (un bache de dos segundos no es
 // noticia), y se va cuando lleva unos segundos bien, sin parpadear.
 
+// 18/11/2026 (Alvaro: «cada rato dice que el internet está bajo»; eligió «solo
+// si de verdad se corta»). Medido ese día: el codificador «limitado por ancho de
+// banda» salía el 22 % del tiempo y es normal (la calidad se acomoda sola), así
+// que ya NO cuenta. Solo cuenta la conexión en POOR o LOST, y 20 s seguidos.
 /** Cuánto tiene que durar lo malo para que salga el cartel. */
-export const DEBIL_SOSTENIDO_MS = 10_000;
+export const DEBIL_SOSTENIDO_MS = 20_000;
 /** Cuánto tiene que durar lo bueno para que se vaya. */
 export const BIEN_SOSTENIDO_MS = 6_000;
 /** Cada cuánto se mira. */

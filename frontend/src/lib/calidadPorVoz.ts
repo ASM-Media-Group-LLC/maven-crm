@@ -35,8 +35,15 @@ export function ajustarConEstaGente(sala: string, remotos: number): boolean {
 }
 
 /** La calidad máxima que se pide para la cámara de ese compañero. */
+//
+// COMO MEET (Alvaro, 18/11/2026: «miro pixeleada a la gente»; eligió «como
+// Meet»). Medido ese día: a quien no hablaba se le pedía la capa de 180p aunque
+// su cuadro estuviera grande, y se veía pixeleado. Ahora el tope de quien no
+// habla es la capa MEDIA (360p): si su cuadro es chico, adaptiveStream pide sola
+// la baja (sale del tamaño en pantalla), y si es grande se ve decente. Quien
+// habla o está fijado, la alta (HD).
 export function calidadDeCamara(o: { fijado: boolean; hablando: boolean; ultimaVezHablo: number | undefined; ahora: number }): VideoQuality {
   if (o.fijado || o.hablando) return VideoQuality.HIGH;
   if (o.ultimaVezHablo !== undefined && o.ahora - o.ultimaVezHablo < NITIDO_TRAS_HABLAR_MS) return VideoQuality.HIGH;
-  return VideoQuality.LOW;
+  return VideoQuality.MEDIUM;
 }
