@@ -54,17 +54,8 @@ export function AhoraEnVivo({ userId, capturas }: { userId: string; capturas: Ca
       <div className="v-cont flex flex-col gap-3">
         <div className="flex flex-wrap items-center gap-2">
           <h2 className="text-sm font-semibold">{t("hr.exp.cron.ahora")}</h2>
-          {vivo ? (
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-destructive/12 px-2 py-0.5 text-[11px] font-semibold text-destructive">
-              <span className="relative flex h-2 w-2">
-                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-destructive opacity-60 motion-reduce:animate-none" />
-                <span className="relative inline-flex h-2 w-2 rounded-full bg-destructive" />
-              </span>
-              {t("hr.exp.vivo.enVivo")}
-            </span>
-          ) : (
-            <span className="text-[11px] text-muted-foreground">{motivo}</span>
-          )}
+          {/* «En vivo» ya lo dice el video (18/11/2026: «se repite»). */}
+          {!vivo && <span className="text-[11px] text-muted-foreground">{motivo}</span>}
           <Link
             to={`/hr/en-vivo/${userId}`}
             className="ml-auto inline-flex items-center gap-1.5 rounded-full border border-border/60 px-2.5 py-1 text-[11px] font-medium text-foreground/80 transition-colors hover:bg-foreground/[0.06] hover:text-foreground"
@@ -74,7 +65,9 @@ export function AhoraEnVivo({ userId, capturas }: { userId: string; capturas: Ca
         </div>
 
         {vivo ? (
-          <div className="overflow-hidden rounded-xl">
+          // Grande (Alvaro, 18/11/2026: «el live está muy chiquito»): a todo el ancho,
+          // hasta casi el alto de la ventana.
+          <div className="mx-auto w-full max-w-[calc((100vh-9rem)*16/9)] overflow-hidden rounded-xl">
             <EscenarioEnVivo
               estado={obs.estado}
               pantalla={obs.pantalla}

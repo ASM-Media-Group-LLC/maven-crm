@@ -116,6 +116,21 @@ export async function urlCaptura(path: string): Promise<string | null> {
   }
 }
 
+/** URLs firmadas de varias fotos del buzón en un solo viaje: { path: url }.
+ *  Un fallo devuelve mapa vacío (la miniatura queda cargando, nunca «no hay»). */
+export async function urlsDelBuzon(paths: string[]): Promise<Record<string, string>> {
+  const unicas = [...new Set(paths.filter(Boolean))];
+  if (unicas.length === 0) return {};
+  try {
+    const { data } = await supabase.storage.from("monitor-capturas").createSignedUrls(unicas, 3600);
+    const m: Record<string, string> = {};
+    for (const r of data ?? []) if (r.path && r.signedUrl) m[r.path] = r.signedUrl;
+    return m;
+  } catch {
+    return {};
+  }
+}
+
 /** URLs firmadas para las capturas que ya viven en el NAS (en_nas), en un solo
  *  viaje. Devuelve un mapa { nasPath: url }. Solo el dueño puede (lo fuerza la
  *  edge argos-foto). Un fallo devuelve mapa vacío (la miniatura queda en spinner,
