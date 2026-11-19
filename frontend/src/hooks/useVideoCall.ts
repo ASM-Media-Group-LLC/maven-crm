@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { SUENA_MS, invitarALaLlamada } from "@/lib/llamadaInvitar";
 import { urlDeLaLlamada } from "@/lib/urlDeLaLlamada";
+import { enlaceDeApp } from "@/lib/abrirEnApp";
 
 export type CallStatus = "idle" | "ringing" | "accepted" | "ended" | "declined";
 export type CallType = "audio" | "video";
@@ -261,8 +262,22 @@ export function useVideoCall() {
   );
 
   // ── Accept call ──────────────────────────────────────────────────
-  const acceptCall = useCallback(async () => {
+  // `enLaApp` (llamadas solo en la app, 18/11/2026): en el navegador de un
+  // computador no se abre la pestaña de la llamada; se abre la app de Maven en
+  // esa misma llamada. Quien no la tiene, la baja desde el cartel.
+  const acceptCall = useCallback(async (opciones?: { enLaApp?: boolean }) => {
     if (!incomingCall || !user) return;
+    const ruta = urlDeLaLlamada(incomingCall.room_id, {
+      nombre: incomingCall.titulo || incomingCall.caller_name,
+      directo: true,
+      audio: incomingCall.call_type === "audio",
+    });
+    if (opciones?.enLaApp) {
+      // No se marca «contestó» aquí: lo marca la app al entrar (VideoCallPage).
+      // Si no la tiene, la llamada sigue sonando y puede descargarla.
+      window.location.href = enlaceDeApp(ruta);
+      return;
+    }
 
     // Solo si seguía sonando: a una llamada de grupo ya en curso no se le pisa
     // la hora de inicio.
@@ -281,15 +296,7 @@ export function useVideoCall() {
 
     // Contestar = entrar ya a la llamada (sin sala previa), con el nombre de
     // quien llama arriba.
-    window.open(
-      urlDeLaLlamada(incomingCall.room_id, {
-        nombre: incomingCall.titulo || incomingCall.caller_name,
-        directo: true,
-        audio: incomingCall.call_type === "audio",
-      }),
-      `call-${incomingCall.room_id}`,
-      "noopener"
-    );
+    window.open(ruta, `call-${incomingCall.room_id}`, "noopener");
   }, [incomingCall, user]);
 
   // ── Decline call ─────────────────────────────────────────────────

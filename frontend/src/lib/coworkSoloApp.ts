@@ -26,6 +26,30 @@ export function estadoSoloApp(p: { ua: string; tactil: boolean; enApp: boolean; 
   return p.ahora >= p.desde ? "bloqueo" : "aviso";
 }
 
+// ── LLAMADAS INTERNAS SOLO EN LA APP (Alvaro, 18/11/2026) ────────────────────
+// Lo mismo que Cowork, para las llamadas del Messenger (1 a 1 y de grupo) y los
+// Meet internos: todo lo que pasa por /call/:sala (VideoCallPage) con sesión de
+// Maven. La fecha vive en monitor_config.llamadas_solo_app_desde y los
+// probadores de Cowork también la ven antes. Celular: nada cambia.
+//
+// Los INVITADOS DE AFUERA nunca pasan por aquí: entran por /entrar/:código o
+// /unirse/:link (MeetGuestPage, MeetLinkPage) sin sesión y con su propio token
+// de LiveKit. Por eso esas páginas no miran este bloqueo.
+
+/** Qué ajuste de monitor_config manda en cada lugar. */
+export type LugarSoloApp = "cowork" | "llamadas";
+export const COLUMNA_DESDE: Record<LugarSoloApp, "cowork_solo_app_desde" | "llamadas_solo_app_desde"> = {
+  cowork: "cowork_solo_app_desde",
+  llamadas: "llamadas_solo_app_desde",
+};
+
+/** Salas de /call/ que piden la app. Las de Cowork no: esa página las manda a
+ *  /cowork, que tiene su propio bloqueo. */
+export function salaPideApp(sala: string | null | undefined): boolean {
+  if (!sala) return false;
+  return !sala.startsWith("cowork_");
+}
+
 export const DESCARGA_MAC = "Maven-Mac.dmg";
 export const DESCARGA_WINDOWS = "Maven-Windows.exe";
 export const descargaParaEsteEquipo = (ua: string) => (/Macintosh/i.test(ua) ? DESCARGA_MAC : DESCARGA_WINDOWS);

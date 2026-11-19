@@ -6,6 +6,7 @@ import { usePushSubscription } from "@/hooks/usePushSubscription";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import IncomingCallModal from "@/pages/messenger/components/IncomingCallModal";
+import { useLlamadasSoloApp } from "@/components/CoworkSoloApp";
 
 // Sistema de llamadas GLOBAL. Antes vivía dentro de MessengerPage, así que una
 // llamada entrante solo sonaba si el otro estaba parado en el tab de Messenger.
@@ -177,6 +178,10 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => installRingAudioUnlock(), []);
   useLlamadaEnLaApp(call.incomingCall, call.acceptCall, call.declineCall);
   useAvisarQueMeSuena(call.incomingCall?.id ?? null);
+  // Llamadas solo en la app (18/11/2026): en el navegador del computador,
+  // contestar abre la app en vez de la pestaña de la llamada.
+  const soloApp = useLlamadasSoloApp();
+  const enLaApp = soloApp.estado === "bloqueo";
   return (
     <CallContext.Provider value={call}>
       {children}
@@ -184,7 +189,8 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
         <>
           <IncomingCallModal
             call={call.incomingCall}
-            onAccept={call.acceptCall}
+            onAccept={() => void call.acceptCall({ enLaApp })}
+            enLaApp={enLaApp}
             onDecline={call.declineCall}
           />
           <Ringtone />

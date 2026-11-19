@@ -8,7 +8,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useFormato } from "@/hooks/useFormato";
 import { escritorio } from "@/lib/escritorio";
 import { enlaceDeApp } from "@/lib/abrirEnApp";
-import { estadoSoloApp, type EstadoSoloApp } from "@/lib/coworkSoloApp";
+import { COLUMNA_DESDE, esNavegadorDeComputador, estadoSoloApp, type EstadoSoloApp, type LugarSoloApp } from "@/lib/coworkSoloApp";
 import { RUTA_DESCARGAR_CON_GUIA } from "@/lib/guiaApp";
 import { RUTA_GUIA_APP } from "@/lib/guiaApp";
 
@@ -20,25 +20,47 @@ const sinTipar = supabase as unknown as { from: (t: string) => any };
 const CLAVE_CERRADO = "maven.coworkSoloApp.avisoCerrado";
 
 export function useCoworkSoloApp(): { estado: EstadoSoloApp; desde: Date | null } {
+  const { estado, desde } = useSoloApp("cowork");
+  return { estado, desde };
+}
+
+/** Llamadas del Messenger y Meet internos (lib/coworkSoloApp.ts → LLAMADAS). */
+export function useLlamadasSoloApp(): { estado: EstadoSoloApp; desde: Date | null; listo: boolean } {
+  return useSoloApp("llamadas");
+}
+
+/** El mismo bloqueo para Cowork y para las llamadas; cambia solo la fecha.
+ *  `listo` = ya se sabe la respuesta (en la app o el celular, al instante): una
+ *  llamada no se conecta mientras tanto, para no entrar y sacarla un segundo
+ *  después. Si la lectura falla, no se bloquea (igual que Cowork). */
+function useSoloApp(lugar: LugarSoloApp): { estado: EstadoSoloApp; desde: Date | null; listo: boolean } {
   const { user } = useAuth();
   const [desde, setDesde] = useState<Date | null>(null);
   const [probadores, setProbadores] = useState<string[]>([]);
-  useEffect(() => {
-    let vivo = true;
-    void (async () => {
-      try {
-        const { data, error } = await sinTipar.from("monitor_config").select("cowork_solo_app_desde, cowork_solo_app_probadores").eq("id", 1).maybeSingle();
-        if (error || !vivo) return;
-        setDesde(data?.cowork_solo_app_desde ? new Date(data.cowork_solo_app_desde) : null);
-        setProbadores(Array.isArray(data?.cowork_solo_app_probadores) ? data.cowork_solo_app_probadores : []);
-      } catch { /* sin fecha no se bloquea */ }
-    })();
-    return () => { vivo = false; };
-  }, []);
+  const [leido, setLeido] = useState(false);
   const ua = typeof navigator !== "undefined" ? navigator.userAgent || "" : "";
   const tactil = typeof navigator !== "undefined" && (navigator.maxTouchPoints ?? 0) > 1;
+  const enApp = !!escritorio();
+  const hayQueMirar = esNavegadorDeComputador({ ua, tactil, enApp });
+  useEffect(() => {
+    let vivo = true;
+    const columna = COLUMNA_DESDE[lugar];
+    void (async () => {
+      try {
+        // Solo la columna de este lugar: si la de llamadas todavía no existe,
+        // Cowork sigue leyendo la suya sin error.
+        const { data, error } = await sinTipar.from("monitor_config").select(`${columna}, cowork_solo_app_probadores`).eq("id", 1).maybeSingle();
+        if (error || !vivo) return;
+        setDesde(data?.[columna] ? new Date(data[columna]) : null);
+        setProbadores(Array.isArray(data?.cowork_solo_app_probadores) ? data.cowork_solo_app_probadores : []);
+      } catch { /* sin fecha no se bloquea */ } finally {
+        if (vivo) setLeido(true);
+      }
+    })();
+    return () => { vivo = false; };
+  }, [lugar]);
   const probador = !!user?.id && probadores.includes(user.id);
-  return { estado: estadoSoloApp({ ua, tactil, enApp: !!escritorio(), desde, ahora: new Date(), probador }), desde };
+  return { estado: estadoSoloApp({ ua, tactil, enApp, desde, ahora: new Date(), probador }), desde, listo: leido || !hayQueMirar };
 }
 
 function enlaces() {
@@ -89,15 +111,19 @@ function AvisoSoloAppEnCowork() {
   );
 }
 
-/** Desde la fecha: Cowork no abre en el navegador del computador. */
-export function BloqueoSoloApp() {
+/** Desde la fecha: Cowork (o una llamada interna, `lugar="llamadas"`) no abre
+ *  en el navegador del computador. Misma pantalla, mismos botones. */
+export function BloqueoSoloApp({ lugar = "cowork" }: { lugar?: LugarSoloApp } = {}) {
   const { t } = useLanguage();
   const { app, descarga } = enlaces();
+  const textos = lugar === "llamadas"
+    ? ({ titulo: "messenger.soloApp.titulo", desc: "messenger.soloApp.desc", celular: "messenger.soloApp.celular" } as const)
+    : ({ titulo: "cowork.soloApp.titulo", desc: "cowork.soloApp.desc", celular: "cowork.soloApp.celular" } as const);
   return (
     <div className="flex flex-1 min-h-0 flex-col items-center justify-center gap-4 px-4 text-center">
       <MonitorDown className="h-10 w-10 text-primary" />
-      <p className="text-lg font-semibold text-foreground">{t("cowork.soloApp.titulo")}</p>
-      <p className="max-w-md text-sm text-muted-foreground">{t("cowork.soloApp.desc")}</p>
+      <p className="text-lg font-semibold text-foreground">{t(textos.titulo)}</p>
+      <p className="max-w-md text-sm text-muted-foreground">{t(textos.desc)}</p>
       <div className="flex flex-wrap justify-center gap-2">
         <Button asChild><a href={app}><ExternalLink className="mr-1.5 h-4 w-4" />{t("cowork.soloApp.abrir")}</a></Button>
         <Button asChild variant="outline"><a href={descarga}><Download className="mr-1.5 h-4 w-4" />{t("cowork.soloApp.descargar")}</a></Button>
@@ -106,7 +132,7 @@ export function BloqueoSoloApp() {
       <Link to={RUTA_GUIA_APP} className="inline-flex items-center gap-1.5 text-sm font-medium text-primary underline-offset-2 hover:underline">
         <CircleHelp className="h-4 w-4" />{t("cowork.soloApp.comoSeInstala")}
       </Link>
-      <p className="max-w-md text-xs text-muted-foreground">{t("cowork.soloApp.celular")}</p>
+      <p className="max-w-md text-xs text-muted-foreground">{t(textos.celular)}</p>
     </div>
   );
 }
