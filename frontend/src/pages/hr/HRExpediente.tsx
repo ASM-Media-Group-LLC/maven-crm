@@ -314,10 +314,10 @@ function TiraDelDia({ capturas, t }: { capturas: CapturaDia[]; t: Tr }) {
                   type="button"
                   onClick={(e) => { e.stopPropagation(); setVisorIdx(visibles.indexOf(m)); }}
                   title={`${hora}${m.veredicto ? ` · ${m.veredicto}` : ""}`}
-                  className={`group relative aspect-[16/10] overflow-hidden rounded-md bg-muted/40 transition ${mala ? "ring-2 ring-destructive/70" : "ring-1 ring-border/30 hover:ring-primary/50"}`}
+                  className={`group relative aspect-[16/10] overflow-hidden rounded-control bg-muted/40 transition ${mala ? "ring-2 ring-destructive/70" : "ring-1 ring-border/30 hover:ring-primary/50"}`}
                 >
                   {urlP || urlC ? (
-                    <img src={(urlP ?? urlC)!} alt={hora} loading="lazy" onError={() => reFirmar(m.pantalla ?? m.camara)} className="h-full w-full object-cover transition group-hover:scale-[1.03]" />
+                    <img src={(urlP ?? urlC)!} alt={hora} loading="lazy" onError={() => reFirmar(m.pantalla ?? m.camara)} className="h-full w-full object-cover" />
                   ) : m.pantalla || m.camara ? (
                     <div className="h-full w-full animate-pulse bg-foreground/[0.06]" />
                   ) : (
@@ -359,11 +359,11 @@ function TiraDelDia({ capturas, t }: { capturas: CapturaDia[]; t: Tr }) {
                     </div>
                   ) : (
                     // Cerrada: 6 miniaturas, una cada 10 minutos.
-                    <div className="grid grid-cols-6 gap-1.5 px-3 pb-3">
+                    <div className="grid grid-cols-3 gap-1.5 px-3 pb-3 sm:grid-cols-6">
                       {h.casillas.map((c, i) => c.rep ? (
                         <div key={i} className="min-w-0">{miniatura(c.rep, false)}</div>
                       ) : (
-                        <div key={i} className="flex aspect-[16/10] items-center justify-center rounded-md border border-dashed border-border/30 text-[9px] tabular-nums text-muted-foreground/60">
+                        <div key={i} className="flex aspect-[16/10] items-center justify-center rounded-control border border-dashed border-border/30 text-[9px] tabular-nums text-muted-foreground/60">
                           {a12(format(new Date(c.desde), "HH:mm"))}
                         </div>
                       ))}
