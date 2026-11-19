@@ -55,6 +55,7 @@ import {
   armarMuestra, borrarLlamadaEnCurso, leerMemoria, leerReporte, marcarLlamadaEnCurso, medirRetraso, medirTrabas, type Traba, recargaConLlamada,
   type DestinoDeTelemetria, type LecturaDePista, type MemoriaDelEquipo, type MuestraDeLlamada,
 } from "@/lib/saludDeLlamada";
+import { armarAudio, leerAudioRecibido, leerMicrofono, type AudioDeLaMuestra, type ContadoresDeAudio } from "@/lib/audioDeLlamada";
 import { AHORRO_INICIAL, PANTALLA_AHORRO, ahorroPorPrueba, siguienteAhorro, type EstadoAhorro } from "@/lib/modoAhorro";
 import {
   CAMARA_INICIAL, camaraEnHD, copiarTopes, elegirPerfilDeCamara, escribirTopes, siguientePerfilDeCamara, topesDeCowork, topesLivianos,
@@ -592,7 +593,7 @@ export function useLiveKit() {
   }, []);
 
   type InsertaSalud = (tabla: "llamada_salud") => {
-    insert: (fila: { sala: string; datos: MuestraDeLlamada & MemoriaDelEquipo & { ahorro: boolean; nc: EstadoNC; prueba?: PruebaDeRed; perfil_cam: PerfilDeCamara; trabas?: Traba[] } }) =>
+    insert: (fila: { sala: string; datos: MuestraDeLlamada & MemoriaDelEquipo & { ahorro: boolean; nc: EstadoNC; prueba?: PruebaDeRed; perfil_cam: PerfilDeCamara; trabas?: Traba[]; audio?: AudioDeLaMuestra } }) =>
       PromiseLike<{ error: { message: string } | null }>;
   };
   // Si el componente se desmonta sin colgar, el reloj de muestras no queda vivo.
@@ -644,6 +645,8 @@ export function useLiveKit() {
     pararMuestreoRef.current?.();
     const retraso = medirRetraso();
     const trabas = medirTrabas();
+    // El audio del minuto (lib/audioDeLlamada.ts): lo acumulado en la muestra anterior.
+    let contadoresAudio: ContadoresDeAudio | null = null;
     // Modo ahorro (lib/modoAhorro.ts): con la subida lenta, cámara en calidad
     // media y pantalla a 5 cuadros por segundo, solo para esta persona.
     ahorroRef.current = AHORRO_INICIAL;
@@ -742,6 +745,31 @@ export function useLiveKit() {
           cam, pant, mic, lag_ms: retraso.leer(),
         });
         const trabasDelMinuto = trabas.leer();
+        // El sonido (18/11/2026): si la escuchan y si ella escucha bien.
+        let audio: AudioDeLaMuestra | undefined;
+        try {
+          const micPub = room.localParticipant.getTrackPublication(Track.Source.Microphone);
+          const micReporte = micPub?.track ? await micPub.track.getRTCStatsReport().catch(() => undefined) : undefined;
+          const recibido: Record<string, { ocultas: number; recibidas: number }> = {};
+          for (const p of room.remoteParticipants.values()) {
+            for (const pub of p.audioTrackPublications.values()) {
+              const receptor = pub.track?.receiver;
+              if (!receptor) continue;
+              const r = await receptor.getStats().catch(() => undefined);
+              const l = r ? leerAudioRecibido(r.values() as Iterable<Record<string, unknown>>) : null;
+              if (l) recibido[pub.trackSid] = l;
+            }
+          }
+          const armado = armarAudio({
+            abierto: !!micPub?.track && !micPub.isMuted,
+            crudoMudo: micVigiladoRef.current?.muted === true || micVigiladoRef.current?.readyState === "ended",
+            mic: micReporte ? leerMicrofono(micReporte.values() as Iterable<Record<string, unknown>>) : null,
+            recibido,
+            antes: contadoresAudio,
+          });
+          contadoresAudio = armado.contadores;
+          audio = armado.audio;
+        } catch { /* sin audio en la muestra, pero con llamada */ }
         ultimaMuestraRef.current = muestra;
         marcarLlamadaEnCurso(room.name); // la marca de «sigue viva» se renueva
         // Si la cancelación de ruido está corriendo de verdad (lib/estadoNC.ts).
@@ -796,7 +824,7 @@ export function useLiveKit() {
         if (perfilCam !== perfilCamAntes) console.info(`[LiveKit] cámara: perfil ${perfilCam}`);
         if (conPrueba || perfilCam === "liviano" || perfilCamAntes === "liviano") void aplicarCamara();
         const memoria = await leerMemoria();
-        const filaDeSalud = { sala: room.name, datos: { ...muestra, ...memoria, ahorro: ahorro.activo, nc, perfil_cam: perfilCam, ...(prueba ? { prueba } : {}), ...(trabasDelMinuto.length ? { trabas: trabasDelMinuto } : {}) } };
+        const filaDeSalud = { sala: room.name, datos: { ...muestra, ...memoria, ahorro: ahorro.activo, nc, perfil_cam: perfilCam, ...(prueba ? { prueba } : {}), ...(trabasDelMinuto.length ? { trabas: trabasDelMinuto } : {}), ...(audio ? { audio } : {}) } };
         if (telemetriaRef.current) telemetriaRef.current.salud(filaDeSalud);
         else void (supabase.from as unknown as InsertaSalud)("llamada_salud")
           .insert(filaDeSalud)

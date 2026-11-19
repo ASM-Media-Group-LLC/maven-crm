@@ -208,6 +208,10 @@ const NO_TOCAN_EL_MESSENGER: Record<string, string> = {
     "Cowork: la señal de los supervisores en el Hub y el aviso al dueño. Entra a esta cadena solo porque su " +
     "vigía inserta avisos en notifications, pero usa destinatarios_de_aviso, las tablas de Cowork y pg_cron, " +
     "que este fixture no trae; no toca nada del Messenger.",
+  "20261119011000_calidad_de_llamadas.sql":
+    "Llamadas: el tablero de calidad del dueño y el aviso de audio malo. Usa llamada_salud y llamada_num " +
+    "(salud_de_llamada, que tampoco carga aquí), destinatarios_de_aviso y pg_cron; se prueba en " +
+    "supabase/tests/calidad_de_llamadas.ts. No toca nada del Messenger.",
   "20261111080000_salud_de_llamada.sql":
     "Llamadas: por qué se cae la llamada (llamada_salud, diagnóstico y aviso a la persona y su supervisor). " +
     "Entra a esta cadena solo porque su vigía inserta avisos en notifications, pero usa es_admin_o_dueno, " +
