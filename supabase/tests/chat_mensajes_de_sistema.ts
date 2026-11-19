@@ -204,6 +204,10 @@ const NO_CARGAN_AQUI: Record<string, string> = {
     "Cowork: la señal de los supervisores en el Hub y el aviso al dueño. Entra a esta cadena solo porque su " +
     "vigía inserta avisos en notifications, pero usa destinatarios_de_aviso, las tablas de Cowork y pg_cron, " +
     "que este fixture no trae; no toca nada del Messenger.",
+  "20261119080000_turno_marcar_entrada.sql":
+    "Marcar entrada / pausa / salida (turno_marcas, en_turno). Entra a esta cadena solo porque rehace los vigías " +
+    "que insertan avisos en notifications, pero usa monitor_config, cowork_breaks, las tablas de Argos y pg_cron, " +
+    "que este fixture no trae; no toca nada del Messenger.",
   "20261119011000_calidad_de_llamadas.sql":
     "Llamadas: el tablero de calidad del dueño y el aviso de audio malo. Usa llamada_salud y llamada_num " +
     "(salud_de_llamada, que tampoco carga aquí), destinatarios_de_aviso y pg_cron; se prueba en " +

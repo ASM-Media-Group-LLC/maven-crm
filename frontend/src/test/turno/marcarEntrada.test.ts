@@ -7,7 +7,7 @@ import { duracion, reloj } from "@/components/turno/PiezasTurno";
 // están trabajando y ya». Obligatorio desde el 20/11/2026 00:00 Bogotá.
 
 const fuentes = (import.meta as unknown as {
-  glob: (p: string, o: Record<string, unknown>) => Record<string, string>;
+  glob: (p: string | string[], o: Record<string, unknown>) => Record<string, string>;
 }).glob([
   "/frontend/src/pages/messenger/videocall/LiveKitCallView.tsx",
   "/frontend/src/hooks/useFaceNudge.ts",
