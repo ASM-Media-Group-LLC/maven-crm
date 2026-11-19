@@ -322,7 +322,8 @@ export async function armarCadenaNC(entrada: MediaStreamTrack, alFallar?: (motiv
       fuente.connect(nodo);
       nodo.connect(banco);
       const prueba = await esperarCargaDF(nodo);
-      if (cerrada || ctx.state === "closed") { soltarNodoDF(nodo); return; }
+      // El contexto pudo cerrarse durante la espera (TS no lo sabe: lo leemos de nuevo).
+      if (cerrada || (ctx.state as AudioContextState) === "closed") { soltarNodoDF(nodo); return; }
       if (!prueba || !pruebaDeCargaDF(prueba)) {
         try { fuente.disconnect(nodo); } catch { /* noop */ }
         soltarNodoDF(nodo);
