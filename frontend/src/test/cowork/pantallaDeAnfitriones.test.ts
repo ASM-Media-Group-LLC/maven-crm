@@ -128,8 +128,9 @@ describe("la llamada", () => {
   it("con la cámara opcional, Argos trabaja solo con la cámara prendida", () => {
     expect(llamada).toContain("const argosConCamara = !camaraOpcional || camaraRealOn;");
     expect(llamada).toContain("useFaceNudge(supervisorEncuadre && conSalaViva && argosConCamara ? faceWatch : null);");
-    expect(llamada.match(/activo: !!supervisorEncuadre && conSalaViva && argosConCamara,/g)?.length).toBe(2);
-    expect(llamada).toContain("activo: !!supervisorEncuadre && argosConCamara,");
+    // + solo en turno (Marcar entrada, 19/11/2026).
+    expect(llamada.match(/activo: !!supervisorEncuadre && conSalaViva && argosConCamara && enTurno,/g)?.length).toBe(2);
+    expect(llamada).toContain("activo: !!supervisorEncuadre && argosConCamara && enTurno,");
   });
 
   it("los que pueden ver la pantalla del Hub reciben todo", () => {

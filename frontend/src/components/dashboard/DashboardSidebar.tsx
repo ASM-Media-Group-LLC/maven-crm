@@ -2,6 +2,7 @@ import {
   Activity, AlertTriangle, BarChart3, Bell, BookOpen, Bot, Briefcase, Calculator, CalendarDays, CalendarRange, ChevronRight, Clapperboard, ClipboardCheck, Clock, DollarSign, Eye, FileSpreadsheet, FileText, Gauge, Gift, GraduationCap, HardDrive, Headphones, Home, Inbox, LayoutDashboard, Mail, Map, Megaphone, MessageCircle, Moon, Palette, Phone, Presentation, RefreshCw, Rocket, Search, Settings, Shield, Smartphone, Sun, Ticket, UserCheck, UserCog, UserPlus, Users, Users2, Video, Wallet, Wifi, MonitorDown,
  MoreHorizontal,
 } from "lucide-react";
+import { TurnoEnMenu } from "@/components/turno/TurnoEnMenu";
 import { Fragment, useEffect, useState } from "react";
 import { useIncidentesSalud } from "@/hooks/useIncidentesSalud";
 import { useTheme } from "next-themes";
@@ -1008,6 +1009,10 @@ const DashboardSidebar = () => {
             <NotificationBell />
           </div>
         )}
+        {/* Marcar entrada / pausa / salida (19/11/2026): solo a quien marca turno. */}
+        <div className={cn(collapsed ? "py-1" : "pb-1")}>
+          <TurnoEnMenu compacto={collapsed} />
+        </div>
         <UserFooterBlock collapsed={collapsed} />
       </SidebarFooter>
     </Sidebar>

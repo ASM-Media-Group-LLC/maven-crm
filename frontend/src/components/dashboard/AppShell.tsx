@@ -1,4 +1,6 @@
 import { Suspense, useEffect } from "react";
+import { useMiTurno } from "@/hooks/useMiTurno";
+import { AvisoNovedadTurno } from "@/components/turno/AvisoNovedadTurno";
 import type { CSSProperties } from "react";
 import { BarraDeLlamada } from "@/components/BarraDeLlamada";
 import { Navigate, Outlet, useLocation } from "react-router-dom";
@@ -73,6 +75,9 @@ const AppShell = () => {
   useEffect(() => instalarTablasMovil(), []);
   // App de computador: guarda para Argos qué app/página estuvo al frente (17/11/2026).
   useArgosEscritorio();
+  // La tarjeta del turno pone la bandera «en turno»; aquí también se lee para que
+  // valga aunque el menú esté plegado o en el teléfono (19/11/2026).
+  useMiTurno();
 
   const { popups } = useAnnouncementsByChannel();
   // Aviso global de WhatsApp/Telegram entrante (sonido + notificación del navegador),
@@ -129,6 +134,8 @@ const AppShell = () => {
           <AvisoNasCaido />
           {/* Argos: en su turno y fuera de Cowork → cartel + voz en cualquier página (13/11/2026). */}
           <AvisoFueraDeCowork />
+          {/* Desde el 20/11 se marca entrada, pausa y salida: el aviso, una vez. */}
+          <AvisoNovedadTurno />
           <main className="vidrio-panel relative flex flex-1 flex-col min-h-0 overflow-hidden">
             <Suspense fallback={<ContentLoadingFallback />}>
               {irACowork ? <Navigate to="/cowork" replace /> : <Outlet />}

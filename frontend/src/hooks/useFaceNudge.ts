@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import { estaEnTurno } from "@/lib/turnoActivo";
 import { toast } from "sonner";
 import type { FaceWatch } from "@/hooks/useFaceWatch";
 import { useAuth } from "@/hooks/useAuth";
@@ -170,7 +171,7 @@ export function useFaceNudge(
       // página de Cowork, que puede no estar montada cuando esto corre.
       // Y una llamada de Maven en curso (Messenger/Meet/1:1) silencia igual
       // que la pausa: la cámara está EN esa llamada, no ausente (Grace, 01/09).
-      if (enPausaProp || estaEnPausa() || estaEnLlamadaDeMaven()) {
+      if (enPausaProp || estaEnPausa() || estaEnLlamadaDeMaven() || !estaEnTurno()) {
         ultimoAviso.current = 0;
         llamados.current = 0;
         avisadoCoordinador.current = false;
@@ -342,7 +343,7 @@ export function useScreenShareNudge(compartiendo: boolean, activo: boolean) {
       // La pausa se consulta en cada tic, igual que en el encuadre: quien
       // avisó que se iba no tiene por qué estar compartiendo nada. Y en una
       // llamada de Maven tampoco se reclama pantalla: la misma regla que arriba.
-      if (estaEnPausa() || estaEnLlamadaDeMaven()) { desde.current = null; ultimo.current = 0; llamados.current = 0; return; }
+      if (estaEnPausa() || estaEnLlamadaDeMaven() || !estaEnTurno()) { desde.current = null; ultimo.current = 0; llamados.current = 0; return; }
       // La regla de la sesión, en cada tic. Apagada = acá no se pide pantalla:
       // se olvida el reloj para que, si la vuelven a encender, cuente desde ahí
       // y no desde que la persona entró.
