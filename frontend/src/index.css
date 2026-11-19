@@ -1436,7 +1436,12 @@ html:not(.dark) .avatar-iniciales { background: hsl(var(--av-h, 220) 72% 92%); c
    animationDelay inline) y LEVANTAN al pasar el mouse. Todo se apaga con
    prefers-reduced-motion y en alto contraste. */
 @keyframes vidrio-subir { from { opacity: 0; transform: translateY(22px) scale(.985); } to { opacity: 1; transform: none; } }
-.sube { animation: vidrio-subir .6s cubic-bezier(.2,.8,.2,1) both; }
+/* SIN REBOTE AL NAVEGAR (Alvaro, 18/11/2026: «cuando me muevo de un lugar a otro
+   en el menú es como si rebotara, un parpadeo, un flashazo; en la app también»).
+   Las tarjetas entraban invisibles y 22 px más abajo durante 0,6 s en CADA cambio
+   de sección: eso era el rebote y el flash. Ahora la página aparece de una, quieta.
+   La clase se queda (la usan ~40 pantallas) pero ya no anima. */
+.sube { animation: none; }
 .vidrio-lift { transition: transform .28s cubic-bezier(.2,.8,.2,1), box-shadow .28s cubic-bezier(.2,.8,.2,1); }
 .vidrio-lift:hover { transform: translateY(-4px); box-shadow: 0 24px 50px rgba(30,40,70,.18), inset 0 1px 0 rgba(255,255,255,.95); }
 .dark .vidrio-lift:hover { box-shadow: 0 30px 64px rgba(0,0,0,.55), inset 0 1px 0 rgba(255,255,255,.2); }
