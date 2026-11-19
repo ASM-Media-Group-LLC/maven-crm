@@ -90,7 +90,8 @@ describe("en Cowork la pantalla se comparte sola", () => {
   });
   it("la llamada la pide sola solo en la app, solo en Cowork y nunca en pausa", () => {
     // Desde el 18/11/2026, tampoco a quien tiene la pantalla opcional (el grupo de Luis).
-    expect(llamada).toMatch(/const pantallaSola = !!supervisorEncuadre && !pantallaOpcional && !hideScreenShare && typeof appDeComputador\?\.pantallaAutomatica === "function"/);
+    // Y solo en turno (19/11/2026: «nadie mira fuera del turno»).
+    expect(llamada).toMatch(/const pantallaSola = !!supervisorEncuadre && !pantallaOpcional && !hideScreenShare && enTurno && typeof appDeComputador\?\.pantallaAutomatica === "function"/);
     expect(llamada).toContain("if (estaEnPausa() || antesDePausaRef.current) return;");
   });
   it("si falla, espera 10 s, 20 s, 40 s… hasta 5 min", () => {

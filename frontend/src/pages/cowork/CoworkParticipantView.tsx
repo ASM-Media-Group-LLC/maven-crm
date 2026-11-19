@@ -436,12 +436,16 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
     }
   }, [breakStartedAt, trackMediaState, cowork]);
 
+  // Se llena más abajo, cuando existe handleLeaveRoom (lo usa la salida del turno).
+  const salirDeLaSalaRef = useRef<(() => Promise<void>) | null>(null);
   // La tarjeta del turno (menú) pide pausa / volver / salida (19/11/2026).
   useEffect(() => escucharPedidos((p) => {
     if (p.tipo === "pausar") { if (!breakStartedAt) void toggleBreak(p.kind); return true; }
     if (p.tipo === "volver") { if (breakStartedAt) void toggleBreak(); return true; }
-    // Salida: el servidor ya cerró la pausa; aquí solo se limpia lo local.
+    // Salida: el servidor ya cerró la pausa; se limpia lo local y se sale de la
+    // sala (19/11/2026: fuera del turno nadie ve su pantalla ni su cámara).
     setBreakStartedAt(null); setBreakKind(null); setBreakLimite(null);
+    void salirDeLaSalaRef.current?.();
     return true;
   }), [breakStartedAt, toggleBreak]);
 
@@ -475,6 +479,7 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
     // cada navegacion, que es exactamente el bug que estamos evitando.
     if (window.location.pathname.startsWith("/cowork")) navigate("/dashboard");
   }, [cowork, navigate, endCall]);
+  salirDeLaSalaRef.current = handleLeaveRoom;
 
   // La config de la llamada se arma UNA vez por sala. Los callbacks se leen por
   // ref: si fueran dependencias, cualquier cambio de estado del componente

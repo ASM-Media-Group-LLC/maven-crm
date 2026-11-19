@@ -27,3 +27,23 @@ function suscribir(f: () => void) {
 export function useEnTurno(): boolean {
   return useSyncExternalStore(suscribir, estaEnTurno, estaEnTurno);
 }
+
+// LA MISMA REGLA QUE EL SERVIDOR (en_turno, 19/11/2026: «nadie mira fuera del
+// turno»). Quien no marca turno (dueño, admins, exentos) no se toca. Antes del
+// corte cuenta solo DENTRO de su horario; desde el corte, con la entrada marcada.
+export interface DatosTurno {
+  aplica: boolean;
+  obligatorio: boolean;
+  abierta: boolean;
+  turno_inicio: string | null;
+  turno_fin: string | null;
+}
+
+export function calcularEnTurno(t: DatosTurno, ahora: number): boolean {
+  if (!t.aplica) return true;
+  if (t.obligatorio) return t.abierta;
+  if (!t.turno_inicio || !t.turno_fin) return false;
+  const ini = Date.parse(t.turno_inicio);
+  const fin = Date.parse(t.turno_fin);
+  return Number.isFinite(ini) && Number.isFinite(fin) && ahora >= ini && ahora < fin;
+}

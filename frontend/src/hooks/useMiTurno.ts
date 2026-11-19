@@ -2,7 +2,7 @@ import { useEffect } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
-import { marcarEnTurno } from "@/lib/turnoActivo";
+import { calcularEnTurno, marcarEnTurno } from "@/lib/turnoActivo";
 
 // MI TURNO (Marcar entrada / Pausa / Salida, 19/11/2026): lo que dice la base
 // (mi_turno) y las acciones. Un fallo de red no apaga nada: se queda como estaba.
@@ -47,12 +47,17 @@ export function useMiTurno() {
       return fila ?? null;
     },
   });
-  // La bandera que leen capturas y llamados: antes de la fecha de corte o con la
-  // entrada marcada. Si no hay datos (cargando o falló), no se toca.
+  // La bandera que leen capturas, llamados y la pantalla de Cowork: la misma
+  // regla que el servidor (calcularEnTurno). Se recalcula cada 30 s porque el
+  // horario se acaba solo, sin que cambien los datos. Si no hay datos (cargando
+  // o falló), no se toca: el candado real lo tiene el servidor.
   useEffect(() => {
     const t = q.data;
     if (!t) return;
-    marcarEnTurno(!t.aplica || !t.obligatorio || t.abierta);
+    const aplicar = () => marcarEnTurno(calcularEnTurno(t, Date.now()));
+    aplicar();
+    const id = window.setInterval(aplicar, 30_000);
+    return () => window.clearInterval(id);
   }, [q.data]);
   return q;
 }
