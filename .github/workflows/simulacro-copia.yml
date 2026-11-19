@@ -1,0 +1,42 @@
+# SIMULACRO (Alvaro, 19/11/2026): copia SOLO LA ESTRUCTURA de producción
+# (tablas, reglas, funciones; NADA de datos) al proyecto aparte
+# «maven-simulacro» (glzncicyfrjidvkjjaig), donde corren las 1000 personas
+# inventadas sin tocar producción. Se dispara al subir a la rama
+# simulacro-copia. Usa el mismo SUPABASE_ACCESS_TOKEN de deploy-edge-functions.
+name: simulacro-copia
+on:
+  push:
+    branches: [simulacro-copia]
+  workflow_dispatch:
+concurrency: { group: simulacro-copia, cancel-in-progress: false }
+jobs:
+  copiar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      PROD: lsagslbkliprespbyhts
+      COPIA: glzncicyfrjidvkjjaig
+    steps:
+      - uses: supabase/setup-cli@v1
+        with:
+          version: 2.110.0
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+      - name: Estructura de producción (sin datos)
+        run: |
+          set -euo pipefail
+          test "$COPIA" != "$PROD"
+          mkdir -p /tmp/sim && cd /tmp/sim && supabase init --force >/dev/null 2>&1 || true
+          supabase link --project-ref "$PROD" < /dev/null
+          supabase db dump --linked -f esquema.sql
+          echo "tamaño: $(wc -c < esquema.sql) bytes, $(grep -c '^CREATE TABLE' esquema.sql) tablas"
+      - name: Cargarla en la copia
+        run: |
+          set -euo pipefail
+          cd /tmp/sim
+          supabase link --project-ref "$COPIA" < /dev/null
+          mkdir -p supabase/migrations
+          rm -f supabase/migrations/*.sql
+          cp esquema.sql supabase/migrations/20260101000000_esquema_produccion.sql
+          supabase db push --linked --include-all --yes
