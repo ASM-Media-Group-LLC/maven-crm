@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   alfaPorColor, confianzaDelColor, pesoDeFranja, alfaFinal, colorDePersona,
   personaFusionada, cercaDelContorno, tocaMulticlase,
-  SUBIDA_MAX_DEL_COLOR, FUERZA_DEL_MATE, CADA_CUANTOS_MULTICLASE, FUSION_POR_DEFECTO,
+  SUBIDA_MAX_DEL_COLOR, FUERZA_DEL_MATE, BAJADA_MAX_DEL_COLOR, PERSONA_SEGURA, CADA_CUANTOS_MULTICLASE, FUSION_POR_DEFECTO,
 } from "@/lib/fondoFino/parametros";
 
 // El borde por color del fondo fino (17/11/2026, noche): los huecos del pelo
@@ -36,8 +36,20 @@ describe("borde por color", () => {
     expect(alfaFinal(1, 1, PARED, PELO, PARED, 0)).toBe(1);
   });
 
-  it("saca la pared de un hueco del pelo aunque la máscara diga persona", () => {
-    expect(alfaFinal(1, 1, PARED, PELO, PARED, 1)).toBeCloseTo(1 - FUERZA_DEL_MATE, 5);
+  it("saca la pared de un hueco del pelo donde la máscara duda, con tope", () => {
+    // Máscara insegura (0,7) con «a» 0,8 y color de pared: baja, pero como
+    // mucho BAJADA_MAX_DEL_COLOR (antes sin límite: titilaba y se comía caras).
+    const a = alfaFinal(0.8, 0.7, PARED, PELO, PARED, 1);
+    expect(a).toBeLessThan(0.8 - 0.3);
+    expect(a).toBeGreaterThanOrEqual(0.8 - BAJADA_MAX_DEL_COLOR - 1e-9);
+  });
+
+  it("donde la máscara está SEGURA de que es persona, el color no borra nada (18/11)", () => {
+    // La cara o la mano con un color parecido a la pared: antes quedaba en
+    // 1 − FUERZA_DEL_MATE (la cara borrada en el borde). Ahora se queda.
+    expect(alfaFinal(1, 1, PARED, PELO, PARED, 1)).toBe(1);
+    expect(alfaFinal(1, PERSONA_SEGURA.hasta, PARED, PELO, PARED, 1)).toBe(1);
+    expect(FUERZA_DEL_MATE).toBeGreaterThan(0);
   });
 
   it("sube persona por color poco y solo donde la máscara ya ve algo", () => {

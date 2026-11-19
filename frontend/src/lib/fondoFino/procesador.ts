@@ -33,7 +33,10 @@ import type {
 } from "@livekit/track-processors";
 import { RADIO_DE_BLUR, cadaCuantosCuadrosSegmentar } from "@/lib/fondoDeLlamada";
 import { crearPipelineFondo, type PipelineFondo } from "./pipelineGL";
-import { FUSION_POR_DEFECTO, tocaMulticlase } from "./parametros";
+import {
+  CUADROS_DE_CALENTAMIENTO, FUSION_POR_DEFECTO, REVISAR_RITMO_CADA,
+  promedioMovil, ritmoDelDetector, tocaMulticlase,
+} from "./parametros";
 
 // ── El detector ──────────────────────────────────────────────────────────────
 //
@@ -180,6 +183,13 @@ export class TransformadorFondoFino implements VideoTrackTransformer<OpcionesFon
   private fino?: vision.ImageSegmenter;
   private ultimoTsFino = 0;
   private generacion = 0;
+  // El ritmo medido (ver ritmoDelDetector en parametros.ts): cuánto tardan el
+  // detector y el dibujo, y lo que se decidió con eso.
+  private costoDetectorMs = 0;
+  private costoDibujoMs = 0;
+  private cuadrosMedidos = 0;
+  private ritmo: { cadaCuantos: number; mate: boolean } | null = null;
+  private modoAnterior: "borroso" | "imagen" | null = null;
 
   constructor(opciones: OpcionesFondoFino) {
     this.options = { ...opciones };
@@ -201,6 +211,11 @@ export class TransformadorFondoFino implements VideoTrackTransformer<OpcionesFon
     this.segmentador = await this.crearSegmentador(outputCanvas);
     this.apagado = false;
     this.cuadro = 0;
+    // Cámara o canvas nuevos: el ritmo se vuelve a medir.
+    this.cuadrosMedidos = 0;
+    this.costoDetectorMs = 0;
+    this.costoDibujoMs = 0;
+    this.ritmo = null;
     this.cargarFinoDeFondo(outputCanvas);
     if (this.options.imagePath) {
       await this.cargarFondo(this.options.imagePath).catch((e) => console.warn("[fondo] imagen:", e));
@@ -285,6 +300,11 @@ export class TransformadorFondoFino implements VideoTrackTransformer<OpcionesFon
     if (this.imagen) this.pipeline.ponerImagen(this.imagen.bitmap);
     this.apagado = false;
     this.cuadro = 0;
+    // Cámara o canvas nuevos: el ritmo se vuelve a medir.
+    this.cuadrosMedidos = 0;
+    this.costoDetectorMs = 0;
+    this.costoDibujoMs = 0;
+    this.ritmo = null;
     this.cargarFinoDeFondo(outputCanvas);
   }
 
@@ -327,12 +347,38 @@ export class TransformadorFondoFino implements VideoTrackTransformer<OpcionesFon
     return null;
   }
 
+  /**
+   * Junta cuánto tardan el detector y el dibujo y, cada REVISAR_RITMO_CADA
+   * cuadros, decide el ritmo (ver ritmoDelDetector). Los primeros cuadros no
+   * cuentan: compilan shaders y calientan la GPU.
+   */
+  private medirRitmo(detectorMs: number, dibujoMs: number) {
+    this.cuadrosMedidos++;
+    if (this.cuadrosMedidos <= CUADROS_DE_CALENTAMIENTO) return;
+    if (detectorMs > 0) this.costoDetectorMs = promedioMovil(this.costoDetectorMs, detectorMs);
+    this.costoDibujoMs = promedioMovil(this.costoDibujoMs, dibujoMs);
+    if (this.cuadrosMedidos % REVISAR_RITMO_CADA !== 0 || !(this.costoDetectorMs > 0)) return;
+    const nuevo = ritmoDelDetector({
+      detectorMs: this.costoDetectorMs,
+      dibujoMs: this.costoDibujoMs,
+      base: this.options.cadaCuantos ?? 1,
+    });
+    if (!this.ritmo || nuevo.cadaCuantos !== this.ritmo.cadaCuantos || nuevo.mate !== this.ritmo.mate) {
+      console.info(
+        `[fondo] ritmo: detector cada ${nuevo.cadaCuantos} cuadro(s), borde por color ${nuevo.mate ? "sí" : "no"} ` +
+        `(detector ${this.costoDetectorMs.toFixed(1)} ms, dibujo ${this.costoDibujoMs.toFixed(1)} ms)`,
+      );
+    }
+    this.ritmo = nuevo;
+  }
+
   async transform(frame: VideoFrame, controller: TransformStreamDefaultController<VideoFrame>) {
     let entregado = false;
     try {
       if (!(frame instanceof VideoFrame) || frame.codedWidth === 0 || frame.codedHeight === 0) return;
       const modo = this.modo();
       if (this.apagado || !modo || !this.pipeline || !this.canvas) {
+        this.modoAnterior = null;
         // Sin efecto pedido: el cuadro pasa tal cual (cero costo).
         controller.enqueue(frame);
         entregado = true;
@@ -342,9 +388,21 @@ export class TransformadorFondoFino implements VideoTrackTransformer<OpcionesFon
       const h = frame.displayHeight;
       this.pipeline.ajustarTamano(w, h);
 
+      // Se volvió a poner el fondo después de un rato apagado: la máscara vieja
+      // es de otro momento (otra postura). Se arranca de cero.
+      if (this.modoAnterior === null) {
+        this.pipeline.reiniciarMascara();
+        this.cuadro = 0;
+      }
+      this.modoAnterior = modo;
+
       const t0 = performance.now();
-      const cadaCuantos = Math.max(1, this.options.cadaCuantos ?? 1);
-      if (this.segmentador && this.cuadro % cadaCuantos === 0) {
+      const cadaCuantos = this.ritmo?.cadaCuantos ?? Math.max(1, this.options.cadaCuantos ?? 1);
+      // Sin máscara NO se dibuja nunca (sería todo «fondo»: la cara borrada un
+      // cuadro): se segmenta aunque no toque.
+      const toca = this.cuadro % cadaCuantos === 0 || !this.pipeline.tieneMascara();
+      let segmento = false;
+      if (this.segmentador && toca) {
         const modelo = this.modelo();
         // VIDEO exige marcas de tiempo crecientes.
         const ts = Math.max(performance.now(), this.ultimoTs + 1);
@@ -356,6 +414,7 @@ export class TransformadorFondoFino implements VideoTrackTransformer<OpcionesFon
           resultado.close();
         });
         this.segmentacionMs = performance.now() - t0;
+        segmento = true;
       }
       if (this.fino && tocaMulticlase(this.cuadro)) {
         const ts = Math.max(performance.now(), this.ultimoTsFino + 1);
@@ -376,10 +435,12 @@ export class TransformadorFondoFino implements VideoTrackTransformer<OpcionesFon
       }
       this.cuadro++;
       const t1 = performance.now();
-      this.pipeline.dibujar(frame, modo, this.options.blurRadius ?? 0, this.options.mate ?? true);
+      const mate = (this.options.mate ?? true) && (this.ritmo?.mate ?? true);
+      this.pipeline.dibujar(frame, modo, this.options.blurRadius ?? 0, mate);
       const nuevo = new VideoFrame(this.canvas, { timestamp: frame.timestamp ?? 0 });
       controller.enqueue(nuevo);
       const filtroMs = performance.now() - t1;
+      this.medirRitmo(segmento ? this.segmentacionMs : 0, filtroMs);
       this.options.onFrameProcessed?.({
         processingTimeMs: this.segmentacionMs + filtroMs,
         segmentationTimeMs: this.segmentacionMs,
