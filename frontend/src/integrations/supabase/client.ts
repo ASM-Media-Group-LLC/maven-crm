@@ -8,6 +8,7 @@
 import { createClient } from '@supabase/supabase-js';
 import type { Database } from './types';
 import { conSesionRenovada, crearRenovador } from '@/lib/sesionVencida';
+import { protegerRenovacion } from '@/lib/entrarConPaciencia';
 import { alLatidoDelSocket, LATIDO_REALTIME_MS } from '@/lib/latidoDelRealtime';
 
 const PROD_URL =
@@ -43,8 +44,11 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABL
   // repite una vez, sin depender del reloj del computador (07/10/2026: un
   // reloj atrasado dejó a una persona 2 h y media con el spinner). Ver
   // lib/sesionVencida.ts. `supabase` se lee recién al renovar, ya creado.
+  // 19/11/2026 (simulacro de 1.000 entradas): una renovación que vuelve con
+  // 429/5xx ya no cierra la sesión; se espera al azar y se reintenta. Ver
+  // lib/entrarConPaciencia.ts.
   global: {
-    fetch: conSesionRenovada((input, init) => fetch(input, init), (viejo) => renovarSesion(viejo)),
+    fetch: conSesionRenovada(protegerRenovacion((input, init) => fetch(input, init)), (viejo) => renovarSesion(viejo)),
   },
   // 17/11/2026 («se sale»): el latido de la conexión en vivo (mensajes, avisos,
   // Cowork) corre en un hilo aparte. Con Maven en segundo plano, Chrome adormece
