@@ -20,6 +20,7 @@ import {
 } from "@/lib/sesionDuplicada";
 import { escritorio } from "@/lib/escritorio";
 import { pausarVideoConAppEscondida } from "@/lib/videoEscondido";
+import { MEDIR_REGIONES_CADA, medirRegiones } from "@/lib/pingRegiones";
 import { ESPERA_SIN_FIN_MS, esperaDeReentrada, fueUnaCaida, MAX_REENTRADAS } from "@/lib/conexionSala";
 import { faseSegunSueno, vigiaDelSueno } from "@/lib/equipoDormido";
 import { DEBIL_INICIAL, MIRAR_DEBIL_CADA_MS, siguienteDebil } from "@/lib/internetDebil";
@@ -733,6 +734,7 @@ export function useLiveKit() {
       const reporte = await pista.getRTCStatsReport().catch(() => undefined);
       return reporte ? leerReporte(reporte.values() as Iterable<Record<string, unknown>>) : null;
     };
+    let vueltaRegiones = 0;
     const tomar = async () => {
       try {
         if (roomRef.current !== room || room.state !== ConnectionState.Connected) return;
@@ -824,7 +826,9 @@ export function useLiveKit() {
         if (perfilCam !== perfilCamAntes) console.info(`[LiveKit] cámara: perfil ${perfilCam}`);
         if (conPrueba || perfilCam === "liviano" || perfilCamAntes === "liviano") void aplicarCamara();
         const memoria = await leerMemoria();
-        const filaDeSalud = { sala: room.name, datos: { ...muestra, ...memoria, ahorro: ahorro.activo, nc, perfil_cam: perfilCam, ...(prueba ? { prueba } : {}), ...(trabasDelMinuto.length ? { trabas: trabasDelMinuto } : {}), ...(audio ? { audio } : {}) } };
+        // Cada 10 minutos: qué tan lejos queda cada servidor de llamadas (lib/pingRegiones.ts).
+        const regiones = (vueltaRegiones++ % MEDIR_REGIONES_CADA === 0) ? await medirRegiones() : null;
+        const filaDeSalud = { sala: room.name, datos: { ...muestra, ...memoria, ahorro: ahorro.activo, nc, perfil_cam: perfilCam, ...(prueba ? { prueba } : {}), ...(trabasDelMinuto.length ? { trabas: trabasDelMinuto } : {}), ...(audio ? { audio } : {}), ...(regiones ? { regiones } : {}) } };
         if (telemetriaRef.current) telemetriaRef.current.salud(filaDeSalud);
         else void (supabase.from as unknown as InsertaSalud)("llamada_salud")
           .insert(filaDeSalud)
