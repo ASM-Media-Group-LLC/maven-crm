@@ -63,6 +63,7 @@ import {
   type EstadoCamara, type PerfilDeCamara, type SenalesDeSubida, type TopeDeCodificacion,
 } from "@/lib/perfilDeCamara";
 import { ajustarSuscripciones, esSupervisorEnLaSala, soloAudioDeLosCompaneros } from "@/lib/videoAjeno";
+import { anotarVoz } from "@/lib/vozPropia";
 
 // La recarga a mitad de llamada se revisa UNA vez por página (al primer connect,
 // cuando ya hay sesión para anotarla). Ver saludDeLlamada.ts.
@@ -1927,6 +1928,14 @@ export function useLiveKit() {
         setActiveSpeaker(speakers.length > 0 ? speakers[0].identity : null);
         debouncedRefresh();
       });
+      // Hablar cuenta como actividad (19/11/2026): mientras el micrófono propio
+      // capte voz, se anota cada segundo (lib/vozPropia.ts). Se mira cada segundo
+      // porque ActiveSpeakersChanged solo avisa cuando la lista cambia.
+      const relojVoz = window.setInterval(() => {
+        if (roomRef.current !== room) { window.clearInterval(relojVoz); return; }
+        if (room.localParticipant?.isSpeaking) anotarVoz();
+      }, 1000);
+      room.once(RoomEvent.Disconnected, () => window.clearInterval(relojVoz));
 
       // El desbloqueo de ESTA Room, para que la libreria pueda levantar el
       // contexto de audio suspendido cuando llegue el gesto. Sin esto, el
