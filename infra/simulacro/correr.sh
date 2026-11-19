@@ -24,9 +24,15 @@ persona() { # nombre ciudad cond salida -- comando...
     --env-file ./sim.env -e REGION="$ciudad" -e COND="$cond" -e RTT_MS="${RTT[$ciudad]}" \
     -v /opt/simulacro:/sim:ro -v "$R":/resultados sim-persona "$@" >/dev/null
 }
-esperar() { while [ -n "$(docker ps -q --filter name=sim-)" ]; do sleep 15; done; }
+# Solo las personas de la prueba (sim-carga/red/vivo/llamada); la réplica de
+# llamadas (sim-lk) y el Maven de prueba (sim-web) viven siempre y no se esperan.
+esperar() { while [ -n "$(docker ps -q --filter name=sim-carga- --filter name=sim-red- --filter name=sim-vivo- --filter name=sim-llamada-)" ]; do sleep 15; done; }
+# FASES="2s 3 4" corre solo esas (2s = solo «sin internet»); por defecto, todas.
+FASES=${FASES:-"1 2 3 4"}
+toca() { [[ " $FASES " == *" $1 "* ]]; }
 
 # ── Fase 1: carga total ────────────────────────────────────────────────
+if toca 1; then
 echo "-- Fase 1: 1000 personas, 10 ciudades, internet bueno"
 i=0
 for c in "${CIUDADES[@]}"; do
@@ -35,9 +41,12 @@ for c in "${CIUDADES[@]}"; do
   i=$((i+1))
 done
 esperar
+fi
 
 # ── Fase 2: internet malo, cortes y sin internet ───────────────────────
-for cond in malo cortes sin_internet; do
+CONDS2="malo cortes sin_internet"; toca 2s && CONDS2="sin_internet"
+if toca 2 || toca 2s; then
+for cond in $CONDS2; do
   echo "-- Fase 2: $cond"
   i=0
   for c in madrid bogota miami; do
@@ -47,8 +56,10 @@ for cond in malo cortes sin_internet; do
   done
   esperar
 done
+fi
 
 # ── Fase 3: tiempo real del Messenger ──────────────────────────────────
+if toca 3; then
 for cond in bueno malo cortes sin_internet; do
   echo "-- Fase 3: tiempo real, $cond"
   i=0
@@ -59,22 +70,21 @@ for cond in bueno malo cortes sin_internet; do
   done
   esperar
 done
+fi
 
 # ── Fase 4: llamadas (salas tipo Cowork) ───────────────────────────────
-docker rm -f sim-livekit >/dev/null 2>&1
-docker run -d --rm --name sim-livekit --network host livekit/livekit-server:v1.8.4 --dev --bind 0.0.0.0 >/dev/null
-sleep 8
-IP=$(hostname -I | awk '{print $1}')
+# Contra la RÉPLICA del servidor de llamadas de producción (sim-lk, este VPS).
+if toca 4; then
 for cond in bueno malo cortes; do
   echo "-- Fase 4: llamadas, $cond"
   for c in madrid bogota miami; do
-    persona "sim-llamada-$c" "$c" "$cond" bash -c "lk load-test --url ws://$IP:7880 --api-key devkey --api-secret secret \
+    persona "sim-llamada-$c" "$c" "$cond" bash -c "lk load-test --url ws://144.126.155.175:7880 --api-key $SIM_LK_KEY --api-secret $SIM_LK_SECRET \
       --room sala-$c-$cond --video-publishers 6 --audio-publishers 8 --subscribers 10 --video-resolution medium \
       --duration 3m > /resultados/llamada__${c}__${cond}.txt 2>&1"
   done
   esperar
 done
-docker rm -f sim-livekit >/dev/null 2>&1
+fi
 
 echo "== Terminó $(date -u +%H:%M) UTC"
 python3 /opt/simulacro/agrega.py "$R" > "$R/semaforo.json" && echo "semaforo listo"
