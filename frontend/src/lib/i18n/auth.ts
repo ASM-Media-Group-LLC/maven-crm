@@ -23,6 +23,15 @@ export const auth = {
   "auth.requiredFields": { es: "Campos requeridos", en: "Required fields" },
   "auth.requiredFieldsDesc": { es: "Por favor completa todos los campos.", en: "Please fill in all the fields." },
   "auth.loginError": { es: "Error al iniciar sesión", en: "Sign-in error" },
+  "auth.muchaGenteReintentando": {
+    es: "Mucha gente entrando a la vez, reintentando…",
+    en: "Lots of people signing in at once, retrying…",
+  },
+  "auth.muchaGenteTitulo": { es: "Mucha gente entrando ahora", en: "Lots of people signing in right now" },
+  "auth.muchaGenteDesc": {
+    es: "No pudimos entrar todavía. Espera un minuto y vuelve a intentarlo; tus datos están bien.",
+    en: "We couldn't sign you in yet. Wait a minute and try again; your details are fine.",
+  },
   "auth.registerTitle": { es: "Crear cuenta", en: "Create account" },
   "auth.registerSubtitle": { es: "Regístrate para empezar a usar Maven CRM", en: "Sign up to start using Maven CRM" },
   "auth.fullName": { es: "Nombre completo *", en: "Full name *" },

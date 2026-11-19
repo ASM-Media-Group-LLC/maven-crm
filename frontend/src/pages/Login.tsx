@@ -9,6 +9,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { useLanguage } from "@/hooks/useLanguage";
 import { traducirErrorAuth } from "@/lib/authErrors";
+import { entrarConReintentos, esReintentableAlEntrar } from "@/lib/entrarConPaciencia";
 import { escritorio } from "@/lib/escritorio";
 import { Eye, EyeOff, Loader2 } from "lucide-react";
 
@@ -38,6 +39,9 @@ const Login = () => {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  // Cambio de turno (simulacro 19/11/2026): si el servidor dice «espera», se
+  // reintenta solo y se avisa con calma en vez de un error rojo.
+  const [reintentando, setReintentando] = useState(false);
 
   // En la app de computador (Alvaro, 18/11/2026: «que el app recuerde tu login
   // y password»): la app no trae el gestor de contraseñas de Chrome, así que
@@ -77,10 +81,18 @@ const Login = () => {
     }
 
     setLoading(true);
-    const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
+    setReintentando(false);
+    const { error } = await entrarConReintentos(
+      () => supabase.auth.signInWithPassword({ email: email.trim(), password }),
+      { alReintentar: () => setReintentando(true) },
+    );
     setLoading(false);
+    setReintentando(false);
 
-    if (error) {
+    if (error && esReintentableAlEntrar(error)) {
+      // Se insistió ~30 s y el servidor sigue lleno: aviso tranquilo, no error.
+      toast({ title: t("auth.muchaGenteTitulo"), description: t("auth.muchaGenteDesc") });
+    } else if (error) {
       toast({ title: t("auth.loginError"), description: traducirErrorAuth(error), variant: "destructive" });
     } else {
       // Entró bien: la app lo recuerda para la próxima (solo en la app de computador).
@@ -138,6 +150,11 @@ const Login = () => {
             {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             {t("auth.loginButton")}
           </Button>
+          {reintentando && (
+            <p role="status" aria-live="polite" className="text-center text-sm text-white/60">
+              {t("auth.muchaGenteReintentando")}
+            </p>
+          )}
           {accesoDeLaApp && <p className="text-center text-xs text-white/40">{t("auth.recordadoEnApp")}</p>}
         </form>
 
