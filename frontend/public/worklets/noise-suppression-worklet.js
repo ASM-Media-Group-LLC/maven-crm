@@ -26,14 +26,14 @@ class NoiseSuppressorProcessor extends AudioWorkletProcessor {
     this._segundosSubida = 15;
 
     // Gate parameters
-    this._gateRatio = 2.0; // Signal must be 2x above noise floor
+    this._gateRatio = 1.6; // RATIO_PUERTA (afinada 18/11/2026; antes 2.0)
     this._smoothedGain = 0.0;
-    this._holdSamples = Math.floor(0.20 * sampleRate); // 200ms hold after voice
+    this._holdSamples = Math.floor(0.4 * sampleRate); // SEGUNDOS_SOSTEN (antes 0.20)
     this._holdCounter = 0;
 
     // Per-sample gain smoothing coefficients
     this._attackCoeff = 1 - Math.exp(-1 / (0.003 * sampleRate)); // 3ms attack
-    this._releaseCoeff = 1 - Math.exp(-1 / (0.04 * sampleRate)); // 40ms release
+    this._releaseCoeff = 1 - Math.exp(-1 / (0.15 * sampleRate)); // SEGUNDOS_CIERRE (antes 0.04)
 
     // Enabled state (controlled from main thread)
     this._enabled = true;
@@ -111,7 +111,7 @@ class NoiseSuppressorProcessor extends AudioWorkletProcessor {
     } else {
       // Soft attenuation: quadratic curve for smooth transition
       const ratio = rms / Math.max(threshold, 0.0001);
-      targetGain = Math.max(ratio * ratio, 0.02); // ~-34dB noise floor
+      targetGain = Math.max(ratio * ratio, 0.1); // GANANCIA_MINIMA, -20 dB (antes 0.02)
     }
 
     // Apply gain with per-sample smoothing to all channels

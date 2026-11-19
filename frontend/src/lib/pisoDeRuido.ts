@@ -24,7 +24,19 @@
 //     seguidor sube hasta el nivel del ruido y el piso lo sigue.
 
 export const PISO_MINIMO = 0.00008;
-export const RATIO_PUERTA = 2.0;
+// ── PUERTA AFINADA (Alvaro, 18/11/2026: «el sonido a veces falla»; eligió
+// afinarla para todos). La puerta cortaba sílabas suaves y finales de palabra:
+// abría solo con el doble del piso, se cerraba a los 200 ms y en 40 ms bajaba
+// la voz a -34 dB. Ahora abre con 1,6× el piso, aguanta 400 ms después de la
+// voz, cierra en 150 ms y nunca baja de -20 dB (RNNoise ya quitó el ruido; la
+// puerta es solo el remate). Los mismos números en el worklet (port fiel).
+export const RATIO_PUERTA = 1.6;
+/** Cuánto se queda abierta después de la última voz, en segundos. */
+export const SEGUNDOS_SOSTEN = 0.4;
+/** Cuánto tarda en cerrarse, en segundos (constante de tiempo). */
+export const SEGUNDOS_CIERRE = 0.15;
+/** Lo mínimo que deja pasar con la puerta cerrada (0,1 = -20 dB). */
+export const GANANCIA_MINIMA = 0.1;
 export const ADAPTACION_BAJADA = 0.997;
 /** Constante de tiempo de SUBIDA del seguidor de mínimos, en segundos. */
 export const SEGUNDOS_SUBIDA = 15;
