@@ -26,10 +26,11 @@ const FOTOS: Record<string, string> = {
   "b/1.jpg": pantallazo("#334155", "#0f172a", "Escritorio"),
 };
 
-const base = {
+type Base = Pick<CasoArgos, "avatar_url" | "en_curso" | "puede_juzgar" | "puede_corregir" | "historial" | "juzgado_por" | "juzgado_at" | "frase" | "veredicto">;
+const base: Base = {
   avatar_url: null, en_curso: false, puede_juzgar: false, puede_corregir: false, historial: [],
   juzgado_por: null, juzgado_at: null, frase: null, veredicto: null,
-} as const;
+};
 
 const CASOS: CasoArgos[] = [
   {
