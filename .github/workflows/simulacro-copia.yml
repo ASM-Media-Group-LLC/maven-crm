@@ -31,7 +31,7 @@ jobs:
           supabase link --project-ref "$PROD" < /dev/null
           supabase db dump --linked -f esquema.sql
           echo "tamaño: $(wc -c < esquema.sql) bytes, $(grep -c '^CREATE TABLE' esquema.sql) tablas"
-      - name: Ver la instrucción que falla
+      - name: Quitar lo que habla hacia afuera (webhooks de la base)
         run: |
           cd /tmp/sim
           python3 - <<'PY'
@@ -57,8 +57,9 @@ jobs:
                   cur=[]
               else: cur.append(c)
               i+=1
-          for k in (4089,4090,4091,4092):
-              if k-1<len(out): print('--- #%d:'%k, out[k-1][:400].replace('\n',' '))
+          limpio=[t for t in out if 'supabase_functions' not in t]
+          print('instrucciones:', len(out), 'quitadas (webhooks):', len(out)-len(limpio))
+          open('esquema_limpio.sql','w').write(';\n\n'.join(limpio)+';\n')
           PY
       - name: Cargarla en la copia
         run: |
@@ -67,5 +68,5 @@ jobs:
           supabase link --project-ref "$COPIA" < /dev/null
           mkdir -p supabase/migrations
           rm -f supabase/migrations/*.sql
-          cp esquema.sql supabase/migrations/20260101000000_esquema_produccion.sql
+          cp esquema_limpio.sql supabase/migrations/20260101000000_esquema_produccion.sql
           supabase db push --linked --include-all --yes --debug 2>&1 | grep -iE -B2 -A8 "error|failed" | head -80; exit ${PIPESTATUS[0]}
