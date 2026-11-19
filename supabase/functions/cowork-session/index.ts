@@ -160,13 +160,6 @@ function normalizarReloj(raw: unknown, base: ReglaReloj): ReglaReloj {
   return { fueraDeCamaraSeg: numeroEntre(r.fueraDeCamaraSeg, SEG_MIN, SEG_MAX, base.fueraDeCamaraSeg) };
 }
 
-/** Qué exige el reloj en esta sesión = qué alertas tiene encendidas el
- *  supervisor (cámara y pantalla). Sin reglas propias, las dos. */
-function exigenciasDelReloj(alertRules: unknown): Exigencias {
-  const r = normalizarReglas(alertRules ?? {});
-  return { camara: r.camara.activa, pantalla: r.pantalla.activa };
-}
-
 /** Umbral del reloj (ms) que fija la SESIÓN; sin reglas propias, el estándar. */
 function umbralFueraDeCamaraMs(alertRules: unknown): number {
   const reloj = alertRules && typeof alertRules === "object"
@@ -862,20 +855,18 @@ serve(async (req) => {
       const { data: sesionReloj } = await admin.from("cowork_sessions")
         .select("alert_rules").eq("id", sessionId).maybeSingle();
       const umbralMs = umbralFueraDeCamaraMs(sesionReloj?.alert_rules);
-      // Y qué exige: si el supervisor apagó la pantalla para su equipo
-      // (managers), el reloj no se detiene por pantalla. Jhon, 07/09.
-      // El anfitrión, cámara y pantalla SIEMPRE (Alvaro, 13/11/2026: «con cámara y
-      // pantalla como todos»): las reglas de la sesión son para su equipo.
-      let exige = esAnfitrion ? EXIGE_TODO : exigenciasDelReloj(sesionReloj?.alert_rules);
-      // Salvo el grupo de Luis (argos_reglas_persona: Luis, Juan Pachas, Grace,
-      // Jackeline y Alvaro René — Alvaro, 18/11/2026): ni cámara ni pantalla
-      // obligatorias; su tiempo cuenta mientras estén conectados. Lo dice la
-      // base, nunca el navegador.
-      if (esAnfitrion) {
-        const { data: regla } = await admin.from("argos_reglas_persona")
-          .select("pantalla_obligatoria, camara_obligatoria").eq("user_id", userId).maybeSingle();
-        if (regla) {
-          exige = { camara: regla.camara_obligatoria !== false, pantalla: regla.pantalla_obligatoria !== false };
+      // Y qué exige: lo dice el PUESTO de la persona (Alvaro, 19/11/2026: «solo
+      // manda el puesto»): cada puesto pide cámara y pantalla por separado, y las
+      // reglas de la sala ya no las apagan. Lo dice la base, nunca el navegador.
+      // Si la base no responde, se exige todo (como antes de los puestos).
+      let exige: Exigencias = EXIGE_TODO;
+      {
+        const { data: ex, error: errEx } = await admin.rpc("exigencias_de", { _uid: userId });
+        const e = ex as { camara?: unknown; pantalla?: unknown } | null;
+        if (!errEx && e && typeof e.camara === "boolean" && typeof e.pantalla === "boolean") {
+          exige = { camara: e.camara, pantalla: e.pantalla };
+        } else if (errEx) {
+          console.error("cowork-session: exigencias_de", errEx.message);
         }
       }
 

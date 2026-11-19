@@ -23,6 +23,7 @@ import { nombreYApellido } from "@/lib/pausaCowork";
 import { pedirApagarPorPausa, pedirReanudarTrasPausa } from "@/lib/ordenesDePausa";
 import { marcarPausa } from "@/lib/coworkPausa";
 import { fijarReglas, normalizarReglas } from "@/lib/coworkReglas";
+import { useMisExigencias } from "@/hooks/useExigencias";
 import { cn } from "@/lib/utils";
 import { rpcBanoConsumido, rpcConsumoPausas, leerLimitesPausa } from "@/lib/coworkTablas";
 import MiPausa, { type TipoPausa } from "./MiPausa";
@@ -74,6 +75,15 @@ export function formatBreak(totalSeconds: number): string {
 function relojParaPresencia(): { relojEstado: string | null; relojSegundosHoy: number | null; relojEn: number | null } {
   const r = leerReloj();
   return r ? { relojEstado: r.estado, relojSegundosHoy: r.segundosHoy, relojEn: r.en } : { relojEstado: null, relojSegundosHoy: null, relojEn: null };
+}
+
+// Lo que el PUESTO de esta persona pide (Alvaro, 19/11/2026: «solo manda el
+// puesto»). Viaja por presencia para que el supervisor no reciba alarmas de
+// pantalla o cámara de quien no las tiene obligatorias. Vive a nivel de módulo
+// por lo mismo que el reloj: la presencia se publica desde varios lugares.
+let exigenciasVigentes: { exigeCamara: boolean; exigePantalla: boolean } = { exigeCamara: true, exigePantalla: true };
+function exigenciasParaPresencia(): { exigeCamara: boolean; exigePantalla: boolean } {
+  return exigenciasVigentes;
 }
 
 // Qué pausas muestra el resumen "Hoy en pausas" de la pantalla de pausa propia.
@@ -283,9 +293,17 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
   // leen en cada tic. Como el realtime de la sesión refetchea la fila, un cambio
   // del supervisor pasa por acá y llega en vivo. `null`/sin columna = estándar.
   const alertRulesDeSesion: unknown = cowork.session?.alert_rules;
+  // La cámara y la pantalla, en cambio, las pide el PUESTO (19/11/2026): la sala
+  // ya no las apaga, y a quien su puesto no se las pide no se le avisa por ellas.
+  // Si la base no contesta, se piden las dos (como antes).
+  const misExigencias = useMisExigencias();
+  const exigeCamara = misExigencias.data?.camara ?? true;
+  const exigePantalla = misExigencias.data?.pantalla ?? true;
   useEffect(() => {
-    fijarReglas(normalizarReglas(alertRulesDeSesion));
-  }, [alertRulesDeSesion]);
+    exigenciasVigentes = { exigeCamara, exigePantalla };
+    const r = normalizarReglas(alertRulesDeSesion);
+    fijarReglas({ ...r, camara: { ...r.camara, activa: exigeCamara }, pantalla: { ...r.pantalla, activa: exigePantalla } });
+  }, [alertRulesDeSesion, exigeCamara, exigePantalla]);
   // Los topes salen de la BASE (cowork_break_limits), no de un número escrito
   // acá. El menú decía "Break (30 min)" y "Baño" a secas: si mañana alguien
   // cambia el tope en la tabla, el cartel seguiría prometiendo lo viejo.
@@ -331,6 +349,7 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
       onBreak: !!breakStartedAt, breakStartedAt, breakKind, banoConsumidoSeg: banoConsumido,
       ...faceRef.current,
       ...relojParaPresencia(),
+        ...exigenciasParaPresencia(),
     });
   }), [trackMediaState, breakStartedAt, breakKind, banoConsumido]);
   const recargarConsumido = useCallback(async () => {
@@ -425,6 +444,7 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
         onBreak: !cerrando, breakStartedAt: inicio, breakKind: cerrando ? null : kind,
         ...faceRef.current,
         ...relojParaPresencia(),
+        ...exigenciasParaPresencia(),
       });
       actualizarLatido({ onBreak: !cerrando });
     } catch (e) {
@@ -519,6 +539,7 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
         banoConsumidoSeg: banoConsumido,
         ...faceRef.current,
         ...relojParaPresencia(),
+        ...exigenciasParaPresencia(),
       });
     },
     [breakStartedAt, breakKind, banoConsumido, trackMediaState]
@@ -539,6 +560,7 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
         onBreak: !!breakStartedAt, breakStartedAt, breakKind, banoConsumidoSeg: banoConsumido,
         ...faceRef.current,
         ...relojParaPresencia(),
+        ...exigenciasParaPresencia(),
       });
     },
     [trackMediaState, breakStartedAt, breakKind, banoConsumido]
@@ -791,6 +813,9 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
       onMediaStateChange: handleMediaStateChange,
       onFaceStateChange: handleFaceStateChange,
       supervisorEncuadre: true,
+      // Lo que el puesto no pide no se le exige (puede compartir igual si quiere).
+      camaraOpcional: !exigeCamara,
+      pantallaOpcional: !exigePantalla,
       // Ven a sus compañeros como siempre, con pantalla y cámara (Alvaro, 14/11/2026:
       // «tienen que quedar como estaba» — las pantallas de los compañeros hacen falta
       // para los empalmes). El modo «solo audio» (lib/videoAjeno.ts) queda apagado.
@@ -798,7 +823,7 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
       leaveIcon: LogOut,
     });
   }, [connectedLkRoom, oneOnOneRoom, meetRoom, displayName, myRoom?.name, startCall,
-      getToken, handleLeaveRoom, handleMediaStateChange, handleFaceStateChange]);
+      getToken, handleLeaveRoom, handleMediaStateChange, handleFaceStateChange, exigeCamara, exigePantalla]);
 
   if (pestanaPrincipal === false) {
     return (

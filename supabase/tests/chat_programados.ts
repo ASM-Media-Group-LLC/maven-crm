@@ -203,6 +203,10 @@ const NO_CARGAN_AQUI: Record<string, string> = {
     "Turno: pausas por modalidad de cada empresa, quién cambia a quién e inactividad. Entra a esta cadena solo " +
     "porque sus avisos insertan en notifications, pero usa las posiciones, el turno, Cowork y Argos, que este " +
     "fixture no trae; no toca nada del Messenger.",
+  "20261119230000_camara_pantalla_por_puesto.sql":
+    "Puestos: la cámara y la pantalla las pide el puesto y Argos va con la pantalla. Entra a esta cadena solo " +
+    "porque sus avisos insertan en notifications, pero usa las posiciones, Argos, el Hub y Cowork, que este " +
+    "fixture no trae; no toca nada del Messenger.",
   "20261119011000_calidad_de_llamadas.sql":
     "Llamadas: el tablero de calidad del dueño y el aviso de audio malo. Entra a esta cadena solo porque su vigía " +
     "inserta avisos en notifications, pero usa llamada_salud y llamada_num (salud_de_llamada, que tampoco carga " +

@@ -76,9 +76,12 @@ describe("la regla de cada anfitrión", () => {
     expect(grupo).toMatch(/where public\.is_in_role_group\(ur\.user_id, 'admin'\);/);
   });
 
-  it("el reloj del anfitrión exige lo que dice la base", () => {
-    expect(fuente("cowork-session/index.ts")).toContain(
-      "exige = { camara: regla.camara_obligatoria !== false, pantalla: regla.pantalla_obligatoria !== false };");
+  it("el reloj exige lo que pide el PUESTO (19/11/2026), no la regla por persona ni la sala", () => {
+    const e = fuente("cowork-session/index.ts");
+    expect(e).toContain('admin.rpc("exigencias_de", { _uid: userId })');
+    expect(e).toContain("exige = { camara: e.camara, pantalla: e.pantalla };");
+    expect(e).not.toContain("argos_reglas_persona");
+    expect(e).not.toContain("exigenciasDelReloj");
   });
 });
 

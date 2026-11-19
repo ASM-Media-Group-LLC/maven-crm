@@ -19,9 +19,9 @@ export function usePosicionesArgos(habilitado: boolean): Map<string, PosicionDe>
     staleTime: 60_000,
     queryFn: async (): Promise<Map<string, PosicionDe> | null> => {
       const [pos, asig, marcas] = await Promise.all([
-        sinTipar.from("posiciones_borrador").select("id, nombre, orden, activa"),
+        sinTipar.from("posiciones_borrador").select("id, nombre, orden, activa, pide_pantalla"),
         sinTipar.from("posiciones_borrador_personas").select("user_id, posicion_id"),
-        sinTipar.from("personas_borrador_marcas").select("user_id, sin_camara, deshabilitada"),
+        sinTipar.from("personas_borrador_marcas").select("user_id, deshabilitada"),
       ]);
       if (pos.error || asig.error || marcas.error) return null;
       const lista = (pos.data ?? []) as PosicionBorrador[];

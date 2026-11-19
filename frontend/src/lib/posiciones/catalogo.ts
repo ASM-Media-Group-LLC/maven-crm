@@ -114,6 +114,11 @@ export const CATALOGO_POSICIONES: SeccionCatalogo[] = [
                 "clave": "N:argos.apps_ajenas",
                 "etiqueta": "posiciones.c.vigilar_apps_ajenas",
                 "nueva": true
+              },
+              {
+                "clave": "N:camara_pantalla.decidir",
+                "etiqueta": "posiciones.c.decidir_camara_pantalla",
+                "nueva": true
               }
             ]
           },

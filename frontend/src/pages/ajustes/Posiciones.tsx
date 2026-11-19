@@ -704,7 +704,8 @@ function ListaPersonas({ datos }: { datos: NonNullable<ReturnType<typeof useDato
                     </div>
                     <div>
                       <div className="flex flex-col gap-1.5 text-xs">
-                        {([["protegido", "posiciones.personas.protegido"], ["sin_camara", "posiciones.personas.sinCamara"], ["deshabilitada", "posiciones.personas.deshabilitada"]] as const).map(([campo, k]) => (
+                        {/* La cámara y la pantalla ya no se marcan por persona: las pide el puesto (Ajustes → Empresa, 19/11/2026). */}
+                        {([["protegido", "posiciones.personas.protegido"], ["deshabilitada", "posiciones.personas.deshabilitada"]] as const).map(([campo, k]) => (
                           <label key={campo} className={cn("flex cursor-pointer items-center gap-2", !m?.[campo] && "text-muted-foreground")}>
                             <Casilla checked={!!m?.[campo]} onCheckedChange={(v) => cambiarMarca.mutate({ uid: p.id, campo, v: v === true })} />{t(k)}
                           </label>

@@ -102,6 +102,7 @@ export const posiciones = {
   "posiciones.c.gestionar_horario_y_pausa": { es: "Cambiar el horario y la pausa de su gente (nunca la propia, ni a admins ni al dueño)", en: "Change their people's schedule and break (never their own, nor admins or the owner)" },
   "posiciones.c.configurar_la_empresa": { es: "Configurar la empresa (Ajustes → Empresa: modalidades de pausa y lo que es de toda la empresa)", en: "Configure the company (Settings → Company: break plans and company-wide settings)" },
   "posiciones.c.lo_que_argos_le_vigila": { es: "Lo que Argos le vigila", en: "What Argos watches" },
+  "posiciones.c.decidir_camara_pantalla": { es: "Decidir qué puestos piden cámara y pantalla (Ajustes → Empresa; nunca el puesto Admin ni el suyo)", en: "Decide which positions require camera and screen (Settings → Company; never the Admin position or their own)" },
   "posiciones.c.vigilar_apps_ajenas": { es: "Se le vigilan las apps ajenas (alerta grave a la hora; su trabajo cabe en la lista)", en: "Watch non-work apps (serious alert after one hour; their work fits the list)" },
   "posiciones.c.juzgar_casos_de_argos": { es: "Juzgar los casos de Argos (cometió, no cometió, justificado)", en: "Judge Argos cases (did it, didn't, justified)" },
   "posiciones.c.obligado_a_revisar": { es: "Tiene que revisar cada día (cartel si se atrasa)", en: "Must review every day (blocking banner if late)" },

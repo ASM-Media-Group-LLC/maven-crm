@@ -25,6 +25,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.4";
 import { asuntoGracia, correoGraciaHTML, type CierreGracia } from "../_shared/correo-gracia.ts";
+import { asuntoExigencias, correoExigenciasHTML, type CambioExigencias } from "../_shared/correo-exigencias.ts";
 import { asuntoPrimerContacto, correoPrimerContactoHTML, type PrimerContacto } from "../_shared/correo-primer-contacto.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
@@ -165,6 +166,43 @@ async function correrPrimerContacto(admin: Admin): Promise<{ pendientes: number;
   return { pendientes: filas.length, enviados, errores };
 }
 
+// ── 5) CÁMARA Y PANTALLA POR PUESTO (Alvaro, 19/11/2026) ──
+// Cuando alguien quita o pide la cámara o la pantalla a un puesto (o pasa a una
+// persona a un puesto que pide distinto), la base lo anota y avisa por la
+// campana. Aquí sale el correo al dueño, a los admins y a RR. HH. de la empresa.
+async function correrExigencias(admin: Admin): Promise<{ pendientes: number; enviados: number; errores: number }> {
+  const { data, error } = await admin.rpc("exigencias_por_correo");
+  if (error) throw new Error(error.message);
+  const filas = (data ?? []) as CambioExigencias[];
+  if (filas.length === 0) return { pendientes: 0, enviados: 0, errores: 0 };
+
+  const emailPor = new Map<string, string>();
+  const { data: lista, error: errLista } = await admin.auth.admin.listUsers({ page: 1, perPage: 1000 });
+  if (errLista) throw new Error(errLista.message);
+  for (const u of (lista?.users ?? []) as Array<{ id: string; email?: string }>) if (u.email) emailPor.set(u.id, u.email);
+
+  let enviados = 0, errores = 0;
+  for (const f of filas) {
+    const to = [...new Set((f.destinatarios ?? []).map((id) => emailPor.get(id)).filter((e): e is string => !!e))];
+    if (to.length === 0) {
+      // Nadie con correo: se marca igual (la campana ya avisó) para no reintentar para siempre.
+      await admin.rpc("exigencias_marcar_correo", { _id: f.id, _correo_a: [], _ok: true });
+      continue;
+    }
+    const { error: errEnvio } = await admin.functions.invoke("send-notification-email", {
+      body: { to, subject: asuntoExigencias(f), html: correoExigenciasHTML(f), tag: "camara-pantalla" },
+    });
+    if (errEnvio) {
+      errores++;
+      await admin.rpc("exigencias_marcar_correo", { _id: f.id, _correo_a: to, _ok: false });
+      continue;
+    }
+    const { error: errMarca } = await admin.rpc("exigencias_marcar_correo", { _id: f.id, _correo_a: to, _ok: true });
+    if (errMarca) errores++; else enviados++;
+  }
+  return { pendientes: filas.length, enviados, errores };
+}
+
 interface Persona {
   user_id: string; tenant_id: string;
   entrada: string; entradaMin: number; tolerancia: number;
@@ -184,6 +222,8 @@ serve(async (req) => {
   const gracia = await correrGracia(admin).catch((e) => ({ error: (e as Error).message }));
   // El aviso del primer contacto entre chatters (también aparte).
   const primerContacto = await correrPrimerContacto(admin).catch((e) => ({ error: (e as Error).message }));
+  // El correo de cámara y pantalla por puesto (también aparte).
+  const exigencias = await correrExigencias(admin).catch((e) => ({ error: (e as Error).message }));
   const ahora = new Date();
   const hoy = diaBogota(ahora);
   const nowMin = minBogota(ahora);
@@ -238,7 +278,7 @@ serve(async (req) => {
     });
   }
   if (candidatos.length === 0) {
-    return new Response(JSON.stringify({ ok: true, candidatos: 0, gracia, primerContacto }), { headers: { ...CORS, "Content-Type": "application/json" } });
+    return new Response(JSON.stringify({ ok: true, candidatos: 0, gracia, primerContacto, exigencias }), { headers: { ...CORS, "Content-Type": "application/json" } });
   }
 
   // Ya avisados hoy (cada tipo su tabla).
@@ -341,5 +381,5 @@ serve(async (req) => {
     }
   }
 
-  return new Response(JSON.stringify({ ok: true, candidatos: candidatos.length, tardNuevas, camNuevas, gracia, primerContacto }), { headers: { ...CORS, "Content-Type": "application/json" } });
+  return new Response(JSON.stringify({ ok: true, candidatos: candidatos.length, tardNuevas, camNuevas, gracia, primerContacto, exigencias }), { headers: { ...CORS, "Content-Type": "application/json" } });
 });

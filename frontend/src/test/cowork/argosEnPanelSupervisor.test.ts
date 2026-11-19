@@ -28,9 +28,9 @@ describe("Argos en el panel del supervisor", () => {
 
   it("el servidor le cuenta el reloj al anfitrión sin sala y le exige cámara y pantalla", () => {
     expect(e).toMatch(/esAnfitrion = membresia\?\.role === "host";/);
-    expect(e).toMatch(/let exige = esAnfitrion \? EXIGE_TODO : exigenciasDelReloj/);
-    // Salvo el grupo de Luis: lo que exige lo dice la base, nunca el navegador.
-    expect(e).toMatch(/exige = \{ camara: regla\.camara_obligatoria !== false, pantalla: regla\.pantalla_obligatoria !== false \};/);
+    // Lo que exige lo dice el PUESTO, desde la base (19/11/2026), nunca el navegador.
+    expect(e).toMatch(/let exige: Exigencias = EXIGE_TODO;/);
+    expect(e).toMatch(/admin\.rpc\("exigencias_de", \{ _uid: userId \}\)/);
     expect(e).not.toMatch(/body\.pantallaYaCompartida/);
     expect(e).toMatch(/room_id: salaId/);
   });

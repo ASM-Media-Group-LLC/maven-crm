@@ -2,14 +2,16 @@ import { describe, expect, it } from "vitest";
 import { aplicarPosiciones, mapaDePosiciones } from "@/lib/posicionesArgos";
 
 // JORNADA POR POSICIÓN (Alvaro, 19/11/2026): una caja por posición; quien es
-// Admin + otra posición va a la de trabajo; los no obligados a cámara/pantalla
-// y los solo-Admin salen en gris sin nota; el dueño y los deshabilitados no salen.
+// Admin + otra posición va a la de trabajo; quien tiene un puesto que no pide
+// pantalla (sin Argos, 19/11/2026) y los solo-Admin salen en gris sin nota; el
+// dueño y los deshabilitados no salen.
 
 const POS = [
-  { id: "d", nombre: "Dueño", orden: 0, activa: true },
-  { id: "a", nombre: "Admin", orden: 1, activa: true },
+  { id: "d", nombre: "Dueño", orden: 0, activa: true, pide_pantalla: false },
+  { id: "a", nombre: "Admin", orden: 1, activa: true, pide_pantalla: false },
   { id: "h", nombre: "HHRR", orden: 2, activa: true },
   { id: "c", nombre: "Closer", orden: 3, activa: true },
+  { id: "ce", nombre: "Closer externo", orden: 4, activa: true, pide_pantalla: false },
   { id: "ch", nombre: "Chatter", orden: 6, activa: true },
   { id: "x", nombre: "Vieja", orden: 20, activa: false },
 ];
@@ -19,16 +21,13 @@ describe("mapaDePosiciones", () => {
     { user_id: "grace", posicion_id: "a" }, { user_id: "grace", posicion_id: "h" },
     { user_id: "jack", posicion_id: "a" }, { user_id: "jack", posicion_id: "c" },
     { user_id: "soloAdmin", posicion_id: "a" },
-    { user_id: "pachas", posicion_id: "c" },
+    { user_id: "pachas", posicion_id: "ce" },
     { user_id: "chat", posicion_id: "ch" },
     { user_id: "yo", posicion_id: "d" },
     { user_id: "lore", posicion_id: "ch" },
     { user_id: "vieja", posicion_id: "x" },
   ], [
-    { user_id: "grace", sin_camara: true, deshabilitada: false },
-    { user_id: "jack", sin_camara: true, deshabilitada: false },
-    { user_id: "pachas", sin_camara: true, deshabilitada: false },
-    { user_id: "lore", sin_camara: false, deshabilitada: true },
+    { user_id: "lore", deshabilitada: true },
   ]);
 
   it("quien es Admin y algo más va a la caja de su trabajo", () => {
