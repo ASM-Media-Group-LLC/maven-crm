@@ -235,6 +235,37 @@ export const BAJADA_MAX_DEL_COLOR = 0.5;
 /** …y nada donde la máscara está segura de que es persona (entre estos dos valores se apaga). */
 export const PERSONA_SEGURA = { desde: 0.85, hasta: 0.98 } as const;
 
+// ── El pelo oscuro contra la pared oscura (19/11/2026) ───────────────────────
+//
+// Alvaro: «con el pelo oscuro y el fondo oscuro, el pelo se deforma, se lo
+// come». Lo hacía el borde por color: F (el promedio de la persona segura
+// cerca) incluye la CARA, que es clara; B (la pared) es oscura. El pelo oscuro
+// se parece más a B que a F, así que el color decía «esto es pared» y bajaba la
+// «a» hasta 0,5 justo en el pelo, aunque el detector lo viera como persona.
+// Ahora el color solo puede BAJAR:
+//   · donde el propio detector duda (máscara < ~0,6; con más, es persona y
+//     punto), y
+//   · donde hay luz: si el píxel y la pared son oscuros los dos, el color no
+//     distingue pelo de pared (es casi todo ruido de la cámara) y manda la
+//     máscara.
+
+/** Máscara desde/hasta la que el color ya no puede bajar la «a» (el detector la ve como persona). */
+export const MASCARA_SIN_BAJADA = { desde: 0.35, hasta: 0.6 } as const;
+/** Luminancia (0..1) desde/hasta la que el color puede bajar: por debajo, todo es oscuro y no se le cree. */
+export const LUZ_PARA_BAJAR = { desde: 0.1, hasta: 0.25 } as const;
+
+/** Luminancia de un color (Rec. 709), igual que en el shader. */
+export function luminancia(c: RGB): number {
+  return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2];
+}
+
+/** Cuánto (0..1) del tope de bajada se permite en este píxel. */
+export function permisoDeBajada(mascara: number, i: RGB, b: RGB): number {
+  const dudosa = 1 - smoothstep(MASCARA_SIN_BAJADA.desde, MASCARA_SIN_BAJADA.hasta, mascara);
+  const luz = smoothstep(LUZ_PARA_BAJAR.desde, LUZ_PARA_BAJAR.hasta, Math.max(luminancia(i), luminancia(b)));
+  return dudosa * luz;
+}
+
 /**
  * La «a» final del borde: la de la máscara (`alfaMascara`, ya con la curva),
  * corregida por el color donde se puede. `mascara` es la confianza refinada.
@@ -243,7 +274,7 @@ export function alfaFinal(alfaMascara: number, mascara: number, i: RGB, f: RGB, 
   const proteger = 1 - smoothstep(PERSONA_SEGURA.desde, PERSONA_SEGURA.hasta, mascara);
   const w = franja * confianzaDelColor(f, b) * FUERZA_DEL_MATE * proteger;
   const tope = alfaMascara + SUBIDA_MAX_DEL_COLOR * smoothstep(0.02, 0.2, mascara);
-  const piso = alfaMascara - BAJADA_MAX_DEL_COLOR;
+  const piso = alfaMascara - BAJADA_MAX_DEL_COLOR * permisoDeBajada(mascara, i, b);
   return alfaMascara + w * (Math.max(piso, Math.min(alfaPorColor(i, f, b), tope)) - alfaMascara);
 }
 
@@ -300,7 +331,11 @@ export function tocaMulticlase(cuadro: number, cada = CADA_CUANTOS_MULTICLASE): 
   return cuadro % n === (n > 1 ? 1 : 0);
 }
 
-/** El multiclase de ayuda queda apagado por defecto (ver MODELOS en procesador.ts). */
+/**
+ * El multiclase de ayuda: apagado si quien crea el procesador no dice nada.
+ * Desde el 19/11/2026 ProcesadorDeFondo lo PRENDE en los equipos fuertes
+ * (usaRecorteFino), y se apaga solo si el equipo se atrasa (debeBajarAlLiviano).
+ */
 export const FUSION_POR_DEFECTO = false;
 
 // ── El ritmo del detector según lo que aguanta el equipo (18/11/2026) ────────
@@ -338,4 +373,28 @@ export function ritmoDelDetector(costo: { detectorMs: number; dibujoMs: number; 
 export function promedioMovil(anterior: number, nuevo: number, peso = 0.1): number {
   if (!(anterior > 0)) return nuevo;
   return anterior + peso * (nuevo - anterior);
+}
+
+// ── Recorte fino o liviano según lo que aguanta el equipo (19/11/2026) ───────
+//
+// El recorte fino (liviano + multiclase con el pelo, ver usaRecorteFino en
+// lib/fondoDeLlamada.ts) se elige por el equipo al crear el procesador. Pero
+// lo que de verdad importa es lo que tarda CADA cuadro: si el promedio pasa de
+// PRESUPUESTO_RECORTE_FINO_MS durante REVISIONES_LENTAS_PARA_BAJAR revisiones
+// seguidas (~2 s), el multiclase se apaga y queda el liviano solo hasta que se
+// cierre la cámara. Nunca se vuelve a subir en la misma llamada: subir y bajar
+// cada rato sería un tironeo que se ve.
+
+/** Milisegundos por cuadro (detector + dibujo, promedio) por encima de los cuales se baja al liviano. */
+export const PRESUPUESTO_RECORTE_FINO_MS = 25;
+/** Revisiones del ritmo (cada REVISAR_RITMO_CADA cuadros) seguidas por encima del presupuesto. */
+export const REVISIONES_LENTAS_PARA_BAJAR = 2;
+
+/**
+ * Cuenta las revisiones lentas seguidas y dice si toca bajar. `lentas` es la
+ * cuenta que se trae; devuelve la nueva y la decisión.
+ */
+export function debeBajarAlLiviano(promedioMs: number, lentas: number): { lentas: number; bajar: boolean } {
+  const n = promedioMs > PRESUPUESTO_RECORTE_FINO_MS ? lentas + 1 : 0;
+  return { lentas: n, bajar: n >= REVISIONES_LENTAS_PARA_BAJAR };
 }

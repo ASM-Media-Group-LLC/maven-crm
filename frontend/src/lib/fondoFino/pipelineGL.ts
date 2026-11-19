@@ -40,6 +40,7 @@ import {
   CURVA_BORDE_BLUR, CURVA_BORDE_IMAGEN, MUESTRAS_MAX_POR_LADO, REDUCCION_DE_LA_MASCARA,
   REDUCCION_DEL_DESENFOQUE, SUAVIZADO_MAX, CAMBIO_CHICO, CAMBIO_GRANDE, factoresPorRitmo,
   CONFIANZA_COLOR, FRANJA, FUERZA_DEL_MATE, ANCHO_MIN_DEL_BORDE, BAJADA_MAX_DEL_COLOR, PERSONA_SEGURA, PISO_DEL_DESPEJE, SUBIDA_MAX_DEL_COLOR, RADIO_CERCA_TEXELES, SIGMA_DEL_MATE_720,
+  MASCARA_SIN_BAJADA, LUZ_PARA_BAJAR,
   muestrasPorLado, pasoDeMuestreo, sigmaEnTextura, uvParaCubrir,
 } from "./parametros";
 
@@ -231,7 +232,12 @@ void main() {
   ac = min(ac, a + ${SUBIDA_MAX_DEL_COLOR.toFixed(2)} * smoothstep(0.02, 0.2, m));
   // Y bajar, con tope y nunca donde la máscara está segura de que es persona
   // (la cara o la mano de un color parecido a la pared ya no se borran).
-  ac = max(ac, a - ${BAJADA_MAX_DEL_COLOR.toFixed(2)});
+  // Bajar solo donde el detector duda y hay luz: el pelo oscuro contra la pared
+  // oscura ya no se come (ver permisoDeBajada en parametros.ts).
+  const vec3 LUMA = vec3(0.2126, 0.7152, 0.0722);
+  float dudosa = 1.0 - smoothstep(${MASCARA_SIN_BAJADA.desde.toFixed(3)}, ${MASCARA_SIN_BAJADA.hasta.toFixed(3)}, m);
+  float luz = smoothstep(${LUZ_PARA_BAJAR.desde.toFixed(3)}, ${LUZ_PARA_BAJAR.hasta.toFixed(3)}, max(dot(persona, LUMA), dot(B, LUMA)));
+  ac = max(ac, a - ${BAJADA_MAX_DEL_COLOR.toFixed(2)} * dudosa * luz);
   float proteger = 1.0 - smoothstep(${PERSONA_SEGURA.desde.toFixed(3)}, ${PERSONA_SEGURA.hasta.toFixed(3)}, m);
   a += franja * confianza * proteger * ${FUERZA_DEL_MATE.toFixed(3)} * (ac - a);
   // Color de la persona SIN el fondo viejo (ver colorDePersona en parametros.ts):

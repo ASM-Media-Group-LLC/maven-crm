@@ -35,7 +35,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useArgosEscaleraClip } from "@/hooks/useArgosEscaleraClip";
 import { latirEnLlamada, salirDeLlamada, LATIDO_LLAMADA_MS, LATIDO_SERVIDOR_MS, latirLlamadaEnServidor, salirLlamadaEnServidor } from "@/lib/llamadaEnMaven";
 import { useRegistrarLlamados } from "@/hooks/useRegistrarLlamados";
-import { esBlur, alternarBlur, leerFondoGuardado, guardarFondo, type BackgroundEffect } from "@/lib/fondoDeLlamada";
+import { esBlur, alternarBlur, blurPorDefecto, efectoDeNivel, leerFondoGuardado, guardarFondo, type BackgroundEffect } from "@/lib/fondoDeLlamada";
 import { precalentarFondo, soportaProcesadorDeFondo } from "@/lib/fondoFino/procesador";
 import { escritorio } from "@/lib/escritorio";
 import { estaEnPausa } from "@/lib/coworkPausa";
@@ -401,7 +401,8 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
   // El último nivel de difuminado que la persona eligió, para que el botón
   // rápido lo devuelva igual. Antes apagaba "Difuminar más" y lo volvía a
   // prender como normal, sin decir nada.
-  const ultimoBlurRef = useRef<BackgroundEffect>("blur");
+  // Arranca en el nivel guardado (Fuerte si nunca eligió).
+  const ultimoBlurRef = useRef<BackgroundEffect>(blurPorDefecto());
   if (esBlur(bgEffect)) ultimoBlurRef.current = bgEffect;
 
   // El detector del fondo baja ~9,4 MB la primera vez (lib/fondoFino/procesador.ts).
@@ -1636,6 +1637,7 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
         onOpenAdjustView={() => setAdjustViewOpen(true)}
         backgroundEffect={bgEffect}
         onToggleBlurBackground={() => handleBgChange(alternarBlur(bgEffect, ultimoBlurRef.current))}
+        onElegirNivelBlur={(nivel) => handleBgChange(efectoDeNivel(nivel))}
         controlesExtra={controlesExtra}
       />
 

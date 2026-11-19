@@ -78,7 +78,7 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "
 import { useLanguage } from "@/hooks/useLanguage";
 import { traducir, type TranslationKey } from "@/lib/i18n";
 import { ETIQUETA_SUPERVISOR, NOMBRE_PAUSA, claveMotivoDetenido, mensajeDeSolicitud } from "./textosCowork";
-import { alternarBlur, esBlur, guardarFondo, leerFondoGuardado, type BackgroundEffect } from "@/lib/fondoDeLlamada";
+import { alternarBlur, blurPorDefecto, esBlur, guardarFondo, leerFondoGuardado, type BackgroundEffect } from "@/lib/fondoDeLlamada";
 import { precalentarFondo, soportaProcesadorDeFondo } from "@/lib/fondoFino/procesador";
 import { crearCamaraDelAnfitrion, type CamaraDelAnfitrion, type ResultadoDelFondo } from "@/lib/camaraDelAnfitrion";
 import { escritorio } from "@/lib/escritorio";
@@ -844,7 +844,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
   fondoRef.current = fondo;
   // El último nivel de difuminado elegido, para que el botón lo devuelva igual
   // (mismo criterio que el botón rápido de la llamada).
-  const ultimoBlurRef = useRef<BackgroundEffect>("blur");
+  const ultimoBlurRef = useRef<BackgroundEffect>(blurPorDefecto());
   if (esBlur(fondo)) ultimoBlurRef.current = fondo;
   const [preparandoFondo, setPreparandoFondo] = useState(false);
   const camaraRef = useRef<CamaraDelAnfitrion | null>(null);
