@@ -1,0 +1,8 @@
+# Una persona en Chrome de verdad (Playwright) con el internet de su ciudad.
+FROM mcr.microsoft.com/playwright:v1.48.2-noble
+RUN apt-get update && apt-get install -y --no-install-recommends iproute2 iptables && rm -rf /var/lib/apt/lists/*
+WORKDIR /app
+RUN npm init -y >/dev/null && npm i playwright@1.48.2 >/dev/null
+COPY red.sh /red.sh
+RUN chmod +x /red.sh
+ENTRYPOINT ["/red.sh"]
