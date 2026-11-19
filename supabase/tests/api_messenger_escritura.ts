@@ -191,6 +191,10 @@ const NO_CARGAN_AQUI: Record<string, string> = {
     "Cowork: un episodio de «fuera de Cowork» no se pisa con el anterior (mismo vigía, solo cambia desde). " +
     "Entra a esta cadena solo porque su vigía inserta avisos en notifications, pero usa las tablas del reloj de " +
     "Cowork y es_admin_o_dueno, que este fixture no trae; no toca nada del Messenger.",
+  "20261119012000_hub_supervisores_senal_y_avisos.sql":
+    "Cowork: la señal de los supervisores en el Hub y el aviso al dueño. Entra a esta cadena solo porque su " +
+    "vigía inserta avisos en notifications, pero usa destinatarios_de_aviso, las tablas de Cowork y pg_cron, " +
+    "que este fixture no trae; no toca nada del Messenger.",
   "20261111080000_salud_de_llamada.sql":
     "Llamadas: por qué se cae la llamada (llamada_salud, diagnóstico y aviso a la persona y su supervisor). " +
     "Entra a esta cadena solo porque su vigía inserta avisos en notifications, pero usa es_admin_o_dueno, " +
