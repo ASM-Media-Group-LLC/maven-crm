@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { esPrimeraCarga, leerArranque } from "@/lib/arranque";
 
 export type AppRole =
   | "admin" | "manager" | "employee" | "agent" | "closer" | "supervisor" | "spammer"
@@ -41,8 +42,19 @@ export const useUserRole = () => {
   // reintentos de verdad.
   const { data: roleData, isLoading, isError, refetch } = useQuery({
     queryKey: ["user-role", user?.id],
-    queryFn: async () => {
+    queryFn: async ({ client }) => {
       if (!user?.id) return null;
+
+      // Primera carga: el rol y su grupo vienen en la petición única del
+      // arranque (lib/arranque.ts). Si falló, sigue por el camino de siempre.
+      if (esPrimeraCarga(client, ["user-role", user.id])) {
+        const a = await leerArranque(user.id);
+        if (a) {
+          if (!a.rol) return null;
+          return { role: a.rol as AppRole, isSupervisorGroup: !!a.grupo?.is_supervisor_or_above };
+        }
+      }
+
       const { data, error } = await supabase
         .from("user_roles")
         .select("role")

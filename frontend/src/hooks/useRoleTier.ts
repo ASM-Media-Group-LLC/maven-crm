@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { esPrimeraCarga, leerArranque } from "@/lib/arranque";
 
 // Nivel de capacidad del rol del usuario, leído de `role_groups` — la MISMA
 // tabla que consulta `is_in_role_group()` en RLS y en las edge functions.
@@ -16,7 +17,18 @@ export const useRoleTier = () => {
 
   const { data, isLoading } = useQuery({
     queryKey: ["role-tier", user?.id],
-    queryFn: async (): Promise<RoleTier> => {
+    queryFn: async ({ client }): Promise<RoleTier> => {
+      // Primera carga: rol y grupo ya vinieron en el arranque (lib/arranque.ts).
+      if (esPrimeraCarga(client, ["role-tier", user?.id])) {
+        const a = await leerArranque(user?.id);
+        if (a) {
+          if (!a.rol || !a.grupo) return "member";
+          if (a.grupo.is_admin) return "admin";
+          if (a.grupo.is_manager_or_above) return "manager";
+          if (a.grupo.is_supervisor_or_above) return "supervisor";
+          return "member";
+        }
+      }
       const { data: userRole } = await supabase
         .from("user_roles")
         .select("role")
