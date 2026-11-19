@@ -90,3 +90,9 @@ describe("resúmenes para jefes", () => {
     expect(sqlResumen).toContain("a.medido_min >= 300 and b.medido_min >= 300");
   });
 });
+
+describe("la alerta se abre de verdad", () => {
+  it("«found» mira la consulta del episodio, no la del nombre", () => {
+    expect(sql).toMatch(/select \* into g from public\.argos_graves\s+where user_id = r\.user_id and tipo = r\.tipo and cerrada_at is null;\s+if not found then/);
+  });
+});

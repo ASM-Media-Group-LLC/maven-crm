@@ -226,9 +226,10 @@ begin
      where m.aj60 >= 3000 and m.aj10 >= 0.5 * greatest(m.cub10, 1)
        and public.tiene_funcion(m.user_id, 'N:argos.apps_ajenas') and not public.es_dueno(m.user_id)
   loop
+    select coalesce(nullif(btrim(p.full_name), ''), 'Alguien') into nombre from public.profiles p where p.id = r.user_id;
+    -- «found» mira la última consulta: por eso la del episodio va justo antes del if.
     select * into g from public.argos_graves
      where user_id = r.user_id and tipo = r.tipo and cerrada_at is null;
-    select coalesce(nullif(btrim(p.full_name), ''), 'Alguien') into nombre from public.profiles p where p.id = r.user_id;
 
     if not found then
       insert into public.argos_graves (user_id, tipo, minutos, detalle)
