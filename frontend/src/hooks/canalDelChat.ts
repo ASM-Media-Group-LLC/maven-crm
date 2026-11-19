@@ -3,6 +3,7 @@ import type { RealtimeChannel } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 import { esperaDeReconexion, ESTADOS_MUERTOS } from "@/hooks/useCanalQueRevive";
 import { escucharLaVuelta } from "@/hooks/useReanudarAlVolver";
+import { escucharLatido, socketSinLatido } from "@/lib/latidoDelRealtime";
 
 /**
  * EL CANAL DEL CHAT: UNO por pestaña, para todos los que escuchan el Messenger.
@@ -174,8 +175,13 @@ function recomputarSalud(): void {
     if (estado === "reconectando") { next = "reconectando"; break; }
     if (estado === "en-vivo") next = "en-vivo";
   }
+  // El socket que no contesta el latido cuenta como caído aunque los canales
+  // todavía digan SUBSCRIBED: es el "muerto en silencio" que dejaba mensajes
+  // ~40 s atrás (simulacro v2, 19/11). Solo pesa si hay algún chat escuchando.
+  if (next === "en-vivo" && socketSinLatido()) next = "reconectando";
   emitirSalud(next);
 }
+escucharLatido(recomputarSalud);
 
 /** Una fuente reporta su estado. "conectando" la retira (ya no cuenta). La salud
  *  global queda como la peor de las fuentes vivas (ver arriba). */
