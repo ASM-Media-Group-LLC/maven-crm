@@ -789,8 +789,11 @@ let primero = "";
   }
   const casos: [string, string, number, string | null][] = [
     ["GET", `/messenger/conversations/${G}/messages/${M_G_ANA}`, 405, "PATCH, DELETE"],
-    ["POST", "/creators", 405, "GET"],
-    ["DELETE", "/creators/x", 405, "GET"],
+    // /creators se escribe desde el 18/11/2026 (POST y PATCH, scope creators:write).
+    ["POST", "/creators", 403, null],
+    ["DELETE", "/creators", 405, "GET, POST"],
+    ["DELETE", `/creators/${G}`, 405, "GET, PATCH"],
+    ["PATCH", "/creators/x", 404, null],
     ["POST", "/", 405, "GET"],
     ["PUT", "/messenger/conversations", 405, "GET, POST, PATCH, DELETE"],
     ["POST", "/me", 405, "GET"],
@@ -803,8 +806,8 @@ let primero = "";
     check(r.estado === estado && (allow === null || r.cabeceras.get("Allow") === allow), `${metodo} ${ruta}: ${estado}${allow ? ` Allow: ${allow}` : ""} → ${r.estado} ${r.cabeceras.get("Allow")}`);
   }
   // Un 405 no lee el cuerpo: uno de 70 KB a /creators sigue siendo 405, no 413.
-  const grande = await pedir("POST", "/creators", { cuerpo: { text: "x".repeat(70_000) } });
-  check(grande.estado === 405, `POST /creators con 70 KB: 405 (no se leyó) → ${grande.estado}`);
+  const grande = await pedir("DELETE", "/creators", { cuerpo: { text: "x".repeat(70_000) } });
+  check(grande.estado === 405, `DELETE /creators con 70 KB: 405 (no se leyó) → ${grande.estado}`);
   // En inglés, el mismo código y otro texto.
   const en = await pedir("POST", `/messenger/conversations/${G}/messages`, { cuerpo: { text: "x" }, idioma: "en" });
   check(en.estado === 400 && en.json.error === "idempotency_key_required" && /^Missing Idempotency-Key/.test(en.json.message), `en inglés → ${d(en)}`);
