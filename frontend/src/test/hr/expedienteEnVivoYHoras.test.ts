@@ -45,8 +45,10 @@ describe("todas las horas", () => {
   it("las horas vacías seguidas se juntan en una línea", () => {
     expect(s).toContain('filas.push({ tipo: "hueco"');
   });
-  it("solo se firma lo que se ve (una foto por casilla y el visor)", () => {
+  it("solo se firma lo que se ve: 6 miniaturas por hora cerrada, todas en la abierta, y el visor", () => {
     expect(s).toContain("const aFirmar = useMemo(");
-    expect(s).not.toContain("setAbiertas");
+    // Horas plegables (Alvaro, 19/11/2026: «por hora, algo bien friendly»).
+    expect(s).toMatch(/if \(abiertas\.has\(h\.ms\)\) lista\.push\(\.\.\.h\.casillas\.flatMap\(\(c\) => c\.momentos\)\);/);
+    expect(s).toMatch(/else if \(horasVistas\.has\(h\.ms\)\) for \(const c of h\.casillas\) if \(c\.rep\) lista\.push\(c\.rep\);/);
   });
 });
