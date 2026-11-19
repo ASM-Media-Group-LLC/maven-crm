@@ -31,6 +31,35 @@ jobs:
           supabase link --project-ref "$PROD" < /dev/null
           supabase db dump --linked -f esquema.sql
           echo "tamaño: $(wc -c < esquema.sql) bytes, $(grep -c '^CREATE TABLE' esquema.sql) tablas"
+      - name: Ver la instrucción que falla
+        run: |
+          cd /tmp/sim
+          python3 - <<'PY'
+          import re
+          s=open('esquema.sql').read()
+          # separa por ';' fuera de comillas y de bloques $tag$
+          out=[];cur=[];i=0;n=len(s);q=None;dq=None
+          while i<n:
+              c=s[i]
+              if dq:
+                  if s.startswith(dq,i): cur.append(dq); i+=len(dq); dq=None; continue
+              elif q:
+                  if c=="'" : q=None
+              elif s.startswith('--',i):
+                  j=s.find('\n',i); j=n if j<0 else j; i=j; continue
+              elif c=="'": q=c
+              elif c=='$':
+                  m=re.match(r'\$[A-Za-z_]*\$',s[i:])
+                  if m: dq=m.group(0); cur.append(dq); i+=len(dq); continue
+              if c==';' and not q and not dq:
+                  t=''.join(cur).strip()
+                  if t: out.append(t)
+                  cur=[]
+              else: cur.append(c)
+              i+=1
+          for k in (4089,4090,4091,4092):
+              if k-1<len(out): print('--- #%d:'%k, out[k-1][:400].replace('\n',' '))
+          PY
       - name: Cargarla en la copia
         run: |
           set -euo pipefail
