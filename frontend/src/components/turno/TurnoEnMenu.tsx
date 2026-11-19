@@ -6,6 +6,7 @@ import { useLanguage } from "@/hooks/useLanguage";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { horaUI } from "@/lib/formatoHora";
+import { useAhoraCadaSegundo } from "@/lib/ahoraCompartido";
 import { pedirACowork } from "@/lib/pedidoACowork";
 import { useAccionesTurno, useMiTurno } from "@/hooks/useMiTurno";
 import { AvisoEntrada, CLASE_BOTON_SUAVE, ConfirmarSalida, PreguntaSigues, TarjetaTurno, type EstadoTurno } from "@/components/turno/PiezasTurno";
@@ -24,16 +25,12 @@ export function TurnoEnMenu({ compacto = false }: { compacto?: boolean }) {
   const q = useMiTurno();
   const { entrar, salir, sigo } = useAccionesTurno();
   const tr = q.data;
-  const [ahora, setAhora] = useState(() => Date.now());
+  // El reloj compartido: 1 s a la vista, 30 s fuera (lib/ahoraCompartido.ts).
+  const ahora = useAhoraCadaSegundo();
   const [abrirEntrada, setAbrirEntrada] = useState(false);
   const [abrirSalida, setAbrirSalida] = useState(false);
   const [preguntaDesde, setPreguntaDesde] = useState<number | null>(null);
   const cerrandoSolo = useRef(false);
-
-  useEffect(() => {
-    const id = window.setInterval(() => setAhora(Date.now()), 1000);
-    return () => window.clearInterval(id);
-  }, []);
 
   const ms = (iso: string | null | undefined) => (iso ? Date.parse(iso) : null);
   const fin = ms(tr?.turno_fin);
