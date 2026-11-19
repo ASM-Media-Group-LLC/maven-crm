@@ -161,7 +161,11 @@ Lo aplica «Edificio · entrada (auth)» por la API de administración:
 
 ## 4. Relojes (pg_cron) del edificio
 
-Kash tiene 98 relojes (19/11). El edificio lleva 42 (39 prendidos y 3 del NAS apagados), en
+Kash tiene 98 relojes (19/11). El edificio lleva 43 (40 prendidos y 3 del NAS apagados):
+los 42 propios del edificio más `vigia-audio-de-llamada` (cada 5 min), que crea la
+migración `calidad_de_llamadas`. **Ojo:** ese reloj está en el archivo del repo pero Kash
+no lo tiene programado: allá se aplicó otra versión o se quitó a mano.
+Los 42 propios viven en
 `infra/casas/edificio-migraciones/20261119230000_edificio_crons.sql` (fuera de
 `supabase/migrations` a propósito: nunca se aplica a Kash). Los que llaman funciones usan
 `public.edificio_llamar()`, que lee dirección y token de la bóveda: no hay ninguna
@@ -210,6 +214,10 @@ dirección ni llave escrita.
   en todos los Coworks y los probadores de «Cowork solo en la app».
 - El ensayo corre en cada push de la rama `claude/edificio-vivo` (Postgres vacío del
   runner, nunca el edificio) y deja la tabla «entra / falla» en el resumen del workflow.
+- **Ensayo del 19/11 (run 44583748488): las 51 entran, 0 fallan.** Resultado: 429 tablas
+  y 969 funciones en `public` (Kash: 968 + `edificio_llamar`), 43 relojes (40 prendidos).
+  Las 26 tablas que Kash tiene de más son respaldos (`*_respaldo_*`, `*_backup_*`) y
+  `cowork_app_obligatoria`.
 
 ## Riesgos y pendientes
 
