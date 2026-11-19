@@ -1,3 +1,18 @@
+// NOTA v3 (Alvaro, 18/11/2026, preguntas y respuestas: «no puede ser por una
+// sola cosa: cuántas veces le llamó la atención Argos, si llegó temprano…»; y
+// «pantalla y cámara se miden sobre el tiempo CONECTADO, no hasta el final del
+// turno»). Seis partes, con «más peso a los llamados»:
+//   · Llamados de Argos 25 — empieza completo; cada llamado de atención resta y
+//     si Argos lo reportó al supervisor resta el doble.
+//   · Atención          20 — pantallazos en lo suyo.
+//   · Pantalla          15 — % del tiempo CONECTADO compartiendo.
+//   · Puntualidad       15 — a tiempo (≤ 5 min) completo; a los 30 min tarde, 0.
+//   · En su puesto      15 — minutos fuera de Cowork en su turno (y salir antes);
+//                             a los 30 min, 0.
+//   · Cámara            10 — % del tiempo CONECTADO con la cara visible.
+// La regla dura de la pantalla sigue (sin pantalla, tope 50). Un factor sin dato
+// reparte su peso, como siempre. Lo de abajo es la historia de la v2.
+//
 // La NOTA diaria del empleado (Monitor IA · Argos). Alvaro, 05/11/2026 (v2).
 //
 // Una sola cifra 0–100 que responde lo único que importa: ¿trabajó FULL el turno,
@@ -38,8 +53,29 @@ export function fraccionJornada(segundos: number, horasJornada = JORNADA_HORAS, 
   return Math.min(1, Math.max(0, segundos) / denom);
 }
 
+/** Fracción 0–1 del tiempo CONECTADO (trabajando en Cowork) que cubren esos
+ *  segundos (v3, 18/11/2026). Sin tiempo conectado no hay dato. */
+export function fraccionConectado(segundos: number, segConectado: number): number | undefined {
+  if (!(segConectado > 0)) return undefined;
+  return Math.min(1, Math.max(0, segundos) / segConectado);
+}
+
+/** A los cuántos minutos (tarde o fuera) la parte llega a 0. */
+export const MINUTOS_HASTA_CERO = 30;
+/** Cuánto resta del sub-puntaje (0–100) cada llamado de atención de Argos; un
+ *  llamado reportado al supervisor resta el doble. */
+export const RESTA_POR_LLAMADO = 15;
+
 /** Señales crudas de una persona en un período. */
 export interface SenalesEmpleado {
+  /** Minutos tarde pasada la tolerancia. null = llegó a tiempo; undefined = sin horario/sin dato. */
+  tardeMin?: number | null;
+  /** Llamados de atención de Argos en el período (undefined = sin dato). */
+  llamados?: number;
+  /** De esos, cuántos se reportaron al supervisor. */
+  escalados?: number;
+  /** Minutos fuera de su puesto en su turno (fuera de Cowork + salir antes). undefined = sin dato. */
+  minFuera?: number;
   /** Fracción 0–1 del TURNO con la PANTALLA compartida. undefined = sin dato / no se califica. */
   pantallaPct?: number;
   /** Fracción 0–1 del TURNO con la CÁMARA/cara visible. undefined = sin dato / no se califica. */
@@ -52,7 +88,7 @@ export interface SenalesEmpleado {
 /** Un factor de la nota: su sub-puntaje 0–100 y su peso. El texto legible lo arma
  *  la UI con t(). */
 export interface FactorNota {
-  clave: "pantalla" | "camara" | "atencion";
+  clave: "pantalla" | "camara" | "atencion" | "puntualidad" | "llamados" | "puesto";
   /** 0–100, o null si no había dato. */
   sub: number | null;
   /** Peso relativo del factor (antes de repartir). */
@@ -67,7 +103,8 @@ export interface Nota {
 }
 
 // Pesos base (suman 1). Si un factor no tiene dato, su peso se reparte.
-const PESO = { pantalla: 0.45, camara: 0.35, atencion: 0.2 } as const;
+// v3 (18/11/2026): «más peso a los llamados».
+const PESO = { llamados: 0.25, atencion: 0.2, pantalla: 0.15, puntualidad: 0.15, puesto: 0.15, camara: 0.1 } as const;
 // Si compartió MENOS que esto de pantalla, cuenta como "no compartió": tope 50.
 const UMBRAL_SIN_PANTALLA = 0.05;
 const TOPE_SIN_PANTALLA = 50;
@@ -83,10 +120,14 @@ export function bandaDeNota(valor: number): BandaNota {
 
 /** Calcula la nota 0–100 de una persona a partir de sus señales. */
 export function calcularNota(s: SenalesEmpleado): Nota {
+  const hastaCero = (min: number) => clamp(100 * (1 - Math.max(0, min) / MINUTOS_HASTA_CERO));
   const factores: FactorNota[] = [
-    { clave: "pantalla", sub: pct(s.pantallaPct), peso: PESO.pantalla },
-    { clave: "camara", sub: pct(s.camaraPct), peso: PESO.camara },
+    { clave: "llamados", sub: s.llamados === undefined ? null : clamp(100 - RESTA_POR_LLAMADO * (s.llamados + (s.escalados ?? 0))), peso: PESO.llamados },
     { clave: "atencion", sub: pct(s.atencionPct), peso: PESO.atencion },
+    { clave: "pantalla", sub: pct(s.pantallaPct), peso: PESO.pantalla },
+    { clave: "puntualidad", sub: s.tardeMin === undefined ? null : s.tardeMin === null ? 100 : hastaCero(s.tardeMin), peso: PESO.puntualidad },
+    { clave: "puesto", sub: s.minFuera === undefined ? null : hastaCero(s.minFuera), peso: PESO.puesto },
+    { clave: "camara", sub: pct(s.camaraPct), peso: PESO.camara },
   ];
 
   // Promedio ponderado SOLO con los factores que tienen dato; el peso de los que

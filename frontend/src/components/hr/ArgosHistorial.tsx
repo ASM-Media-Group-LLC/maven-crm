@@ -58,9 +58,10 @@ type TipoFalla = "fuera" | "camara" | "pantalla";
 function tiposFallaDe(p: PersonaTurno): TipoFalla[] {
   const sub = (c: string) => p.nota.factores.find((x) => x.clave === c)?.sub ?? null;
   const out: TipoFalla[] = [];
-  if ((sub("atencion") ?? 100) < 95) out.push("fuera");
-  if ((sub("camara") ?? 100) < 80) out.push("camara");
-  if ((sub("pantalla") ?? 100) < 80) out.push("pantalla");
+  if ((p.atencionPct ?? sub("atencion") ?? 100) < 95) out.push("fuera");
+  // Cámara y pantalla: sobre el tiempo CONECTADO (18/11/2026), como las barras.
+  if ((p.camaraPct ?? 100) < BAJO_DESDE) out.push("camara");
+  if ((p.pantallaPct ?? 100) < BAJO_DESDE) out.push("pantalla");
   return out;
 }
 const FLAG_LBL: Record<TipoFalla, TranslationKey> = { fuera: "hr.hist.flagFuera", camara: "hr.hist.flagCamara", pantalla: "hr.hist.flagPantalla" };
@@ -71,20 +72,28 @@ function fallasDe(p: PersonaTurno, t: Tr): string[] {
 // INDICADORES (Alvaro, 13/11/2026: «es pobre, chiquito… indicadores… cuando me
 // meto a Chatters deberían ser pequeñas tarjetitas donde vea cómo van»).
 // Una barra fina por factor: el color insinúa (bien/ojo/mal), la cifra en blanco.
+// 18/11/2026 (Alvaro: «rojo y verde no»; eligió «un solo color y la cifra», y
+// «bajo» desde menos de 80 %): la barra siempre en el color de Maven; lo que va
+// bajo lleva un puntito ámbar junto a la cifra.
+const BAJO_DESDE = 80;
 function Barra({ label, valor }: { label: string; valor: number | null }) {
   const v = valor == null ? null : Math.max(0, Math.min(100, valor));
-  const color = v == null ? "bg-muted-foreground/30" : v >= 80 ? "bg-success/70" : v >= 60 ? "bg-warning/70" : "bg-destructive/70";
+  const bajo = v != null && v < BAJO_DESDE;
   return (
     <div className="flex items-center gap-2 text-[11px]">
       <span className="w-[4.5rem] shrink-0 truncate text-muted-foreground">{label}</span>
       <span className="h-1.5 min-w-0 flex-1 overflow-hidden rounded-full bg-foreground/10">
-        <span className={`block h-full rounded-full ${color}`} style={{ width: `${v ?? 0}%` }} />
+        <span className={`block h-full rounded-full ${v == null ? "bg-muted-foreground/30" : "bg-primary/70"}`} style={{ width: `${v ?? 0}%` }} />
       </span>
-      <span className="w-9 shrink-0 text-right tabular-nums text-foreground/85">{v == null ? "—" : `${Math.round(v)}%`}</span>
+      <span className="flex w-11 shrink-0 items-center justify-end gap-1 tabular-nums text-foreground/85">
+        {bajo && <span className="h-1.5 w-1.5 rounded-full bg-warning" aria-hidden />}
+        {v == null ? "—" : `${Math.round(v)}%`}
+      </span>
     </div>
   );
 }
-const PUNTO_BANDA: Record<string, string> = { bien: "bg-success", ojo: "bg-warning", mal: "bg-destructive" };
+// La nota: solo un puntito ámbar si va baja; nada de verde ni rojo.
+const PUNTO_BANDA: Record<string, string> = { ojo: "bg-warning", mal: "bg-warning" };
 
 // Una persona como TARJETITA: cara y nombre, su nota grande, sus 3 barras, a qué
 // hora entró (y si llegó tarde) y sus fallas con un puntito. Clic → expediente.
@@ -92,10 +101,9 @@ function PersonaTarjeta({ p, t, onClick }: { p: PersonaTurno; t: Tr; onClick: ()
   const f = (c: string) => p.nota.factores.find((x) => x.clave === c)?.sub ?? null;
   const fallas = tiposFallaDe(p);
   const tarde = p.tardeMin != null && p.tardeMin > 0;
-  const mala = p.nota.banda === "mal";
   return (
     <button type="button" onClick={onClick} title={t("hr.hist.verExpediente")}
-      className={`group flex flex-col gap-3 rounded-[14px] border bg-card/30 p-3.5 text-left transition-colors hover:bg-card/50 ${mala ? "border-destructive/50" : "border-border/50 hover:border-foreground/25"}`}>
+      className={`group flex flex-col gap-3 rounded-[14px] border bg-card/30 p-3.5 text-left transition-colors hover:bg-card/50 border-border/50 hover:border-foreground/25`}>
       <div className="flex items-center gap-2.5">
         <UserAvatar name={p.nombre || t("hr.noName")} src={p.avatarUrl} seed={p.avatarSeed} size="md" />
         <div className="min-w-0 flex-1">
@@ -108,7 +116,7 @@ function PersonaTarjeta({ p, t, onClick }: { p: PersonaTurno; t: Tr; onClick: ()
         </div>
         <div className="flex shrink-0 flex-col items-end">
           <span className="flex items-center gap-1.5 font-display text-2xl font-semibold leading-none tabular-nums text-foreground">
-            {p.nota.banda && <span className={`h-1.5 w-1.5 rounded-full ${PUNTO_BANDA[p.nota.banda] ?? "bg-muted-foreground"}`} aria-hidden />}
+            {p.nota.banda && PUNTO_BANDA[p.nota.banda] && <span className={`h-1.5 w-1.5 rounded-full ${PUNTO_BANDA[p.nota.banda]}`} aria-hidden />}
             {p.nota.valor ?? "—"}
           </span>
           <span className="mt-0.5 text-[10px] text-muted-foreground">{t("hr.hist.nota")}</span>
@@ -123,7 +131,7 @@ function PersonaTarjeta({ p, t, onClick }: { p: PersonaTurno; t: Tr; onClick: ()
         <div className="flex flex-wrap gap-1.5">
           {fallas.map((tf) => (
             <span key={tf} className="inline-flex items-center gap-1.5 rounded-full border border-border/60 bg-foreground/[0.04] px-2 py-0.5 text-[10px] font-medium text-foreground/80">
-              <span className={`h-1.5 w-1.5 rounded-full ${tf === "fuera" ? "bg-destructive" : "bg-warning"}`} aria-hidden />{t(FLAG_LBL[tf])}
+              <span className={`h-1.5 w-1.5 rounded-full bg-warning`} aria-hidden />{t(FLAG_LBL[tf])}
             </span>
           ))}
         </div>
@@ -163,9 +171,9 @@ function TarjetaGrupo({ nombre, gente, nota, pantalla, camara, atencion, conFall
         </div>
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-border/40 pt-2.5 text-[11px] text-muted-foreground">
           {conFallas > 0 ? (
-            <span className="inline-flex items-center gap-1.5 text-foreground/85"><span className="h-1.5 w-1.5 rounded-full bg-destructive" aria-hidden />{t("hr.hist.deptoConFallas", { n: conFallas })}</span>
+            <span className="inline-flex items-center gap-1.5 text-foreground/85"><span className="h-1.5 w-1.5 rounded-full bg-warning" aria-hidden />{t("hr.hist.deptoConFallas", { n: conFallas })}</span>
           ) : (
-            <span className="inline-flex items-center gap-1.5"><span className="h-1.5 w-1.5 rounded-full bg-success" aria-hidden />{t("hr.hist.deptoSinFallas")}</span>
+            <span className="inline-flex items-center gap-1.5"><span className="h-1.5 w-1.5 rounded-full bg-primary/70" aria-hidden />{t("hr.hist.deptoSinFallas")}</span>
           )}
           {conTarde > 0 && (
             <span className="inline-flex items-center gap-1.5"><span className="h-1.5 w-1.5 rounded-full bg-warning" aria-hidden />{t("hr.hist.deptoTarde", { n: conTarde })}</span>
@@ -221,9 +229,9 @@ function TurnoDetalle({ turno, dia, resumen, t, onVolver, onPersona }: {
             <div className="mt-0.5 font-display text-xl font-semibold tabular-nums text-foreground">{m.v == null ? "—" : `${m.v}%`}</div>
           </div>
         ))}
-        <div className={`rounded-[12px] border bg-card/30 px-3 py-2.5 ${enProblema > 0 ? "border-destructive/50" : "border-border/50"}`}>
+        <div className={`rounded-[12px] border bg-card/30 px-3 py-2.5 border-border/50`}>
           <div className="flex items-center gap-1.5 text-[11px] font-medium text-muted-foreground">
-            {enProblema > 0 && <span className="h-1.5 w-1.5 rounded-full bg-destructive" aria-hidden />}{t("hr.hist.enProblemaLbl")}
+            {enProblema > 0 && <span className="h-1.5 w-1.5 rounded-full bg-warning" aria-hidden />}{t("hr.hist.enProblemaLbl")}
           </div>
           <div className="mt-0.5 font-display text-xl font-semibold tabular-nums text-foreground">{enProblema}</div>
         </div>
