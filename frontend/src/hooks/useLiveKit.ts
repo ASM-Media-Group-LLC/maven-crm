@@ -36,6 +36,7 @@ import { toast } from "sonner";
 import { traducir } from "@/lib/i18n";
 import { claveDeRecuadro, participantesEstables } from "@/lib/participantesEstables";
 import { modoLivianoActivo } from "@/lib/appLiviana";
+import { anotarTransporte, leerTransporte, MIRAR_TRANSPORTE_CADA_MS, porRedBloqueada, PRIMERA_MIRADA_MS, transporteDeLaLlamada, type Transporte } from "@/lib/redBloqueada";
 import { esPantallaCompleta, puedeCompartirPantalla, motivoDeFalloAlCompartir } from "@/lib/compartirPantalla";
 import { supabase, SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY } from "@/integrations/supabase/client";
 import { avisarSalidaDeLlamada, mostrarAvisoDeSala, ID_AVISO_ME_SILENCIARON } from "@/lib/avisosDeLlamada";
@@ -606,7 +607,7 @@ export function useLiveKit() {
   }, []);
 
   type InsertaSalud = (tabla: "llamada_salud") => {
-    insert: (fila: { sala: string; datos: MuestraDeLlamada & MemoriaDelEquipo & { ahorro: boolean; nc: EstadoNC; nc_info?: InfoNC; prueba?: PruebaDeRed; perfil_cam: PerfilDeCamara; trabas?: Traba[]; audio?: AudioDeLaMuestra } }) =>
+    insert: (fila: { sala: string; datos: MuestraDeLlamada & MemoriaDelEquipo & { ahorro: boolean; nc: EstadoNC; nc_info?: InfoNC; prueba?: PruebaDeRed; perfil_cam: PerfilDeCamara; transporte: Transporte | null; trabas?: Traba[]; audio?: AudioDeLaMuestra } }) =>
       PromiseLike<{ error: { message: string } | null }>;
   };
   // Si el componente se desmonta sin colgar, el reloj de muestras no queda vivo.
@@ -713,7 +714,9 @@ export function useLiveKit() {
         if (!params.encodings?.length) return;
         // En Meet y en las llamadas de Maven la cámara va en HD y NO se recorta a
         // 360p por la subida (Alvaro, 17/11/2026: «calidad alta en Meet»).
-        const liviano = perfilCamaraRef.current.perfil === "liviano" && !camaraEnHD(room.name);
+        // Salvo por TCP (lib/redBloqueada.ts): ahí el HD congela el video 71 a
+        // 110 veces en 5 minutos, así que se topa también en Meet y en el chat.
+        const liviano = (perfilCamaraRef.current.perfil === "liviano" && !camaraEnHD(room.name)) || porRedBloqueada();
         // En Cowork también el normal va topado: todo en vivo, a 10 fps
         // (perfilDeCamara.ts, CAMARA_COWORK). Fuera de Cowork, el normal es el de siempre.
         if (liviano || conPrueba) {
@@ -838,11 +841,11 @@ export function useLiveKit() {
         perfilCamaraRef.current = siguientePerfilDeCamara(perfilCamaraRef.current, senalesDeSubida(muestra));
         const perfilCam = perfilCamaraRef.current.perfil;
         if (perfilCam !== perfilCamAntes) console.info(`[LiveKit] cámara: perfil ${perfilCam}`);
-        if (conPrueba || perfilCam === "liviano" || perfilCamAntes === "liviano") void aplicarCamara();
+        if (conPrueba || perfilCam === "liviano" || perfilCamAntes === "liviano" || porRedBloqueada()) void aplicarCamara();
         const memoria = await leerMemoria();
         // Cada 10 minutos: qué tan lejos queda cada servidor de llamadas (lib/pingRegiones.ts).
         const regiones = (vueltaRegiones++ % MEDIR_REGIONES_CADA === 0) ? await medirRegiones() : null;
-        const filaDeSalud = { sala: room.name, datos: { ...muestra, ...memoria, ahorro: ahorro.activo, nc, ...(ncInfo ? { nc_info: ncInfo } : {}), perfil_cam: perfilCam, ...(prueba ? { prueba } : {}), ...(trabasDelMinuto.length ? { trabas: trabasDelMinuto } : {}), ...(audio ? { audio } : {}), ...(regiones ? { regiones } : {}) } };
+        const filaDeSalud = { sala: room.name, datos: { ...muestra, ...memoria, ahorro: ahorro.activo, nc, ...(ncInfo ? { nc_info: ncInfo } : {}), perfil_cam: perfilCam, transporte: transporteDeLaLlamada(), ...(prueba ? { prueba } : {}), ...(trabasDelMinuto.length ? { trabas: trabasDelMinuto } : {}), ...(audio ? { audio } : {}), ...(regiones ? { regiones } : {}) } };
         if (telemetriaRef.current) telemetriaRef.current.salud(filaDeSalud);
         else void (supabase.from as unknown as InsertaSalud)("llamada_salud")
           .insert(filaDeSalud)
@@ -868,9 +871,43 @@ export function useLiveKit() {
         } catch { /* avisar jamás rompe la llamada */ }
       })();
     }, MIRAR_DEBIL_CADA_MS);
+    // Por dónde viaja la llamada (lib/redBloqueada.ts): UDP o TCP. Si pasa a
+    // TCP, la cámara propia se topa en el acto (aplicarCamara) y la vista pide
+    // las ajenas en la capa media. Se lee del emisor del micrófono (o de la
+    // cámara, o de lo primero que se reciba): todos comparten el transporte.
+    anotarTransporte(null);
+    const mirarTransporte = async () => {
+      try {
+        if (roomRef.current !== room || room.state !== ConnectionState.Connected) return;
+        let reporte: RTCStatsReport | undefined;
+        for (const fuente of [Track.Source.Microphone, Track.Source.Camera]) {
+          const pista = room.localParticipant.getTrackPublication(fuente)?.track;
+          reporte = pista ? await pista.getRTCStatsReport().catch(() => undefined) : undefined;
+          if (reporte) break;
+        }
+        if (!reporte) {
+          for (const p of room.remoteParticipants.values()) {
+            const receptor = [...p.trackPublications.values()].find((pub) => pub.track?.receiver)?.track?.receiver;
+            if (receptor) { reporte = await receptor.getStats().catch(() => undefined); break; }
+          }
+        }
+        if (!reporte || roomRef.current !== room) return;
+        const t: Transporte | null = leerTransporte(reporte.values() as Iterable<Record<string, unknown>>);
+        if (t === null) return;
+        if (anotarTransporte(t)) {
+          console.info(`[LiveKit] transporte ${t}`);
+          void aplicarCamara();
+        }
+      } catch { /* mirar jamás rompe la llamada */ }
+    };
+    const primeraMirada = window.setTimeout(() => { void mirarTransporte(); }, PRIMERA_MIRADA_MS);
+    const vigiaTransporte = window.setInterval(() => { void mirarTransporte(); }, MIRAR_TRANSPORTE_CADA_MS);
     pararMuestreoRef.current = () => {
       window.clearTimeout(primera);
       window.clearInterval(cada);
+      window.clearTimeout(primeraMirada);
+      window.clearInterval(vigiaTransporte);
+      anotarTransporte(null);
       window.clearInterval(vigiaDebil);
       setInternetDebil(false);
       retraso.parar();

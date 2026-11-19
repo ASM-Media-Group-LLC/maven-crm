@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { Eye, Loader2, FileSpreadsheet, CalendarClock } from "lucide-react";
 import { useHorariosEquipo } from "@/hooks/useHorariosEquipo";
@@ -18,21 +18,40 @@ import { Page } from "@/components/ui/page";
 import { PageHeader } from "@/components/ui/page-header";
 import { useMonitorConfig } from "@/hooks/useMonitorConfig";
 import { DondeEstaPanel } from "@/components/hr/DondeEstaPanel";
-import { ConectadosAhoraPanel } from "@/components/hr/ConectadosAhoraPanel";
-import { PantallazosVivoPanel } from "@/components/hr/PantallazosVivoPanel";
-import { ContextoEmpresaPanel } from "@/components/hr/ContextoEmpresaPanel";
-import { ArgosPanelDia } from "@/components/hr/ArgosPanelDia";
-import { ArgosHistorial } from "@/components/hr/ArgosHistorial";
-import { LlamadasPanel } from "@/components/hr/LlamadasPanel";
-import { TableroCalidadLlamadas } from "@/components/hr/TableroCalidadLlamadas";
-import { RevisionCasos } from "@/components/hr/RevisionCasos";
 import { useFuncionesCasos } from "@/hooks/useCasosArgos";
 import { veRevision } from "@/lib/casosArgos";
-import { HistorialHubPanel } from "@/components/hr/HistorialHubPanel";
 import { useEsDueno } from "@/hooks/useEsDueno";
-import { EstadoPanel } from "@/components/hr/EstadoPanel";
-import { ArgosAjustesContenido } from "@/pages/hr/ArgosAjustes";
 import type { TranslationKey } from "@/lib/i18n";
+import { estaEnLlamadaDeMaven } from "@/lib/llamadaEnMaven";
+
+// PANTALLAS AL INSTANTE (19/11/2026): Argos abre en «Dónde está» y es lo único
+// que se dibuja al entrar. Las demás pestañas (con gráficos y tableros pesados)
+// bajan recién al tocarlas, y en ocio después de abrir, así el primer pantallazo
+// no espera código que no se ve. El contenido de cada pestaña no cambia.
+const cargarPestanas = {
+  ahora: () => Promise.all([import("@/components/hr/ConectadosAhoraPanel"), import("@/components/hr/PantallazosVivoPanel")]),
+  dia: () => Promise.all([import("@/components/hr/ArgosHistorial"), import("@/components/hr/ArgosPanelDia")]),
+  llamadas: () => Promise.all([import("@/components/hr/EstadoPanel"), import("@/components/hr/TableroCalidadLlamadas"), import("@/components/hr/LlamadasPanel")]),
+  hub: () => import("@/components/hr/HistorialHubPanel"),
+  revision: () => import("@/components/hr/RevisionCasos"),
+  ajustes: () => Promise.all([import("@/pages/hr/ArgosAjustes"), import("@/components/hr/ContextoEmpresaPanel")]),
+};
+const ConectadosAhoraPanel = lazy(() => import("@/components/hr/ConectadosAhoraPanel").then((m) => ({ default: m.ConectadosAhoraPanel })));
+const PantallazosVivoPanel = lazy(() => import("@/components/hr/PantallazosVivoPanel").then((m) => ({ default: m.PantallazosVivoPanel })));
+const ArgosHistorial = lazy(() => import("@/components/hr/ArgosHistorial").then((m) => ({ default: m.ArgosHistorial })));
+const ArgosPanelDia = lazy(() => import("@/components/hr/ArgosPanelDia").then((m) => ({ default: m.ArgosPanelDia })));
+const EstadoPanel = lazy(() => import("@/components/hr/EstadoPanel").then((m) => ({ default: m.EstadoPanel })));
+const TableroCalidadLlamadas = lazy(() => import("@/components/hr/TableroCalidadLlamadas").then((m) => ({ default: m.TableroCalidadLlamadas })));
+const LlamadasPanel = lazy(() => import("@/components/hr/LlamadasPanel").then((m) => ({ default: m.LlamadasPanel })));
+const HistorialHubPanel = lazy(() => import("@/components/hr/HistorialHubPanel").then((m) => ({ default: m.HistorialHubPanel })));
+const RevisionCasos = lazy(() => import("@/components/hr/RevisionCasos").then((m) => ({ default: m.RevisionCasos })));
+const ArgosAjustesContenido = lazy(() => import("@/pages/hr/ArgosAjustes").then((m) => ({ default: m.ArgosAjustesContenido })));
+const ContextoEmpresaPanel = lazy(() => import("@/components/hr/ContextoEmpresaPanel").then((m) => ({ default: m.ContextoEmpresaPanel })));
+
+/** Mientras baja una pestaña: la misma ruedita de carga de la app. */
+const CargandoPestana = () => (
+  <div className="mt-10 flex justify-center"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>
+);
 
 // Panel de RRHH del monitor de cámara de Cowork. Muestra en vivo las faltas que
 // registra el monitor (cámara apagada/tapada, se fue, cara incompleta, celular,
@@ -169,6 +188,24 @@ export default function HRMonitorIA() {
   const funcionesCasos = useFuncionesCasos();
   const veCasos = veRevision(funcionesCasos.data);
 
+  // Las otras pestañas bajan en ocio una vez abierta la primera (de a una, con
+  // un respiro entre cada una), así al tocarlas ya están.
+  useEffect(() => {
+    const w = window as Window & { requestIdleCallback?: (cb: () => void, o?: { timeout: number }) => number; cancelIdleCallback?: (id: number) => void };
+    const pendientes = Object.values(cargarPestanas);
+    let cancelado = false;
+    let t: number | undefined;
+    const siguiente = () => {
+      const cargar = pendientes.shift();
+      // En llamada no se baja nada (cada KB es para el video): la pestaña bajará al tocarla.
+      if (cancelado || !cargar || estaEnLlamadaDeMaven()) return;
+      cargar().catch(() => { /* bajará al tocar la pestaña */ }).finally(() => { t = window.setTimeout(siguiente, 800); });
+    };
+    const id = typeof w.requestIdleCallback === "function" ? w.requestIdleCallback(siguiente, { timeout: 4_000 }) : undefined;
+    if (id === undefined) t = window.setTimeout(siguiente, 1_500);
+    return () => { cancelado = true; if (id !== undefined) w.cancelIdleCallback?.(id); window.clearTimeout(t); };
+  }, []);
+
   const monitorOff = config ? !config.activo : false;
   const horariosEq = useHorariosEquipo();
 
@@ -237,6 +274,7 @@ export default function HRMonitorIA() {
         </div>
       )}
 
+      <Suspense fallback={<CargandoPestana />}>
       {/* AHORA — el piso en vivo: tablero de caras con semáforo + muralla de pantallazos. */}
       {tab === "ahora" && (
         <div className="mt-5 flex flex-col gap-5">
@@ -299,6 +337,7 @@ export default function HRMonitorIA() {
           <ContextoEmpresaPanel />
         </div>
       )}
+      </Suspense>
     </Page>
   );
 }

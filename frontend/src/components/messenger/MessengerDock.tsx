@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from "react";
+import { createContext, lazy, Suspense, useCallback, useContext, useMemo, useState, type ReactNode } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { MessageCircle, X, Users } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -8,9 +8,17 @@ import { useChatShared } from "@/hooks/ChatProvider";
 import { usePermissions } from "@/hooks/usePermissions";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useMuelleFlotante, fabSize, MARGIN, MUELLE_EXTRA_ID } from "@/hooks/useMuelleFlotante";
-import ClariAiFab from "@/components/ClariAiFab";
 import { useUserRole } from "@/hooks/useUserRole";
-import DockChatWindow, { VENTANA_ANCHO } from "./DockChatWindow";
+import { VENTANA_ANCHO } from "./medidasDeVentana";
+
+// La ventanita de chat trae el editor completo (tiptap + markdown, ~1 MB sin
+// comprimir). Antes viajaba en el arranque de TODA la app aunque nadie abriera
+// un chat (y con el muelle apagado, nunca se dibuja); ahora baja recién cuando
+// se dibuja una (pantallas al instante, 19/11/2026). Es el mismo editor que usa
+// /messenger, así que lo comparten.
+const DockChatWindow = lazy(() => import("./DockChatWindow"));
+// Clari (chat con markdown) igual: solo admins y solo con el muelle visible.
+const ClariAiFab = lazy(() => import("@/components/ClariAiFab"));
 import ChatsPanel from "./ChatsPanel";
 import type { ConversationWithDetails } from "@/pages/messenger/types";
 import { cn } from "@/lib/utils";
@@ -132,14 +140,16 @@ export function MessengerDockProvider({ children }: { children: ReactNode }) {
           className="pointer-events-none fixed z-50 flex items-end gap-2"
           style={estiloVentanas}
         >
-          {ventanas.map((c) => (
-            <DockChatWindow
-              key={c.id}
-              conversation={c}
-              onMinimize={() => minimizar(c.id)}
-              onClose={() => cerrar(c.id)}
-            />
-          ))}
+          <Suspense fallback={null}>
+            {ventanas.map((c) => (
+              <DockChatWindow
+                key={c.id}
+                conversation={c}
+                onMinimize={() => minimizar(c.id)}
+                onClose={() => cerrar(c.id)}
+              />
+            ))}
+          </Suspense>
         </div>
       )}
 
@@ -179,12 +189,14 @@ export function MessengerDockProvider({ children }: { children: ReactNode }) {
         <>
           <div className="fixed inset-0 z-40 bg-black/40" onClick={() => setChatEnHoja(null)} aria-hidden />
           <div className="fixed inset-x-0 bottom-0 z-50 h-[85dvh] pb-safe">
-            <DockChatWindow
-              conversation={porId[chatEnHoja]}
-              llenar
-              onMinimize={() => { setChatEnHoja(null); setPanelAbierto(true); }}
-              onClose={() => setChatEnHoja(null)}
-            />
+            <Suspense fallback={null}>
+              <DockChatWindow
+                conversation={porId[chatEnHoja]}
+                llenar
+                onMinimize={() => { setChatEnHoja(null); setPanelAbierto(true); }}
+                onClose={() => setChatEnHoja(null)}
+              />
+            </Suspense>
           </div>
         </>
       )}
@@ -200,7 +212,7 @@ export function MessengerDockProvider({ children }: { children: ReactNode }) {
         style={estiloContenedor}
         {...arrastreProps}
       >
-        {mostrarClari && <ClariAiFab anclarPanel={anclarPanel} />}
+        {mostrarClari && <Suspense fallback={null}><ClariAiFab anclarPanel={anclarPanel} /></Suspense>}
 
         {mostrarMessenger && (
           <button

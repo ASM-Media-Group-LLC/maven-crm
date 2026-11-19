@@ -51,6 +51,9 @@ const IMPORTADORES: Record<string, () => Promise<unknown>> = {
   "/agency-qa": () => import("@/pages/agency-qa/AgencyQA"),
   "/conexion": () => import("@/pages/conexion/GuiaConexionPage"),
   "/app": () => import("@/pages/guiaApp/GuiaAppPage"),
+  // Argos (pantallas al instante, 19/11/2026): una de las cinco pantallas
+  // principales y no estaba en el mapa.
+  "/hr/monitor-ia": () => import("@/pages/hr/HRMonitorIA"),
 };
 
 /** Segundos entre dos chunks en la precarga de ocio: que sea un goteo, no una
@@ -126,3 +129,18 @@ export function crearPrecargador(importadores: Record<string, () => Promise<unkn
 const precargador = crearPrecargador(IMPORTADORES);
 export const precargarRuta = precargador.precargarRuta;
 export const precargarEnOcio = precargador.precargarEnOcio;
+
+/**
+ * La sección en la que ARRANCA la app (pantallas al instante, 19/11/2026).
+ *
+ * Al abrir Maven directo en /cowork, /messenger, /correo… el chunk de la página
+ * recién se pedía cuando la sesión y los permisos ya habían llegado (la ruta
+ * espera los permisos antes de dibujar la página). Pidiéndolo al arrancar, baja
+ * EN PARALELO con la sesión y los permisos en vez de después. Es la misma
+ * precarga inofensiva de arriba: una vez, sin lanzar, y si la ruta no está en
+ * el mapa no hace nada. No mira si hay llamada: al arrancar no hay ninguna.
+ */
+export function precargarRutaActual(pathname: string = window.location.pathname): void {
+  const ruta = pathname.length > 1 ? pathname.replace(/\/+$/, "") : pathname;
+  precargarRuta(ruta);
+}

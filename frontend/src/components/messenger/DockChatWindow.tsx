@@ -19,8 +19,8 @@ import { puedeVerLaListaDeMiembros } from "@/pages/messenger/utils";
 import { cn } from "@/lib/utils";
 import { useLanguage } from "@/hooks/useLanguage";
 
-export const VENTANA_ANCHO = 336;
-export const VENTANA_ALTO = 460;
+import { VENTANA_ANCHO, VENTANA_ALTO } from "./medidasDeVentana";
+export { VENTANA_ANCHO, VENTANA_ALTO };
 
 /**
  * Ventanita de chat del muelle, estilo Facebook: cabecera compacta, mensajes y

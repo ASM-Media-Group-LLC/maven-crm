@@ -41,29 +41,28 @@ export const usePermissions = () => {
         if (a && a.rol === role && a.permisos) return a.permisos as Permission[];
       }
 
-      // Find the roles_config entry matching the user's role name
-      const { data: roleConfig, error: rcError } = await supabase
-        .from("roles_config")
-        .select("id")
-        .eq("name", role)
-        .eq("is_active", true)
-        .maybeSingle();
+      // UN SOLO VIAJE (pantallas al instante, 19/11/2026): los permisos se piden
+      // junto con su roles_config (embed por la FK role_permissions.role_id).
+      // Antes eran dos en fila —primero el id del rol, después sus permisos— y
+      // toda pantalla con permisos esperaba los dos. `!inner` hace que solo
+      // vengan las filas del rol activo con ese nombre: sin rol configurado (o
+      // inactivo) la respuesta es [] de verdad, igual que antes.
+      const { data, error } = await supabase
+        .from("role_permissions")
+        .select("module, submodule, can_access, data_scope, roles_config!inner(name, is_active)")
+        .eq("roles_config.name", role)
+        .eq("roles_config.is_active", true);
 
       // ⚠️ Un fallo NO es "rol sin configurar". Tragarse el error devolvía []
       // y la app concluía "solo módulos universales": menú recortado y
       // PermissionRoute sacando a la persona del evaluador en pleno roleplay
       // (John Idrobo, 07/10: "se cerró el roleplay solo"). Con throw,
       // react-query conserva los permisos anteriores y marca el error.
-      if (rcError) throw rcError;
-      if (!roleConfig) return [];
-
-      const { data, error } = await supabase
-        .from("role_permissions")
-        .select("module, submodule, can_access, data_scope")
-        .eq("role_id", roleConfig.id);
-
       if (error) throw error;
-      return (data || []) as Permission[];
+      if (!data) return [];
+      return (data as unknown as Array<Permission & { roles_config?: unknown }>).map(
+        ({ module, submodule, can_access, data_scope }) => ({ module, submodule, can_access, data_scope }),
+      );
     },
     enabled: !!role && !isAdmin, // Admin gets full access, skip query
     staleTime: 5 * 60 * 1000,
