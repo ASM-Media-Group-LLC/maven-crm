@@ -78,3 +78,21 @@ export function usePuedoConfigurarEmpresa() {
 export function textoModalidad(comida: number, bano: number): string {
   return `${comida} + ${bano} min`;
 }
+
+/** La pausa pagada que trae MI puesto (almuerzo + baño). null = sin dato: el
+ *  texto queda general, nunca un número inventado. */
+export function useMiPausa(uid: string | null | undefined) {
+  return useQuery<{ comida: number; bano: number } | null>({
+    queryKey: ["mi-pausa", uid],
+    enabled: !!uid,
+    staleTime: 5 * 60_000,
+    queryFn: async () => {
+      const { data, error } = await db.rpc("argos_pausas_de", { _uid: uid });
+      if (error) throw new Error(error.message);
+      const f = (Array.isArray(data) ? data[0] : data) as { comida_min?: unknown; bano_min?: unknown } | null;
+      if (!f) return null;
+      const comida = Number(f.comida_min), bano = Number(f.bano_min);
+      return Number.isFinite(comida) && Number.isFinite(bano) ? { comida, bano } : null;
+    },
+  });
+}
