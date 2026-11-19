@@ -261,9 +261,14 @@ export default function CoworkReglasDialog({ open, onOpenChange, reglas, nombreS
           <TarjetaRegla
             icono={VideoOff}
             titulo={t("cowork.rules.camera")}
-            resumen={resumenAviso(borrador.camara, t)}
-            activa={borrador.camara.activa}
-            onActiva={(v) => cambiarAviso("camara", { activa: v })}
+            // Si se pide o no lo decide el PUESTO (19/11/2026), no la sala: aquí
+            // solo se elige cuándo avisarle al supervisor.
+            resumen={
+              <>
+                <span className="block">{t("cowork.rules.byPosition")}</span>
+                <span className="block">{resumenAviso({ ...borrador.camara, activa: true }, t)}</span>
+              </>
+            }
             abierta={!!abiertas.camara}
             onAlternar={() => alternar("camara")}
           >
@@ -290,9 +295,12 @@ export default function CoworkReglasDialog({ open, onOpenChange, reglas, nombreS
           <TarjetaRegla
             icono={Monitor}
             titulo={t("cowork.rules.screen")}
-            resumen={resumenAviso(borrador.pantalla, t)}
-            activa={borrador.pantalla.activa}
-            onActiva={(v) => cambiarAviso("pantalla", { activa: v })}
+            resumen={
+              <>
+                <span className="block">{t("cowork.rules.byPosition")}</span>
+                <span className="block">{resumenAviso({ ...borrador.pantalla, activa: true }, t)}</span>
+              </>
+            }
             abierta={!!abiertas.pantalla}
             onAlternar={() => alternar("pantalla")}
           >
@@ -337,7 +345,7 @@ export default function CoworkReglasDialog({ open, onOpenChange, reglas, nombreS
           <TarjetaRegla
             icono={Timer}
             titulo={t("cowork.rules.clock")}
-            resumen={resumenReloj(borrador.reloj, borrador.camara.activa, borrador.pantalla.activa, t)}
+            resumen={resumenReloj(borrador.reloj, true, true, t)}
             abierta={!!abiertas.reloj}
             onAlternar={() => alternar("reloj")}
           >

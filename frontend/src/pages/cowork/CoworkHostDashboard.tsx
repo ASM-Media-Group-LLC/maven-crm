@@ -187,7 +187,13 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
   // estándar, o sea lo que Cowork hizo siempre. Va ARRIBA de todo lo que la
   // usa: es una const, y leerla desde un arreglo de dependencias antes de su
   // línea es la TDZ que ya tumbó esta pantalla dos veces.
-  const reglas = useMemo(() => normalizarReglas(cowork.session?.alert_rules), [cowork.session?.alert_rules]);
+  // La cámara y la pantalla ya no se apagan por sala (19/11/2026: «solo manda el
+  // puesto»): las dos quedan activas aquí, y a quien su puesto no se las pide
+  // lo dice su presencia (exigeCamara / exigePantalla).
+  const reglas = useMemo(() => {
+    const r = normalizarReglas(cowork.session?.alert_rules);
+    return { ...r, camara: { ...r.camara, activa: true }, pantalla: { ...r.pantalla, activa: true } };
+  }, [cowork.session?.alert_rules]);
   const [reglasOpen, setReglasOpen] = useState(false);
   const [pausasOpen, setPausasOpen] = useState(false);
   const [displayName, setDisplayName] = useState("Host");
@@ -1394,7 +1400,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
   const salaCaidaEn = (ms: MediaState | undefined): boolean =>
     ms?.conexionSala === "desconectada" || ms?.relojEstado === "sin_conexion" || ms?.relojEstado === "sin_conexion_larga";
 
-  const sinPantalla = (ms: MediaState | undefined): boolean => !salaCaidaEn(ms) && debeAvisarSinPantalla(
+  const sinPantalla = (ms: MediaState | undefined): boolean => ms?.exigePantalla !== false && !salaCaidaEn(ms) && debeAvisarSinPantalla(
     ms, now,
     reglas.pantalla.activa && reglas.pantalla.supervisorSeg !== null ? reglas.pantalla.supervisorSeg * 1000 : null,
   );
@@ -1402,6 +1408,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
   const faceIssue = (ms: MediaState | undefined): ProblemaCara | null => {
     if (!ms || !ms.faceState || !ms.faceSince) return null;
     if (ms.onBreak) return null;                   // ya sabemos que no está
+    if (ms.exigeCamara === false) return null;     // su puesto no le pide cámara
     if (salaCaidaEn(ms)) return null;              // se cayó la sala, no su cámara
     if (ms.faceState === "ok") return null;
     if (ms.faceState === "unavailable") return null; // el detector no cargó en su equipo

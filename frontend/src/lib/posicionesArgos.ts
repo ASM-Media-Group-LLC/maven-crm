@@ -4,15 +4,16 @@
 //   · «Solo yo por ahora»: mientras las posiciones sean borrador, solo el dueño
 //     las ve así (la tabla del borrador solo la lee el dueño); los demás siguen
 //     con los equipos de siempre. Nadie ve a una persona más que antes.
-//   · «Salen en gris, sin nota»: quien no está obligado a cámara/pantalla
-//     (René, Grace, Jackeline, Luis, Pachas) y quien solo es Admin salen en su
-//     caja, pero sin nota y sin bajar el promedio.
+//   · «Salen en gris, sin nota»: quien no tiene Argos —su puesto no pide
+//     pantalla (19/11/2026: Admin, Closer externo, Operations Sales,
+//     Freelance)— y quien solo es Admin salen en su caja, pero sin nota y sin
+//     bajar el promedio. Lo dice el PUESTO, nunca una marca por persona.
 //   · El dueño no sale en Argos (eso lo hace la base: argos_vigilables).
 // Lógica pura, para probarla sin base.
 
-export interface PosicionBorrador { id: string; nombre: string; orden: number | null; activa: boolean | null }
+export interface PosicionBorrador { id: string; nombre: string; orden: number | null; activa: boolean | null; pide_pantalla?: boolean | null }
 export interface AsignacionBorrador { user_id: string; posicion_id: string }
-export interface MarcaBorrador { user_id: string; sin_camara: boolean | null; deshabilitada: boolean | null }
+export interface MarcaBorrador { user_id: string; deshabilitada: boolean | null }
 
 export interface PosicionDe {
   /** La posición que define su caja (la de trabajo, no la de «Admin»). */
@@ -51,7 +52,8 @@ export function mapaDePosiciones(
     out.set(userId, {
       posicion: trabajo.nombre,
       orden: trabajo.orden ?? 999,
-      sinNota: soloAcceso || m?.sin_camara === true,
+      // Con que uno de sus puestos no pida pantalla, no hay Argos (ni nota).
+      sinNota: soloAcceso || orden.some((p) => p.pide_pantalla === false),
       oculta: esDueno || m?.deshabilitada === true,
     });
   }

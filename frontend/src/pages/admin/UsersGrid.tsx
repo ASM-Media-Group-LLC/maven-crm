@@ -13,7 +13,6 @@ import { useFormato } from "@/hooks/useFormato";
 import { useAuth } from "@/hooks/useAuth";
 import { useLanguage } from "@/hooks/useLanguage";
 import { DriveFullToggle } from "./DriveFullToggle";
-import { ExonerarCamaraToggle } from "./ExonerarCamaraToggle";
 
 const roleConfig: Record<string, { icon: React.ReactNode; variant: "default" | "secondary" | "destructive" | "outline" }> = {
   admin: { icon: <Shield className="h-3 w-3" />, variant: "destructive" },
@@ -48,7 +47,6 @@ const UsersGrid = ({ users, onEditRole, onEdit, onResetPassword, onMigrarCorreo,
             <CardContent className="p-5">
               <div className="absolute top-3 left-3">
                 <DriveFullToggle user={user} />
-                <ExonerarCamaraToggle user={user} />
               </div>
               <div className="absolute top-3 right-3">
                 <DropdownMenu>

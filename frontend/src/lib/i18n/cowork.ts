@@ -321,6 +321,7 @@ export const cowork = {
   "cowork.rules.framing": { es: "Encuadre y luz", en: "Framing and light" },
   "cowork.rules.framingHint": { es: "Sin rostro, fuera de cuadro o con poca luz.", en: "No face, out of frame, or low light." },
   "cowork.rules.screen": { es: "Compartir pantalla", en: "Screen sharing" },
+  "cowork.rules.byPosition": { es: "Si se pide o no lo decide el puesto de cada persona (Ajustes → Empresa).", en: "Whether it is required is set by each person's position (Settings → Company)." },
   "cowork.rules.pauses": { es: "Pausas", en: "Pauses" },
   "cowork.rules.clock": { es: "Reloj de tiempo trabajado", en: "Time-worked clock" },
   "cowork.rules.nobodyOnCamera": { es: "Nadie frente a la cámara", en: "Nobody on camera" },
