@@ -422,6 +422,15 @@ Deno.serve(async (req) => {
   // /creators con POST/PATCH (Backstage, 18/11/2026): crear creadoras y cargar su ID
   // de OnlyFans. Escribe con service_role atado a la agencia, como /contenido.
   const esCreadorasEscritura = recursoClave === "creators" && metodo !== "GET";
+  if (esCreadorasEscritura) {
+    // La ruta antes que el scope (y sin leer el cuerpo): 404/405 con su Allow.
+    const r = rutaDeCreadoras(metodo, rest.slice(1));
+    if (!r.ok && r.estado === 404) return json(req, { error: "not_found", message: msg(idioma, "creadora_no_encontrada") }, 404);
+    if (!r.ok) {
+      return json(req, { error: "method_not_allowed", message: msg(idioma, "metodo_no_permitido", { permitidos: (r.permitidos ?? ["GET"]).join(", ") }) },
+        405, { "Allow": (r.permitidos ?? ["GET"]).join(", ") });
+    }
+  }
   if (esCreadorasEscritura && !need("creators:write")) {
     return json(req, { error: "forbidden", message: msg(idioma, "falta_scope", { scope: "creators:write" }) }, 403);
   }
