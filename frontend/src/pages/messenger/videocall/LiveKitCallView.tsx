@@ -40,6 +40,7 @@ import { precalentarFondo, soportaProcesadorDeFondo } from "@/lib/fondoFino/proc
 import { escritorio } from "@/lib/escritorio";
 import { estaEnPausa } from "@/lib/coworkPausa";
 import { modoLivianoActivo } from "@/lib/appLiviana";
+import { porRedBloqueada } from "@/lib/redBloqueada";
 import { proximoIntentoDePantalla } from "@/lib/pantallaSolaEnLaApp";
 import { useHubDelSupervisor } from "@/hooks/useHubDelSupervisor";
 import { columnasDelMosaico, textoDePantallaDelHub, pantallasParaMosaico } from "@/lib/hubComoMeet";
@@ -590,7 +591,9 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
             ? calidadDeCamara({ fijado: p.sid === pinnedSid, hablando: p.isSpeaking, ultimaVezHablo: ultimaVez.get(p.sid), ahora })
             : VideoQuality.HIGH;
           // App en un equipo de 8 GB o menos (lib/appLiviana.ts): como mucho media.
-          pub.setVideoQuality(modoLivianoActivo() && calidad === VideoQuality.HIGH ? VideoQuality.MEDIUM : calidad);
+          const conTope = modoLivianoActivo() && calidad === VideoQuality.HIGH ? VideoQuality.MEDIUM : calidad;
+          // Llamada por TCP porque la red bloquea UDP (lib/redBloqueada.ts): también media.
+          pub.setVideoQuality(porRedBloqueada() && conTope === VideoQuality.HIGH ? VideoQuality.MEDIUM : conTope);
         } catch { /* la calidad nunca rompe la llamada */ }
       });
     };
