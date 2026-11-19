@@ -76,6 +76,8 @@ interface CallControlsProps {
   estadoNC?: EstadoNC;
   backgroundEffect?: BackgroundEffect;
   onToggleBlurBackground?: () => void;
+  /** Mostrar las flechitas de micrófono y cámara. Por defecto, fuera del modo compacto. */
+  flechas?: boolean;
   /** Un control más, a la derecha del chat. Lo usa el Supervisor Hub para la
    *  tacita de pausa. Va como hueco y no como botón propio para que esta barra
    *  —cuyo ancho está medido— no aprenda nada de Cowork. */
@@ -366,7 +368,7 @@ export default function CallControls({
   onSendReaction, onLeave,
   onAudioInputChange, onAudioOutputChange, onVideoInputChange,
   onOpenVideoSettings, onOpenMetrics, onOpenAdjustView, hideScreenShare, hideLeaveButton, leaveLabel, leaveIcon, compact, tactil, controlesExtra,
-  backgroundEffect, onToggleBlurBackground,
+  backgroundEffect, onToggleBlurBackground, flechas,
 }: CallControlsProps) {
   const { t } = useLanguage();
   const [audioPopoverOpen, setAudioPopoverOpen] = useState(false);
@@ -397,6 +399,13 @@ export default function CallControls({
   };
 
   const btnSize = compact ? (tactil ? "h-9 w-9" : "h-8 w-8") : "h-11 w-11";
+  // Las flechitas de micrófono y cámara (dispositivo y fondo borroso) se ven
+  // siempre, también con la barra achicada; solo se esconden en la ventanita
+  // flotante y el PiP, que son demasiado chicos (Alvaro, 19/11/2026: «no me
+  // salen las flechitas»).
+  const conFlechas = flechas ?? !compact;
+  const altoFlecha = compact ? (tactil ? "h-9" : "h-8") : "h-11";
+  const anchoBoton = compact ? (tactil ? "w-9" : "w-8") : "w-11";
   const iconSize = compact && !tactil ? "h-3.5 w-3.5" : "h-[18px] w-[18px]";
 
   return (
@@ -407,8 +416,8 @@ export default function CallControls({
           elevada translúcida que agrupa los controles. En compacto (el Hub
           flotante) es más chica. */}
       <div className={cn("flex items-center flex-wrap justify-center dock-estudio", compact ? "gap-1 rounded-xl px-1.5 py-1" : "gap-2 rounded-2xl px-2.5 py-2")}>
-        {/* Mic — compact skips device popover */}
-        {compact ? (
+        {/* Mic — sin flechita solo en la ventanita flotante / PiP */}
+        {!conFlechas ? (
           <button
             onClick={onToggleMic}
             title={t("messenger.call.microfono")}
@@ -426,7 +435,7 @@ export default function CallControls({
             <Popover open={audioPopoverOpen} onOpenChange={setAudioPopoverOpen}>
               <PopoverTrigger asChild>
                 <button className={cn(
-                  "h-11 w-8 rounded-l-lg flex items-center justify-center transition-colors border-r",
+                  altoFlecha, "w-8 rounded-l-lg flex items-center justify-center transition-colors border-r",
                   isMicOn
                     ? "bg-card text-muted-foreground hover:bg-muted border-border"
                     : "bg-destructive/85 text-white hover:bg-destructive/80 border-destructive/90"
@@ -448,19 +457,19 @@ export default function CallControls({
               onClick={onToggleMic}
               title={t("messenger.call.microfono")}
               className={cn(
-                "h-11 w-11 rounded-r-lg flex items-center justify-center transition-colors",
+                altoFlecha, anchoBoton, "rounded-r-lg flex items-center justify-center transition-colors",
                 isMicOn
                   ? "bg-card text-foreground hover:bg-muted"
                   : "bg-destructive text-white hover:bg-destructive/90"
               )}
             >
-              {isMicOn ? <Mic className="h-[18px] w-[18px]" /> : <MicOff className="h-[18px] w-[18px]" />}
+              {isMicOn ? <Mic className={iconSize} /> : <MicOff className={iconSize} />}
             </button>
           </div>
         )}
 
-        {/* Cam — compact skips device popover */}
-        {compact ? (
+        {/* Cam — sin flechita solo en la ventanita flotante / PiP */}
+        {!conFlechas ? (
           <button
             onClick={onToggleCam}
             title={t("messenger.input.camara")}
@@ -478,7 +487,7 @@ export default function CallControls({
             <Popover open={videoPopoverOpen} onOpenChange={setVideoPopoverOpen}>
               <PopoverTrigger asChild>
                 <button className={cn(
-                  "h-11 w-8 rounded-l-lg flex items-center justify-center transition-colors border-r",
+                  altoFlecha, "w-8 rounded-l-lg flex items-center justify-center transition-colors border-r",
                   isCamOn
                     ? "bg-card text-muted-foreground hover:bg-muted border-border"
                     : "bg-destructive/85 text-white hover:bg-destructive/80 border-destructive/90"
@@ -517,13 +526,13 @@ export default function CallControls({
               onClick={onToggleCam}
               title={t("messenger.input.camara")}
               className={cn(
-                "h-11 w-11 rounded-r-lg flex items-center justify-center transition-colors",
+                altoFlecha, anchoBoton, "rounded-r-lg flex items-center justify-center transition-colors",
                 isCamOn
                   ? "bg-card text-foreground hover:bg-muted"
                   : "bg-destructive text-white hover:bg-destructive/90"
               )}
             >
-              {isCamOn ? <VideoIcon className="h-[18px] w-[18px]" /> : <VideoOff className="h-[18px] w-[18px]" />}
+              {isCamOn ? <VideoIcon className={iconSize} /> : <VideoOff className={iconSize} />}
             </button>
           </div>
         )}

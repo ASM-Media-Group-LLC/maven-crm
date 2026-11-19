@@ -1556,6 +1556,7 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
         leaveIcon={leaveIcon}
         compact={effectiveCompact}
         tactil={tactil}
+        flechas={!compact}
         onOpenAdjustView={() => setAdjustViewOpen(true)}
         backgroundEffect={bgEffect}
         onToggleBlurBackground={() => handleBgChange(alternarBlur(bgEffect, ultimoBlurRef.current))}
