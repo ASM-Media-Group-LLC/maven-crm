@@ -23,6 +23,8 @@ import { ContextoEmpresaPanel } from "@/components/hr/ContextoEmpresaPanel";
 import { ArgosPanelDia } from "@/components/hr/ArgosPanelDia";
 import { ArgosHistorial } from "@/components/hr/ArgosHistorial";
 import { LlamadasPanel } from "@/components/hr/LlamadasPanel";
+import { TableroCalidadLlamadas } from "@/components/hr/TableroCalidadLlamadas";
+import { useEsDueno } from "@/hooks/useEsDueno";
 import { ArgosAjustesContenido } from "@/pages/hr/ArgosAjustes";
 import type { TranslationKey } from "@/lib/i18n";
 
@@ -116,6 +118,7 @@ function PanelAjustes({ t }: { t: Tr }) {
 export default function HRMonitorIA() {
   const { t } = useLanguage();
   const { isAdmin } = useUserRole();
+  const { esDueno } = useEsDueno();
   const { esRh } = useEsRh();
   // HR (Andrea) ve la vista COMPLETA igual que un admin (el historial por turno),
   // aunque su nivel sea agente. La RLS ya filtra que no vea a los admins.
@@ -234,7 +237,9 @@ export default function HRMonitorIA() {
       {/* LLAMADAS — a quién se le corta la llamada hoy, por qué, su internet
           medido de verdad y si la cancelación de ruido le corre (13/11/2026). */}
       {tab === "llamadas" && (
-        <div className="mt-5">
+        <div className="mt-5 flex flex-col gap-6">
+          {/* ¿Las llamadas mejoran? Solo el dueño (18/11/2026). */}
+          {esDueno === true && <TableroCalidadLlamadas />}
           <LlamadasPanel />
         </div>
       )}
