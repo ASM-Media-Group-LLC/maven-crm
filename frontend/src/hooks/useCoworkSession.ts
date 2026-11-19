@@ -1,5 +1,7 @@
 import { useState, useCallback, useEffect, useRef } from "react";
-import { supabase, SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY } from "@/integrations/supabase/client";
+import { supabase, SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, fetchConSesion } from "@/integrations/supabase/client";
+import { toast } from "sonner";
+import { traducir } from "@/lib/i18n";
 import { RealtimeChannel } from "@supabase/supabase-js";
 import { idDePestana } from "@/lib/idDePestana";
 import type { ReglasCowork } from "@/lib/coworkReglas";
@@ -142,9 +144,27 @@ export interface ScreenShareRequest {
   created_at: string;
 }
 
+// La sesión vencida (19/11/2026): Cowork llamaba con `fetch` a mano y se saltaba
+// la renovación de la sesión; con el token vencido todo volvía «Unauthorized»,
+// el latido no llegaba y Argos la daba por fuera de Cowork estando adentro. Ahora
+// va por fetchConSesion (renueva y repite una vez) y, si ni así entra, se le dice
+// a la persona que vuelva a entrar en vez de dejarla fallando en silencio.
+const ID_AVISO_SESION = "cowork-sesion-vencida";
+function avisarSesionVencida() {
+  toast.error(traducir("cowork.sesionVencida.titulo"), {
+    id: ID_AVISO_SESION,
+    description: traducir("cowork.sesionVencida.desc"),
+    duration: Infinity,
+    action: {
+      label: traducir("cowork.sesionVencida.volver"),
+      onClick: () => { void supabase.auth.signOut().finally(() => { window.location.href = "/login"; }); },
+    },
+  });
+}
+
 async function invokeCowork(action: string, payload: Record<string, unknown>) {
   const { data: { session } } = await supabase.auth.getSession();
-  const res = await fetch(
+  const res = await fetchConSesion(
     `${SUPABASE_URL}/functions/v1/cowork-session`,
     {
       method: "POST",
@@ -162,6 +182,8 @@ async function invokeCowork(action: string, payload: Record<string, unknown>) {
   // servidor, con el status como pista.
   let json = null;
   try { json = await res.json(); } catch { json = null; }
+  if (res.status === 401) avisarSesionVencida();
+  else toast.dismiss(ID_AVISO_SESION);
   if (!res.ok || json === null) {
     throw new Error(json?.error || `cowork-session: ${res.status}`);
   }
