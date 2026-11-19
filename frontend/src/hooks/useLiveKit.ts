@@ -65,6 +65,10 @@ import {
 } from "@/lib/perfilDeCamara";
 import { ajustarSuscripciones, esSupervisorEnLaSala, soloAudioDeLosCompaneros } from "@/lib/videoAjeno";
 import { anotarVoz } from "@/lib/vozPropia";
+import {
+  REINTENTOS_ANTES_DE_AVISAR, VIGILANTE_CAMARA_INICIAL, VIGILAR_CAMARA_MS, causaDeFalloDeCamara, decidirRepararCamara,
+  type CausaFalloCamara, type EstadoVigilanteCamara,
+} from "@/lib/falloDeCamara";
 
 // La recarga a mitad de llamada se revisa UNA vez por página (al primer connect,
 // cuando ya hay sesión para anotarla). Ver saludDeLlamada.ts.
@@ -457,6 +461,13 @@ export function useLiveKit() {
   const [unreadChatCount, setUnreadChatCount] = useState(0);
   const [isMicOn, setIsMicOn] = useState(true);
   const [isCamOn, setIsCamOn] = useState(true);
+  // CÁMARA QUE SE CAE O NO PRENDE (19/11/2026, lib/falloDeCamara.ts): la causa
+  // para el cartel, si la persona la quiere prendida, y el vigilante.
+  const [falloDeCamara, setFalloDeCamara] = useState<CausaFalloCamara | null>(null);
+  const quiereCamaraRef = useRef(false);
+  const vigilanteCamaraRef = useRef<EstadoVigilanteCamara>(VIGILANTE_CAMARA_INICIAL);
+  const ultimoErrorCamaraRef = useRef<unknown>(null);
+  const falloCamaraParaSaludRef = useRef<CausaFalloCamara | null>(null);
   const [isScreenSharing, setIsScreenSharing] = useState(false);
   // Quién apaga la cancelación de ruido si el filtro deja de funcionar andando
   // (se fija más abajo, cuando existe `apagarNCPorFallo`; acá va por ref para
@@ -607,7 +618,7 @@ export function useLiveKit() {
   }, []);
 
   type InsertaSalud = (tabla: "llamada_salud") => {
-    insert: (fila: { sala: string; datos: MuestraDeLlamada & MemoriaDelEquipo & { ahorro: boolean; nc: EstadoNC; nc_info?: Partial<InfoNC> & { ruido_usuario: "si" | "no" }; prueba?: PruebaDeRed; perfil_cam: PerfilDeCamara; transporte: Transporte | null; trabas?: Traba[]; audio?: AudioDeLaMuestra } }) =>
+    insert: (fila: { sala: string; datos: MuestraDeLlamada & MemoriaDelEquipo & { ahorro: boolean; nc: EstadoNC; nc_info?: Partial<InfoNC> & { ruido_usuario: "si" | "no" }; prueba?: PruebaDeRed; perfil_cam: PerfilDeCamara; transporte: Transporte | null; trabas?: Traba[]; audio?: AudioDeLaMuestra; cam_fallo?: CausaFalloCamara } }) =>
       PromiseLike<{ error: { message: string } | null }>;
   };
   // Si el componente se desmonta sin colgar, el reloj de muestras no queda vivo.
@@ -845,7 +856,8 @@ export function useLiveKit() {
         const memoria = await leerMemoria();
         // Cada 10 minutos: qué tan lejos queda cada servidor de llamadas (lib/pingRegiones.ts).
         const regiones = (vueltaRegiones++ % MEDIR_REGIONES_CADA === 0) ? await medirRegiones() : null;
-        const filaDeSalud = { sala: room.name, datos: { ...muestra, ...memoria, ahorro: ahorro.activo, nc, nc_info: { ...(ncInfo ?? {}), ruido_usuario: ncUsuarioRef.current ? "si" as const : "no" as const }, perfil_cam: perfilCam, transporte: transporteDeLaLlamada(), ...(prueba ? { prueba } : {}), ...(trabasDelMinuto.length ? { trabas: trabasDelMinuto } : {}), ...(audio ? { audio } : {}), ...(regiones ? { regiones } : {}) } };
+        const filaDeSalud = { sala: room.name, datos: { ...muestra, ...memoria, ahorro: ahorro.activo, nc, nc_info: { ...(ncInfo ?? {}), ruido_usuario: ncUsuarioRef.current ? "si" as const : "no" as const }, perfil_cam: perfilCam, transporte: transporteDeLaLlamada(), ...(prueba ? { prueba } : {}), ...(trabasDelMinuto.length ? { trabas: trabasDelMinuto } : {}), ...(audio ? { audio } : {}), ...(regiones ? { regiones } : {}), ...(falloCamaraParaSaludRef.current ? { cam_fallo: falloCamaraParaSaludRef.current } : {}) } };
+        falloCamaraParaSaludRef.current = null;
         if (telemetriaRef.current) telemetriaRef.current.salud(filaDeSalud);
         else void (supabase.from as unknown as InsertaSalud)("llamada_salud")
           .insert(filaDeSalud)
@@ -1193,6 +1205,7 @@ export function useLiveKit() {
     async (room: Room, preferredVideoDeviceId?: string) => {
       const useBackgroundSafeProfile = backgroundEffectRef.current !== "none";
       const videoConstraint = getVideoConstraint(preferredVideoDeviceId, useBackgroundSafeProfile);
+      ultimoErrorCamaraRef.current = null;
 
       // Attempt 1: preferred device + profile-aware constraints
       try {
@@ -1203,6 +1216,7 @@ export function useLiveKit() {
           return true;
         }
       } catch (err) {
+        ultimoErrorCamaraRef.current = err;
         console.warn("[LiveKit] Camera enable attempt 1 failed:", err);
       }
 
@@ -1218,10 +1232,13 @@ export function useLiveKit() {
           return true;
         }
       } catch (err) {
+        ultimoErrorCamaraRef.current = err;
         console.warn("[LiveKit] Camera enable attempt 2 failed:", err);
       }
 
-      // All attempts failed
+      // All attempts failed. La causa queda anotada (la salud de la llamada la
+      // sube en el próximo minuto); el cartel lo decide quien llamó.
+      falloCamaraParaSaludRef.current = causaDeFalloDeCamara(ultimoErrorCamaraRef.current);
       try { await room.localParticipant.setCameraEnabled(false); } catch {}
       setIsCamOn(false);
       refreshParticipants();
@@ -1636,6 +1653,11 @@ export function useLiveKit() {
     isAdmin = false,
     options: ConnectOptions = {},
   ) => {
+    // Sala nueva: se entra como se entra (la cámara la prende la persona); el
+    // vigilante de cámara arranca de cero.
+    quiereCamaraRef.current = false;
+    vigilanteCamaraRef.current = VIGILANTE_CAMARA_INICIAL;
+    setFalloDeCamara(null);
     // Empieza un intento nuevo: la marca de "me la tomaron" ya no aplica.
     setOtraPestanaTomoLaSesion(false);
     setQuienTieneLaSala(null);
@@ -2387,6 +2409,8 @@ export function useLiveKit() {
 
   // ── Disconnect ─────────────────────────────────────────────────
   const disconnect = useCallback(() => {
+    quiereCamaraRef.current = false;
+    vigilanteCamaraRef.current = VIGILANTE_CAMARA_INICIAL;
     // Salir a propósito también apaga la re-entrada automática.
     if (reentradaTimerRef.current != null) {
       clearTimeout(reentradaTimerRef.current);
@@ -2734,6 +2758,9 @@ export function useLiveKit() {
       const currentlyEnabled = hasActiveCameraPublication(room) || room.localParticipant.isCameraEnabled;
 
       if (!currentlyEnabled) {
+        // La persona la quiere prendida: si después se cae sola, el vigilante la repara.
+        quiereCamaraRef.current = true;
+        vigilanteCamaraRef.current = VIGILANTE_CAMARA_INICIAL;
         // Optimistic UI: show cam on immediately
         setIsCamOn(true);
 
@@ -2750,6 +2777,7 @@ export function useLiveKit() {
         const cameraEnabled = await enableCameraWithRecovery(room, preferredDevicesRef.current.videoDeviceId);
 
         if (cameraEnabled) {
+          setFalloDeCamara(null);
           refreshParticipants();
           // User-driven camera ON: allow background apply attempts again.
           skipAutoBackgroundRestoreRef.current = false;
@@ -2761,12 +2789,18 @@ export function useLiveKit() {
             }
           }
         } else if (shouldGateVideoUntilBackground) {
+          setFalloDeCamara(causaDeFalloDeCamara(ultimoErrorCamaraRef.current));
           holdLocalVideoUntilBackgroundRef.current = false;
           refreshParticipants();
         } else {
+          // La tocó y no prendió: se le dice por qué (y el vigilante sigue probando).
+          setFalloDeCamara(causaDeFalloDeCamara(ultimoErrorCamaraRef.current));
           setIsCamOn(false);
         }
       } else {
+        // La apagó la persona (o la pausa / el momento privado): no se repara.
+        quiereCamaraRef.current = false;
+        setFalloDeCamara(null);
         // Optimistic UI: show cam off immediately
         setIsCamOn(false);
 
@@ -2806,6 +2840,76 @@ export function useLiveKit() {
       camToggleInFlightRef.current = false;
     }
   }, [refreshParticipants, hasActiveCameraPublication, enableCameraWithRecovery, getLocalCameraTrack, disposeBackgroundProcessor, applyBackgroundBeforeLocalVideoVisible, scheduleDeferredBackgroundReapply]);
+
+  // ── El vigilante de la cámara (19/11/2026, lib/falloDeCamara.ts) ──────────
+  // Si la persona la tenía prendida y se cae sola (otro programa la tomó, el
+  // equipo se durmió, se desconectó), se vuelve a pedir: dos vueltas para no
+  // pelear con un cambio de perfil, tres intentos seguidos y después cada 30 s.
+  // Si no hay caso, el cartel dice por qué. Lo que la persona apagó (o la
+  // pausa, o el momento privado) no se toca: eso pasa por toggleCam.
+  const reparandoCamaraRef = useRef(false);
+  useEffect(() => {
+    const tic = async () => {
+      const room = roomRef.current;
+      const conectado = !!room && room.state === ConnectionState.Connected;
+      if (!room || !conectado) { vigilanteCamaraRef.current = VIGILANTE_CAMARA_INICIAL; return; }
+      const activa = hasActiveCameraPublication(room);
+      if (activa && !camToggleInFlightRef.current) quiereCamaraRef.current = true;
+      const t = getLocalCameraTrack(room) as { _mediaStreamTrack?: MediaStreamTrack; mediaStreamTrack?: MediaStreamTrack } | null;
+      const cruda = t?._mediaStreamTrack ?? t?.mediaStreamTrack;
+      const caida = !activa || !cruda || cruda.readyState !== "live";
+      if (!caida) {
+        vigilanteCamaraRef.current = VIGILANTE_CAMARA_INICIAL;
+        setFalloDeCamara((f) => (f ? null : f));
+        return;
+      }
+      const { reparar, memoria } = decidirRepararCamara(
+        { conectado, quiere: quiereCamaraRef.current, ocupado: camToggleInFlightRef.current || reparandoCamaraRef.current, caida },
+        vigilanteCamaraRef.current,
+        Date.now(),
+      );
+      vigilanteCamaraRef.current = memoria;
+      if (!reparar) return;
+      reparandoCamaraRef.current = true;
+      camToggleInFlightRef.current = true;
+      try {
+        console.warn("[LiveKit] la cámara se cayó sola; la vuelvo a pedir (intento", memoria.intentos, ")");
+        const ok = await enableCameraWithRecovery(room, preferredDevicesRef.current.videoDeviceId);
+        if (ok) {
+          setIsCamOn(true);
+          setFalloDeCamara(null);
+          vigilanteCamaraRef.current = VIGILANTE_CAMARA_INICIAL;
+          refreshParticipants();
+        } else if (memoria.intentos >= REINTENTOS_ANTES_DE_AVISAR) {
+          setFalloDeCamara(causaDeFalloDeCamara(ultimoErrorCamaraRef.current));
+        }
+      } catch (err) {
+        console.warn("[LiveKit] no pude reparar la cámara:", err);
+      } finally {
+        reparandoCamaraRef.current = false;
+        camToggleInFlightRef.current = false;
+      }
+    };
+    const id = window.setInterval(() => { void tic(); }, VIGILAR_CAMARA_MS);
+    return () => window.clearInterval(id);
+  }, [hasActiveCameraPublication, getLocalCameraTrack, enableCameraWithRecovery, refreshParticipants]);
+
+  /** El botón «Reintentar» del cartel: borra la cuenta y la pide ya. */
+  const reintentarCamara = useCallback(async () => {
+    vigilanteCamaraRef.current = VIGILANTE_CAMARA_INICIAL;
+    const room = roomRef.current;
+    if (!room || camToggleInFlightRef.current) return;
+    if (hasActiveCameraPublication(room)) { setFalloDeCamara(null); return; }
+    quiereCamaraRef.current = true;
+    camToggleInFlightRef.current = true;
+    try {
+      const ok = await enableCameraWithRecovery(room, preferredDevicesRef.current.videoDeviceId);
+      if (ok) { setIsCamOn(true); setFalloDeCamara(null); refreshParticipants(); }
+      else setFalloDeCamara(causaDeFalloDeCamara(ultimoErrorCamaraRef.current));
+    } finally {
+      camToggleInFlightRef.current = false;
+    }
+  }, [hasActiveCameraPublication, enableCameraWithRecovery, refreshParticipants]);
 
   // ── Screen share (using ref to avoid stale closure) ───────────
   const isScreenSharingRef = useRef(isScreenSharing);
@@ -3243,6 +3347,8 @@ export function useLiveKit() {
 
   return {
     connectionState,
+    falloDeCamara,
+    reintentarCamara,
     participants,
     chatMessages,
     unreadChatCount,
