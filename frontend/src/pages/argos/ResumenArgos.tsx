@@ -31,7 +31,7 @@ function Error({ onRetry }: { onRetry: () => void }) {
   const { t } = useLanguage();
   return (
     <div className="vidrio flex flex-col items-center gap-3 p-8 text-center">
-      <p className="text-sm text-muted-foreground">{t("hr.resumen.error")}</p>
+      <p className="text-sm text-muted-foreground">{t("hr.resumenJefes.error")}</p>
       <Button variant="outline" size="sm" className="rounded-control" onClick={onRetry}><RefreshCw className="mr-1.5 h-3.5 w-3.5" />{t("hr.casos.reintentar")}</Button>
     </div>
   );
@@ -71,17 +71,17 @@ function VistaDia({ dia }: { dia: string }) {
     <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
       <section className="vidrio flex flex-col p-4">
         <h3 className="flex items-center gap-2 text-sm font-semibold text-foreground">
-          <span className="h-1.5 w-1.5 rounded-full bg-destructive" />{t("hr.resumen.peores")}
+          <span className="h-1.5 w-1.5 rounded-full bg-destructive" />{t("hr.resumenJefes.peores")}
         </h3>
-        {r.peores.length === 0 ? <p className="py-6 text-sm text-muted-foreground">{t("hr.resumen.nadieMarcado")}</p> : (
+        {r.peores.length === 0 ? <p className="py-6 text-sm text-muted-foreground">{t("hr.resumenJefes.nadieMarcado")}</p> : (
           <ul className="divide-y divide-border/40">{r.peores.map((p) => <FilaPeor key={p.id} p={p} />)}</ul>
         )}
       </section>
       <section className="vidrio flex flex-col p-4">
         <h3 className="flex items-center gap-2 text-sm font-semibold text-foreground">
-          <span className="h-1.5 w-1.5 rounded-full bg-success" />{t("hr.resumen.mejores")}
+          <span className="h-1.5 w-1.5 rounded-full bg-success" />{t("hr.resumenJefes.mejores")}
         </h3>
-        {r.mejores.length === 0 ? <p className="py-6 text-sm text-muted-foreground">{t("hr.resumen.sinMedidas")}</p> : (
+        {r.mejores.length === 0 ? <p className="py-6 text-sm text-muted-foreground">{t("hr.resumenJefes.sinMedidas")}</p> : (
           <ul className="divide-y divide-border/40">
             {r.mejores.map((m) => (
               <li key={m.user_id} className="flex items-center gap-3 py-3">
@@ -91,14 +91,14 @@ function VistaDia({ dia }: { dia: string }) {
                   {m.puesto && <p className="truncate text-xs text-muted-foreground">{m.puesto}</p>}
                 </div>
                 <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
-                  {t("hr.resumen.horasYMarcas", { h: (m.medido_min / 60).toFixed(1), m: m.marcados_min })}
+                  {t("hr.resumenJefes.horasYMarcas", { h: (m.medido_min / 60).toFixed(1), m: m.marcados_min })}
                 </span>
               </li>
             ))}
           </ul>
         )}
       </section>
-      <p className="text-xs text-muted-foreground lg:col-span-2">{t("hr.resumen.pieDia", { n: r.medidas, c: r.casos })}</p>
+      <p className="text-xs text-muted-foreground lg:col-span-2">{t("hr.resumenJefes.pieDia", { n: r.medidas, c: r.casos })}</p>
     </div>
   );
 }
@@ -106,7 +106,7 @@ function VistaDia({ dia }: { dia: string }) {
 function ListaTendencia({ filas, tono }: { filas: FilaTendencia[]; tono: "bien" | "mal" }) {
   const { t } = useLanguage();
   const Flecha = tono === "bien" ? ArrowDownRight : ArrowUpRight;
-  if (filas.length === 0) return <p className="py-6 text-sm text-muted-foreground">{t("hr.resumen.nadie")}</p>;
+  if (filas.length === 0) return <p className="py-6 text-sm text-muted-foreground">{t("hr.resumenJefes.nadie")}</p>;
   return (
     <ul className="divide-y divide-border/40">
       {filas.map((f) => (
@@ -114,7 +114,7 @@ function ListaTendencia({ filas, tono }: { filas: FilaTendencia[]; tono: "bien" 
           <UserAvatar name={f.nombre} size="sm" />
           <div className="min-w-0 flex-1">
             <p className="truncate text-sm font-semibold text-foreground">{f.nombre}</p>
-            <p className="truncate text-xs text-muted-foreground">{t("hr.resumen.horasSemana", { h: f.horas })}</p>
+            <p className="truncate text-xs text-muted-foreground">{t("hr.resumenJefes.horasSemana", { h: f.horas })}</p>
           </div>
           <span className={`inline-flex shrink-0 items-center gap-1 text-xs font-semibold tabular-nums ${tono === "bien" ? "text-success" : "text-destructive"}`}>
             {f.por_hora_antes} → {f.por_hora}<Flecha className="h-3.5 w-3.5" />
@@ -143,18 +143,18 @@ function VistaSemana() {
   return (
     <div className="flex flex-col gap-4">
       <p className="text-xs text-muted-foreground">
-        {t("hr.resumen.semanaDe", { d: format(fechaDeDia(r.semana), "d MMM", { locale: f.fechas }) })} · {t("hr.resumen.explicaSemana")}
+        {t("hr.resumenJefes.semanaDe", { d: format(fechaDeDia(r.semana), "d MMM", { locale: f.fechas }) })} · {t("hr.resumenJefes.explicaSemana")}
       </p>
       {r.comparadas === 0 ? (
-        <div className="vidrio p-8 text-center text-sm text-muted-foreground">{t("hr.resumen.sinComparar")}</div>
+        <div className="vidrio p-8 text-center text-sm text-muted-foreground">{t("hr.resumenJefes.sinComparar")}</div>
       ) : (
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
           <section className="vidrio p-4">
-            <h3 className="flex items-center gap-2 text-sm font-semibold text-foreground"><span className="h-1.5 w-1.5 rounded-full bg-success" />{t("hr.resumen.mejoran")}</h3>
+            <h3 className="flex items-center gap-2 text-sm font-semibold text-foreground"><span className="h-1.5 w-1.5 rounded-full bg-success" />{t("hr.resumenJefes.mejoran")}</h3>
             <ListaTendencia filas={r.mejoran} tono="bien" />
           </section>
           <section className="vidrio p-4">
-            <h3 className="flex items-center gap-2 text-sm font-semibold text-foreground"><span className="h-1.5 w-1.5 rounded-full bg-destructive" />{t("hr.resumen.empeoran")}</h3>
+            <h3 className="flex items-center gap-2 text-sm font-semibold text-foreground"><span className="h-1.5 w-1.5 rounded-full bg-destructive" />{t("hr.resumenJefes.empeoran")}</h3>
             <ListaTendencia filas={r.empeoran} tono="mal" />
           </section>
         </div>
@@ -183,11 +183,11 @@ export default function ResumenArgos() {
 
   return (
     <Page>
-      <PageHeader title={t("hr.resumen.titulo")} subtitle={t("hr.resumen.sub")} icon={<BarChart3 className="h-5 w-5" />} />
+      <PageHeader title={t("hr.resumenJefes.titulo")} subtitle={t("hr.resumenJefes.sub")} icon={<BarChart3 className="h-5 w-5" />} />
       <div className="mt-4 flex flex-col gap-4">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <Segmentado valor={vista} onCambio={(k) => fijar("vista", k === "dia" ? null : k)}
-            opciones={[{ k: "dia", texto: t("hr.resumen.vistaDia") }, { k: "semana", texto: t("hr.resumen.vistaSemana") }]} />
+            opciones={[{ k: "dia", texto: t("hr.resumenJefes.vistaDia") }, { k: "semana", texto: t("hr.resumenJefes.vistaSemana") }]} />
           {vista === "dia" && (
             <div className="flex gap-1 overflow-x-auto">
               {ultimos.map((d) => (
@@ -200,7 +200,7 @@ export default function ResumenArgos() {
           )}
         </div>
         {vista === "dia" ? <VistaDia dia={dia} /> : <VistaSemana />}
-        <Link to="/hr/monitor-ia" className="text-sm font-medium text-primary hover:underline">{t("hr.resumen.irArgos")}</Link>
+        <Link to="/hr/monitor-ia" className="text-sm font-medium text-primary hover:underline">{t("hr.resumenJefes.irArgos")}</Link>
       </div>
     </Page>
   );
