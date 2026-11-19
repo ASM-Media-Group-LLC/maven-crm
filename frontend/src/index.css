@@ -303,6 +303,36 @@ All colors MUST be HSL. Light mode in :root, dark mode in .dark.
     --sidebar-ring: 220 10% 20%;
   }
 
+  /* GRIS y NEGRO en oscuro: también las SUPERFICIES (Alvaro, 19/11/2026: «uno
+     elige negro y queda todavía el azul, no puede ser»). El oscuro de Maven es
+     azul marino (16/11), pero quien elige gris o negro quiere eso: fondo,
+     tarjetas, menú y bordes neutros, sin tinte azul. Las demás pieles siguen
+     con el azul marino oficial. .dark[data-skin] (0,2,0) va después de .dark. */
+  .dark[data-skin="gris"] {
+    --background: 220 6% 13%;
+    --card: 220 6% 16%;
+    --popover: 220 6% 16%;
+    --secondary: 220 5% 20%;
+    --muted: 220 5% 20%;
+    --border: 220 5% 25%;
+    --input: 220 5% 25%;
+    --sidebar-background: 220 6% 11%;
+    --sidebar-accent: 220 5% 20%;
+    --sidebar-border: 220 5% 21%;
+  }
+  .dark[data-skin="negro"] {
+    --background: 0 0% 3%;
+    --card: 220 4% 7%;
+    --popover: 220 4% 7%;
+    --secondary: 220 4% 11%;
+    --muted: 220 4% 11%;
+    --border: 220 4% 17%;
+    --input: 220 4% 17%;
+    --sidebar-background: 0 0% 2%;
+    --sidebar-accent: 220 4% 11%;
+    --sidebar-border: 220 4% 13%;
+  }
+
   /* BLANCO PURO (Alvaro, 12/11/2026: «un modo de verdad blanco»; luego «que
      los botones sean del color de la skin»). Preferencia aparte, como Negro
      puro: data-blanco en <html>. Solo vale en claro; el color de los botones
