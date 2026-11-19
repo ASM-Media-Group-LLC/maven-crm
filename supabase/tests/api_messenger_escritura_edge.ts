@@ -68,6 +68,8 @@ function tocaAlgo(sql: string): boolean {
 // Migraciones que tocan objetos de este banco pero necesitan tablas que sus fixtures no traen.
 // Se prueban en su propio banco, con el motivo al lado.
 const NO_CARGAN_AQUI: Record<string, string> = {
+  "20261119060000_posiciones_mandan.sql":
+    "Posiciones (Ajustes): toca user_roles (trigger de protegidos) y depende de posiciones_borrador, roles_config, monitor_config, drive_acceso_extra y auth.users, que estos fixtures no traen; no toca nada del Messenger. Se aplicó y comprobó en producción con la comparación antes/después.",
   "20261111120000_backstage_equipo.sql":
     "Backstage manda el equipo (POST /equipo/sync): el interruptor, la bitácora y las RPC api_equipo_*. Entra a " +
     "esta cadena solo porque cambia rol, nivel, horario y la papelera de profiles/user_roles y lee api_keys, pero " +
