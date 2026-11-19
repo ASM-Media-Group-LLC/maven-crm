@@ -51,19 +51,13 @@ export function useAutoPiP(getRoom: () => Room | null, enabled: boolean) {
         const t = trackOf(p, Track.Source.ScreenShare);
         if (t) return t;
       }
-      const speaker = room.activeSpeakers?.find((s) => !s.isLocal);
-      if (speaker) {
-        const t = trackOf(speaker as unknown as { videoTrackPublications: Map<string, unknown> }, Track.Source.Camera);
-        if (t) return t;
-      }
+      // Vista fija (19/11/2026): ya no se elige por quién habla, y tu propia
+      // pantalla nunca va a la ventanita (sería el túnel infinito).
       for (const p of remotes) {
         const t = trackOf(p, Track.Source.Camera);
         if (t) return t;
       }
-      return (
-        trackOf(room.localParticipant, Track.Source.ScreenShare) ||
-        trackOf(room.localParticipant, Track.Source.Camera)
-      );
+      return trackOf(room.localParticipant, Track.Source.Camera);
     };
 
     let entering = false;

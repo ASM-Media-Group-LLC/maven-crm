@@ -19,7 +19,7 @@ import MonitoreoActivo from "./MonitoreoActivo";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { suscribirOrdenesDePausa } from "@/lib/ordenesDePausa";
 
-import { Loader2, Wifi, WifiOff, Copy, ChevronLeft, ChevronRight, DoorOpen, Check, MonitorUp, LayoutGrid } from "lucide-react";
+import { Loader2, Wifi, WifiOff, Copy, ChevronLeft, ChevronRight, DoorOpen, Check, MonitorUp, LayoutGrid, VideoOff } from "lucide-react";
 import { CLAVES_SALA_TOMADA, olvidarSalaSoltada } from "@/lib/sesionDuplicada";
 import { caidaEnCurso, conexionDeSala, marcarCaida, olvidarCaida } from "@/lib/conexionSala";
 import type { ConexionSala } from "@/lib/coworkTiempoRegla";
@@ -196,6 +196,14 @@ function usePunteroGrueso(): boolean {
 
 /** Gracia antes del aviso grande de «falta tu pantalla» en el Hub. */
 const GRACIA_PANTALLA_HUB_MS = 8_000;
+
+/** El cartel de la cámara que no prende, según la causa (lib/falloDeCamara). */
+const TEXTO_FALLO_CAMARA = {
+  ocupada: { titulo: "messenger.callView.camaraFallo.ocupadaTitulo", detalle: "messenger.callView.camaraFallo.ocupadaDetalle" },
+  permiso: { titulo: "messenger.callView.camaraFallo.permisoTitulo", detalle: "messenger.callView.camaraFallo.permisoDetalle" },
+  sin_camara: { titulo: "messenger.callView.camaraFallo.sinCamaraTitulo", detalle: "messenger.callView.camaraFallo.sinCamaraDetalle" },
+  otro: { titulo: "messenger.callView.camaraFallo.otroTitulo", detalle: "messenger.callView.camaraFallo.otroDetalle" },
+} as const;
 
 export default function LiveKitCallView({ roomName, displayName, callDisplayName, isAdmin = false, onLeave, initialMicOn = true, initialCamOn = true, initialScreenShareOn = false, initialAudioDeviceId, initialVideoDeviceId, initialAudioOutputDeviceId, initialBackgroundEffect = "none", hideShareLink, hideScreenShare, hideLeaveButton, leaveLabel, leaveIcon, suppressLeaveToast, compact, autoPip = true, autoLeaveOnEmpty, getToken, onMediaStateChange, onFaceStateChange, supervisorEncuadre, onLocalScreenTrack, pantallaSoloParaMi, pantallaVisiblePara, pantallaOpcional = false, camaraOpcional = false, pantallaPrestada = null, sinLatidoDeLlamada, incomingAudioMuted, roomSwitcher, recording, shareLink: shareLinkProp, accionesBarra, guardarChat, encima, hideEndForAll, controlesExtra, sinVideoAjeno = false, telemetria, sinVolverEnError = false, hubDelSupervisor = null, mosaicoDePantallas = false }: LiveKitCallViewProps) {
   // Lista de salas del navegador (solo Cowork supervisor+): estado del popup.
@@ -1081,7 +1089,9 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
     const mode = viewSettings.layout;
     if (mode === "sidebar") return "sidebar";
     if (mode === "tiled") return "grid";
-    return lk.participants.some((p) => p.isScreenSharing) ? "sidebar" : "grid";
+    // Como Meet (19/11/2026): solo la pantalla de OTRO pasa al escenario. La tuya
+    // la cubre la tarjeta «Estás presentando»; no cambia la vista.
+    return lk.participants.some((p) => p.isScreenSharing && !p.isLocal) ? "sidebar" : "grid";
   }, [viewSettings.layout, lk.participants, pinnedSid]);
 
   // PERSONAS, no recuadros. Al compartir pantalla se emiten DOS tiles de la
@@ -1093,7 +1103,9 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
   );
 
   const visibleParticipants = useMemo(() => {
-    let list = lk.participants;
+    // Tu propia pantalla no es un recuadro (19/11/2026): la tarjeta «Estás
+    // presentando a todos» ya la dice, sin el túnel infinito.
+    let list = lk.participants.filter((p) => !(p.isLocal && p.isScreenSharing));
     if (viewSettings.hideNoVideo) list = list.filter((p) => !p.isCameraOff || p.isScreenSharing || p.isLocal);
     if (list.length > viewSettings.maxTiles) list = list.slice(0, viewSettings.maxTiles);
     return list;
@@ -1109,11 +1121,15 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
     // compartiendo», y antes de eso, el túnel de espejos que veía el supervisor.
     const noEsMiPantalla = (p: (typeof visibleParticipants)[number]) => !(p.isLocal && p.isScreenSharing);
     const ss = visibleParticipants.find((p) => p.isScreenSharing && !p.isLocal);
+    // VISTA FIJA, COMO MEET EN MOSAICO (Alvaro, 19/11/2026: «el que habla va
+    // cambiando… visualmente te cansa»): el escenario ya NO sigue al que habla.
+    // Es la pantalla de otro, lo que fijaste con un clic, o el primero que no
+    // eres tú, y ahí se queda. Quien habla solo se marca con un borde verde.
     return ss
-      || visibleParticipants.find((p) => p.identity === lk.activeSpeaker && noEsMiPantalla(p))
+      || visibleParticipants.find((p) => !p.isLocal && noEsMiPantalla(p))
       || visibleParticipants.find(noEsMiPantalla)
       || visibleParticipants[0];
-  }, [visibleParticipants, lk.activeSpeaker, pinnedSid]);
+  }, [visibleParticipants, pinnedSid]);
 
   // Los que NO son el destacado. Se calculaba dos veces inline; con la vista
   // compacta pasaban a ser tres, así que se nombra una vez.
@@ -1290,6 +1306,18 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
       {/* «Monitoreo activo · pantallazo hace X». En su propio componente: el
           pantallazo de cada minuto ya no redibuja la llamada entera. */}
       {supervisorEncuadre && conSalaViva && <MonitoreoActivo />}
+      {/* La cámara no prende o se cayó sola y no volvió (19/11/2026): se dice
+          POR QUÉ y se ofrece reintentar. El vigilante sigue probando solo. */}
+      {lk.falloDeCamara && !estaEnPausa() && (
+        <div role="alert" className="shrink-0 flex flex-wrap items-center justify-center gap-x-3 gap-y-1.5 py-2.5 px-3 bg-warning/15 text-foreground text-sm font-medium text-center">
+          <VideoOff className="h-4 w-4 shrink-0 text-warning" aria-hidden />
+          <span>{t(TEXTO_FALLO_CAMARA[lk.falloDeCamara].titulo)}</span>
+          <span className="font-normal opacity-80">{t(TEXTO_FALLO_CAMARA[lk.falloDeCamara].detalle)}</span>
+          <button type="button" onClick={() => void lk.reintentarCamara()} className="rounded-md bg-foreground/10 px-2.5 py-1 hover:bg-foreground/15">
+            {t("messenger.callView.camaraFallo.reintentar")}
+          </button>
+        </div>
+      )}
       {avisoPantallaHub && (
         <div role="alert" className="shrink-0 flex flex-wrap items-center justify-center gap-x-3 gap-y-1.5 py-2.5 px-3 bg-destructive/15 text-foreground text-sm font-medium text-center">
           <MonitorUp className="h-4 w-4 shrink-0 text-destructive" aria-hidden />

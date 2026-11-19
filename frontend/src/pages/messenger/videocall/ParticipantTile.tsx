@@ -341,7 +341,8 @@ const ParticipantTile = memo(function ParticipantTile({
         // El fondo del tile lo pone esa clase (antes era un gris plano inline).
         "tile-estudio group relative overflow-hidden flex items-center justify-center h-full transition-all duration-200",
         compact ? "rounded-lg" : "rounded-2xl",
-        participant.isSpeaking && "ring-2 ring-primary ring-offset-2 ring-offset-background",
+        // Quien habla: borde verde y nada se mueve de lugar (vista fija, 19/11/2026).
+        participant.isSpeaking && "ring-2 ring-emerald-400 ring-offset-2 ring-offset-background",
         isPinned && "ring-2 ring-primary",
         className
       )}

@@ -106,9 +106,11 @@ describe("5. tu propia pantalla compartida, como en Meet", () => {
     expect(s).toContain("onToggleScreenShare={salaCaida ? primeroReconectar : alternarPantallaDesdeBoton}");
   });
 
-  it("el cuadrito: video mudo, «Dejar de compartir», se esconde en «Compartiendo» y avisa del negro", () => {
+  it("la tarjeta: «Estás presentando a todos» SIN video (sin túnel), «Dejar de compartir», se esconde y avisa del negro", () => {
     const s = leer("videocall/MiPantallaCompartida.tsx");
-    expect(s).toMatch(/<video[^>]*\bmuted\b/);
+    // Alvaro, 19/11/2026: como Meet pero sin la vista real (el túnel del 18/11).
+    expect(s).not.toMatch(/<video/);
+    expect(s).toContain('t("messenger.callView.miPantalla.presentando")');
     expect(s).toContain('t("messenger.callView.miPantalla.dejar")');
     expect(s).toContain('t("messenger.callView.miPantalla.compartiendo")');
     expect(s).toContain('t("messenger.callView.miPantalla.negra")');
