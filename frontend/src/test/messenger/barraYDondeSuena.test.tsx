@@ -78,7 +78,7 @@ describe("la barra de la llamada en curso", () => {
 
   it("está montada en Maven y la llamada la alimenta", () => {
     expect(fuente("AppShell.tsx")).toContain("<BarraDeLlamada />");
-    expect(fuente("VideoCallPage.tsx")).toContain("useAnunciarLlamada({ sala: roomName, nombre: callDisplayName, activa: joined, alColgar: handleLeave });");
+    expect(fuente("VideoCallPage.tsx")).toContain("useAnunciarLlamada({ sala: roomName, nombre: callDisplayName, activa: conectada, alColgar: handleLeave });");
   });
 });
 

@@ -5,6 +5,7 @@ import { useLanguage } from "@/hooks/useLanguage";
 import { UserAvatar } from "@/components/UserAvatar";
 import { supabase } from "@/integrations/supabase/client";
 import { vibrarMientrasSuena } from "@/lib/tonosDeLlamada";
+import { RUTA_DESCARGAR_CON_GUIA } from "@/lib/guiaApp";
 
 /** La foto de quien llama (si no se puede leer, quedan sus iniciales). */
 function useFotoDe(uid: string | null | undefined) {
@@ -25,9 +26,12 @@ interface Props {
   call: Call;
   onAccept: () => void;
   onDecline: () => void;
+  /** Llamadas solo en la app (18/11/2026): en el navegador del computador,
+   *  «Aceptar» abre la app y se ofrece descargarla. */
+  enLaApp?: boolean;
 }
 
-export default function IncomingCallModal({ call, onAccept, onDecline }: Props) {
+export default function IncomingCallModal({ call, onAccept, onDecline, enLaApp = false }: Props) {
   const { t } = useLanguage();
   const isAudio = call.call_type === "audio";
   const isGroup = call.is_group === true;
@@ -89,9 +93,22 @@ export default function IncomingCallModal({ call, onAccept, onDecline }: Props) 
             <div className="h-14 w-14 rounded-full bg-success flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform">
               <Phone className="h-6 w-6 text-success-foreground" />
             </div>
-            <span className="text-xs text-muted-foreground">{isOngoing ? t("messenger.incoming.unirse") : t("messenger.incoming.aceptar")}</span>
+            <span className="text-xs text-muted-foreground">
+              {enLaApp
+                ? t(isOngoing ? "messenger.incoming.unirseEnApp" : "messenger.incoming.contestarEnApp")
+                : t(isOngoing ? "messenger.incoming.unirse" : "messenger.incoming.aceptar")}
+            </span>
           </button>
         </div>
+
+        {enLaApp && (
+          <div className="space-y-1 text-center">
+            <p className="text-xs text-muted-foreground">{t("messenger.incoming.soloEnApp")}</p>
+            <a href={RUTA_DESCARGAR_CON_GUIA} target="_blank" rel="noopener noreferrer" className="text-xs font-medium text-primary underline-offset-2 hover:underline">
+              {t("messenger.incoming.descargarApp")}
+            </a>
+          </div>
+        )}
       </div>
     </div>
   );

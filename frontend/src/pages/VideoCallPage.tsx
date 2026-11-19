@@ -23,6 +23,8 @@ import AgregarALaLlamada from "./messenger/videocall/AgregarALaLlamada";
 import AvisoDeInvitados from "./messenger/videocall/AvisoDeInvitados";
 import { useLanguage } from "@/hooks/useLanguage";
 import { useAnunciarLlamada } from "@/hooks/useAnunciarLlamada";
+import { BloqueoSoloApp, useLlamadasSoloApp } from "@/components/CoworkSoloApp";
+import { salaPideApp } from "@/lib/coworkSoloApp";
 
 export default function VideoCallPage() {
   const { t } = useLanguage();
@@ -43,6 +45,15 @@ export default function VideoCallPage() {
   const esDelMessenger = !!roomName?.startsWith("call-");
   const conversacion = roomName ? conversacionDeLaSala(roomName) : null;
   const [joined, setJoined] = useState(directo);
+  // LLAMADAS SOLO EN LA APP (Alvaro, 18/11/2026): en el navegador de un
+  // computador, una llamada interna (Messenger o Meet con sesión) no se conecta:
+  // sale la misma pantalla de Cowork con «Abrir en la app». Mientras no se sabe
+  // la respuesta, tampoco se conecta. Los invitados de afuera no pasan por esta
+  // página (/entrar, /unirse), así que a ellos nunca les toca.
+  const soloApp = useLlamadasSoloApp();
+  const pideApp = salaPideApp(roomName);
+  const bloqueada = pideApp && (!soloApp.listo || soloApp.estado === "bloqueo");
+  const conectada = joined && !bloqueada;
   const [coworkRedirecting, setCoworkRedirecting] = useState(() => {
     // Synchronously detect cowork rooms to block rendering from the start
     return !!roomName && (roomName.startsWith("cowork_hub_") || roomName.startsWith("cowork_"));
@@ -59,11 +70,12 @@ export default function VideoCallPage() {
       ? { micOn: true, camOn: !soloAudio, backgroundEffect: soloAudio ? "none" : leerFondoGuardado() }
       : { micOn: false, camOn: false, backgroundEffect: "none" },
   );
-  const invitados = useInvitadosDeLaLlamada(roomName, user?.id, esDelMessenger && joined);
+  const invitados = useInvitadosDeLaLlamada(roomName, user?.id, esDelMessenger && conectada);
   // Entrar a la sala = contestar. Si llegaste por el aviso del celular o por el
   // link del chat, tu timbre se apaga y la llamada deja de contar como perdida.
   useEffect(() => {
-    if (!joined || !esDelMessenger || !roomName || !user?.id) return;
+    // Bloqueada en el navegador: contestar es en la app, no aquí.
+    if (!conectada || !esDelMessenger || !roomName || !user?.id) return;
     void (async () => {
       try {
         const viva = await buscarLlamadaViva(roomName);
@@ -79,7 +91,7 @@ export default function VideoCallPage() {
         }
       } catch { /* contestar es un extra: la llamada sigue igual */ }
     })();
-  }, [joined, esDelMessenger, roomName, user?.id]);
+  }, [conectada, esDelMessenger, roomName, user?.id]);
   const [pantallaCompleta, setPantallaCompleta] = useState(false);
   useEffect(() => {
     const alCambiar = () => setPantallaCompleta(!!document.fullscreenElement);
@@ -188,7 +200,7 @@ export default function VideoCallPage() {
     }, 300);
   };
   // Maven muestra «En llamada con… · Volver · Colgar» mientras esta pestaña vive.
-  useAnunciarLlamada({ sala: roomName, nombre: callDisplayName, activa: joined, alColgar: handleLeave });
+  useAnunciarLlamada({ sala: roomName, nombre: callDisplayName, activa: conectada, alColgar: handleLeave });
 
   if (!roomName) {
     return (
@@ -215,7 +227,15 @@ export default function VideoCallPage() {
     );
   }
 
-  if (isLoading || !profile) {
+  if (pideApp && soloApp.estado === "bloqueo") {
+    return (
+      <div className="h-screen flex flex-col bg-background">
+        <BloqueoSoloApp lugar="llamadas" />
+      </div>
+    );
+  }
+
+  if (isLoading || !profile || bloqueada) {
     return (
       <div className="h-screen flex items-center justify-center bg-background">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />

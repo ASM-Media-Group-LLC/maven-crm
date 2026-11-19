@@ -187,6 +187,15 @@ export const messenger = {
   "messenger.incoming.rechazar": { es: "Rechazar", en: "Decline" },
   "messenger.incoming.unirse": { es: "Unirse", en: "Join" },
   "messenger.incoming.aceptar": { es: "Aceptar", en: "Accept" },
+  "messenger.incoming.contestarEnApp": { es: "Contestar en la app", en: "Answer in the app" },
+  "messenger.incoming.unirseEnApp": { es: "Unirse en la app", en: "Join in the app" },
+  "messenger.incoming.soloEnApp": { es: "En el computador, las llamadas se contestan en la app de Maven.", en: "On a computer, calls are answered in the Maven app." },
+  "messenger.incoming.descargarApp": { es: "¿No tienes la app? Descárgala", en: "Don't have the app? Download it" },
+
+  // Llamadas internas solo en la app (Alvaro, 18/11/2026). Los invitados de afuera no ven esto.
+  "messenger.soloApp.titulo": { es: "Las llamadas ahora se abren en la app de Maven", en: "Calls now open in the Maven app" },
+  "messenger.soloApp.desc": { es: "En el computador, las llamadas y reuniones del equipo funcionan solo en la app de Maven. Si ya la tienes, ábrela aquí; si no, descárgala e inicia sesión con tu correo de siempre.", en: "On a computer, team calls and meetings only work in the Maven app. If you have it, open it here; if not, download it and sign in with your usual email." },
+  "messenger.soloApp.celular": { es: "En el celular las llamadas siguen funcionando igual. Los invitados de afuera entran por su link desde el navegador.", en: "On your phone, calls work as before. Outside guests join from their link in the browser." },
 
   // Cajón de escritura (MessageInput) y la subida de archivos (uploadUtils).
   "messenger.upload.excedeLimite": { es: "El archivo excede el límite de Storage del proyecto. Ve a Supabase Dashboard > Storage > Settings y aumenta el 'Global file size limit'.", en: "The file exceeds the project's Storage limit. Go to Supabase Dashboard > Storage > Settings and raise the 'Global file size limit'." },
