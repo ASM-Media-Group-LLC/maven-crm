@@ -159,6 +159,7 @@ const Messenger = lazy(() => import("./pages/Messenger"));
 const Notificaciones = lazy(() => import("./pages/Notificaciones"));
 const NotificacionesSettings = lazy(() => import("./pages/ajustes/NotificacionesSettings"));
 const Settings = lazy(() => import("./pages/Settings"));
+const Posiciones = lazy(() => import("./pages/ajustes/Posiciones"));
 
 // HR — eager. The user navigates between subtabs constantly.
 const HRLayout = lazy(() => import("./pages/hr/HRLayout"));
@@ -475,6 +476,7 @@ const App = () => (
                 <Route path="/conexion" element={<GuiaConexionPage />} />
                 <Route path="/app" element={<GuiaAppPage />} />
                 <Route path="/ajustes/notificaciones" element={<NotificacionesSettings />} />
+                <Route path="/ajustes/posiciones" element={<Posiciones />} />
                 {/* HR routes */}
                 <Route path="/hr" element={<PermissionRoute module="HR" submodule="Dashboard"><HRLayout><HRDashboard /></HRLayout></PermissionRoute>} />
                 <Route path="/hr/personal" element={<PermissionRoute module="HR" submodule="Empleados Activos"><HRLayout><HRPersonnel /></HRLayout></PermissionRoute>} />

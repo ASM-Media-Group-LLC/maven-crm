@@ -51,6 +51,7 @@ import { conexionEquipo } from "./i18n/conexionEquipo";
 import { portada } from "./i18n/portada";
 import { guiaConexion } from "./i18n/guiaConexion";
 import { guiaApp } from "./i18n/guiaApp";
+import { posiciones } from "./i18n/posiciones";
 
 // EL DICCIONARIO, PARTIDO POR MÓDULO.
 //
@@ -112,6 +113,7 @@ const translations = {
   ...portada,
   ...guiaConexion,
   ...guiaApp,
+  ...posiciones,
 } as const;
 
 export type TranslationKey = keyof typeof translations;
