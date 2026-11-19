@@ -112,9 +112,10 @@ function aplicar(): void {
 
 let instalado = false;
 
-/** Se llama una vez al arrancar (main.tsx), antes de montar React. */
-export function instalarModoLiviano(): void {
-  if (instalado || typeof document === "undefined") return;
+/** Se llama una vez al arrancar (main.tsx), antes de montar React. Devuelve
+ *  cómo soltar la escucha de la pestaña (lo usan las pruebas). */
+export function instalarModoLiviano(): () => void {
+  if (instalado || typeof document === "undefined") return () => {};
   instalado = true;
   motivos.debil = equipoDebil();
   motivos.menosMovimiento = pideMenosMovimiento();
@@ -141,4 +142,8 @@ export function instalarModoLiviano(): void {
   const w = window as Window & { requestIdleCallback?: (cb: () => void, o?: { timeout: number }) => number };
   if (typeof w.requestIdleCallback === "function") w.requestIdleCallback(revisarGpu, { timeout: 5000 });
   else window.setTimeout(revisarGpu, 2000);
+  return () => {
+    document.removeEventListener("visibilitychange", aplicar);
+    instalado = false;
+  };
 }

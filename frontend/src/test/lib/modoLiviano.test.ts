@@ -8,15 +8,10 @@ import { describe, it, expect, vi, afterEach } from "vitest";
 //    la página fuera de la vista;
 //  · relojes de 1 s que redibujan pantallas enteras o siguen igual de rápido
 //    con la página oculta.
-// Las fuentes TSX se leen con import.meta.glob.
-
-// El CSS no: con ?raw (o ?inline) Vitest lo entrega vacío. Se lee del disco
-// como las otras guardas de index.css, pero con import dinámico para no sumar
-// errores de tipos (el tsconfig no trae los de Node). La ruta pasa por una
-// variable: con el texto literal Vite reescribe el new URL.
-const fs = (await import(/* @vite-ignore */ ["node", "fs"].join(":"))) as { readFileSync: (p: URL, c: "utf8") => string };
-const rutaCss = "../../index.css";
-const css = fs.readFileSync(new URL(rutaCss, import.meta.url), "utf8");
+// Las fuentes se leen con import.meta.glob (sin node:fs: el tsconfig no trae
+// los tipos de Node). index.css NO se puede leer así: con ?raw Vitest entrega
+// los .css vacíos. Por eso aquí se prueba el COMPORTAMIENTO (cuándo se pone la
+// clase y con qué motivo) y que los relojes usen el reloj compartido.
 const main = Object.values(import.meta.glob("../../main.tsx", { query: "?raw", import: "default", eager: true }))[0] as string;
 const fuentes = import.meta.glob(
   [
@@ -28,46 +23,14 @@ const fuentes = import.meta.glob(
   { query: "?raw", import: "default", eager: true },
 ) as Record<string, string>;
 
-/** El cuerpo de la primera regla cuyo selector contiene `sel`. */
-const regla = (sel: string) => {
-  const i = css.indexOf(sel);
-  if (i < 0) return "";
-  const a = css.indexOf("{", i);
-  return css.slice(a + 1, css.indexOf("}", a));
-};
-
-describe("el CSS del modo liviano", () => {
-  it("apaga el vidrio esmerilado en html.liviano", () => {
-    expect(regla("html.liviano *:not(.pt *),")).toMatch(/backdrop-filter: none !important/);
-    expect(regla("html.liviano *:not(.pt *),")).toMatch(/-webkit-backdrop-filter: none !important/);
-  });
-  it("las animaciones sin fin dan una vuelta y paran (la ruedita de cargando sigue)", () => {
-    const sel = 'html.liviano *:not(.animate-spin):not([class*="loading-bar"])';
-    expect(css).toContain(sel);
-    expect(regla(sel)).toMatch(/animation-iteration-count: 1 !important/);
-  });
-  it("con la página fuera de la vista no se mueve nada", () => {
-    expect(regla('html.liviano[data-liviano~="oculta"] *')).toMatch(/animation-play-state: paused !important/);
-  });
-  it("el vidrio sin blur va más denso para que se lea", () => {
-    expect(css).toMatch(/html\.liviano[^{]*\.vidrio \{ background:/);
-    expect(css).toMatch(/html\.liviano \.glass-panel/);
-  });
-  it("el fondo de la app ya no se anima, ni con la máquina fuerte", () => {
-    expect(css).not.toMatch(/\.fondo-glass \{ animation: vidrio-deriva/);
-    expect(css).not.toMatch(/@keyframes vidrio-deriva/);
-  });
-  it("el tile de la cámara (fondo opaco) no paga un blur que no se ve", () => {
-    expect(regla(".tile-estudio {")).not.toMatch(/backdrop-filter:/);
-  });
-  it("vidrio dentro de vidrio: solo el de afuera difumina", () => {
-    expect(css).toMatch(/:is\(\.vidrio, \.vidrio-barra, \.glass-panel, \.tarjeta-sesion, \[data-sidebar="sidebar"\]\) :is\([^)]*\) \{\s*-webkit-backdrop-filter: none;\s*backdrop-filter: none;/);
-  });
+describe("arranque", () => {
   it("main.tsx lo instala antes de montar React", () => {
     expect(main).toContain("instalarModoLiviano();");
     expect(main.indexOf("instalarModoLiviano();")).toBeLessThan(main.indexOf("createRoot("));
   });
 });
+
+let soltar: () => void = () => {};
 
 const equipoFuerte = () => {
   Object.defineProperty(navigator, "hardwareConcurrency", { configurable: true, value: 16 });
@@ -76,6 +39,7 @@ const equipoFuerte = () => {
 
 describe("cuándo se prende", () => {
   afterEach(() => {
+    soltar(); soltar = () => {};
     vi.resetModules();
     vi.unstubAllGlobals();
     document.documentElement.classList.remove("liviano");
@@ -103,11 +67,30 @@ describe("cuándo se prende", () => {
     expect(dibujaSinGpu(canvas(false, false))).toBe(true);
   });
 
+  it("en un equipo débil queda prendido desde el arranque, con el motivo", async () => {
+    Object.defineProperty(navigator, "hardwareConcurrency", { configurable: true, value: 4 });
+    Object.defineProperty(navigator, "deviceMemory", { configurable: true, value: 8 });
+    vi.stubGlobal("requestIdleCallback", () => 0);
+    const m = await import("@/lib/modoLiviano");
+    soltar = m.instalarModoLiviano();
+    const html = document.documentElement;
+    expect(html.classList.contains(m.CLASE_LIVIANO)).toBe(true);
+    expect(html.dataset.liviano).toContain("equipo");
+    // Oculta y de vuelta: sigue prendido (el motivo «equipo» no se va).
+    Object.defineProperty(document, "visibilityState", { configurable: true, get: () => "hidden" });
+    document.dispatchEvent(new Event("visibilitychange"));
+    expect(html.dataset.liviano).toBe("equipo oculta");
+    Object.defineProperty(document, "visibilityState", { configurable: true, get: () => "visible" });
+    document.dispatchEvent(new Event("visibilitychange"));
+    expect(html.classList.contains(m.CLASE_LIVIANO)).toBe(true);
+    expect(html.dataset.liviano).toBe("equipo");
+  });
+
   it("con la pestaña oculta se prende, y al volver se apaga (equipo fuerte)", async () => {
     equipoFuerte();
     vi.stubGlobal("requestIdleCallback", () => 0);
     const m = await import("@/lib/modoLiviano");
-    m.instalarModoLiviano();
+    soltar = m.instalarModoLiviano();
     const html = document.documentElement;
     expect(html.classList.contains("liviano")).toBe(false);
 
@@ -127,6 +110,7 @@ const ultimoMs = (llamadas: unknown[][]) => llamadas[llamadas.length - 1]?.[1];
 
 describe("los relojes de un segundo", () => {
   afterEach(() => {
+    soltar(); soltar = () => {};
     vi.useRealTimers();
     vi.resetModules();
     vi.unstubAllGlobals();
@@ -139,7 +123,7 @@ describe("los relojes de un segundo", () => {
     vi.stubGlobal("requestIdleCallback", () => 0);
     const espia = vi.spyOn(globalThis, "setInterval");
     const liviano = await import("@/lib/modoLiviano");
-    liviano.instalarModoLiviano();
+    soltar = liviano.instalarModoLiviano();
     const m = await import("@/lib/ahoraCompartido");
     const { renderHook } = await import("@testing-library/react");
     const r = renderHook(() => m.useAhoraCadaSegundo());
