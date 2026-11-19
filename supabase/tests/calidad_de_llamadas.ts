@@ -1,5 +1,5 @@
 // El tablero de calidad de llamadas y el vigía del audio (migración
-// 20261119010000_calidad_de_llamadas), probado contra un Postgres de verdad
+// 20261119011000_calidad_de_llamadas), probado contra un Postgres de verdad
 // (PGlite) con el esquema de PROD del chat (28/09).
 //
 //   deno run -A --node-modules-dir=none --no-lock supabase/tests/calidad_de_llamadas.ts
@@ -17,7 +17,7 @@ import { PGlite } from "npm:@electric-sql/pglite@0.3";
 
 const leer = (rel: string) => Deno.readTextFileSync(new URL(rel, import.meta.url));
 const FIXTURE = leer("./fixtures/prod_chat_api_20260928.sql");
-const N = "20261119010000_calidad_de_llamadas.sql";
+const N = "20261119011000_calidad_de_llamadas.sql";
 const M = leer(`../migrations/${N}`);
 
 const ok: string[] = [], mal: string[] = [];

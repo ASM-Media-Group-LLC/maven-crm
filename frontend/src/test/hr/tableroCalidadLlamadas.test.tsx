@@ -104,11 +104,11 @@ describe("la pantalla", () => {
 });
 
 describe("la puerta y el SQL", () => {
-  const fuentes = import.meta.glob(["/frontend/src/pages/hr/HRMonitorIA.tsx", "/supabase/migrations/20261119010000_calidad_de_llamadas.sql"], {
+  const fuentes = import.meta.glob(["/frontend/src/pages/hr/HRMonitorIA.tsx", "/supabase/migrations/20261119011000_calidad_de_llamadas.sql"], {
     query: "?raw", import: "default", eager: true,
   }) as Record<string, string>;
   const pagina = fuentes["/frontend/src/pages/hr/HRMonitorIA.tsx"];
-  const sql = fuentes["/supabase/migrations/20261119010000_calidad_de_llamadas.sql"];
+  const sql = fuentes["/supabase/migrations/20261119011000_calidad_de_llamadas.sql"];
 
   it("el tablero solo se dibuja para el dueño, en la pestaña Llamadas", () => {
     expect(pagina).toContain("useEsDueno()");

@@ -14,7 +14,7 @@
 //                los silencios / totalSamplesReceived, en el minuto)
 //
 // El servidor usa la MISMA regla que audioMalo() (llamada_audio_malo en
-// supabase/migrations/20261119010000_calidad_de_llamadas.sql) para el tablero
+// supabase/migrations/20261119011000_calidad_de_llamadas.sql) para el tablero
 // del dueño y para avisar a la persona y a su supervisor. Medir jamás rompe la
 // llamada: todo lo que falle queda en null.
 
