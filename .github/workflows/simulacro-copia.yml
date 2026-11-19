@@ -96,3 +96,38 @@ jobs:
               '{query: ("alter table public." + $t + " disable trigger user; insert into public." + $t + " select * from json_populate_recordset(null::public." + $t + ", $sim$" + $d + "$sim$::json) on conflict do nothing; alter table public." + $t + " enable trigger user;")}' > escribir.json
             q "$COPIA" escribir.json | head -c 300; echo
           done
+  funciones:
+    # Las funciones del servidor (las mismas de producción) publicadas en la
+    # COPIA, apuntando a la RÉPLICA del servidor de llamadas (144.126.155.175).
+    # Las llaves son de la réplica de pruebas, nunca las de producción.
+    needs: copiar
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      COPIA: glzncicyfrjidvkjjaig
+      LK_KEY: ${{ secrets.SIM_LIVEKIT_API_KEY }}
+      LK_SECRET: ${{ secrets.SIM_LIVEKIT_API_SECRET }}
+    steps:
+      - uses: actions/checkout@v4
+        with: { ref: main }
+      - uses: supabase/setup-cli@v1
+        with: { version: 2.110.0 }
+        env: { GITHUB_TOKEN: "${{ github.token }}" }
+      - name: Llaves de la réplica (si ya están)
+        run: |
+          set -euo pipefail
+          if [ -z "${LK_KEY:-}" ] || [ -z "${LK_SECRET:-}" ]; then echo "::warning::Faltan SIM_LIVEKIT_API_KEY/SECRET: las funciones se publican sin llamadas"; exit 0; fi
+          supabase secrets set --project-ref "$COPIA" LIVEKIT_URL="ws://144.126.155.175:7880" LIVEKIT_API_KEY="$LK_KEY" LIVEKIT_API_SECRET="$LK_SECRET" >/dev/null
+          echo "llaves puestas en la copia"
+      - name: Publicar funciones en la copia
+        run: |
+          set -uo pipefail
+          ok=0; mal=0
+          for d in supabase/functions/*/; do
+            n=$(basename "$d"); case "$n" in _*) continue;; esac
+            [ -f "$d/index.ts" ] || continue
+            if supabase functions deploy "$n" --project-ref "$COPIA" --use-api >/dev/null 2>&1; then ok=$((ok+1)); else mal=$((mal+1)); echo "no se pudo: $n"; fi
+          done
+          echo "publicadas: $ok · fallaron: $mal"
