@@ -77,7 +77,16 @@ async function chequearArgos(): Promise<Senal> {
   const j = juzgadas.count ?? 0, p = pantallazos.count ?? 0;
   // Solo se escala si HAY pantallazos nuevos (equipo activo) pero NINGUNO
   // juzgado: así fin de semana o 4am (sin equipo) no dispara alerta.
-  if (p >= 5 && j === 0) return { tipo: "argos_sin_juzgar", mal: true, mensaje: `${p} pantallazos en 15 min, ninguno juzgado` };
+  if (p >= 5 && j === 0) {
+    // Tope de gasto del día alcanzado (monitor_config.argos_tope_dia_usd, Alvaro
+    // 19/11): Argos deja fotos sin juzgar A PROPÓSITO. No es una caída.
+    const { data: fin } = await admin.from("argos_diag").select("detalle")
+      .eq("paso", "fin").gte("at", new Date(Date.now() - 10 * 60_000).toISOString())
+      .order("at", { ascending: false }).limit(1).maybeSingle();
+    const tope = Number((fin?.detalle as Record<string, unknown> | null)?.sin_juzgar_tope ?? 0);
+    if (tope > 0) return { tipo: "argos_sin_juzgar", mal: false, mensaje: "Argos llegó al tope de gasto del día" };
+    return { tipo: "argos_sin_juzgar", mal: true, mensaje: `${p} pantallazos en 15 min, ninguno juzgado` };
+  }
   return { tipo: "argos_sin_juzgar", mal: false, mensaje: "Argos juzgando OK" };
 }
 
