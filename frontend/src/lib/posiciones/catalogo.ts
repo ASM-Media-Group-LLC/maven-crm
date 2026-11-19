@@ -393,8 +393,33 @@ export const CATALOGO_POSICIONES: SeccionCatalogo[] = [
             "funciones": [
               {
                 "clave": "Administración|Roles",
-                "etiqueta": "posiciones.c.agregar_editar_borrar_posiciones_y_sus_c",
+                "etiqueta": "posiciones.c.ver_posiciones",
                 "nueva": false
+              },
+              {
+                "clave": "N:pos.agregar",
+                "etiqueta": "posiciones.c.agregar_posicion",
+                "nueva": true
+              },
+              {
+                "clave": "N:pos.editar",
+                "etiqueta": "posiciones.c.editar_posicion",
+                "nueva": true
+              },
+              {
+                "clave": "N:pos.borrar",
+                "etiqueta": "posiciones.c.borrar_posicion",
+                "nueva": true
+              },
+              {
+                "clave": "N:pos.activar",
+                "etiqueta": "posiciones.c.activar_desactivar",
+                "nueva": true
+              },
+              {
+                "clave": "N:pos.permisos",
+                "etiqueta": "posiciones.c.dar_permisos",
+                "nueva": true
               }
             ]
           },

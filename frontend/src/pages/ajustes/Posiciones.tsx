@@ -370,7 +370,8 @@ function DialogoPosicion({ estado, posiciones, onCerrar }: {
 function PermisosDe({ pos, personas, asignaciones, onVolver }: { pos: Posicion; personas: Persona[]; asignaciones: Asignacion[]; onVolver: () => void }) {
   const { t } = useLanguage();
   const qc = useQueryClient();
-  const [cerrados, setCerrados] = useState<Set<string>>(new Set());
+  // Como Blu: los grupos arrancan cerrados y se abren con la flecha.
+  const [abiertos, setAbiertos] = useState<Set<string>>(new Set());
   const gente = asignaciones.filter((a) => a.posicion_id === pos.id).map((a) => personas.find((p) => p.id === a.user_id)?.full_name).filter(Boolean) as string[];
 
   // Autoguardado como Blu: cada check escribe al instante (optimista).
@@ -400,7 +401,7 @@ function PermisosDe({ pos, personas, asignaciones, onVolver }: { pos: Posicion; 
     const n = claves.filter(on).length;
     return n === 0 ? false : n === claves.length ? true : "indeterminate";
   };
-  const alternar = (id: string) => setCerrados((s) => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n; });
+  const alternar = (id: string) => setAbiertos((s) => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n; });
   const bloqueado = pos.acceso_total;
 
   return (
@@ -455,7 +456,13 @@ function PermisosDe({ pos, personas, asignaciones, onVolver }: { pos: Posicion; 
                   {sec.grupos.map((g) => {
                     const id = `${sec.seccion}/${g.grupo}`;
                     const clavesG = g.filas.flatMap((f) => f.funciones.map((x) => x.clave));
-                    const abierto = !cerrados.has(id);
+                    const abierto = abiertos.has(id);
+                    // Grupo de una sola fila: va directo, sin flecha (como «API keys» en Blu).
+                    if (g.filas.length === 1) {
+                      const f = g.filas[0];
+                      return [<FilaPermiso key={`${id}/${f.fila}`} fila={{ ...f, etiqueta: g.etiqueta }} pos={pos} bloqueado={bloqueado} on={on} estadoDe={estadoDe} marcar={marcar} plano
+                        alcance={(a) => guardar.mutate({ alcances: { ...pos.alcances, [f.fila]: a } })} />];
+                    }
                     return [
                       <TableRow key={id} className="border-t border-border bg-muted/20">
                         <TableCell className="px-4 py-2.5">
@@ -485,8 +492,8 @@ function PermisosDe({ pos, personas, asignaciones, onVolver }: { pos: Posicion; 
   );
 }
 
-function FilaPermiso({ fila, pos, bloqueado, on, estadoDe, marcar, alcance }: {
-  fila: FilaCatalogo; pos: Posicion; bloqueado: boolean;
+function FilaPermiso({ fila, pos, bloqueado, on, estadoDe, marcar, alcance, plano = false }: {
+  fila: FilaCatalogo; pos: Posicion; bloqueado: boolean; plano?: boolean;
   on: (k: string) => boolean; estadoDe: (c: string[]) => boolean | "indeterminate";
   marcar: (c: string[], v: boolean) => void; alcance: (a: AlcanceDatos) => void;
 }) {
@@ -497,7 +504,7 @@ function FilaPermiso({ fila, pos, bloqueado, on, estadoDe, marcar, alcance }: {
   return (
     <TableRow className="border-t border-border align-top">
       <TableCell className="px-4 py-3">
-        <label className="flex items-center gap-2 pl-6">
+        <label className={cn("flex items-center gap-2", plano ? "font-medium" : "pl-6")}>
           <Casilla disabled={bloqueado} checked={estadoDe(claves)} onCheckedChange={(v) => marcar(claves, v === true)} />{t(fila.etiqueta)}
         </label>
       </TableCell>
