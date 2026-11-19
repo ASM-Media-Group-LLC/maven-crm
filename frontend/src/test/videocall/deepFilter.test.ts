@@ -30,11 +30,12 @@ describe("worklet de DeepFilterNet", () => {
     expect(paquete).toMatch(/"@lofcz\/deepfilternet-web": "\d+\.\d+\.\d+"/);
   });
 
-  it("lo más fuerte que da el modelo, con el posfiltro prendido", () => {
-    expect(ATENUACION_DF_DB).toBe(100);
-    // Medido el 16/11 con voz real + ruido real: con posfiltro las pausas bajan
-    // de -52 a -57 dBFS y la voz pierde 2 dB en vez de 3,6 (RNNoise pierde 7).
-    expect(POSFILTRO_DF).toBeGreaterThan(0);
+  it("atenuación moderada y sin posfiltro (a fondo, la voz salía robotizada)", () => {
+    // 18/11: con 100 dB + posfiltro 0,02 el modelo se comía armónicos de la voz.
+    expect(ATENUACION_DF_DB).toBeGreaterThanOrEqual(18);
+    expect(ATENUACION_DF_DB).toBeLessThanOrEqual(24);
+    expect(POSFILTRO_DF).toBe(0);
+    // El retoque sigue, por si algún día se vuelve a prender el posfiltro.
     expect(workletDeepFilter(crudo)).toContain("df_set_post_filter_beta(this.#handle, opts.postFilterBeta)");
   });
   it("⚠️ el hilo de audio no trae TextDecoder ni crypto: el worklet los rellena antes de cargar", () => {
@@ -62,7 +63,7 @@ describe("si el equipo no da abasto, vuelve a RNNoise", () => {
 
 describe("la cadena", () => {
   it("arranca con RNNoise y DeepFilterNet entra después, en caliente", () => {
-    expect(cadena).toContain("deepFilterPermitido()");
+    expect(cadena).toContain("motivoSinDeepFilter()");
     expect(cadena).toMatch(/setTimeout\(\(\) => \{ void subirADeepFilter\(\); \}, ESPERA_ANTES_DE_DF_MS\)/);
   });
   it("si no aguanta, se marca el equipo y se vuelve al motor anterior", () => {
@@ -83,26 +84,10 @@ describe("qué se anota en datos.nc", () => {
   });
 });
 
-describe("DeepFilterNet: apagado en el navegador Y en la app (18/11/2026: la voz salía robotizada)", () => {
-  it("en el navegador nadie lo arma: siguen con RNNoise", async () => {
-    const { deepFilterPermitido, DEEPFILTER_PRENDIDO } = await import("@/lib/deepfilter");
-    expect(DEEPFILTER_PRENDIDO).toBe(false);
-    expect(deepFilterPermitido()).toBe(false);
-  });
-
-  it("en la app de computador, ni con 8 núcleos: la voz robotizada no vuelve", async () => {
-    const { deepFilterPermitido, DEEPFILTER_EN_APP } = await import("@/lib/deepfilter");
-    expect(DEEPFILTER_EN_APP).toBe(false);
-    const w = window as unknown as { mavenEscritorio?: unknown };
-    const nucleos = Object.getOwnPropertyDescriptor(navigator, "hardwareConcurrency");
-    w.mavenEscritorio = { esApp: true };
-    Object.defineProperty(navigator, "hardwareConcurrency", { value: 16, configurable: true });
-    try {
-      expect(deepFilterPermitido()).toBe(false);
-    } finally {
-      delete w.mavenEscritorio;
-      if (nucleos) Object.defineProperty(navigator, "hardwareConcurrency", nucleos);
-      else delete (navigator as unknown as { hardwareConcurrency?: number }).hardwareConcurrency;
-    }
+describe("DeepFilterNet: prendido otra vez, solo en equipos fuertes (19/11/2026, opción B)", () => {
+  it("el interruptor general está prendido y ya no hay interruptor aparte para la app", async () => {
+    const m = await import("@/lib/deepfilter");
+    expect(m.DEEPFILTER_PRENDIDO).toBe(true);
+    expect("DEEPFILTER_EN_APP" in m).toBe(false);
   });
 });

@@ -2,7 +2,8 @@ import rnnoiseWorkletUrl from "@sapphi-red/web-noise-suppressor/rnnoiseWorklet.j
 import rnnoiseWasmUrl from "@sapphi-red/web-noise-suppressor/rnnoise.wasm?url";
 import rnnoiseSimdWasmUrl from "@sapphi-red/web-noise-suppressor/rnnoise_simd.wasm?url";
 import {
-  crearNodoDF, deepFilterPermitido, descartarDeepFilterEnPestana, marcarDeepFilterPesado, soltarNodoDF, veredictoCarga,
+  crearNodoDF, descartarDeepFilterEnPestana, esperarCargaDF, LATENCIA_CONTEXTO_DF, marcarDeepFilterPesado, motivoSinDeepFilter,
+  pruebaDeCargaDF, ruidoDelNavegador, soltarNodoDF, veredictoCarga, type SinDeepFilter,
 } from "@/lib/deepfilter";
 
 // Cancelación de ruido de las llamadas (Meet, Cowork y videollamadas).
@@ -30,6 +31,14 @@ import {
 // el equipo no da abasto se vuelve solo a RNNoise:
 //
 //   Micro → DeepFilterNet3 (o RNNoise) → puerta adaptativa → pista procesada
+//
+// NIVEL 3, OTRA VEZ (19/11/2026, Alvaro, opción B: automático según el equipo):
+//   · Computador fuerte (8+ núcleos y 8+ GB, no celular): DeepFilterNet, después
+//     de una prueba de carga de ~2 s en paralelo que nadie oye.
+//   · Los demás: RNNoise (liviano, no suena robótico).
+//   · Si algo falla: la puerta sola o, en el peor caso, el micrófono crudo con el
+//     noiseSuppression del navegador (se pide al capturar).
+// Las causas de la voz robotizada y sus arreglos están en lib/deepfilter.ts.
 
 /** Qué motor de cancelación de ruido quedó armado en esta pestaña. */
 export type MotorNC = "deepfilter+puerta" | "rnnoise+puerta" | "puerta";
@@ -87,11 +96,22 @@ async function cargarWasmRnnoise(): Promise<ArrayBuffer> {
   }
 }
 
+/** Lo que va en llamada_salud.datos.nc_info para medir qué filtro corre y por qué. */
+export interface InfoNC {
+  /** Por qué no corre DeepFilterNet (null si corre o todavía puede entrar). */
+  sin_df: SinDeepFilter | "prueba" | null;
+  /** Fracción del hilo de audio que gasta DeepFilterNet (0–1), si está al aire. */
+  carga: number | null;
+  /** Cómo quedó el noiseSuppression del navegador en el micrófono crudo (null = no se sabe). */
+  ns_navegador: boolean | null;
+}
+
 export interface CadenaNC {
   /** La pista limpia, lista para publicar (o para clonar por sala). */
   salida: MediaStreamTrack;
   /** Cambia en vivo: RNNoise al armar, DeepFilterNet cuando toma el relevo. */
   readonly motor: MotorNC;
+  readonly info: InfoNC;
   destruir(): Promise<void>;
 }
 
@@ -137,7 +157,13 @@ export async function armarCadenaNC(entrada: MediaStreamTrack, alFallar?: (motiv
   // 48 kHz no es una preferencia: RNNoise está entrenado a esa tasa y trabaja
   // en cuadros de 10 ms (480 muestras). El worklet del paquete hace el buffer
   // intermedio desde los 128 del AudioWorklet.
-  const ctx = new AudioContext({ sampleRate: 48000 });
+  //
+  // Si este equipo va a usar DeepFilterNet, el contexto se crea con latencia
+  // «balanced»: bloques de ~10 ms donde cabe el cuadro entero del modelo. Con
+  // «interactive» (2,7 ms) el audio se cortaba cada 10 ms: la voz robotizada.
+  const motivoSinDF = motivoSinDeepFilter();
+  const conDF = motivoSinDF === null;
+  const ctx = new AudioContext(conDF ? { sampleRate: 48000, latencyHint: LATENCIA_CONTEXTO_DF } : { sampleRate: 48000 });
   if (ctx.state === "suspended") {
     try { await ctx.resume(); } catch { /* se decide abajo */ }
   }
@@ -248,6 +274,15 @@ export async function armarCadenaNC(entrada: MediaStreamTrack, alFallar?: (motiv
   // abasto, se vuelve a RNNoise.
   let cerrada = false;
   let nodoDF: AudioWorkletNode | null = null;
+  let sinDF: InfoNC["sin_df"] = motivoSinDF;
+  let nsNavegador: boolean | null = null;
+  let cargaDF: number | null = null;
+  // El noiseSuppression del navegador se apaga SOLO mientras DeepFilterNet está
+  // al aire (limpiar dos veces ensuciaba la voz) y se devuelve al bajar.
+  const devolverRuidoDelNavegador = () => {
+    if (nsNavegador !== false) return;
+    void ruidoDelNavegador(entrada, true).then((q) => { nsNavegador = q; });
+  };
   const conectarAnterior = () => {
     if (rnnoise) { fuente.connect(rnnoise); rnnoise.connect(puerta); }
     else fuente.connect(puerta);
@@ -267,25 +302,50 @@ export async function armarCadenaNC(entrada: MediaStreamTrack, alFallar?: (motiv
     conectarAnterior();
     try { fuente.disconnect(nodo); } catch { /* noop */ }
     soltarNodoDF(nodo);
+    devolverRuidoDelNavegador();
+    cargaDF = null;
+    sinDF = "pesado";
     motor = rnnoise ? "rnnoise+puerta" : "puerta";
     motorVigente = motor;
     console.warn(`[NC] DeepFilterNet apagado (${motivo}); sigue ${motor}`);
   };
   const subirADeepFilter = async () => {
     let nodo: AudioWorkletNode | null = null;
+    let banco: MediaStreamAudioDestinationNode | null = null;
     try {
       nodo = await crearNodoDF(ctx);
       if (cerrada || ctx.state === "closed") { soltarNodoDF(nodo); return; }
+      // PRUEBA DE CARGA: DeepFilterNet corre ~2 s en paralelo hacia un destino
+      // mudo (nadie lo oye; la llamada sigue con RNNoise). Solo sale al aire si
+      // el equipo de verdad aguanta.
+      banco = ctx.createMediaStreamDestination();
       fuente.connect(nodo);
+      nodo.connect(banco);
+      const prueba = await esperarCargaDF(nodo);
+      if (cerrada || ctx.state === "closed") { soltarNodoDF(nodo); return; }
+      if (!prueba || !pruebaDeCargaDF(prueba)) {
+        try { fuente.disconnect(nodo); } catch { /* noop */ }
+        soltarNodoDF(nodo);
+        nodo = null;
+        if (prueba) marcarDeepFilterPesado(); else descartarDeepFilterEnPestana();
+        sinDF = "prueba";
+        console.warn("[NC] DeepFilterNet no pasó la prueba de carga; sigue", motor, prueba ?? "(sin reporte)");
+        return;
+      }
       nodo.connect(puerta);
       desconectarAnterior();
+      try { nodo.disconnect(banco); } catch { /* noop */ }
       nodoDF = nodo;
       motor = "deepfilter+puerta";
       motorVigente = motor;
+      cargaDF = prueba.gastoMs / prueba.ventanaMs;
+      cargaDFVigente = cargaDF;
+      nsNavegador = await ruidoDelNavegador(entrada, false);
       let malas = 0;
       nodo.port.onmessage = (e: MessageEvent) => {
         if (e.data?.tipo !== "carga") return;
-        cargaDFVigente = e.data.ventanaMs > 0 ? e.data.gastoMs / e.data.ventanaMs : null;
+        cargaDF = e.data.ventanaMs > 0 ? e.data.gastoMs / e.data.ventanaMs : null;
+        cargaDFVigente = cargaDF;
         const v = veredictoCarga(e.data, malas);
         malas = v.seguidas;
         if (v.pesado) {
@@ -295,12 +355,13 @@ export async function armarCadenaNC(entrada: MediaStreamTrack, alFallar?: (motiv
       };
       console.info("[NC] cancelación de ruido fuerte armada: deepfilter+puerta");
     } catch (e) {
-      if (nodo) soltarNodoDF(nodo);
+      if (nodo) { try { fuente.disconnect(nodo); } catch { /* noop */ } soltarNodoDF(nodo); }
       descartarDeepFilterEnPestana();
+      sinDF = "no_cargo";
       console.warn("[NC] DeepFilterNet no disponible, sigue", motor, "·", (e as Error)?.message ?? e);
     }
   };
-  const relevoDF = deepFilterPermitido()
+  const relevoDF = conDF
     ? window.setTimeout(() => { void subirADeepFilter(); }, ESPERA_ANTES_DE_DF_MS)
     : 0;
 
@@ -308,10 +369,12 @@ export async function armarCadenaNC(entrada: MediaStreamTrack, alFallar?: (motiv
   return {
     salida,
     get motor() { return motor; },
+    get info(): InfoNC { return { sin_df: nodoDF ? null : sinDF, carga: nodoDF ? cargaDF : null, ns_navegador: nsNavegador }; },
     async destruir() {
       cerrada = true;
       window.clearTimeout(relevoDF);
       if (nodoDF) { soltarNodoDF(nodoDF); nodoDF = null; }
+      devolverRuidoDelNavegador();
       window.clearInterval(vigilante);
       ctx.onstatechange = null;
       for (const n of nodos) { try { n.disconnect(); } catch { /* noop */ } }
@@ -333,6 +396,10 @@ export class NoiseSuppresionTrackProcessor {
   /** Con qué motor está corriendo ahora (cambia cuando DeepFilterNet toma el relevo). */
   get motor(): MotorNC | null {
     return this.cadena?.motor ?? null;
+  }
+  /** Qué filtro corre y por qué (para llamada_salud.datos.nc_info). */
+  get info(): InfoNC | null {
+    return this.cadena?.info ?? null;
   }
 
   private cadena?: CadenaNC;
