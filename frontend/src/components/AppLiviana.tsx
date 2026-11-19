@@ -73,8 +73,11 @@ export function AppLiviana() {
       const ultimo = Number(leer(CLAVE_ULTIMO_REFRESCO)) || null;
       if (debeRefrescarPorMemoria({
         ramAppMb: m.app_mb,
+        equipoGb: m.equipo_gb ?? null,
+        libreGb: m.libre_gb ?? null,
         enLlamada: hayLlamadaActiva(),
         enPausa: estaEnPausa(),
+        enCowork: window.location.pathname.startsWith("/cowork"),
         escribiendo: hayAlgoAMedioEscribir(),
         ultimoRefresco: ultimo,
         ahora: Date.now(),
