@@ -53,7 +53,9 @@ describe("el arranque va en una sola petición", () => {
     expect(arranque).toMatch(/catch \{\s*return null;\s*\}/);
     expect(arranque).toMatch(/if \(error \|\| !data \|\| typeof data !== "object"\) return null;/);
     // El camino viejo sigue ahí y sigue lanzando si falla.
-    expect(permisos).toMatch(/if \(rcError\) throw rcError;/);
+    // (Desde «pantallas al instante» el camino viejo es UNA consulta con su
+    // roles_config embebido; el error se sigue lanzando antes del vacío.)
+    expect(permisos).toMatch(/if \(error\) throw error;\s*if \(!data\) return \[\];/);
     expect(permisos).toMatch(/if \(a && a\.rol === role && a\.permisos\) return a\.permisos/);
     expect(rol).toMatch(/if \(rgError\) throw rgError;/);
   });

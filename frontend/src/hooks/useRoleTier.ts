@@ -29,20 +29,24 @@ export const useRoleTier = () => {
           return "member";
         }
       }
-      const { data: userRole } = await supabase
-        .from("user_roles")
-        .select("role")
-        .eq("user_id", user!.id)
-        .maybeSingle();
+      // Rol y grupos EN PARALELO (pantallas al instante, 19/11/2026): antes eran
+      // dos viajes en fila. Los grupos son pocas filas (una por rol de la
+      // agencia), así que se traen todos y se busca el del rol acá.
+      const [{ data: userRole }, { data: grupos }] = await Promise.all([
+        supabase
+          .from("user_roles")
+          .select("role")
+          .eq("user_id", user!.id)
+          .maybeSingle(),
+        supabase
+          .from("role_groups")
+          .select("role_name, is_admin, is_manager_or_above, is_supervisor_or_above"),
+      ]);
 
       // Sin rol asignado → el nivel más bajo (default-deny).
       if (!userRole?.role) return "member";
 
-      const { data: group } = await supabase
-        .from("role_groups")
-        .select("is_admin, is_manager_or_above, is_supervisor_or_above")
-        .eq("role_name", userRole.role)
-        .maybeSingle();
+      const group = (grupos ?? []).find((g) => g.role_name === userRole.role) ?? null;
 
       // Un rol sin fila en role_groups no tiene NINGUNA capacidad a nivel DB
       // (is_in_role_group le devuelve false a todo) → tratarlo como miembro.

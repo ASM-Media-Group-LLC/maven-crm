@@ -55,11 +55,22 @@ export const useUserRole = () => {
         }
       }
 
-      const { data, error } = await supabase
-        .from("user_roles")
-        .select("role")
-        .eq("user_id", user.id)
-        .maybeSingle();
+      // Si el arranque falló, o en las recargas: rol y grupos EN PARALELO
+      // (pantallas al instante, 19/11/2026). Antes iban en fila (rol → su grupo) y eran dos viajes
+      // a Supabase antes de poder dibujar cualquier pantalla con permisos. Los
+      // grupos son pocas filas (una por rol de la agencia; la RLS ya filtra por
+      // agencia), así que se traen todos y se busca el del rol acá.
+      const [rolRes, gruposRes] = await Promise.all([
+        supabase
+          .from("user_roles")
+          .select("role")
+          .eq("user_id", user.id)
+          .maybeSingle(),
+        supabase
+          .from("role_groups")
+          .select("role_name, is_supervisor_or_above"),
+      ]);
+      const { data, error } = rolRes;
 
       if (error) throw error;
       const roleName = (data?.role as AppRole) ?? null;
@@ -71,16 +82,14 @@ export const useUserRole = () => {
       // dejó a Miguel/María tratados como miembros rasos en el front (sin la tab
       // "Todas", pipeline filtrado a 0 asignados). Leyéndolo del grupo, cualquier
       // rol nuevo o renombrado de nivel supervisor funciona sin tocar código.
-      const { data: rg, error: rgError } = await supabase
-        .from("role_groups")
-        .select("is_supervisor_or_above")
-        .eq("role_name", roleName)
-        .maybeSingle();
+      const { data: grupos, error: rgError } = gruposRes;
       // Igual que arriba: un fallo no es "no es supervisor"; se reintenta y,
       // si ya había dato, se conserva.
       if (rgError) throw rgError;
+      const rg = ((grupos ?? []) as Array<{ role_name: string; is_supervisor_or_above?: boolean }>)
+        .find((g) => g.role_name === roleName) ?? null;
 
-      return { role: roleName, isSupervisorGroup: !!(rg as { is_supervisor_or_above?: boolean } | null)?.is_supervisor_or_above };
+      return { role: roleName, isSupervisorGroup: !!rg?.is_supervisor_or_above };
     },
     enabled: !!user?.id,
     staleTime: 5 * 60 * 1000,

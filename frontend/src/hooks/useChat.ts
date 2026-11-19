@@ -81,16 +81,24 @@ export function useChat() {
     return map;
   }, []);
 
-  const loadConversations = useCallback(async (perfilesRecienCargados?: Record<string, UserProfile>) => {
+  const loadConversations = useCallback(async (
+    perfilesRecienCargados?: Record<string, UserProfile> | Promise<Record<string, UserProfile> | null>,
+  ) => {
     if (!user) return;
 
     // Con qué mapa se arma la lista: el recién cargado gana sobre el ref, y si
     // está vacío se reintenta. El por qué está en perfilesGarantizados.
-    const perfiles = await perfilesGarantizados(
-      perfilesRecienCargados,
+    // EN PARALELO (pantallas al instante, 19/11/2026): los perfiles pueden llegar
+    // como promesa y se esperan recién al armar la lista. Antes la primera carga
+    // iba en fila —perfiles → participaciones → conversaciones → no leídos—,
+    // cuatro viajes a Supabase antes de ver un chat; ahora son dos.
+    const perfilesP = Promise.resolve(perfilesRecienCargados).then((recien) => perfilesGarantizados(
+      recien ?? undefined,
       profilesRef.current,
       loadProfiles,
-    );
+    ));
+    // Si la carga se aborta antes de usarlos, que un fallo no quede suelto.
+    perfilesP.catch(() => { /* se ve en el await de abajo */ });
 
     // `loading` SOLO en la primera carga de esta sesión. Antes se prendía en
     // cada llamada, y como hay un poll de 20s (+ visibilitychange + reconexión
@@ -105,6 +113,12 @@ export function useChat() {
     // y se borraba todo (Grace y Brayan, 10/09). Ver queHacerConLaCarga.
     let abortada = false;
     try {
+      // Las vistas previas y los no leídos solo dependen de quién soy: salen
+      // junto con las participaciones, no después.
+      // ⚠️ `.then((r) => r)`: el builder de supabase no sale hasta que alguien
+      // le hace then; sin esto la petición esperaría al await de más abajo.
+      const lastMsgsP = supabase.rpc("get_last_messages", { _user_id: user.id }).then((r) => r);
+      const noLeidosP = supabase.rpc("get_unread_counts", { _user_id: user.id }).then((r) => r);
       const participaciones = await supabase
         .from("chat_participants")
         .select("conversation_id, last_read_at")
@@ -141,7 +155,7 @@ export function useChat() {
           .from("chat_participants")
           .select("*")
           .in("conversation_id", convIds),
-        supabase.rpc("get_last_messages", { _user_id: user.id }),
+        lastMsgsP,
       ]);
 
       // Las tres tienen que llegar. Si falla la de vistas previas y se siguiera
@@ -169,7 +183,7 @@ export function useChat() {
 
       // Server-side unread counts — single RPC call
       const unreadMap: Record<string, number> = {};
-      const noLeidos = await supabase.rpc("get_unread_counts", { _user_id: user.id });
+      const noLeidos = await noLeidosP;
       // Si falla, se aborta como las otras cuatro peticiones. Antes seguía con
       // el mapa vacío y TODAS las burbujas de no leídos saltaban a 0 hasta el
       // siguiente refresco.
@@ -182,6 +196,7 @@ export function useChat() {
         unreadMap[row.conversation_id] = row.unread_count || 0;
       }
 
+      const perfiles = await perfilesP;
       const enriched: ConversationWithDetails[] = convs.map((conv: any) => {
         const convParticipants = (allParticipants || []).filter(
           (p: any) => p.conversation_id === conv.id
@@ -238,7 +253,8 @@ export function useChat() {
   }, [user, loadProfiles]);
 
   useEffect(() => {
-    loadProfiles().then((perfiles) => loadConversations(perfiles ?? undefined));
+    // Perfiles y lista salen a la vez; la lista espera el mapa recién al armarse.
+    void loadConversations(loadProfiles());
   }, [loadProfiles, loadConversations]);
 
   // Realtime subscription for conversation sync
