@@ -1,5 +1,6 @@
 // EL LIMPIADOR DE RUIDO FUERTE SOLO EN COMPUTADORES FUERTES (Alvaro, 17/11/2026:
-// «solo en equipos de 8 núcleos o más; en los demás trababa»).
+// «solo en equipos de 8 núcleos o más; en los demás trababa»; 19/11/2026: además
+// 8 GB de memoria o más).
 //
 // DeepFilterNet3 (lib/deepfilter.ts) pesa ~12 MB y gasta procesador. Con menos de
 // 8 núcleos, o si el navegador no dice cuántos, la llamada se queda con RNNoise
@@ -18,6 +19,8 @@ beforeEach(async () => {
   // Un computador de escritorio con memoria de sobra y nada guardado: así el test
   // solo mide los núcleos, sin depender del navegador simulado de CI.
   try { localStorage.clear(); } catch { /* noop */ }
+  // Prueba voluntaria (19/11/2026): sin esto nadie arma DeepFilterNet.
+  try { localStorage.setItem("maven.deepfilter", "si"); } catch { /* noop */ }
   vi.spyOn(navigator, "userAgent", "get").mockReturnValue(
     "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36",
   );
@@ -51,7 +54,7 @@ afterEach(() => {
 describe("¿a quién le toca DeepFilterNet?", () => {
   it("el umbral es 8 núcleos, con la decisión anotada", () => {
     expect(NUCLEOS_PARA_DEEPFILTER).toBe(8);
-    expect(df).toMatch(/Alvaro, 17\/11: solo en equipos de 8 núcleos o más; en los demás trababa\./);
+    expect(df).toMatch(/8 núcleos o más Y 8 GB de memoria o más/);
   });
 
   it("con 4 o 6 núcleos, no; con 8 o más, sí", () => {
@@ -60,9 +63,7 @@ describe("¿a quién le toca DeepFilterNet?", () => {
       expect(deepFilterPermitido(), `${n} núcleos`).toBe(false);
       vi.restoreAllMocks();
     }
-    // Con 8 o más, solo si DeepFilterNet está prendido. Hoy está APAGADO para
-    // todos (Alvaro, 17/11 08:50: «no sirve el audio, no se escucha, es lento»):
-    // la regla de los núcleos queda lista para cuando se vuelva a prender.
+    // Con 8 o más (y 8 GB, que fija el beforeEach), sí.
     for (const n of [8, 12, 16]) {
       nucleos(n);
       expect(deepFilterPermitido(), `${n} núcleos`).toBe(DEEPFILTER_PRENDIDO);
@@ -78,6 +79,7 @@ describe("¿a quién le toca DeepFilterNet?", () => {
   });
 
   it("la regla de los 14 días sigue: un equipo fuerte que no aguantó no lo vuelve a intentar", () => {
+    try { localStorage.setItem("maven.deepfilter", "si"); } catch { /* noop */ }
     nucleos(16);
     expect(deepFilterPermitido()).toBe(DEEPFILTER_PRENDIDO);
     marcarDeepFilterPesado();
@@ -88,7 +90,8 @@ describe("¿a quién le toca DeepFilterNet?", () => {
 
 describe("⚠️ en los débiles nunca se bajan los 12 MB", () => {
   it("el relevo a DeepFilterNet solo se programa si está permitido, y el modelo solo se baja ahí", () => {
-    expect(cadena).toMatch(/const relevoDF = deepFilterPermitido\(\)\s*\?\s*window\.setTimeout\(\(\) => \{ void subirADeepFilter\(\); \}/);
+    expect(cadena).toMatch(/const conDF = motivoSinDF === null;/);
+    expect(cadena).toMatch(/const relevoDF = conDF\s*\?\s*window\.setTimeout\(\(\) => \{ void subirADeepFilter\(\); \}/);
     // crearNodoDF (que baja el WASM) se llama en un solo lugar: dentro del relevo.
     expect(cadena.match(/crearNodoDF\(/g)?.length).toBe(1);
     const relevo = cadena.slice(cadena.indexOf("const subirADeepFilter"), cadena.indexOf("const relevoDF"));

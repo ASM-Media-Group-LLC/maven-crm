@@ -46,7 +46,7 @@ import {
   resolverImagenDeFondo, leerFondoGuardado, guardarFondo,
 } from "@/lib/fondoDeLlamada";
 import type { ImagenDeFondo } from "@/lib/fondoDeLlamada";
-import { NoiseSuppresionTrackProcessor, supportsNoiseSuppression, loadNCPreference } from "@/lib/noise-suppression-processor";
+import { NoiseSuppresionTrackProcessor, supportsNoiseSuppression, loadNCPreference, type InfoNC } from "@/lib/noise-suppression-processor";
 import { estadoDeNC, type EstadoNC } from "@/lib/estadoNC";
 import { clasificarFalloDePantalla, pantallaSinPermiso, type FalloDePantalla } from "@/lib/fallosDePantalla";
 export type { FalloDePantalla } from "@/lib/fallosDePantalla";
@@ -607,7 +607,7 @@ export function useLiveKit() {
   }, []);
 
   type InsertaSalud = (tabla: "llamada_salud") => {
-    insert: (fila: { sala: string; datos: MuestraDeLlamada & MemoriaDelEquipo & { ahorro: boolean; nc: EstadoNC; prueba?: PruebaDeRed; perfil_cam: PerfilDeCamara; transporte: Transporte | null; trabas?: Traba[]; audio?: AudioDeLaMuestra } }) =>
+    insert: (fila: { sala: string; datos: MuestraDeLlamada & MemoriaDelEquipo & { ahorro: boolean; nc: EstadoNC; nc_info?: InfoNC; prueba?: PruebaDeRed; perfil_cam: PerfilDeCamara; transporte: Transporte | null; trabas?: Traba[]; audio?: AudioDeLaMuestra } }) =>
       PromiseLike<{ error: { message: string } | null }>;
   };
   // Si el componente se desmonta sin colgar, el reloj de muestras no queda vivo.
@@ -792,6 +792,8 @@ export function useLiveKit() {
         // Si la cancelación de ruido está corriendo de verdad (lib/estadoNC.ts).
         const nc = leerEstadoNC(room);
         setEstadoNC(nc);
+        // Qué filtro corre y por qué no DeepFilterNet (19/11/2026: para medir la regla por equipo).
+        const ncInfo = leerInfoNC(room);
         // La prueba de velocidad (al entrar y cada 30 min). Las estadísticas de
         // arriba ya se leyeron, así que la prueba no ensucia esta muestra; el
         // resultado viaja en ella. Pestaña oculta o llamada reconectando: no.
@@ -843,7 +845,7 @@ export function useLiveKit() {
         const memoria = await leerMemoria();
         // Cada 10 minutos: qué tan lejos queda cada servidor de llamadas (lib/pingRegiones.ts).
         const regiones = (vueltaRegiones++ % MEDIR_REGIONES_CADA === 0) ? await medirRegiones() : null;
-        const filaDeSalud = { sala: room.name, datos: { ...muestra, ...memoria, ahorro: ahorro.activo, nc, perfil_cam: perfilCam, transporte: transporteDeLaLlamada(), ...(prueba ? { prueba } : {}), ...(trabasDelMinuto.length ? { trabas: trabasDelMinuto } : {}), ...(audio ? { audio } : {}), ...(regiones ? { regiones } : {}) } };
+        const filaDeSalud = { sala: room.name, datos: { ...muestra, ...memoria, ahorro: ahorro.activo, nc, ...(ncInfo ? { nc_info: ncInfo } : {}), perfil_cam: perfilCam, transporte: transporteDeLaLlamada(), ...(prueba ? { prueba } : {}), ...(trabasDelMinuto.length ? { trabas: trabasDelMinuto } : {}), ...(audio ? { audio } : {}), ...(regiones ? { regiones } : {}) } };
         if (telemetriaRef.current) telemetriaRef.current.salud(filaDeSalud);
         else void (supabase.from as unknown as InsertaSalud)("llamada_salud")
           .insert(filaDeSalud)
@@ -997,6 +999,15 @@ export function useLiveKit() {
     const t = micPub?.track as (LocalAudioTrack & { getProcessor?: () => unknown }) | undefined;
     const proc = t?.getProcessor?.() as { motor?: "deepfilter+puerta" | "rnnoise+puerta" | "puerta" | null } | undefined;
     return estadoDeNC({ soportada: supportsNoiseSuppression(), hayMicro: !!t, motor: proc?.motor ?? null });
+  }, []);
+  /** Qué filtro corre y por qué (lib/noise-suppression-processor.ts › InfoNC), o null sin procesador. */
+  const leerInfoNC = useCallback((room: Room | null): InfoNC | null => {
+    const micPub = room
+      ? Array.from(room.localParticipant.audioTrackPublications.values()).find((p) => p.source === Track.Source.Microphone)
+      : undefined;
+    const t = micPub?.track as (LocalAudioTrack & { getProcessor?: () => unknown }) | undefined;
+    const proc = t?.getProcessor?.() as { info?: InfoNC | null } | undefined;
+    return proc?.info ?? null;
   }, []);
   const refrescarEstadoNC = useCallback(() => {
     setEstadoNC(leerEstadoNC(roomRef.current));
