@@ -7,14 +7,14 @@ name: LiveKit — servidor de llamadas (Miami / St. Louis)
 # Decisión de Alvaro (19/11/2026): pasar a Miami a las 6:00 a. m. de Colombia, y
 # si en la primera hora sale peor que St. Louis (más conexiones malas o más
 # ping), volver solo a St. Louis.
-#   · 11:00 UTC (6:00 Bogotá)  → miami
-#   · 12:00 y 13:00 UTC        → revisar: si Miami sale peor que ayer en St. Louis, vuelve
+#   · 11:07 UTC (6:07 Bogotá) del 20/11 → miami (el 19/11 GitHub no disparó el horario)
+#   · 12:13 y 13:13 UTC        → revisar: si Miami sale peor que ayer en St. Louis, vuelve
 # También se puede correr a mano: destino = miami | stlouis | revisar.
 
 on:
   schedule:
-    - cron: '0 11 19 11 *'
-    - cron: '0 12,13 19 11 *'
+    - cron: '7 11 20 11 *'
+    - cron: '13 12,13 20 11 *'
   workflow_dispatch:
     inputs:
       destino:
@@ -41,7 +41,7 @@ jobs:
         run: |
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             echo "accion=${{ inputs.destino }}" >> "$GITHUB_OUTPUT"
-          elif [ "${{ github.event.schedule }}" = "0 11 19 11 *" ]; then
+          elif [ "${{ github.event.schedule }}" = "7 11 20 11 *" ]; then
             echo "accion=miami" >> "$GITHUB_OUTPUT"
           else
             echo "accion=revisar" >> "$GITHUB_OUTPUT"
