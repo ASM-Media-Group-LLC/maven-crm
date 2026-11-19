@@ -59,7 +59,7 @@ import {
 import { armarAudio, leerAudioRecibido, leerMicrofono, type AudioDeLaMuestra, type ContadoresDeAudio } from "@/lib/audioDeLlamada";
 import { AHORRO_INICIAL, PANTALLA_AHORRO, ahorroPorPrueba, siguienteAhorro, type EstadoAhorro } from "@/lib/modoAhorro";
 import {
-  CAMARA_INICIAL, camaraEnHD, copiarTopes, elegirPerfilDeCamara, escribirTopes, siguientePerfilDeCamara, topesDeCowork, topesLivianos,
+  CAMARA_INICIAL, PUBLICACION_DE_CAMARA, camaraEnHD, copiarTopes, elegirPerfilDeCamara, escribirTopes, siguientePerfilDeCamara, topesDeCowork, topesLivianos,
   type EstadoCamara, type PerfilDeCamara, type SenalesDeSubida, type TopeDeCodificacion,
 } from "@/lib/perfilDeCamara";
 import { ajustarSuscripciones, esSupervisorEnLaSala, soloAudioDeLosCompaneros } from "@/lib/videoAjeno";
@@ -329,7 +329,18 @@ const ROOM_OPTIONS: RoomOptions = {
   // «screen», LiveKit cuenta los píxeles de una pantalla retina (Mac) a la
   // MITAD: pedía la capa de 720p de una pantalla compartida y la estiraba al
   // doble, y se veía pixeleada (Alvaro, 18/11/2026). Las cámaras de quien no
-  // habla siguen topadas en baja por calidadPorVoz.ts (setVideoQuality gana).
+  // habla siguen topadas en la capa media (360p) por calidadPorVoz.ts.
+  //
+  // 19/11/2026 (simulacro v2: el video se congelaba en vez de bajar de calidad).
+  // Estas tres cosas son las que dejan al servidor DEGRADAR en vez de congelar,
+  // y no se apagan: simulcast con tres capas (abajo, en publishDefaults) para
+  // que a quien recibe con internet flojo se le pase a una capa más chica;
+  // dynacast para que quien publica no gaste subida en capas que nadie mira; y
+  // adaptiveStream para que un recuadro chico o escondido no pida la capa alta.
+  // En salas de 8 a 16 se medían 180p en todos: eso es adaptiveStream por el
+  // tamaño del recuadro, no calidadPorVoz.ts (que nunca pide la capa baja).
+  // Lo que congelaba era la preferencia de degradación de la cámara en HD: ver
+  // PUBLICACION_DE_CAMARA en lib/perfilDeCamara.ts.
   adaptiveStream: { pixelDensity: "screen" },
   dynacast: true,
   // Keep local tracks alive when unpublished — avoids getUserMedia re-calls
@@ -1132,7 +1143,7 @@ export function useLiveKit() {
 
       // Attempt 1: preferred device + profile-aware constraints
       try {
-        await room.localParticipant.setCameraEnabled(true, videoConstraint);
+        await room.localParticipant.setCameraEnabled(true, videoConstraint, PUBLICACION_DE_CAMARA);
         const isReady = await waitForCameraPublication(room, [80, 150, 300]);
         if (isReady) {
           refreshParticipants();
@@ -1147,7 +1158,7 @@ export function useLiveKit() {
         await disposeBackgroundProcessor();
         await room.localParticipant.setCameraEnabled(false);
         await wait(80);
-        await room.localParticipant.setCameraEnabled(true, getVideoConstraint(undefined, useBackgroundSafeProfile));
+        await room.localParticipant.setCameraEnabled(true, getVideoConstraint(undefined, useBackgroundSafeProfile), PUBLICACION_DE_CAMARA);
         const isReady = await waitForCameraPublication(room, [100, 200, 400]);
         if (isReady) {
           refreshParticipants();
@@ -3094,7 +3105,7 @@ export function useLiveKit() {
           } catch {
             await room.localParticipant.setCameraEnabled(false);
             await wait(70);
-            await room.localParticipant.setCameraEnabled(true, getVideoConstraint(nextDeviceId, hasBackgroundEffect));
+            await room.localParticipant.setCameraEnabled(true, getVideoConstraint(nextDeviceId, hasBackgroundEffect), PUBLICACION_DE_CAMARA);
           }
 
           const isReady = await waitForCameraPublication(room, [80, 150, 300]);
