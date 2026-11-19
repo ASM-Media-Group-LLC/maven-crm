@@ -63,44 +63,43 @@ jobs:
           curl -sf -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" "https://api.supabase.com/v1/projects/$PROJECT_REF/secrets" \
             | jq -r '.[] | select(.name=="LIVEKIT_URL") | "LIVEKIT_URL vigente: " + (.value // "(la API no devuelve el valor)")' | tee -a "$GITHUB_STEP_SUMMARY"
 
-      - name: Revisar Miami contra St. Louis (ayer, misma hora)
+      - name: Revisar Miami (solo si las llamadas ya están en Miami)
         id: revisar
         if: steps.que.outputs.accion == 'revisar'
         run: |
           set -euo pipefail
+          # ¿Estamos en Miami? La API da el sha256 del valor del secreto.
+          VIG=$(curl -sf -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" "https://api.supabase.com/v1/projects/$PROJECT_REF/secrets" | jq -r '.[] | select(.name=="LIVEKIT_URL") | .value')
+          MIA=$(printf '%s' "$URL_MIAMI" | sha256sum | cut -d' ' -f1)
+          if [ "$VIG" != "$MIA" ] && [ "$VIG" != "$URL_MIAMI" ]; then
+            echo "Las llamadas no están en Miami: no hay nada que revisar." | tee -a "$GITHUB_STEP_SUMMARY"
+            echo "peor=false" >> "$GITHUB_OUTPUT"; exit 0
+          fi
+          # Dos pruebas, con la gente que ya está en Miami (últimos 50 min):
+          #  1) Ping medido desde el mismo computador a cada servidor (datos.regiones):
+          #     si Miami tarda más que St. Louis, es peor.
+          #  2) Conexión mala (poor/lost): si pasa de 12 % (el día normal en
+          #     St. Louis anda entre 3 y 11 %), es peor.
           SQL=$(cat <<'Q'
-          with ahora as (
-            select count(*) n,
-                   100.0 * avg((datos->>'calidad' in ('poor','lost'))::int) mala,
-                   percentile_cont(0.5) within group (order by nullif((datos->>'rtt_ms')::numeric,0)) rtt
-              from llamada_salud where creado > now() - interval '50 minutes'),
-          base as (
-            select count(*) n,
-                   100.0 * avg((datos->>'calidad' in ('poor','lost'))::int) mala,
-                   percentile_cont(0.5) within group (order by nullif((datos->>'rtt_ms')::numeric,0)) rtt
-              from llamada_salud where creado between now() - interval '1 day 50 minutes' and now() - interval '1 day')
-          select json_build_object('n', a.n, 'mala', round(a.mala,2), 'rtt', a.rtt,
-                                   'n_base', b.n, 'mala_base', round(b.mala,2), 'rtt_base', b.rtt) from ahora a, base b
+          select json_build_object(
+            'n', count(*),
+            'mala', round(100.0 * avg((datos->>'calidad' in ('poor','lost'))::int), 2),
+            'n_reg', count(*) filter (where datos ? 'regiones'),
+            'mia', percentile_cont(0.5) within group (order by nullif((datos->'regiones'->>'mia')::numeric, 0)),
+            'stl', percentile_cont(0.5) within group (order by nullif((datos->'regiones'->>'stl')::numeric, 0)))
+            from llamada_salud where creado > now() - interval '50 minutes'
           Q
           )
           R=$(curl -sf -X POST -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" -H "Content-Type: application/json" \
                "https://api.supabase.com/v1/projects/$PROJECT_REF/database/query" \
                -d "$(jq -n --arg q "$SQL" '{query:$q}')")
-          echo "$R"
           J=$(echo "$R" | jq -c '.[0].json_build_object')
-          N=$(echo "$J" | jq '.n'); NB=$(echo "$J" | jq '.n_base')
-          MALA=$(echo "$J" | jq '.mala // 0'); MALAB=$(echo "$J" | jq '.mala_base // 0')
-          RTT=$(echo "$J" | jq '.rtt // 0'); RTTB=$(echo "$J" | jq '.rtt_base // 0')
-          PEOR=$(jq -n --argjson n "$N" --argjson nb "$NB" --argjson m "$MALA" --argjson mb "$MALAB" --argjson r "$RTT" --argjson rb "$RTTB" \
-            'if $n < 200 or $nb < 200 then false else ($m > ($mb * 1.5 + 1)) or ($rb > 0 and $r > $rb * 1.2) end')
-          echo "Miami: $N muestras, mala $MALA %, ping $RTT ms · St. Louis ayer: $NB muestras, mala $MALAB %, ping $RTTB ms → peor=$PEOR"
+          N=$(echo "$J" | jq '.n'); MALA=$(echo "$J" | jq '.mala // 0'); NR=$(echo "$J" | jq '.n_reg')
+          MIAP=$(echo "$J" | jq '.mia // 0'); STLP=$(echo "$J" | jq '.stl // 0')
+          PEOR=$(jq -n --argjson n "$N" --argjson m "$MALA" --argjson nr "$NR" --argjson a "$MIAP" --argjson b "$STLP" \
+            'if $n < 200 then false else ($m > 12) or ($nr >= 20 and $a > 0 and $b > 0 and $a > $b) end')
+          echo "Miami: $N muestras, conexión mala $MALA % · ping medido: Miami $MIAP ms vs St. Louis $STLP ms ($NR mediciones) → peor=$PEOR" | tee -a "$GITHUB_STEP_SUMMARY"
           echo "peor=$PEOR" >> "$GITHUB_OUTPUT"
-          {
-            echo "### Revisión Miami vs St. Louis"
-            echo "- Miami (últimos 50 min): $N muestras, conexión mala $MALA %, ping $RTT ms"
-            echo "- St. Louis (ayer, misma hora): $NB muestras, conexión mala $MALAB %, ping $RTTB ms"
-            echo "- ¿Peor? $PEOR"
-          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Cambiar LIVEKIT_URL
         if: steps.que.outputs.accion == 'miami' || steps.que.outputs.accion == 'stlouis' || steps.revisar.outputs.peor == 'true'
