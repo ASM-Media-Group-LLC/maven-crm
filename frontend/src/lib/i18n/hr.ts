@@ -1868,6 +1868,7 @@ export const hr = {
   "hr.llamadas.nc.solo_puerta": { es: "Cancelación de ruido a medias", en: "Noise cancellation partial" },
   "hr.llamadas.nc.fallo": { es: "Cancelación de ruido falló", en: "Noise cancellation failed" },
   "hr.llamadas.nc.no_soportada": { es: "Su navegador no la soporta", en: "Their browser doesn't support it" },
+  "hr.llamadas.nc.apagada": { es: "La apagó la persona", en: "Turned off by the person" },
   "hr.llamadas.nc.sin_micro": { es: "Micrófono sin prender", en: "Microphone not on yet" },
   "hr.llamadas.nc.sinDato": { es: "Cancelación de ruido sin dato", en: "Noise cancellation: no data" },
 

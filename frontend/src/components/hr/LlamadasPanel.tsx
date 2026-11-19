@@ -49,6 +49,7 @@ const NC: Record<string, TranslationKey> = {
   fallo: "hr.llamadas.nc.fallo",
   no_soportada: "hr.llamadas.nc.no_soportada",
   sin_micro: "hr.llamadas.nc.sin_micro",
+  apagada: "hr.llamadas.nc.apagada",
 };
 const TIPO: Record<TipoCorte, TranslationKey> = {
   internet: "hr.llamadas.tipo.internet",

@@ -487,6 +487,8 @@ export const messenger = {
   "messenger.call.navegadorBloqueoDesc": { es: "Hay que habilitarlo desde el candado de la barra de direcciones.", en: "Turn it on from the lock icon in the address bar." },
   // La cancelación de ruido es obligatoria desde el 13/11/2026: ya no hay botón, solo esta nota.
   "messenger.call.cancelacionRuido": { es: "Cancelación de ruido", en: "Noise cancellation" },
+  "messenger.call.ncActivadaDesc": { es: "Quita teclado, ventilador y voces de fondo mientras hablas.", en: "Removes keyboard, fan and background voices while you talk." },
+  "messenger.call.ncDesactivadaDesc": { es: "Apagada: tu micrófono sale solo con el filtro del navegador.", en: "Off: your microphone goes out with just the browser's filter." },
   "messenger.call.ncSiempreActiva": { es: "Siempre activa", en: "Always on" },
   "messenger.call.ncSiempreActivaDesc": { es: "Quita teclado, ventilador y voces de fondo mientras hablas. No se puede apagar.", en: "Removes keyboard, fan and background voices while you talk. It can't be turned off." },
   "messenger.call.ncNoDisponible": { es: "No disponible", en: "Not available" },
