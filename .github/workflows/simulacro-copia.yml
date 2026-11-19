@@ -39,4 +39,4 @@ jobs:
           mkdir -p supabase/migrations
           rm -f supabase/migrations/*.sql
           cp esquema.sql supabase/migrations/20260101000000_esquema_produccion.sql
-          supabase db push --linked --include-all --yes
+          supabase db push --linked --include-all --yes --debug 2>&1 | grep -iE -B2 -A8 "error|failed" | head -80; exit ${PIPESTATUS[0]}
