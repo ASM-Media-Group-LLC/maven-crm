@@ -20,7 +20,7 @@ type Glob = (p: string, o: Record<string, unknown>) => Record<string, string>;
 const llamada = Object.values((import.meta as unknown as { glob: Glob }).glob("/frontend/src/pages/messenger/videocall/LiveKitCallView.tsx", { query: "?raw", import: "default", eager: true }))[0] ?? "";
 const tablero = Object.values((import.meta as unknown as { glob: Glob }).glob("/frontend/src/pages/cowork/CoworkHostDashboard.tsx", { query: "?raw", import: "default", eager: true }))[0] ?? "";
 const livekit = Object.values((import.meta as unknown as { glob: Glob }).glob("/frontend/src/hooks/useLiveKit.ts", { query: "?raw", import: "default", eager: true }))[0] ?? "";
-const migracion = Object.values((import.meta as unknown as { glob: Glob }).glob("/supabase/migrations/20261119010000_hub_supervisores_senal_y_avisos.sql", { query: "?raw", import: "default", eager: true }))[0] ?? "";
+const migracion = Object.values((import.meta as unknown as { glob: Glob }).glob("../../../../supabase/migrations/20261119012000_hub_supervisores_senal_y_avisos.sql", { query: "?raw", import: "default", eager: true }))[0] ?? "";
 const estadoChip = Object.values((import.meta as unknown as { glob: Glob }).glob("/frontend/src/pages/cowork/EstadoSupervisoresHub.tsx", { query: "?raw", import: "default", eager: true }))[0] ?? "";
 const avisosHub = Object.values((import.meta as unknown as { glob: Glob }).glob("/frontend/src/pages/cowork/AvisosEnElHub.tsx", { query: "?raw", import: "default", eager: true }))[0] ?? "";
 
