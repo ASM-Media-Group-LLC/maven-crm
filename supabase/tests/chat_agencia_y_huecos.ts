@@ -105,6 +105,8 @@ const FIXTURE_HASTA = "20260929180000";
 // el motivo. Si SÍ cambia el Messenger, lo que hay que hacer es sumar al fixture
 // lo que le falta.
 const NO_TOCAN_EL_MESSENGER: Record<string, string> = {
+  "20261119060000_posiciones_mandan.sql":
+    "Posiciones (Ajustes): toca user_roles (trigger de protegidos) y depende de posiciones_borrador, roles_config, monitor_config, drive_acceso_extra y auth.users, que estos fixtures no traen; no toca nada del Messenger. Se aplicó y comprobó en producción con la comparación antes/después.",
   "20261111120000_backstage_equipo.sql":
     "Backstage manda el equipo (POST /equipo/sync): el interruptor, la bitácora y las RPC api_equipo_*. Entra a " +
     "esta cadena solo porque cambia rol, nivel, horario y la papelera de profiles/user_roles y lee api_keys, pero " +
