@@ -81,6 +81,9 @@ export function armarHoyDelEquipo(
   donde: FilaDondeEsta[],
   llegadas: Map<string, string>,
   notas: Map<string, number | null>,
+  /** Quiénes tienen el horario confirmado (19/11/2026). Sin confirmar: ni tarde ni
+   *  falta. null = no se pudo leer → se mide como antes. */
+  confirmados: Set<string> | null = null,
 ): HoyDelEquipo {
   const personas: PersonaDeHoy[] = donde.map((f) => {
     const llegoAt = llegadas.get(f.user_id) ?? null;
@@ -90,7 +93,7 @@ export function armarHoyDelEquipo(
       equipo: f.equipo,
       entrada: f.entrada ? a12(f.entrada.slice(0, 5)) : null,
       llegoAt,
-      tardeMin: minutosTarde(f.entrada, llegoAt),
+      tardeMin: !confirmados || confirmados.has(f.user_id) ? minutosTarde(f.entrada, llegoAt) : null,
       estado: f.estado,
       estadoDesde: f.estado_desde,
       nota: notas.get(f.user_id) ?? null,
@@ -98,7 +101,7 @@ export function armarHoyDelEquipo(
   });
   const llegaron = personas.filter((p) => p.llegoAt)
     .sort((a, b) => Date.parse(a.llegoAt!) - Date.parse(b.llegoAt!));
-  const faltan = personas.filter((p) => !p.llegoAt && p.estado === "no_ha_entrado");
+  const faltan = personas.filter((p) => !p.llegoAt && p.estado === "no_ha_entrado" && (!confirmados || confirmados.has(p.userId)));
   const tarde = llegaron.filter((p) => p.tardeMin != null).sort((a, b) => b.tardeMin! - a.tardeMin!);
   // Mismo criterio que Presencia: rojo y naranja en su turno (gris = fuera de turno).
   const noTrabajan = personas.filter((p) => {

@@ -61,12 +61,23 @@ export function useHoyDelEquipo(habilitado: boolean) {
     },
   });
   const notasQ = useTurnoPersonas(hoy, 0, 24, habilitado);
+  // Horarios confirmados (19/11/2026): sin confirmar, ni tarde ni falta.
+  const confQ = useQuery({
+    enabled: habilitado,
+    queryKey: ["horarios-confirmados"],
+    staleTime: 60_000,
+    queryFn: async (): Promise<Set<string> | null> => {
+      const { data, error } = await (supabase as unknown as { from: (t: string) => { select: (c: string) => Promise<{ data: Array<{ user_id: string }> | null; error: unknown }> } })
+        .from("horario_confirmado").select("user_id");
+      return error ? null : new Set((data ?? []).map((c) => c.user_id));
+    },
+  });
 
   const datos: HoyDelEquipo | null = useMemo(() => {
-    if (!donde.data || !llegadasQ.data) return null;
+    if (!donde.data || !llegadasQ.data || confQ.isLoading) return null;
     const notas = new Map(notasQ.personas.map((p) => [p.userId, p.nota.valor]));
-    return armarHoyDelEquipo(donde.data, llegadasQ.data, notas);
-  }, [donde.data, llegadasQ.data, notasQ.personas]);
+    return armarHoyDelEquipo(donde.data, llegadasQ.data, notas, confQ.data ?? null);
+  }, [donde.data, llegadasQ.data, notasQ.personas, confQ.data, confQ.isLoading]);
 
   const fotos = useFotosDe((donde.data ?? []).map((f) => f.user_id)).data ?? {};
 

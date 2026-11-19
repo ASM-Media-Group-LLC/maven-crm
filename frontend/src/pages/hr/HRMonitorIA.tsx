@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
-import { useSearchParams } from "react-router-dom";
-import { Eye, Loader2, FileSpreadsheet } from "lucide-react";
+import { Link, useSearchParams } from "react-router-dom";
+import { Eye, Loader2, FileSpreadsheet, CalendarClock } from "lucide-react";
+import { useHorariosEquipo } from "@/hooks/useHorariosEquipo";
 import { useLanguage } from "@/hooks/useLanguage";
 import { useUserRole } from "@/hooks/useUserRole";
 import { useEsRh } from "@/hooks/useEsRh";
@@ -159,6 +160,7 @@ export default function HRMonitorIA() {
   const setTab = (k: TabArgos) => setSearchParams((prev) => { const n = new URLSearchParams(prev); n.set("t", k); return n; }, { replace: true });
 
   const monitorOff = config ? !config.activo : false;
+  const horariosEq = useHorariosEquipo();
 
   return (
     <Page>
@@ -168,6 +170,12 @@ export default function HRMonitorIA() {
         icon={<Eye className="h-5 w-5" />}
         actions={
           <>
+            {/* Horarios del equipo (19/11/2026): solo si tiene a alguien a cargo. */}
+            {(horariosEq.data?.length ?? 0) > 0 && (
+              <Button asChild variant="outline" size="sm" className="rounded-full">
+                <Link to="/hr/horarios-equipo"><CalendarClock className="h-4 w-4 sm:mr-1.5" /><span className="hidden sm:inline">{t("hr.horEq.abrir")}</span></Link>
+              </Button>
+            )}
             {vistaCompleta && (
               <Button variant="outline" size="sm" className="rounded-full" onClick={exportarHoras} disabled={exportar.isPending}>
                 {exportar.isPending ? <Loader2 className="h-4 w-4 animate-spin sm:mr-1.5" /> : <FileSpreadsheet className="h-4 w-4 sm:mr-1.5" />}

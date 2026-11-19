@@ -118,6 +118,7 @@ function PersonaTarjeta({ p, t, onClick }: { p: PersonaTurno; t: Tr; onClick: ()
             {p.entroHHMM ? t("hr.hist.entro", { h: p.entroHHMM }) : t("hr.hist.sinEntrada")}
             {tarde && <span className="inline-flex items-center gap-1 text-foreground/85"><span className="h-1.5 w-1.5 rounded-full bg-warning" aria-hidden />+{p.tardeMin} min</span>}
             {p.horasTurno > 0 && <span>· {p.horasTurno.toFixed(1)}h</span>}
+            {p.horarioSinConfirmar && <span className="text-muted-foreground/80">· {t("hr.hist.horarioSinConfirmar")}</span>}
           </p>
         </div>
         <div className="flex shrink-0 flex-col items-end">

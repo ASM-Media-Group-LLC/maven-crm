@@ -38,7 +38,11 @@ export function usePuntualidadSemana(habilitado: boolean) {
       // El horario de cada día (puede cambiar de un día a otro).
       const horarios = await Promise.all(dias.map((dia) => cargarHorarios(ids, dia)));
       const porDia = new Map(dias.map((dia, i) => [dia, horarios[i]]));
-      return contarPuntualidad(dias, hoy, filas, (dia, id) => porDia.get(dia)?.get(id)?.entrada ?? null);
+      // Solo cuenta la puntualidad de quien tiene el horario confirmado (19/11/2026).
+      return contarPuntualidad(dias, hoy, filas, (dia, id) => {
+        const h = porDia.get(dia)?.get(id);
+        return h?.confirmado ? h.entrada : null;
+      });
     },
   });
   return { dias: q.data ?? [], cargando: q.isLoading, fallo: q.isError, reintentar: () => void q.refetch() };

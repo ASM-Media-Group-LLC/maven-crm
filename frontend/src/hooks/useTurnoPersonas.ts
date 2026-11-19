@@ -32,6 +32,8 @@ export interface PersonaTurno {
   tardeMin: number | null;
   /** ¿Pantalla y cámara cuentan en su nota? (su puesto se califica y no está exonerado). */
   califica: boolean;
+  /** Su horario todavía no lo confirma RR. HH. ni su supervisor: no se le cuenta tarde. */
+  horarioSinConfirmar?: boolean;
   /** Sale en gris, sin nota y fuera del promedio de su caja (posiciones, 19/11/2026):
    *  no está obligado a cámara/pantalla o solo es Admin. */
   sinNota?: boolean;
@@ -185,7 +187,8 @@ export function useTurnoPersonas(dia: string, hDesde: number, hHasta: number, ha
         // Comparación SIEMPRE en hora Bogotá, no en la zona del navegador.
         const horPers = horarioDe(horarios, f.user_id);
         let tardeMin: number | null = null;
-        if (horPers.entrada && h) {
+        // Sin horario confirmado por RR. HH./supervisor no hay «tarde» (19/11/2026).
+        if (horPers.entrada && h && horPers.confirmado) {
           const [eh, em] = horPers.entrada.split(":").map(Number);
           const asignadoMin = eh * 60 + (em || 0);
           const [rh, rm] = hhmmBogota(h.primero).split(":").map(Number);
@@ -212,7 +215,7 @@ export function useTurnoPersonas(dia: string, hDesde: number, hHasta: number, ha
         const llamados = llamadosPor.get(f.user_id) ?? { n: 0, escalados: 0 };
         const nota = calcularNota({
           pantallaPct, camaraPct, atencionPct,
-          tardeMin: horPers.entrada ? tardeMin : undefined,
+          tardeMin: horPers.entrada && horPers.confirmado ? tardeMin : undefined,
           llamados: llamados.n, escalados: llamados.escalados,
           minFuera: (minFueraPor.get(f.user_id) ?? 0) + minSalioAntes,
         });
@@ -235,6 +238,7 @@ export function useTurnoPersonas(dia: string, hDesde: number, hHasta: number, ha
           entroHHMM: h ? a12(hhmmBogota(h.primero)) : null,
           salioHHMM: h ? a12(hhmmBogota(h.ultimo)) : null,
           tardeMin,
+          horarioSinConfirmar: !!horPers.entrada && !horPers.confirmado,
           turnoAsignado: turnoDeEntrada(horPers.entrada),
         };
       });
