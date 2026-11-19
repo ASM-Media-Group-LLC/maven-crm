@@ -50,6 +50,7 @@ import { useMyProfile, useRequestWhatsappVerification, useUpdateMyPhone, useUplo
 import ChangePasswordModal from "@/components/dashboard/ChangePasswordModal";
 import { TarjetaDeApariencia } from "@/components/ajustes/TarjetaDeApariencia";
 import { TarjetaHoraEmpresa } from "@/components/ajustes/TarjetaHoraEmpresa";
+import { TarjetaPosiciones } from "@/components/ajustes/TarjetaPosiciones";
 
 // Settings page — left rail with the user's role banner + tab list,
 // right side renders the active section. Layout matches the screenshot
@@ -260,6 +261,8 @@ const MyAccountTab = () => {
       <TarjetaDeApariencia />
       {/* La hora de toda la empresa: solo la ve el dueño (18/11/2026). */}
       <TarjetaHoraEmpresa />
+      {/* Posiciones y permisos al estilo Blu (borrador, solo el dueño). */}
+      <TarjetaPosiciones />
 
       <WhatsappPhoneCard
         currentValue={profileQ.data?.phone_e164 ?? null}
