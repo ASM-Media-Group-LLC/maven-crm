@@ -13,6 +13,7 @@ import "./lib/sinZoomAlEnfocar";
 import "./lib/codigosAlt";
 import { applyStoredSkin, applyStoredAppearance } from "./hooks/useSkin";
 import { instalarFormatoHora } from "./lib/formatoHora";
+import { instalarModoLiviano } from "./lib/modoLiviano";
 import { irAlDominioCanonico } from "./lib/dominioCanonico";
 import { traducir, cargarIdioma } from "./lib/i18n";
 import { idiomaInicial } from "./hooks/useLanguage";
@@ -31,6 +32,9 @@ irAlDominioCanonico();
 // (ui_prefs) — mismo contrato: local primero, el perfil sincroniza después.
 applyStoredSkin();
 applyStoredAppearance();
+// Modo liviano (19/11/2026): sin vidrio esmerilado ni animaciones sin fin en
+// equipos débiles, sin GPU o con la página fuera de la vista (lib/modoLiviano.ts).
+instalarModoLiviano();
 // La hora de la empresa (AM/PM o militar) en toda la plataforma (18/11/2026).
 instalarFormatoHora();
 

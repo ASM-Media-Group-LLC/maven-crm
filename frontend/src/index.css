@@ -1321,7 +1321,8 @@ All colors MUST be HSL. Light mode in :root, dark mode in .dark.
   background:
     radial-gradient(90% 70% at 50% 0%, hsl(var(--primary) / .1), transparent 60%),
     radial-gradient(120% 120% at 50% 28%, hsl(var(--card)), hsl(var(--background)));
-  -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px);
+  /* Sin backdrop-filter (19/11/2026): el fondo del tile es OPACO, así que el
+     blur no se veía nunca y se pagaba en cada cámara de Cowork. */
   box-shadow:
     inset 0 1px 0 hsl(0 0% 100% / .08),
     0 2px 8px -4px hsl(0 0% 0% / .55),
@@ -1466,8 +1467,12 @@ html:not(.dark) .avatar-iniciales { background: hsl(var(--av-h, 220) 72% 92%); c
 @keyframes vidrio-respira { 0%, 100% { opacity: .32; } 50% { opacity: .78; } }
 @keyframes vidrio-barra-crece { from { transform: scaleY(0); } to { transform: scaleY(1); } }
 .barra-crece { transform-origin: bottom; animation: vidrio-barra-crece .7s cubic-bezier(.2,.8,.2,1) both; }
-.fondo-glass { animation: vidrio-deriva 22s ease-in-out infinite alternate; }
-@keyframes vidrio-deriva { from { background-position: 50% 44%; } to { background-position: 50% 60%; } }
+/* La atmósfera YA NO deriva (19/11/2026, modo liviano). Mover el
+   background-position de un fondo fijo a pantalla completa obligaba a repintar
+   TODA la ventana en cada cuadro, todo el día, y a recalcular el blur del menú,
+   la barra y cada tarjeta de vidrio que tenía encima (el fondo detrás cambiaba).
+   Era el mayor gasto de CPU con la app quieta, por un movimiento de 16 % en
+   22 s que casi nadie notaba. El fondo se ve igual, quieto. */
 
 @media (prefers-reduced-motion: reduce) {
   .sube, .barra-crece, .fondo-glass { animation: none; }
@@ -1853,3 +1858,63 @@ html.en-escritorio .riel-logo { display: none; }
 html.escritorio-mac:has(.peer[data-state="collapsed"]) .barra-arrastrable { margin-left: 26px; }
 /* En la app no hay «Volver al inicio» (la portada es para el navegador). */
 html.en-escritorio .entrar-volver { display: none; }
+
+/* ─────────────────────────────────────────────────────────────────────
+   MODO LIVIANO (19/11/2026: «Maven abierto todo el día en un portátil
+   promedio o viejo, por debajo del 15 % de CPU»). La clase `liviano` en
+   <html> la pone lib/modoLiviano.ts cuando el equipo es débil (≤ 4 núcleos o
+   ≤ 4 GB), cuando el navegador dibuja sin GPU, cuando la persona pidió menos
+   movimiento y SIEMPRE que nadie ve la página (pestaña oculta o app
+   minimizada). En un equipo fuerte y a la vista, nada de esto aplica (salvo
+   el punto 4).
+
+   1. Sin vidrio esmerilado. Sin GPU, cada backdrop-filter se calcula con el
+      procesador en cada cuadro. Sobre la atmósfera (degradés suaves) el blur
+      casi no se nota: el mismo color translúcido, un poco más denso, se ve
+      igual. Lo que flota sobre CONTENIDO (panel de chats, dock de la llamada)
+      va casi opaco para que el texto se siga leyendo. Blanco puro y alto
+      contraste conservan su fondo propio. */
+html.liviano *:not(.pt *),
+html.liviano *:not(.pt *)::before,
+html.liviano *:not(.pt *)::after {
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+}
+html.liviano:not(.dark):not([data-blanco]):not([data-contrast="high"]) .vidrio { background: linear-gradient(160deg, rgba(255,255,255,.88), rgba(255,255,255,.74)); }
+html.liviano:not(.dark):not([data-blanco]):not([data-contrast="high"]) .vidrio-barra { background: linear-gradient(160deg, rgba(255,255,255,.86), rgba(255,255,255,.72)); }
+html.liviano.dark:not([data-contrast="high"]) .vidrio,
+html.liviano.dark:not([data-contrast="high"]) .vidrio-barra { background: linear-gradient(160deg, rgba(255,255,255,.10), rgba(255,255,255,.045)); }
+html.liviano .glass-panel,
+html.liviano.dark .glass-panel { background: hsl(var(--popover) / .97); }
+html.liviano:not(.dark) .tarjeta-sesion { background: radial-gradient(62% 80% at 92% 0%, hsl(var(--primary) / .07), transparent 60%), hsl(var(--card) / .9); }
+html.liviano .dock-estudio { background: hsl(var(--card) / .94); }
+html.liviano:not(.dark) [data-sidebar="sidebar"] { background-color: hsl(var(--sidebar-background) / .92); }
+
+/* 2. Sin animaciones que no terminan. Cada una repinta su pedazo de pantalla
+      unas 60 veces por segundo todo el día (el glow que respira en cada
+      tarjeta, el pulso de «en línea» en cada avatar, los puntitos que laten).
+      Dan una vuelta y se quedan quietas. La ruedita y la barra de «cargando»
+      siguen girando: esas avisan que algo está pasando y se van solas.
+      La portada pública (.pt) queda fuera de 1 y 2: se ve un rato, no 8 h. */
+html.liviano *:not(.animate-spin):not([class*="loading-bar"]):not([style*="giro"]):not(.pt *),
+html.liviano *:not(.pt *)::before,
+html.liviano *:not(.pt *)::after {
+  animation-iteration-count: 1 !important;
+}
+html.liviano .vidrio-glow::before { animation: none; opacity: .5; }
+html.liviano .glow-suave::before { opacity: .26; }
+
+/* 3. Con la página fuera de la vista no se mueve NADA (ni la ruedita). */
+html.liviano[data-liviano~="oculta"] *,
+html.liviano[data-liviano~="oculta"] *::before,
+html.liviano[data-liviano~="oculta"] *::after {
+  animation-play-state: paused !important;
+}
+
+/* 4. Vidrio dentro de vidrio, también en equipos fuertes: el de adentro
+      difumina algo que ya está difuminado (no se ve la diferencia) y cuesta
+      el doble. Solo el de afuera hace el blur. */
+:is(.vidrio, .vidrio-barra, .glass-panel, .tarjeta-sesion, [data-sidebar="sidebar"]) :is(.vidrio, .vidrio-barra, .tarjeta-sesion, .glass-card, .glass-card-subtle) {
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}

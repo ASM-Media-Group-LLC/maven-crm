@@ -5,6 +5,7 @@
 import { useEffect, useState } from "react";
 import { Phone, PhoneOff } from "lucide-react";
 import { useLanguage } from "@/hooks/useLanguage";
+import { useAhoraCadaSegundo } from "@/lib/ahoraCompartido";
 import {
   abrirCanalDeLlamada, aplicarMensaje, duracion, esMensajeDeLlamada, llamadasVivas,
   type LlamadaVista, type MensajeLlamada,
@@ -13,7 +14,6 @@ import {
 export function BarraDeLlamada() {
   const { t } = useLanguage();
   const [llamadas, setLlamadas] = useState<Record<string, LlamadaVista>>({});
-  const [ahora, setAhora] = useState(() => Date.now());
   const [canal, setCanal] = useState<BroadcastChannel | null>(null);
 
   useEffect(() => {
@@ -27,13 +27,10 @@ export function BarraDeLlamada() {
     return () => { c.close(); setCanal(null); };
   }, []);
 
+  // El reloj compartido, solo mientras hay alguna llamada (1 s a la vista, 30 s fuera).
+  const ahora = useAhoraCadaSegundo(Object.keys(llamadas).length > 0);
   const vivas = llamadasVivas(llamadas, ahora);
   const hay = vivas.length > 0;
-  useEffect(() => {
-    if (!hay && Object.keys(llamadas).length === 0) return;
-    const id = window.setInterval(() => setAhora(Date.now()), 1000);
-    return () => window.clearInterval(id);
-  }, [hay, llamadas]);
 
   if (!hay) return null;
   const llamada = vivas[0];

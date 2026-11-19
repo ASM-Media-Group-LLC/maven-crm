@@ -14,6 +14,7 @@ import { useCoworkMediaPresence, salirDePresencia } from "@/hooks/useCoworkMedia
 import { iniciarLatido, actualizarLatido, detenerLatido, suscribirReloj, leerReloj, alQuedarSinSala } from "@/lib/coworkLatido";
 import type { ConexionSala } from "@/lib/coworkTiempoRegla";
 import RelojCowork from "./RelojCowork";
+import { SegundosDesde } from "./RelojVivo";
 import GraciaCowork from "./GraciaCowork";
 import { usePestanaPrincipal } from "@/hooks/usePestanaPrincipal";
 import { esEstadoSupervisor, type EstadoSupervisor } from "@/lib/pausaSupervisor";
@@ -206,7 +207,6 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
   // Pausa (baño). El tiempo lo cuenta el cliente de quien está en pausa y viaja
   // por presence, así el coordinador lo ve en vivo aunque recargue su dashboard.
   const [breakStartedAt, setBreakStartedAt] = useState<number | null>(null);
-  const [breakElapsed, setBreakElapsed] = useState(0);
   // `conexionSala` es obligatoria en el tipo (y null hasta el primer aviso de la
   // sala): así el latido no puede salir sin decidir qué dice sobre la conexión.
   const lastMediaRef = useRef<{ micOn: boolean; camOn: boolean; screenShareOn: boolean; conexionSala: ConexionSala | null }>({
@@ -238,14 +238,9 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
   const refetchCowork = cowork.refetch;
   useEffect(() => alQuedarSinSala(() => { void refetchCowork(true); }), [refetchCowork]);
 
-
-  useEffect(() => {
-    if (!breakStartedAt) { setBreakElapsed(0); return; }
-    const tick = () => setBreakElapsed(Math.floor((Date.now() - breakStartedAt) / 1000));
-    tick();
-    const id = window.setInterval(tick, 1000);
-    return () => window.clearInterval(id);
-  }, [breakStartedAt]);
+  // El contador de la pausa NO vive aquí: un tic por segundo en esta vista la
+  // redibujaba entera (la sala, la llamada, los controles). Lo cuentan pedacitos
+  // <SegundosDesde> con el reloj compartido (pages/cowork/RelojVivo.tsx, 19/11/2026).
 
   const [breakKind, setBreakKind] = useState<"bano" | "break" | "almuerzo" | null>(null);
   const [breakLimite, setBreakLimite] = useState<number | null>(null);
@@ -1000,7 +995,7 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
               <>
                 <Coffee className="h-4 w-4" />
                 <span>{t(NOMBRE_PAUSA[breakKind ?? "bano"])} ·</span>
-                {(() => {
+                <SegundosDesde desde={breakStartedAt}>{(breakElapsed) => {
                   const c = cuentaPausa(breakElapsed, breakLimite, consumidoDe(breakKind));
                   return (
                     <span className={cn("tabular-nums", clasesPausa(c.estado))}>
@@ -1008,7 +1003,7 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
                       {c.excedida && <span className="ml-1 font-normal">{t("cowork.participant.over")}</span>}
                     </span>
                   );
-                })()}
+                }}</SegundosDesde>
               </>
             ) : (
               <span>
@@ -1039,7 +1034,7 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
               <DoorOpen className="h-3.5 w-3.5" /> {t("cowork.participant.goToMyRoom")}
             </button>
           )}
-          {breakStartedAt && (() => {
+          {breakStartedAt && <SegundosDesde desde={breakStartedAt}>{(breakElapsed) => {
             const c = cuentaPausa(breakElapsed, breakLimite, consumidoDe(breakKind));
             return (
               <button
@@ -1058,7 +1053,7 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
                 {c.texto}
               </button>
             );
-          })()}
+          }}</SegundosDesde>}
           {dismissedActiveRequest && !isInOneOnOne && (
             <Button variant="ghost" size="icon" className="text-warning animate-pulse rounded-full" onClick={handleReconnectPrivateCall}>
               <PhoneCall className="h-4 w-4" />
@@ -1087,10 +1082,10 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
                 <DropdownMenuItem onClick={() => toggleBreak()}>
                   <Coffee className="h-4 w-4 mr-2" />
                   <span>{t(NOMBRE_PAUSA[breakKind ?? "bano"])} ·&nbsp;</span>
-                  {(() => {
+                  <SegundosDesde desde={breakStartedAt}>{(breakElapsed) => {
                     const c = cuentaPausa(breakElapsed, breakLimite, consumidoDe(breakKind));
                     return <span className={cn("tabular-nums", clasesPausa(c.estado))}>{c.texto}</span>;
-                  })()}
+                  }}</SegundosDesde>
                 </DropdownMenuItem>
               ) : (
                 <>
@@ -1235,20 +1230,22 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
             y el resumen del día. En meet o llamada privada NO se tapa: ahí la
             persona está en una llamada activa aunque haya marcado pausa. */}
         {breakStartedAt && !meetRoom && !isInOneOnOne && (
-          <MiPausa
-            nombre={displayName}
-            kind={breakKind}
-            segundos={breakElapsed}
-            desde={breakStartedAt}
-            limiteMin={breakLimite}
-            consumidoPrevio={consumidoDe(breakKind)}
-            consumoHoy={consumoHoy}
-            limites={limitesPausa}
-            kindsResumen={KINDS_RESUMEN_PAUSA}
-            horaDesde={new Date(breakStartedAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}
-            onVolver={() => toggleBreak()}
-            t={t}
-          />
+          <SegundosDesde desde={breakStartedAt}>{(breakElapsed) => (
+            <MiPausa
+              nombre={displayName}
+              kind={breakKind}
+              segundos={breakElapsed}
+              desde={breakStartedAt}
+              limiteMin={breakLimite}
+              consumidoPrevio={consumidoDe(breakKind)}
+              consumoHoy={consumoHoy}
+              limites={limitesPausa}
+              kindsResumen={KINDS_RESUMEN_PAUSA}
+              horaDesde={new Date(breakStartedAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}
+              onVolver={() => toggleBreak()}
+              t={t}
+            />
+          )}</SegundosDesde>
         )}
 
         {/* Aviso del supervisor: va por encima de todo, incluso de la pausa. */}

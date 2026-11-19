@@ -4,6 +4,7 @@
 import { useEffect, useState } from "react";
 import { Timer, Pause } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useAhoraCadaSegundo } from "@/lib/ahoraCompartido";
 import { suscribirReloj, leerReloj } from "@/lib/coworkLatido";
 import { segundosMostrados, formatoReloj, type RelojCowork as Reloj } from "@/lib/coworkReloj";
 import { cuentaComoTrabajo } from "@/lib/coworkTiempoRegla";
@@ -13,15 +14,11 @@ import { claveMotivoDetenido } from "./textosCowork";
 /** Estado del reloj propio, con un tic por segundo mientras corre. */
 export function useRelojPropio(): { reloj: Reloj | null; segundos: number } {
   const [reloj, setReloj] = useState<Reloj | null>(() => leerReloj());
-  const [ahora, setAhora] = useState(() => Date.now());
   useEffect(() => suscribirReloj(setReloj), []);
   // Corre en lo que se paga: la regla es UNA (cuentaComoTrabajo), no una copia.
   const corre = !!reloj && cuentaComoTrabajo(reloj.estado);
-  useEffect(() => {
-    if (!corre) return;
-    const id = window.setInterval(() => setAhora(Date.now()), 1000);
-    return () => window.clearInterval(id);
-  }, [corre]);
+  // Un solo reloj para todos (lib/ahoraCompartido.ts): 1 s a la vista, 30 s fuera.
+  const ahora = useAhoraCadaSegundo(corre);
   return { reloj, segundos: segundosMostrados(reloj, corre ? ahora : Date.now()) };
 }
 
