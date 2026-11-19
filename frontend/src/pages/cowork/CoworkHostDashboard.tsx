@@ -1090,6 +1090,9 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
       roomName: hubRoom,
       displayName,
       callDisplayName: "Supervisor Hub",
+      // «Volver a Cowork» de la ventanita flotante (y doble clic en el video):
+      // de vuelta a esta misma sesión, donde el hueco del Hub la recibe.
+      volverA: cowork.session?.id ? `/cowork?session=${cowork.session.id}` : "/cowork",
       isAdmin: true,
       hideEndForAll: true,
       onLeave: colgarHub,

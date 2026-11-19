@@ -14,6 +14,8 @@ import RecordingControl, { leerMiGrabacion, detenerAlSalir } from "./RecordingCo
 import RoomAudioSink from "./RoomAudioSink";
 import { useAutoPiP } from "./useAutoPiP";
 import AvisoCaidasSeguidas from "./AvisoCaidasSeguidas";
+import MiPantallaCompartida from "./MiPantallaCompartida";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { suscribirOrdenesDePausa } from "@/lib/ordenesDePausa";
 
 import { Loader2, Wifi, WifiOff, Copy, ChevronLeft, ChevronRight, DoorOpen, Check, MonitorUp, LayoutGrid } from "lucide-react";
@@ -194,6 +196,10 @@ function usePunteroGrueso(): boolean {
 export default function LiveKitCallView({ roomName, displayName, callDisplayName, isAdmin = false, onLeave, initialMicOn = true, initialCamOn = true, initialScreenShareOn = false, initialAudioDeviceId, initialVideoDeviceId, initialAudioOutputDeviceId, initialBackgroundEffect = "none", hideShareLink, hideScreenShare, hideLeaveButton, leaveLabel, leaveIcon, suppressLeaveToast, compact, autoPip = true, autoLeaveOnEmpty, getToken, onMediaStateChange, onFaceStateChange, supervisorEncuadre, onLocalScreenTrack, pantallaSoloParaMi, pantallaVisiblePara, pantallaOpcional = false, camaraOpcional = false, pantallaPrestada = null, sinLatidoDeLlamada, incomingAudioMuted, roomSwitcher, recording, shareLink: shareLinkProp, accionesBarra, guardarChat, encima, hideEndForAll, controlesExtra, sinVideoAjeno = false, telemetria, sinVolverEnError = false, hubDelSupervisor = null, mosaicoDePantallas = false }: LiveKitCallViewProps) {
   // Lista de salas del navegador (solo Cowork supervisor+): estado del popup.
   const [salasAbiertas, setSalasAbiertas] = useState(false);
+  // Las flechas < > de cambiar de sala PREGUNTAN antes (Alvaro, 19/11/2026: en la
+  // ventanita un clic sin querer te sacaba de la sala). Aquí queda la sala a la
+  // que se quiere ir hasta que confirme o cancele.
+  const [salaPorConfirmar, setSalaPorConfirmar] = useState<{ id: string; name: string } | null>(null);
   // ⚠️ `lk` es un objeto NUEVO en cada dibujo (cambia con cada participante que
   // habla). En las dependencias de un efecto va la función estable que se usa
   // (`lk.getRoom`, `lk.disconnect`…), NUNCA `lk` entero: con `lk` el efecto se
@@ -1167,12 +1173,12 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
     ? Math.max(0, salasNavegables.findIndex((r) => r.id === roomSwitcher.currentId))
     : 0;
   const selectorDeSalas = salasNavegables && roomSwitcher ? (
-    <div className="relative flex items-center">
+    <div className="relative flex min-w-0 items-center">
       <button
         type="button"
         onClick={() => setSalasAbiertas((v) => !v)}
         title={t("messenger.callView.cambiarDeSala")}
-        className={`flex items-center gap-1.5 rounded-full bg-muted/60 px-2.5 py-1 text-xs font-medium text-foreground transition-colors hover:bg-muted ${effectiveCompact ? "max-w-[190px]" : "max-w-[240px]"}`}
+        className={`flex items-center gap-1.5 rounded-full bg-muted/60 px-2.5 py-1 text-xs font-medium text-foreground transition-colors hover:bg-muted ${effectiveCompact ? "min-w-0 max-w-[190px]" : "max-w-[240px]"}`}
       >
         <DoorOpen className="h-3.5 w-3.5 shrink-0" />
         <span className="truncate">{salasNavegables[salaActualIdx]?.name ?? t("messenger.callView.salas")}</span>
@@ -1201,18 +1207,29 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
       <CallTopBar roomName={callDisplayName || roomName} participantCount={cantidadDePersonas} onOpenAdjustView={() => setAdjustViewOpen(true)} shareLink={shareLink} hideShareLink={hideShareLink} compact={effectiveCompact} tactil={tactil} extra={selectorDeSalas} acciones={accionesBarra} esLlamada={roomName.startsWith("call-")} />
       {encima}
 
-      {lk.isReconnecting && (
-        <div className="shrink-0 flex items-center justify-center gap-2 py-1.5 bg-warning/15 text-warning text-xs font-medium">
-          <WifiOff className="h-3.5 w-3.5 animate-pulse" /> {t("messenger.callView.reconectando")}
+      {/* Los carteles de conexión van en su propia fila (shrink-0), nunca
+          encima del video. En la ventanita son UNA línea fina, con el texto
+          entero en el title: antes el de internet débil envolvía en tres líneas
+          y tapaba la pantalla y las cámaras (Alvaro, 19/11/2026). */}
+      {lk.isReconnecting && !lk.internetDebil && (
+        <div className={cn("shrink-0 flex items-center justify-center gap-2 bg-warning/15 text-warning font-medium", effectiveCompact ? "py-0.5 text-[11px]" : "py-1.5 text-xs")}>
+          <WifiOff className={cn("animate-pulse", effectiveCompact ? "h-3 w-3" : "h-3.5 w-3.5")} /> {t("messenger.callView.reconectando")}
         </div>
       )}
-      {/* «Solo avisarle» (Alvaro, 17/11/2026): con la conexión mala sostenida,
-          un aviso discreto que se va solo cuando mejora. No apaga nada
-          (lib/internetDebil.ts). */}
-      {lk.internetDebil && salaConectada && !lk.isReconnecting && (
-        <div role="status" className="shrink-0 flex items-center justify-center gap-2 py-1 px-3 bg-warning/10 text-warning text-xs font-medium text-center">
-          <Wifi className="h-3.5 w-3.5 shrink-0" aria-hidden="true" /> {t("messenger.callView.internetDebil")}
-        </div>
+      {/* «Tu internet está débil» SOLO cuando la llamada se cayó de verdad:
+          reconectando o en LOST más de 20 s (lib/internetDebil.ts). Un bajón
+          de calidad (POOR) no muestra nada. Solo avisa: no apaga nada. */}
+      {lk.internetDebil && !salaCaida && (
+        effectiveCompact ? (
+          <div role="status" title={t("messenger.callView.internetDebil")} className="shrink-0 flex items-center justify-center gap-1.5 py-0.5 px-2 bg-warning/10 text-warning text-[11px] font-medium whitespace-nowrap overflow-hidden">
+            <WifiOff className="h-3 w-3 shrink-0 animate-pulse" aria-hidden="true" />
+            <span className="truncate">{t("messenger.callView.internetDebilCorto")}</span>
+          </div>
+        ) : (
+          <div role="status" className="shrink-0 flex items-center justify-center gap-2 py-1 px-3 bg-warning/10 text-warning text-xs font-medium text-center">
+            <Wifi className="h-3.5 w-3.5 shrink-0" aria-hidden="true" /> {t("messenger.callView.internetDebil")}
+          </div>
+        )
       )}
       {/* «Tu internet se está cortando seguido» (lib/caidasSeguidas.ts): con 3
           caídas propias en 30 min, una vez por hora. Solo avisa. */}
@@ -1433,6 +1450,18 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
             </div>
           )}
 
+          {/* Tu propia pantalla, como en Meet (Alvaro, 19/11/2026): un cuadrito
+              chico con «Dejar de compartir», que se esconde en una pastilla.
+              Sale de la publicación ScreenShare del participante local. */}
+          {localScreenShare && localScreenTrack && (
+            <MiPantallaCompartida
+              track={localScreenTrack}
+              compacto={effectiveCompact}
+              onDejar={() => { void alternarPantallaDesdeBoton(); }}
+              negra={enHubVigilado ? pantallaNegra : undefined}
+            />
+          )}
+
 
         </div>
 
@@ -1504,7 +1533,7 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
               type="button"
               title={t("messenger.callView.irA", { name: anterior.name })}
               aria-label={t("messenger.callView.irA", { name: anterior.name })}
-              onClick={() => roomSwitcher.onSwitch(anterior.id)}
+              onClick={() => setSalaPorConfirmar(anterior)}
               className="absolute left-1.5 top-1/2 -translate-y-1/2 z-30 h-9 w-9 rounded-full flex items-center justify-center bg-black/45 text-white/85 backdrop-blur-sm hover:bg-black/65 hover:text-white transition-colors"
             >
               <ChevronLeft className="h-5 w-5" />
@@ -1513,15 +1542,50 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
               type="button"
               title={t("messenger.callView.irA", { name: siguiente.name })}
               aria-label={t("messenger.callView.irA", { name: siguiente.name })}
-              onClick={() => roomSwitcher.onSwitch(siguiente.id)}
+              onClick={() => setSalaPorConfirmar(siguiente)}
               className="absolute right-1.5 top-1/2 -translate-y-1/2 z-30 h-9 w-9 rounded-full flex items-center justify-center bg-black/45 text-white/85 backdrop-blur-sm hover:bg-black/65 hover:text-white transition-colors"
             >
               <ChevronRight className="h-5 w-5" />
             </button>
-
           </>
         );
       })()}
+      {/* Confirmar antes de cambiar de sala con las flechas. Va por encima de la
+          ventanita flotante (z-[150]) y, si la llamada está en la ventana del
+          sistema, se dibuja en ESE documento. */}
+      {roomSwitcher && (
+        <AlertDialog open={!!salaPorConfirmar} onOpenChange={(abierto) => { if (!abierto) setSalaPorConfirmar(null); }}>
+          <AlertDialogContent
+            container={rootRef.current?.ownerDocument?.body ?? null}
+            overlayClassName="z-[300]"
+            className="z-[310] max-w-sm"
+          >
+            <AlertDialogHeader>
+              <AlertDialogTitle className="flex items-center gap-2">
+                <DoorOpen className="h-5 w-5 shrink-0 text-primary" aria-hidden />
+                {t("messenger.callView.confirmarSala.titulo", { destino: salaPorConfirmar?.name ?? "" })}
+              </AlertDialogTitle>
+              <AlertDialogDescription>
+                {t("messenger.callView.confirmarSala.detalle", {
+                  actual: roomSwitcher.rooms.find((r) => r.id === roomSwitcher.currentId)?.name ?? (callDisplayName || roomName),
+                })}
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel />
+              <AlertDialogAction
+                onClick={() => {
+                  const destino = salaPorConfirmar;
+                  setSalaPorConfirmar(null);
+                  if (destino && destino.id !== roomSwitcher.currentId) roomSwitcher.onSwitch(destino.id);
+                }}
+              >
+                {t("messenger.callView.confirmarSala.cambiar")}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      )}
 
       <CallControls
         isMicOn={lk.isMicOn}

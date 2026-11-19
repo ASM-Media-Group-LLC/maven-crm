@@ -2,11 +2,13 @@ import {
   createContext, useCallback, useContext, useEffect, useMemo, useRef, useState,
 } from "react";
 import { createPortal } from "react-dom";
-import { Minimize2, Maximize2, PhoneOff, PictureInPicture2, GripHorizontal, Volume2, VolumeX } from "lucide-react";
+import { Minimize2, Maximize2, PhoneOff, PictureInPicture2, GripHorizontal, Volume2, VolumeX, Scaling, Undo2 } from "lucide-react";
+import { useInRouterContext, useNavigate } from "react-router-dom";
 import LiveKitCallView from "@/pages/messenger/videocall/LiveKitCallView";
 import { usePipWindow, docPipSupported } from "@/pages/cowork/usePipWindow";
 import { useLanguageSiHay } from "@/hooks/useLanguage";
 import { traducir } from "@/lib/i18n";
+import { TAMANOS_FLOTANTE, acotarTamano, siguienteTamano } from "@/lib/ventanitaFlotante";
 
 // Llamada que SOBREVIVE a cambiar de página.
 //
@@ -26,7 +28,12 @@ import { traducir } from "@/lib/i18n";
 // ventanita in-app funciona siempre; el botón de "sacar del navegador" queda a
 // un clic, que es cuando el navegador sí lo permite.
 
-type CallConfig = React.ComponentProps<typeof LiveKitCallView> & { key: string };
+type CallConfig = React.ComponentProps<typeof LiveKitCallView> & {
+  key: string;
+  /** Ruta a la que vuelve «Volver a Cowork» desde la ventanita (p. ej. el
+   *  Supervisor Hub: /cowork?session=…). Sin ruta, no hay botón. */
+  volverA?: string;
+};
 
 interface Ctx {
   /** Arranca (o reemplaza) la llamada persistente. */
@@ -80,10 +87,29 @@ export function CallOutlet({ className }: { className?: string }) {
 }
 
 const POS_KEY = "maven.call.float.pos";
+const SIZE_KEY = "maven.call.float.size";
+
+// Tamaños de la ventanita (tres fijos + mínimo + acotar): lib/ventanitaFlotante.ts.
+const TAMANO_INICIAL = TAMANOS_FLOTANTE[1];
+
+/** Deja en la ref el navigate del router. Va aparte porque el provider también
+ *  se monta sin router (en las pruebas) y useNavigate ahí revienta. */
+function NavegarEnRef({ destino }: { destino: React.MutableRefObject<((ruta: string) => void) | null> }) {
+  const navigate = useNavigate();
+  destino.current = navigate;
+  return null;
+}
 
 import { useCoworkRequestAlerts } from "@/hooks/useCoworkRequestAlerts";
 import { useAutoFlotante } from "@/hooks/useAutoFlotante";
 import { useReanudarMedia } from "@/hooks/useReanudarMedia";
+
+/** La config sin lo que es solo de la ventanita. */
+function sinVolverA(c: CallConfig): Omit<CallConfig, "volverA"> {
+  const { volverA: _v, ...resto } = c;
+  void _v;
+  return resto;
+}
 
 export function PersistentCallProvider({ children }: { children: React.ReactNode }) {
   // Las manos levantadas de Cowork suenan desde acá y no desde la pagina del
@@ -119,7 +145,28 @@ export function PersistentCallProvider({ children }: { children: React.ReactNode
   // mismo objeto —y React corta el render— cuando la posición ya estaba
   // acotada. Leerlo en el render lo dejaba viejo justo en ese caso.
   const [anchoPantalla, setAnchoPantalla] = useState(() => window.innerWidth);
-  const anchoFlotante = Math.min(minimizada ? 220 : 340, anchoPantalla - 16);
+  const [altoPantalla, setAltoPantalla] = useState(() => window.innerHeight);
+  const [tamano, setTamano] = useState<{ w: number; h: number }>(() => {
+    try {
+      const raw = window.localStorage.getItem(SIZE_KEY);
+      if (raw) {
+        const t = JSON.parse(raw) as { w?: unknown; h?: unknown };
+        if (typeof t.w === "number" && typeof t.h === "number") return { w: t.w, h: t.h };
+      }
+    } catch { /* sin tamaño guardado */ }
+    return { w: TAMANO_INICIAL.w, h: TAMANO_INICIAL.h };
+  });
+  const guardarTamano = useCallback((t: { w: number; h: number }) => {
+    try { window.localStorage.setItem(SIZE_KEY, JSON.stringify(t)); } catch { /* noop */ }
+  }, []);
+  // Lo que se dibuja: el tamaño elegido, acotado a la pantalla de ahora.
+  const tamanoVisible = acotarTamano(tamano, anchoPantalla, altoPantalla);
+  const anchoFlotante = minimizada ? Math.min(220, anchoPantalla - 16) : tamanoVisible.w;
+  const altoFlotante = minimizada ? 44 : tamanoVisible.h;
+  const tamanoRef = useRef(tamanoVisible);
+  tamanoRef.current = tamanoVisible;
+  const enRouter = useInRouterContext();
+  const navegarRef = useRef<((ruta: string) => void) | null>(null);
 
   // Traerla de vuelta a la pantalla: al montar (la posición guardada puede ser
   // de un monitor mucho más ancho) y cada vez que la ventana cambia de tamaño
@@ -127,9 +174,11 @@ export function PersistentCallProvider({ children }: { children: React.ReactNode
   useEffect(() => {
     const acotar = () => {
       setAnchoPantalla(window.innerWidth);
+      setAltoPantalla(window.innerHeight);
       setPos((p) => {
-      const ancho = Math.min(minimizada ? 220 : 340, window.innerWidth - 16);
-      const alto = minimizada ? 44 : 240;
+      const t = acotarTamano(tamanoRef.current, window.innerWidth, window.innerHeight);
+      const ancho = minimizada ? Math.min(220, window.innerWidth - 16) : t.w;
+      const alto = minimizada ? 44 : t.h;
       const x = Math.min(Math.max(8, p.x), Math.max(8, window.innerWidth - ancho - 8));
       const y = Math.min(Math.max(8, p.y), Math.max(8, window.innerHeight - alto - 8));
       return x === p.x && y === p.y ? p : { x, y };
@@ -142,7 +191,7 @@ export function PersistentCallProvider({ children }: { children: React.ReactNode
       window.removeEventListener("resize", acotar);
       window.removeEventListener("orientationchange", acotar);
     };
-  }, [minimizada]);
+  }, [minimizada, tamano]);
 
   const startCall = useCallback((next: CallConfig) => {
     setConfig(next);
@@ -198,6 +247,43 @@ export function PersistentCallProvider({ children }: { children: React.ReactNode
     // listener de pointermove pegado a window para siempre.
     window.addEventListener("pointercancel", soltar);
   }, [pos, floatEl]);
+
+  // Estirar la ventanita desde la esquina inferior derecha (mismo gesto que la
+  // del Hub dentro de Cowork: CoworkHostDashboard › startWindowResize).
+  const onResizeStart = useCallback((e: React.PointerEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const inicio = { x: e.clientX, y: e.clientY, w: tamanoRef.current.w, h: tamanoRef.current.h };
+    let ultimo: { w: number; h: number } | null = null;
+    const mover = (ev: PointerEvent) => {
+      // Que no se salga por la derecha ni por abajo desde donde está.
+      const t = acotarTamano(
+        { w: inicio.w + (ev.clientX - inicio.x), h: inicio.h + (ev.clientY - inicio.y) },
+        window.innerWidth - Math.max(0, pos.x - 8),
+        window.innerHeight - Math.max(0, pos.y - 8),
+      );
+      ultimo = t;
+      setTamano(t);
+    };
+    const soltar = () => {
+      window.removeEventListener("pointermove", mover);
+      window.removeEventListener("pointerup", soltar);
+      window.removeEventListener("pointercancel", soltar);
+      if (ultimo) guardarTamano(ultimo);
+    };
+    window.addEventListener("pointermove", mover);
+    window.addEventListener("pointerup", soltar);
+    window.addEventListener("pointercancel", soltar);
+  }, [pos, guardarTamano]);
+
+  // Los tres tamaños fijos, uno por clic.
+  const ciclarTamano = useCallback(() => {
+    const p = siguienteTamano(tamanoRef.current);
+    const t = { w: p.w, h: p.h };
+    setTamano(t);
+    guardarTamano(t);
+    setMinimizada(false);
+  }, [guardarTamano]);
 
   const ctx = useMemo<Ctx>(
     () => ({
@@ -283,15 +369,26 @@ export function PersistentCallProvider({ children }: { children: React.ReactNode
   // Reanudar el video y el audio despues de cada mudanza (ver el hook).
   useReanudarMedia(caja, destino, !!config);
 
+  // «Volver a Cowork»: a la página dueña de la llamada, donde su hueco la
+  // recibe de vuelta (la misma llamada, sin reconectar).
+  const volverA = config?.volverA ?? null;
+  const volver = useCallback(() => {
+    if (!volverA) return;
+    if (navegarRef.current) navegarRef.current(volverA);
+    else window.location.assign(volverA);
+  }, [volverA]);
+  const siguiente = siguienteTamano(tamanoVisible);
+
   return (
     <PersistentCallContext.Provider value={ctx}>
       {children}
+      {enRouter && <NavegarEnRef destino={navegarRef} />}
 
       {config && enFlotante && (
         <div
           ref={setFloatEl}
           className="fixed z-[150] rounded-2xl border border-border bg-card shadow-2xl overflow-hidden flex flex-col"
-          style={{ left: pos.x, top: pos.y, width: anchoFlotante, height: minimizada ? 44 : 240 }}
+          style={{ left: pos.x, top: pos.y, width: anchoFlotante, height: altoFlotante }}
         >
           <div
             className="flex items-center justify-between gap-1 px-2 py-1.5 bg-muted border-b border-border shrink-0 touch-none cursor-grab active:cursor-grabbing"
@@ -302,6 +399,18 @@ export function PersistentCallProvider({ children }: { children: React.ReactNode
               {config.callDisplayName || t("shared.floatCall.inCall")}
             </span>
             <span className="flex items-center gap-0.5 shrink-0">
+              {volverA && (
+                <button
+                  type="button"
+                  title={t("shared.floatCall.backToCoworkHint")}
+                  aria-label={t("shared.floatCall.backToCowork")}
+                  onClick={volver}
+                  className="h-6 flex items-center gap-1 rounded-md px-1.5 text-[11px] font-medium text-primary hover:bg-primary/10"
+                >
+                  <Undo2 className="h-3.5 w-3.5" aria-hidden />
+                  {anchoFlotante >= 400 && <span>{t("shared.floatCall.backToCowork")}</span>}
+                </button>
+              )}
               {/* Silencio local del audio entrante (p.ej. el Hub de Cowork).
                   Solo aparece si la llamada OPTÓ por el control (el dueño pasó
                   incomingAudioMuted en la config): en una llamada común no
@@ -338,6 +447,15 @@ export function PersistentCallProvider({ children }: { children: React.ReactNode
               )}
               <button
                 type="button"
+                title={t("shared.floatCall.size", { tamano: t(`shared.floatCall.${siguiente.id}`) })}
+                aria-label={t("shared.floatCall.size", { tamano: t(`shared.floatCall.${siguiente.id}`) })}
+                onClick={ciclarTamano}
+                className="h-6 w-6 rounded-md flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-background/60"
+              >
+                <Scaling className="h-3.5 w-3.5" />
+              </button>
+              <button
+                type="button"
                 title={minimizada ? t("shared.window.expand") : t("shared.window.minimize")}
                 aria-label={minimizada ? t("shared.window.expand") : t("shared.window.minimize")}
                 onClick={() => setMinimizada((v) => !v)}
@@ -356,8 +474,26 @@ export function PersistentCallProvider({ children }: { children: React.ReactNode
               </button>
             </span>
           </div>
-          {/* Acá adentro se porta la llamada cuando está flotante. */}
-          <div ref={setFloatSlot} className={minimizada ? "hidden" : "flex-1 min-h-0"} />
+          {/* Acá adentro se porta la llamada cuando está flotante. Doble clic
+              sobre el video (no sobre un botón) = volver a Cowork. */}
+          <div
+            ref={setFloatSlot}
+            className={minimizada ? "hidden" : "flex-1 min-h-0"}
+            onDoubleClick={volverA ? (e) => {
+              if ((e.target as HTMLElement).closest("button, a, input, select, textarea, [role='button'], [role='dialog']")) return;
+              volver();
+            } : undefined}
+          />
+          {!minimizada && (
+            <div
+              role="separator"
+              aria-label={t("shared.floatCall.resize")}
+              title={t("shared.floatCall.resize")}
+              onPointerDown={onResizeStart}
+              className="absolute bottom-0 right-0 z-[5] h-4 w-4 cursor-nwse-resize touch-none"
+              style={{ background: "linear-gradient(135deg, transparent 50%, hsl(var(--muted-foreground) / 0.55) 50%)" }}
+            />
+          )}
         </div>
       )}
 
@@ -390,7 +526,7 @@ export function PersistentCallProvider({ children }: { children: React.ReactNode
           cambiar de página mueve el video, no lo reinicia. La caja es la que
           viaja al hueco / a la ventanita / a la ventana del sistema. */}
       {config && createPortal(
-        <LiveKitCallView {...config} compact={enFlotante || !!pipWindow} autoPip={!docPipSupported()} />,
+        <LiveKitCallView {...sinVolverA(config)} compact={enFlotante || !!pipWindow} autoPip={!docPipSupported()} />,
         caja,
       )}
     </PersistentCallContext.Provider>

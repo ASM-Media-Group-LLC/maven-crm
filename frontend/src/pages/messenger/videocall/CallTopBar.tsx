@@ -51,7 +51,9 @@ export default function CallTopBar({
 
   return (
     <div className={cn("shrink-0 flex items-center justify-between bg-background", compact ? "px-2 py-1" : "px-4 py-2")}>
-      <div className={cn("flex items-center", compact ? "gap-2" : "gap-3")}>
+      {/* `min-w-0`: en la ventanita el nombre se recorta y el conteo de gente
+          sigue a la vista (antes lo empujaba fuera). */}
+      <div className={cn("flex min-w-0 items-center", compact ? "gap-2" : "gap-3")}>
         {/* Con selector de sesiones/salas, el selector VA EN LUGAR del nombre:
             el selector ya dice dónde estás, y en el Supervisor Hub el nombre
             además se repetía con el título de la ventanita, uno debajo del otro
@@ -80,8 +82,8 @@ export default function CallTopBar({
         )}
       </div>
 
-      <div className="flex items-center gap-1">
-        <span className={cn("text-muted-foreground mr-1", compact ? "text-[10px]" : "text-xs mr-2")}>
+      <div className="flex shrink-0 items-center gap-1">
+        <span className={cn("text-muted-foreground mr-1 whitespace-nowrap", compact ? "text-[10px]" : "text-xs mr-2")}>
           {participantCount === 1 ? t("messenger.topbar.unParticipante") : t("messenger.metrics.nParticipantes", { n: participantCount })}
         </span>
         {acciones}

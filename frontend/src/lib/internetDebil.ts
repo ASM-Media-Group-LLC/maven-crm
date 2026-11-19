@@ -1,3 +1,5 @@
+import { ConnectionQuality, ConnectionState } from "livekit-client";
+
 // «TU INTERNET ESTÁ DÉBIL» (Alvaro, 17/11/2026: «solo avisarle»).
 //
 // Cuando la conexión de alguien está mala en la llamada, se le avisa con un
@@ -14,6 +16,19 @@
 // si de verdad se corta»). Medido ese día: el codificador «limitado por ancho de
 // banda» salía el 22 % del tiempo y es normal (la calidad se acomoda sola), así
 // que ya NO cuenta. Solo cuenta la conexión en POOR o LOST, y 20 s seguidos.
+//
+// 19/11/2026 (Alvaro, ventanita del Hub: «solo cuando de verdad se cae»). Un
+// bajón de calidad (POOR) ya NO cuenta: no se muestra nada. Solo cuenta la
+// llamada CAÍDA de verdad: reconectando, o conectada pero con la conexión en
+// LOST, y sostenido más de 20 s. Desconectada del todo la maneja su propio
+// cartel (salaCaida en LiveKitCallView), no este.
+
+/** ¿La llamada está caída de verdad con esta lectura? Lo que alimenta a siguienteDebil. */
+export function llamadaCaida(estado: ConnectionState, calidad: ConnectionQuality): boolean {
+  if (estado === ConnectionState.Reconnecting || estado === ConnectionState.SignalReconnecting) return true;
+  return estado === ConnectionState.Connected && calidad === ConnectionQuality.Lost;
+}
+
 /** Cuánto tiene que durar lo malo para que salga el cartel. */
 export const DEBIL_SOSTENIDO_MS = 20_000;
 /** Cuánto tiene que durar lo bueno para que se vaya. */
