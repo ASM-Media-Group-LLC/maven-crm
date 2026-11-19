@@ -23,6 +23,10 @@ import { pedirApagarPorPausa, pedirReanudarTrasPausa } from "@/lib/ordenesDePaus
 import { marcarPausa } from "@/lib/coworkPausa";
 import { fijarReglas, normalizarReglas } from "@/lib/coworkReglas";
 import { useMisExigencias } from "@/hooks/useExigencias";
+import { useMiGracia } from "@/hooks/useGracia";
+import { resumenGracia } from "@/lib/gracia";
+import { minutosDisponibles, momentoPrivadoGuardado } from "@/lib/momentoPrivado";
+import { BotonMomentoPrivado, ItemMomentoPrivado, useAvisoFinMomentoPrivado } from "@/components/cowork/BotonMomentoPrivado";
 import { cn } from "@/lib/utils";
 import { rpcBanoConsumido, rpcConsumoPausas, leerLimitesPausa } from "@/lib/coworkTablas";
 import MiPausa, { type TipoPausa } from "./MiPausa";
@@ -81,8 +85,10 @@ function relojParaPresencia(): { relojEstado: string | null; relojSegundosHoy: n
 // pantalla o cámara de quien no las tiene obligatorias. Vive a nivel de módulo
 // por lo mismo que el reloj: la presencia se publica desde varios lugares.
 let exigenciasVigentes: { exigeCamara: boolean; exigePantalla: boolean } = { exigeCamara: true, exigePantalla: true };
-function exigenciasParaPresencia(): { exigeCamara: boolean; exigePantalla: boolean } {
-  return exigenciasVigentes;
+function exigenciasParaPresencia(): { exigeCamara: boolean; exigePantalla: boolean; momentoPrivadoHasta: number | null } {
+  // Y si está en un «Momento privado», hasta cuándo: el supervisor no recibe
+  // alarmas de cámara ni pantalla mientras dure (lib/momentoPrivado).
+  return { ...exigenciasVigentes, momentoPrivadoHasta: momentoPrivadoGuardado() };
 }
 
 // Qué pausas muestra el resumen "Hoy en pausas" de la pantalla de pausa propia.
@@ -307,8 +313,25 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
   useEffect(() => {
     exigenciasVigentes = { exigeCamara, exigePantalla };
     const r = normalizarReglas(alertRulesDeSesion);
-    fijarReglas({ ...r, camara: { ...r.camara, activa: exigeCamara }, pantalla: { ...r.pantalla, activa: exigePantalla } });
+    // Y Argos le habla al minuto y le insiste cada 2 (al 3.er llamado reporta):
+    // lo decidió Alvaro para todos (19/11/2026), no cada sala.
+    fijarReglas({
+      ...r,
+      camara: { ...r.camara, activa: exigeCamara, primerAvisoSeg: 60, repetirSeg: 120 },
+      pantalla: { ...r.pantalla, activa: exigePantalla, primerAvisoSeg: 60, repetirSeg: 120 },
+    });
   }, [alertRulesDeSesion, exigeCamara, exigePantalla]);
+
+  // «Momento privado» (19/11/2026): dura lo que le quede de gracia en lo que su
+  // puesto pide (la menor de cámara y pantalla). Sin gracia, no hay botón activo.
+  const { gracia: miGracia } = useMiGracia(!!connectedLkRoom);
+  const minutosPrivado = (() => {
+    if (!miGracia || miGracia.aplica === false) return null;
+    const r = resumenGracia(miGracia);
+    return minutosDisponibles({ camara: exigeCamara, pantalla: exigePantalla }, { camara: r.camara.queda, pantalla: r.pantalla.queda });
+  })();
+  const conMomentoPrivado = exigeCamara || exigePantalla;
+  useAvisoFinMomentoPrivado();
   // Los topes salen de la BASE (cowork_break_limits), no de un número escrito
   // acá. El menú decía "Break (30 min)" y "Baño" a secas: si mañana alguien
   // cambia el tope en la tabla, el cartel seguiría prometiendo lo viejo.
@@ -1013,6 +1036,9 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
           <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-foreground hover:bg-muted gap-1.5 rounded-full" disabled={!!myOpenRequest || isInOneOnOne} onClick={handleRequestOneOnOne}>
             <Phone className="h-4 w-4" /> {isInOneOnOne ? t("cowork.participant.inPrivateCall") : t("cowork.participant.privateCallShort")}
           </Button>
+          {conMomentoPrivado && (
+            <BotonMomentoPrivado minutos={minutosPrivado} deshabilitado={!!breakStartedAt || isInOneOnOne || !!meetRoom || !connectedLkRoom} />
+          )}
           <Button
             variant="ghost"
             size="sm"
@@ -1104,6 +1130,9 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
                 <Phone className="h-4 w-4 mr-2" />
                 {isInOneOnOne ? t("cowork.participant.inPrivateCall") : t("cowork.participant.privateCallWithSupervisor")}
               </DropdownMenuItem>
+              {conMomentoPrivado && (
+                <ItemMomentoPrivado minutos={minutosPrivado} deshabilitado={!!breakStartedAt || isInOneOnOne || !!meetRoom || !connectedLkRoom} />
+              )}
               <DropdownMenuItem onClick={() => setCodigoAbierto(true)}>
                 <KeyRound className="h-4 w-4 mr-2" />
                 {t("cowork.page.enterWithCode")}

@@ -276,6 +276,12 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
       const lp = l.getRoom()?.localParticipant;
       return typeof lp?.isMicrophoneEnabled === "boolean" ? lp.isMicrophoneEnabled : l.isMicOn;
     };
+    if (orden === "soltar") {
+      // Fin de un momento privado: nada se prende solo. Si además está en pausa,
+      // manda la pausa (lo que guardó se usa al volver de ella).
+      if (!estaEnPausa()) { antesDePausaRef.current = null; setPantallaPendiente(null); }
+      return;
+    }
     if (orden === "apagar") {
       if (!conSala) { antesDePausaRef.current = null; setPantallaPendiente(null); return; }
       const mic = micReal();

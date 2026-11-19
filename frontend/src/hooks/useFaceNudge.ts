@@ -6,6 +6,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { playMessageNotification } from "@/lib/notificationSound";
 import { anunciar } from "@/lib/anunciarVoz";
 import { estaEnPausa } from "@/lib/coworkPausa";
+import { estaEnMomentoPrivado } from "@/lib/momentoPrivado";
 import { estaEnLlamadaDeMaven } from "@/lib/llamadaEnMaven";
 import { reglasActuales, reglaDeEstado } from "@/lib/coworkReglas";
 import { traducir, type TranslationKey } from "@/lib/i18n";
@@ -171,7 +172,8 @@ export function useFaceNudge(
       // página de Cowork, que puede no estar montada cuando esto corre.
       // Y una llamada de Maven en curso (Messenger/Meet/1:1) silencia igual
       // que la pausa: la cámara está EN esa llamada, no ausente (Grace, 01/09).
-      if (enPausaProp || estaEnPausa() || estaEnLlamadaDeMaven() || !estaEnTurno()) {
+      // Y en un «Momento privado» (19/11/2026) Argos no insiste: gasta su gracia.
+      if (enPausaProp || estaEnPausa() || estaEnMomentoPrivado() || estaEnLlamadaDeMaven() || !estaEnTurno()) {
         ultimoAviso.current = 0;
         llamados.current = 0;
         avisadoCoordinador.current = false;
@@ -343,7 +345,7 @@ export function useScreenShareNudge(compartiendo: boolean, activo: boolean) {
       // La pausa se consulta en cada tic, igual que en el encuadre: quien
       // avisó que se iba no tiene por qué estar compartiendo nada. Y en una
       // llamada de Maven tampoco se reclama pantalla: la misma regla que arriba.
-      if (estaEnPausa() || estaEnLlamadaDeMaven() || !estaEnTurno()) { desde.current = null; ultimo.current = 0; llamados.current = 0; return; }
+      if (estaEnPausa() || estaEnMomentoPrivado() || estaEnLlamadaDeMaven() || !estaEnTurno()) { desde.current = null; ultimo.current = 0; llamados.current = 0; return; }
       // La regla de la sesión, en cada tic. Apagada = acá no se pide pantalla:
       // se olvida el reloj para que, si la vuelven a encender, cuente desde ahí
       // y no desde que la persona entró.
