@@ -196,11 +196,12 @@ export function useExpedienteEmpleado(userId: string | null, anio: number, mes: 
         }
         d.llamadosArgos = ll.n;
         d.escaladosArgos = ll.escalados;
-        d.tardeMinNota = horarioUser.entrada && d.entroAt ? minutosTarde(horarioUser.entrada, d.entroAt) : undefined;
+        // Sin horario confirmado no se cuenta tarde (19/11/2026).
+        d.tardeMinNota = horarioUser.entrada && horarioUser.confirmado && d.entroAt ? minutosTarde(horarioUser.entrada, d.entroAt) : undefined;
         d.minFueraPuesto = (d.minFueraCowork ?? 0) + salioAntes;
         d.nota = calcularNota({
           pantallaPct, camaraPct, atencionPct,
-          tardeMin: horarioUser.entrada && d.entroAt ? minutosTarde(horarioUser.entrada, d.entroAt) : undefined,
+          tardeMin: horarioUser.entrada && horarioUser.confirmado && d.entroAt ? minutosTarde(horarioUser.entrada, d.entroAt) : undefined,
           llamados: hayTiempo ? ll.n : undefined,
           escalados: ll.escalados,
           minFuera: hayTiempo ? (d.minFueraCowork ?? 0) + salioAntes : undefined,

@@ -20,9 +20,12 @@ export interface HorarioResuelto {
   entrada: string | null; // HH:MM:SS del horario asignado (persona o rol); null si no hay
   salida: string | null;
   toleranciaMin: number;  // minutos de gracia antes de contar "tarde"; default 5
+  /** ¿RR. HH. o su supervisor ya confirmó este horario? Sin confirmar, Argos no le
+   *  cuenta llegadas tarde (Alvaro, 19/11/2026). */
+  confirmado: boolean;
 }
 
-const DEFAULT: HorarioResuelto = { jornadaHoras: 8, exentoSeg: 40 * 60, entrada: null, salida: null, toleranciaMin: 5 };
+const DEFAULT: HorarioResuelto = { jornadaHoras: 8, exentoSeg: 40 * 60, entrada: null, salida: null, toleranciaMin: 5, confirmado: false };
 
 interface RolSched { name: string; hora_entrada: string | null; hora_salida: string | null; comida_min: number | null; bano_min: number | null; tolerancia_min: number | null }
 interface PerfilSched { id: string; hora_entrada: string | null; hora_salida: string | null; comida_min: number | null; bano_min: number | null; turno_id: string | null }
@@ -71,13 +74,17 @@ export async function cargarHorarios(ids: string[], fecha?: string): Promise<Map
   const out = new Map<string, HorarioResuelto>();
   if (ids.length === 0) return out;
 
-  const [perfRes, rolesRes, rolSchedRes, turnosRes, semanaRes] = await Promise.all([
+  const [perfRes, rolesRes, rolSchedRes, turnosRes, semanaRes, confRes] = await Promise.all([
     sinTipar.from("profiles").select("id, hora_entrada, hora_salida, comida_min, bano_min, turno_id").in("id", ids),
     sinTipar.from("user_roles").select("user_id, role").in("user_id", ids),
     sinTipar.from("roles_config").select("name, hora_entrada, hora_salida, comida_min, bano_min, tolerancia_min").eq("is_active", true),
     sinTipar.from("rol_turnos").select("id, role, nombre, hora_entrada, hora_salida"),
     sinTipar.from("horario_semanal").select("user_id, dia, entrada, salida").in("user_id", ids),
+    sinTipar.from("horario_confirmado").select("user_id").in("user_id", ids),
   ]);
+  // Confirmados (19/11/2026). Si la lectura falla no se sabe: se sigue como antes
+  // (se mide la puntualidad) en vez de borrar de golpe todas las llegadas tarde.
+  const confirmados: Set<string> | null = confRes.error ? null : new Set(((confRes.data ?? []) as Array<{ user_id: string }>).map((c) => c.user_id));
   // Si la lectura del horario por semana falla (por ejemplo, la tabla todavía no está
   // porque la migración no se aplicó), se sigue con el horario de siempre, como con las
   // otras lecturas de aquí: es un cálculo, no una lista que diga «no hay nada».
@@ -117,7 +124,7 @@ export async function cargarHorarios(ids: string[], fecha?: string): Promise<Map
     // Tolerancia de tardanza: el MAYOR entre sus roles; si no tiene, default 5 min.
     const tolsRol = roles.map((r) => r.tolerancia_min).filter((n): n is number => n != null);
     const toleranciaMin = tolsRol.length ? Math.max(...tolsRol) : 5;
-    out.set(id, { jornadaHoras, exentoSeg: (Math.max(0, comida) + Math.max(0, bano)) * 60, entrada, salida, toleranciaMin });
+    out.set(id, { jornadaHoras, exentoSeg: (Math.max(0, comida) + Math.max(0, bano)) * 60, entrada, salida, toleranciaMin, confirmado: confirmados ? confirmados.has(id) : true });
   }
   return out;
 }

@@ -12,6 +12,7 @@ import { AvisoSoloApp } from "@/components/CoworkSoloApp";
 import { AbrirEnApp } from "@/components/AbrirEnApp";
 import { AvisoActualizacionApp } from "@/components/AvisoActualizacionApp";
 import { CartelVersionNueva } from "@/components/CartelVersionNueva";
+import { HorariosObligatorios } from "@/components/horarios/HorariosObligatorios";
 import { RelojDeLaEmpresa } from "@/components/ajustes/TarjetaHoraEmpresa";
 import { NovedadesApp } from "@/components/NovedadesApp";
 import { AppLiviana } from "@/components/AppLiviana";
@@ -192,6 +193,7 @@ const HROffboarding = lazy(() => import("./pages/hr/HROffboarding"));
 const HROffboardingNew = lazy(() => import("./pages/hr/HROffboardingNew"));
 const HRMonitoring = lazy(() => import("./pages/hr/HRMonitoring"));
 const HRMonitorIA = lazy(() => import("./pages/hr/HRMonitorIA"));
+const HorariosEquipo = lazy(() => import("./pages/hr/HorariosEquipo"));
 const HRExpediente = lazy(() => import("./pages/hr/HRExpediente"));
 const EnVivoPersona = lazy(() => import("./pages/hr/EnVivoPersona"));
 const ArgosComparativo = lazy(() => import("./pages/hr/ArgosComparativo"));
@@ -306,6 +308,8 @@ const App = () => (
             <AvisoActualizacionApp />
             {/* Versión nueva de la página: cartel en el centro (18/11/2026). */}
             <CartelVersionNueva />
+            {/* RR. HH.: confirmar el horario de cada persona, no se quita (19/11/2026). */}
+            <HorariosObligatorios />
             {/* La hora que eligió el dueño (AM/PM o militar), 18/11/2026. */}
             <RelojDeLaEmpresa />
             <NovedadesApp />
@@ -511,6 +515,7 @@ const App = () => (
                 <Route path="/hr/monitoreo" element={<PermissionRoute module="HR" submodule="Monitoreo"><HRLayout><HRMonitoring /></HRLayout></PermissionRoute>} />
                 {/* Argos: dueño, admins, RR. HH. y supervisores (ve_argos); la RLS filtra a quién ve cada uno. Ajustes, solo el dueño. */}
                 <Route path="/hr/monitor-ia" element={<PermissionRoute module="HR" submodule="Monitor IA" argos><HRLayout><HRMonitorIA /></HRLayout></PermissionRoute>} />
+                <Route path="/hr/horarios-equipo" element={<PermissionRoute module="HR" submodule="Monitor IA" argos><HRLayout><HorariosEquipo /></HRLayout></PermissionRoute>} />
                 <Route path="/hr/expediente/:userId" element={<PermissionRoute module="HR" submodule="Monitor IA" argos><HRLayout><HRExpediente /></HRLayout></PermissionRoute>} />
                 {/* La vista en vivo de una persona (Alvaro, 11/11): a donde llevan los avisos
                     de Argos y de «se salió de Cowork». Dueño, RR. HH. y supervisores (su equipo). */}
