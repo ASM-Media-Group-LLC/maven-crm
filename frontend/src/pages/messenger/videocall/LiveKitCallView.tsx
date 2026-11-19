@@ -854,13 +854,21 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
   const appDeComputador = escritorio();
   // Con la pantalla opcional (el grupo de Luis) no se comparte sola: la
   // comparten cuando quieren (Alvaro, 18/11/2026).
-  const pantallaSola = !!supervisorEncuadre && !pantallaOpcional && !hideScreenShare && typeof appDeComputador?.pantallaAutomatica === "function";
+  // Fuera del turno no se comparte sola (19/11/2026: «nadie mira fuera del turno»).
+  const pantallaSola = !!supervisorEncuadre && !pantallaOpcional && !hideScreenShare && enTurno && typeof appDeComputador?.pantallaAutomatica === "function";
   useEffect(() => {
     if (!pantallaSola) return;
     const app = escritorio();
     app?.pantallaAutomatica?.(true);
     return () => { app?.pantallaAutomatica?.(false); };
   }, [pantallaSola]);
+  // Al salir del turno (marcó salida, se cerró solo o se le acabó el horario) en
+  // Cowork se deja de compartir la pantalla en ese momento: nadie la ve en vivo.
+  useEffect(() => {
+    if (enTurno || !supervisorEncuadre) return;
+    const l = lkRef.current;
+    if (l?.isScreenSharing) void l.toggleScreenShare();
+  }, [enTurno, supervisorEncuadre]);
   const intentoPantallaRef = useRef({ enCurso: false, ultimo: 0, fallos: 0 });
   // EN EL HUB, QUITARLA A MANO SE RESPETA (Alvaro, 18/11/2026: «la pueden
   // apagar, pero cuenta como que no comparten»). Mientras esté así no se vuelve
