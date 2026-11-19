@@ -32,6 +32,9 @@ export interface PersonaTurno {
   tardeMin: number | null;
   /** ¿Pantalla y cámara cuentan en su nota? (su puesto se califica y no está exonerado). */
   califica: boolean;
+  /** Sale en gris, sin nota y fuera del promedio de su caja (posiciones, 19/11/2026):
+   *  no está obligado a cámara/pantalla o solo es Admin. */
+  sinNota?: boolean;
   /** Llamados de atención de Argos en el turno (nota v3). */
   llamados: number;
   /** Minutos fuera de su puesto en el turno: fuera de Cowork + salir antes (nota v3). */

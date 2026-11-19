@@ -1451,6 +1451,13 @@ export const hr = {
   "hr.hist.secTarde": { es: "Llegó tarde · {n}", en: "Arrived late · {n}" },
   "hr.hist.secATiempo": { es: "A tiempo · {n}", en: "On time · {n}" },
   "hr.hist.volver": { es: "Volver al historial", en: "Back to history" },
+  // Jornada por posición (19/11/2026)
+  "hr.hist.posicionesBtn": { es: "Posiciones", en: "Positions" },
+  "hr.hist.volverPosiciones": { es: "Volver a posiciones", en: "Back to positions" },
+  "hr.hist.porPosicion": { es: "Por posición", en: "By position" },
+  "hr.hist.sinPosicion": { es: "Sin posición", en: "No position" },
+  "hr.hist.sinNota": { es: "sin nota", en: "no score" },
+  "hr.hist.noSeCalifica": { es: "No se califica: no está obligado a cámara ni pantalla.", en: "Not graded: not required to use camera or screen." },
   "hr.hist.soloFallas": { es: "Solo con fallas ({n})", en: "Only with issues ({n})" },
   "hr.hist.sinFallas": { es: "Nadie con fallas en este turno. 🎉", en: "Nobody with issues this shift. 🎉" },
   "hr.hist.flagFuera": { es: "Fuera de lugar", en: "Off task" },
