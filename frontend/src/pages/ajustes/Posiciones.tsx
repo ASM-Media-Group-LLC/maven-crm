@@ -5,6 +5,8 @@ import { ArrowLeft, Check, ChevronDown, ChevronRight, Info, Minus, MoreHorizonta
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Page } from "@/components/ui/page";
+import { PageHeader } from "@/components/ui/page-header";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Card, CardContent } from "@/components/ui/card";
 import * as CheckboxPrimitive from "@radix-ui/react-checkbox";
 import { Input } from "@/components/ui/input";
@@ -117,19 +119,17 @@ export default function Posiciones() {
         <PermisosDe pos={posAbierta} personas={datos.data!.personas} asignaciones={datos.data!.asignaciones} onVolver={() => setAbierta(null)} />
       ) : (
         <>
-          <div className="flex flex-col gap-3">
-            <div>
-              <h1 className="text-2xl font-semibold tracking-tight">{t("posiciones.titulo")}</h1>
-              <p className="mt-1 text-sm text-muted-foreground">{t("posiciones.sub")}</p>
-            </div>
-            <div className="flex w-fit rounded-lg border border-border p-0.5 text-sm">
-              {(["posiciones", "personas"] as const).map((p) => (
-                <button key={p} type="button" onClick={() => setPestana(p)}
-                  className={cn("rounded-md px-3 py-1.5 transition-colors", pestana === p ? "bg-primary/10 font-medium text-primary" : "text-muted-foreground hover:text-foreground")}>
-                  {t(`posiciones.tab.${p}`)}
-                </button>
-              ))}
-            </div>
+          <PageHeader
+            title={t("posiciones.titulo")}
+            subtitle={t("posiciones.sub")}
+          />
+            <div className="flex w-fit rounded-control border border-border p-0.5 text-sm">
+            {(["posiciones", "personas"] as const).map((p) => (
+              <button key={p} type="button" onClick={() => setPestana(p)}
+                className={cn("rounded-control px-3 py-1.5 transition-colors", pestana === p ? "bg-primary/10 font-medium text-primary" : "text-muted-foreground hover:text-foreground")}>
+                {t(`posiciones.tab.${p}`)}
+              </button>
+            ))}
           </div>
           <AvisoBorrador />
           {datos.isError ? (
@@ -138,7 +138,7 @@ export default function Posiciones() {
               <Button size="sm" variant="outline" onClick={() => void datos.refetch()}>{t("posiciones.reintentar")}</Button>
             </CardContent></Card>
           ) : !datos.data ? (
-            <div className="h-40 animate-pulse rounded-xl bg-muted/40" />
+            <div className="h-40 animate-pulse rounded-panel bg-muted/40" />
           ) : pestana === "posiciones" ? (
             <ListaPosiciones datos={datos.data} onAbrir={setAbierta} />
           ) : (
@@ -154,7 +154,7 @@ export default function Posiciones() {
 function AvisoBorrador() {
   const { t } = useLanguage();
   return (
-    <div className="flex items-start gap-2 rounded-lg border border-primary/20 bg-primary/5 px-4 py-3 text-sm text-primary">
+    <div className="flex items-start gap-2 rounded-control border border-primary/20 bg-primary/5 px-4 py-3 text-sm text-primary">
       <Info className="mt-0.5 h-4 w-4 shrink-0" />
       <span>{t("posiciones.borrador")}</span>
     </div>
@@ -219,7 +219,7 @@ function ListaPosiciones({ datos, onAbrir }: { datos: NonNullable<ReturnType<typ
             <label className="flex flex-col gap-1 text-xs text-muted-foreground">
               {t("posiciones.porEstado")}
               <select id="estado-posicion" value={estado} onChange={(e) => setEstado(e.target.value as typeof estado)}
-                className="h-10 rounded-md border border-input bg-background px-3 text-sm text-foreground">
+                className="h-10 rounded-control border border-input bg-background px-3 text-sm text-foreground">
                 <option value="todas">{t("posiciones.estado.todas")}</option>
                 <option value="activas">{t("posiciones.estado.activas")}</option>
                 <option value="inactivas">{t("posiciones.estado.inactivas")}</option>
@@ -230,40 +230,40 @@ function ListaPosiciones({ datos, onAbrir }: { datos: NonNullable<ReturnType<typ
             <Button className="ml-auto" onClick={() => setDialogo({ modo: "nueva" })}><Plus className="mr-1.5 h-4 w-4" />{t("posiciones.agregar")}</Button>
           </div>
           <div className="text-xs text-muted-foreground">{t("posiciones.total", { n: visibles.length })}</div>
-          <div className="overflow-x-auto rounded-lg border border-border">
-            <table className="w-full text-sm">
-              <thead className="bg-muted/40 text-left text-xs uppercase tracking-wide text-muted-foreground">
-                <tr>
-                  <th className="px-4 py-2.5 font-medium">{t("posiciones.col.posicion")}</th>
-                  <th className="px-4 py-2.5 font-medium">{t("posiciones.col.descripcion")}</th>
-                  <th className="px-4 py-2.5 font-medium">{t("posiciones.col.personas")}</th>
-                  <th className="px-4 py-2.5 font-medium">{t("posiciones.col.estado")}</th>
-                  <th className="px-4 py-2.5 text-right font-medium">{t("posiciones.col.acciones")}</th>
-                </tr>
-              </thead>
-              <tbody>
+          <div className="rounded-control border border-border max-md:border-0">
+            <Table className="w-full text-sm">
+              <TableHeader className="bg-muted/40 text-left text-xs text-muted-foreground">
+                <TableRow>
+                  <TableHead className="px-4 py-2.5 font-medium">{t("posiciones.col.posicion")}</TableHead>
+                  <TableHead className="px-4 py-2.5 font-medium">{t("posiciones.col.descripcion")}</TableHead>
+                  <TableHead className="px-4 py-2.5 font-medium">{t("posiciones.col.personas")}</TableHead>
+                  <TableHead className="px-4 py-2.5 font-medium">{t("posiciones.col.estado")}</TableHead>
+                  <TableHead className="px-4 py-2.5 text-right font-medium">{t("posiciones.col.acciones")}</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
                 {visibles.length === 0 && (
-                  <tr><td colSpan={5} className="px-4 py-8 text-center text-muted-foreground">{t("posiciones.vacio")}</td></tr>
+                  <TableRow><TableCell colSpan={5} className="px-4 py-8 text-center text-muted-foreground">{t("posiciones.vacio")}</TableCell></TableRow>
                 )}
                 {visibles.map((p) => {
                   const gente = genteDe.get(p.id) ?? [];
                   return (
-                    <tr key={p.id} className="border-t border-border align-middle">
-                      <td className="px-4 py-3 font-medium">
+                    <TableRow key={p.id} className="border-t border-border align-middle">
+                      <TableCell className="px-4 py-3 font-medium">
                         <span className="flex items-center gap-1.5">{p.acceso_total && <ShieldCheck className="h-4 w-4 text-primary" />}{p.nombre}</span>
-                      </td>
-                      <td className="max-w-[260px] px-4 py-3 text-muted-foreground">{p.descripcion || "—"}</td>
-                      <td className="px-4 py-3">
+                      </TableCell>
+                      <TableCell className="max-w-[260px] px-4 py-3 text-muted-foreground">{p.descripcion || "—"}</TableCell>
+                      <TableCell className="px-4 py-3">
                         <div className="flex max-w-[360px] flex-wrap gap-1">
                           {gente.slice(0, 3).map((n) => <span key={n} className="rounded-full border border-border bg-muted/40 px-2 py-0.5 text-xs">{n}</span>)}
                           {gente.length > 3 && <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs text-primary">+{gente.length - 3}</span>}
                           {gente.length === 0 && <span className="text-xs text-muted-foreground">—</span>}
                         </div>
-                      </td>
-                      <td className="px-4 py-3">
+                      </TableCell>
+                      <TableCell className="px-4 py-3">
                         <Switch checked={p.activa} onCheckedChange={() => cambiarEstado.mutate(p)} aria-label={t("posiciones.col.estado")} />
-                      </td>
-                      <td className="px-4 py-3 text-right">
+                      </TableCell>
+                      <TableCell className="px-4 py-3 text-right">
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
                             <Button size="icon" variant="outline" className="h-8 w-8" aria-label={t("posiciones.accionesDe", { nombre: p.nombre })}><MoreHorizontal className="h-4 w-4" /></Button>
@@ -274,12 +274,12 @@ function ListaPosiciones({ datos, onAbrir }: { datos: NonNullable<ReturnType<typ
                             <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={() => setBorrar(p)}>{t("posiciones.accion.borrar")}</DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
-                      </td>
-                    </tr>
+                      </TableCell>
+                    </TableRow>
                   );
                 })}
-              </tbody>
-            </table>
+              </TableBody>
+            </Table>
           </div>
         </CardContent>
       </Card>
@@ -349,7 +349,7 @@ function DialogoPosicion({ estado, posiciones, onCerrar }: {
           {!editando && (
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="pos-copiar">{t("posiciones.dialogo.copiarDe")}</Label>
-              <select id="pos-copiar" value={copiar} onChange={(e) => setCopiar(e.target.value)} className="h-10 rounded-md border border-input bg-background px-3 text-sm">
+              <select id="pos-copiar" value={copiar} onChange={(e) => setCopiar(e.target.value)} className="h-10 rounded-control border border-input bg-background px-3 text-sm">
                 <option value="">{t("posiciones.dialogo.ninguna")}</option>
                 {posiciones.map((p) => <option key={p.id} value={p.id}>{p.nombre}</option>)}
               </select>
@@ -405,20 +405,18 @@ function PermisosDe({ pos, personas, asignaciones, onVolver }: { pos: Posicion; 
 
   return (
     <>
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">{t("posiciones.permisosDe", { nombre: pos.nombre })}</h1>
-          <p className="mt-1 flex flex-wrap items-center gap-1 text-sm text-muted-foreground"><Users className="h-4 w-4" />{gente.join(" · ") || "—"}</p>
-        </div>
-        <Button variant="outline" onClick={onVolver}><ArrowLeft className="mr-1.5 h-4 w-4" />{t("posiciones.volver")}</Button>
-      </div>
+      <PageHeader
+        title={t("posiciones.permisosDe", { nombre: pos.nombre })}
+        subtitle={<span className="flex flex-wrap items-center gap-1"><Users className="h-4 w-4" />{gente.join(" · ") || "—"}</span>}
+        actions={<Button variant="outline" onClick={onVolver}><ArrowLeft className="mr-1.5 h-4 w-4" />{t("posiciones.volver")}</Button>}
+      />
       <AvisoBorrador />
-      <div className="flex items-center gap-2 rounded-lg border border-border bg-muted/30 px-4 py-2.5 text-sm text-muted-foreground">
+      <div className="flex items-center gap-2 rounded-control border border-border bg-muted/30 px-4 py-2.5 text-sm text-muted-foreground">
         <Info className="h-4 w-4 shrink-0" />{t("posiciones.autoguardado")}
       </div>
 
       {([["acceso_total", "posiciones.accesoTotal", "posiciones.accesoTotalDesc"], ["todas_creadoras", "posiciones.todasCreadoras", "posiciones.todasCreadorasDesc"]] as const).map(([campo, tit, desc]) => (
-        <label key={campo} className="flex cursor-pointer items-start gap-3 rounded-xl border border-border bg-card p-4">
+        <label key={campo} className="flex cursor-pointer items-start gap-3 rounded-panel border border-border bg-card p-4">
           <Casilla className="mt-0.5" checked={pos[campo]} onCheckedChange={(v) => guardar.mutate({ [campo]: v === true } as Partial<Posicion>)} />
           <span>
             <span className="block text-sm font-semibold">{t(tit)}</span>
@@ -432,53 +430,53 @@ function PermisosDe({ pos, personas, asignaciones, onVolver }: { pos: Posicion; 
         return (
           <section key={sec.seccion} className="flex flex-col gap-2">
             <h2 className="text-base font-semibold">{t(sec.etiqueta)}</h2>
-            <div className={cn("overflow-x-auto rounded-xl border border-border bg-card", bloqueado && "opacity-60")}>
-              <table className="w-full min-w-[720px] text-sm">
-                <thead className="bg-muted/40 text-left text-xs uppercase tracking-wide text-muted-foreground">
-                  <tr>
-                    <th className="w-[28%] px-4 py-2.5 font-medium">{t("posiciones.col.menus")}</th>
-                    <th className="px-4 py-2.5 font-medium">{t("posiciones.col.funciones")}</th>
-                    <th className="w-[200px] px-4 py-2.5 font-medium">{t("posiciones.col.datos")}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr className="border-t border-border">
-                    <td className="px-4 py-2.5">
+            <div className={cn("overflow-x-auto rounded-panel border border-border bg-card", bloqueado && "opacity-60")}>
+              <Table className="w-full min-w-[720px] text-sm">
+                <TableHeader className="bg-muted/40 text-left text-xs text-muted-foreground">
+                  <TableRow>
+                    <TableHead className="w-[28%] px-4 py-2.5 font-medium">{t("posiciones.col.menus")}</TableHead>
+                    <TableHead className="px-4 py-2.5 font-medium">{t("posiciones.col.funciones")}</TableHead>
+                    <TableHead className="w-[200px] px-4 py-2.5 font-medium">{t("posiciones.col.datos")}</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  <TableRow className="border-t border-border">
+                    <TableCell className="px-4 py-2.5">
                       <label className="flex items-center gap-2 font-medium">
                         <Casilla disabled={bloqueado} checked={estadoDe(clavesSec)} onCheckedChange={(v) => marcar(clavesSec, v === true)} />{t("posiciones.todo")}
                       </label>
-                    </td>
-                    <td className="px-4 py-2.5" colSpan={2}>
+                    </TableCell>
+                    <TableCell className="px-4 py-2.5" colSpan={2}>
                       <label className="flex items-center gap-2 text-muted-foreground">
                         <Casilla disabled={bloqueado} checked={estadoDe(clavesSec)} onCheckedChange={(v) => marcar(clavesSec, v === true)} />{t("posiciones.todo")}
                       </label>
-                    </td>
-                  </tr>
+                    </TableCell>
+                  </TableRow>
                   {sec.grupos.map((g) => {
                     const id = `${sec.seccion}/${g.grupo}`;
                     const clavesG = g.filas.flatMap((f) => f.funciones.map((x) => x.clave));
                     const abierto = !cerrados.has(id);
                     return [
-                      <tr key={id} className="border-t border-border bg-muted/20">
-                        <td className="px-4 py-2.5">
+                      <TableRow key={id} className="border-t border-border bg-muted/20">
+                        <TableCell className="px-4 py-2.5">
                           <span className="flex items-center gap-2 font-medium">
                             <Casilla disabled={bloqueado} checked={estadoDe(clavesG)} onCheckedChange={(v) => marcar(clavesG, v === true)} aria-label={t(g.etiqueta)} />
                             <button type="button" onClick={() => alternar(id)} className="flex items-center gap-1 hover:text-primary" aria-expanded={abierto}>
                               {abierto ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}{t(g.etiqueta)}
                             </button>
                           </span>
-                        </td>
-                        <td className="px-4 py-2.5 text-muted-foreground">—</td>
-                        <td className="px-4 py-2.5 text-muted-foreground">—</td>
-                      </tr>,
+                        </TableCell>
+                        <TableCell className="px-4 py-2.5 text-muted-foreground">—</TableCell>
+                        <TableCell className="px-4 py-2.5 text-muted-foreground">—</TableCell>
+                      </TableRow>,
                       ...(abierto ? g.filas.map((f) => (
                         <FilaPermiso key={`${id}/${f.fila}`} fila={f} pos={pos} bloqueado={bloqueado} on={on} estadoDe={estadoDe} marcar={marcar}
                           alcance={(a) => guardar.mutate({ alcances: { ...pos.alcances, [f.fila]: a } })} />
                       )) : []),
                     ];
                   })}
-                </tbody>
-              </table>
+                </TableBody>
+              </Table>
             </div>
           </section>
         );
@@ -497,24 +495,24 @@ function FilaPermiso({ fila, pos, bloqueado, on, estadoDe, marcar, alcance }: {
   const alguna = claves.some(on);
   const actual: AlcanceDatos = pos.acceso_total ? "all" : (pos.alcances[fila.fila] ?? "all");
   return (
-    <tr className="border-t border-border align-top">
-      <td className="px-4 py-3">
+    <TableRow className="border-t border-border align-top">
+      <TableCell className="px-4 py-3">
         <label className="flex items-center gap-2 pl-6">
           <Casilla disabled={bloqueado} checked={estadoDe(claves)} onCheckedChange={(v) => marcar(claves, v === true)} />{t(fila.etiqueta)}
         </label>
-      </td>
-      <td className="px-4 py-3">
+      </TableCell>
+      <TableCell className="px-4 py-3">
         <div className="flex flex-wrap gap-x-4 gap-y-1.5">
           {fila.funciones.map((fn) => (
             <label key={fn.clave} className={cn("flex items-center gap-1.5", !on(fn.clave) && "text-muted-foreground")}>
               <Casilla disabled={bloqueado} checked={on(fn.clave)} onCheckedChange={(v) => marcar([fn.clave], v === true)} />
               {t(fn.etiqueta)}
-              {fn.nueva && <span title={t("posiciones.nuevoAyuda")} className="rounded bg-amber-500/15 px-1.5 text-[10px] font-medium uppercase tracking-wide text-amber-600 dark:text-amber-400">{t("posiciones.nuevo")}</span>}
+              {fn.nueva && <span title={t("posiciones.nuevoAyuda")} className="rounded-control bg-warning/15 px-1.5 text-[10px] font-medium text-warning">{t("posiciones.nuevo")}</span>}
             </label>
           ))}
         </div>
-      </td>
-      <td className="px-4 py-3">
+      </TableCell>
+      <TableCell className="px-4 py-3">
         {fila.datos === "no" ? (
           <span className="text-xs text-muted-foreground">{t("posiciones.datos.empresa")}</span>
         ) : (
@@ -528,8 +526,8 @@ function FilaPermiso({ fila, pos, bloqueado, on, estadoDe, marcar, alcance }: {
             ))}
           </div>
         )}
-      </td>
-    </tr>
+      </TableCell>
+    </TableRow>
   );
 }
 
@@ -575,8 +573,8 @@ function ListaPersonas({ datos }: { datos: NonNullable<ReturnType<typeof useDato
           </div>
           <span className="text-xs text-muted-foreground">{t("posiciones.personas.total", { n: visibles.length })}</span>
         </div>
-        <div className="divide-y divide-border rounded-lg border border-border text-sm">
-          <div className="hidden grid-cols-[1.1fr_1.4fr_1.5fr] gap-4 bg-muted/40 px-4 py-2.5 text-xs font-medium uppercase tracking-wide text-muted-foreground md:grid">
+        <div className="divide-y divide-border rounded-control border border-border text-sm">
+          <div className="hidden grid-cols-[1.1fr_1.4fr_1.5fr] gap-4 bg-muted/40 px-4 py-2.5 text-xs font-medium text-muted-foreground md:grid">
             <span>{t("posiciones.personas.col.persona")}</span>
             <span>{t("posiciones.personas.col.posiciones")}</span>
             <span>{t("posiciones.personas.col.marcas")}</span>
@@ -591,7 +589,7 @@ function ListaPersonas({ datos }: { datos: NonNullable<ReturnType<typeof useDato
                       <Popover>
                         <PopoverTrigger asChild>
                           <button type="button" aria-label={t("posiciones.personas.asignar", { nombre: p.full_name ?? "" })}
-                            className="flex max-w-[320px] flex-wrap items-center gap-1 rounded-md border border-dashed border-border px-2 py-1 text-left hover:border-primary/50">
+                            className="flex max-w-[320px] flex-wrap items-center gap-1 rounded-control border border-dashed border-border px-2 py-1 text-left hover:border-primary/50">
                             {mias.length === 0
                               ? <span className="text-xs text-muted-foreground">{t("posiciones.personas.sinPosicion")}</span>
                               : mias.map((pid) => <span key={pid} className="rounded-full bg-primary/10 px-2 py-0.5 text-xs text-primary">{nombresPos.get(pid)}</span>)}
