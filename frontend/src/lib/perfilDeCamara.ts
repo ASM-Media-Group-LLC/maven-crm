@@ -1,3 +1,4 @@
+import type { TrackPublishOptions } from "livekit-client";
 import { PRUEBA_VIGENTE_MS } from "@/lib/perfilDePantalla";
 
 // CON QUÉ CALIDAD SE PUBLICA LA CÁMARA, SEGÚN EL INTERNET DE QUIEN LA PUBLICA
@@ -45,6 +46,30 @@ import { PRUEBA_VIGENTE_MS } from "@/lib/perfilDePantalla";
 // originales. LiveKit (dynacast) solo prende y apaga capas (`active`), no toca
 // estos topes; igual se vuelven a aplicar cada minuto por si el navegador o una
 // reconexión los repone.
+
+// ── LA CÁMARA SE ACHICA, NO SE CONGELA (19/11/2026, simulacro v2) ────────────
+//
+// Medido con Chrome real desde 4 países: en llamadas de 2 personas con red tipo
+// 4G (8 Mbit, 0,5% de pérdida, +40 ms) o forzadas a TCP/TURN, quien recibe vio
+// el video congelarse 66 a 100 veces en 5 minutos (18 a 47 s quieto), y con la
+// subida floja de un lado (1,5 Mbit, 3% de pérdida) el otro lo vio congelado
+// 47 s de cada 5 minutos. El audio, bien.
+//
+// La causa del lado del navegador: livekit-client elige solo la preferencia de
+// degradación, y a una cámara capturada a 1080p (todas las de Meet y las
+// llamadas del chat, ver camaraEnHD) le pone «maintain-resolution». Con eso,
+// cuando falta internet o procesador, el codificador se aferra al 1080p y TIRA
+// CUADROS: el que mira ve la imagen quieta. Con «balanced» baja un poco los
+// cuadros y la resolución a la vez, como Meet: la cara se ve más chica o menos
+// fluida, pero se sigue moviendo. En Cowork (720p) LiveKit ya usaba «balanced»;
+// ahora queda escrito para que no dependa del tamaño de la captura.
+//
+// Va SOLO en la publicación de la cámara, no en publishDefaults: la pantalla
+// compartida tiene su propia preferencia (lib/perfilDePantalla.ts) y una
+// pantalla publicada sin opciones heredaría «balanced» y llegaría borrosa.
+export const PUBLICACION_DE_CAMARA: TrackPublishOptions = {
+  degradationPreference: "balanced",
+};
 
 /** Debajo de esto (subida medida de verdad, en Mbps) la cámara va en liviano. */
 export const SUBIDA_PARA_CAMARA_NORMAL_MBPS = 1.5;
