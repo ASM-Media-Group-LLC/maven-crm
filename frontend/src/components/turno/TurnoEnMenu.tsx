@@ -9,6 +9,8 @@ import { horaUI } from "@/lib/formatoHora";
 import { useAhoraCadaSegundo } from "@/lib/ahoraCompartido";
 import { pedirACowork } from "@/lib/pedidoACowork";
 import { useAccionesTurno, useMiTurno } from "@/hooks/useMiTurno";
+import { useAuth } from "@/hooks/useAuth";
+import { useMiPausa } from "@/hooks/usePausas";
 import { AvisoEntrada, CLASE_BOTON_SUAVE, ConfirmarSalida, PreguntaSigues, TarjetaTurno, type EstadoTurno } from "@/components/turno/PiezasTurno";
 
 // LA TARJETA DEL TURNO EN EL MENÚ (Alvaro, 19/11/2026): marcar entrada, pausa
@@ -23,6 +25,8 @@ export function TurnoEnMenu({ compacto = false }: { compacto?: boolean }) {
   const { t } = useLanguage();
   const navigate = useNavigate();
   const q = useMiTurno();
+  const { user } = useAuth();
+  const miPausa = useMiPausa(user?.id);
   const { entrar, salir, sigo } = useAccionesTurno();
   const tr = q.data;
   // El reloj compartido: 1 s a la vista, 30 s fuera (lib/ahoraCompartido.ts).
@@ -140,7 +144,7 @@ export function TurnoEnMenu({ compacto = false }: { compacto?: boolean }) {
       <Dialog open={abrirEntrada} onOpenChange={setAbrirEntrada}>
         <DialogContent className="max-w-2xl overflow-hidden border-border/60 p-0">
           <DialogTitle className="sr-only">{t("cowork.turno.aviso.titulo")}</DialogTitle>
-          <AvisoEntrada primeraVez={!tr.terminos_ok} horario={horarioTxt} onAceptar={marcarEntrada} onCancelar={() => setAbrirEntrada(false)} t={t} />
+          <AvisoEntrada primeraVez={!tr.terminos_ok} horario={horarioTxt} pausa={miPausa.data ?? null} onAceptar={marcarEntrada} onCancelar={() => setAbrirEntrada(false)} t={t} />
         </DialogContent>
       </Dialog>
 

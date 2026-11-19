@@ -157,10 +157,16 @@ function Regla({ icono, titulo, texto, destacada }: { icono: ReactNode; titulo: 
 }
 
 /** El anuncio al marcar entrada. La primera vez pide aceptar las reglas. */
-export function AvisoEntrada({ primeraVez, horario, onAceptar, onCancelar, t }: {
-  primeraVez: boolean; horario?: string | null; onAceptar?: () => void; onCancelar?: () => void; t: Tr;
+export function AvisoEntrada({ primeraVez, horario, pausa, onAceptar, onCancelar, t }: {
+  primeraVez: boolean; horario?: string | null;
+  /** La pausa pagada de SU puesto (19/11/2026); sin dato, el texto es general. */
+  pausa?: { comida: number; bano: number } | null;
+  onAceptar?: () => void; onCancelar?: () => void; t: Tr;
 }) {
   const [acepta, setAcepta] = useState(false);
+  const textoPausa = !pausa ? t("cowork.turno.aviso.banoGeneral")
+    : pausa.comida + pausa.bano === 0 ? t("cowork.turno.aviso.banoSinPausa")
+    : t("cowork.turno.aviso.bano", { b: pausa.bano, c: pausa.comida });
   return (
     <div className="flex max-h-[88vh] flex-col overflow-hidden">
       {/* Cabecera con brillo verde suave */}
@@ -179,7 +185,7 @@ export function AvisoEntrada({ primeraVez, horario, onAceptar, onCancelar, t }: 
           <Regla icono={<ScreenShare className="h-[18px] w-[18px]" />} titulo={t("cowork.turno.aviso.pantallaT")} texto={t("cowork.turno.aviso.pantalla")} />
           <Regla icono={<Camera className="h-[18px] w-[18px]" />} titulo={t("cowork.turno.aviso.camaraT")} texto={t("cowork.turno.aviso.camara")} />
           <Regla destacada icono={<EyeOff className="h-[18px] w-[18px]" />} titulo={t("cowork.turno.aviso.personalT")} texto={t("cowork.turno.aviso.personal")} />
-          <Regla icono={<Coffee className="h-[18px] w-[18px]" />} titulo={t("cowork.turno.aviso.banoT")} texto={t("cowork.turno.aviso.bano")} />
+          <Regla icono={<Coffee className="h-[18px] w-[18px]" />} titulo={t("cowork.turno.aviso.banoT")} texto={textoPausa} />
           <Regla icono={<Clock className="h-[18px] w-[18px]" />} titulo={t("cowork.turno.aviso.pagoT")} texto={t("cowork.turno.aviso.pago")} />
           <Regla icono={<Users className="h-[18px] w-[18px]" />} titulo={t("cowork.turno.aviso.quienT")} texto={t("cowork.turno.aviso.quien")} />
         </ul>
