@@ -46,6 +46,15 @@ Deno.test("cambio de puesto de una persona", () => {
   assertStringIncludes(html, "<b>Argos</b> deja de vigilar");
 });
 
+Deno.test("Argos solo entra o sale si cambia «al menos una»", () => {
+  // Quitar la cámara con la pantalla todavía pedida: Argos sigue.
+  assertEquals(correoExigenciasHTML(base).includes("<b>Argos</b>"), false);
+  const nada = { ...base, pantalla_despues: false };
+  assertStringIncludes(correoExigenciasHTML(nada), "<b>Argos</b> deja de vigilar");
+  const vuelve = { ...base, camara_antes: false, pantalla_antes: false, camara_despues: true, pantalla_despues: false };
+  assertStringIncludes(correoExigenciasHTML(vuelve), "<b>Argos</b> empieza a vigilarlas");
+});
+
 Deno.test("marca: la de la empresa si tiene, si no Maven", () => {
   assertStringIncludes(correoExigenciasHTML(base), "[M]aven");
   const cliente = correoExigenciasHTML({ ...base, marca_nombre: "Acme <Studio>", marca_logo_url: "https://acme.test/logo.png" });

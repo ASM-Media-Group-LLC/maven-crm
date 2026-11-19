@@ -230,7 +230,7 @@ export const ajustes = {
   "settings.empresa.sinPermiso": { es: "Tu puesto no tiene la función «Configurar la empresa».", en: "Your position doesn't have the “Configure the company” function." },
   "settings.empresa.volver": { es: "Volver a Ajustes", en: "Back to Settings" },
   "settings.exig.titulo": { es: "Cámara y pantalla por puesto", en: "Camera and screen by position" },
-  "settings.exig.sub": { es: "Lo que cada puesto le pide a su gente. Sin pantalla no hay Argos, aunque la persona comparta por su cuenta.", en: "What each position asks of its people. No screen means no Argos, even if the person shares on their own." },
+  "settings.exig.sub": { es: "Lo que cada puesto le pide a su gente. Argos funciona con al menos una de las dos; sin ninguna no hay Argos, aunque la persona comparta por su cuenta.", en: "What each position asks of its people. Argos works with at least one of the two; with neither there is no Argos, even if the person shares on their own." },
   "settings.exig.subVer": { es: "Lo que cada puesto le pide a su gente. Lo cambian el dueño y los admins.", en: "What each position asks of its people. The owner and admins change it." },
   "settings.exig.camara": { es: "Cámara", en: "Camera" },
   "settings.exig.pantalla": { es: "Pantalla", en: "Screen" },

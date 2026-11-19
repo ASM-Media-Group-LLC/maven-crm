@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { calcularNota, fraccionConectado, type Nota } from "@/lib/notaEmpleado";
-import { cargarExoneracion, esExento } from "@/lib/exoneracionCamara";
+import { calificaCamara, calificaPantalla, cargarExoneracion } from "@/lib/exoneracionCamara";
 import { cargarHorarios, horarioDe } from "@/lib/horarioEmpleado";
 import { turnoDeEntrada } from "@/hooks/useTurnoPersonas";
 
@@ -151,13 +151,15 @@ export function useResumenDia(dia: string) {
         const m = turno ? ventanas[turno].get(id) : sumaDia(id);
         const at = m ? { ok: m.juzOk, n: m.juz } : undefined;
         // No se califica en cámara/pantalla si el rol no se califica, o si está exonerado.
-        const calificado = esCalificado(id) && !esExento(exo, id, rolesPor.get(id));
+        // Por separado (19/11/2026): solo lo que su puesto pide.
+        const califCamara = esCalificado(id) && calificaCamara(exo, id, rolesPor.get(id));
+        const califPantalla = esCalificado(id) && calificaPantalla(exo, id, rolesPor.get(id));
         // Pantalla% y cámara% sobre la JORNADA de 8 h (pausa libre descontada): así
         // medio día ≈ 50 y las horas quedan metidas. Si el rol NO se califica
         // (supervisor, finanzas…), esos factores quedan en N/A: no cuentan.
         // Nota v3 (18/11/2026): sobre el tiempo CONECTADO, como Jornada y el expediente.
-        const pantallaPct = calificado && m ? fraccionConectado(m.pantalla, m.horas * 3600) : undefined;
-        const camaraPct = calificado && m ? fraccionConectado(m.camara, m.horas * 3600) : undefined;
+        const pantallaPct = califPantalla && m ? fraccionConectado(m.pantalla, m.horas * 3600) : undefined;
+        const camaraPct = califCamara && m ? fraccionConectado(m.camara, m.horas * 3600) : undefined;
         const atencionPct = at && at.n > 0 ? at.ok / at.n : undefined;
         const horas = m?.horas ?? 0;
         // Activo = estuvo en Maven ese día por CUALQUIER señal.
@@ -178,7 +180,7 @@ export function useResumenDia(dia: string) {
           horas,
           bajones,
           activo,
-          calificado,
+          calificado: califCamara || califPantalla,
         };
       });
 
