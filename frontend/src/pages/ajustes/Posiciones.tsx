@@ -151,13 +151,77 @@ export default function Posiciones() {
   );
 }
 
+// Estado del cambio: borrador (nada manda) o ya mandan, con el regreso de 7 días.
+function useEstadoPosiciones() {
+  return useQuery({
+    queryKey: ["posiciones-estado"],
+    queryFn: async () => {
+      const [flag, resp] = await Promise.all([
+        sinTipar.from("app_flags").select("enabled").eq("key", "posiciones_mandan").maybeSingle(),
+        sinTipar.from("posiciones_respaldo").select("id, created_at, restaurado_at").is("restaurado_at", null).order("id", { ascending: false }).limit(1).maybeSingle(),
+      ]);
+      if (flag.error) throw flag.error;
+      if (resp.error) throw resp.error;
+      const creado = resp.data?.created_at ? new Date(resp.data.created_at as string) : null;
+      const hasta = creado ? new Date(creado.getTime() + 7 * 86_400_000) : null;
+      return { mandan: !!flag.data?.enabled, creado, hasta: hasta && hasta > new Date() ? hasta : null };
+    },
+  });
+}
+
 function AvisoBorrador() {
   const { t } = useLanguage();
+  const qc = useQueryClient();
+  const estado = useEstadoPosiciones();
+  const [confirmar, setConfirmar] = useState(false);
+  const regresar = useMutation({
+    mutationFn: async () => {
+      const { error } = await (supabase as unknown as { rpc: (f: string) => Promise<{ error: unknown }> }).rpc("posiciones_regresar");
+      if (error) throw error;
+    },
+    onSuccess: () => { setConfirmar(false); toast.success(t("posiciones.regresar.listo")); void qc.invalidateQueries(); },
+    onError: () => toast.error(t("posiciones.regresar.error")),
+  });
+  if (estado.isError) {
+    return (
+      <div className="flex items-center justify-between gap-3 rounded-control border border-border px-4 py-3 text-sm">
+        <span>{t("posiciones.estado.error")}</span>
+        <Button size="sm" variant="outline" onClick={() => void estado.refetch()}>{t("posiciones.reintentar")}</Button>
+      </div>
+    );
+  }
+  if (!estado.data?.mandan) {
+    return (
+      <div className="flex items-start gap-2 rounded-control border border-primary/20 bg-primary/5 px-4 py-3 text-sm text-primary">
+        <Info className="mt-0.5 h-4 w-4 shrink-0" />
+        <span>{t("posiciones.borrador")}</span>
+      </div>
+    );
+  }
+  const fecha = (d: Date | null) => (d ? d.toLocaleString(undefined, { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" }) : "");
   return (
-    <div className="flex items-start gap-2 rounded-control border border-primary/20 bg-primary/5 px-4 py-3 text-sm text-primary">
-      <Info className="mt-0.5 h-4 w-4 shrink-0" />
-      <span>{t("posiciones.borrador")}</span>
-    </div>
+    <>
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-control border border-success/30 bg-success/10 px-4 py-3 text-sm text-success">
+        <span className="flex items-start gap-2"><ShieldCheck className="mt-0.5 h-4 w-4 shrink-0" />{t("posiciones.mandan")}</span>
+        {estado.data.hasta && (
+          <Button size="sm" variant="outline" onClick={() => setConfirmar(true)}>{t("posiciones.regresar")}</Button>
+        )}
+      </div>
+      <AlertDialog open={confirmar} onOpenChange={setConfirmar}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t("posiciones.regresar.titulo", { fecha: fecha(estado.data.creado) })}</AlertDialogTitle>
+            <AlertDialogDescription>{t("posiciones.regresar.desc", { hasta: fecha(estado.data.hasta) })}</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>{t("posiciones.dialogo.cancelar")}</AlertDialogCancel>
+            <AlertDialogAction disabled={regresar.isPending} onClick={(e) => { e.preventDefault(); regresar.mutate(); }}>
+              {t("posiciones.regresar")}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   );
 }
 
