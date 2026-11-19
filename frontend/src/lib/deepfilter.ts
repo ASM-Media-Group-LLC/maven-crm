@@ -176,30 +176,15 @@ let descartadoEnPestana = false;
 let pesadoEnPestana = false;
 
 /** Por qué este equipo NO usa DeepFilterNet (para datos.nc_info), o null si puede. */
-export type SinDeepFilter = "apagado" | "equipo" | "sin_prueba" | "pesado" | "no_cargo" | "sin_wasm";
-
-/**
- * PRUEBA VOLUNTARIA (19/11/2026). Antes de que llegue a todos hay que oírlo en
- * una llamada real (ya salió robotizado una vez). Solo arma DeepFilterNet quien
- * lo pidió en ese navegador con localStorage "maven.deepfilter" = "si" (y además
- * tiene equipo fuerte). Todos los demás siguen EXACTO como hoy: RNNoise + puerta.
- * Para abrirlo a todos: quitar esta condición en motivoSinDeepFilter.
- */
-export const CLAVE_PRUEBA_DF = "maven.deepfilter";
-
-export function pruebaDeepFilterPedida(): boolean {
-  try {
-    return localStorage.getItem(CLAVE_PRUEBA_DF) === "si";
-  } catch {
-    return false;
-  }
-}
+export type SinDeepFilter = "apagado" | "equipo" | "pesado" | "no_cargo" | "sin_wasm";
 
 /**
  * Interruptor general. Prendido desde el 19/11/2026 (opción B) con la regla de
  * equipo fuerte, la prueba de carga y los arreglos de la voz robotizada (arriba).
  * Historia: prendido 16/11, apagado 17/11 en el navegador y 18/11 en la app
- * porque la voz salía robotizada.
+ * porque la voz salía robotizada; 19/11 primero como prueba voluntaria y ese
+ * mismo día para todos (Alvaro), con interruptor por persona en la llamada
+ * (loadNCPreference en noise-suppression-processor.ts).
  */
 export const DEEPFILTER_PRENDIDO = true;
 
@@ -210,7 +195,6 @@ export function motivoSinDeepFilter(): SinDeepFilter | null {
   if (typeof WebAssembly === "undefined") return "sin_wasm";
   const nav = navigator as Navigator & { deviceMemory?: number };
   if (!equipoFuerte({ nucleos: nav.hardwareConcurrency, memoriaGb: nav.deviceMemory, agente: nav.userAgent })) return "equipo";
-  if (!pruebaDeepFilterPedida()) return "sin_prueba";
   try {
     const t = Number(localStorage.getItem(CLAVE_PESADO));
     if (t && Date.now() - t < DIAS_SIN_REINTENTAR * 86_400_000) return "pesado";

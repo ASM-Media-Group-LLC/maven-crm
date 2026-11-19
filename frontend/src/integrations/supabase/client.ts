@@ -10,6 +10,7 @@ import type { Database } from './types';
 import { conSesionRenovada, crearRenovador } from '@/lib/sesionVencida';
 import { protegerRenovacion } from '@/lib/entrarConPaciencia';
 import { alLatidoDelSocket, LATIDO_REALTIME_MS } from '@/lib/latidoDelRealtime';
+import { almacenDelNavegador, elegirConexion, envDeLaApp, fijarDestinoDeEstaPestana } from '@/lib/puerta';
 
 const PROD_URL =
   "https://lsagslbkliprespbyhts.supabase.co";
@@ -28,8 +29,18 @@ const rawKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
 // Exportados para que otros módulos (p.ej. uploadUtils/TUS) usen la MISMA config con
 // fallback, en vez de leer import.meta.env.VITE_* suelto (que en prod puede quedar como
 // placeholder __RUNTIME_* sin reemplazar → rompía la subida de archivos >5MB).
-export const SUPABASE_URL = isPlaceholder(rawUrl) ? PROD_URL : rawUrl;
-export const SUPABASE_PUBLISHABLE_KEY = isPlaceholder(rawKey) ? PROD_PUBLISHABLE_KEY : rawKey;
+const KASH_URL = isPlaceholder(rawUrl) ? PROD_URL : rawUrl;
+const KASH_KEY = isPlaceholder(rawKey) ? PROD_PUBLISHABLE_KEY : rawKey;
+
+// LA PUERTA (vagón 7, 19/11/2026): con VITE_PUERTA_EDIFICIO=1, un navegador que el login
+// mandó al edificio (maven-agencias) arranca contra el edificio. Apagada (lo de hoy) o
+// sin elección guardada: Kash, exactamente como siempre. Ver lib/puerta.ts.
+const conexion = elegirConexion(envDeLaApp(), almacenDelNavegador(), { url: KASH_URL, llave: KASH_KEY });
+fijarDestinoDeEstaPestana(conexion.destino);
+/** "kash" o "edificio": a qué base está conectada esta pestaña. */
+export const DESTINO_SUPABASE = conexion.destino;
+export const SUPABASE_URL = conexion.url;
+export const SUPABASE_PUBLISHABLE_KEY = conexion.llave;
 
 // Import the supabase client like this:
 // import { supabase } from "@/integrations/supabase/client";

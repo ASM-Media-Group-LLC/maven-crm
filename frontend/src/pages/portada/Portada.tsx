@@ -9,6 +9,7 @@ import { useLanguage } from "@/hooks/useLanguage";
 import { type TranslationKey } from "@/lib/i18n";
 import { IDIOMAS, NOMBRE_IDIOMA, esIdioma, type Idioma } from "@/lib/idiomas";
 import { BanderaIdioma } from "@/components/BanderaIdioma";
+import { envDeLaApp, puertaActiva } from "@/lib/puerta";
 import "./portada.css";
 import "./reinventada.css";
 
@@ -361,6 +362,8 @@ export default function Portada({ idiomaDeRuta }: { idiomaDeRuta?: Idioma }) {
   useEnlacesDeIdioma(idiomaDeRuta ?? language);
   // El formulario de demo queda guardado hasta que alguien lo pide: así la
   // página cierra limpia, como la de referencia, y no con un formulario largo.
+  // Con la puerta del edificio apagada (lo de hoy), los planes siguen yendo a la demo.
+  const registroAbierto = puertaActiva(envDeLaApp());
   const [demoAbierta, setDemoAbierta] = useState(
     () => typeof window !== "undefined" && window.location.hash === "#demo",
   );
@@ -513,13 +516,26 @@ export default function Portada({ idiomaDeRuta }: { idiomaDeRuta?: Idioma }) {
                 <ul>
                   {p.incluye.map((linea) => <li key={linea}>{t(linea)}</li>)}
                 </ul>
-                <a
-                  className={`pr-btn ${p.contacto ? "pr-btn-fantasma" : "pr-btn-neon"}`}
-                  href="#demo"
-                  onClick={abrirDemo}
-                >
-                  {t(p.boton)}
-                </a>
+                {registroAbierto && !p.contacto ? (
+                  // Registro solo (vagón 7): con la puerta del edificio prendida, Equipo y
+                  // Empresa van a /empezar (14 días gratis con tarjeta); la demo sigue abajo.
+                  <>
+                    <Link className="pr-btn pr-btn-neon" to={`/empezar?plan=${p.id}`}>
+                      {t("cobros.portada.probarGratis")}
+                    </Link>
+                    <a className="pr-plan-demo" href="#demo" onClick={abrirDemo}>
+                      {t("cobros.portada.oDemo")}
+                    </a>
+                  </>
+                ) : (
+                  <a
+                    className={`pr-btn ${p.contacto ? "pr-btn-fantasma" : "pr-btn-neon"}`}
+                    href="#demo"
+                    onClick={abrirDemo}
+                  >
+                    {t(p.boton)}
+                  </a>
+                )}
               </article>
             ))}
           </div>

@@ -119,9 +119,27 @@ describe("CallControls", () => {
     expect(screen.getByTitle("Compartir pantalla")).toBeInTheDocument();
   });
   // La cancelación de ruido vive en el menú del micrófono (Jhon la buscó y no
-  // estaba). Desde el 13/11/2026 es OBLIGATORIA: el menú dice que está siempre
-  // activa y no ofrece ningún interruptor para apagarla.
-  it("el menú del micrófono dice que la cancelación de ruido está siempre activa, sin interruptor", async () => {
+  // estaba). Desde el 19/11/2026 es un interruptor cuando la pantalla pasa
+  // onToggleCancelacionRuido; sin él, sigue siendo una nota.
+  it("con el interruptor: prendida por defecto, y tocarlo avisa a la pantalla", async () => {
+    const onToggle = vi.fn();
+    render(<CallControls {...defaultProps} onToggleCancelacionRuido={onToggle} />);
+    fireEvent.click(screen.getAllByRole("button")[0]);
+    const sw = await screen.findByRole("switch", { name: /cancelación de ruido/i });
+    expect(sw).toHaveAttribute("aria-checked", "true");
+    fireEvent.click(sw);
+    expect(onToggle).toHaveBeenCalledOnce();
+  });
+
+  it("apagada por la persona: el interruptor lo dice", async () => {
+    render(<CallControls {...defaultProps} estadoNC="apagada" ncActivada={false} onToggleCancelacionRuido={vi.fn()} />);
+    fireEvent.click(screen.getAllByRole("button")[0]);
+    const sw = await screen.findByRole("switch", { name: /cancelación de ruido/i });
+    expect(sw).toHaveAttribute("aria-checked", "false");
+    expect(sw).toHaveTextContent(/filtro del navegador/i);
+  });
+
+  it("sin interruptor de la pantalla, el menú solo la nombra como nota", async () => {
     render(<CallControls {...defaultProps} />);
     // El caret del micro es el primer botón de la barra (abre el popover de dispositivos).
     fireEvent.click(screen.getAllByRole("button")[0]);

@@ -10,8 +10,11 @@
 //   · "reanudar" → vuelve a encender cámara y micro si estaban; la pantalla
 //                  compartida NO se puede reabrir sola (el navegador exige un
 //                  clic), así que la llamada muestra un botón para retomarla.
+//   · "soltar"   → se olvida lo que tenía, SIN prender nada (19/11/2026: el
+//                  «Momento privado» que se acaba solo no le prende la cámara a
+//                  nadie; Argos se la vuelve a pedir).
 
-export type OrdenDePausa = "apagar" | "reanudar";
+export type OrdenDePausa = "apagar" | "reanudar" | "soltar";
 
 const oyentes = new Set<(o: OrdenDePausa) => void>();
 let ultima: OrdenDePausa | null = null;
@@ -33,6 +36,9 @@ export function pedirApagarPorPausa(): void { emitir("apagar"); }
 
 /** La persona volvió: reencender lo que estaba encendido. */
 export function pedirReanudarTrasPausa(): void { emitir("reanudar"); }
+
+/** Se acabó un momento privado: olvidar lo apagado sin volver a prenderlo. */
+export function pedirSoltarSinPrender(): void { emitir("soltar"); }
 
 /** Para tests y para que la llamada, al montarse, sepa si ya está en pausa. */
 export function ultimaOrdenDePausa(): OrdenDePausa | null { return ultima; }

@@ -142,3 +142,31 @@ Medido en el edificio el 19/11 (710 políticas; 103 filtran por `current_tenant_
    `cowork-session`, `livekit-token`…): sumar `es_dueno_de_agencia(current_tenant_id())`.
 5. `admin-user-actions` tiene que mostrar los errores `agencia_llena` / `agencia_archivada` /
    `cuenta_de_cliente` en vez de un error genérico.
+
+## Vagón 7 · cobros con Stripe, bloqueo por pago y la puerta
+
+| Archivo | Qué trae |
+|---|---|
+| `20261120090000_cobros.sql` | Estado `bloqueada`, `precios_plataforma`, `stripe_eventos` (cada evento una vez), tope de la puerta, funciones del cobro y del bloqueo, créditos de Argos desde Stripe y los relojes |
+
+Va DESPUÉS de las dos del árbol. Se aplica igual (MCP `apply_migration` con
+`project_id = ezeigddgkaemxpshghmu`, con el OK de Alvaro). El banco del árbol la carga encima y la prueba.
+
+- **El cobro vive en `organizaciones.cobro`** (solo lo leen el dueño y el admin de ese cliente):
+  `estado_pago` = `pendiente_checkout` (se registró y no puso tarjeta: no entra) · `esperando_tarjeta`
+  (alta del dueño con link: entra) · `prueba` · `al_dia` · `pago_fallido` · `cancelada` · `por_fuera`;
+  más `stripe_customer_id`, `stripe_subscription_id`, `gracia_hasta`, `prueba_hasta` y las opciones del
+  dueño (`dias_gratis`, `sin_tarjeta`, `sin_setup`, `precio_a_medida`).
+- **Pago fallido → 7 días de gracia → `bloqueada`** (nadie entra; nada se borra). La regla está dos
+  veces, igual: `cobros_debe_bloquear()` (base) y `debeBloquear()` (edge). El reloj `cobros-bloquear`
+  (cada hora) aplica; `cobros_mi_acceso()` ya responde «bloqueada» aunque el reloj no haya pasado.
+  Al pagar (invoice.paid) vuelve a `activa`. Un cliente pausado o archivado por Maven no lo toca Stripe.
+- `cobros_mi_acceso()`: lo que pregunta la app al entrar (pantalla «Tu empresa está bloqueada por pago
+  pendiente» con «Pagar ahora» para su admin). Motivos: `pago`, `falta_tarjeta`, `pausada`,
+  `agencia_pausada`, `archivada`. La plataforma nunca queda bloqueada.
+- Argos: la factura pagada acredita el plan del mes (`argos_acreditar_plan_de`, una vez por mes; se
+  acumula); la recarga (25 → 50) entra por `argos_acreditar` y no se repite (`argos_mov_recarga_ref_idx`).
+  Quien paga por fuera recibe su crédito el día 1 (`argos_acreditar_planes_sin_stripe`).
+- `directorio_es_del_edificio(correo)` + `puerta_contar`: la puerta de app.maven-ai.me (solo sí/no, con tope).
+- `organizaciones_externas.fuente = 'kash'`: la fila que refresca `refrescar-externas` con la función
+  de solo lectura de Kash (`kash-resumen`).

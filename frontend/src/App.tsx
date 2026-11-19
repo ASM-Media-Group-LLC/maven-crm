@@ -44,6 +44,9 @@ const Privacidad = lazy(() => import("./pages/portada/Privacidad"));
 const Documentacion = lazy(() => import("./pages/portada/Documentacion"));
 const DiagnosticoPantalla = lazy(() => import("./pages/DiagnosticoPantalla"));
 const Login = lazy(() => import("./pages/Login"));
+// Registro solo desde la portada y la vuelta de Stripe (vagón 7, 19/11/2026).
+const Empezar = lazy(() => import("./pages/cobros/Empezar"));
+const Bienvenido = lazy(() => import("./pages/cobros/Bienvenido"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 
 // Rare / public — kept lazy.
@@ -342,6 +345,8 @@ const App = () => (
               {/* Medidas del dispositivo para depurar la PWA en teléfonos (pública). */}
               <Route path="/diagnostico-pantalla" element={<DiagnosticoPantalla />} />
               <Route path="/login" element={<Login />} />
+              <Route path="/empezar" element={<Empezar />} />
+              <Route path="/bienvenido" element={<Bienvenido />} />
               {/* El registro público está cerrado (ver `bloquear_alta_publica`
                   en la base): quien llega con un link viejo cae en el
                   formulario de demo, no en un formulario que no funciona. */}

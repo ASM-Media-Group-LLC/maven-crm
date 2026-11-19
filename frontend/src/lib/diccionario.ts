@@ -53,6 +53,7 @@ import { guiaConexion } from "./i18n/guiaConexion";
 import { guiaApp } from "./i18n/guiaApp";
 import { posiciones } from "./i18n/posiciones";
 import { plataforma } from "./i18n/plataforma";
+import { cobros } from "./i18n/cobros";
 
 // EL DICCIONARIO, PARTIDO POR MÓDULO.
 //
@@ -116,6 +117,7 @@ const translations = {
   ...guiaApp,
   ...posiciones,
   ...plataforma,
+  ...cobros,
 } as const;
 
 export type TranslationKey = keyof typeof translations;

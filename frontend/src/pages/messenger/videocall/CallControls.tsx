@@ -71,9 +71,12 @@ interface CallControlsProps {
    *  La fila ya envuelve (`flex-wrap`), así que si no entran pasa a dos líneas
    *  en vez de salirse de la pantalla. */
   tactil?: boolean;
-  /** Si la cancelación de ruido (obligatoria) está corriendo. Sin esto, el menú
-   *  no la menciona. Ya no hay interruptor: se quitó el 13/11/2026. */
+  /** Si la cancelación de ruido está corriendo. Sin esto, el menú no la menciona. */
   estadoNC?: EstadoNC;
+  /** Lo que eligió la persona (prendida por defecto). Con `onToggleCancelacionRuido`
+   *  la nota pasa a ser un interruptor (vuelve el 19/11/2026, Alvaro). */
+  ncActivada?: boolean;
+  onToggleCancelacionRuido?: () => void;
   backgroundEffect?: BackgroundEffect;
   onToggleBlurBackground?: () => void;
   /** Mostrar las flechitas de micrófono y cámara. Por defecto, fuera del modo compacto. */
@@ -279,13 +282,47 @@ function useDevices(open: boolean) {
    día hay que agregar algo, que sea ADENTRO del panel.
    ────────────────────────────────────────────────────────────────────────── */
 
-/** La cancelación de ruido en el menú del micro. Desde el 13/11/2026 es
- *  OBLIGATORIA (Alvaro): ya no es un interruptor sino una nota que dice que está
- *  siempre activa, o que este navegador no puede correrla (entonces el micro sale
- *  sin filtro, nunca mudo). Ya no lleva rol de interruptor: no hay nada que apagar. */
-function NotaCancelacionRuido({ estado, className }: { estado: EstadoNC; className?: string }) {
+/** La cancelación de ruido en el menú del micro. Del 13/11 al 19/11/2026 fue
+ *  obligatoria y esto era solo una nota; desde el 19/11 (Alvaro: «prendida para
+ *  todos y que cada uno la pueda apagar») es un INTERRUPTOR cuando la pantalla
+ *  pasa `onToggle`. Apagada, el micro sale con el filtro del navegador. Si este
+ *  navegador no puede correrla, sigue siendo una nota (no hay nada que prender). */
+function NotaCancelacionRuido({ estado, activada, onToggle, className }: {
+  estado: EstadoNC; activada?: boolean; onToggle?: () => void; className?: string;
+}) {
   const { t } = useLanguage();
   const funciona = ncFunciona(estado);
+  if (onToggle && estado !== "no_soportada") {
+    const prendida = activada !== false;
+    const fallo = prendida && !funciona;
+    return (
+      <button
+        type="button"
+        role="switch"
+        aria-checked={prendida}
+        aria-label={t("messenger.call.cancelacionRuido")}
+        onClick={onToggle}
+        className={cn("w-full px-3 py-2 rounded-lg flex items-start gap-2.5 text-sm border border-border/60 bg-foreground/[0.03] hover:bg-muted transition-colors", className)}
+      >
+        <AudioLines className="h-4 w-4 shrink-0 mt-0.5 text-muted-foreground" />
+        <span className="flex-1 min-w-0 text-left">
+          <span className="text-foreground">{t("messenger.call.cancelacionRuido")}</span>
+          <span className="block text-[11px] text-muted-foreground mt-0.5">
+            {fallo ? t("messenger.call.ncNoDisponibleDesc") : prendida ? t("messenger.call.ncActivadaDesc") : t("messenger.call.ncDesactivadaDesc")}
+          </span>
+        </span>
+        <span
+          aria-hidden
+          className={cn(
+            "relative mt-0.5 inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors",
+            prendida ? "bg-primary" : "bg-muted-foreground/30",
+          )}
+        >
+          <span className={cn("inline-block h-4 w-4 rounded-full bg-background shadow transition-transform", prendida ? "translate-x-4" : "translate-x-0.5")} />
+        </span>
+      </button>
+    );
+  }
   return (
     <div
       role="note"
@@ -363,7 +400,7 @@ function GrupoDispositivos({ titulo, icon: Icon, devices, selectedId, onSelect }
 export default function CallControls({
   isMicOn, isCamOn, isScreenSharing, isHandRaised, isChatOpen, unreadChatCount, isParticipantsOpen,
   currentAudioInputId, currentAudioOutputId, currentVideoInputId,
-  onToggleMic, estadoNC, onToggleCam, onToggleScreenShare, onToggleHand,
+  onToggleMic, estadoNC, ncActivada, onToggleCancelacionRuido, onToggleCam, onToggleScreenShare, onToggleHand,
   onToggleChat, onToggleParticipants,
   onSendReaction, onLeave,
   onAudioInputChange, onAudioOutputChange, onVideoInputChange,
@@ -449,8 +486,8 @@ export default function CallControls({
                   <DevicePill icon={Volume2} tipo="altavoz" devices={devices.audioOutputs} selectedId={currentAudioOutputId || ""} onSelect={onAudioOutputChange} onPedirPermiso={() => devices.pedirPermiso("audio")} pidiendo={devices.pidiendo} />
                 </div>
                 {/* La cancelación de ruido va junto al micro, que es donde uno la
-                    busca. Desde el 13/11/2026 es obligatoria: una nota, no un botón. */}
-                {estadoNC && <NotaCancelacionRuido estado={estadoNC} className="mt-2" />}
+                    busca. Desde el 19/11/2026, con interruptor. */}
+                {estadoNC && <NotaCancelacionRuido estado={estadoNC} activada={ncActivada} onToggle={onToggleCancelacionRuido} className="mt-2" />}
               </PopoverContent>
             </Popover>
             <button
@@ -640,7 +677,7 @@ export default function CallControls({
                   <GrupoDispositivos titulo={t("messenger.call.altavoz")} icon={Volume2} devices={devices.audioOutputs}
                     selectedId={currentAudioOutputId} onSelect={(id) => cerrarY(() => onAudioOutputChange(id))()} />
                   <div className="h-px bg-border my-1" />
-                  {estadoNC && <NotaCancelacionRuido estado={estadoNC} className="my-1" />}
+                  {estadoNC && <NotaCancelacionRuido estado={estadoNC} activada={ncActivada} onToggle={onToggleCancelacionRuido} className="my-1" />}
                   <FilaMenu icon={Cloud} label={t("messenger.call.difuminarFondo")}
                     activa={esBlur(backgroundEffect)}
                     onClick={cerrarY(onToggleBlurBackground)} />

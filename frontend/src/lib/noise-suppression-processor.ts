@@ -480,24 +480,36 @@ export function supportsNoiseSuppression(): boolean {
 
 const NC_STORAGE_KEY = "call-noise-cancellation-enabled";
 
+/** Dónde se guarda la elección de cada persona, por navegador: "si" / "no". */
+export const CLAVE_RUIDO_USUARIO = "maven.ruido";
+
 /**
- * OBLIGATORIA DESDE EL 13/11/2026 (Alvaro). Antes (03/09) arrancaba activada
- * pero se podía apagar desde el menú del micrófono, y quien la apagaba una vez
- * quedaba apagado para siempre en ese navegador. Ahora siempre se arma: el botón
- * se quitó de la llamada y un «false» guardado de antes se IGNORA (y se borra,
- * para que no reaparezca si algún día vuelve el botón).
+ * ¿La persona quiere la cancelación de ruido? (Alvaro, 19/11/2026: «prendida
+ * para todos, y que cada uno la pueda apagar».)
  *
- * Lo que NO cambia: si el navegador no la soporta o el motor no carga, la cadena
- * cae a la puerta de antes o al micrófono crudo. Obligatoria nunca quiere decir
- * «sin audio». Si de verdad está corriendo lo mide lib/estadoNC.ts en cada
- * muestra de la llamada.
+ * Historia: del 03/09 al 13/11 había interruptor; del 13/11 al 19/11 fue
+ * obligatoria. Vuelve el interruptor con una clave NUEVA ("maven.ruido") y
+ * prendida por defecto: un «false» viejo de la clave anterior se borra y no
+ * cuenta, así nadie queda apagado por algo que eligió hace meses.
  *
- * Se conserva el nombre porque lo usan la llamada y el micrófono que el
- * supervisor de Cowork reparte a las salas.
+ * Apagada = sin DeepFilterNet y sin RNNoise: el micrófono sale con el
+ * noiseSuppression del navegador (se pide al capturar). Si el navegador no la
+ * soporta o el motor no carga, la cadena cae a la puerta o al micrófono crudo:
+ * nunca «sin audio». Lo usan la llamada y el micrófono que el supervisor de
+ * Cowork reparte a las salas.
  */
 export function loadNCPreference(): boolean {
   try {
     if (localStorage.getItem(NC_STORAGE_KEY) !== null) localStorage.removeItem(NC_STORAGE_KEY);
-  } catch { /* sin storage: da igual, es obligatoria */ }
-  return true;
+  } catch { /* sin storage */ }
+  try {
+    return localStorage.getItem(CLAVE_RUIDO_USUARIO) !== "no";
+  } catch {
+    return true;
+  }
+}
+
+/** Guarda la elección de la persona en este navegador. Nunca tira. */
+export function saveNCPreference(prendida: boolean): void {
+  try { localStorage.setItem(CLAVE_RUIDO_USUARIO, prendida ? "si" : "no"); } catch { /* sin storage: vale para esta llamada */ }
 }

@@ -2,6 +2,7 @@ import { Navigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { Loader2 } from "lucide-react";
 import { esCuentaDeCreadora } from "@/lib/portal/cuenta";
+import PuertaDeCobro from "@/components/cobros/PuertaDeCobro";
 
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const { user, loading } = useAuth();
@@ -24,7 +25,8 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
     return <Navigate to="/portal" replace />;
   }
 
-  return <>{children}</>;
+  // Bloqueo por pago (vagón 7): solo para quien entró por el edificio. En Kash no hace nada.
+  return <PuertaDeCobro>{children}</PuertaDeCobro>;
 };
 
 export default ProtectedRoute;

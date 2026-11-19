@@ -48,6 +48,9 @@ const FUERA_DEL_SHELL = new Set([
   "PortalEntrar", "PortalContrasena",
   // Subir contenido por link público (/aportar/:token): fuera del shell, la ventana scrollea sola.
   "PaginaAportar",
+  // Registro solo desde la portada (/empezar) y la vuelta de Stripe (/bienvenido):
+  // públicas, con el marco de las pantallas de entrar (vagón 7, 19/11/2026).
+  "Empezar", "Bienvenido",
 ]);
 
 /** El scroll de un MODAL no es el scroll de la página.

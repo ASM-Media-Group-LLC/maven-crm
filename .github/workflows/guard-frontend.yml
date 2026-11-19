@@ -64,6 +64,8 @@ on:
       - "supabase/tests/chat_programados.ts"
       - "supabase/tests/chat_agencia_y_huecos.ts"
       - "infra/nas-drive/**"
+      - "infra/edificio/**"
+      - ".github/workflows/deploy-edge-functions.yml"
       # El edificio (edificioNoTocaKash.test.ts lee sus scripts y workflows).
       - "infra/casas/**"
       - ".github/workflows/edificio-*.yml"

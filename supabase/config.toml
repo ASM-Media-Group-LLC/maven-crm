@@ -427,3 +427,31 @@ verify_jwt = false
 # adentro (es-admin), además del JWT de la puerta.
 [functions.centro-operaciones]
 verify_jwt = true
+
+# ─── Tren de agencias · vagón 7 (19/11/2026): cobros, puerta y Kash para mirar ───
+# Las tres primeras son SOLO del EDIFICIO (maven-agencias): están en
+# infra/casas/funciones-edificio.txt y en infra/casas/funciones-solo-edificio.txt,
+# así que «Deploy Edge Functions» (el de Kash) las salta. El bloque va aquí igual
+# porque la guarda exige uno por función y el workflow del edificio lee verify_jwt de aquí.
+
+# Cobros con Stripe. verify_jwt=false: el webhook de Stripe no trae JWT (se verifica
+# la firma con STRIPE_WEBHOOK_SECRET); registro es público con tope por IP; el resto
+# revisa la sesión adentro.
+[functions.cobros-stripe]
+verify_jwt = false
+
+# La puerta: «¿este correo vive en el edificio?» → solo sí/no, con tope por IP.
+# verify_jwt=false: quien pregunta todavía no entró.
+[functions.directorio]
+verify_jwt = false
+
+# Refresca la tarjeta de Kash (solo mirar) en el panel del dueño. La despierta un
+# reloj del edificio con X-Cron-Token.
+[functions.refrescar-externas]
+verify_jwt = false
+
+# ESTA SÍ ES DE KASH, y es SOLO LECTURA (Alvaro, 19/11/2026, tanda 5): cuenta y
+# resume (personas, en vivo, nota de Argos, gasto, alertas) sin datos personales.
+# verify_jwt=false: la llama el edificio con la llave dedicada X-Kash-Resumen-Token.
+[functions.kash-resumen]
+verify_jwt = false

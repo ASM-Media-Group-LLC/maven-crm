@@ -141,6 +141,16 @@ jobs:
         if: steps.cambios.outputs.correr == 'true'
         run: deno run -A --node-modules-dir=none --no-lock infra/edificio/tests/arbol.ts
 
+      # Vagón 7 (19/11): cobros con Stripe (firma del webhook, gracia de 7 días → bloqueo,
+      # recargas 25 → 50, Grace sin precios), la puerta (directorio) y la tarjeta de Kash.
+      # kash-resumen es la ÚNICA función nueva de Kash: la guarda comprueba que solo lee
+      # y que no saca datos personales.
+      - name: Guard — cobros, puerta y lectura de Kash
+        if: steps.cambios.outputs.correr == 'true'
+        run: |
+          deno test --allow-read supabase/functions/cobros-stripe/ supabase/functions/kash-resumen/ supabase/functions/refrescar-externas/
+          deno check supabase/functions/cobros-stripe/index.ts supabase/functions/directorio/index.ts supabase/functions/refrescar-externas/index.ts supabase/functions/kash-resumen/index.ts
+
       - name: Tipos — mail-fetch
         if: steps.cambios.outputs.correr == 'true'
         run: deno check supabase/functions/mail-fetch/index.ts supabase/functions/mail-fetch/programados.test.ts supabase/functions/mail-fetch/reacciones.test.ts
