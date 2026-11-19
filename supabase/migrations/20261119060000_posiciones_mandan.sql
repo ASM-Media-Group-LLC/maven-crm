@@ -24,6 +24,10 @@
 --   siguen como hoy en el código; se conectan uno por uno después (decisión
 --   de Alvaro, 19/11). Excepción: N:drive.empresa ya manda (drive_acceso_extra).
 
+-- El banco PGlite no trae todas las tablas/funciones de producción: los
+-- cuerpos se validan al correr, y las políticas van solo si existe es_dueno.
+set check_function_bodies = off;
+
 create table if not exists public.posiciones_catalogo (
   clave text primary key,
   modulo text not null,
@@ -32,9 +36,13 @@ create table if not exists public.posiciones_catalogo (
   datos text not null check (datos in ('tres','no'))
 );
 alter table public.posiciones_catalogo enable row level security;
-drop policy if exists posiciones_catalogo_dueno on public.posiciones_catalogo;
-create policy posiciones_catalogo_dueno on public.posiciones_catalogo for select to authenticated
-  using ((select public.es_dueno((select auth.uid()))));
+do $pol$ begin
+  if to_regprocedure('public.es_dueno(uuid)') is not null then
+    drop policy if exists posiciones_catalogo_dueno on public.posiciones_catalogo;
+    create policy posiciones_catalogo_dueno on public.posiciones_catalogo for select to authenticated
+      using ((select public.es_dueno((select auth.uid()))));
+  end if;
+end $pol$;
 
 insert into public.posiciones_catalogo (clave, modulo, sub, fila, datos) values
   ('Dashboard|*','Dashboard',null,'Dashboard','tres'),
@@ -190,9 +198,13 @@ create table if not exists public.posiciones_respaldo (
   datos jsonb not null
 );
 alter table public.posiciones_respaldo enable row level security;
-drop policy if exists posiciones_respaldo_dueno on public.posiciones_respaldo;
-create policy posiciones_respaldo_dueno on public.posiciones_respaldo for select to authenticated
-  using ((select public.es_dueno((select auth.uid()))));
+do $pol$ begin
+  if to_regprocedure('public.es_dueno(uuid)') is not null then
+    drop policy if exists posiciones_respaldo_dueno on public.posiciones_respaldo;
+    create policy posiciones_respaldo_dueno on public.posiciones_respaldo for select to authenticated
+      using ((select public.es_dueno((select auth.uid()))));
+  end if;
+end $pol$;
 
 -- Espejo de usePermissions.canAccess (sin el bypass de admin ni los ocultos).
 create or replace function public.rp_efectivo(_rid uuid, _mod text, _sub text)
@@ -517,9 +529,13 @@ begin
   if tg_op = 'DELETE' then return old; end if;
   return new;
 end $$;
-drop trigger if exists user_roles_protegidos on public.user_roles;
-create trigger user_roles_protegidos before insert or update or delete on public.user_roles
-  for each row execute function public.user_roles_protegidos();
+do $trg$ begin
+  if to_regclass('public.user_roles') is not null then
+    drop trigger if exists user_roles_protegidos on public.user_roles;
+    create trigger user_roles_protegidos before insert or update or delete on public.user_roles
+      for each row execute function public.user_roles_protegidos();
+  end if;
+end $trg$;
 
 revoke all on function public.posiciones_aplicar(boolean, boolean) from public, anon;
 revoke all on function public.posiciones_regresar() from public, anon;
