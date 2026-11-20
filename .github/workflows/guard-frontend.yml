@@ -66,6 +66,8 @@ on:
       - "infra/nas-drive/**"
       - "infra/edificio/**"
       - ".github/workflows/deploy-edge-functions.yml"
+      - ".github/workflows/kash-resumen-llave.yml"
+      - ".github/workflows/edificio-*.yml"
       # El edificio (edificioNoTocaKash.test.ts lee sus scripts y workflows).
       - "infra/casas/**"
       - ".github/workflows/edificio-*.yml"
