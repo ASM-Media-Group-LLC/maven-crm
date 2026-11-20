@@ -1,4 +1,4 @@
-import { AlarmClock, AlertTriangle, LogIn, TrendingDown, UserX } from "lucide-react";
+import { AlarmClock, AlertTriangle, CalendarClock, LogIn, TrendingDown, UserX } from "lucide-react";
 import { useLanguage } from "@/hooks/useLanguage";
 import type { FilaNumero } from "@/components/ui/ListaDeNumeros";
 import { useHoyDelEquipo } from "@/hooks/useHoyDelEquipo";
@@ -28,7 +28,8 @@ export function useAtajosDeHoy(habilitado: boolean): FilaNumero[] {
       .map((k, i) => ({ icono: [AlarmClock, LogIn, TrendingDown, UserX][i], etiqueta: t(k), valor: "…" }));
   }
 
-  const { llegaron, faltan, tarde, noTrabajan, porNota } = datos;
+  const { llegaron, faltan, tarde, noTrabajan, porNota, conTurno } = datos;
+  const sinConfirmar = conTurno.filter((p) => p.confirmado === false).length;
   const bajos = porNota.filter((p) => (p.nota ?? 100) < 60);
 
   return [
@@ -43,6 +44,13 @@ export function useAtajosDeHoy(habilitado: boolean): FilaNumero[] {
       valor: <span>{llegaron.length}<span className="text-sm text-muted-foreground">/{llegaron.length + faltan.length}</span></span>,
       detalle: t("dashboard.atajos.llegaronDetalle"),
       href: rutaDeCifra("llegaron"),
+    },
+    {
+      // Horarios de hoy (20/11/2026: «¿dónde miro los horarios?»).
+      icono: CalendarClock, tono: sinConfirmar > 0 ? "warning" : "primary", etiqueta: t("dashboard.atajos.horarios"),
+      valor: conTurno.length,
+      detalle: sinConfirmar > 0 ? t("dashboard.atajos.horariosSinConfirmar", { n: sinConfirmar }) : t("dashboard.atajos.horariosDetalle"),
+      href: rutaDeCifra("horarios"),
     },
     {
       icono: TrendingDown, tono: bajos.length > 0 ? "danger" : "success", etiqueta: t("dashboard.atajos.abajo"),

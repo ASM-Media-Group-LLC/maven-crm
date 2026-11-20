@@ -1,7 +1,7 @@
 import { useMemo, type ReactNode } from "react";
 import { Link, Navigate, useParams } from "react-router-dom";
 import {
-  AlarmClock, AlertTriangle, ArrowLeft, CheckCircle2, Clock, Gauge, Loader2, LogIn, MessageCircle, RefreshCw,
+  AlarmClock, AlertTriangle, ArrowLeft, CalendarClock, CheckCircle2, Clock, Gauge, Loader2, LogIn, MessageCircle, RefreshCw,
   Timer, TrendingDown, Users, UserX, type LucideIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -15,7 +15,7 @@ import { useMensajesPorPersona } from "@/hooks/useMensajesPorPersona";
 import { useVistaEnVivo } from "@/hooks/useVistaEnVivo";
 import { TarjetaEnVivo, type TonoCifra, type TonoEstado } from "@/components/vigilancia/TarjetaEnVivo";
 import { CIFRAS, esCifra, horasYMinutos, rutaDeCifra, type Cifra } from "@/lib/cifrasDeHoy";
-import { horaBogota } from "@/lib/llegadas";
+import { esMasTarde, horaBogota, minutoBogota, type PersonaDeHoy } from "@/lib/llegadas";
 import { PUNTOS_VIVOS } from "@/lib/motivosVivos";
 import type { EstadoVivo } from "@/hooks/useRondinVivo";
 import type { TranslationKey } from "@/lib/i18n";
@@ -28,20 +28,20 @@ import { cn } from "@/lib/utils";
 // (la ruta va con RutaDeVigilancia y los datos ya vienen filtrados).
 
 const ICONO: Record<Cifra, LucideIcon> = {
-  "tarde": AlarmClock, "llegaron": LogIn, "nota-baja": TrendingDown, "no-trabajan": UserX,
+  "tarde": AlarmClock, "llegaron": LogIn, "horarios": CalendarClock, "nota-baja": TrendingDown, "no-trabajan": UserX,
   "en-cowork": Users, "nota-equipo": Gauge, "trabajando": CheckCircle2, "con-problemas": AlertTriangle,
   "cowork-hoy": Clock, "mensajes": MessageCircle, "respuesta": Timer,
 };
 
 const TITULO: Record<Cifra, TranslationKey> = {
-  "tarde": "dashboard.hoy.t.tarde", "llegaron": "dashboard.hoy.t.llegaron", "nota-baja": "dashboard.hoy.t.notaBaja",
+  "tarde": "dashboard.hoy.t.tarde", "llegaron": "dashboard.hoy.t.llegaron", "horarios": "dashboard.hoy.t.horarios", "nota-baja": "dashboard.hoy.t.notaBaja",
   "no-trabajan": "dashboard.hoy.t.noTrabajan", "en-cowork": "dashboard.hoy.t.enCowork", "nota-equipo": "dashboard.hoy.t.notaEquipo",
   "trabajando": "dashboard.hoy.t.trabajando", "con-problemas": "dashboard.hoy.t.conProblemas", "cowork-hoy": "dashboard.hoy.t.coworkHoy",
   "mensajes": "dashboard.hoy.t.mensajes", "respuesta": "dashboard.hoy.t.respuesta",
 };
 
 const DESCRIPCION: Record<Cifra, TranslationKey> = {
-  "tarde": "dashboard.hoy.d.tarde", "llegaron": "dashboard.hoy.d.llegaron", "nota-baja": "dashboard.hoy.d.notaBaja",
+  "tarde": "dashboard.hoy.d.tarde", "llegaron": "dashboard.hoy.d.llegaron", "horarios": "dashboard.hoy.d.horarios", "nota-baja": "dashboard.hoy.d.notaBaja",
   "no-trabajan": "dashboard.hoy.d.noTrabajan", "en-cowork": "dashboard.hoy.d.enCowork", "nota-equipo": "dashboard.hoy.d.notaEquipo",
   "trabajando": "dashboard.hoy.d.trabajando", "con-problemas": "dashboard.hoy.d.conProblemas", "cowork-hoy": "dashboard.hoy.d.coworkHoy",
   "mensajes": "dashboard.hoy.d.mensajes", "respuesta": "dashboard.hoy.d.respuesta",
@@ -71,6 +71,8 @@ interface Item {
   estadoVivo?: EstadoVivo;
 }
 
+interface Grupo { titulo: string; items: Item[] }
+
 const esBaja = (nota: number | null | undefined) => nota != null && nota < 60;
 const conHoras = (horas: number) => horas > 0;
 const minutosDesde = (iso: string | null) => (iso ? Math.max(0, Math.round((Date.now() - Date.parse(iso)) / 60_000)) : null);
@@ -97,13 +99,22 @@ function Pantalla({ cifra }: { cifra: Cifra }) {
   const filaDe = useMemo(() => new Map((donde.data ?? []).map((f) => [f.user_id, f])), [donde.data]);
   const nombreDe = (id: string, otro?: string | null) => filaDe.get(id)?.nombre ?? otro ?? "—";
 
-  const { principales, secundarios, resumen, cargando, fallo, reintentar } = useMemo(() => {
-    const vacio = { principales: [] as Item[], secundarios: [] as Item[], resumen: "" as ReactNode };
+  const { principales, grupos, resumen, cargando, fallo, reintentar } = useMemo(() => {
+    const vacio = { principales: [] as Item[], grupos: [] as Grupo[], resumen: "" as ReactNode };
     const datos = hoy.datos;
     const pulso = pulsoQ.pulso;
     const faltan = (): Item[] => (datos?.faltan ?? []).map((p) => ({
       userId: p.userId, nombre: p.nombre, motivo: t("dashboard.hoy.m.noLlega", { e: p.entrada ?? "—" }), cifra: "—", tonoCifra: "mal" as TonoCifra,
     }));
+    const masTarde = (): Item[] => (datos?.entranMasTarde ?? []).map((p) => ({
+      userId: p.userId, nombre: p.nombre, motivo: t("dashboard.hoy.m.entraA", { e: p.entrada ?? "—" }), cifra: p.entrada ?? undefined, tonoCifra: "neutro" as TonoCifra,
+    }));
+    // Debajo de «Llegaron tarde» y «Llegaron»: quién falta y quién entra más tarde
+    // (20/11/2026: el turno de la tarde ya no sale como «llegó a las 12:00 a. m.»).
+    const deLlegada = (): Grupo[] => [
+      { titulo: t("dashboard.hoy.todaviaNo", { n: datos?.faltan.length ?? 0 }), items: faltan() },
+      { titulo: t("dashboard.hoy.masTarde", { n: datos?.entranMasTarde.length ?? 0 }), items: masTarde() },
+    ].filter((g) => g.items.length > 0);
     switch (cifra) {
       case "tarde": {
         if (!datos) return { ...vacio, cargando: hoy.cargando, fallo: hoy.fallo, reintentar: hoy.reintentar };
@@ -112,7 +123,7 @@ function Pantalla({ cifra }: { cifra: Cifra }) {
             userId: p.userId, nombre: p.nombre, tonoCifra: "ojo" as TonoCifra, cifra: `+${min(p.tardeMin ?? 0)}`,
             motivo: t("dashboard.hoy.m.tarde", { h: horaBogota(p.llegoAt!), e: p.entrada ?? "—" }),
           })),
-          secundarios: faltan(),
+          grupos: deLlegada(),
           resumen: datos.tarde.length,
           cargando: false, fallo: false, reintentar: hoy.reintentar,
         };
@@ -125,8 +136,33 @@ function Pantalla({ cifra }: { cifra: Cifra }) {
             tonoCifra: (p.tardeMin != null ? "ojo" : "bien") as TonoCifra,
             motivo: p.tardeMin != null ? t("dashboard.hoy.m.llegoTarde", { m: min(p.tardeMin) }) : p.entrada ? t("dashboard.hoy.m.aTiempo", { e: p.entrada }) : t("dashboard.hoy.m.sinHorario"),
           })),
-          secundarios: faltan(),
+          grupos: deLlegada(),
           resumen: `${datos.llegaron.length}/${datos.llegaron.length + datos.faltan.length}`,
+          cargando: false, fallo: false, reintentar: hoy.reintentar,
+        };
+      }
+      case "horarios": {
+        if (!datos) return { ...vacio, cargando: hoy.cargando, fallo: hoy.fallo, reintentar: hoy.reintentar };
+        const ahora = minutoBogota(new Date().toISOString()) ?? 0;
+        const llego = new Map(datos.llegaron.map((p) => [p.userId, p] as const));
+        const item = (p: PersonaDeHoy): Item => {
+          const l = llego.get(p.userId);
+          return {
+            userId: p.userId, nombre: p.nombre, cifra: p.entrada ?? undefined,
+            tonoCifra: (l ? (l.tardeMin != null ? "ojo" : "bien") : "neutro") as TonoCifra,
+            motivo: l ? t("dashboard.hoy.m.llegoA", { h: horaBogota(l.llegoAt!) })
+              : esMasTarde(p.entradaMin, ahora) ? t("dashboard.hoy.m.entraA", { e: p.entrada ?? "—" })
+              : t("dashboard.hoy.m.noHaMarcado"),
+          };
+        };
+        const sinConfirmar = datos.conTurno.filter((p) => p.confirmado === false);
+        return {
+          principales: datos.conTurno.filter((p) => p.confirmado !== false).map(item),
+          grupos: [
+            { titulo: t("dashboard.hoy.sinConfirmarN", { n: sinConfirmar.length }), items: sinConfirmar.map(item) },
+            { titulo: t("dashboard.hoy.descansanN", { n: datos.sinTurno.length }), items: datos.sinTurno.map((p) => ({ userId: p.userId, nombre: p.nombre, motivo: t("dashboard.hoy.m.sinTurnoHoy") })) },
+          ].filter((g) => g.items.length > 0),
+          resumen: datos.conTurno.length,
           cargando: false, fallo: false, reintentar: hoy.reintentar,
         };
       }
@@ -135,7 +171,7 @@ function Pantalla({ cifra }: { cifra: Cifra }) {
         const bajos = datos.porNota.filter((p) => esBaja(p.nota)).sort((a, b) => (a.nota ?? 0) - (b.nota ?? 0));
         return {
           principales: bajos.map((p) => ({ userId: p.userId, nombre: p.nombre, cifra: p.nota ?? "—", tonoCifra: "mal" as TonoCifra, motivo: t("dashboard.hoy.m.notaDelDia") })),
-          secundarios: [], resumen: bajos.length, cargando: false, fallo: hoy.falloNotas, reintentar: hoy.reintentar,
+          grupos: [], resumen: bajos.length, cargando: false, fallo: hoy.falloNotas, reintentar: hoy.reintentar,
         };
       }
       case "no-trabajan": {
@@ -151,7 +187,7 @@ function Pantalla({ cifra }: { cifra: Cifra }) {
                 : p.estadoDesde ? t("dashboard.hoy.m.estadoDesde", { e: t(ESTADO_DONDE[p.estado] ?? "hr.donde.estado.otro"), h: horaBogota(p.estadoDesde) }) : t(ESTADO_DONDE[p.estado] ?? "hr.donde.estado.otro"),
             };
           }),
-          secundarios: [], resumen: datos.noTrabajan.length, cargando: false, fallo: false, reintentar: hoy.reintentar,
+          grupos: [], resumen: datos.noTrabajan.length, cargando: false, fallo: false, reintentar: hoy.reintentar,
         };
       }
       case "en-cowork": {
@@ -162,7 +198,7 @@ function Pantalla({ cifra }: { cifra: Cifra }) {
             userId: f.user_id, nombre: f.nombre ?? "—",
             motivo: f.estado_desde ? t("dashboard.hoy.m.estadoDesde", { e: t(ESTADO_DONDE[f.estado] ?? "hr.donde.estado.otro"), h: horaBogota(f.estado_desde) }) : t(ESTADO_DONDE[f.estado] ?? "hr.donde.estado.otro"),
           })),
-          secundarios: [], resumen: adentro.length, cargando: false, fallo: false, reintentar: () => void donde.refetch(),
+          grupos: [], resumen: adentro.length, cargando: false, fallo: false, reintentar: () => void donde.refetch(),
         };
       }
       case "nota-equipo":
@@ -186,7 +222,7 @@ function Pantalla({ cifra }: { cifra: Cifra }) {
               tonoCifra: (cifra === "trabajando" ? "bien" : cifra === "con-problemas" ? "mal" : puntos == null ? "neutro" : esBaja(puntos) ? "mal" : "bien") as TonoCifra,
             };
           }),
-          secundarios: [],
+          grupos: [],
           resumen: cifra === "nota-equipo" ? (pulso.notaViva ?? "—") : lista.length,
           cargando: false, fallo: false, reintentar: pulsoQ.reintentar,
         };
@@ -198,7 +234,7 @@ function Pantalla({ cifra }: { cifra: Cifra }) {
         const tot = horasYMinutos(total);
         return {
           principales: filas.map(([id, x]) => { const hm = horasYMinutos(x.horas); return { userId: id, nombre: nombreDe(id), cifra: t("dashboard.atajos.horas", { h: hm.h, m: String(hm.m).padStart(2, "0") }), tonoCifra: "neutro" as TonoCifra, motivo: t("dashboard.hoy.m.enElReloj") }; }),
-          secundarios: [], resumen: t("dashboard.atajos.horas", { h: tot.h, m: String(tot.m).padStart(2, "0") }),
+          grupos: [], resumen: t("dashboard.atajos.horas", { h: tot.h, m: String(tot.m).padStart(2, "0") }),
           cargando: false, fallo: false, reintentar: tiempo.reintentar,
         };
       }
@@ -210,14 +246,14 @@ function Pantalla({ cifra }: { cifra: Cifra }) {
           filas.sort((a, b) => b[1].mensajes - a[1].mensajes);
           return {
             principales: filas.map(([id, x]) => ({ userId: id, nombre: nombreDe(id), cifra: x.mensajes, tonoCifra: "neutro" as TonoCifra, motivo: t("dashboard.hoy.m.conversaciones", { n: x.conversaciones }) })),
-            secundarios: [], resumen: filas.reduce((a, [, x]) => a + x.mensajes, 0), cargando: false, fallo: false, reintentar: () => void mensajes.refetch(),
+            grupos: [], resumen: filas.reduce((a, [, x]) => a + x.mensajes, 0), cargando: false, fallo: false, reintentar: () => void mensajes.refetch(),
           };
         }
         const conTiempo = filas.filter(([, x]) => x.respuestaS != null).sort((a, b) => (b[1].respuestaS ?? 0) - (a[1].respuestaS ?? 0));
         const prom = conTiempo.length ? conTiempo.reduce((a, [, x]) => a + (x.respuestaS ?? 0), 0) / conTiempo.length : null;
         return {
           principales: conTiempo.map(([id, x]) => ({ userId: id, nombre: nombreDe(id), cifra: seg(x.respuestaS ?? 0), tonoCifra: "neutro" as TonoCifra, motivo: t("dashboard.hoy.m.mensajesEn", { n: x.mensajes, c: x.conversaciones }) })),
-          secundarios: [], resumen: prom == null ? "—" : seg(prom), cargando: false, fallo: false, reintentar: () => void mensajes.refetch(),
+          grupos: [], resumen: prom == null ? "—" : seg(prom), cargando: false, fallo: false, reintentar: () => void mensajes.refetch(),
         };
       }
     }
@@ -225,7 +261,15 @@ function Pantalla({ cifra }: { cifra: Cifra }) {
   }, [cifra, hoy.datos, hoy.cargando, hoy.fallo, hoy.cargandoNotas, hoy.falloNotas, pulsoQ.pulso, pulsoQ.cargando, pulsoQ.error,
       donde.data, donde.isLoading, donde.isError, tiempo.porPersona, tiempo.cargando, tiempo.fallo, mensajes.data, mensajes.isLoading, mensajes.isError, filaDe, t]);
 
-  const ids = useMemo(() => [...principales, ...secundarios].map((i) => i.userId), [principales, secundarios]);
+  const ids = useMemo(() => [...principales, ...grupos.flatMap((g) => g.items)].map((i) => i.userId), [principales, grupos]);
+  // El turno de hoy de cada uno, en su tarjeta (20/11/2026: «¿dónde miro los horarios?»).
+  const turnoPor = useMemo(() => new Map([...(hoy.datos?.conTurno ?? [])].map((p) => [p.userId, p] as const)), [hoy.datos]);
+  const turnoDe = (id: string): string | null => {
+    const p = turnoPor.get(id);
+    if (!p) return hoy.datos ? t("dashboard.hoy.sinTurnoHoy") : null;
+    const base = `${p.entrada ?? "—"} – ${p.salida ?? "—"}`;
+    return p.confirmado === false ? `${base} · ${t("dashboard.hoy.sinConfirmar")}` : base;
+  };
   const vista = useVistaEnVivo(ids);
   const fotos = useFotosDe(ids).data ?? {};
   const Icono = ICONO[cifra];
@@ -240,7 +284,7 @@ function Pantalla({ cifra }: { cifra: Cifra }) {
     return (
       <TarjetaEnVivo key={i.userId} userId={i.userId} nombre={i.nombre} equipo={f?.equipo} foto={fotos[i.userId]}
         vista={vista(i.userId)} estado={estado} motivo={i.motivo} cifra={i.cifra} tonoCifra={i.tonoCifra}
-        enPantalla={[app, que].filter(Boolean).join(" · ") || null} enlace={`/hr/en-vivo/${i.userId}`} volverA={volverA} />
+        enPantalla={[app, que].filter(Boolean).join(" · ") || null} turno={turnoDe(i.userId)} enlace={`/hr/en-vivo/${i.userId}`} volverA={volverA} />
     );
   };
 
@@ -250,6 +294,10 @@ function Pantalla({ cifra }: { cifra: Cifra }) {
         <div className="flex flex-wrap items-center gap-3">
           <Button asChild variant="ghost" size="sm" className="-ml-2 gap-1.5 rounded-full text-muted-foreground">
             <Link to="/dashboard"><ArrowLeft className="h-4 w-4" />{t("dashboard.hoy.volver")}</Link>
+          </Button>
+          {/* Los horarios se corrigen ahí (Alvaro, 20/11/2026). */}
+          <Button asChild variant="outline" size="sm" className="ml-auto gap-1.5 rounded-full">
+            <Link to="/hr/horarios-equipo" state={{ volverA }}><CalendarClock className="h-4 w-4" />{t("dashboard.hoy.horarios")}</Link>
           </Button>
         </div>
         <header className="vidrio flex flex-wrap items-center gap-4 p-5">
@@ -278,19 +326,19 @@ function Pantalla({ cifra }: { cifra: Cifra }) {
           </div>
         ) : cargando ? (
           <div className="flex justify-center p-12"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
-        ) : principales.length === 0 && secundarios.length === 0 ? (
+        ) : principales.length === 0 && grupos.length === 0 ? (
           <div className="vidrio p-8 text-center text-sm text-muted-foreground">{t("dashboard.hoy.nadie")}</div>
         ) : (
           <>
             {principales.length > 0 && (
               <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">{principales.map(tarjeta)}</ul>
             )}
-            {secundarios.length > 0 && (
-              <section className="flex flex-col gap-3">
-                <h2 className="text-sm font-semibold text-muted-foreground">{t("dashboard.hoy.todaviaNo", { n: secundarios.length })}</h2>
-                <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">{secundarios.map(tarjeta)}</ul>
+            {grupos.map((g) => (
+              <section key={g.titulo} className="flex flex-col gap-3">
+                <h2 className="text-sm font-semibold text-muted-foreground">{g.titulo}</h2>
+                <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">{g.items.map(tarjeta)}</ul>
               </section>
-            )}
+            ))}
           </>
         )}
       </div>

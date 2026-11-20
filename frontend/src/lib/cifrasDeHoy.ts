@@ -3,7 +3,7 @@
 // Presencia de Argos). Cada número del inicio lleva a /hoy/<cifra>.
 
 export const CIFRAS = [
-  "tarde", "llegaron", "nota-baja", "no-trabajan",
+  "tarde", "llegaron", "horarios", "nota-baja", "no-trabajan",
   "en-cowork", "nota-equipo", "trabajando", "con-problemas",
   "cowork-hoy", "mensajes", "respuesta",
 ] as const;

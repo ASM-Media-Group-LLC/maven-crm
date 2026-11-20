@@ -43,6 +43,8 @@ export interface TarjetaEnVivoProps {
   tonoCifra?: TonoCifra;
   /** Qué tiene en pantalla ahora (la línea de Argos). */
   enPantalla?: string | null;
+  /** Su turno de hoy («4:00 PM – 12:00 AM · sin confirmar»). */
+  turno?: string | null;
   /** A dónde lleva el toque (su vista en vivo). */
   enlace: string;
   volverA: string;
@@ -99,6 +101,12 @@ export function TarjetaEnVivo(p: TarjetaEnVivoProps) {
         <dl className="mt-auto grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-1 border-t border-border/30 px-3 py-2.5 text-[11.5px] leading-snug">
           <dt className="whitespace-nowrap text-muted-foreground">{t("dashboard.hoy.porQue")}</dt>
           <dd className="truncate text-foreground/90">{p.motivo}</dd>
+          {p.turno && (
+            <>
+              <dt className="whitespace-nowrap text-muted-foreground">{t("dashboard.hoy.turno")}</dt>
+              <dd className="truncate tabular-nums text-foreground/80">{p.turno}</dd>
+            </>
+          )}
           {p.enPantalla && (
             <>
               <dt className="whitespace-nowrap text-muted-foreground">{t("dashboard.hoy.enPantalla")}</dt>

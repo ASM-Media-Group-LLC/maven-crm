@@ -47,12 +47,59 @@ export function minutosTarde(entrada: string | null | undefined, llegoIso: strin
   return dif > TOLERANCIA_TARDE_MIN ? dif : null;
 }
 
+/** ¿Su turno de hoy todavía no empieza? */
+export function esMasTarde(entradaMin: number | null, ahoraMin: number): boolean {
+  return entradaMin != null && entradaMin > ahoraMin;
+}
+
+/** De qué día es un turno (20/11/2026: «un turno que cruza la medianoche es del
+ *  día en que empieza»): el día de Bogotá de su marca de entrada, corrido 30 min
+ *  para que quien marca a las 11:45 p. m. un turno de las 12:00 a. m. cuente al
+ *  día siguiente. */
+export function diaDelTurno(inicioIso: string): string {
+  return new Date(Date.parse(inicioIso) + 30 * 60_000).toLocaleDateString("en-CA", { timeZone: "America/Bogota" });
+}
+
+/** CUÁNDO LLEGÓ CADA UNO HOY (20/11/2026: «está todo mezclado, de hoy y de
+ *  ayer»). Manda su marca de entrada del turno de hoy (lo mismo que usa Argos).
+ *  Quien no marca (los que no están obligados) usa su primera entrada a Cowork,
+ *  pero no si es la cola del turno de anoche: tiene que ser desde una hora antes
+ *  de su entrada de hoy. */
+export function llegadasDeHoy(
+  hoy: string,
+  marcas: Array<{ user_id: string; inicio: string }>,
+  primerIngreso: Map<string, string>,
+  entradaDe: (userId: string) => string | null,
+): Map<string, string> {
+  const m = new Map<string, string>();
+  for (const x of marcas) {
+    if (diaDelTurno(x.inicio) !== hoy) continue;
+    const antes = m.get(x.user_id);
+    if (!antes || Date.parse(x.inicio) < Date.parse(antes)) m.set(x.user_id, x.inicio);
+  }
+  const conMarca = new Set(marcas.filter((x) => diaDelTurno(x.inicio) === hoy).map((x) => x.user_id));
+  for (const [uid, iso] of primerIngreso) {
+    if (conMarca.has(uid) || m.has(uid)) continue;
+    const e = minutoDeHora(entradaDe(uid));
+    const l = minutoBogota(iso);
+    if (e != null && l != null && l < e - 60) continue; // la cola de anoche
+    m.set(uid, iso);
+  }
+  return m;
+}
+
 export interface PersonaDeHoy {
   userId: string;
   nombre: string;
   equipo: string | null;
   /** Hora de entrada de su horario de hoy, «HH:MM». */
   entrada: string | null;
+  /** La misma entrada como minuto del día (para saber si su turno ya empezó). */
+  entradaMin: number | null;
+  /** Salida de su horario de hoy, «HH:MM» (am/pm). */
+  salida: string | null;
+  /** ¿Su horario está confirmado por RR. HH.? null = no se pudo leer. */
+  confirmado: boolean | null;
   /** Primera vez que entró a Cowork hoy (ISO). */
   llegoAt: string | null;
   tardeMin: number | null;
@@ -67,6 +114,12 @@ export interface HoyDelEquipo {
   llegaron: PersonaDeHoy[];
   /** Los que debían estar y todavía no entran. */
   faltan: PersonaDeHoy[];
+  /** Los que tienen turno hoy pero todavía no les toca (20/11/2026): ni faltan ni llegaron. */
+  entranMasTarde: PersonaDeHoy[];
+  /** Todos los que tienen turno hoy, por hora de entrada (Horarios de hoy). */
+  conTurno: PersonaDeHoy[];
+  /** Los que hoy no tienen turno (descanso o sin horario). */
+  sinTurno: PersonaDeHoy[];
   /** Los que entraron con más de 5 min de retraso, el más tarde primero. */
   tarde: PersonaDeHoy[];
   /** En su turno y no están trabajando: fuera de Cowork, sin pantalla, sin cámara… */
@@ -84,6 +137,8 @@ export function armarHoyDelEquipo(
   /** Quiénes tienen el horario confirmado (19/11/2026). Sin confirmar: ni tarde ni
    *  falta. null = no se pudo leer → se mide como antes. */
   confirmados: Set<string> | null = null,
+  /** Minuto del día de ahora en Bogotá (para «entran más tarde»). */
+  ahoraMin: number = minutoBogota(new Date().toISOString()) ?? 0,
 ): HoyDelEquipo {
   const personas: PersonaDeHoy[] = donde.map((f) => {
     const llegoAt = llegadas.get(f.user_id) ?? null;
@@ -92,6 +147,9 @@ export function armarHoyDelEquipo(
       nombre: f.nombre ?? "—",
       equipo: f.equipo,
       entrada: f.entrada ? a12(f.entrada.slice(0, 5)) : null,
+      entradaMin: minutoDeHora(f.entrada),
+      salida: f.salida ? a12(f.salida.slice(0, 5)) : null,
+      confirmado: confirmados ? confirmados.has(f.user_id) : null,
       llegoAt,
       tardeMin: !confirmados || confirmados.has(f.user_id) ? minutosTarde(f.entrada, llegoAt) : null,
       estado: f.estado,
@@ -102,6 +160,9 @@ export function armarHoyDelEquipo(
   const llegaron = personas.filter((p) => p.llegoAt)
     .sort((a, b) => Date.parse(a.llegoAt!) - Date.parse(b.llegoAt!));
   const faltan = personas.filter((p) => !p.llegoAt && p.estado === "no_ha_entrado" && (!confirmados || confirmados.has(p.userId)));
+  const entranMasTarde = personas
+    .filter((p) => !p.llegoAt && p.estado !== "no_ha_entrado" && esMasTarde(p.entradaMin, ahoraMin))
+    .sort((a, b) => (a.entradaMin ?? 0) - (b.entradaMin ?? 0));
   const tarde = llegaron.filter((p) => p.tardeMin != null).sort((a, b) => b.tardeMin! - a.tardeMin!);
   // Mismo criterio que Presencia: rojo y naranja en su turno (gris = fuera de turno).
   const noTrabajan = personas.filter((p) => {
@@ -109,7 +170,9 @@ export function armarHoyDelEquipo(
     return tono === "rojo" || tono === "naranja";
   });
   const porNota = personas.filter((p) => p.nota != null).sort((a, b) => a.nota! - b.nota!);
-  return { llegaron, faltan, tarde, noTrabajan, porNota };
+  const conTurno = personas.filter((p) => p.entradaMin != null).sort((a, b) => (a.entradaMin ?? 0) - (b.entradaMin ?? 0));
+  const sinTurno = personas.filter((p) => p.entradaMin == null);
+  return { llegaron, faltan, entranMasTarde, conTurno, sinTurno, tarde, noTrabajan, porNota };
 }
 
 export interface DiaPuntual {
