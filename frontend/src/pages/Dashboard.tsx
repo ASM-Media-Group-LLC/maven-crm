@@ -9,6 +9,7 @@ import { useUserRole } from "@/hooks/useUserRole";
 import { usePermissions } from "@/hooks/usePermissions";
 import { useRoleTier } from "@/hooks/useRoleTier";
 import { useEsRh } from "@/hooks/useEsRh";
+import { TarjetaHoyInicio } from "@/components/ausencias/TarjetaHoyInicio";
 
 // Los importadores sueltos sirven para PRECARGAR (ver el efecto del Dashboard):
 // lazy() y la precarga piden el mismo módulo, así que es el mismo chunk.
@@ -49,7 +50,7 @@ const Cargando = () => (
 //    de otros módulos (Rendimiento Semanal, Actividad Reciente, Pipeline, Top
 //    5 Creadoras, CS, Closers, RRHH), cada uno disponible en su módulo.
 //  · **El resto** → el genérico, hasta que tengan el suyo.
-const Dashboard = () => {
+const Repartidor = () => {
   const { isChatter, role, isLoading } = useUserRole();
   const { canAccess, isLoading: permisosCargando } = usePermissions();
   const { tier, isLoading: tierCargando } = useRoleTier();
@@ -150,5 +151,14 @@ const Dashboard = () => {
   // tablero genérico mostraba números de toda la empresa y ya no se usa aquí.
   return <MiTablero />;
 };
+
+// «Hoy en tu equipo» (20/11/2026): arriba de cualquier tablero, solo para quien
+// ve a otras personas en Asistencia (la tarjeta decide sola si se dibuja).
+const Dashboard = () => (
+  <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+    <TarjetaHoyInicio />
+    <Repartidor />
+  </div>
+);
 
 export default Dashboard;

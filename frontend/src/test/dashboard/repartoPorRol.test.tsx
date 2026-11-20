@@ -13,6 +13,8 @@ vi.mock("@/hooks/useUserRole", () => ({ useUserRole: () => rol }));
 vi.mock("@/hooks/usePermissions", () => ({ usePermissions: () => permisos }));
 vi.mock("@/hooks/useRoleTier", () => ({ useRoleTier: () => tier }));
 vi.mock("@/hooks/useEsRh", () => ({ useEsRh: () => rh }));
+// La tarjeta «Hoy en tu equipo» (Asistencia, 20/11/2026) va arriba de cualquier tablero: aquí no se prueba.
+vi.mock("@/components/ausencias/TarjetaHoyInicio", () => ({ TarjetaHoyInicio: () => null }));
 // «Solo lo suyo» (10/11) reemplazó al genérico: quien no tiene tablero de su área cae aquí.
 vi.mock("@/pages/dashboard/MiTablero", () => ({ default: () => <div>MIO</div> }));
 vi.mock("@/pages/dashboard/TableroRRHH", () => ({ default: () => <div>RRHH</div> }));

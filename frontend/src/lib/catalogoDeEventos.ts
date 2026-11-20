@@ -107,6 +107,17 @@ export const CATALOGO_DE_EVENTOS: readonly ModuloDeAvisos[] = [
   modulo("Evaluador", "int.events.module.evaluador", "Evaluator", [
     evento("chatter_evaluation", "int.events.chatterEvaluation", ["in_app", "push", "email"]),
   ]),
+  // Ausencias (20/11/2026): los manda la base (ausencias_avisar mira
+  // notif_canal_activo antes de insertar). Para todos (cada uno recibe lo suyo).
+  modulo("Ausencias", "aus.ev.modulo", null, [
+    evento("ausencia_solicitada", "aus.ev.solicitada", ["in_app", "push", "email"], "aus.ev.solicitadaDesc"),
+    evento("ausencia_por_aprobar", "aus.ev.porAprobar", ["in_app", "push", "email"], "aus.ev.porAprobarDesc"),
+    evento("ausencia_aprobada", "aus.ev.aprobada", ["in_app", "push", "email"]),
+    evento("ausencia_rechazada", "aus.ev.rechazada", ["in_app", "push", "email"]),
+    evento("ausencia_pendiente_48h", "aus.ev.pendiente48", ["in_app", "push", "email"]),
+    evento("ausencia_regreso", "aus.ev.regreso", ["in_app", "push"]),
+    evento("permiso_especial", "aus.ev.permisoEspecial", ["in_app", "push", "email"]),
+  ]),
   modulo("Creadoras", "int.events.module.creadoras", "Creadores", [
     evento("onboarding_inactivity", "int.events.onboardingInactivity", ["in_app", "push", "email"]),
     evento("onboarding_complete", "int.events.onboardingComplete", ["in_app", "push", "email"]),

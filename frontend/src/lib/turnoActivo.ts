@@ -37,9 +37,14 @@ export interface DatosTurno {
   abierta: boolean;
   turno_inicio: string | null;
   turno_fin: string | null;
+  /** Ausencia aprobada (o festivo) en este momento: mi_ausencia_hoy.ahora, la
+   *  misma regla que ausente_ahora() en el servidor (20/11/2026). */
+  ausente?: boolean;
 }
 
 export function calcularEnTurno(t: DatosTurno, ahora: number): boolean {
+  // Durante una ausencia aprobada nadie mira: ni capturas, ni llamados, ni Cowork.
+  if (t.ausente) return false;
   if (!t.aplica) return true;
   if (t.obligatorio) return t.abierta;
   if (!t.turno_inicio || !t.turno_fin) return false;

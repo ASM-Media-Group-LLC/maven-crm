@@ -54,6 +54,7 @@ import { guiaApp } from "./i18n/guiaApp";
 import { posiciones } from "./i18n/posiciones";
 import { plataforma } from "./i18n/plataforma";
 import { cobros } from "./i18n/cobros";
+import { ausencias } from "./i18n/ausencias";
 
 // EL DICCIONARIO, PARTIDO POR MÓDULO.
 //
@@ -118,6 +119,7 @@ const translations = {
   ...posiciones,
   ...plataforma,
   ...cobros,
+  ...ausencias,
 } as const;
 
 export type TranslationKey = keyof typeof translations;

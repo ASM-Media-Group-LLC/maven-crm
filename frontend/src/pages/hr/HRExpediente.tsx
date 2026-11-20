@@ -30,6 +30,7 @@ import { AhoraEnVivo } from "@/components/hr/AhoraEnVivo";
 import { CronologiaDelDia } from "@/components/hr/CronologiaDelDia";
 import { useDisenoPulido } from "@/hooks/useDisenoPulido";
 import { Mail } from "lucide-react";
+import { PerfilLaboral } from "@/components/ausencias/PerfilLaboral";
 
 // Expediente del empleado, estilo Hubstaff: se abre en HOY, con su nota y sus
 // horas arriba, y la TIRA de pantallazos del día —cada pantalla con su cámara
@@ -1224,6 +1225,9 @@ export default function HRExpediente() {
 
       {/* Qué le dijo Argos ese día: cronología de nudges (Alvaro, 09/11). */}
       {userId && <AvisosDeArgos userId={userId} fecha={dia.fecha} />}
+
+      {/* Vacaciones, fecha de ingreso y permisos especiales (20/11/2026). */}
+      {userId && <PerfilLaboral userId={userId} />}
 
     </Page>
   );

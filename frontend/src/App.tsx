@@ -173,7 +173,6 @@ const HRDashboard = lazy(() => import("./pages/hr/HRDashboard"));
 const EmployeeDirectory = lazy(() => import("./pages/hr/EmployeeDirectory"));
 const EmployeeNew = lazy(() => import("./pages/hr/EmployeeNew"));
 const EmployeeProfile = lazy(() => import("./pages/hr/EmployeeProfile"));
-const HRAbsences = lazy(() => import("./pages/hr/HRAbsences"));
 const HRIncidents = lazy(() => import("./pages/hr/HRIncidents"));
 const HRApplicants = lazy(() => import("./pages/hr/HRApplicants"));
 const HRTraining = lazy(() => import("./pages/hr/HRTraining"));
@@ -181,15 +180,9 @@ const HRTrainingChatters = lazy(() => import("./pages/hr/HRTrainingChatters"));
 const HRTrainingTech = lazy(() => import("./pages/hr/HRTrainingTech"));
 const HRPerformance = lazy(() => import("./pages/hr/HRPerformance"));
 const HRPerformanceNew = lazy(() => import("./pages/hr/HRPerformanceNew"));
-const HRAttendance = lazy(() => import("./pages/hr/HRAttendance"));
-const HRVacations = lazy(() => import("./pages/hr/HRVacations"));
-const HRPermisos = lazy(() => import("./pages/hr/HRPermisos"));
 const HRPermisoNew = lazy(() => import("./pages/hr/HRPermisoNew"));
-const HRSchedules = lazy(() => import("./pages/hr/HRSchedules"));
-const HRStaffSchedules = lazy(() => import("./pages/hr/HRStaffSchedules"));
 const HROvertimeDetail = lazy(() => import("./pages/hr/HROvertimeDetail"));
 const HRHourBank = lazy(() => import("./pages/hr/HRHourBank"));
-const HRChatterSchedules = lazy(() => import("./pages/hr/HRChatterSchedules"));
 const HRIncidentNew = lazy(() => import("./pages/hr/HRIncidentNew"));
 const HRApplicantNew = lazy(() => import("./pages/hr/HRApplicantNew"));
 const HROnboarding = lazy(() => import("./pages/hr/HROnboarding"));
@@ -199,6 +192,9 @@ const HROffboardingNew = lazy(() => import("./pages/hr/HROffboardingNew"));
 const HRMonitoring = lazy(() => import("./pages/hr/HRMonitoring"));
 const HRMonitorIA = lazy(() => import("./pages/hr/HRMonitorIA"));
 const HorariosEquipo = lazy(() => import("./pages/hr/HorariosEquipo"));
+// Asistencia y Mis días (20/11/2026): el tiempo del equipo en un solo lugar.
+const Asistencia = lazy(() => import("./pages/asistencia/Asistencia"));
+const MisDias = lazy(() => import("./pages/asistencia/MisDias"));
 const CasoArgos = lazy(() => import("./pages/argos/CasoArgos"));
 const ResumenArgos = lazy(() => import("./pages/argos/ResumenArgos"));
 const HRExpediente = lazy(() => import("./pages/hr/HRExpediente"));
@@ -480,6 +476,9 @@ const App = () => (
                 <Route path="/correo/conectar" element={<CorreoConectarPage />} />
                 <Route path="/messenger" element={<PermissionRoute module="Messenger"><Messenger /></PermissionRoute>} />
                 <Route path="/cowork" element={<PermissionRoute module="Cowork"><CoworkPage /></PermissionRoute>} />
+                {/* Asistencia (al lado de Cowork) y Mis días: quién ve a quién lo decide el servidor por puesto. */}
+                <Route path="/asistencia" element={<Asistencia />} />
+                <Route path="/mis-dias" element={<MisDias />} />
                 <Route path="/meet" element={<PermissionRoute module="Meet"><MeetPage /></PermissionRoute>} />
                 <Route path="/grabaciones" element={<PermissionRoute module="Grabaciones"><GrabacionesPage /></PermissionRoute>} />
                 {/* ⚠️ `/oficina/hojas` y `/oficina/:id` compiten por la misma
@@ -523,7 +522,8 @@ const App = () => (
                 <Route path="/hr/directorio" element={<PermissionRoute module="HR" submodule="Empleados Activos"><HRLayout><EmployeeDirectory /></HRLayout></PermissionRoute>} />
                 <Route path="/hr/empleado/nuevo" element={<PermissionRoute module="HR" submodule="Empleados Activos"><HRLayout><EmployeeNew /></HRLayout></PermissionRoute>} />
                 <Route path="/hr/empleado/:id" element={<PermissionRoute module="HR" submodule="Empleados Activos"><HRLayout><EmployeeProfile /></HRLayout></PermissionRoute>} />
-                <Route path="/hr/ausencias" element={<PermissionRoute module="HR" submodule="Vacaciones"><HRLayout><HRAbsences /></HRLayout></PermissionRoute>} />
+                {/* Las pantallas sueltas de tiempo se mudaron a Asistencia (20/11/2026): los links viejos siguen sirviendo. */}
+                <Route path="/hr/ausencias" element={<Navigate to="/asistencia?tab=ausencias" replace />} />
                 <Route path="/hr/incidentes" element={<PermissionRoute module="HR" submodule="Incidentes"><HRLayout><HRIncidents /></HRLayout></PermissionRoute>} />
                 <Route path="/hr/incidentes/nuevo" element={<PermissionRoute module="HR" submodule="Incidentes"><HRLayout><HRIncidentNew /></HRLayout></PermissionRoute>} />
                 <Route path="/hr/candidatos" element={<PermissionRoute module="HR" submodule="Candidatos"><HRLayout><HRApplicants /></HRLayout></PermissionRoute>} />
@@ -537,15 +537,15 @@ const App = () => (
                 <Route path="/hr/capacitacion/tecnologia" element={<PermissionRoute module="HR" submodule="Capacitación"><HRLayout><HRTrainingTech /></HRLayout></PermissionRoute>} />
                 <Route path="/hr/desempeno" element={<PermissionRoute module="HR" submodule="Desempeño"><HRLayout><HRPerformance /></HRLayout></PermissionRoute>} />
                 <Route path="/hr/desempeno/nuevo" element={<PermissionRoute module="HR" submodule="Desempeño"><HRLayout><HRPerformanceNew /></HRLayout></PermissionRoute>} />
-                <Route path="/hr/asistencia" element={<PermissionRoute module="HR" submodule="Asistencia"><HRLayout><HRAttendance /></HRLayout></PermissionRoute>} />
-                <Route path="/hr/vacaciones" element={<PermissionRoute module="HR" submodule="Vacaciones"><HRLayout><HRVacations /></HRLayout></PermissionRoute>} />
-                <Route path="/hr/permisos" element={<PermissionRoute module="HR" submodule="Permisos"><HRLayout><HRPermisos /></HRLayout></PermissionRoute>} />
+                <Route path="/hr/asistencia" element={<Navigate to="/asistencia?tab=hoy" replace />} />
+                <Route path="/hr/vacaciones" element={<Navigate to="/asistencia?tab=ausencias" replace />} />
+                <Route path="/hr/permisos" element={<Navigate to="/asistencia?tab=ausencias" replace />} />
                 <Route path="/hr/permisos/nuevo" element={<PermissionRoute module="HR" submodule="Permisos"><HRLayout><HRPermisoNew /></HRLayout></PermissionRoute>} />
-                <Route path="/hr/horarios" element={<PermissionRoute module="HR" submodule="Horarios"><HRLayout><HRSchedules /></HRLayout></PermissionRoute>} />
-                <Route path="/hr/horarios-personal" element={<PermissionRoute module="HR" submodule="Horarios"><HRLayout><HRStaffSchedules /></HRLayout></PermissionRoute>} />
+                <Route path="/hr/horarios" element={<Navigate to="/asistencia?tab=horarios&vista=turnos" replace />} />
+                <Route path="/hr/horarios-personal" element={<Navigate to="/asistencia?tab=horarios&vista=personal" replace />} />
                 <Route path="/hr/horarios/horas-extras" element={<PermissionRoute module="HR" submodule="Horas Extra"><HRLayout><HROvertimeDetail /></HRLayout></PermissionRoute>} />
                 <Route path="/hr/horarios/banco-horas" element={<PermissionRoute module="HR" submodule="Banco de Horas"><HRLayout><HRHourBank /></HRLayout></PermissionRoute>} />
-                <Route path="/hr/horarios-chatters" element={<PermissionRoute module="HR" submodule="Horarios Chatters"><HRLayout><HRChatterSchedules /></HRLayout></PermissionRoute>} />
+                <Route path="/hr/horarios-chatters" element={<Navigate to="/asistencia?tab=horarios&vista=chatters" replace />} />
                 <Route path="/hr/monitoreo" element={<PermissionRoute module="HR" submodule="Monitoreo"><HRLayout><HRMonitoring /></HRLayout></PermissionRoute>} />
                 {/* Argos: dueño, admins, RR. HH. y supervisores (ve_argos); la RLS filtra a quién ve cada uno. Ajustes, solo el dueño. */}
                 <Route path="/hr/monitor-ia" element={<PermissionRoute module="HR" submodule="Monitor IA" argos><HRLayout><HRMonitorIA /></HRLayout></PermissionRoute>} />

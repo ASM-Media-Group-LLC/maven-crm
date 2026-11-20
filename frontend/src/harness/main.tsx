@@ -19,6 +19,7 @@ import BancoConexionEquipo from "./bancoConexionEquipo";
 import BancoCostos from "./bancoCostos";
 import BancoGracia from "./bancoGracia";
 import BancoTurno from "./bancoTurno";
+import { BancoAsistencia, BancoMenuAsistencia, prepararAsistenciaFalsa } from "./bancoAsistencia";
 import BancoCasos from "./bancoCasos";
 import BancoGuiaConexion from "./bancoGuiaConexion";
 import { BancoGuiaApp, BancoAppDelEquipo } from "./bancoGuiaApp";
@@ -88,6 +89,7 @@ const verConexion = ver === "conexion";
 const params = new URLSearchParams(window.location.search);
 if (params.get("tema") === "claro") document.documentElement.classList.remove("dark");
 if (ver === "app-medidor") prepararAppFalsa(params.get("estado") ?? "bien");
+if (ver === "asistencia" || ver === "mis-dias") prepararAsistenciaFalsa();
 if (ver === "app-barra") prepararBarraFalsa(params.get("mac") !== "0");
 if (params.get("skin")) document.documentElement.setAttribute("data-skin", params.get("skin")!);
 
@@ -153,6 +155,15 @@ void cargarIdioma(idiomaInicial()).finally(() => raiz.render(
     <StrictMode>
       <LanguageProvider><BancoTurno /></LanguageProvider>
     </StrictMode>
+  ) :
+  // /harness.html?ver=asistencia[&tab=…&vista=…] · ?ver=mis-dias · ?ver=menu-asistencia (20/11/2026).
+  ver === "asistencia" || ver === "mis-dias" ? (
+    <LanguageProvider>
+      <BancoAsistencia cual={ver} ruta={ver === "asistencia" ? `/asistencia?${params.toString()}` : "/mis-dias"} />
+    </LanguageProvider>
+  ) :
+  ver === "menu-asistencia" ? (
+    <LanguageProvider><BancoMenuAsistencia /></LanguageProvider>
   ) :
   ver === "gracia" ? (
     <StrictMode>

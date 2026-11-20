@@ -95,6 +95,10 @@ const FIXTURE_HASTA = "20260929180000";
 // Migraciones que tocan objetos de este banco pero necesitan tablas que sus fixtures no traen.
 // Se prueban en su propio banco, con el motivo al lado.
 const NO_CARGAN_AQUI: Record<string, string> = {
+  "20261120150000_ausencias.sql":
+    "Ausencias y calendario de asistencia: le suma fecha_ingreso a profiles e inserta avisos en notifications, pero usa " +
+    "tenant_members, posiciones_borrador, horario_semanal, turno_marcas y las funciones de Argos, que este fixture no trae; " +
+    "no toca nada del Messenger. Se prueba en su propio banco, ausencias.ts.",
   "20261119060000_posiciones_mandan.sql":
     "Posiciones (Ajustes): toca user_roles (trigger de protegidos) y depende de posiciones_borrador, roles_config, monitor_config, drive_acceso_extra y auth.users, que estos fixtures no traen; no toca nada del Messenger. Se aplicó y comprobó en producción con la comparación antes/después.",
   "20261111120000_backstage_equipo.sql":
