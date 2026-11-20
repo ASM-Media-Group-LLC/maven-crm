@@ -203,6 +203,7 @@ const CasoArgos = lazy(() => import("./pages/argos/CasoArgos"));
 const ResumenArgos = lazy(() => import("./pages/argos/ResumenArgos"));
 const HRExpediente = lazy(() => import("./pages/hr/HRExpediente"));
 const EnVivoPersona = lazy(() => import("./pages/hr/EnVivoPersona"));
+const CifraDeHoy = lazy(() => import("./pages/hoy/CifraDeHoy"));
 // La plataforma Maven (dueño → clientes → trabajadores). Apagada = manda a /dashboard.
 const PlataformaRaiz = lazy(() => import("./pages/plataforma/PlataformaRaiz"));
 const PlataformaGuarda = lazy(() => import("./pages/plataforma/PlataformaRaiz").then((m) => ({ default: m.Guarda })));
@@ -554,6 +555,8 @@ const App = () => (
                 {/* La vista en vivo de una persona (Alvaro, 11/11): a donde llevan los avisos
                     de Argos y de «se salió de Cowork». Dueño, RR. HH. y supervisores (su equipo). */}
                 <Route path="/hr/en-vivo/:userId" element={<RutaDeVigilancia><EnVivoPersona /></RutaDeVigilancia>} />
+                {/* Cada número de «Los números de hoy» abre su pantalla (Alvaro, 20/11/2026). */}
+                <Route path="/hoy/:cifra" element={<RutaDeVigilancia><CifraDeHoy /></RutaDeVigilancia>} />
                 <Route path="/hr/argos-comparativo" element={<PermissionRoute module="HR" submodule="Monitor IA" argos><HRLayout><ArgosComparativo /></HRLayout></PermissionRoute>} />
                 <Route path="/hr/argos-ajustes" element={<PermissionRoute module="HR" submodule="Monitor IA" soloDueno><HRLayout><ArgosAjustes /></HRLayout></PermissionRoute>} />
                 <Route path="/hr/organizacion/directorio" element={<PermissionRoute module="HR" submodule="Directorio"><HRLayout><HRDirectoryLookup /></HRLayout></PermissionRoute>} />

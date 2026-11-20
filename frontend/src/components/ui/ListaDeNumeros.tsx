@@ -1,5 +1,6 @@
 import { useState, type ReactNode } from "react";
-import { ChevronDown, type LucideIcon } from "lucide-react";
+import { Link } from "react-router-dom";
+import { ChevronDown, ChevronRight, type LucideIcon } from "lucide-react";
 
 // LOS NÚMEROS en una lista limpia (Alvaro, 13/11/2026: el inicio en dos columnas;
 // a la derecha «los números en una lista»). Cada fila: ícono en su color suave,
@@ -15,6 +16,9 @@ export type FilaNumero = {
   /** Si trae contenido, la fila se toca y lo despliega debajo (los atajos del
    *  inicio, 18/11/2026: «quién llegó tarde» abre la lista ahí mismo). */
   desplegable?: ReactNode;
+  /** Si trae ruta, la fila es un botón que abre SU pantalla (Alvaro, 20/11/2026:
+   *  «cada cosa debería mandarme a una pantalla»). Gana sobre `desplegable`. */
+  href?: string;
   /** Rótulo de un grupo nuevo que empieza DESPUÉS de esta fila (atajos | «Ahora mismo»). */
   separarCon?: string;
 };
@@ -36,7 +40,7 @@ export function ListaDeNumeros({ titulo, icono: IconoTitulo, filas }: { titulo: 
         {titulo}
       </h2>
       <ul className="divide-y divide-border/40">
-        {filas.flatMap(({ icono: Icono, tono = "primary", etiqueta, valor, detalle, desplegable, separarCon }) => {
+        {filas.flatMap(({ icono: Icono, tono = "primary", etiqueta, valor, detalle, desplegable, href, separarCon }) => {
           const contenido = (
             <>
               <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ring-1 ${CHIP[tono]}`}>
@@ -52,7 +56,15 @@ export function ListaDeNumeros({ titulo, icono: IconoTitulo, filas }: { titulo: 
           const abiertaEsta = abierta === etiqueta;
           const fila = (
             <li key={etiqueta}>
-              {desplegable ? (
+              {href ? (
+                <Link
+                  to={href}
+                  className="-mx-2 flex w-[calc(100%+1rem)] items-center gap-3 rounded-xl px-2 py-2.5 text-left transition-colors hover:bg-foreground/[0.04]"
+                >
+                  {contenido}
+                  <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
+                </Link>
+              ) : desplegable ? (
                 <>
                   <button
                     type="button"
