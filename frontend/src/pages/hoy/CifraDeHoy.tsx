@@ -6,6 +6,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Page } from "@/components/ui/page";
+import { PageHeader } from "@/components/ui/page-header";
 import { useLanguage } from "@/hooks/useLanguage";
 import { hoyEnBogota, useFotosDe, useHoyDelEquipo } from "@/hooks/useHoyDelEquipo";
 import { usePulsoEquipo } from "@/hooks/usePulsoEquipo";
@@ -291,23 +292,23 @@ function Pantalla({ cifra }: { cifra: Cifra }) {
   return (
     <Page>
       <div className="flex flex-col gap-5">
-        <div className="flex flex-wrap items-center gap-3">
-          <Button asChild variant="ghost" size="sm" className="-ml-2 gap-1.5 rounded-full text-muted-foreground">
-            <Link to="/dashboard"><ArrowLeft className="h-4 w-4" />{t("dashboard.hoy.volver")}</Link>
-          </Button>
-          {/* Los horarios se corrigen ahí (Alvaro, 20/11/2026). */}
-          <Button asChild variant="outline" size="sm" className="ml-auto gap-1.5 rounded-full">
-            <Link to="/hr/horarios-equipo" state={{ volverA }}><CalendarClock className="h-4 w-4" />{t("dashboard.hoy.horarios")}</Link>
-          </Button>
-        </div>
-        <header className="vidrio flex flex-wrap items-center gap-4 p-5">
-          <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-primary/[0.08] text-primary ring-1 ring-primary/20"><Icono className="h-6 w-6" /></span>
-          <div className="min-w-0 flex-1">
-            <h1 className="font-display text-2xl font-semibold leading-tight">{t(TITULO[cifra])}</h1>
-            <p className="mt-0.5 text-sm text-muted-foreground">{t(DESCRIPCION[cifra])}</p>
-          </div>
-          <span className="font-display text-4xl font-semibold tabular-nums">{cargando ? "…" : resumen}</span>
-        </header>
+        <Button asChild variant="ghost" size="sm" className="-ml-2 w-fit gap-1.5 rounded-full text-muted-foreground">
+          <Link to="/dashboard"><ArrowLeft className="h-4 w-4" />{t("dashboard.hoy.volver")}</Link>
+        </Button>
+        <PageHeader
+          icon={<Icono className="h-5 w-5" />}
+          title={t(TITULO[cifra])}
+          subtitle={t(DESCRIPCION[cifra])}
+          actions={
+            <div className="flex items-center gap-4">
+              <span className="font-display text-4xl font-semibold tabular-nums">{cargando ? "…" : resumen}</span>
+              {/* Los horarios se corrigen ahí (Alvaro, 20/11/2026). */}
+              <Button asChild variant="outline" size="sm" className="gap-1.5 rounded-full">
+                <Link to="/hr/horarios-equipo" state={{ volverA }}><CalendarClock className="h-4 w-4" />{t("dashboard.hoy.horarios")}</Link>
+              </Button>
+            </div>
+          }
+        />
 
         <nav aria-label={t("dashboard.hoy.otros")} className="-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-0.5 [scrollbar-width:none] sm:flex-wrap">
           {CIFRAS.map((c) => (
