@@ -17,7 +17,7 @@ export const portada = {
   "portada.cta.demo": { es: "Pedir una demo", en: "Request a demo" },
 
   "portada.hero.linea1": { es: "La oficina,", en: "The office," },
-  "portada.hero.linea2": { es: "reinventada.", en: "reinvented" },
+  "portada.hero.linea2": { es: "reinventada", en: "reinvented" },
   "portada.hero.bajada": { es: "La plataforma donde tu equipo trabaja junto desde cualquier casa: cámaras en vivo, una IA que vigila y todo tu negocio en un solo lugar — sin pagar oficina.", en: "The platform where your team works together from any home: live cameras, an AI that keeps watch and your whole business in one place — without paying for an office." },
   "portada.hero.verComo": { es: "Ver cómo funciona", en: "See how it works" },
 
@@ -132,7 +132,7 @@ export const portada = {
   "portada.app.titulo": { es: "También en tu computador:", en: "Also on your computer:" },
   "portada.app.mac": { es: "Descargar para Mac", en: "Download for Mac" },
   "portada.app.windows": { es: "Descargar para Windows", en: "Download for Windows" },
-  "portada.pie.lema": { es: "La oficina, reinventada.", en: "The office, reinvented" },
+  "portada.pie.lema": { es: "La oficina, reinventada", en: "The office, reinvented" },
   "portada.pie.enlaces": { es: "Enlaces del pie", en: "Footer links" },
   "portada.pie.privacidad": { es: "Privacidad", en: "Privacy" },
 } as const;
