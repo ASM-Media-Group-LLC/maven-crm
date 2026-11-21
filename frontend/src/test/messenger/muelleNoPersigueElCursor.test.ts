@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, vi } from "vitest";
 import { act, renderHook } from "@testing-library/react";
 import type { PointerEvent as ReactPointerEvent } from "react";
 import { useMuelleFlotante } from "@/hooks/useMuelleFlotante";
@@ -50,5 +50,25 @@ describe("arrastre del muelle", () => {
     act(() => { window.dispatchEvent(new Event("blur")); });
     act(() => mover(300, 300, 1));
     expect(h.result.current.pos).toEqual(antes);
+  });
+
+  it("distingue el clic de arrastre de un clic nuevo después de soltar fuera", () => {
+    const h = renderHook(() => useMuelleFlotante());
+    const clic = { preventDefault: vi.fn(), stopPropagation: vi.fn() };
+    const capturar = () => h.result.current.arrastreProps.onClickCapture(clic as unknown as Parameters<typeof h.result.current.arrastreProps.onClickCapture>[0]);
+
+    agarrar(h);
+    act(() => mover(400, 400, 1));
+    act(() => window.dispatchEvent(new Event("pointerup")));
+    capturar();
+    expect(clic.preventDefault).toHaveBeenCalledTimes(1);
+
+    agarrar(h);
+    act(() => mover(400, 400, 1));
+    act(() => window.dispatchEvent(new Event("pointerup")));
+    agarrar(h);
+    act(() => window.dispatchEvent(new Event("pointerup")));
+    capturar();
+    expect(clic.preventDefault).toHaveBeenCalledTimes(1);
   });
 });

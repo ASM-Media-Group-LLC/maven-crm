@@ -69,7 +69,6 @@ import type { useCoworkSession, CoworkRoom } from "@/hooks/useCoworkSession";
 import { useUserRole } from "@/hooks/useUserRole";
 import { useReglaDeAnfitrion, useVenPantallasDelHub } from "@/hooks/useReglaDeAnfitrion";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { useChatShared } from "@/hooks/ChatProvider";
 import { useMessengerDock } from "@/components/messenger/MessengerDock";
 import { MUELLE_EXTRA_ID } from "@/hooks/useMuelleFlotante";
 import { UserAvatar } from "@/components/UserAvatar";
@@ -1683,9 +1682,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
   const [avisarSala, setAvisarSala] = useState<string | null>(null);
   // Escribirle a alguien desde la lista de pantallas: se abre (o crea) el DM
   // y sale en la ventanita flotante del Messenger, sin irse del tablero.
-  const { createDirectChat } = useChatShared();
-  const { abrirChat } = useMessengerDock();
-  const escribirA = (uid: string) => { const id = createDirectChat(uid); if (id) abrirChat(id); };
+  const { abrirDirecto: escribirA } = useMessengerDock();
   // MOVER A OTRA SALA (Alvaro, 17/11/2026): antes cada participante elegía su
   // sala y el anfitrión no podía moverlo. La edge valida que quien mueve es
   // anfitrión y que la sala es de esta sesión; a la persona le llega por

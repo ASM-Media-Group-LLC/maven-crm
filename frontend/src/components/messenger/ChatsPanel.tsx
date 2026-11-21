@@ -43,11 +43,12 @@ const TABS: { id: Tab; label: TranslationKey }[] = [
  * eso vive suelto y no dentro de ninguno de los dos.
  */
 export default function ChatsPanel({
-  alto = 380, onAbrirChat, onNuevo, onVerTodo, onCerrar,
+  alto = 380, onAbrirChat, onAbrirDirecto, onNuevo, onVerTodo, onCerrar,
 }: {
   /** Alto de la lista; el resto del panel es fijo. */
   alto?: number;
   onAbrirChat: (conversationId: string) => void;
+  onAbrirDirecto: (userId: string) => void;
   onNuevo: () => void;
   onVerTodo: () => void;
   /** Cierra el panel. Si no se pasa, no se dibuja la X (el contenedor se
@@ -57,7 +58,7 @@ export default function ChatsPanel({
 }) {
   const { user } = useAuth();
   const { t } = useLanguage();
-  const { conversations, loading, profiles, createDirectChat } = useChatShared();
+  const { conversations, loading, profiles } = useChatShared();
   const { isOnline, getStatus, getStatusColorPersonal } = useOnlinePresence();
   const { quienEscribe } = useTypingInbox();
   const [tab, setTab] = useState<Tab>("all");
@@ -104,13 +105,6 @@ export default function ChatsPanel({
       .sort((a, b) => (a.full_name ?? "").localeCompare(b.full_name ?? ""))
       .slice(0, 8);
   }, [search, profiles, conversations, user]);
-
-  const abrirConPersona = (userId: string) => {
-    // createDirectChat reusa la conversación si ya existía y si no la crea
-    // optimista, así que devuelve un id usable al instante.
-    const id = createDirectChat(userId);
-    if (id) onAbrirChat(id);
-  };
 
   return (
     <>
@@ -208,7 +202,7 @@ export default function ChatsPanel({
                     online={isOnline(p.id)}
                     estado={getStatus(p.id)}
                     colorPersonal={getStatusColorPersonal(p.id)}
-                    onClick={() => abrirConPersona(p.id)}
+                    onClick={() => onAbrirDirecto(p.id)}
                   />
                 ))}
               </>
