@@ -17,7 +17,7 @@ export const portada = {
   "portada.cta.demo": { es: "Pedir una demo", en: "Request a demo" },
 
   "portada.hero.linea1": { es: "La oficina,", en: "The office," },
-  "portada.hero.linea2": { es: "reinventada.", en: "reinvented." },
+  "portada.hero.linea2": { es: "reinventada.", en: "reinvented" },
   "portada.hero.bajada": { es: "La plataforma donde tu equipo trabaja junto desde cualquier casa: cámaras en vivo, una IA que vigila y todo tu negocio en un solo lugar — sin pagar oficina.", en: "The platform where your team works together from any home: live cameras, an AI that keeps watch and your whole business in one place — without paying for an office." },
   "portada.hero.verComo": { es: "Ver cómo funciona", en: "See how it works" },
 
