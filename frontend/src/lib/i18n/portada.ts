@@ -132,7 +132,7 @@ export const portada = {
   "portada.app.titulo": { es: "También en tu computador:", en: "Also on your computer:" },
   "portada.app.mac": { es: "Descargar para Mac", en: "Download for Mac" },
   "portada.app.windows": { es: "Descargar para Windows", en: "Download for Windows" },
-  "portada.pie.lema": { es: "La oficina, reinventada.", en: "The office, reinvented." },
+  "portada.pie.lema": { es: "La oficina, reinventada.", en: "The office, reinvented" },
   "portada.pie.enlaces": { es: "Enlaces del pie", en: "Footer links" },
   "portada.pie.privacidad": { es: "Privacidad", en: "Privacy" },
 } as const;
