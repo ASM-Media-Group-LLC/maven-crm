@@ -48,6 +48,13 @@ contextBridge.exposeInMainWorld("mavenEscritorio", {
   terminarLlamadaEntrante: (id) => ipcRenderer.send("maven:llamada-fin", id),
   /** La ventana de una llamada se trae al frente («Volver a la llamada» desde la barra de Maven). */
   mostrarEstaVentana: () => ipcRenderer.invoke("maven:mostrar-esta-ventana"),
+  miniaturaLlamada: (accion) => ipcRenderer.invoke("maven:miniatura-llamada", accion),
+  arrastrarMiniaturaLlamada: (fase) => ipcRenderer.send("maven:arrastrar-miniatura", fase),
+  alCambiarMiniaturaLlamada: (cb) => {
+    const f = (_e, estado) => cb(estado);
+    ipcRenderer.on("maven:miniatura-llamada", f);
+    return () => ipcRenderer.removeListener("maven:miniatura-llamada", f);
+  },
   /** Ventanita flotante: true la achica y la deja encima; false la devuelve. Sin argumento alterna. */
   flotante: (si) => ipcRenderer.invoke("maven:flotante", si),
   alCambiarFlotante: (cb) => {

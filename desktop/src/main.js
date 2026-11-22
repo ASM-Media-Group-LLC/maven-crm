@@ -32,7 +32,7 @@ const { pantallaPermitida, primeraVezSinPermiso, guiaPermisoPantalla, pedirPermi
 const { revisarCamaraYMicrofono } = require("./permisoCamaraWindows");
 const { guardarAcceso, leerAcceso, olvidarAcceso, hayAccesoGuardado } = require("./acceso");
 const { vigilarVentana, leerYBorrarCierres } = require("./recuperarse");
-const { esLlamada, prepararVentanaDeLlamada, mostrarVentana } = require("./ventanaDeLlamada");
+const { esLlamada, prepararVentanaDeLlamada, mostrarVentana, controlarMiniatura, arrastrarMiniatura } = require("./ventanaDeLlamada");
 
 const URL_MAVEN = process.env.MAVEN_URL || "https://app.maven-ai.me/login";
 const ORIGENES_MAVEN = new Set(["https://app.maven-ai.me", "https://maven-ai.me", "https://www.maven-ai.me"]);
@@ -396,6 +396,16 @@ ipcMain.handle("maven:mostrar-esta-ventana", (e) => {
   const url = e.sender.getURL();
   if (!esDeMaven(url) || !esLlamada(url)) return false;
   return mostrarVentana(BrowserWindow.fromWebContents(e.sender));
+});
+ipcMain.handle("maven:miniatura-llamada", (e, accion) => {
+  const url = e.sender.getURL();
+  if (!esDeMaven(url) || !esLlamada(url) || e.senderFrame !== e.sender.mainFrame) return null;
+  return controlarMiniatura(BrowserWindow.fromWebContents(e.sender), accion);
+});
+ipcMain.on("maven:arrastrar-miniatura", (e, fase) => {
+  const url = e.sender.getURL();
+  if (!esDeMaven(url) || !esLlamada(url) || e.senderFrame !== e.sender.mainFrame) return;
+  arrastrarMiniatura(BrowserWindow.fromWebContents(e.sender), fase);
 });
 ipcMain.handle("maven:flotante", (e, si) => (deLaVentana(e) ? flotante(si === undefined ? undefined : Boolean(si)) : false));
 ipcMain.handle("maven:inactividad", (e) => (deLaVentana(e) ? segundosInactivo() : null));

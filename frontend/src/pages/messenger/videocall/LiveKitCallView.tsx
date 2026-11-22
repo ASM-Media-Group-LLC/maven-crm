@@ -4,6 +4,8 @@ import { ConnectionState, CriticalTimers, RoomEvent, Track, VideoQuality } from 
 import { useLiveKit } from "@/hooks/useLiveKit";
 import CallTopBar from "./CallTopBar";
 import CallControls from "./CallControls";
+import BarraMiniaturaLlamada from "./BarraMiniaturaLlamada";
+import VideosEnMiniatura from "./VideosEnMiniatura";
 import CallChatSidebar from "./CallChatSidebar";
 import CallParticipantsSidebar from "./CallParticipantsSidebar";
 import AdjustViewDialog, { type ViewSettings } from "./AdjustViewDialog";
@@ -37,7 +39,7 @@ import { latirEnLlamada, salirDeLlamada, LATIDO_LLAMADA_MS, LATIDO_SERVIDOR_MS, 
 import { useRegistrarLlamados } from "@/hooks/useRegistrarLlamados";
 import { esBlur, alternarBlur, blurPorDefecto, efectoDeNivel, leerFondoGuardado, guardarFondo, type BackgroundEffect } from "@/lib/fondoDeLlamada";
 import { precalentarFondo, soportaProcesadorDeFondo } from "@/lib/fondoFino/procesador";
-import { escritorio } from "@/lib/escritorio";
+import { escritorio, type EstadoMiniaturaLlamada } from "@/lib/escritorio";
 import { estaEnPausa } from "@/lib/coworkPausa";
 import { modoLivianoActivo } from "@/lib/appLiviana";
 import { porRedBloqueada } from "@/lib/redBloqueada";
@@ -73,6 +75,7 @@ interface LiveKitCallViewProps {
   /** When true, skip the generic "Llamada finalizada" toast on leave */
   suppressLeaveToast?: boolean;
   compact?: boolean;
+  estadoMiniatura?: EstadoMiniaturaLlamada | null;
   /** Deja que ESTA vista maneje el PiP de video del navegador.
    *
    *  Se apaga donde la llamada ya sale a la ventana flotante del sistema
@@ -205,7 +208,7 @@ const TEXTO_FALLO_CAMARA = {
   otro: { titulo: "messenger.callView.camaraFallo.otroTitulo", detalle: "messenger.callView.camaraFallo.otroDetalle" },
 } as const;
 
-export default function LiveKitCallView({ roomName, displayName, callDisplayName, isAdmin = false, onLeave, initialMicOn = true, initialCamOn = true, initialScreenShareOn = false, initialAudioDeviceId, initialVideoDeviceId, initialAudioOutputDeviceId, initialBackgroundEffect = "none", hideShareLink, hideScreenShare, hideLeaveButton, leaveLabel, leaveIcon, suppressLeaveToast, compact, autoPip = true, autoLeaveOnEmpty, getToken, onMediaStateChange, onFaceStateChange, supervisorEncuadre, onLocalScreenTrack, pantallaSoloParaMi, pantallaVisiblePara, pantallaOpcional = false, camaraOpcional = false, pantallaPrestada = null, sinLatidoDeLlamada, incomingAudioMuted, roomSwitcher, recording, shareLink: shareLinkProp, accionesBarra, guardarChat, encima, hideEndForAll, controlesExtra, sinVideoAjeno = false, telemetria, sinVolverEnError = false, hubDelSupervisor = null, mosaicoDePantallas = false }: LiveKitCallViewProps) {
+export default function LiveKitCallView({ roomName, displayName, callDisplayName, isAdmin = false, onLeave, initialMicOn = true, initialCamOn = true, initialScreenShareOn = false, initialAudioDeviceId, initialVideoDeviceId, initialAudioOutputDeviceId, initialBackgroundEffect = "none", hideShareLink, hideScreenShare, hideLeaveButton, leaveLabel, leaveIcon, suppressLeaveToast, compact, estadoMiniatura, autoPip = true, autoLeaveOnEmpty, getToken, onMediaStateChange, onFaceStateChange, supervisorEncuadre, onLocalScreenTrack, pantallaSoloParaMi, pantallaVisiblePara, pantallaOpcional = false, camaraOpcional = false, pantallaPrestada = null, sinLatidoDeLlamada, incomingAudioMuted, roomSwitcher, recording, shareLink: shareLinkProp, accionesBarra, guardarChat, encima, hideEndForAll, controlesExtra, sinVideoAjeno = false, telemetria, sinVolverEnError = false, hubDelSupervisor = null, mosaicoDePantallas = false }: LiveKitCallViewProps) {
   // Lista de salas del navegador (solo Cowork supervisor+): estado del popup.
   const [salasAbiertas, setSalasAbiertas] = useState(false);
   // Las flechas < > de cambiar de sala PREGUNTAN antes (Alvaro, 19/11/2026: en la
@@ -220,6 +223,7 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
   // varias veces por segundo (18/11/2026, guarda: test/videocall/llamadaSinTrabas).
   const lk = useLiveKit();
   const { t } = useLanguage();
+  const enMiniatura = estadoMiniatura?.miniatura === true;
 
   // Silencio local del audio entrante (p.ej. el Hub de Cowork mientras el
   // coordinador está metido en una sala). setVolume(0) por participante remoto:
@@ -332,7 +336,7 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
     ro.observe(el);
     return () => ro.disconnect();
   }, [lk.connectionState]);
-  const effectiveCompact = compact || autoCompact;
+  const effectiveCompact = compact || autoCompact || enMiniatura;
   // ¿Los controles se van a tocar con un dedo?
   //
   // El modo compacto se inventó para la ventana flotante de 340px, donde los
@@ -1158,11 +1162,16 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
     && visibleParticipants.filter((p) => p.isScreenSharing && !p.isLocal).length >= 2;
 
   const room = lk.getRoom();
+  const barraMiniatura = enMiniatura
+    ? <BarraMiniaturaLlamada nombre={callDisplayName || roomName} anclada={estadoMiniatura.anclada} />
+    : null;
+  const videosEnMiniatura = enMiniatura && lk.participants.some((p) => !p.isLocal);
 
   // Volviendo de una caída NO se tapa la llamada: se queda el cartel.
   if (lk.connectionState === ConnectionState.Connecting && !yaEstuvoConectada) {
     return (
-      <div className="flex flex-col h-full bg-background text-foreground items-center justify-center gap-4">
+      <div className="relative flex flex-col h-full bg-background text-foreground items-center justify-center gap-4">
+        {barraMiniatura && <div className="absolute inset-x-0 top-0">{barraMiniatura}</div>}
         <Loader2 className="h-10 w-10 animate-spin text-primary" />
         <p className="text-sm text-muted-foreground">{t("messenger.callView.conectando")}</p>
       </div>
@@ -1173,7 +1182,8 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
   // de error, cuyo único botón SACA de la sala. Se sigue intentando.
   if (lk.error && !salaCaida) {
     return (
-      <div className="flex flex-col h-full bg-background text-foreground items-center justify-center gap-4">
+      <div className="relative flex flex-col h-full bg-background text-foreground items-center justify-center gap-4">
+        {barraMiniatura && <div className="absolute inset-x-0 top-0">{barraMiniatura}</div>}
         <p className="text-destructive font-medium">{t("messenger.callView.errorConexion")}</p>
         <p className="text-sm text-muted-foreground max-w-md text-center">{lk.error}</p>
         {/* La conexión inicial se reintenta sola (espera creciente): que se vea,
@@ -1241,7 +1251,9 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
 
   return (
     <div ref={rootRef} className="relative flex flex-col h-full bg-background text-foreground">
-      <CallTopBar roomName={callDisplayName || roomName} participantCount={cantidadDePersonas} onOpenAdjustView={() => setAdjustViewOpen(true)} shareLink={shareLink} hideShareLink={hideShareLink} compact={effectiveCompact} tactil={tactil} extra={selectorDeSalas} acciones={accionesBarra} esLlamada={roomName.startsWith("call-")} />
+      {barraMiniatura ?? (
+        <CallTopBar roomName={callDisplayName || roomName} participantCount={cantidadDePersonas} onOpenAdjustView={() => setAdjustViewOpen(true)} shareLink={shareLink} hideShareLink={hideShareLink} compact={effectiveCompact} tactil={tactil} extra={selectorDeSalas} acciones={accionesBarra} esLlamada={roomName.startsWith("call-")} />
+      )}
       {encima}
 
       {/* Los carteles de conexión van en su propia fila (shrink-0), nunca
@@ -1374,7 +1386,7 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
       )}
 
       <div className="relative flex-1 flex overflow-hidden">
-        <div className="call-ambiente relative flex-1 p-3 overflow-hidden">
+        <div className={cn("call-ambiente relative flex-1 overflow-hidden", enMiniatura ? "p-1.5" : "p-3")}>
           {puedeVolverAlMosaico && (
             <button
               type="button"
@@ -1391,11 +1403,13 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
               roomName={roomName}
               source={recording?.source ?? "cowork"}
               title={recording?.title}
-              canControl={!!recording}
+              canControl={!!recording && !enMiniatura}
               compact={effectiveCompact}
             />
           </div>
-          {pantallasEnMosaico ? (
+          {videosEnMiniatura ? (
+            <VideosEnMiniatura participantes={lk.participants} vozActiva={lk.activeSpeaker} room={room} audioOutputId={audioOutputId} />
+          ) : pantallasEnMosaico ? (
             <div className="flex h-full flex-col gap-2">
               <div className={cn("grid min-h-0 flex-1 gap-2 mx-auto w-full max-w-[1800px] auto-rows-fr", columnasDelMosaico(pantallasEnMosaico.length))}>
                 {pantallasEnMosaico.map((p) => (
@@ -1504,7 +1518,7 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
 
         </div>
 
-        {chatOpen && (
+        {chatOpen && !enMiniatura && (
           <CallChatSidebar
             messages={lk.chatMessages}
             onSend={(texto) => { lk.sendChatMessage(texto); guardarChat?.texto(texto); }}
@@ -1522,7 +1536,7 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
         </div>
       )}
 
-      {participantsOpen && (
+      {participantsOpen && !enMiniatura && (
           <CallParticipantsSidebar
             participants={lk.participants}
             isAdmin={isAdmin}
@@ -1657,6 +1671,7 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
         // envolver la fila de controles en dos renglones (Jhon, 10/09).
         hideScreenShare={hideScreenShare || !puedeCompartirPantalla()}
         hideLeaveButton={hideLeaveButton}
+        miniaturaDeEscritorio={enMiniatura}
         leaveLabel={leaveLabel}
         leaveIcon={leaveIcon}
         compact={effectiveCompact}
