@@ -5,6 +5,7 @@ import { useLiveKit } from "@/hooks/useLiveKit";
 import CallTopBar from "./CallTopBar";
 import CallControls from "./CallControls";
 import BarraMiniaturaLlamada from "./BarraMiniaturaLlamada";
+import VideosEnMiniatura from "./VideosEnMiniatura";
 import CallChatSidebar from "./CallChatSidebar";
 import CallParticipantsSidebar from "./CallParticipantsSidebar";
 import AdjustViewDialog, { type ViewSettings } from "./AdjustViewDialog";
@@ -1164,12 +1165,7 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
   const barraMiniatura = enMiniatura
     ? <BarraMiniaturaLlamada nombre={callDisplayName || roomName} anclada={estadoMiniatura.anclada} />
     : null;
-  const remotoEnMiniatura = enMiniatura && cantidadDePersonas === 2
-    ? lk.participants.find((p) => !p.isLocal && p.isScreenSharing) ?? lk.participants.find((p) => !p.isLocal)
-    : undefined;
-  const yoEnMiniatura = remotoEnMiniatura
-    ? lk.participants.find((p) => p.isLocal && !p.isScreenSharing)
-    : undefined;
+  const videosEnMiniatura = enMiniatura && lk.participants.some((p) => !p.isLocal);
 
   // Volviendo de una caída NO se tapa la llamada: se queda el cartel.
   if (lk.connectionState === ConnectionState.Connecting && !yaEstuvoConectada) {
@@ -1411,15 +1407,8 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
               compact={effectiveCompact}
             />
           </div>
-          {remotoEnMiniatura ? (
-            <div className="relative h-full" data-testid="video-miniatura-llamada">
-              <ParticipantTile compact large participant={remotoEnMiniatura} room={room} className="h-full" preferredAudioOutputDeviceId={audioOutputId} />
-              {yoEnMiniatura && (
-                <div className="absolute bottom-2 right-2 z-10 h-[28%] w-[28%] min-h-12 min-w-16">
-                  <ParticipantTile compact participant={yoEnMiniatura} room={room} className="h-full" />
-                </div>
-              )}
-            </div>
+          {videosEnMiniatura ? (
+            <VideosEnMiniatura participantes={lk.participants} vozActiva={lk.activeSpeaker} room={room} audioOutputId={audioOutputId} />
           ) : pantallasEnMosaico ? (
             <div className="flex h-full flex-col gap-2">
               <div className={cn("grid min-h-0 flex-1 gap-2 mx-auto w-full max-w-[1800px] auto-rows-fr", columnasDelMosaico(pantallasEnMosaico.length))}>

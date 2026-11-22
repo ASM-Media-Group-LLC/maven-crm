@@ -87,7 +87,7 @@ let salaFalsa: SalaFalsa = crearSalaFalsa();
 const defaultLkState = {
   connectionState: ConnectionState.Connected,
   participants: [makeParticipant()],
-  activeSpeaker: null,
+  activeSpeaker: null as string | null,
   isMicOn: true,
   isCamOn: true,
   isScreenSharing: false,
@@ -284,6 +284,55 @@ describe("LiveKitCallView", () => {
       expect(lkState.disconnect).not.toHaveBeenCalled();
     } finally {
       delete host.mavenEscritorio;
+    }
+  });
+
+  it("sigue una voz sostenida solo en la miniatura grupal y restaura la vista completa", () => {
+    vi.useFakeTimers();
+    try {
+      lkState.participants = [
+        makeParticipant(),
+        makeParticipant({ sid: "remoto-1", identity: "user-2", name: "Ana", isLocal: false }),
+        makeParticipant({ sid: "remoto-2", identity: "user-3", name: "Camilo", isLocal: false }),
+      ];
+      const mini = { miniatura: true, anclada: true };
+      const { rerender } = render(<LiveKitCallView {...defaultProps} estadoMiniatura={mini} />);
+      const principal = () => within(screen.getByTestId("video-miniatura-principal"));
+      const camaraDeCamilo = screen.getByTestId("participant-user-3");
+      expect(principal().getByText("Ana")).toBeInTheDocument();
+
+      lkState.activeSpeaker = "user-3";
+      rerender(<LiveKitCallView {...defaultProps} estadoMiniatura={mini} />);
+      act(() => { vi.advanceTimersByTime(300); });
+      lkState.activeSpeaker = null;
+      rerender(<LiveKitCallView {...defaultProps} estadoMiniatura={mini} />);
+      act(() => { vi.advanceTimersByTime(800); });
+      expect(principal().getByText("Ana")).toBeInTheDocument();
+
+      lkState.activeSpeaker = "user-3";
+      rerender(<LiveKitCallView {...defaultProps} estadoMiniatura={mini} />);
+      act(() => { vi.advanceTimersByTime(750); });
+      expect(principal().getByText("Camilo")).toBeInTheDocument();
+      expect(screen.getByTestId("participant-user-3")).toBe(camaraDeCamilo);
+      lkState.activeSpeaker = "user-1";
+      rerender(<LiveKitCallView {...defaultProps} estadoMiniatura={mini} />);
+      act(() => { vi.advanceTimersByTime(800); });
+      expect(principal().getByText("Camilo")).toBeInTheDocument();
+
+      const completa = { ...mini, miniatura: false };
+      rerender(<LiveKitCallView {...defaultProps} estadoMiniatura={completa} />);
+      const camaraCompleta = screen.getByTestId("participant-user-3");
+      lkState.activeSpeaker = "user-2";
+      rerender(<LiveKitCallView {...defaultProps} estadoMiniatura={completa} />);
+      act(() => { vi.advanceTimersByTime(800); });
+      expect(screen.queryByTestId("video-miniatura-llamada")).not.toBeInTheDocument();
+      expect(screen.getByTestId("participant-user-3")).toBe(camaraCompleta);
+      expect(screen.getByText("Ana")).toBeInTheDocument();
+      expect(screen.getByText("Tú")).toBeInTheDocument();
+      expect(lkState.connect).toHaveBeenCalledTimes(1);
+      expect(lkState.disconnect).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
     }
   });
 
