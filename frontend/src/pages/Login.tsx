@@ -159,11 +159,12 @@ const Login = () => {
             <Label htmlFor="email" className="text-white/70">{t("auth.email")}</Label>
             <Input
               id="email"
+              name="email"
               type="email"
               placeholder={t("auth.emailPlaceholder")}
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              autoComplete="email"
+              autoComplete={paso === "clave" ? "username" : "email"}
               readOnly={puerta && paso === "clave"}
               className="bg-white/10 border-white/10 text-white placeholder:text-white/30"
             />
@@ -179,6 +180,7 @@ const Login = () => {
             <div className="relative">
               <Input
                 id="password"
+                name="password"
                 type={showPassword ? "text" : "password"}
                 placeholder="••••••••"
                 value={password}
