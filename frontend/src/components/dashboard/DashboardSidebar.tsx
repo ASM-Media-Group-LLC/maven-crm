@@ -1,7 +1,8 @@
 import {
   Activity, AlertTriangle, BarChart3, Bell, BookOpen, Bot, Briefcase, Calculator, CalendarDays, CalendarRange, ChevronRight, Clapperboard, ClipboardCheck, Clock, DollarSign, Eye, FileSpreadsheet, FileText, Gauge, Gift, GraduationCap, HardDrive, Headphones, Home, Inbox, LayoutDashboard, Mail, Map, Megaphone, MessageCircle, Moon, Palette, Phone, Presentation, RefreshCw, Rocket, Search, Settings, Shield, Smartphone, Sun, Ticket, UserCheck, UserCog, UserPlus, Users, Users2, Video, Wallet, Wifi, MonitorDown,
- MoreHorizontal,
+ MoreHorizontal, CalendarCheck2, CalendarHeart,
 } from "lucide-react";
+import { useMisPermisosAusencias, veAOtros } from "@/hooks/useAusencias";
 import { TurnoEnMenu } from "@/components/turno/TurnoEnMenu";
 import { Fragment, useEffect, useState } from "react";
 import { useIncidentesSalud } from "@/hooks/useIncidentesSalud";
@@ -106,11 +107,19 @@ const DashboardSidebar = () => {
   const unreadChatCount = useUnreadChatCount();
   const { promologCount, leadgenCount, closersCount, waInboxCount, tgInboxCount, coworkRequestsCount, correoUnreadCount } = useSidebarBadges();
 
+  // ASISTENCIA (Alvaro, 20/11/2026): al lado de Cowork, para quien su puesto (o un
+  // permiso especial) le deja ver a otras personas o aprobar ausencias. «Mis días»
+  // es de todos. Lo decide el servidor (mis_permisos_ausencias).
+  const permisosAusencias = useMisPermisosAusencias();
+  const veAsistencia = veAOtros(permisosAusencias.data);
+
   // Sin `module` = para todo el que entra (no pasa por canAccess).
-  const mainMenuAll: { title: string; url: string; icon: any; module?: string; submodule?: string; badge?: number }[] = [
+  const mainMenuAll: { title: string; url: string; icon: any; module?: string; submodule?: string; badge?: number; solo?: boolean }[] = [
     // Los cinco de todos los días, cada uno con su fila propia (Alvaro, 18/11/2026).
     { title: t("nav.dashboard"), url: "/dashboard", icon: LayoutDashboard, module: "Dashboard" },
     { title: t("nav.cowork"), url: "/cowork", icon: Users2, module: "Cowork", badge: coworkRequestsCount || undefined },
+    { title: t("aus.nav.equipo"), url: "/asistencia", icon: CalendarCheck2, solo: veAsistencia },
+    { title: t("aus.nav.mias"), url: "/mis-dias", icon: CalendarHeart },
     // El mute del Messenger vive en la cabecera de su lista de chats, al lado
     // del "+" (Jhon, 09/09/2026); WhatsApp y Telegram lo siguen teniendo acá.
     { title: t("nav.messenger"), url: "/messenger", icon: MessageCircle, module: "Messenger", badge: unreadChatCount || undefined },
@@ -125,10 +134,11 @@ const DashboardSidebar = () => {
     // computador va solo en la app; la guía paso a paso, para todos.
     { title: t("nav.appGuide"), url: RUTA_GUIA_APP, icon: MonitorDown },
   ];
-  const mainMenu = mainMenuAll.filter((item) => !item.module || canAccess(item.module, item.submodule));
+  const mainMenu = mainMenuAll.filter((item) => item.solo !== false && (!item.module || canAccess(item.module, item.submodule)));
   // MENÚ NUEVO (Alvaro, 18/11/2026): Dashboard, Cowork, Messenger, Mail y Meet
   // sueltos arriba; lo demás (Grabaciones, Contactos, guías, Creadores) en «Más».
-  const URLS_PRINCIPALES = ["/dashboard", "/cowork", "/messenger", "/correo", "/meet"];
+  // Asistencia y Mis días (20/11/2026) también arriba, al lado de Cowork.
+  const URLS_PRINCIPALES = ["/dashboard", "/cowork", "/asistencia", "/mis-dias", "/messenger", "/correo", "/meet"];
   const principales = mainMenu.filter((i) => URLS_PRINCIPALES.includes(i.url));
   const masMenu = mainMenu.filter((i) => !URLS_PRINCIPALES.includes(i.url));
 
@@ -208,21 +218,11 @@ const DashboardSidebar = () => {
         {
           label: t("nav.hr.timeControl"),
           key: "tiempo",
+          // Asistencia, horarios, vacaciones y permisos se mudaron a «Asistencia»
+          // (menú principal, 20/11/2026). Aquí quedan horas extra y banco de horas.
           items: [
-            { title: t("nav.hr.attendance"), url: "/hr/asistencia", submodule: "Asistencia" },
-            { title: t("nav.hr.schedules"), url: "/hr/horarios", submodule: "Horarios" },
-            { title: t("nav.hr.staffSchedule"), url: "/hr/horarios-personal", submodule: "Horarios" },
-            { title: t("nav.hr.chatterSchedules"), url: "/hr/horarios-chatters", submodule: "Horarios Chatters" },
             { title: t("nav.hr.overtime"), url: "/hr/horarios/horas-extras", submodule: "Horas Extra" },
             { title: t("nav.hr.hoursBank"), url: "/hr/horarios/banco-horas", submodule: "Banco de Horas" },
-          ],
-        },
-        {
-          label: t("nav.hr.absences"),
-          key: "ausencias",
-          items: [
-            { title: t("nav.hr.vacations"), url: "/hr/vacaciones", submodule: "Vacaciones" },
-            { title: t("nav.hr.leave"), url: "/hr/permisos", submodule: "Permisos" },
           ],
         },
       ],

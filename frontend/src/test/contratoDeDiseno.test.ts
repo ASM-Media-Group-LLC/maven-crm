@@ -72,12 +72,12 @@ const CON_PAGEHEADER = new Set([
   "ChatterHorarios", "ChatterProfileEdit", "ChatterRendimiento", "Closers", "CollectionsPage",
   "ConfiguracionPage", "Contactos", "ControlFinancieroPage", "CoworkVsHubstaff", "CreadorasDashboardPage",
   "Creadores", "EmployeeDirectory", "EmployeeNew", "EmployeeProfile", "FacturacionPage",
-  "FinanzasDashboard", "GrabacionesPage", "HRAbsences", "HRAnnouncements", "HRApplicantNew", "HRApplicants",
-  "HRAttendance", "HRChatterSchedules", "HRDeductionNew", "HRDeductions", "HRDirectoryLookup", "HRHourBank",
+  "FinanzasDashboard", "GrabacionesPage", "HRAnnouncements", "HRApplicantNew", "HRApplicants",
+  "HRDeductionNew", "HRDeductions", "HRDirectoryLookup", "HRHourBank",
   "HRIncidentNew", "HRIncidents", "HROffboarding", "HROffboardingNew", "HROnboarding", "HROnboardingNew",
-  "HROrganigrama", "HROvertimeDetail", "HRPerformance", "HRPerformanceNew", "HRPermisoNew", "HRPermisos",
-  "HRPersonCard", "HRSchedules", "HRStaffSchedules", "HRTraining", "HRTrainingChatters", "HRTrainingTech",
-  "HRVacations", "HorasVariablesPage", "InboxAnalyticsPage", "InboxBotsPage", "InboxChannelsPage",
+  "HROrganigrama", "HROvertimeDetail", "HRPerformance", "HRPerformanceNew", "HRPermisoNew",
+  "HRPersonCard", "HRTraining", "HRTrainingChatters", "HRTrainingTech",
+  "HorasVariablesPage", "InboxAnalyticsPage", "InboxBotsPage", "InboxChannelsPage",
   "LeadGen", "LeadGenBaseDatos", "NominaPage", "Notificaciones", "NuevaNotaPago", "NuevoContacto",
   "NuevoCreador", "NuevoInvoice", "OffboardingDetailPage", "OffboardingListPage", "OnboardingPage",
   "OnboardingWizardPage", "OpportunitiesPage", "PanelDeControl", "Parrilla", "Personalizados", "Promolog",
@@ -89,6 +89,8 @@ const CON_PAGEHEADER = new Set([
  * Pantallas anteriores al contrato (foto del 9 de septiembre de 2026: 103).
  * Exentas hasta que se migren en las fases 2 a 5. Si migrás una, SACALA de acá.
  * Si el test "la lista solo se achica" falla, una de estas ya no existe: sacala.
+ * (20/11/2026: HRAbsences, HRAttendance, HRVacations, HRPermisos y los tres de horarios
+ * salieron: se mudaron a Asistencia y sus rutas viejas redirigen.)
  */
 const ANTERIORES_AL_CONTRATO = new Set([
   ...CON_PAGEHEADER,
@@ -100,10 +102,10 @@ const ANTERIORES_AL_CONTRATO = new Set([
   "ChatterProfileDetail", "ChatterProfileEdit", "ChatterAdmin", "ChatterHistory", "ChatterHistorySessionDetail",
   "ChatterWorkspace", "ChatterRendimiento", "NuevoContacto", "AdminUsuarios", "AuditoriaRoles", "CoworkVsHubstaff",
   "Messenger", "Notificaciones", "NotificacionesSettings", "Settings", "HRLayout", "HRDashboard",
-  "EmployeeDirectory", "EmployeeNew", "EmployeeProfile", "HRAbsences", "HRIncidents", "HRApplicants", "HRTraining",
-  "HRTrainingChatters", "HRTrainingTech", "HRPerformance", "HRPerformanceNew", "HRAttendance", "HRVacations",
-  "HRPermisos", "HRPermisoNew", "HRSchedules", "HRStaffSchedules", "HROvertimeDetail", "HRHourBank",
-  "HRChatterSchedules", "HRIncidentNew", "HRApplicantNew", "HROnboarding", "HROnboardingNew", "HROffboarding",
+  "EmployeeDirectory", "EmployeeNew", "EmployeeProfile", "HRIncidents", "HRApplicants", "HRTraining",
+  "HRTrainingChatters", "HRTrainingTech", "HRPerformance", "HRPerformanceNew",
+  "HRPermisoNew", "HROvertimeDetail", "HRHourBank",
+  "HRIncidentNew", "HRApplicantNew", "HROnboarding", "HROnboardingNew", "HROffboarding",
   "HROffboardingNew", "HRMonitoring", "HRDirectoryLookup", "HROrganigrama", "HRDeductions", "HRDeductionNew",
   "HRAnnouncements", "HRPersonnel", "HRPersonCard", "HRPayroll", "FinanzasLayout", "FinanzasDashboard",
   "NominaPage", "FacturacionPage", "NuevoInvoice", "NuevaNotaPago", "TemplatesPage", "ControlFinancieroPage",

@@ -1316,6 +1316,41 @@ export const CATALOGO_POSICIONES: SeccionCatalogo[] = [
               }
             ]
           },
+          // AUSENCIAS Y ASISTENCIA (20/11/2026): el alcance de esta fila decide de
+          // quién ve el calendario (todos / su equipo / solo lo suyo); las dos
+          // funciones son los dos niveles de aprobación. El servidor lee la fila
+          // por su nombre («Ausencias»: alcance_fila) y las claves N:ausencias.*.
+          {
+            "fila": "Ausencias",
+            "etiqueta": "posiciones.c.ausencias",
+            "datos": "tres",
+            "funciones": [
+              {
+                "clave": "N:ausencias.aprobar_equipo",
+                "etiqueta": "posiciones.c.aprobar_ausencias_equipo",
+                "nueva": true
+              },
+              {
+                "clave": "N:ausencias.aprobar_final",
+                "etiqueta": "posiciones.c.aprobacion_final_ausencias",
+                "nueva": true
+              }
+            ]
+          },
+          // PERMISOS ESPECIALES (20/11/2026): dar a una persona una función o un
+          // alcance encima de su puesto (permisos_extra, con auditoría).
+          {
+            "fila": "Permisos especiales",
+            "etiqueta": "posiciones.c.permisos_especiales",
+            "datos": "no",
+            "funciones": [
+              {
+                "clave": "N:permisos.extra",
+                "etiqueta": "posiciones.c.dar_permisos_especiales",
+                "nueva": true
+              }
+            ]
+          },
           {
             "fila": "Gestión",
             "etiqueta": "posiciones.c.gestion",

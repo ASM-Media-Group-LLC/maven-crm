@@ -147,9 +147,18 @@ Deno.serve(async (req: Request) => {
     for (const s of (data ?? []) as Sesion[]) sesiones.set(s.id, s);
   }
 
+  // AUSENCIAS (20/11/2026): durante una ausencia aprobada (o un festivo) Argos no
+  // le abre alertas a nadie. Lo dice la base (ausentes_del_dia, el mismo ayudante
+  // que borra el turno ese día). Si la consulta falla, queda anotado y se sigue
+  // como antes: las capturas ya no llegan en la ausencia (en_turno las frena).
+  const hoyBogota = new Date(ahora - 5 * 3600_000).toISOString().slice(0, 10);
+  const ausRes = await admin.rpc("ausentes_del_dia", { _dia: hoyBogota });
+  if (ausRes.error) await diag("ausentes_error", { error: ausRes.error.message });
+  const conDiaLibre = new Set(((ausRes.data ?? []) as Array<{ user_id: string }>).map((r) => r.user_id));
+
   // 2) Las alertas que DEBERÍAN estar vivas ahora.
   const deseadas = new Map<string, Deseada>();
-  const poner = (d: Deseada) => { if (!esDueno.has(d.user_id)) deseadas.set(`${d.user_id}|${d.tipo}`, d); };
+  const poner = (d: Deseada) => { if (!esDueno.has(d.user_id) && !conDiaLibre.has(d.user_id)) deseadas.set(`${d.user_id}|${d.tipo}`, d); };
 
   // 2a/2b. Por persona, desde las capturas (ya vienen de más nueva a más vieja).
   const ultimaPor = new Map<string, Captura>(); // última captura (cualquier tipo)

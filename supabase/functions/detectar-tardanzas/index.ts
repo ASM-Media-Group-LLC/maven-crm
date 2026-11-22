@@ -261,11 +261,23 @@ serve(async (req) => {
     }
   }
 
+  // AUSENCIAS (20/11/2026): quien tiene el día libre (vacaciones, permiso,
+  // incapacidad, día libre, festivo de su empresa o una ausencia parcial hoy) no
+  // tiene tardanza ni correo de cámara. Lo dice la base (ausentes_del_dia, el
+  // mismo ayudante que borra el turno). Si la consulta falla NO se adivina: no se
+  // marca a nadie tarde en esta vuelta (corre cada 2 min).
+  const { data: ausentes, error: errAusentes } = await admin.rpc("ausentes_del_dia", { _dia: hoy });
+  if (errAusentes) {
+    return new Response(JSON.stringify({ ok: false, error: `ausentes_del_dia: ${errAusentes.message}`, gracia, primerContacto, exigencias }), { status: 500, headers: { ...CORS, "Content-Type": "application/json" } });
+  }
+  const conDiaLibre = new Set(((ausentes ?? []) as Array<{ user_id: string }>).map((r) => r.user_id));
+
   // Candidatos con horario resuelto.
   const candidatos: Persona[] = [];
   for (const p of perfilesArr) {
     const tenant = tenantPor.get(p.id);
     if (!tenant) continue;
+    if (conDiaLibre.has(p.id)) continue;
     const rol = rolPor.get(p.id) ?? null;
     const turno = p.turno_id ? turnoPorId.get(p.turno_id) : null;
     const entrada = p.hora_entrada ?? turno?.hora_entrada ?? (rol ? cfgPor.get(rol)?.hora_entrada ?? null : null);

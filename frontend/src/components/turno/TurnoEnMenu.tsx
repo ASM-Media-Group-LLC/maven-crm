@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Coffee, Pause, Play, Square, Utensils } from "lucide-react";
+import { CalendarHeart, Coffee, Pause, Play, Square, Utensils } from "lucide-react";
+import { useMiAusenciaHoy } from "@/hooks/useAusencias";
+import { ETIQUETA_TIPO } from "@/lib/ausencias";
 import { toast } from "sonner";
 import { useLanguage } from "@/hooks/useLanguage";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
@@ -25,6 +27,7 @@ export function TurnoEnMenu({ compacto = false }: { compacto?: boolean }) {
   const { t } = useLanguage();
   const navigate = useNavigate();
   const q = useMiTurno();
+  const ausencia = useMiAusenciaHoy();
   const { user } = useAuth();
   const miPausa = useMiPausa(user?.id);
   const { entrar, salir, sigo } = useAccionesTurno();
@@ -65,6 +68,36 @@ export function TurnoEnMenu({ compacto = false }: { compacto?: boolean }) {
   }, [tr]);
 
   if (!tr || !tr.aplica) return null;
+
+  // AUSENCIA APROBADA o FESTIVO (20/11/2026): no se pide marcar entrada; la
+  // tarjeta dice por qué. Si ya había marcado, sigue la tarjeta normal (para salir).
+  const au = ausencia.data;
+  if (au?.ahora && !tr.abierta) {
+    const fechaFin = au.hasta ? new Date(`${au.hasta}T12:00:00Z`).toLocaleDateString(undefined, { day: "numeric", month: "short" }) : "";
+    const tipoTxt = au.tipo ? t(ETIQUETA_TIPO[au.tipo]) : "";
+    const texto = au.festivo ? t("aus.turno.festivo", { n: au.festivo })
+      : au.parcial ? t("aus.turno.parcial", { t: tipoTxt, a: (au.hora_desde ?? "").slice(0, 5), b: (au.hora_hasta ?? "").slice(0, 5) })
+      : au.tipo === "vacaciones" ? t("aus.turno.deVacaciones", { f: fechaFin })
+      : t("aus.turno.ausente", { t: tipoTxt.toLowerCase(), f: fechaFin });
+    if (compacto) {
+      return (
+        <button type="button" onClick={() => navigate("/mis-dias")} title={texto}
+          className="mx-auto flex h-9 w-9 items-center justify-center rounded-xl bg-foreground/[0.06] text-muted-foreground">
+          <CalendarHeart className="h-4 w-4" />
+        </button>
+      );
+    }
+    return (
+      <button type="button" onClick={() => navigate("/mis-dias")}
+        className="vidrio flex w-full items-start gap-2.5 p-3 text-left">
+        <CalendarHeart className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+        <span className="flex min-w-0 flex-col">
+          <span className="text-sm font-medium text-foreground">{texto}</span>
+          <span className="text-[11px] text-muted-foreground">{t("aus.turno.nada")}</span>
+        </span>
+      </button>
+    );
+  }
 
   const entradaTxt = tr.turno_inicio ? horaUI(tr.turno_inicio) : null;
   const horarioTxt = tr.turno_inicio && tr.turno_fin ? `${horaUI(tr.turno_inicio)} – ${horaUI(tr.turno_fin)}` : null;

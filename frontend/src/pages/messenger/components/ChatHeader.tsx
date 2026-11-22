@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from "react";
+import { useAusentesHoy } from "@/hooks/useAusencias";
 import {
   Video, Phone, Search, MoreVertical, ArrowLeft, Bell, FileText, Users,
   Pin, PinOff, Archive, Trash2, Settings, Pencil, Check,
@@ -106,6 +107,9 @@ export default function ChatHeader({
   // Estado personalizado de la otra persona (texto libre): si lo tiene, manda sobre
   // la etiqueta fija ("Disponible"/"Ausente"), como en Google Chat.
   const statusText = otherUserId ? getStatusText(otherUserId) : "";
+  // De vacaciones / Ausente hoy (20/11/2026): lo ven los compañeros, sin motivo.
+  const ausentesHoy = useAusentesHoy();
+  const ausenteHoy = otherUserId ? ausentesHoy.data?.get(otherUserId) : undefined;
 
   const typingNames = typingUsers
     .map(id => profiles[id]?.full_name?.split(" ")[0] || t("messenger.header.alguien"))
@@ -125,6 +129,8 @@ export default function ChatHeader({
               ? t("messenger.header.miembrosEnLinea", { n: conversation.participants.length, online: onlineCount })
               : t("messenger.header.miembros", { n: conversation.participants.length }))
           : t("messenger.header.grupo"))
+      : ausenteHoy
+        ? t(ausenteHoy.etiqueta === "vacaciones" ? "aus.chip.vacaciones" : "aus.chip.ausente")
       : statusText
         ? statusText
         : online

@@ -10,6 +10,7 @@ import type { FaceWatch, FaceState } from "@/hooks/useFaceWatch";
 import { TIPO_POR_CARA } from "@/lib/monitorFaltas";
 import { anotarPantallazo, tomarLosDeAfuera } from "@/lib/monitorLocal";
 import { debePreguntarIA } from "@/lib/ojoDeIA";
+import { estaEnTurno } from "@/lib/turnoActivo";
 
 // Monitor de cámara de RRHH (Álvaro, 30/10). Corre en el navegador de la propia
 // persona, DENTRO de la llamada de Cowork (al lado de useFaceNudge), para que
@@ -140,6 +141,10 @@ async function guardarEnBuzon(
   roomNombre: string | null,
   caraVisible: boolean | null,
 ): Promise<void> {
+  // Fuera del turno o durante una ausencia aprobada (20/11/2026) no se toma ni se
+  // sube nada: la bandera es la de mi_turno + mi_ausencia_hoy (lib/turnoActivo).
+  // El candado real sigue en el servidor (en_turno en la política del buzón).
+  if (!estaEnTurno()) return;
   // Pantalla nítida (1600) para leer el texto; cámara chica (640) basta para una cara.
   let huella: string | null = null;
   const b64 = tipo === "pantalla"
