@@ -182,7 +182,8 @@ serve(async (req) => {
       }
     }
 
-    const livekitUrl = urlDeLiveKit(userId);
+    // Quien llama y quien contesta reciben el mismo servidor general.
+    const livekitUrl = urlDeLiveKit(null);
     const apiKey = Deno.env.get("LIVEKIT_API_KEY")!;
     const apiSecret = Deno.env.get("LIVEKIT_API_SECRET")!;
 

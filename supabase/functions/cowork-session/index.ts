@@ -263,7 +263,8 @@ serve(async (req) => {
     const veredicto = await revisarPedido(admin, miAgencia, String(action ?? ""), body ?? {});
     if (!veredicto.ok) return err(req, veredicto.error, veredicto.status);
 
-    const lkUrl = urlDeLiveKit(userId);
+    // Cowork usa el servidor general para que todos compartan la misma sala.
+    const lkUrl = urlDeLiveKit(null);
     const lkKey = Deno.env.get("LIVEKIT_API_KEY")!;
     const lkSecret = Deno.env.get("LIVEKIT_API_SECRET")!;
 
