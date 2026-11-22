@@ -66,6 +66,12 @@
           "arch": [
             "x64"
           ]
+        },
+        {
+          "target": "nsis-web",
+          "arch": [
+            "x64"
+          ]
         }
       ],
       "icon": "build/icon.ico",
@@ -84,6 +90,9 @@
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
       "runAfterFinish": true
+    },
+    "nsisWeb": {
+      "artifactName": "Maven-Instalador.${ext}"
     },
     "afterPack": "build/firmar-adhoc.js",
     "files": [

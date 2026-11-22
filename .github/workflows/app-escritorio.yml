@@ -1,12 +1,15 @@
 # Arma la app de computador (desktop/) y sube los instaladores al balde público
 # `descargas` de Supabase, de donde los baja el botón de la portada:
 #   …/storage/v1/object/public/descargas/Maven-Mac.dmg
-#   …/storage/v1/object/public/descargas/Maven-Windows.exe
+#   …/storage/v1/object/public/descargas/Maven-Windows.exe      (el completo: lo usan las actualizaciones)
+#   …/storage/v1/object/public/descargas/Maven-Instalador.exe   (el chico, ~1 MB: baja el resto al instalar)
 # Windows se arma en una máquina Windows de GitHub; Mac, ver app-escritorio-mac.yml.
 # La llave de servicio se pide al vuelo con SUPABASE_ACCESS_TOKEN y no se guarda.
 name: app-escritorio
 
 on:
+  # A mano desde una rama = ENSAYO: arma sin firmar (Azure solo confía en main),
+  # no sube nada al balde y deja los instaladores como artefacto de la corrida.
   workflow_dispatch:
   push:
     branches: [main]
@@ -40,7 +43,7 @@ jobs:
     timeout-minutes: 40
     env:
       PROYECTO: lsagslbkliprespbyhts
-      ARCHIVOS: Maven-Windows.exe Maven-Windows.exe.blockmap latest.yml
+      EN_MAIN: ${{ github.ref == 'refs/heads/main' }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -49,6 +52,7 @@ jobs:
         working-directory: desktop
         run: npm ci --no-audit --no-fund
       - name: Entrar a Azure para firmar (sin contraseña)
+        if: env.EN_MAIN == 'true'
         uses: azure/login@v2
         with:
           client-id: ${{ vars.AZURE_CLIENT_ID }}
@@ -58,11 +62,41 @@ jobs:
         working-directory: desktop
         run: |
           npm version "2.0.${{ github.run_number }}" --no-git-tag-version
+          if [ "$EN_MAIN" != "true" ]; then
+            # Ensayo: sin firma (fuera de main Azure no deja entrar).
+            node -e 'const f="package.json",p=require("./"+f);delete p.build.win.azureSignOptions;require("fs").writeFileSync(f,JSON.stringify(p,null,2))'
+          fi
           npx electron-builder --win --publish never -c.directories.output=dist
+      # Instalador chico (nsis-web, 18/11/2026): Microsoft solo acepta revisar
+      # archivos de hasta 50 MB y el completo pesa ~114 MB. El chico baja el
+      # paquete .7z de su versión desde el balde al instalar.
+      - name: Revisar el instalador chico
+        run: |
+          set -euo pipefail
+          ls -la desktop/dist desktop/dist/nsis-web
+          CHICO=desktop/dist/nsis-web/Maven-Instalador.exe
+          PESO=$(stat -c %s "$CHICO")
+          echo "instalador chico: $PESO bytes"
+          [ "$PESO" -lt 10000000 ] || { echo "El instalador chico pesa demasiado"; exit 1; }
+          ls desktop/dist/nsis-web/*.nsis.7z >/dev/null
+          echo "--- latest.yml (el que leen las actualizaciones) ---"; cat desktop/dist/latest.yml
+          # Las actualizaciones siguen con el instalador completo.
+          grep -q "url: Maven-Windows.exe" desktop/dist/latest.yml
+      - name: Guardar el ensayo
+        if: env.EN_MAIN != 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ensayo-windows
+          path: |
+            desktop/dist/nsis-web/Maven-Instalador.exe
+            desktop/dist/latest.yml
+            desktop/dist/nsis-web/*.yml
+          retention-days: 7
       - name: Revisar que salió firmado (si no, no se publica)
+        if: env.EN_MAIN == 'true'
         shell: pwsh
         run: |
-          foreach ($archivo in @("desktop/dist/Maven-Windows.exe", "desktop/dist/win-unpacked/Maven.exe")) {
+          foreach ($archivo in @("desktop/dist/Maven-Windows.exe", "desktop/dist/win-unpacked/Maven.exe", "desktop/dist/nsis-web/Maven-Instalador.exe")) {
             $firma = Get-AuthenticodeSignature $archivo
             Write-Host "$archivo -> $($firma.Status) · $($firma.SignerCertificate.Subject)"
             if ($firma.Status -ne "Valid" -or $firma.SignerCertificate.Subject -notmatch "CN=Alvaro Mejia") {
@@ -70,6 +104,7 @@ jobs:
             }
           }
       - name: Subir a Supabase (balde descargas)
+        if: env.EN_MAIN == 'true'
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
         run: |
@@ -78,12 +113,16 @@ jobs:
             -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
             | node -e 'let d="";process.stdin.on("data",c=>d+=c).on("end",()=>console.log(JSON.parse(d).find(k=>k.name==="service_role").api_key))')
           echo "::add-mask::$LLAVE"
-          # El .yml va al final: anuncia la versión nueva solo cuando ya subió todo.
-          for ARCHIVO in $ARCHIVOS; do
-            curl -fsS -X POST "https://$PROYECTO.supabase.co/storage/v1/object/descargas/$ARCHIVO" \
+          # Orden: primero el paquete .7z (el chico lo pide al instalar), luego
+          # los instaladores, y el .yml al final: anuncia la versión nueva solo
+          # cuando ya subió todo.
+          cd desktop/dist
+          PAQUETE=$(cd nsis-web && ls *.nsis.7z)
+          for ARCHIVO in "nsis-web/$PAQUETE" nsis-web/Maven-Instalador.exe Maven-Windows.exe Maven-Windows.exe.blockmap latest.yml; do
+            curl -fsS -X POST "https://$PROYECTO.supabase.co/storage/v1/object/descargas/$(basename "$ARCHIVO")" \
               -H "Authorization: Bearer $LLAVE" -H "apikey: $LLAVE" \
               -H "x-upsert: true" -H "cache-control: max-age=60" \
               -H "Content-Type: application/octet-stream" \
-              --data-binary "@desktop/dist/$ARCHIVO" >/dev/null
+              --data-binary "@$ARCHIVO" >/dev/null
             echo "subido $ARCHIVO"
           done
