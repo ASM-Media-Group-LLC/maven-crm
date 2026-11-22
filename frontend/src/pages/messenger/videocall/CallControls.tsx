@@ -49,6 +49,7 @@ interface CallControlsProps {
   onOpenAdjustView?: () => void;
   hideScreenShare?: boolean;
   hideLeaveButton?: boolean;
+  miniaturaDeEscritorio?: boolean;
   leaveLabel?: string;
   leaveIcon?: LucideIcon;
   compact?: boolean;
@@ -446,7 +447,7 @@ export default function CallControls({
   onSendReaction, onLeave,
   onAudioInputChange, onAudioOutputChange, onVideoInputChange,
   onOpenVideoSettings, onOpenMetrics, onOpenAdjustView, hideScreenShare, hideLeaveButton, leaveLabel, leaveIcon, compact, tactil, controlesExtra,
-  backgroundEffect, onToggleBlurBackground, onElegirNivelBlur, flechas,
+  backgroundEffect, onToggleBlurBackground, onElegirNivelBlur, flechas, miniaturaDeEscritorio,
 }: CallControlsProps) {
   const { t } = useLanguage();
   const [audioPopoverOpen, setAudioPopoverOpen] = useState(false);
@@ -485,6 +486,22 @@ export default function CallControls({
   const altoFlecha = compact ? (tactil ? "h-9" : "h-8") : "h-11";
   const anchoBoton = compact ? (tactil ? "w-9" : "w-8") : "w-11";
   const iconSize = compact && !tactil ? "h-3.5 w-3.5" : "h-[18px] w-[18px]";
+
+  if (miniaturaDeEscritorio) {
+    const LeaveIcon = leaveIcon ?? PhoneOff;
+    return (
+      <div className="flex shrink-0 items-center justify-center gap-2 bg-background px-2 pb-1.5 pt-1">
+        <ControlBtn icon={isMicOn ? Mic : MicOff} active={isMicOn} onClick={onToggleMic} label={t("messenger.call.microfono")} compact />
+        <ControlBtn icon={isCamOn ? VideoIcon : VideoOff} active={isCamOn} onClick={onToggleCam} label={t("messenger.input.camara")} compact />
+        {!hideLeaveButton && (
+          <button type="button" onClick={onLeave} aria-label={leaveLabel || t("messenger.call.colgar")}
+            className="flex h-8 w-12 items-center justify-center rounded-full bg-destructive text-destructive-foreground hover:bg-destructive/90">
+            <LeaveIcon className="h-4 w-4" aria-hidden />
+          </button>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div className={cn("shrink-0 flex items-center bg-background", compact ? "py-1.5 px-2 justify-center flex-wrap" : "py-3 px-4")}>

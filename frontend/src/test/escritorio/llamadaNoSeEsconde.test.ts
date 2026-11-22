@@ -1,12 +1,10 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 // LA LLAMADA NO SE ESCONDE (Alvaro, 18/11/2026: «se escondió la llamada y no
 // encontraba dónde colgar»). En la app, la ventana de una llamada que pierde el
-// foco se achica a una ventanita arriba a la derecha, siempre encima; al tocarla
-// vuelve a su tamaño. «Volver a la llamada» (la barra de Maven) la trae al frente
+// foco se achica a una ventanita. «Expandir» conserva el tamaño previo de la
+// ventana. «Volver a la llamada» (la barra de Maven) la trae al frente
 // por maven:mostrar-esta-ventana, que solo una ventana de llamada puede pedir.
-// Probado con una copia de la app el 18/11: 360×250 encima al pasar a Maven, y
-// de vuelta a 800×600 con «Volver».
 const leer = (g: Record<string, unknown>) => Object.values(g)[0] as string;
 const ventana = leer(import.meta.glob("../../../../desktop/src/ventanaDeLlamada.js", { query: "?raw", import: "default", eager: true }));
 const main = leer(import.meta.glob("../../../../desktop/src/main.js", { query: "?raw", import: "default", eager: true }));
@@ -21,13 +19,57 @@ describe("la ventana de la llamada", () => {
     expect(main).toMatch(/webContents\.on\("did-create-window", \(hija, \{ url \}\) => \{\s*if \(esDeMaven\(url\) && esLlamada\(url\)\) prepararVentanaDeLlamada\(hija\);/);
   });
 
-  it("al perder el foco se achica y queda encima; al volver, su tamaño", () => {
-    expect(ventana).toMatch(/hija\.on\("blur"/);
-    expect(ventana).toMatch(/hija\.setAlwaysOnTop\(true, "floating"\)/);
-    expect(ventana).toMatch(/hija\.on\("focus", \(\) => \{ clearTimeout\(espera\); agrandar\(\); \}\)/);
-    expect(ventana).toMatch(/hija\.setAlwaysOnTop\(false\)/);
-    // En pantalla completa no se toca.
-    expect(ventana).toMatch(/hija\.isFullScreen\(\)/);
+  it("permite mover y desanclar sin expandir al recuperar el foco", () => {
+    vi.useFakeTimers();
+    try {
+      const original = { x: 100, y: 100, width: 820, height: 620 };
+      let bounds = original;
+      let cursor = { x: 800, y: 40 };
+      const eventos = new Map<string, () => void>();
+      const hija = {
+        getBounds: () => bounds,
+        setBounds: vi.fn((nuevo) => { bounds = nuevo; }),
+        isDestroyed: () => false, isMinimized: () => false, isFullScreen: () => false,
+        isFocused: () => false, isMaximized: () => false,
+        setAlwaysOnTop: vi.fn(), setVisibleOnAllWorkspaces: vi.fn(),
+        webContents: { isDestroyed: () => false, send: vi.fn() },
+        on: (evento: string, fn: () => void) => eventos.set(evento, fn),
+      };
+      const pantalla = () => ({ workArea: { x: 0, y: 0, width: 1200, height: 800 } });
+      const electron = { screen: { getDisplayMatching: pantalla, getDisplayNearestPoint: pantalla, getCursorScreenPoint: () => cursor } };
+      const modulo = { exports: {
+        prepararVentanaDeLlamada: (_hija: typeof hija) => {},
+        controlarMiniatura: (_hija: typeof hija, _accion: string): unknown => null,
+        arrastrarMiniatura: (_hija: typeof hija, _fase: string) => {},
+      } };
+      new Function("require", "module", ventana)(() => electron, modulo);
+      const { prepararVentanaDeLlamada, controlarMiniatura, arrastrarMiniatura } = modulo.exports;
+      prepararVentanaDeLlamada(hija);
+      controlarMiniatura(hija, "estado");
+      const perderFoco = () => { eventos.get("blur")?.(); vi.advanceTimersByTime(400); };
+      perderFoco();
+      expect(bounds.width).toBeLessThan(original.width);
+      expect(hija.setAlwaysOnTop).toHaveBeenLastCalledWith(true, "floating");
+      const movida = { ...bounds, x: 34, y: 54 };
+      const inicio = bounds;
+      eventos.get("focus")?.();
+      expect(bounds).toEqual(inicio);
+      arrastrarMiniatura(hija, "inicio");
+      cursor = { x: cursor.x + movida.x - inicio.x, y: cursor.y + movida.y - inicio.y };
+      arrastrarMiniatura(hija, "mover");
+      arrastrarMiniatura(hija, "fin");
+      expect(bounds).toEqual(movida);
+      expect(controlarMiniatura(hija, "anclaje")).toEqual({ miniatura: true, anclada: false });
+      expect(hija.setAlwaysOnTop).toHaveBeenLastCalledWith(false, "floating");
+      controlarMiniatura(hija, "expandir");
+      expect(bounds).toEqual(original);
+      perderFoco();
+      expect(bounds).toEqual(movida);
+      expect(hija.setAlwaysOnTop).toHaveBeenLastCalledWith(false, "floating");
+      expect(controlarMiniatura(hija, "arbitraria")).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("es una llamada /call/ o un Meet /meet/", () => {

@@ -5,6 +5,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import LiveKitCallView from "./messenger/videocall/LiveKitCallView";
+import { useMiniaturaLlamada } from "./messenger/videocall/BarraMiniaturaLlamada";
 import { LlamadaEnVentanaFlotante } from "@/components/LlamadaEnVentanaFlotante";
 import { docPipSupported } from "@/pages/cowork/usePipWindow";
 import PreJoinLobby from "./messenger/videocall/PreJoinLobby";
@@ -54,6 +55,7 @@ export default function VideoCallPage() {
   const pideApp = salaPideApp(roomName);
   const bloqueada = pideApp && (!soloApp.listo || soloApp.estado === "bloqueo");
   const conectada = joined && !bloqueada;
+  const estadoMiniatura = useMiniaturaLlamada(esDelMessenger && conectada);
   const [coworkRedirecting, setCoworkRedirecting] = useState(() => {
     // Synchronously detect cowork rooms to block rendering from the start
     return !!roomName && (roomName.startsWith("cowork_hub_") || roomName.startsWith("cowork_"));
@@ -268,12 +270,13 @@ export default function VideoCallPage() {
       {/* La llamada puede salir a la ventana flotante del sistema cuando la
           persona se va a otro programa: esta pestaña es SOLO la llamada, así
           que si se va, deja de verse. La ventana queda siempre al frente. */}
-      <LlamadaEnVentanaFlotante activa>
+      <LlamadaEnVentanaFlotante activa={!estadoMiniatura}>
         <LiveKitCallView
-          autoPip={!docPipSupported()}
+          autoPip={!estadoMiniatura && !docPipSupported()}
           roomName={roomName}
           displayName={userName}
           callDisplayName={callDisplayName}
+          estadoMiniatura={estadoMiniatura}
           isAdmin={isAdmin}
           onLeave={handleLeave}
           initialMicOn={joinOpts.micOn}
