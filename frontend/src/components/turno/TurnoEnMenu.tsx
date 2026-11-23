@@ -31,6 +31,7 @@ export function TurnoEnMenu({ compacto = false }: { compacto?: boolean }) {
   const config = useJornadaConfig();
   const jornada = useJornadaAcciones();
   const independiente = config.data?.configurada === true;
+  const soloRegistro = independiente && config.data?.requiere_terminos === false;
   const { user } = useAuth();
   const miPausa = useMiPausa(user?.id);
   const { entrar, salir, sigo } = useAccionesTurno();
@@ -82,7 +83,7 @@ export function TurnoEnMenu({ compacto = false }: { compacto?: boolean }) {
   const faltaSeg = tr.turno_inicio ? (Date.parse(tr.turno_inicio) - ahora) / 1000 : null;
 
   const marcarEntrada = () => {
-    entrar.mutate({ aceptarTerminos: !tr.terminos_ok }, {
+    entrar.mutate({ aceptarTerminos: !soloRegistro && !tr.terminos_ok }, {
       onSuccess: () => {
         setAbrirEntrada(false);
         toast.success(t("cowork.turno.toast.entrada"));
@@ -165,7 +166,7 @@ export function TurnoEnMenu({ compacto = false }: { compacto?: boolean }) {
       <Dialog open={abrirEntrada} onOpenChange={setAbrirEntrada}>
         <DialogContent className="max-w-2xl overflow-hidden border-border/60 p-0">
           <DialogTitle className="sr-only">{t("cowork.turno.aviso.titulo")}</DialogTitle>
-          {independiente ? <div className="space-y-4 p-6">
+          {soloRegistro ? <div className="space-y-4 p-6">
             <h2 className="text-lg font-semibold">{t("cowork.jornada.iniciar")}</h2>
             <p className="text-sm text-muted-foreground">{t("cowork.jornada.aviso")}</p>
             <div className="flex justify-end gap-2"><Button variant="ghost" onClick={() => setAbrirEntrada(false)}>{t("cowork.jornada.cancelar")}</Button><Button disabled={entrar.isPending} onClick={marcarEntrada}>{t("cowork.turno.marcarEntrada")}</Button></div>

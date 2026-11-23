@@ -20,6 +20,7 @@ grant select,update on profiles to authenticated;
 create policy perfil_propio on profiles for all to authenticated using(id=auth.uid()) with check(id=auth.uid());
 `);
 await db.exec(sql('../migrations/20261123221616_admin_jornada_protegida.sql'));
+await db.exec(sql('../migrations/20261123231941_jornada_consentimiento_administradores.sql'));
 let count=0;
 const run=async(uid,query,params=[])=>{
  await db.exec('reset role');await db.query("select set_config('test.uid',$1,false)",[uid]);await db.exec('set role authenticated');
@@ -36,10 +37,11 @@ ok((await run(delegate,'select puede_editar_horario($1) v',[delegate]))[0].v,fal
 ok((await run(person,'select puede_editar_horario($1) v',[person]))[0].v,false,'Admin no se cambia a sí mismo');
 ok((await run(person,'select (mi_jornada_config()->>\'registra_horas\')::boolean v'))[0].v,false,'Admin heredado sin cambios');
 await db.query('update posiciones_borrador set registra_horas=true,registra_comida=false,registra_bano=false where id=$1',[one]);
-ok((await run(person,'select mi_jornada_config() v'))[0].v,{configurada:true,registra_horas:true,registra_comida:false,registra_bano:false},'Consultor con horas sin pausas');
+ok((await run(person,'select mi_jornada_config() v'))[0].v,{configurada:true,registra_horas:true,registra_comida:false,registra_bano:false,requiere_terminos:false},'Consultor con horas sin pausas');
 ok((await run(person,'select aplica from mi_turno()'))[0].aplica,true,'La tarjeta de admin queda visible');
-await db.query('insert into turno_terminos values($1,1)',[person]);
+
 await run(person,'select turno_entrar()');await run(person,'select turno_entrar()');
+ok((await db.query('select count(*)::int n from turno_terminos where user_id=$1',[person])).rows[0].n,0,'No inventa aceptación de monitoreo del admin');
 ok((await db.query('select count(*)::int n from turno_marcas where user_id=$1',[person])).rows[0].n,1,'Entrada idempotente');
 await denied(person,"select jornada_pausar('bano')");await denied(person,"select jornada_pausar('almuerzo')");
 await db.query('update posiciones_borrador set registra_comida=true where id=$1',[one]);
@@ -82,4 +84,8 @@ await assert.rejects(()=>run(owner,'select jornada_resolver_correccion($1,true)'
 ok((await run(other,'select jornada_registros() v'))[0].v.registros.length,0,'Empleado no ve horas ajenas');
 ok((await run(owner2,'select jornada_registros() v'))[0].v.solicitudes.length,0,'Otra empresa no ve solicitudes');
 console.log(`${count} comprobaciones de jornada, permisos, pausas, aislamiento y aprobación correctas`);
+await db.query('update posiciones_borrador set registra_horas=true where id=$1',[delegatePosition]);
+ok((await run(delegate,'select (mi_jornada_config()->>\'requiere_terminos\')::boolean v'))[0].v,true,'El empleado conserva el aviso de monitoreo');
+await assert.rejects(()=>run(delegate,'select turno_entrar()'),/acepta las reglas/);count++;
+console.log(`${count} comprobaciones finales, incluidos consentimientos correctas`);
 await db.close();

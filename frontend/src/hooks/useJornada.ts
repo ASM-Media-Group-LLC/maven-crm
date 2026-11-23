@@ -4,7 +4,7 @@ import { useAuth } from "@/hooks/useAuth";
 
 interface Db { rpc(name: string, args?: Record<string, unknown>): Promise<{ data: unknown; error: { message: string } | null }> }
 const db = supabase as unknown as Db;
-export interface JornadaConfig { configurada: boolean; registra_horas: boolean; registra_comida: boolean; registra_bano: boolean }
+export interface JornadaConfig { configurada: boolean; registra_horas: boolean; registra_comida: boolean; registra_bano: boolean; requiere_terminos?: boolean }
 export interface RegistroJornada { id: string; user_id: string; nombre: string; inicio: string; fin: string | null; pausa_seg: number }
 export interface SolicitudJornada {
   id: string; solicitante: string; nombre: string; motivo: string; estado: "pendiente" | "aprobada" | "rechazada";

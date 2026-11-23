@@ -6,6 +6,7 @@
 const AJENAS = new Set([
   // Jornada y datos laborales: cubiertos en admin_jornada_protegida.mjs.
   '20261123221616_admin_jornada_protegida.sql',
+  '20261123231941_jornada_consentimiento_administradores.sql',
   '20261123033654_posiciones_aplicar_y_avisos_saldo.sql',
   '20261123034838_argos_avisos_saldo_10_5.sql',
   '20261123042735_posiciones_permisos_efectivos.sql',
