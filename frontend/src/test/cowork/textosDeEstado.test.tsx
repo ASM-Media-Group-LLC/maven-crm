@@ -5,7 +5,14 @@
 //      español la pantalla tiene que quedar igual que antes);
 //   2. que un estado nuevo llegue sin su clave (en inglés saldría la clave).
 import type { ReactNode } from "react";
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, vi } from "vitest";
+// Esta prueba cubre los textos del modo anterior, sin configuración de jornada.
+vi.mock("@/hooks/useJornada", () => ({
+  useJornadaConfig: () => ({
+    data: { configurada: false, registra_horas: true, registra_comida: true, registra_bano: true },
+  }),
+}));
+
 import { render, screen, fireEvent } from "@testing-library/react";
 import { LanguageProvider } from "@/hooks/useLanguage";
 import { getTranslation } from "@/lib/i18n";
