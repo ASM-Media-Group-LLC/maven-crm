@@ -74,7 +74,7 @@ export function MedidorEquipo() {
           })}
         </button>
       </PopoverTrigger>
-      <PopoverContent align="end" className="vidrio w-80 rounded-[20px] border-border/60 p-3">
+      <PopoverContent align="end" className="vidrio max-h-[var(--radix-popover-content-available-height)] w-96 max-w-[calc(100vw-2rem)] overflow-y-auto rounded-[20px] border-border/60 p-3">
         <div className="mb-3 flex items-center gap-2 px-1">
           <Gauge className="h-4 w-4 text-primary" />
           <p className="flex-1 text-sm font-semibold text-foreground">{t("pwa.medidor.titulo")}</p>
@@ -92,17 +92,24 @@ export function MedidorEquipo() {
             cosa="computador"
             luz={luces.computador}
             valor={m.cpu_equipo_pct != null ? `${m.cpu_equipo_pct}%` : "—"}
-            detalle={t("pwa.medidor.computadorDetalle", { app: m.cpu_app_pct ?? 0 })}
+            detalle={t("pwa.medidor.computadorDetalle", { app: m.cpu_app_pct ?? "—" })}
             lleno={m.cpu_equipo_pct ?? 0}
           />
           <Fila
             cosa="memoria"
             luz={luces.memoria}
             valor={m.libre_gb != null ? t("pwa.medidor.libres", { gb: m.libre_gb }) : "—"}
-            detalle={t("pwa.medidor.memoriaDetalle", { total: m.equipo_gb ?? 0, app: m.app_mb ?? 0 })}
+            detalle={t("pwa.medidor.memoriaDetalle", { total: m.equipo_gb ?? "—", app: m.app_mb ?? "—" })}
             lleno={usadoGb != null && m.equipo_gb ? Math.round((usadoGb / m.equipo_gb) * 100) : 0}
           />
         </div>
+        <details className="mt-3 rounded-xl border border-border/60 px-3 py-2 text-xs">
+          <summary className="cursor-pointer font-medium text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+            {t("pwa.medidor.diagnostico.titulo")}
+          </summary>
+          <p className="mt-2 text-muted-foreground">{t("pwa.medidor.diagnostico.mediciones")}</p>
+          <p className="mt-2 text-muted-foreground">{t("pwa.medidor.diagnostico.registro")}</p>
+        </details>
       </PopoverContent>
     </Popover>
   );

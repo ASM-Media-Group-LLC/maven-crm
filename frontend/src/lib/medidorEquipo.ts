@@ -63,9 +63,11 @@ export function peorLuz(s: Semaforo): Luz {
 export type Cosa = keyof Semaforo;
 export const AVISO_CADA_MS = 30 * 60 * 1000;
 
-/** ¿Toca avisarle a la persona? Solo si está en rojo en DOS muestras seguidas
- *  (un pico no cuenta) y no se le avisó de eso en los últimos 30 minutos. */
+/** Solo la conexión puede generar un aviso. El procesador y la RAM se consultan
+ *  en el detalle: su uso alto no demuestra que Maven esté fallando. La conexión
+ *  necesita DOS muestras rojas seguidas y 30 minutos desde el último aviso. */
 export function tocaAvisar(cosa: Cosa, actual: Semaforo, anterior: Semaforo | null, ultimoAviso: number | undefined, ahora: number): boolean {
+  if (cosa !== "internet") return false;
   if (actual[cosa] !== "rojo" || anterior?.[cosa] !== "rojo") return false;
   return ultimoAviso == null || ahora - ultimoAviso >= AVISO_CADA_MS;
 }

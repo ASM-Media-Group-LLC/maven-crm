@@ -32,13 +32,21 @@ describe("medidor del equipo", () => {
     expect(peorLuz(semaforo({ ...base, cpu_equipo_pct: 95 }))).toBe("rojo");
   });
 
-  it("avisa solo con dos rojos seguidos y no más de una vez cada 30 min", () => {
-    const rojo = semaforo({ ...base, libre_gb: 0.2 });
+  it("avisa de la conexión solo con dos rojos seguidos y no más de una vez cada 30 min", () => {
+    const rojo = semaforo({ ...base, ping_ms: 700 });
     const verde = semaforo(base);
-    expect(tocaAvisar("memoria", rojo, verde, undefined, 1000)).toBe(false);
-    expect(tocaAvisar("memoria", rojo, rojo, undefined, 1000)).toBe(true);
-    expect(tocaAvisar("memoria", rojo, rojo, 1000, 1000 + AVISO_CADA_MS - 1)).toBe(false);
-    expect(tocaAvisar("memoria", rojo, rojo, 1000, 1000 + AVISO_CADA_MS)).toBe(true);
+    expect(tocaAvisar("internet", rojo, verde, undefined, 1000)).toBe(false);
+    expect(tocaAvisar("internet", rojo, rojo, undefined, 1000)).toBe(true);
+    expect(tocaAvisar("internet", rojo, rojo, 1000, 1000 + AVISO_CADA_MS - 1)).toBe(false);
+    expect(tocaAvisar("internet", rojo, rojo, 1000, 1000 + AVISO_CADA_MS)).toBe(true);
+  });
+
+  it("procesador y RAM no generan alertas, aunque permanezcan en rojo", () => {
+    const rojo = semaforo({ ...base, cpu_equipo_pct: 100, libre_gb: 0 });
+    for (const cosa of ["computador", "memoria"] as const) {
+      expect(tocaAvisar(cosa, rojo, rojo, undefined, 1000)).toBe(false);
+      expect(tocaAvisar(cosa, rojo, rojo, 1000, 1000 + AVISO_CADA_MS)).toBe(false);
+    }
   });
 
   it("el resumen del día cuenta los rojos y toma la última muestra", () => {
