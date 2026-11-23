@@ -1,5 +1,5 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent, waitFor, within } from "@testing-library/react";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { render, screen, fireEvent, waitFor, within, cleanup, act } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
 // Keila (contabilidad), 28/09: «si yo le asigno solo etiqueta me lo deja en
@@ -101,6 +101,13 @@ beforeEach(() => {
   localStorage.clear();
   carpetaDelCorreo = "INBOX";
   porCorreo = new Map();
+});
+
+afterEach(async () => {
+  cleanup();
+  // TipTap destruye el editor de respuesta en un timer de 1 ms al desmontar.
+  // Debe terminar antes de que Vitest quite window al cerrar este archivo.
+  await act(async () => { await new Promise(resolve => setTimeout(resolve, 5)); });
 });
 
 describe("«Mover a» una etiqueta, como Gmail", () => {
