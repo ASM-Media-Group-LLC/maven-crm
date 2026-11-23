@@ -19,6 +19,11 @@ const MSG: Record<string, string> = {
   last_admin: "No puedes dejar el sistema sin ningún admin",
   no_target: "Falta el usuario objetivo",
   unknown_action: "Acción no permitida",
+  position_function_denied: "Tu posición no permite esta función",
+  outside_position_scope: "Esta cuenta está fuera del alcance de tu posición",
+  protected_owner: "Solo el dueño puede administrar la cuenta del dueño",
+  protected_user: "Solo el dueño puede administrar esta cuenta protegida",
+  other_agency: "No puedes administrar una cuenta de otra empresa",
 };
 
 // PromiseLike y no Promise: el `rpc()` de supabase-js devuelve un

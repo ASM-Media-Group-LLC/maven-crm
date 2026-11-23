@@ -62,4 +62,14 @@ describe("La posición gobierna las acciones antes que el nivel del rol",()=>{
     await client.invalidateQueries({queryKey:["mis-funciones-posicion"]});
     await waitFor(()=>expect(result.current.explicitPermission("Cowork","Crear sesión")).toBe(false));
   });
+  it.each(["employee","supervisor","admin"] as AppRole[])("%s: las funciones nuevas no heredan el permiso general de usuarios",async role=>{
+    const {result,client}=setup(role,{"Administración|Usuarios":true,"N:usr.editar":true});
+    await waitFor(()=>expect(result.current.isLoading).toBe(false));
+    expect(result.current.canFunction("N:usr.editar",true)).toBe(true);
+    expect(result.current.canFunction("N:usr.reset",true)).toBe(false);
+    expect(result.current.canFunction("N:usr.asignar",true)).toBe(false);
+    stub.setFuncionesPosicion({uid:adminUser.id,aplica:true,total:false,bloqueada:false,checks:{"Administración|Usuarios":true}});
+    await client.invalidateQueries({queryKey:["mis-funciones-posicion"]});
+    await waitFor(()=>expect(result.current.canFunction("N:usr.editar",true)).toBe(false));
+  });
 });

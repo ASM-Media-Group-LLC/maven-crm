@@ -26,6 +26,7 @@ import { avisarPersona } from "@/lib/avisoPersona";
 import { adminInvoke, SessionExpiredError } from "@/lib/adminInvoke";
 import { PageHeader } from "@/components/ui/page-header";
 import { useLanguage } from "@/hooks/useLanguage";
+import { usePermisosUsuarios } from "./usePermisosUsuarios";
 
 // Búsqueda tolerante: sin distinguir mayúsculas ni tildes, porque el roster está
 // lleno de apellidos acentuados (Suárez, Durán, Pinzón) y nadie los tipea con tilde.
@@ -34,6 +35,7 @@ const norm = (s: string) =>
 
 const AdminUsuarios = () => {
   const { t } = useLanguage();
+  const funcionesUsuario = usePermisosUsuarios();
   const [credenciales, setCredenciales] = useState<CredencialesCreadas | null>(null);
   const navigate = useNavigate();
   // Esta pantalla vive en dos lados: embebida en Settings (?sub=usuarios) y con
@@ -192,7 +194,7 @@ const AdminUsuarios = () => {
                     <Button asChild variant="outline" size="sm">
                       <Link to="/admin/horarios"><Clock className="h-4 w-4 mr-1" />{t("admin.horarios.titulo")}</Link>
                     </Button>
-                    {activeTab === "usuarios" ? (
+                    {activeTab === "usuarios" && funcionesUsuario.agregar ? (
                       <Button variant="outline" size="sm" onClick={() => setAddUserOpen(true)}>
                         <Plus className="h-4 w-4 mr-1" />
                         {t("admin.users.addUser")}
@@ -266,7 +268,8 @@ const AdminUsuarios = () => {
                   cuentas={papelera.cuentas}
                   diasDePapelera={papelera.diasDePapelera}
                   isLoading={papelera.isLoading}
-                  puedePurgar={isAdmin}
+                  puedePurgar={isAdmin && funcionesUsuario.desactivar}
+                  puedeRecuperar={funcionesUsuario.desactivar}
                   onRecuperar={(id) => papelera.recuperar.mutate(id)}
                   onPurgar={(id) => papelera.purgar.mutate(id)}
                   recuperando={papelera.recuperar.isPending}
@@ -333,6 +336,7 @@ const AdminUsuarios = () => {
                   />
 
                   <EditUserModal
+                    puedeAsignarRol={funcionesUsuario.asignar && !!selectedUser?.manageable}
                     open={editOpen}
                     onOpenChange={setEditOpen}
                     user={selectedUser}
@@ -403,6 +407,7 @@ const AdminUsuarios = () => {
               )}
 
               <AddUserModal
+                puedeAsignarRol={funcionesUsuario.asignar}
                 open={addUserOpen}
                 onOpenChange={(o) => {
                   setAddUserOpen(o);

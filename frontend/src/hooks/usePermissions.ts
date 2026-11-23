@@ -195,6 +195,7 @@ export const usePermissions = () => {
   return {
     canAccess,
     explicitPermission,
+    canFunction: (clave: string, fallback = false): boolean => posicionSinVerificar ? false : (decisionPosicion(funcionesPosicion.data, clave) ?? fallback),
     dataScope,
     isLoading: roleLoading || permsLoading || funcionesPosicion.isLoading,
     /**

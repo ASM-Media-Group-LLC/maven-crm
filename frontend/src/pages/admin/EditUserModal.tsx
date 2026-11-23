@@ -14,11 +14,12 @@ interface EditUserModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   user: AdminUser | null;
-  onConfirm: (data: { first_name: string; last_name: string; role: string; ai_daily_quota_override: number | null }) => void;
+  onConfirm: (data: { first_name: string; last_name: string; role?: string; ai_daily_quota_override: number | null }) => void;
+  puedeAsignarRol: boolean;
   isLoading: boolean;
 }
 
-const EditUserModal = ({ open, onOpenChange, user, onConfirm, isLoading }: EditUserModalProps) => {
+const EditUserModal = ({ open, onOpenChange, user, onConfirm, isLoading, puedeAsignarRol }: EditUserModalProps) => {
   const { t } = useLanguage();
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
@@ -51,7 +52,7 @@ const EditUserModal = ({ open, onOpenChange, user, onConfirm, isLoading }: EditU
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!firstName.trim() || !lastName.trim()) return;
-    onConfirm({ first_name: firstName.trim(), last_name: lastName.trim(), role, ai_daily_quota_override: aiOverride.trim() === "" ? null : Number(aiOverride) });
+    onConfirm({ first_name: firstName.trim(), last_name: lastName.trim(), ...(puedeAsignarRol ? {role} : {}), ai_daily_quota_override: aiOverride.trim() === "" ? null : Number(aiOverride) });
   };
 
   return (
@@ -96,8 +97,8 @@ const EditUserModal = ({ open, onOpenChange, user, onConfirm, isLoading }: EditU
 
           <div className="space-y-2">
             <Label htmlFor="edit-role">{t("common.role")}</Label>
-            <Select value={role} onValueChange={setRole}>
-              <SelectTrigger>
+            <Select value={role} onValueChange={setRole} disabled={!puedeAsignarRol}>
+              <SelectTrigger id="edit-role">
                 <SelectValue placeholder={t("admin.selectRole")} />
               </SelectTrigger>
               <SelectContent>

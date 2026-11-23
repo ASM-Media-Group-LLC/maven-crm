@@ -1,5 +1,6 @@
 import { corsFor } from "../_shared/cors.ts";
 import { assertCanManage } from "../_shared/user-hierarchy.ts";
+import { onlyVisibleUsers, visibleUserIds } from "../_shared/user-visibility.ts";
 import { type ClienteParaRoles, esAdmin } from "../_shared/es-admin.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import {
@@ -177,6 +178,12 @@ Deno.serve(async (req) => {
 
     // === LIST USERS (returns emails from auth.users) ===
     if (action === "list_users") {
+      const visibleIds = await visibleUserIds(authClient);
+      if (!visibleIds.size) {
+        return new Response(JSON.stringify({ users: [] }), {
+          headers: { ...corsHeaders(req), "Content-Type": "application/json" },
+        });
+      }
       const { data: { users }, error: listError } = await adminClient.auth.admin.listUsers({ perPage: 1000 });
       if (listError) {
         return new Response(JSON.stringify({ error: listError.message }), {
@@ -185,7 +192,7 @@ Deno.serve(async (req) => {
         });
       }
       return new Response(JSON.stringify({
-        users: (users || []).map((u) => ({ id: u.id, email: u.email })),
+        users: onlyVisibleUsers(users || [], visibleIds).map((u) => ({ id: u.id, email: u.email })),
       }), {
         headers: { ...corsHeaders(req), "Content-Type": "application/json" },
       });
@@ -617,12 +624,10 @@ Deno.serve(async (req) => {
     // (indexada por email_local) y sus vínculos de Hubstaff/BLU se preservan. Además
     // provisiona el buzón Zoho en la nueva dirección. `email` = la NUEVA dirección.
     if (action === "migrate_email") {
-      // Self-servicio permitido: cambiar el PROPIO correo de login + buzón es
-      // benigno (mismo user_id y contraseña), a diferencia de borrar/degradar.
-      // El gate de arriba (can_manage_users) ya asegura que quien llama es admin;
-      // para OTRAS cuentas se aplica la jerarquía normal.
-      if (String(user_id) !== callerId) {
-        const gMig = await assertCanManage(adminClient, callerId, user_id, "delete_user");
+      // También se permite la cuenta propia si su posición concede editarla.
+      // Para otras cuentas se conservan alcance, jerarquía y protección del dueño.
+      {
+        const gMig = await assertCanManage(adminClient, callerId, user_id, "update_profile");
         if (!gMig.ok) {
           return new Response(JSON.stringify(gMig.body), {
             status: gMig.status,
@@ -1092,9 +1097,16 @@ Deno.serve(async (req) => {
 
     // === PAPELERA: qué hay y cuánto le queda ===
     if (action === "list_deleted_users") {
+      const visibleIds = await visibleUserIds(authClient);
+      if (!visibleIds.size) {
+        return new Response(JSON.stringify({ dias_de_papelera: DIAS_DE_PAPELERA, users: [] }), {
+          headers: { ...corsHeaders(req), "Content-Type": "application/json" },
+        });
+      }
       const { data: enPapelera, error: papErr } = await adminClient
         .from("profiles")
         .select("id, full_name, avatar_url, avatar_seed, deleted_at, deleted_by")
+        .in("id", [...visibleIds])
         .not("deleted_at", "is", null)
         .order("deleted_at", { ascending: false });
       if (papErr) {
@@ -1110,7 +1122,8 @@ Deno.serve(async (req) => {
       }[];
 
       // Nombre de quien la dio de baja, para no mostrar un uuid en pantalla.
-      const idsActores = [...new Set(filas.map((f) => f.deleted_by).filter(Boolean))] as string[];
+      const idsActores = [...new Set(filas.map((f) => f.deleted_by)
+        .filter((id): id is string => !!id && visibleIds.has(id)))];
       const nombreDelActor = new Map<string, string>();
       if (idsActores.length) {
         const { data: actores } = await adminClient
@@ -1133,7 +1146,7 @@ Deno.serve(async (req) => {
             avatar_seed: f.avatar_seed,
             email: au?.user?.email ?? "",
             deleted_at: f.deleted_at,
-            deleted_by: f.deleted_by,
+            deleted_by: f.deleted_by && visibleIds.has(f.deleted_by) ? f.deleted_by : null,
             deleted_by_name: f.deleted_by ? nombreDelActor.get(f.deleted_by) ?? null : null,
             // Puede dar 0: es una cuenta que el cron va a purgar en el próximo pase.
             dias_restantes: Math.max(0, Math.ceil(DIAS_DE_PAPELERA - transcurridos)),
@@ -1155,6 +1168,13 @@ Deno.serve(async (req) => {
     // todo antes de borrar; en particular, que pasaron los 30 días: si un admin
     // purga antes, el buzón queda en la cola y lo borra el cron ese día.
     if (action === "purge_user") {
+      const gPurge = await assertCanManage(adminClient, callerId, user_id, "delete_user");
+      if (!gPurge.ok) {
+        return new Response(JSON.stringify(gPurge.body), {
+          status: gPurge.status,
+          headers: { ...corsHeaders(req), "Content-Type": "application/json" },
+        });
+      }
       // No rpc("has_role"): hay dos y PostgREST no elige; daba «no es admin»
       // a todos (ver _shared/es-admin.ts).
       if (!(await esAdmin(adminClient as unknown as ClienteParaRoles, callerId))) {

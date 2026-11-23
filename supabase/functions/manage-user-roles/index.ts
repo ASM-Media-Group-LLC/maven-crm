@@ -73,6 +73,15 @@ Deno.serve(async (req) => {
         });
       }
 
+      // Validar función, alcance y jerarquía antes de leer la cuenta objetivo.
+      const gAssign = await assertCanManage(adminClient, callerId, user_id, "assign_role", role);
+      if (!gAssign.ok) {
+        return new Response(JSON.stringify(gAssign.body), {
+          status: gAssign.status,
+          headers: { ...corsHeaders(req), "Content-Type": "application/json" },
+        });
+      }
+
       // El rol tiene que existir y estar activo EN LA AGENCIA de la persona: desde
       // 20261001211000_roles_por_agencia cada agencia tiene sus roles y el mismo
       // nombre puede estar en varias (con .maybeSingle() eso daba error). select("*")
@@ -92,15 +101,6 @@ Deno.serve(async (req) => {
         return new Response(JSON.stringify({ error: `Invalid or inactive role: ${role}` }), {
           status: 400,
           headers: { ...corsHeaders(req), "Content-Type": "application/json" },
-        });
-      }
-
-      // JERARQUÍA: no se puede asignar un rol de nivel >= al propio (estricto).
-      const gAssign = await assertCanManage(adminClient, callerId, user_id, "assign_role", role);
-      if (!gAssign.ok) {
-        return new Response(JSON.stringify(gAssign.body), {
-          status: gAssign.status,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
 
@@ -139,7 +139,7 @@ Deno.serve(async (req) => {
       if (!gRemove.ok) {
         return new Response(JSON.stringify(gRemove.body), {
           status: gRemove.status,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          headers: { ...corsHeaders(req), "Content-Type": "application/json" },
         });
       }
 

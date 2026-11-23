@@ -57,11 +57,12 @@ interface AddUserModalProps {
   onOpenChange: (open: boolean) => void;
   onConfirm: (data: NuevoUsuario) => void;
   isLoading: boolean;
+  puedeAsignarRol?: boolean;
   /** Al llegar, el modal pasa a la vista de entrega de credenciales. */
   credenciales?: CredencialesCreadas | null;
 }
 
-const AddUserModal = ({ open, onOpenChange, onConfirm, isLoading, credenciales }: AddUserModalProps) => {
+const AddUserModal = ({ open, onOpenChange, onConfirm, isLoading, credenciales, puedeAsignarRol = true }: AddUserModalProps) => {
   const { t } = useLanguage();
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
@@ -114,7 +115,7 @@ const AddUserModal = ({ open, onOpenChange, onConfirm, isLoading, credenciales }
     onConfirm({
       first_name: firstName.trim(),
       last_name: lastName.trim(),
-      role,
+      role: puedeAsignarRol ? role : "employee",
       ...(tipoCorreo === "externo" ? { email: emailExterno.trim().toLowerCase() } : {}),
     });
   };
@@ -331,7 +332,7 @@ const AddUserModal = ({ open, onOpenChange, onConfirm, isLoading, credenciales }
 
               <div className="space-y-2">
                 <Label htmlFor="role">{t("common.role")}</Label>
-                <Select value={role} onValueChange={setRole}>
+                <Select value={puedeAsignarRol ? role : "employee"} onValueChange={setRole} disabled={!puedeAsignarRol}>
                   <SelectTrigger>
                     <SelectValue placeholder={t("admin.selectRole")} />
                   </SelectTrigger>
