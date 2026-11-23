@@ -39,10 +39,12 @@ describe("recuperación del actualizador de escritorio", () => {
     await pulsar("Keep working");
     expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
     expect(screen.getByRole("status")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Download the installer and see the steps" })).toHaveAttribute("href", "/app?descargar=1");
     // Ir a la guía o recargar no vuelve a encerrar a la persona en el cartel.
     cleanup();
     await abrir();
     expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Download the installer and see the steps" })).toHaveAttribute("href", "/app?descargar=1");
     expect(app.actualizarAhora).toHaveBeenCalledTimes(1);
     await pulsar("Retry update");
     expect(app.actualizarAhora).toHaveBeenCalledTimes(2);

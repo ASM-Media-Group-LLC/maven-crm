@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { fireEvent, render, screen, within } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter, useLocation } from "react-router-dom";
+import { StrictMode } from "react";
 
 // GUÍA PARA INSTALAR LA APP (/app, Alvaro 18/11/2026). Desde el viernes 20/11
 // Cowork en el computador va solo en la app de Maven.
@@ -172,10 +173,12 @@ describe("la guía: la página", () => {
     expect(screen.getByText(/guiaApp\.subtituloFecha/)).toBeTruthy();
   });
 
-  it("dentro de la app: «ya estás en la app» e «Ir a Cowork», sin descargar", () => {
+  it("dentro de la app: permite descargar el instalador para recuperar una actualización fallida", () => {
     pintar({ enApp: true, sistemaInicial: "mac" });
     expect(within(screen.getByRole("status")).getByText("guiaApp.yaEnApp.titulo")).toBeTruthy();
-    expect(screen.queryAllByRole("link", { name: /guiaApp\.descargarPara/ })).toHaveLength(0);
+    const descargas = screen.getAllByRole("link", { name: /guiaApp\.descargarPara/ });
+    expect(descargas).toHaveLength(2);
+    for (const enlace of descargas) expect(enlace.getAttribute("href")).toMatch(/Maven-Mac\.dmg$/);
     expect(screen.getAllByRole("link", { name: /guiaApp\.irACowork/ })[0].getAttribute("href")).toBe("/cowork");
     expect(screen.queryByRole("link", { name: /guiaApp\.yaLaTengo$/ })).toBeNull();
   });
@@ -195,6 +198,9 @@ describe("la guía lee el equipo de quien mira", () => {
   afterEach(() => {
     ponerUA(original);
     delete (window as unknown as { mavenEscritorio?: unknown }).mavenEscritorio;
+    vi.restoreAllMocks();
+    vi.clearAllTimers();
+    vi.useRealTimers();
   });
 
   it("en un Mac abre en la pestaña Mac", () => {
@@ -210,5 +216,44 @@ describe("la guía lee el equipo de quien mira", () => {
     render(<MemoryRouter><GuiaAppPage /></MemoryRouter>);
     expect(screen.getAllByRole("tab")[0].textContent).toContain("Windows");
     expect(screen.getByText("guiaApp.yaEnApp.titulo")).toBeTruthy();
+  });
+
+  it.each([
+    ["mac", WIN, "Maven-Mac.dmg"],
+    ["windows", MAC, "Maven-Windows.exe"],
+    [null, MAC, "Maven-Mac.dmg"],
+    [null, WIN, "Maven-Windows.exe"],
+  ] as const)("descarga una sola vez en %s con el instalador correcto, aunque el navegador anuncie otro sistema", (plataforma, ua, archivo) => {
+    vi.useFakeTimers();
+    ponerUA(ua);
+    if (plataforma) (window as unknown as { mavenEscritorio: unknown }).mavenEscritorio = { esApp: true, plataforma };
+    const archivos: string[] = [];
+    vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(function (this: HTMLAnchorElement) {
+      archivos.push(this.getAttribute("href") ?? "");
+    });
+    const RutaActual = () => <output data-testid="ruta">{useLocation().search}</output>;
+    render(<StrictMode><MemoryRouter initialEntries={["/app?descargar=1&origen=actualizacion"]}><GuiaAppPage /><RutaActual /></MemoryRouter></StrictMode>);
+    expect(archivos).toEqual([urlDeDescarga(plataforma ?? (ua === MAC ? "mac" : "windows"))]);
+    expect(archivos[0]).toContain(archivo);
+    expect(screen.getByTestId("ruta").textContent).toBe("?origen=actualizacion");
+    // Si el navegador no inició la descarga, los botones siguen disponibles.
+    for (const enlace of screen.getAllByRole("link", { name: /guiaApp\.descargarPara/ })) {
+      expect(enlace.getAttribute("href")).toContain(archivo);
+    }
+  });
+
+  it("abrir la guía desde la app sin pedir descarga no baja archivos", () => {
+    (window as unknown as { mavenEscritorio: unknown }).mavenEscritorio = { esApp: true, plataforma: "mac" };
+    const descargar = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
+    render(<MemoryRouter initialEntries={["/app"]}><GuiaAppPage /></MemoryRouter>);
+    expect(descargar).not.toHaveBeenCalled();
+  });
+
+  it("un enlace de descarga abierto en un teléfono no baja instaladores de computador", () => {
+    ponerUA(CEL);
+    const descargar = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
+    render(<MemoryRouter initialEntries={["/app?descargar=1"]}><GuiaAppPage /></MemoryRouter>);
+    expect(descargar).not.toHaveBeenCalled();
+    expect(screen.queryAllByRole("link", { name: /guiaApp\.descargarPara/ })).toHaveLength(0);
   });
 });

@@ -133,11 +133,11 @@ export function AvisoActualizacionApp() {
       role="status"
       className="vidrio vidrio-glow sube pointer-events-auto w-full max-w-[520px] rounded-[20px] border border-primary/30 [-webkit-app-region:no-drag]"
     >
-      <div className="v-cont flex items-center gap-3 px-4 py-3">
+      <div className="v-cont flex flex-wrap items-center gap-3 px-4 py-3">
         <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/[0.12] text-primary">
           <Sparkles className="h-5 w-5" />
         </span>
-        <div className="min-w-0 flex-1">
+        <div className="min-w-[160px] flex-1">
           <p className="flex flex-wrap items-center gap-2 text-sm font-semibold text-foreground">
             {t("pwa.app.titulo2")}
             <span className="rounded-full bg-primary/[0.1] px-2 py-0.5 text-[11px] font-medium text-primary tabular-nums">{version}</span>
@@ -145,12 +145,17 @@ export function AvisoActualizacionApp() {
           <p className="text-xs text-muted-foreground">
             {t(fallo ? "pwa.app.noReinicioBreve" : continuar ? "pwa.app.pendiente" : "pwa.app.nuevaEnLlamada")}
           </p>
+          {(fallo || continuar) && (
+            <a href={RUTA_DESCARGAR_CON_GUIA} onClick={seguirTrabajando} className="mt-2 inline-flex text-xs font-semibold text-primary underline underline-offset-4">
+              {t("pwa.app.instalarManual")}
+            </a>
+          )}
         </div>
         <button
           type="button"
           onClick={actualizar}
           disabled={actualizando}
-          className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-primary px-4 py-2 text-xs font-semibold text-primary-foreground transition hover:bg-primary/90 disabled:opacity-70"
+          className="ml-auto inline-flex shrink-0 items-center gap-1.5 rounded-full bg-primary px-4 py-2 text-xs font-semibold text-primary-foreground transition hover:bg-primary/90 disabled:opacity-70"
         >
           {actualizando ? <Loader2 className="h-3.5 w-3.5 animate-spin motion-reduce:animate-none" /> : <Download className="h-3.5 w-3.5" />}
           {actualizando ? t("pwa.app.actualizando") : t(fallo || continuar ? "pwa.app.reintentar" : "pwa.app.actualizar")}

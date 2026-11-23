@@ -42,7 +42,8 @@ export default function GuiaAppPage() {
   useEffect(() => {
     if (params.get("descargar") !== "1" || yaBajo.current) return;
     yaBajo.current = true;
-    if (!app && !celular) {
+    // También desde la app: permite recuperar una actualización que no se instaló.
+    if (!celular) {
       const a = document.createElement("a");
       a.href = urlDeDescarga(sistema);
       a.download = "";
@@ -143,7 +144,7 @@ export function VistaGuiaApp({ sistemaInicial, enApp, enCelular, desde }: {
                   <p className="mt-0.5 text-sm text-muted-foreground">{t("guiaApp.inicio.desc")}</p>
                 </div>
                 <div className="flex w-full flex-col gap-2 sm:w-auto">
-                  {!enApp && botonDescargar}
+                  {botonDescargar}
                   {botonCowork}
                 </div>
               </div>
@@ -192,7 +193,7 @@ export function VistaGuiaApp({ sistemaInicial, enApp, enCelular, desde }: {
               <ol className="mt-4 space-y-3">
                 <Paso n={1} titulo={t("guiaApp.paso.descargar.titulo")} dibujo={<DibujoDescargar archivo={archivo} mac={mac} />}>
                   <p>{t("guiaApp.paso.descargar.desc", { sistema: nombre, archivo })}</p>
-                  {!enCelular && !enApp && <div className="pt-1">{botonDescargar}</div>}
+                  {!enCelular && <div className="pt-1">{botonDescargar}</div>}
                 </Paso>
 
                 <Paso n={2} titulo={t("guiaApp.paso.instalar.titulo")} dibujo={mac ? <DibujoInstalarMac /> : <DibujoAvisoWindows />}>
