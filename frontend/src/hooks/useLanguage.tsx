@@ -19,27 +19,11 @@ const CLAVE_LOCAL = "app-language";
 
 const esIdioma = (v: unknown): v is Language => esIdiomaDeMaven(v);
 
-/** ¿Ya hubo una sesión de Maven en este navegador? (Supabase guarda su token
- *  como `sb-<proyecto>-auth-token`.) */
-function huboSesionAqui(): boolean {
-  try {
-    for (let i = 0; i < localStorage.length; i++) {
-      const k = localStorage.key(i) ?? "";
-      if (k.startsWith("sb-") && k.endsWith("-auth-token")) return true;
-    }
-  } catch {
-    // Bloqueado: se trata como alguien nuevo.
-  }
-  return false;
-}
-
 /** El idioma con que arranca la app (lo usa también main.tsx para bajar ese
  *  paquete antes de pintar):
  *   1. el que la persona eligió en este navegador;
- *   2. si ya trabajaba en Maven aquí y nunca eligió → español, como siempre
- *      (16/11/2026: «tu equipo actual sigue en el idioma que ya eligió»; sin
- *      esto, a quien tiene Chrome en inglés la app le cambiaba de un día al otro);
- *   3. alguien nuevo → el idioma de su navegador, o inglés si Maven no lo habla. */
+ *   2. el idioma principal del dispositivo; si Maven no lo ofrece, inglés.
+ * Tener una sesión guardada no equivale a haber elegido español. */
 /** El idioma de la dirección de la portada (/en, /es, /de…), si la hay. */
 function idiomaDeLaRuta(): Language | null {
   const enLaRuta = typeof location !== "undefined" ? location.pathname.match(/^\/(en|es|de|fr|it|pt)(\/|$)/)?.[1] : undefined;
@@ -54,9 +38,9 @@ export function idiomaInicial(): Language {
     const guardado = localStorage.getItem(CLAVE_LOCAL);
     if (esIdioma(guardado)) return guardado;
   } catch {
-    return "es"; // localStorage bloqueado: sin él igual se puede usar la app
+    // Sin almacenamiento disponible también se respeta el idioma del dispositivo.
   }
-  return huboSesionAqui() ? "es" : idiomaDelNavegador();
+  return idiomaDelNavegador();
 }
 
 const idiomaGuardado = idiomaInicial;
