@@ -132,5 +132,13 @@ assert.equal((await check(null,'reset_password')).reason,'no_caller');n++;
 assert.equal((await check(owner,'accion_inventada')).reason,'unknown_action');n++;
 await db.query('delete from user_roles where user_id=$1',[admin]);
 assert.equal((await check(owner,'delete_user',null,owner)).reason,'self_target_not_allowed');n++;
+// Once positions control a target, legacy assignment cannot overwrite its reviewed roles.
+await db.exec(sql('../migrations/20261123062055_posiciones_constructor_delegado.sql').match(/CREATE OR REPLACE FUNCTION public\.can_manage_user[\s\S]*?\$function\$;/)[0]);
+await set(admin,{'N:usr.asignar':true,'N:usr.editar':true});
+assert.equal((await check(owner,'assign_role','employee',admin)).reason,'use_position_constructor');n++;
+assert.equal((await check(owner,'remove_role',null,admin)).reason,'use_position_constructor');n++;
+assert.equal((await check(owner,'update_profile','employee',admin)).reason,'use_position_constructor');n++;
+await db.query('insert into user_roles values($1,$2,$3)',[admin,'admin',tenant]);
+assert.equal((await check(owner,'update_profile','admin',admin)).allowed,true,'same-role profile editing remains available');n++;
 await db.close();
 console.log(`${n} comprobaciones de Usuarios: casillas por acción en 3 perfiles, revocación, asignación por edición, alta básica, jerarquía, agencia, dueño y usuario deshabilitado.`);

@@ -1,3 +1,4 @@
+import { useSearchParams } from "react-router-dom";
 import type * as React from "react";
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -18,9 +19,10 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { EditorAccesosPersona } from "@/components/ajustes/EditorAccesosPersona";
+import type { AccesosPersonales } from "@/lib/posiciones/personas";
 import { useLanguage } from "@/hooks/useLanguage";
-import { useEsDueno } from "@/hooks/useEsDueno";
+import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
 import { CATALOGO_POSICIONES, type AlcanceDatos, type FilaCatalogo } from "@/lib/posiciones/catalogo";
@@ -29,43 +31,41 @@ import { useModalidades } from "@/hooks/usePausas";
 
 // Posiciones activas. El editor mantiene un borrador local y muestra el antes y
 // después antes de aplicar una revisión atómica, con control de concurrencia.
-// Las asignaciones de Personas conservan su flujo independiente.
+// Las asignaciones y restricciones personales también se revisan antes de aplicar.
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-const sinTipar = supabase as unknown as { from: (t: string) => any };
+const sinTipar = supabase as unknown as { from: (t: string) => any; rpc: (fn: string, args?: Record<string, unknown>) => Promise<{ data: any; error: { message: string } | null }> };
 
 export interface Posicion {
   updated_at: string;
+  protegida?: boolean;
+  asignable?: boolean;
   id: string; nombre: string; descripcion: string | null; activa: boolean;
   acceso_total: boolean; todas_creadoras: boolean;
   checks: Record<string, boolean>; alcances: Record<string, AlcanceDatos>; orden: number;
   /** La modalidad de pausa que trae el puesto (19/11/2026). */
   modalidad_id?: string | null;
 }
-interface Persona { id: string; full_name: string | null; avatar_url: string | null }
-interface Marca { user_id: string; protegido: boolean; sin_camara: boolean; deshabilitada: boolean }
+interface Persona { editable?: boolean; id: string; full_name: string | null; avatar_url: string | null }
+interface Marca { updated_at?: string; user_id: string; protegido: boolean; sin_camara: boolean; deshabilitada: boolean }
 interface Asignacion { user_id: string; posicion_id: string }
 
 const KEY = ["posiciones-borrador"];
 
+interface DatosConstructor {
+  posiciones: Posicion[]; asignaciones: Asignacion[]; personas: Persona[]; marcas: Marca[];
+  revisiones: AccesosPersonales[]; duenos: { user_id: string }[]; dueno: boolean;
+  acciones: Record<"agregar" | "editar" | "borrar" | "activar" | "permisos", boolean>;
+}
 function useDatos() {
+  const { user } = useAuth();
   return useQuery({
-    queryKey: KEY,
-    queryFn: async () => {
-      const [pos, asig, gente, marcas] = await Promise.all([
-        sinTipar.from("posiciones_borrador").select("*").order("orden").order("created_at"),
-        sinTipar.from("posiciones_borrador_personas").select("user_id, posicion_id"),
-        sinTipar.from("profiles").select("id, full_name, avatar_url").is("deleted_at", null).order("full_name"),
-        sinTipar.from("personas_borrador_marcas").select("*"),
-      ]);
-      const err = pos.error || asig.error || gente.error || marcas.error;
-      if (err) throw err;
-      return {
-        posiciones: (pos.data ?? []) as Posicion[],
-        asignaciones: (asig.data ?? []) as Asignacion[],
-        personas: (gente.data ?? []) as Persona[],
-        marcas: (marcas.data ?? []) as Marca[],
-      };
+    queryKey: [...KEY, user?.id], enabled: !!user?.id,
+    queryFn: async (): Promise<DatosConstructor> => {
+      const { data, error } = await sinTipar.rpc("constructor_posiciones_datos");
+      if (error) throw error;
+      if (!data || !Array.isArray(data.posiciones) || !data.acciones) throw new Error("No se pudo verificar el constructor");
+      return data;
     },
   });
 }
@@ -102,15 +102,11 @@ function Letra({ nombre }: { nombre: string | null }) {
 
 export default function Posiciones() {
   const { t } = useLanguage();
-  const { esDueno, cargando } = useEsDueno();
   const datos = useDatos();
-  const [pestana, setPestana] = useState<"posiciones" | "personas">("posiciones");
+  const [params] = useSearchParams();
+  const [pestana, setPestana] = useState<"posiciones" | "personas">(params.has("persona") ? "personas" : "posiciones");
   const [abierta, setAbierta] = useState<string | null>(null);
 
-  if (cargando) return null;
-  if (esDueno !== true) {
-    return <Page><div className="text-sm text-muted-foreground">{t("posiciones.soloDueno")}</div></Page>;
-  }
 
   const posAbierta = datos.data?.posiciones.find((p) => p.id === abierta) ?? null;
 
@@ -133,7 +129,7 @@ export default function Posiciones() {
               </button>
             ))}
           </div>
-          <AvisoBorrador />
+          {datos.data?.dueno && <AvisoBorrador />}
           {datos.isError ? (
             <Card><CardContent className="flex items-center justify-between gap-3 p-5 text-sm">
               <span>{t("posiciones.error")}</span>
@@ -153,37 +149,19 @@ export default function Posiciones() {
   );
 }
 
-// Estado del cambio: borrador (nada manda) o ya mandan, con el regreso de 7 días.
-function useEstadoPosiciones() {
-  return useQuery({
-    queryKey: ["posiciones-estado"],
-    queryFn: async () => {
-      const [flag, resp] = await Promise.all([
-        sinTipar.from("app_flags").select("enabled").eq("key", "posiciones_mandan").maybeSingle(),
-        sinTipar.from("posiciones_respaldo").select("id, created_at, restaurado_at").is("restaurado_at", null).order("id", { ascending: false }).limit(1).maybeSingle(),
-      ]);
-      if (flag.error) throw flag.error;
-      if (resp.error) throw resp.error;
-      const creado = resp.data?.created_at ? new Date(resp.data.created_at as string) : null;
-      const hasta = creado ? new Date(creado.getTime() + 7 * 86_400_000) : null;
-      return { mandan: !!flag.data?.enabled, creado, hasta: hasta && hasta > new Date() ? hasta : null };
-    },
-  });
-}
-
+// El constructor usa revisiones. Un respaldo anterior al constructor no puede
+// restaurar asignaciones y restricciones personales de forma coherente.
 function AvisoBorrador() {
   const { t } = useLanguage();
-  const qc = useQueryClient();
-  const estado = useEstadoPosiciones();
-  const [confirmar, setConfirmar] = useState(false);
-  const regresar = useMutation({
-    mutationFn: async () => {
-      const { error } = await (supabase as unknown as { rpc: (f: string) => Promise<{ error: unknown }> }).rpc("posiciones_regresar");
+  const estado = useQuery({
+    queryKey: ["posiciones-estado"],
+    queryFn: async () => {
+      const { data, error } = await sinTipar.from("app_flags").select("enabled").eq("key", "posiciones_mandan").maybeSingle();
       if (error) throw error;
+      return { mandan: !!data?.enabled };
     },
-    onSuccess: () => { setConfirmar(false); toast.success(t("posiciones.regresar.listo")); void qc.invalidateQueries(); },
-    onError: () => toast.error(t("posiciones.regresar.error")),
   });
+  if (estado.isPending) return null;
   if (estado.isError) {
     return (
       <div className="flex items-center justify-between gap-3 rounded-control border border-border px-4 py-3 text-sm">
@@ -192,38 +170,12 @@ function AvisoBorrador() {
       </div>
     );
   }
-  if (!estado.data?.mandan) {
-    return (
-      <div className="flex items-start gap-2 rounded-control border border-primary/20 bg-primary/5 px-4 py-3 text-sm text-primary">
-        <Info className="mt-0.5 h-4 w-4 shrink-0" />
-        <span>{t("posiciones.borrador")}</span>
-      </div>
-    );
-  }
-  const fecha = (d: Date | null) => (d ? d.toLocaleString(undefined, { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" }) : "");
   return (
-    <>
-      <div className="flex flex-wrap items-center justify-between gap-3 rounded-control border border-success/30 bg-success/10 px-4 py-3 text-sm text-success">
-        <span className="flex items-start gap-2"><ShieldCheck className="mt-0.5 h-4 w-4 shrink-0" />{t("posiciones.mandan")}</span>
-        {estado.data.hasta && (
-          <Button size="sm" variant="outline" onClick={() => setConfirmar(true)}>{t("posiciones.regresar")}</Button>
-        )}
-      </div>
-      <AlertDialog open={confirmar} onOpenChange={setConfirmar}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>{t("posiciones.regresar.titulo", { fecha: fecha(estado.data.creado) })}</AlertDialogTitle>
-            <AlertDialogDescription>{t("posiciones.regresar.desc", { hasta: fecha(estado.data.hasta) })}</AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>{t("posiciones.dialogo.cancelar")}</AlertDialogCancel>
-            <AlertDialogAction disabled={regresar.isPending} onClick={(e) => { e.preventDefault(); regresar.mutate(); }}>
-              {t("posiciones.regresar")}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-    </>
+    <div className={cn("flex items-start gap-2 rounded-control border px-4 py-3 text-sm", estado.data.mandan
+      ? "border-success/30 bg-success/10 text-success" : "border-primary/20 bg-primary/5 text-primary")}>
+      {estado.data.mandan ? <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0" /> : <Info className="mt-0.5 h-4 w-4 shrink-0" />}
+      <span>{t(estado.data.mandan ? "posiciones.mandan" : "posiciones.borrador")}</span>
+    </div>
   );
 }
 
@@ -237,6 +189,7 @@ function ListaPosiciones({ datos, onAbrir }: { datos: NonNullable<ReturnType<typ
   const [estado, setEstado] = useState<"todas" | "activas" | "inactivas">("todas");
   const [dialogo, setDialogo] = useState<{ modo: "nueva" } | { modo: "editar"; pos: Posicion } | null>(null);
   const [borrar, setBorrar] = useState<Posicion | null>(null);
+  const [estadoPendiente, setEstadoPendiente] = useState<Posicion | null>(null);
 
   const genteDe = useMemo(() => {
     const nombres = new Map(datos.personas.map((p) => [p.id, p.full_name ?? "?"]));
@@ -254,19 +207,19 @@ function ListaPosiciones({ datos, onAbrir }: { datos: NonNullable<ReturnType<typ
 
   const cambiarEstado = useMutation({
     mutationFn: async (p: Posicion) => {
-      const { error } = await sinTipar.from("posiciones_borrador").update({ activa: !p.activa, updated_at: new Date().toISOString() }).eq("id", p.id);
+      const { error } = await sinTipar.rpc("posicion_guardar", { _id: p.id, _revision: p.updated_at, _cambios: { activa: !p.activa } });
       if (error) throw error;
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: KEY }),
-    onError: () => toast.error(t("posiciones.errorGuardar")),
+    onSuccess: () => { setEstadoPendiente(null); void qc.invalidateQueries({ queryKey: KEY }); },
+    onError: (e: { message?: string }) => toast.error(e.message || t("posiciones.errorGuardar")),
   });
   const quitar = useMutation({
     mutationFn: async (p: Posicion) => {
-      const { error } = await sinTipar.from("posiciones_borrador").delete().eq("id", p.id);
+      const { error } = await sinTipar.rpc("posicion_eliminar", { _id: p.id, _revision: p.updated_at });
       if (error) throw error;
     },
     onSuccess: () => { setBorrar(null); void qc.invalidateQueries({ queryKey: KEY }); },
-    onError: () => toast.error(t("posiciones.errorGuardar")),
+    onError: (e: { message?: string }) => toast.error(e.message || t("posiciones.errorGuardar")),
   });
 
   return (
@@ -293,7 +246,7 @@ function ListaPosiciones({ datos, onAbrir }: { datos: NonNullable<ReturnType<typ
             </label>
             <Button variant="outline" onClick={() => { setTexto(""); setAplicado(""); setEstado("todas"); }}>{t("posiciones.limpiar")}</Button>
             <Button variant="secondary" onClick={() => setAplicado(texto)}><Search className="mr-1.5 h-4 w-4" />{t("posiciones.buscar")}</Button>
-            <Button className="ml-auto" onClick={() => setDialogo({ modo: "nueva" })}><Plus className="mr-1.5 h-4 w-4" />{t("posiciones.agregar")}</Button>
+            <Button disabled={!datos.acciones.agregar} className="ml-auto" onClick={() => setDialogo({ modo: "nueva" })}><Plus className="mr-1.5 h-4 w-4" />{t("posiciones.agregar")}</Button>
           </div>
           <div className="text-xs text-muted-foreground">{t("posiciones.total", { n: visibles.length })}</div>
           <div className="rounded-control border border-border max-md:border-0">
@@ -327,7 +280,7 @@ function ListaPosiciones({ datos, onAbrir }: { datos: NonNullable<ReturnType<typ
                         </div>
                       </TableCell>
                       <TableCell className="px-4 py-3">
-                        <Switch checked={p.activa} onCheckedChange={() => cambiarEstado.mutate(p)} aria-label={t("posiciones.col.estado")} />
+                        <Switch disabled={p.protegida || !datos.acciones.activar} checked={p.activa} onCheckedChange={() => setEstadoPendiente(p)} aria-label={t("posiciones.col.estado")} />
                       </TableCell>
                       <TableCell className="px-4 py-3 text-right">
                         <DropdownMenu>
@@ -335,9 +288,9 @@ function ListaPosiciones({ datos, onAbrir }: { datos: NonNullable<ReturnType<typ
                             <Button size="icon" variant="outline" className="h-8 w-8" aria-label={t("posiciones.accionesDe", { nombre: p.nombre })}><MoreHorizontal className="h-4 w-4" /></Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={() => onAbrir(p.id)}>{t("posiciones.accion.permisos")}</DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => setDialogo({ modo: "editar", pos: p })}>{t("posiciones.accion.editar")}</DropdownMenuItem>
-                            <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={() => setBorrar(p)}>{t("posiciones.accion.borrar")}</DropdownMenuItem>
+                            <DropdownMenuItem disabled={p.protegida || !datos.acciones.permisos} onClick={() => onAbrir(p.id)}>{t("posiciones.accion.permisos")}</DropdownMenuItem>
+                            <DropdownMenuItem disabled={p.protegida || !datos.acciones.editar} onClick={() => setDialogo({ modo: "editar", pos: p })}>{t("posiciones.accion.editar")}</DropdownMenuItem>
+                            <DropdownMenuItem disabled={p.protegida || !datos.acciones.borrar || gente.length > 0} className="text-destructive focus:text-destructive" onClick={() => setBorrar(p)}>{t("posiciones.accion.borrar")}</DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
                       </TableCell>
@@ -350,7 +303,21 @@ function ListaPosiciones({ datos, onAbrir }: { datos: NonNullable<ReturnType<typ
         </CardContent>
       </Card>
 
-      {dialogo && <DialogoPosicion estado={dialogo} posiciones={datos.posiciones} onCerrar={() => setDialogo(null)} />}
+      {dialogo && <DialogoPosicion estado={dialogo} posiciones={datos.posiciones.filter(p => p.asignable !== false)} onCreada={id => { if (datos.acciones.permisos) onAbrir(id); }} onCerrar={() => setDialogo(null)} />}
+
+      <AlertDialog open={!!estadoPendiente} onOpenChange={open => { if (!open && !cambiarEstado.isPending) setEstadoPendiente(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t("posiciones.estado.revisar", { nombre: estadoPendiente?.nombre ?? "" })}</AlertDialogTitle>
+            <AlertDialogDescription>{t("posiciones.estado.impacto", { n: estadoPendiente ? (genteDe.get(estadoPendiente.id)?.length ?? 0) : 0 })}</AlertDialogDescription>
+          </AlertDialogHeader>
+          <p className="text-sm">{t(estadoPendiente?.activa ? "posiciones.estado.activas" : "posiciones.estado.inactivas")} → {t(estadoPendiente?.activa ? "posiciones.estado.inactivas" : "posiciones.estado.activas")}</p>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={cambiarEstado.isPending}>{t("posiciones.dialogo.cancelar")}</AlertDialogCancel>
+            <AlertDialogAction disabled={cambiarEstado.isPending} onClick={e => { e.preventDefault(); if (estadoPendiente) cambiarEstado.mutate(estadoPendiente); }}>{t("posiciones.revision.aplicar")}</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <AlertDialog open={!!borrar} onOpenChange={(o) => !o && setBorrar(null)}>
         <AlertDialogContent>
@@ -360,7 +327,7 @@ function ListaPosiciones({ datos, onAbrir }: { datos: NonNullable<ReturnType<typ
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>{t("posiciones.dialogo.cancelar")}</AlertDialogCancel>
-            <AlertDialogAction className="bg-destructive text-destructive-foreground hover:bg-destructive/90" onClick={() => borrar && quitar.mutate(borrar)}>
+            <AlertDialogAction disabled={quitar.isPending} className="bg-destructive text-destructive-foreground hover:bg-destructive/90" onClick={e => { e.preventDefault(); if (borrar) quitar.mutate(borrar); }}>
               {t("posiciones.accion.borrar")}
             </AlertDialogAction>
           </AlertDialogFooter>
@@ -370,8 +337,8 @@ function ListaPosiciones({ datos, onAbrir }: { datos: NonNullable<ReturnType<typ
   );
 }
 
-function DialogoPosicion({ estado, posiciones, onCerrar }: {
-  estado: { modo: "nueva" } | { modo: "editar"; pos: Posicion }; posiciones: Posicion[]; onCerrar: () => void;
+function DialogoPosicion({ estado, posiciones, onCerrar, onCreada }: {
+  estado: { modo: "nueva" } | { modo: "editar"; pos: Posicion }; posiciones: Posicion[]; onCerrar: () => void; onCreada: (id: string) => void;
 }) {
   const { t } = useLanguage();
   const qc = useQueryClient();
@@ -381,26 +348,19 @@ function DialogoPosicion({ estado, posiciones, onCerrar }: {
   const [copiar, setCopiar] = useState("");
   const guardar = useMutation({
     mutationFn: async () => {
-      const ahora = new Date().toISOString();
-      if (editando) {
-        const { error } = await sinTipar.from("posiciones_borrador").update({ nombre: nombre.trim(), descripcion: desc.trim() || null, updated_at: ahora }).eq("id", editando.id);
-        if (error) throw error;
-        return;
-      }
-      const base = posiciones.find((p) => p.id === copiar);
-      const { error } = await sinTipar.from("posiciones_borrador").insert({
-        nombre: nombre.trim(), descripcion: desc.trim() || null,
-        orden: Math.max(0, ...posiciones.map((p) => p.orden)) + 1,
-        acceso_total: base?.acceso_total ?? false, todas_creadoras: base?.todas_creadoras ?? false,
-        checks: base?.checks ?? {}, alcances: base?.alcances ?? {},
+      const { data, error } = await sinTipar.rpc("posicion_guardar", {
+        _id: editando?.id ?? null, _revision: editando?.updated_at ?? null,
+        _cambios: { nombre: nombre.trim(), descripcion: desc.trim() || null },
+        _plantilla: editando ? null : copiar || null,
       });
       if (error) throw error;
+      return data as Posicion;
     },
-    onSuccess: () => { void qc.invalidateQueries({ queryKey: KEY }); onCerrar(); },
-    onError: () => toast.error(t("posiciones.errorGuardar")),
+    onSuccess: async creada => { await qc.invalidateQueries({ queryKey: KEY }); onCerrar(); if (!editando) onCreada(creada.id); },
+    onError: (e: { message?: string }) => toast.error(e.message || t("posiciones.errorGuardar")),
   });
   return (
-    <Dialog open onOpenChange={(o) => !o && onCerrar()}>
+    <Dialog open onOpenChange={(o) => { if (!o && !guardar.isPending) onCerrar(); }}>
       <DialogContent>
         <DialogHeader><DialogTitle>{t(editando ? "posiciones.dialogo.editar" : "posiciones.dialogo.nueva")}</DialogTitle></DialogHeader>
         <form className="flex flex-col gap-4" onSubmit={(e) => { e.preventDefault(); if (nombre.trim()) guardar.mutate(); }}>
@@ -422,7 +382,7 @@ function DialogoPosicion({ estado, posiciones, onCerrar }: {
             </div>
           )}
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={onCerrar}>{t("posiciones.dialogo.cancelar")}</Button>
+            <Button type="button" variant="outline" disabled={guardar.isPending} onClick={onCerrar}>{t("posiciones.dialogo.cancelar")}</Button>
             <Button type="submit" disabled={!nombre.trim() || guardar.isPending}>{t("posiciones.dialogo.guardar")}</Button>
           </DialogFooter>
         </form>
@@ -693,28 +653,28 @@ function ListaPersonas({ datos }: { datos: NonNullable<ReturnType<typeof useDato
   const posDe = (uid: string) => datos.asignaciones.filter((a) => a.user_id === uid).map((a) => a.posicion_id);
   const visibles = datos.personas.filter((p) => !buscar || (p.full_name ?? "").toLowerCase().includes(buscar.toLowerCase()));
 
-  const cambiarPos = useMutation({
-    mutationFn: async ({ uid, pid, v }: { uid: string; pid: string; v: boolean }) => {
-      const r = v
-        ? await sinTipar.from("posiciones_borrador_personas").insert({ user_id: uid, posicion_id: pid })
-        : await sinTipar.from("posiciones_borrador_personas").delete().eq("user_id", uid).eq("posicion_id", pid);
-      if (r.error) throw r.error;
-    },
-    onSettled: () => qc.invalidateQueries({ queryKey: KEY }),
-    onError: () => toast.error(t("posiciones.errorGuardar")),
-  });
+  const [params] = useSearchParams();
+  const [editando, setEditando] = useState<Persona | null>(() => datos.personas.find(p => p.id === params.get("persona") && p.editable) ?? null);
+  const esDueno = (uid: string) => datos.duenos.some(d => d.user_id === uid);
+  const posicionesAsignables = datos.posiciones.filter(p => p.asignable !== false);
+  const [marcaPendiente, setMarcaPendiente] = useState<{ persona: Persona; anterior?: Marca; campo: "protegido" | "deshabilitada"; valor: boolean } | null>(null);
   const cambiarMarca = useMutation({
-    mutationFn: async ({ uid, campo, v }: { uid: string; campo: "protegido" | "sin_camara" | "deshabilitada"; v: boolean }) => {
-      const actual = marcas.get(uid);
-      const fila = { user_id: uid, protegido: actual?.protegido ?? false, sin_camara: actual?.sin_camara ?? false, deshabilitada: actual?.deshabilitada ?? false, [campo]: v, updated_at: new Date().toISOString() };
-      const { error } = await sinTipar.from("personas_borrador_marcas").upsert(fila);
+    mutationFn: async () => {
+      if (!marcaPendiente) return;
+      const { persona, anterior, campo, valor } = marcaPendiente;
+      const { error } = await sinTipar.rpc("persona_aplicar_marcas", {
+        _user_id: persona.id, _revision: anterior?.updated_at ?? null,
+        _protegido: campo === "protegido" ? valor : anterior?.protegido ?? false,
+        _deshabilitada: campo === "deshabilitada" ? valor : anterior?.deshabilitada ?? false,
+      });
       if (error) throw error;
     },
-    onSettled: () => qc.invalidateQueries({ queryKey: KEY }),
-    onError: () => toast.error(t("posiciones.errorGuardar")),
+    onSuccess: async () => { await qc.invalidateQueries({ queryKey: KEY }); setMarcaPendiente(null); toast.success(t("posiciones.revision.aplicado")); },
+    onError: (e: { message?: string }) => toast.error(e.message || t("posiciones.errorGuardar")),
   });
 
   return (
+    <>
     <Card>
       <CardContent className="flex flex-col gap-4 p-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
@@ -737,34 +697,23 @@ function ListaPersonas({ datos }: { datos: NonNullable<ReturnType<typeof useDato
                   <div key={p.id} className="grid gap-2 px-4 py-3 md:grid-cols-[1.1fr_1.4fr_1.5fr] md:gap-4">
                     <div><span className="flex items-center gap-2 font-medium"><Letra nombre={p.full_name} />{p.full_name}</span></div>
                     <div>
-                      <Popover>
-                        <PopoverTrigger asChild>
-                          <button type="button" aria-label={t("posiciones.personas.asignar", { nombre: p.full_name ?? "" })}
-                            className="flex max-w-[320px] flex-wrap items-center gap-1 rounded-control border border-dashed border-border px-2 py-1 text-left hover:border-primary/50">
-                            {mias.length === 0
-                              ? <span className="text-xs text-muted-foreground">{t("posiciones.personas.sinPosicion")}</span>
-                              : mias.map((pid) => <span key={pid} className="rounded-full bg-primary/10 px-2 py-0.5 text-xs text-primary">{nombresPos.get(pid)}</span>)}
-                            <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
-                          </button>
-                        </PopoverTrigger>
-                        <PopoverContent align="start" className="w-64 p-2">
-                          <div className="flex max-h-72 flex-col gap-0.5 overflow-y-auto">
-                            {datos.posiciones.map((pos) => (
-                              <label key={pos.id} className="flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 text-sm hover:bg-muted">
-                                <Casilla checked={mias.includes(pos.id)} onCheckedChange={(v) => cambiarPos.mutate({ uid: p.id, pid: pos.id, v: v === true })} />
-                                {pos.nombre}
-                              </label>
-                            ))}
-                          </div>
-                        </PopoverContent>
-                      </Popover>
+                      <button type="button" disabled={!p.editable} onClick={() => setEditando(p)} aria-label={t("posiciones.personas.asignar", { nombre: p.full_name ?? "" })}
+                        className="flex max-w-[320px] flex-wrap items-center gap-1 rounded-control border border-dashed border-border px-2 py-1 text-left hover:border-primary/50 disabled:cursor-default disabled:opacity-70">
+                        {mias.length === 0
+                          ? <span className="text-xs text-muted-foreground">{t("posiciones.personas.sinPosicion")}</span>
+                          : mias.map(pid => <span key={pid} className="rounded-full bg-primary/10 px-2 py-0.5 text-xs text-primary">{nombresPos.get(pid)}</span>)}
+                        {p.editable && <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />}
+                      </button>
+                      {esDueno(p.id) ? <p className="mt-1 text-xs text-muted-foreground">{t("posiciones.personas.editor.protegida")}</p> :
+                        <p className="mt-1 text-xs text-muted-foreground">{t("posiciones.personas.editor.cantidad", { n: datos.revisiones.find(r => r.user_id === p.id)?.denegadas.length ?? 0 })}</p>}
+
                     </div>
                     <div>
                       <div className="flex flex-col gap-1.5 text-xs">
                         {/* La cámara y la pantalla ya no se marcan por persona: las pide el puesto (Ajustes → Empresa, 19/11/2026). */}
                         {([["protegido", "posiciones.personas.protegido"], ["deshabilitada", "posiciones.personas.deshabilitada"]] as const).map(([campo, k]) => (
                           <label key={campo} className={cn("flex cursor-pointer items-center gap-2", !m?.[campo] && "text-muted-foreground")}>
-                            <Casilla checked={!!m?.[campo]} onCheckedChange={(v) => cambiarMarca.mutate({ uid: p.id, campo, v: v === true })} />{t(k)}
+                            <Casilla disabled={!datos.dueno || esDueno(p.id) || cambiarMarca.isPending} checked={!!m?.[campo]} onCheckedChange={(v) => setMarcaPendiente({ persona: p, anterior: m, campo, valor: v === true })} />{t(k)}
                           </label>
                         ))}
                       </div>
@@ -775,5 +724,16 @@ function ListaPersonas({ datos }: { datos: NonNullable<ReturnType<typeof useDato
         </div>
       </CardContent>
     </Card>
+
+    <Dialog open={!!marcaPendiente} onOpenChange={open => { if (!open && !cambiarMarca.isPending) setMarcaPendiente(null); }}>
+      <DialogContent>
+        <DialogHeader><DialogTitle>{t("posiciones.revision.titulo", { nombre: marcaPendiente?.persona.full_name ?? "" })}</DialogTitle><DialogDescription>{t("posiciones.personas.editor.soloPersona")}</DialogDescription></DialogHeader>
+        {marcaPendiente && <p className="text-sm">{t(marcaPendiente.campo === "protegido" ? "posiciones.personas.protegido" : "posiciones.personas.deshabilitada")}: {t(marcaPendiente.valor ? "posiciones.no" : "posiciones.si")} → {t(marcaPendiente.valor ? "posiciones.si" : "posiciones.no")}</p>}
+        <DialogFooter><Button variant="outline" disabled={cambiarMarca.isPending} onClick={() => setMarcaPendiente(null)}>{t("posiciones.dialogo.cancelar")}</Button><Button disabled={cambiarMarca.isPending} onClick={() => cambiarMarca.mutate()}>{t("posiciones.revision.aplicar")}</Button></DialogFooter>
+      </DialogContent>
+    </Dialog>
+    {editando && <EditorAccesosPersona key={editando.id} persona={editando} posiciones={posicionesAsignables}
+      asignadas={posDe(editando.id)} revision={datos.revisiones.find(r => r.user_id === editando.id)} onCerrar={() => setEditando(null)} />}
+    </>
   );
 }

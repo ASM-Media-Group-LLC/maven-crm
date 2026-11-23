@@ -1,3 +1,4 @@
+import { usePermissions } from "@/hooks/usePermissions";
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { enHoras } from "@/lib/duracion";
 import { Cronometro, RelojDePersona } from "./RelojVivo";
@@ -163,6 +164,9 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
   // memoizados y de la config de la llamada usan traducir(): meter `t` en esas
   // dependencias reconectaría el Hub o la sala al cambiar el idioma.
   const { t } = useLanguage();
+  const { canFunction } = usePermissions();
+  const administraSalas = canFunction("N:cowork.abrir", true);
+  const supervisaPantallas = canFunction("N:cowork.verpantallas", true);
   const { isOnline } = useOnlinePresence();
   const { mediaStates, supervisores, supervisoresDesde, trackEstadoSupervisor } = useCoworkMediaPresence(cowork.session?.id, userId);
   // La pausa del supervisor (break / almuerzo / ausente) se elige con la tacita
@@ -1616,6 +1620,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
   };
 
   const handleAddRoom = async () => {
+    if (!administraSalas) return;
     const name = addName.trim();
     if (!name) return;
     setRoomBusy(true);
@@ -2655,6 +2660,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                   variant="outline"
                   className="gap-1 rounded-full h-8 shrink-0"
                   title={t("cowork.host.addRoom")}
+                  disabled={!administraSalas}
                   onClick={() => { setAddName(""); setAddOpen(true); }}
                 >
                   <Plus className="h-3.5 w-3.5" /> <span className="hidden sm:inline">{t("cowork.host.addRoom")}</span>
@@ -2750,7 +2756,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                     // isMobile: si el viewport cruza el breakpoint con la hoja
                     // abierta, dos monitores de la misma sala comparten
                     // identidad en LiveKit y uno patea al otro.
-                    enabled={activeRoomId !== room.id && salaEnHoja !== room.id}
+                    enabled={supervisaPantallas && activeRoomId !== room.id && salaEnHoja !== room.id}
                     onSharersChange={manejadores.sharers}
                     onSpeakingChange={manejadores.speaking}
                     onParticipantsChange={manejadores.participants}
@@ -3340,7 +3346,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                       camBaseTrack={camBaseTrack}
                       screenOn={screenFor(room.id)}
                       screenBaseTrack={baseDePantalla}
-                      enabled={true}
+                      enabled={supervisaPantallas}
                     />
                   </div>
                 )}

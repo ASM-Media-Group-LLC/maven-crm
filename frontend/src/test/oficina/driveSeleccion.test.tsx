@@ -11,6 +11,8 @@ import { MemoryRouter, Route, Routes } from "react-router-dom";
 
 vi.mock("@/hooks/useLanguage", (original) =>
   import("@/test/messenger/espanolEnTests").then((m) => m.idiomaEnEspanol(original)));
+const permisoPosicion = vi.hoisted(() => ({ borrar: true }));
+vi.mock("@/hooks/usePermissions", () => ({ usePermissions: () => ({ canFunction: (clave: string) => clave !== "N:drive.borrar" || permisoPosicion.borrar }) }));
 vi.mock("@/hooks/useAuth", () => ({ useAuth: () => ({ user: { id: "yo" } }) }));
 vi.mock("@/hooks/useUserRole", () => ({ useUserRole: () => ({ isAdmin: false }) }));
 vi.mock("@/hooks/useDirectorioCorreo", () => ({ useDirectorioCorreo: () => ({ data: [] }), candidatosDelDirectorio: () => [] }));
@@ -113,6 +115,7 @@ const barra = () => screen.queryByRole("toolbar", { name: "Acciones con lo selec
 const updates = () => consultas.filter((c) => c.ops.some(([op]) => op === "update"));
 
 beforeEach(() => {
+  permisoPosicion.borrar = true;
   consultas.length = 0;
   toasts.exito.length = 0;
   toasts.error.length = 0;
@@ -407,4 +410,14 @@ describe("mover: lo que pasa cuando la base dice que no", () => {
       [{ parent_id: "x" }, ["f2"]],
     ]);
   });
+});
+
+
+it("la posición sin borrar no ofrece papelera aunque tenga edición del archivo", () => {
+  permisoPosicion.borrar = false;
+  dibujar();
+  fireEvent.click(casilla("a.pdf"));
+  expect(within(barra()!).queryByRole("button", { name: "Mover a la papelera" })).not.toBeInTheDocument();
+  expect(within(barra()!).getByRole("button", { name: "Descargar" })).toBeInTheDocument();
+  expect(updates()).toHaveLength(0);
 });

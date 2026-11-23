@@ -5,7 +5,7 @@ import { useUserRole } from "@/hooks/useUserRole";
 import { moduloEstaOculto } from "@/lib/modulosOcultos";
 import { esPrimeraCarga, leerArranque } from "@/lib/arranque";
 import { useFuncionesPosicion } from "@/hooks/useFuncionesPosicion";
-import { accesoPosicion, decisionPosicion } from "@/lib/posiciones/permisos";
+import { accesoPosicion, decisionPosicion, alcancePosicion } from "@/lib/posiciones/permisos";
 
 interface Permission {
   module: string;
@@ -184,6 +184,9 @@ export const usePermissions = () => {
   };
 
   const dataScope = (module: string): "all" | "subordinates" | "self" => {
+    if (posicionSinVerificar) return "self";
+    const porPosicion = alcancePosicion(funcionesPosicion.data, module);
+    if (porPosicion !== null) return porPosicion;
     if (isAdmin) return "all";
 
     const perm = permissions.find(

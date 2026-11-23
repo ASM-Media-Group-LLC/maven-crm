@@ -84,15 +84,14 @@ Deno.serve(async (req: Request) => {
     const { data: { user } } = await userClient.auth.getUser();
     if (!user) return json({ ok: false, error: "no-auth" }, 401);
     const admin = createClient(SUPABASE_URL, SERVICE_KEY, { auth: { persistSession: false, autoRefreshToken: false } });
-    const { data: todo } = await admin.rpc("es_admin_o_dueno", { _uid: user.id });
-    if (todo !== true) {
+    {
       // Solo lo de las personas que puede vigilar (a quien no puede vigilar a
       // nadie, puede_vigilar_a le dice que no a todo y el mapa sale vacío).
       const pedidas = Array.isArray(body.nas_paths) ? body.nas_paths.filter(esRutaArgos).slice(0, MAX) : [];
       const personas = [...new Set(pedidas.map((r) => r.split("/")[1]).filter((u): u is string => !!u && UUID.test(u)))];
       const permitidas = new Set<string>();
       for (const uid of personas) {
-        const { data: puede } = await admin.rpc("puede_vigilar_a", { _viewer: user.id, _target: uid });
+        const { data: puede } = await admin.rpc("argos_puede_ver_foto", { _viewer: user.id, _target: uid });
         if (puede === true) permitidas.add(uid);
       }
       const urls: Record<string, string> = {};

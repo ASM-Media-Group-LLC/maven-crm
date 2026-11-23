@@ -1,3 +1,4 @@
+import { usePermissions } from "@/hooks/usePermissions";
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { Link as LinkRouter, useSearchParams } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
@@ -166,11 +167,15 @@ export default function DrivePage() {
   /** El archivo abierto en el visor (id), o null. */
   const [viendo, setViendo] = useState<string | null>(null);
   const { isAdmin } = useUserRole();
+  const { canFunction } = usePermissions();
+  const permiteSubir = canFunction("N:drive.subir", true);
+  const permiteBorrar = canFunction("N:drive.borrar", true);
+  const permiteCompartir = canFunction("N:drive.compartir", true);
   const inputArchivos = useRef<HTMLInputElement>(null);
 
   // Subir y crear solo donde se puede: en Mi unidad, o dentro de una carpeta
   // (si no tienes permiso de editar, la base lo rechaza y se avisa).
-  const sePuedeSubir = vista === "mia" || !!carpeta;
+  const sePuedeSubir = permiteSubir && (vista === "mia" || !!carpeta);
   // Como en Google Workspace: las unidades compartidas las crea un admin.
   const sePuedeCrearUnidad = isAdmin && vista === "unidades" && !carpeta;
   const enPapelera = vista === "papelera" && !carpeta;
@@ -221,7 +226,7 @@ export default function DrivePage() {
     setArrastrando(false);
     if (!sePuedeSubir) return;
     const archivos = Array.from(e.dataTransfer.files ?? []);
-    if (archivos.length) void subir(archivos, carpeta);
+    if (archivos.length && permiteSubir) void subir(archivos, carpeta);
   };
 
   const lista = useMemo(() => items.data ?? [], [items.data]);
@@ -446,11 +451,11 @@ export default function DrivePage() {
   };
 
   const acciones: AccionesDeSeleccion = enPapelera
-    ? { restaurar: () => papeleraDe(elegidos, false), borrar: () => setBorrandoVarios(elegidos) }
+    ? { restaurar: permiteBorrar ? () => papeleraDe(elegidos, false) : undefined, borrar: permiteBorrar ? () => setBorrandoVarios(elegidos) : undefined }
     : {
       descargar: elegidos.some((i) => i.estado === "listo") ? () => void bajar(elegidos) : undefined,
       mover: elegidos.every(sePuedeMover) ? () => setMoviendo(elegidos) : undefined,
-      papelera: () => papeleraDe(elegidos, true),
+      papelera: permiteBorrar ? () => papeleraDe(elegidos, true) : undefined,
     };
   const ocupadoConVarios = moverDrive.isPending || papeleraVarias.isPending || preparandoZip || borrar.isPending;
 
@@ -487,14 +492,14 @@ export default function DrivePage() {
       <DropdownMenuContent align="end" className="w-52">
         {enPapelera ? (
           <>
-            <DropdownMenuItem onSelect={() => papeleraDe([i], false, false)}>
+            <DropdownMenuItem disabled={!permiteBorrar} onSelect={() => papeleraDe([i], false, false)}>
               <RotateCcw className="mr-2 h-4 w-4" />{t("drive.accion.restaurar")}
             </DropdownMenuItem>
             <DropdownMenuItem onSelect={() => verDetalles(i)}>
               <Info className="mr-2 h-4 w-4" />{t("drive.detalles.boton")}
             </DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem onSelect={() => setBorrando(i)} className="text-destructive focus:text-destructive">
+            <DropdownMenuItem disabled={!permiteBorrar} onSelect={() => setBorrando(i)} className="text-destructive focus:text-destructive">
               <Trash2 className="mr-2 h-4 w-4" />{t("drive.accion.borrar")}
             </DropdownMenuItem>
           </>
@@ -512,7 +517,7 @@ export default function DrivePage() {
                 <Download className="mr-2 h-4 w-4" />{t("drive.accion.descargar")}
               </DropdownMenuItem>
             )}
-            <DropdownMenuItem onSelect={() => setCompartiendo(i)}>
+            <DropdownMenuItem disabled={!permiteCompartir} onSelect={() => setCompartiendo(i)}>
               <Share2 className="mr-2 h-4 w-4" />{t("drive.accion.compartir")}
             </DropdownMenuItem>
             <DropdownMenuItem onSelect={() => setRenombrando(i)}>
@@ -533,7 +538,7 @@ export default function DrivePage() {
               </DropdownMenuItem>
             )}
             <DropdownMenuSeparator />
-            <DropdownMenuItem onSelect={() => papeleraDe([i], true, false)}>
+            <DropdownMenuItem disabled={!permiteBorrar} onSelect={() => papeleraDe([i], true, false)}>
               <Trash2 className="mr-2 h-4 w-4" />{t("drive.accion.papelera")}
             </DropdownMenuItem>
           </>
@@ -767,7 +772,7 @@ export default function DrivePage() {
         onChange={(e) => {
           const archivos = Array.from(e.target.files ?? []);
           e.target.value = "";
-          if (archivos.length) void subir(archivos, carpeta);
+          if (archivos.length && permiteSubir) void subir(archivos, carpeta);
         }}
       />
 

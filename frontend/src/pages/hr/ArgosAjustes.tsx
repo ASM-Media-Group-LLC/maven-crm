@@ -1,3 +1,4 @@
+import { usePermissions } from "@/hooks/usePermissions";
 import { useEffect, useState } from "react";
 import { useLanguage } from "@/hooks/useLanguage";
 import { Page } from "@/components/ui/page";
@@ -54,6 +55,12 @@ type Aplicacion = { nombre: string; hora: string };
 type Conteo = Record<string, { total: number; gente: Aplicacion[] }>;
 
 export function ArgosAjustesContenido() {
+  const { canFunction } = usePermissions();
+  const { t } = useLanguage();
+  return canFunction("N:argos.ajustes", true) ? <AjustesPermitidos /> : <p>{t("posiciones.funcionNoPermitida")}</p>;
+}
+
+function AjustesPermitidos() {
   const { t } = useLanguage();
   const [sonando, setSonando] = useState<string | null>(null);
   const [off, setOff] = useState<ReadonlySet<string>>(new Set());

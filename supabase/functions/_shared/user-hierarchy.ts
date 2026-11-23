@@ -9,6 +9,7 @@
 // Que el frontend esconda botones es UX, no seguridad: cualquiera puede llamar
 // la edge function a mano.
 const MSG: Record<string, string> = {
+  use_position_constructor: "Administra sus posiciones y restricciones en Ajustes → Posiciones → Personas",
   no_caller: "No se pudo identificar quién hace la petición",
   no_user_management_permission: "No tienes permiso para gestionar usuarios",
   role_at_or_above_caller_level: "No puedes asignar un rol de tu mismo nivel o superior",

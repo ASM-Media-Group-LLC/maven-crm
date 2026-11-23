@@ -3,6 +3,7 @@ import { Link, useSearchParams } from "react-router-dom";
 import { Eye, Loader2, FileSpreadsheet, CalendarClock } from "lucide-react";
 import { useHorariosEquipo } from "@/hooks/useHorariosEquipo";
 import { useLanguage } from "@/hooks/useLanguage";
+import { usePermissions } from "@/hooks/usePermissions";
 import { useUserRole } from "@/hooks/useUserRole";
 import { useEsRh } from "@/hooks/useEsRh";
 import { useExportarHorasAHoja } from "@/hooks/useOnlyOffice";
@@ -147,7 +148,12 @@ export default function HRMonitorIA() {
   const { esRh } = useEsRh();
   // HR (Andrea) ve la vista COMPLETA igual que un admin (el historial por turno),
   // aunque su nivel sea agente. La RLS ya filtra que no vea a los admins.
-  const vistaCompleta = isAdmin || esRh === true;
+  const { canFunction } = usePermissions();
+  const { toast } = useToast();
+  const vePresencia = canFunction("N:argos.presencia", true);
+  const veExpediente = canFunction("N:argos.expediente", true);
+  const ajustaArgos = canFunction("N:argos.ajustes", isAdmin);
+  const vistaCompleta = canFunction("N:argos.expediente", isAdmin || esRh === true);
   // Exportar las horas del MES (del 1 a hoy) a una hoja, de un clic (Alvaro 08/11).
   const exportar = useExportarHorasAHoja();
   const exportarHoras = () => {
@@ -180,7 +186,9 @@ export default function HRMonitorIA() {
   const tabURL = searchParams.get("t");
   // Al entrar a Argos se cae en «Dónde está» (Alvaro, 10/11: «necesito saber
   // dónde está el empleado en todo momento»); antes era «El día» (08/11).
-  const tab: TabArgos = (tabURL && VIEJO_A_NUEVO[tabURL]) || "donde";
+  const solicitada: TabArgos = (tabURL && VIEJO_A_NUEVO[tabURL]) || "donde";
+  const tabPermitida = (k: TabArgos) => k === "ajustes" ? ajustaArgos : k === "dia" ? veExpediente : k === "revision" ? true : vePresencia;
+  const tab: TabArgos = tabPermitida(solicitada) ? solicitada : vePresencia ? "donde" : veExpediente ? "dia" : ajustaArgos ? "ajustes" : "revision";
   const setTab = (k: TabArgos) => setSearchParams((prev) => { const n = new URLSearchParams(prev); n.set("t", k); return n; }, { replace: true });
 
   // Revisión de RR. HH. (19/11/2026): la ve quien tenga alguna función de la
@@ -249,11 +257,11 @@ export default function HRMonitorIA() {
           { k: "llamadas", label: t("hr.monia.tab.llamadas") },
           { k: "hub", label: t("hr.monia.tab.hub") },
           ...(veCasos ? [{ k: "revision" as TabArgos, label: t("hr.monia.tab.revision") }] : []),
-          ...(isAdmin ? [{ k: "ajustes" as TabArgos, label: t("hr.monia.tab.ajustes") }] : []),
+          ...(ajustaArgos ? [{ k: "ajustes" as TabArgos, label: t("hr.monia.tab.ajustes") }] : []),
         ];
         return (
           <div className="mt-4 flex gap-1 overflow-x-auto rounded-2xl border border-border/50 bg-background/40 p-1">
-            {tabs.map((x) => (
+            {tabs.filter(x => tabPermitida(x.k)).map((x) => (
               <button
                 key={x.k}
                 type="button"
@@ -325,7 +333,7 @@ export default function HRMonitorIA() {
           avisa (situaciones) y el contexto. Lo viejo (KPIs de faltas, lista de
           eventos, ranking) se jubiló: esos números viven en Resumen del día y
           Atención ahora (Alvaro, 02/11). */}
-      {tab === "ajustes" && isAdmin && (
+      {tab === "ajustes" && ajustaArgos && (
         <div className="mt-5 flex flex-col gap-4">
           {/* El Centro de control de Argos: voz (Javi), las 15 situaciones y la
               mezcla. Reemplaza el panel viejo del selector de voz para que haya

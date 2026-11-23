@@ -1,3 +1,4 @@
+import { usePermissions } from "@/hooks/usePermissions";
 import { useState, forwardRef } from "react";
 import { Search } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -30,6 +31,8 @@ const NewChatModal = forwardRef<HTMLDivElement, NewChatModalProps>(function NewC
   ref,
 ) {
   const { user } = useAuth();
+  const { canFunction } = usePermissions();
+  const puedeCrearGrupo = canFunction("N:msg.grupo", true);
   const { t } = useLanguage();
   const isOnline = isOnlineFn || (() => false);
   const getStatus = getStatusFn || (() => null);
@@ -57,7 +60,7 @@ const NewChatModal = forwardRef<HTMLDivElement, NewChatModalProps>(function NewC
   };
 
   const handleCreateGroup = () => {
-    if (!groupName.trim() || selected.length === 0) return;
+    if (!puedeCrearGrupo || !groupName.trim() || selected.length === 0) return;
     onCreateGroup?.(groupName.trim(), selected);
     setSelected([]);
     setGroupName("");
@@ -141,7 +144,7 @@ const NewChatModal = forwardRef<HTMLDivElement, NewChatModalProps>(function NewC
 
         {isGroup && (
           <div className="flex justify-end mt-2">
-            <Button onClick={handleCreateGroup} disabled={!groupName.trim() || selected.length === 0} className="rounded-full">
+            <Button onClick={handleCreateGroup} disabled={!puedeCrearGrupo || !groupName.trim() || selected.length === 0} className="rounded-full">
               {t("messenger.newChat.crearGrupo", { n: selected.length })}
             </Button>
           </div>

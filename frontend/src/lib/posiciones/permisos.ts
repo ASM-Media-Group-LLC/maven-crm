@@ -6,14 +6,28 @@ export interface FuncionesPosicion {
   total: boolean;
   bloqueada: boolean;
   checks: Record<string, boolean>;
+  denegadas?: string[];
+  alcances?: Record<string, "all" | "subordinates" | "self" | "none" | null>;
 }
 
 const claves = new Set(TODAS_LAS_CLAVES);
+
+/** Alcance efectivo de la función que abre la pantalla; nunca lo amplía otro permiso. */
+export function alcancePosicion(estado: FuncionesPosicion | undefined, modulo: string): "all" | "subordinates" | "self" | null {
+  if (estado?.bloqueada) return "self";
+  if (!estado?.aplica) return null;
+  const entrada: Record<string,string> = { "Cowork": "Cowork|*", "Scouter Assist": "Scouter Assist|Mis Tareas", "LeadGen": "LeadGen|Lista", "Promolog": "Promolog|Promos", "CRM": "Contactos|Contactos" };
+  const clave = entrada[modulo] ?? `${modulo}|*`;
+  if (decisionPosicion(estado,clave) !== true) return "self";
+  const alcance = estado.alcances?.[clave];
+  return alcance === "all" || alcance === "subordinates" ? alcance : "self";
+}
 
 /** null conserva el sistema anterior; false nunca debe caer al nivel del rol. */
 export function decisionPosicion(estado: FuncionesPosicion | undefined, clave: string): boolean | null {
   if (estado?.bloqueada) return false;
   if (!estado?.aplica || !claves.has(clave)) return null;
+  if (estado.denegadas?.includes(clave)) return false;
   return estado.total || estado.checks[clave] === true;
 }
 

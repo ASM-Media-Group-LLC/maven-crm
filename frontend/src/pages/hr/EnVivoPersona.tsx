@@ -1,3 +1,4 @@
+import { usePermissions } from "@/hooks/usePermissions";
 import { useMemo, useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { ArrowLeft, Loader2, Radio, RefreshCw, ShieldAlert } from "lucide-react";
@@ -35,6 +36,8 @@ import AvisarleDialogo from "@/components/vigilancia/AvisarleDialogo";
 
 
 export default function EnVivoPersona() {
+  const { canFunction } = usePermissions();
+  const puedeAvisar = canFunction("N:argos.avisar", true);
   const { userId = "" } = useParams();
   const [params] = useSearchParams();
   const navigate = useNavigate();
@@ -71,6 +74,7 @@ export default function EnVivoPersona() {
   // video), se intenta y la base contesta.
   const enCowork = obs.estado !== "sin_cowork";
   const avisar = async (slug: string) => {
+    if (!puedeAvisar) return;
     setAvisando(true);
     try {
       const { error: e } = await (supabase as unknown as {
@@ -158,7 +162,7 @@ export default function EnVivoPersona() {
           }
           acciones={{
             avisar: {
-              disponible: enCowork,
+              disponible: enCowork && puedeAvisar,
               enviando: avisando,
               onAbrir: () => setAvisarAbierto(true),
               motivoNo: enCowork ? null : t("vigilancia.accion.avisarSoloEnCowork"),

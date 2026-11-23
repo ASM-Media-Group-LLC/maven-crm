@@ -1,3 +1,4 @@
+import { usePermissions } from "@/hooks/usePermissions";
 import { useRef, useEffect, useCallback, useMemo, useState } from "react";
 import { ChatMessage, UserProfile } from "../types";
 import type { DeletedMessageArchive } from "../useDeletedMessages";
@@ -86,6 +87,8 @@ export default function MessageList({
   hasMore, loadingMore, onLoadMore, className,
 }: MessageListProps) {
   const { t, language } = useLanguage();
+  const { canFunction } = usePermissions();
+  const puedeBorrar = canFunction("N:msg.borrar", true);
   const scrollRef = useRef<HTMLDivElement>(null);
   const msgRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const prevMessagesLengthRef = useRef(0);
@@ -336,6 +339,7 @@ export default function MessageList({
                       deletedArchive={deletedArchive?.[msg.id]}
                       onCopy={() => onCopy(msg.content || "")}
                       onEdit={(content) => onEdit(msg.id, content)}
+                      puedeBorrar={!!msg._localStatus || puedeBorrar}
                       onDelete={() => onDelete(msg.id)}
                       onRetry={onRetry ? () => onRetry(msg.id) : undefined}
                       replyMessage={msg.reply_to_id ? msgById.get(msg.reply_to_id) : undefined}

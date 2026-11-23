@@ -1,5 +1,6 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { usePermissions } from "@/hooks/usePermissions";
 import { useEsDueno } from "@/hooks/useEsDueno";
 import { useRoleTier } from "@/hooks/useRoleTier";
 
@@ -13,7 +14,8 @@ type RpcDb = { rpc: (f: string, a: unknown) => Promise<{ error: { message: strin
 export function usePuedePerdonar(): boolean {
   const { esDueno } = useEsDueno();
   const { tier } = useRoleTier();
-  return esDueno === true || tier === "admin";
+  const { canFunction } = usePermissions();
+  return canFunction("N:argos.perdonar", esDueno === true || tier === "admin");
 }
 
 export function usePerdonarCaptura() {

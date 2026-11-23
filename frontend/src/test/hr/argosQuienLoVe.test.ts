@@ -20,9 +20,9 @@ describe("Argos: lo ven dueño, admins, RR. HH. y supervisores", () => {
       expect(linea, ruta).not.toContain("soloDueno");
     }
   });
-  it("los ajustes de Argos siguen solo para el dueño", () => {
+  it("los ajustes de Argos requieren su función delegable", () => {
     const linea = app.split("\n").find((l) => l.includes('path="/hr/argos-ajustes"')) ?? "";
-    expect(linea).toContain("soloDueno");
+    expect(linea).toContain('funcion="N:argos.ajustes"');
   });
   it("el botón del ojo en el menú depende de useVeArgos, no del permiso del módulo", () => {
     expect(menu).toContain("useVeArgos()");

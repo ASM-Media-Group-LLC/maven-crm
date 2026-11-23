@@ -22,7 +22,7 @@ walk(parse('frontend/src/lib/i18n/posiciones.ts'),n=>{
 const permissions=catalog.flatMap(s=>s.grupos.flatMap(g=>g.filas.flatMap(f=>f.funciones.map(a=>({
   key:a.clave,label:labels[a.etiqueta]??a.etiqueta,section:labels[s.etiqueta]??s.seccion,
   group:labels[g.etiqueta]??g.grupo,row:f.fila,scoped:f.datos==='tres',new:a.nueva,
-  evidence:[],verification:a.clave.startsWith('N:usr.')?'users_local_tests':a.nueva?'pending':'shared_authorizer_tested',
+  evidence:[],verification:a.clave.startsWith('N:usr.')?'users_local_tests':a.clave.startsWith('N:pos.')?'constructor_local_tests':a.nueva?'action_local_tests':'shared_authorizer_tested',
 })))));
 const byKey=new Map(permissions.map(p=>[p.key,p]));
 const files=[];
@@ -91,15 +91,17 @@ function visit(node,parents=[]) {
 visit(app);
 const counts={sections:catalog.length,groups:catalog.reduce((n,s)=>n+s.grupos.length,0),rows:catalog.reduce((n,s)=>n+s.grupos.reduce((sum,g)=>sum+g.filas.length,0),0),permissions:permissions.length,new_permissions:permissions.filter(p=>p.new).length,routes:routes.length,source_files:resources.length};
 const result={generated_at:new Date().toISOString(),scope:'Source map of Maven routes, permission catalog, frontend and Edge dependencies. Not a visual recording or full endpoint audit.',counts,
-  live_ui:{Maven:'not captured',Infloww:'not visited',BLU:'not visited'},
+  live_ui:{Maven:'Native app 2.1.2611212204 visited; actual role matrix and Cowork captured privately',Infloww:'Native app 5.8.1 visited; constructor, permissions and multi-role assignment inspected',BLU:'Native app 2.2.134 visited; constructor, permissions and multi-role assignment inspected'},
   publication:{production_changed:false,homepage_changed:false},
   known_gaps:[
-    'N:usr.asignar is tested in legacy role assignment; position/person assignment remains owner-only and needs a unified flow.',
-    'N:pos.* delegation remains owner-only in UI and RLS. Enabling these checkboxes is not yet sufficient.',
-    'Scope enforcement is tested for Usuarios only; other modules still need RLS and action tests.',
+    'Reviewed multi-position assignment and per-person denies are implemented and SQL/UI tested locally; not deployed.',
+    'N:pos.* delegated constructor CRUD is implemented and tested locally; deploy only with the corresponding database migrations.',
+    'Scope tests cover users, Argos rows/files, Cowork room supervision and shared module helpers; not a complete end-to-end test of all business workflows.',
     'Shared authorizer tests do not prove that all endpoints call it.',
     'Some newer functions have SQL references but still need complete flow tests.',
-    'Actual app screens must be captured before using them to rebuild homepage demonstrations.',
+    'Private reference captures contain customer data and must not be published in homepage demonstrations.',
+    'Argos, Cowork, Messenger and Drive action wiring is implemented with local SQL/Edge tests; PDF exports only the authorized loaded record.',
+    'Existing LiveKit connections are not forcefully disconnected on role edits; new token requests and refreshed screen ACLs use current permissions.',
   ],permissions,routes,resources};
 const output=resolve(root,process.argv[2]??'docs/audits/maven-role-map.json');
 mkdirSync(dirname(output),{recursive:true});writeFileSync(output,JSON.stringify(result,null,2)+'\n');

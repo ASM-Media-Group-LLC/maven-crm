@@ -100,6 +100,7 @@ const AdminUsuarios = () => {
   }, [users, search, filtroRol]);
 
   const handleEditRole = (user: AdminUser) => {
+    if (funcionesUsuario.posiciones) { navigate(`/ajustes/posiciones?persona=${encodeURIComponent(user.id)}`); return; }
     setSelectedUser(user);
     setModalOpen(true);
   };
@@ -164,6 +165,9 @@ const AdminUsuarios = () => {
   useEffect(() => {
     if (!permisosCargando && activeTab === "roles" && !canManageRoles) setActiveTab("usuarios");
   }, [permisosCargando, activeTab, canManageRoles]);
+  useEffect(() => {
+    if (activeTab === "roles" && canManageRoles && funcionesUsuario.posiciones) navigate("/ajustes/posiciones", { replace: true });
+  }, [activeTab, canManageRoles, funcionesUsuario.posiciones, navigate]);
   const tabs = [
     { key: "usuarios" as const, label: t("admin.usersLabel") },
     ...(canManageRoles ? [{ key: "roles" as const, label: "Roles" }] : []),
@@ -298,6 +302,7 @@ const AdminUsuarios = () => {
                       onMigrarCorreo={handleMigrarCorreo}
                       onDelete={handleDelete}
                       onRemoveRole={(user) => {
+                        if (funcionesUsuario.posiciones) { handleEditRole(user); return; }
                         adminAction.mutate(
                           { action: "remove_role", user_id: user.id },
                           { onSuccess: () => avisarPersona({
@@ -316,6 +321,7 @@ const AdminUsuarios = () => {
                       onMigrarCorreo={handleMigrarCorreo}
                       onDelete={handleDelete}
                       onRemoveRole={(user) => {
+                        if (funcionesUsuario.posiciones) { handleEditRole(user); return; }
                         adminAction.mutate(
                           { action: "remove_role", user_id: user.id },
                           { onSuccess: () => avisarPersona({
@@ -336,7 +342,7 @@ const AdminUsuarios = () => {
                   />
 
                   <EditUserModal
-                    puedeAsignarRol={funcionesUsuario.asignar && !!selectedUser?.manageable}
+                    puedeAsignarRol={!funcionesUsuario.posiciones && funcionesUsuario.asignar && !!selectedUser?.manageable}
                     open={editOpen}
                     onOpenChange={setEditOpen}
                     user={selectedUser}
@@ -407,7 +413,7 @@ const AdminUsuarios = () => {
               )}
 
               <AddUserModal
-                puedeAsignarRol={funcionesUsuario.asignar}
+                puedeAsignarRol={!funcionesUsuario.posiciones && funcionesUsuario.asignar}
                 open={addUserOpen}
                 onOpenChange={(o) => {
                   setAddUserOpen(o);

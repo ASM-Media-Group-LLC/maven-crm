@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-11-23T05:02:47.778Z",
+  "generated_at": "2026-11-23T12:46:48.036Z",
   "scope": "Source map of Maven routes, permission catalog, frontend and Edge dependencies. Not a visual recording or full endpoint audit.",
   "counts": {
     "sections": 5,
@@ -8,24 +8,26 @@
     "permissions": 177,
     "new_permissions": 36,
     "routes": 167,
-    "source_files": 1729
+    "source_files": 1733
   },
   "live_ui": {
-    "Maven": "not captured",
-    "Infloww": "not visited",
-    "BLU": "not visited"
+    "Maven": "Native app 2.1.2611212204 visited; actual role matrix and Cowork captured privately",
+    "Infloww": "Native app 5.8.1 visited; constructor, permissions and multi-role assignment inspected",
+    "BLU": "Native app 2.2.134 visited; constructor, permissions and multi-role assignment inspected"
   },
   "publication": {
     "production_changed": false,
     "homepage_changed": false
   },
   "known_gaps": [
-    "N:usr.asignar is tested in legacy role assignment; position/person assignment remains owner-only and needs a unified flow.",
-    "N:pos.* delegation remains owner-only in UI and RLS. Enabling these checkboxes is not yet sufficient.",
-    "Scope enforcement is tested for Usuarios only; other modules still need RLS and action tests.",
+    "Reviewed multi-position assignment and per-person denies are implemented and SQL/UI tested locally; not deployed.",
+    "N:pos.* delegated constructor CRUD is implemented and tested locally; deploy only with the corresponding database migrations.",
+    "Scope tests cover users, Argos rows/files, Cowork room supervision and shared module helpers; not a complete end-to-end test of all business workflows.",
     "Shared authorizer tests do not prove that all endpoints call it.",
     "Some newer functions have SQL references but still need complete flow tests.",
-    "Actual app screens must be captured before using them to rebuild homepage demonstrations."
+    "Private reference captures contain customer data and must not be published in homepage demonstrations.",
+    "Argos, Cowork, Messenger and Drive action wiring is implemented with local SQL/Edge tests; PDF exports only the authorized loaded record.",
+    "Existing LiveKit connections are not forcefully disconnected on role edits; new token requests and refreshed screen ACLs use current permissions."
   ],
   "permissions": [
     {
@@ -47,8 +49,31 @@
       "row": "Presencia en vivo",
       "scoped": true,
       "new": true,
-      "evidence": [],
-      "verification": "pending"
+      "evidence": [
+        {
+          "file": "frontend/src/pages/hr/HRExpediente.tsx",
+          "line": 1148,
+          "kind": "literal_reference"
+        },
+        {
+          "file": "frontend/src/pages/hr/HRMonitorIA.tsx",
+          "line": 153,
+          "kind": "literal_reference"
+        },
+        {
+          "file": "supabase/migrations/20261123061204_posiciones_personas_revision.sql",
+          "kind": "historical_sql_reference"
+        },
+        {
+          "file": "supabase/migrations/20261123062055_posiciones_constructor_delegado.sql",
+          "kind": "historical_sql_reference"
+        },
+        {
+          "file": "supabase/migrations/20261123070139_posiciones_argos_acceso.sql",
+          "kind": "historical_sql_reference"
+        }
+      ],
+      "verification": "action_local_tests"
     },
     {
       "key": "N:argos.avisar",
@@ -58,8 +83,26 @@
       "row": "Presencia en vivo",
       "scoped": true,
       "new": true,
-      "evidence": [],
-      "verification": "pending"
+      "evidence": [
+        {
+          "file": "frontend/src/pages/hr/EnVivoPersona.tsx",
+          "line": 40,
+          "kind": "literal_reference"
+        },
+        {
+          "file": "supabase/migrations/20261123061204_posiciones_personas_revision.sql",
+          "kind": "historical_sql_reference"
+        },
+        {
+          "file": "supabase/migrations/20261123062055_posiciones_constructor_delegado.sql",
+          "kind": "historical_sql_reference"
+        },
+        {
+          "file": "supabase/migrations/20261123064131_posiciones_acciones_messenger_argos.sql",
+          "kind": "historical_sql_reference"
+        }
+      ],
+      "verification": "action_local_tests"
     },
     {
       "key": "N:argos.video",
@@ -69,8 +112,31 @@
       "row": "Presencia en vivo",
       "scoped": true,
       "new": true,
-      "evidence": [],
-      "verification": "pending"
+      "evidence": [
+        {
+          "file": "frontend/src/components/hr/ClipsDelDia.tsx",
+          "line": 49,
+          "kind": "literal_reference"
+        },
+        {
+          "file": "frontend/src/pages/hr/HRExpediente.tsx",
+          "line": 1241,
+          "kind": "literal_reference"
+        },
+        {
+          "file": "supabase/migrations/20261123061204_posiciones_personas_revision.sql",
+          "kind": "historical_sql_reference"
+        },
+        {
+          "file": "supabase/migrations/20261123062055_posiciones_constructor_delegado.sql",
+          "kind": "historical_sql_reference"
+        },
+        {
+          "file": "supabase/migrations/20261123070139_posiciones_argos_acceso.sql",
+          "kind": "historical_sql_reference"
+        }
+      ],
+      "verification": "action_local_tests"
     },
     {
       "key": "N:argos.expediente",
@@ -80,8 +146,36 @@
       "row": "Expediente",
       "scoped": true,
       "new": true,
-      "evidence": [],
-      "verification": "pending"
+      "evidence": [
+        {
+          "file": "frontend/src/pages/hr/HRExpediente.tsx",
+          "line": 933,
+          "kind": "literal_reference"
+        },
+        {
+          "file": "frontend/src/pages/hr/HRMonitorIA.tsx",
+          "line": 154,
+          "kind": "literal_reference"
+        },
+        {
+          "file": "frontend/src/pages/hr/HRMonitorIA.tsx",
+          "line": 156,
+          "kind": "literal_reference"
+        },
+        {
+          "file": "supabase/migrations/20261123061204_posiciones_personas_revision.sql",
+          "kind": "historical_sql_reference"
+        },
+        {
+          "file": "supabase/migrations/20261123062055_posiciones_constructor_delegado.sql",
+          "kind": "historical_sql_reference"
+        },
+        {
+          "file": "supabase/migrations/20261123070139_posiciones_argos_acceso.sql",
+          "kind": "historical_sql_reference"
+        }
+      ],
+      "verification": "action_local_tests"
     },
     {
       "key": "N:argos.perdonar",
@@ -91,8 +185,26 @@
       "row": "Expediente",
       "scoped": true,
       "new": true,
-      "evidence": [],
-      "verification": "pending"
+      "evidence": [
+        {
+          "file": "frontend/src/hooks/usePerdonarCaptura.ts",
+          "line": 18,
+          "kind": "literal_reference"
+        },
+        {
+          "file": "supabase/migrations/20261123061204_posiciones_personas_revision.sql",
+          "kind": "historical_sql_reference"
+        },
+        {
+          "file": "supabase/migrations/20261123062055_posiciones_constructor_delegado.sql",
+          "kind": "historical_sql_reference"
+        },
+        {
+          "file": "supabase/migrations/20261123064131_posiciones_acciones_messenger_argos.sql",
+          "kind": "historical_sql_reference"
+        }
+      ],
+      "verification": "action_local_tests"
     },
     {
       "key": "N:argos.pdf",
@@ -102,8 +214,27 @@
       "row": "Expediente",
       "scoped": true,
       "new": true,
-      "evidence": [],
-      "verification": "pending"
+      "evidence": [
+        {
+          "file": "frontend/src/pages/hr/HRExpediente.tsx",
+          "line": 1014,
+          "kind": "literal_reference"
+        },
+        {
+          "file": "frontend/src/pages/hr/HRExpediente.tsx",
+          "line": 1015,
+          "kind": "literal_reference"
+        },
+        {
+          "file": "supabase/migrations/20261123061204_posiciones_personas_revision.sql",
+          "kind": "historical_sql_reference"
+        },
+        {
+          "file": "supabase/migrations/20261123062055_posiciones_constructor_delegado.sql",
+          "kind": "historical_sql_reference"
+        }
+      ],
+      "verification": "action_local_tests"
     },
     {
       "key": "N:horarios.gestionar",
@@ -121,9 +252,17 @@
         {
           "file": "supabase/migrations/20261119230000_camara_pantalla_por_puesto.sql",
           "kind": "historical_sql_reference"
+        },
+        {
+          "file": "supabase/migrations/20261123061204_posiciones_personas_revision.sql",
+          "kind": "historical_sql_reference"
+        },
+        {
+          "file": "supabase/migrations/20261123062055_posiciones_constructor_delegado.sql",
+          "kind": "historical_sql_reference"
         }
       ],
-      "verification": "pending"
+      "verification": "action_local_tests"
     },
     {
       "key": "N:empresa.configurar",
@@ -137,9 +276,17 @@
         {
           "file": "supabase/migrations/20261119210000_pausas_solo_por_puesto.sql",
           "kind": "historical_sql_reference"
+        },
+        {
+          "file": "supabase/migrations/20261123061204_posiciones_personas_revision.sql",
+          "kind": "historical_sql_reference"
+        },
+        {
+          "file": "supabase/migrations/20261123062055_posiciones_constructor_delegado.sql",
+          "kind": "historical_sql_reference"
         }
       ],
-      "verification": "pending"
+      "verification": "action_local_tests"
     },
     {
       "key": "N:argos.apps_ajenas",
@@ -161,9 +308,17 @@
         {
           "file": "supabase/migrations/20261119200000_pausas_por_modalidad_e_inactividad.sql",
           "kind": "historical_sql_reference"
+        },
+        {
+          "file": "supabase/migrations/20261123061204_posiciones_personas_revision.sql",
+          "kind": "historical_sql_reference"
+        },
+        {
+          "file": "supabase/migrations/20261123062055_posiciones_constructor_delegado.sql",
+          "kind": "historical_sql_reference"
         }
       ],
-      "verification": "pending"
+      "verification": "action_local_tests"
     },
     {
       "key": "N:camara_pantalla.decidir",
@@ -177,9 +332,17 @@
         {
           "file": "supabase/migrations/20261119230000_camara_pantalla_por_puesto.sql",
           "kind": "historical_sql_reference"
+        },
+        {
+          "file": "supabase/migrations/20261123061204_posiciones_personas_revision.sql",
+          "kind": "historical_sql_reference"
+        },
+        {
+          "file": "supabase/migrations/20261123062055_posiciones_constructor_delegado.sql",
+          "kind": "historical_sql_reference"
         }
       ],
-      "verification": "pending"
+      "verification": "action_local_tests"
     },
     {
       "key": "N:argos.casos.juzgar",
@@ -205,9 +368,21 @@
         {
           "file": "supabase/migrations/20261119230000_camara_pantalla_por_puesto.sql",
           "kind": "historical_sql_reference"
+        },
+        {
+          "file": "supabase/migrations/20261123061204_posiciones_personas_revision.sql",
+          "kind": "historical_sql_reference"
+        },
+        {
+          "file": "supabase/migrations/20261123062055_posiciones_constructor_delegado.sql",
+          "kind": "historical_sql_reference"
+        },
+        {
+          "file": "supabase/migrations/20261123070139_posiciones_argos_acceso.sql",
+          "kind": "historical_sql_reference"
         }
       ],
-      "verification": "pending"
+      "verification": "action_local_tests"
     },
     {
       "key": "N:argos.casos.obligado",
@@ -221,9 +396,17 @@
         {
           "file": "supabase/migrations/20261119140000_argos_casos_rrhh.sql",
           "kind": "historical_sql_reference"
+        },
+        {
+          "file": "supabase/migrations/20261123061204_posiciones_personas_revision.sql",
+          "kind": "historical_sql_reference"
+        },
+        {
+          "file": "supabase/migrations/20261123062055_posiciones_constructor_delegado.sql",
+          "kind": "historical_sql_reference"
         }
       ],
-      "verification": "pending"
+      "verification": "action_local_tests"
     },
     {
       "key": "N:argos.casos.corregir",
@@ -237,9 +420,21 @@
         {
           "file": "supabase/migrations/20261119140000_argos_casos_rrhh.sql",
           "kind": "historical_sql_reference"
+        },
+        {
+          "file": "supabase/migrations/20261123061204_posiciones_personas_revision.sql",
+          "kind": "historical_sql_reference"
+        },
+        {
+          "file": "supabase/migrations/20261123062055_posiciones_constructor_delegado.sql",
+          "kind": "historical_sql_reference"
+        },
+        {
+          "file": "supabase/migrations/20261123070139_posiciones_argos_acceso.sql",
+          "kind": "historical_sql_reference"
         }
       ],
-      "verification": "pending"
+      "verification": "action_local_tests"
     },
     {
       "key": "N:argos.casos.reporte",
@@ -253,9 +448,17 @@
         {
           "file": "supabase/migrations/20261119140000_argos_casos_rrhh.sql",
           "kind": "historical_sql_reference"
+        },
+        {
+          "file": "supabase/migrations/20261123061204_posiciones_personas_revision.sql",
+          "kind": "historical_sql_reference"
+        },
+        {
+          "file": "supabase/migrations/20261123062055_posiciones_constructor_delegado.sql",
+          "kind": "historical_sql_reference"
         }
       ],
-      "verification": "pending"
+      "verification": "action_local_tests"
     },
     {
       "key": "N:argos.casos.jefe",
@@ -273,9 +476,17 @@
         {
           "file": "supabase/migrations/20261119230000_camara_pantalla_por_puesto.sql",
           "kind": "historical_sql_reference"
+        },
+        {
+          "file": "supabase/migrations/20261123061204_posiciones_personas_revision.sql",
+          "kind": "historical_sql_reference"
+        },
+        {
+          "file": "supabase/migrations/20261123062055_posiciones_constructor_delegado.sql",
+          "kind": "historical_sql_reference"
         }
       ],
-      "verification": "pending"
+      "verification": "action_local_tests"
     },
     {
       "key": "N:argos.ajustes",
@@ -285,8 +496,36 @@
       "row": "Ajustes de Argos",
       "scoped": false,
       "new": true,
-      "evidence": [],
-      "verification": "pending"
+      "evidence": [
+        {
+          "file": "frontend/src/App.tsx",
+          "line": 561,
+          "kind": "literal_reference"
+        },
+        {
+          "file": "frontend/src/pages/hr/ArgosAjustes.tsx",
+          "line": 60,
+          "kind": "literal_reference"
+        },
+        {
+          "file": "frontend/src/pages/hr/HRMonitorIA.tsx",
+          "line": 155,
+          "kind": "literal_reference"
+        },
+        {
+          "file": "supabase/migrations/20261123061204_posiciones_personas_revision.sql",
+          "kind": "historical_sql_reference"
+        },
+        {
+          "file": "supabase/migrations/20261123062055_posiciones_constructor_delegado.sql",
+          "kind": "historical_sql_reference"
+        },
+        {
+          "file": "supabase/migrations/20261123070139_posiciones_argos_acceso.sql",
+          "kind": "historical_sql_reference"
+        }
+      ],
+      "verification": "action_local_tests"
     },
     {
       "key": "Cowork|*",
@@ -318,19 +557,65 @@
       "row": "Salas",
       "scoped": true,
       "new": true,
-      "evidence": [],
-      "verification": "pending"
+      "evidence": [
+        {
+          "file": "frontend/src/pages/cowork/CoworkHostDashboard.tsx",
+          "line": 168,
+          "kind": "literal_reference"
+        },
+        {
+          "file": "supabase/functions/cowork-session/permisos-posicion.ts",
+          "line": 8,
+          "kind": "literal_reference"
+        },
+        {
+          "file": "supabase/migrations/20261123061204_posiciones_personas_revision.sql",
+          "kind": "historical_sql_reference"
+        },
+        {
+          "file": "supabase/migrations/20261123062055_posiciones_constructor_delegado.sql",
+          "kind": "historical_sql_reference"
+        },
+        {
+          "file": "supabase/migrations/20261123070450_posiciones_cowork_funciones.sql",
+          "kind": "historical_sql_reference"
+        }
+      ],
+      "verification": "action_local_tests"
     },
     {
       "key": "N:cowork.verpantallas",
-      "label": "Ver pantallas de compañeros",
+      "label": "Supervisar pantallas de otras salas",
       "section": "General",
       "group": "Cowork",
       "row": "Salas",
       "scoped": true,
       "new": true,
-      "evidence": [],
-      "verification": "pending"
+      "evidence": [
+        {
+          "file": "frontend/src/pages/cowork/CoworkHostDashboard.tsx",
+          "line": 169,
+          "kind": "literal_reference"
+        },
+        {
+          "file": "supabase/functions/cowork-session/permisos-posicion.ts",
+          "line": 10,
+          "kind": "literal_reference"
+        },
+        {
+          "file": "supabase/migrations/20261123061204_posiciones_personas_revision.sql",
+          "kind": "historical_sql_reference"
+        },
+        {
+          "file": "supabase/migrations/20261123062055_posiciones_constructor_delegado.sql",
+          "kind": "historical_sql_reference"
+        },
+        {
+          "file": "supabase/migrations/20261123070450_posiciones_cowork_funciones.sql",
+          "kind": "historical_sql_reference"
+        }
+      ],
+      "verification": "action_local_tests"
     },
     {
       "key": "Messenger|*",
@@ -351,8 +636,30 @@
       "row": "Mensajes",
       "scoped": true,
       "new": true,
-      "evidence": [],
-      "verification": "pending"
+      "evidence": [
+        {
+          "file": "frontend/src/pages/messenger/components/MessageInput.tsx",
+          "line": 98,
+          "kind": "literal_reference"
+        },
+        {
+          "file": "supabase/migrations/20261123061204_posiciones_personas_revision.sql",
+          "kind": "historical_sql_reference"
+        },
+        {
+          "file": "supabase/migrations/20261123062055_posiciones_constructor_delegado.sql",
+          "kind": "historical_sql_reference"
+        },
+        {
+          "file": "supabase/migrations/20261123064740_posiciones_messenger_crear_y_adjuntar.sql",
+          "kind": "historical_sql_reference"
+        },
+        {
+          "file": "supabase/migrations/20261123070221_posiciones_envios_y_links.sql",
+          "kind": "historical_sql_reference"
+        }
+      ],
+      "verification": "action_local_tests"
     },
     {
       "key": "N:msg.grupo",
@@ -362,8 +669,26 @@
       "row": "Mensajes",
       "scoped": true,
       "new": true,
-      "evidence": [],
-      "verification": "pending"
+      "evidence": [
+        {
+          "file": "frontend/src/pages/messenger/NewChatModal.tsx",
+          "line": 35,
+          "kind": "literal_reference"
+        },
+        {
+          "file": "supabase/migrations/20261123061204_posiciones_personas_revision.sql",
+          "kind": "historical_sql_reference"
+        },
+        {
+          "file": "supabase/migrations/20261123062055_posiciones_constructor_delegado.sql",
+          "kind": "historical_sql_reference"
+        },
+        {
+          "file": "supabase/migrations/20261123064740_posiciones_messenger_crear_y_adjuntar.sql",
+          "kind": "historical_sql_reference"
+        }
+      ],
+      "verification": "action_local_tests"
     },
     {
       "key": "N:msg.llamar",
@@ -373,19 +698,59 @@
       "row": "Mensajes",
       "scoped": true,
       "new": true,
-      "evidence": [],
-      "verification": "pending"
+      "evidence": [
+        {
+          "file": "frontend/src/pages/messenger/components/ChatHeader.tsx",
+          "line": 59,
+          "kind": "literal_reference"
+        },
+        {
+          "file": "supabase/migrations/20261123061204_posiciones_personas_revision.sql",
+          "kind": "historical_sql_reference"
+        },
+        {
+          "file": "supabase/migrations/20261123062055_posiciones_constructor_delegado.sql",
+          "kind": "historical_sql_reference"
+        },
+        {
+          "file": "supabase/migrations/20261123064740_posiciones_messenger_crear_y_adjuntar.sql",
+          "kind": "historical_sql_reference"
+        }
+      ],
+      "verification": "action_local_tests"
     },
     {
       "key": "N:msg.borrar",
-      "label": "Borrar conversaciones",
+      "label": "Borrar mensajes y conversaciones",
       "section": "General",
       "group": "Messenger",
       "row": "Mensajes",
       "scoped": true,
       "new": true,
-      "evidence": [],
-      "verification": "pending"
+      "evidence": [
+        {
+          "file": "frontend/src/pages/messenger/components/MessageList.tsx",
+          "line": 91,
+          "kind": "literal_reference"
+        },
+        {
+          "file": "supabase/migrations/20261123061204_posiciones_personas_revision.sql",
+          "kind": "historical_sql_reference"
+        },
+        {
+          "file": "supabase/migrations/20261123062055_posiciones_constructor_delegado.sql",
+          "kind": "historical_sql_reference"
+        },
+        {
+          "file": "supabase/migrations/20261123064131_posiciones_acciones_messenger_argos.sql",
+          "kind": "historical_sql_reference"
+        },
+        {
+          "file": "supabase/migrations/20261123124105_posiciones_borrar_conversaciones.sql",
+          "kind": "historical_sql_reference"
+        }
+      ],
+      "verification": "action_local_tests"
     },
     {
       "key": "Correo|*",
@@ -509,9 +874,21 @@
         {
           "file": "supabase/migrations/20261119060000_posiciones_mandan.sql",
           "kind": "historical_sql_reference"
+        },
+        {
+          "file": "supabase/migrations/20261123061204_posiciones_personas_revision.sql",
+          "kind": "historical_sql_reference"
+        },
+        {
+          "file": "supabase/migrations/20261123061407_posiciones_constructor_compatibilidad.sql",
+          "kind": "historical_sql_reference"
+        },
+        {
+          "file": "supabase/migrations/20261123062055_posiciones_constructor_delegado.sql",
+          "kind": "historical_sql_reference"
         }
       ],
-      "verification": "pending"
+      "verification": "action_local_tests"
     },
     {
       "key": "N:drive.subir",
@@ -521,8 +898,27 @@
       "row": "Drive",
       "scoped": true,
       "new": true,
-      "evidence": [],
-      "verification": "pending"
+      "evidence": [
+        {
+          "file": "frontend/src/pages/oficina/DrivePage.tsx",
+          "line": 171,
+          "kind": "literal_reference"
+        },
+        {
+          "file": "supabase/functions/drive/index.ts",
+          "line": 163,
+          "kind": "literal_reference"
+        },
+        {
+          "file": "supabase/migrations/20261123061204_posiciones_personas_revision.sql",
+          "kind": "historical_sql_reference"
+        },
+        {
+          "file": "supabase/migrations/20261123062055_posiciones_constructor_delegado.sql",
+          "kind": "historical_sql_reference"
+        }
+      ],
+      "verification": "action_local_tests"
     },
     {
       "key": "N:drive.borrar",
@@ -532,8 +928,31 @@
       "row": "Drive",
       "scoped": true,
       "new": true,
-      "evidence": [],
-      "verification": "pending"
+      "evidence": [
+        {
+          "file": "frontend/src/pages/oficina/DrivePage.tsx",
+          "line": 172,
+          "kind": "literal_reference"
+        },
+        {
+          "file": "supabase/functions/drive/index.ts",
+          "line": 163,
+          "kind": "literal_reference"
+        },
+        {
+          "file": "supabase/migrations/20261123061204_posiciones_personas_revision.sql",
+          "kind": "historical_sql_reference"
+        },
+        {
+          "file": "supabase/migrations/20261123062055_posiciones_constructor_delegado.sql",
+          "kind": "historical_sql_reference"
+        },
+        {
+          "file": "supabase/migrations/20261123065122_posiciones_drive_acciones.sql",
+          "kind": "historical_sql_reference"
+        }
+      ],
+      "verification": "action_local_tests"
     },
     {
       "key": "N:drive.compartir",
@@ -543,8 +962,30 @@
       "row": "Drive",
       "scoped": true,
       "new": true,
-      "evidence": [],
-      "verification": "pending"
+      "evidence": [
+        {
+          "file": "frontend/src/pages/oficina/DrivePage.tsx",
+          "line": 173,
+          "kind": "literal_reference"
+        },
+        {
+          "file": "supabase/migrations/20261123061204_posiciones_personas_revision.sql",
+          "kind": "historical_sql_reference"
+        },
+        {
+          "file": "supabase/migrations/20261123062055_posiciones_constructor_delegado.sql",
+          "kind": "historical_sql_reference"
+        },
+        {
+          "file": "supabase/migrations/20261123065122_posiciones_drive_acciones.sql",
+          "kind": "historical_sql_reference"
+        },
+        {
+          "file": "supabase/migrations/20261123070221_posiciones_envios_y_links.sql",
+          "kind": "historical_sql_reference"
+        }
+      ],
+      "verification": "action_local_tests"
     },
     {
       "key": "Contactos|Contactos",
@@ -634,11 +1075,19 @@
       "evidence": [
         {
           "file": "frontend/src/pages/admin/usePermisosUsuarios.ts",
-          "line": 7,
+          "line": 9,
           "kind": "literal_reference"
         },
         {
           "file": "supabase/migrations/20261123044233_posiciones_funciones_usuarios.sql",
+          "kind": "historical_sql_reference"
+        },
+        {
+          "file": "supabase/migrations/20261123061204_posiciones_personas_revision.sql",
+          "kind": "historical_sql_reference"
+        },
+        {
+          "file": "supabase/migrations/20261123062055_posiciones_constructor_delegado.sql",
           "kind": "historical_sql_reference"
         }
       ],
@@ -655,11 +1104,19 @@
       "evidence": [
         {
           "file": "frontend/src/pages/admin/usePermisosUsuarios.ts",
-          "line": 8,
+          "line": 10,
           "kind": "literal_reference"
         },
         {
           "file": "supabase/migrations/20261123044233_posiciones_funciones_usuarios.sql",
+          "kind": "historical_sql_reference"
+        },
+        {
+          "file": "supabase/migrations/20261123061204_posiciones_personas_revision.sql",
+          "kind": "historical_sql_reference"
+        },
+        {
+          "file": "supabase/migrations/20261123062055_posiciones_constructor_delegado.sql",
           "kind": "historical_sql_reference"
         }
       ],
@@ -676,11 +1133,19 @@
       "evidence": [
         {
           "file": "frontend/src/pages/admin/usePermisosUsuarios.ts",
-          "line": 9,
+          "line": 11,
           "kind": "literal_reference"
         },
         {
           "file": "supabase/migrations/20261123044233_posiciones_funciones_usuarios.sql",
+          "kind": "historical_sql_reference"
+        },
+        {
+          "file": "supabase/migrations/20261123061204_posiciones_personas_revision.sql",
+          "kind": "historical_sql_reference"
+        },
+        {
+          "file": "supabase/migrations/20261123062055_posiciones_constructor_delegado.sql",
           "kind": "historical_sql_reference"
         }
       ],
@@ -697,11 +1162,19 @@
       "evidence": [
         {
           "file": "frontend/src/pages/admin/usePermisosUsuarios.ts",
-          "line": 10,
+          "line": 12,
           "kind": "literal_reference"
         },
         {
           "file": "supabase/migrations/20261123044233_posiciones_funciones_usuarios.sql",
+          "kind": "historical_sql_reference"
+        },
+        {
+          "file": "supabase/migrations/20261123061204_posiciones_personas_revision.sql",
+          "kind": "historical_sql_reference"
+        },
+        {
+          "file": "supabase/migrations/20261123062055_posiciones_constructor_delegado.sql",
           "kind": "historical_sql_reference"
         }
       ],
@@ -717,12 +1190,25 @@
       "new": true,
       "evidence": [
         {
+          "file": "frontend/src/components/ajustes/TarjetaPosiciones.tsx",
+          "line": 12,
+          "kind": "literal_reference"
+        },
+        {
           "file": "frontend/src/pages/admin/usePermisosUsuarios.ts",
-          "line": 11,
+          "line": 13,
           "kind": "literal_reference"
         },
         {
           "file": "supabase/migrations/20261123044233_posiciones_funciones_usuarios.sql",
+          "kind": "historical_sql_reference"
+        },
+        {
+          "file": "supabase/migrations/20261123061204_posiciones_personas_revision.sql",
+          "kind": "historical_sql_reference"
+        },
+        {
+          "file": "supabase/migrations/20261123062055_posiciones_constructor_delegado.sql",
           "kind": "historical_sql_reference"
         }
       ],
@@ -747,8 +1233,17 @@
       "row": "Posiciones",
       "scoped": false,
       "new": true,
-      "evidence": [],
-      "verification": "pending"
+      "evidence": [
+        {
+          "file": "supabase/migrations/20261123061204_posiciones_personas_revision.sql",
+          "kind": "historical_sql_reference"
+        },
+        {
+          "file": "supabase/migrations/20261123062055_posiciones_constructor_delegado.sql",
+          "kind": "historical_sql_reference"
+        }
+      ],
+      "verification": "constructor_local_tests"
     },
     {
       "key": "N:pos.editar",
@@ -758,8 +1253,17 @@
       "row": "Posiciones",
       "scoped": false,
       "new": true,
-      "evidence": [],
-      "verification": "pending"
+      "evidence": [
+        {
+          "file": "supabase/migrations/20261123061204_posiciones_personas_revision.sql",
+          "kind": "historical_sql_reference"
+        },
+        {
+          "file": "supabase/migrations/20261123062055_posiciones_constructor_delegado.sql",
+          "kind": "historical_sql_reference"
+        }
+      ],
+      "verification": "constructor_local_tests"
     },
     {
       "key": "N:pos.borrar",
@@ -769,8 +1273,17 @@
       "row": "Posiciones",
       "scoped": false,
       "new": true,
-      "evidence": [],
-      "verification": "pending"
+      "evidence": [
+        {
+          "file": "supabase/migrations/20261123061204_posiciones_personas_revision.sql",
+          "kind": "historical_sql_reference"
+        },
+        {
+          "file": "supabase/migrations/20261123062055_posiciones_constructor_delegado.sql",
+          "kind": "historical_sql_reference"
+        }
+      ],
+      "verification": "constructor_local_tests"
     },
     {
       "key": "N:pos.activar",
@@ -780,8 +1293,17 @@
       "row": "Posiciones",
       "scoped": false,
       "new": true,
-      "evidence": [],
-      "verification": "pending"
+      "evidence": [
+        {
+          "file": "supabase/migrations/20261123061204_posiciones_personas_revision.sql",
+          "kind": "historical_sql_reference"
+        },
+        {
+          "file": "supabase/migrations/20261123062055_posiciones_constructor_delegado.sql",
+          "kind": "historical_sql_reference"
+        }
+      ],
+      "verification": "constructor_local_tests"
     },
     {
       "key": "N:pos.permisos",
@@ -791,8 +1313,17 @@
       "row": "Posiciones",
       "scoped": false,
       "new": true,
-      "evidence": [],
-      "verification": "pending"
+      "evidence": [
+        {
+          "file": "supabase/migrations/20261123061204_posiciones_personas_revision.sql",
+          "kind": "historical_sql_reference"
+        },
+        {
+          "file": "supabase/migrations/20261123062055_posiciones_constructor_delegado.sql",
+          "kind": "historical_sql_reference"
+        }
+      ],
+      "verification": "constructor_local_tests"
     },
     {
       "key": "Administración|Auditoría",
@@ -6475,9 +7006,14 @@
       "edges": [],
       "permission_calls": [
         {
+          "method": "canFunction",
+          "arguments": [],
+          "line": 80
+        },
+        {
           "method": "canAccess",
           "arguments": [],
-          "line": 84
+          "line": 87
         }
       ]
     },
@@ -6637,6 +7173,28 @@
       "permission_calls": []
     },
     {
+      "file": "frontend/src/components/ajustes/EditorAccesosPersona.tsx",
+      "imports": [
+        "react",
+        "@tanstack/react-query",
+        "sonner",
+        "@/components/ui/button",
+        "@/components/ui/checkbox",
+        "@/components/ui/input",
+        "@/components/ui/dialog",
+        "@/hooks/useLanguage",
+        "@/integrations/supabase/client",
+        "@/lib/posiciones/catalogo",
+        "@/lib/posiciones/personas"
+      ],
+      "tables": [],
+      "rpcs": [
+        "persona_aplicar_accesos"
+      ],
+      "edges": [],
+      "permission_calls": []
+    },
+    {
       "file": "frontend/src/components/ajustes/TarjetaDeApariencia.tsx",
       "imports": [
         "react",
@@ -6703,12 +7261,36 @@
         "@/components/ui/button",
         "@/components/ui/card",
         "@/hooks/useLanguage",
-        "@/hooks/useEsDueno"
+        "@/hooks/usePermissions"
       ],
       "tables": [],
       "rpcs": [],
       "edges": [],
-      "permission_calls": []
+      "permission_calls": [
+        {
+          "method": "canAccess",
+          "arguments": [
+            "Administración",
+            "Roles"
+          ],
+          "line": 12
+        },
+        {
+          "method": "canAccess",
+          "arguments": [
+            "Administración",
+            "Usuarios"
+          ],
+          "line": 12
+        },
+        {
+          "method": "canFunction",
+          "arguments": [
+            "N:usr.asignar"
+          ],
+          "line": 12
+        }
+      ]
     },
     {
       "file": "frontend/src/components/analytics/AnalyticsSectionBanner.tsx",
@@ -8765,6 +9347,7 @@
     {
       "file": "frontend/src/components/hr/ClipsDelDia.tsx",
       "imports": [
+        "@/hooks/usePermissions",
         "@/lib/formatoHora",
         "react",
         "@tanstack/react-query",
@@ -8779,7 +9362,15 @@
       ],
       "rpcs": [],
       "edges": [],
-      "permission_calls": []
+      "permission_calls": [
+        {
+          "method": "canFunction",
+          "arguments": [
+            "N:argos.video"
+          ],
+          "line": 49
+        }
+      ]
     },
     {
       "file": "frontend/src/components/hr/ConectadosAhoraPanel.tsx",
@@ -13314,6 +13905,7 @@
       "imports": [
         "@tanstack/react-query",
         "@/integrations/supabase/client",
+        "@/hooks/usePermissions",
         "@/hooks/useEsDueno",
         "@/hooks/useRoleTier"
       ],
@@ -13322,7 +13914,16 @@
         "argos_perdonar_captura"
       ],
       "edges": [],
-      "permission_calls": []
+      "permission_calls": [
+        {
+          "method": "canFunction",
+          "arguments": [
+            "N:argos.perdonar",
+            "admin"
+          ],
+          "line": 18
+        }
+      ]
     },
     {
       "file": "frontend/src/hooks/usePermissions.ts",
@@ -16442,7 +17043,27 @@
       "permission_calls": []
     },
     {
+      "file": "frontend/src/lib/posiciones/exportarExpediente.ts",
+      "imports": [
+        "@/hooks/useExpedienteEmpleado"
+      ],
+      "tables": [],
+      "rpcs": [],
+      "edges": [],
+      "permission_calls": []
+    },
+    {
       "file": "frontend/src/lib/posiciones/permisos.ts",
+      "imports": [
+        "./catalogo"
+      ],
+      "tables": [],
+      "rpcs": [],
+      "edges": [],
+      "permission_calls": []
+    },
+    {
+      "file": "frontend/src/lib/posiciones/personas.ts",
       "imports": [
         "./catalogo"
       ],
@@ -17688,7 +18309,7 @@
             "Administración",
             "Roles"
           ],
-          "line": 161
+          "line": 162
         }
       ]
     },
@@ -18655,6 +19276,7 @@
     {
       "file": "frontend/src/pages/admin/usePermisosUsuarios.ts",
       "imports": [
+        "@/hooks/useFuncionesPosicion",
         "@/hooks/usePermissions"
       ],
       "tables": [],
@@ -18667,42 +19289,42 @@
             "Administración",
             "Usuarios"
           ],
-          "line": 5
+          "line": 7
         },
         {
           "method": "canFunction",
           "arguments": [
             "N:usr.agregar"
           ],
-          "line": 7
+          "line": 9
         },
         {
           "method": "canFunction",
           "arguments": [
             "N:usr.editar"
           ],
-          "line": 8
+          "line": 10
         },
         {
           "method": "canFunction",
           "arguments": [
             "N:usr.desactivar"
           ],
-          "line": 9
+          "line": 11
         },
         {
           "method": "canFunction",
           "arguments": [
             "N:usr.reset"
           ],
-          "line": 10
+          "line": 12
         },
         {
           "method": "canFunction",
           "arguments": [
             "N:usr.asignar"
           ],
-          "line": 11
+          "line": 13
         }
       ]
     },
@@ -19419,6 +20041,7 @@
     {
       "file": "frontend/src/pages/ajustes/Posiciones.tsx",
       "imports": [
+        "react-router-dom",
         "react",
         "@tanstack/react-query",
         "lucide-react",
@@ -19436,9 +20059,10 @@
         "@/components/ui/dialog",
         "@/components/ui/alert-dialog",
         "@/components/ui/dropdown-menu",
-        "@/components/ui/popover",
+        "@/components/ajustes/EditorAccesosPersona",
+        "@/lib/posiciones/personas",
         "@/hooks/useLanguage",
-        "@/hooks/useEsDueno",
+        "@/hooks/useAuth",
         "@/integrations/supabase/client",
         "@/lib/utils",
         "@/lib/posiciones/catalogo",
@@ -19446,16 +20070,14 @@
         "@/hooks/usePausas"
       ],
       "tables": [
-        "posiciones_borrador",
-        "posiciones_borrador_personas",
-        "profiles",
-        "personas_borrador_marcas",
-        "app_flags",
-        "posiciones_respaldo"
+        "app_flags"
       ],
       "rpcs": [
-        "posiciones_regresar",
-        "posicion_aplicar_revision"
+        "constructor_posiciones_datos",
+        "posicion_guardar",
+        "posicion_eliminar",
+        "posicion_aplicar_revision",
+        "persona_aplicar_marcas"
       ],
       "edges": [],
       "permission_calls": []
@@ -21892,6 +22514,7 @@
     {
       "file": "frontend/src/pages/cowork/CoworkHostDashboard.tsx",
       "imports": [
+        "@/hooks/usePermissions",
         "react",
         "@/lib/duracion",
         "./RelojVivo",
@@ -21973,7 +22596,22 @@
       ],
       "rpcs": [],
       "edges": [],
-      "permission_calls": []
+      "permission_calls": [
+        {
+          "method": "canFunction",
+          "arguments": [
+            "N:cowork.abrir"
+          ],
+          "line": 168
+        },
+        {
+          "method": "canFunction",
+          "arguments": [
+            "N:cowork.verpantallas"
+          ],
+          "line": 169
+        }
+      ]
     },
     {
       "file": "frontend/src/pages/cowork/CoworkIncognitoView.tsx",
@@ -25176,6 +25814,7 @@
     {
       "file": "frontend/src/pages/hr/ArgosAjustes.tsx",
       "imports": [
+        "@/hooks/usePermissions",
         "react",
         "@/hooks/useLanguage",
         "@/components/ui/page",
@@ -25193,7 +25832,15 @@
       ],
       "rpcs": [],
       "edges": [],
-      "permission_calls": []
+      "permission_calls": [
+        {
+          "method": "canFunction",
+          "arguments": [
+            "N:argos.ajustes"
+          ],
+          "line": 60
+        }
+      ]
     },
     {
       "file": "frontend/src/pages/hr/ArgosComparativo.tsx",
@@ -25323,6 +25970,7 @@
     {
       "file": "frontend/src/pages/hr/EnVivoPersona.tsx",
       "imports": [
+        "@/hooks/usePermissions",
         "react",
         "react-router-dom",
         "lucide-react",
@@ -25348,7 +25996,15 @@
         "monitoreo_marcar_revisado"
       ],
       "edges": [],
-      "permission_calls": []
+      "permission_calls": [
+        {
+          "method": "canFunction",
+          "arguments": [
+            "N:argos.avisar"
+          ],
+          "line": 40
+        }
+      ]
     },
     {
       "file": "frontend/src/pages/hr/HRAbsences.tsx",
@@ -25711,6 +26367,9 @@
     {
       "file": "frontend/src/pages/hr/HRExpediente.tsx",
       "imports": [
+        "sonner",
+        "@/lib/posiciones/exportarExpediente",
+        "@/hooks/usePermissions",
         "@/lib/formatoHora",
         "react",
         "@/lib/duracion",
@@ -25748,7 +26407,43 @@
       ],
       "rpcs": [],
       "edges": [],
-      "permission_calls": []
+      "permission_calls": [
+        {
+          "method": "canFunction",
+          "arguments": [
+            "N:argos.expediente"
+          ],
+          "line": 933
+        },
+        {
+          "method": "canFunction",
+          "arguments": [
+            "N:argos.pdf"
+          ],
+          "line": 1014
+        },
+        {
+          "method": "canFunction",
+          "arguments": [
+            "N:argos.pdf"
+          ],
+          "line": 1015
+        },
+        {
+          "method": "canFunction",
+          "arguments": [
+            "N:argos.presencia"
+          ],
+          "line": 1148
+        },
+        {
+          "method": "canFunction",
+          "arguments": [
+            "N:argos.video"
+          ],
+          "line": 1241
+        }
+      ]
     },
     {
       "file": "frontend/src/pages/hr/HRHourBank.tsx",
@@ -25884,6 +26579,7 @@
         "lucide-react",
         "@/hooks/useHorariosEquipo",
         "@/hooks/useLanguage",
+        "@/hooks/usePermissions",
         "@/hooks/useUserRole",
         "@/hooks/useEsRh",
         "@/hooks/useOnlyOffice",
@@ -25910,7 +26606,36 @@
       ],
       "rpcs": [],
       "edges": [],
-      "permission_calls": []
+      "permission_calls": [
+        {
+          "method": "canFunction",
+          "arguments": [
+            "N:argos.presencia"
+          ],
+          "line": 153
+        },
+        {
+          "method": "canFunction",
+          "arguments": [
+            "N:argos.expediente"
+          ],
+          "line": 154
+        },
+        {
+          "method": "canFunction",
+          "arguments": [
+            "N:argos.ajustes"
+          ],
+          "line": 155
+        },
+        {
+          "method": "canFunction",
+          "arguments": [
+            "N:argos.expediente"
+          ],
+          "line": 156
+        }
+      ]
     },
     {
       "file": "frontend/src/pages/hr/HRMonitoring.tsx",
@@ -28026,6 +28751,7 @@
     {
       "file": "frontend/src/pages/messenger/NewChatModal.tsx",
       "imports": [
+        "@/hooks/usePermissions",
         "react",
         "lucide-react",
         "@/components/ui/dialog",
@@ -28045,7 +28771,15 @@
       "tables": [],
       "rpcs": [],
       "edges": [],
-      "permission_calls": []
+      "permission_calls": [
+        {
+          "method": "canFunction",
+          "arguments": [
+            "N:msg.grupo"
+          ],
+          "line": 35
+        }
+      ]
     },
     {
       "file": "frontend/src/pages/messenger/VideoRoomsPanel.tsx",
@@ -28125,6 +28859,7 @@
     {
       "file": "frontend/src/pages/messenger/components/ChatHeader.tsx",
       "imports": [
+        "@/hooks/usePermissions",
         "react",
         "lucide-react",
         "@/components/ui/button",
@@ -28150,7 +28885,15 @@
       ],
       "rpcs": [],
       "edges": [],
-      "permission_calls": []
+      "permission_calls": [
+        {
+          "method": "canFunction",
+          "arguments": [
+            "N:msg.llamar"
+          ],
+          "line": 59
+        }
+      ]
     },
     {
       "file": "frontend/src/pages/messenger/components/DeleteChatDialog.tsx",
@@ -28331,6 +29074,7 @@
     {
       "file": "frontend/src/pages/messenger/components/MessageInput.tsx",
       "imports": [
+        "@/hooks/usePermissions",
         "react",
         "./MentionAutocomplete",
         "lucide-react",
@@ -28367,11 +29111,20 @@
       ],
       "rpcs": [],
       "edges": [],
-      "permission_calls": []
+      "permission_calls": [
+        {
+          "method": "canFunction",
+          "arguments": [
+            "N:msg.archivos"
+          ],
+          "line": 98
+        }
+      ]
     },
     {
       "file": "frontend/src/pages/messenger/components/MessageList.tsx",
       "imports": [
+        "@/hooks/usePermissions",
         "react",
         "../types",
         "../useDeletedMessages",
@@ -28389,7 +29142,15 @@
       "tables": [],
       "rpcs": [],
       "edges": [],
-      "permission_calls": []
+      "permission_calls": [
+        {
+          "method": "canFunction",
+          "arguments": [
+            "N:msg.borrar"
+          ],
+          "line": 91
+        }
+      ]
     },
     {
       "file": "frontend/src/pages/messenger/components/NotaDeVoz.tsx",
@@ -29352,6 +30113,7 @@
     {
       "file": "frontend/src/pages/oficina/DrivePage.tsx",
       "imports": [
+        "@/hooks/usePermissions",
         "react",
         "react-router-dom",
         "@tanstack/react-query",
@@ -29407,7 +30169,29 @@
       "tables": [],
       "rpcs": [],
       "edges": [],
-      "permission_calls": []
+      "permission_calls": [
+        {
+          "method": "canFunction",
+          "arguments": [
+            "N:drive.subir"
+          ],
+          "line": 171
+        },
+        {
+          "method": "canFunction",
+          "arguments": [
+            "N:drive.borrar"
+          ],
+          "line": 172
+        },
+        {
+          "method": "canFunction",
+          "arguments": [
+            "N:drive.compartir"
+          ],
+          "line": 173
+        }
+      ]
     },
     {
       "file": "frontend/src/pages/oficina/EspacioNasPage.tsx",
@@ -33390,8 +34174,7 @@
       ],
       "tables": [],
       "rpcs": [
-        "es_admin_o_dueno",
-        "puede_vigilar_a"
+        "argos_puede_ver_foto"
       ],
       "edges": [],
       "permission_calls": []
@@ -33733,6 +34516,7 @@
     {
       "file": "supabase/functions/cowork-session/index.ts",
       "imports": [
+        "./permisos-posicion.ts",
         "../_shared/cors.ts",
         "https://deno.land/std@0.168.0/http/server.ts",
         "https://esm.sh/@supabase/supabase-js@2",
@@ -33766,6 +34550,17 @@
         "exigencias_de",
         "cowork_tiempo_diario",
         "puede_vigilar"
+      ],
+      "edges": [],
+      "permission_calls": []
+    },
+    {
+      "file": "supabase/functions/cowork-session/permisos-posicion.ts",
+      "imports": [],
+      "tables": [],
+      "rpcs": [
+        "posicion_decision",
+        "cowork_posicion_ver_sala"
       ],
       "edges": [],
       "permission_calls": []
@@ -33989,6 +34784,7 @@
       "rpcs": [
         "drive_sin_tipo",
         "drive_corregir_tipos",
+        "posicion_decision",
         "current_tenant_id",
         "drive_unidad_de",
         "drive_uso_agencia",

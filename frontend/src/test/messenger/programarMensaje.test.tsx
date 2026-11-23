@@ -13,6 +13,7 @@ import type { Editor } from "@tiptap/core";
 configure({ asyncUtilTimeout: 5000 });
 vi.setConfig({ testTimeout: 60_000 });
 
+vi.mock("@/hooks/usePermissions", () => ({ usePermissions: () => ({ canFunction: () => true }) }));
 vi.mock("@/hooks/useAuth", () => ({ useAuth: () => ({ user: { id: "u1" } }) }));
 vi.mock("@/integrations/supabase/client", () => ({ supabase: {} }));
 vi.mock("@/hooks/useLanguage", (original) =>

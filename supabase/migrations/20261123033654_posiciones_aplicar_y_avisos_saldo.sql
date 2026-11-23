@@ -2,7 +2,7 @@
 create table public.posiciones_revisiones (
   id bigint generated always as identity primary key,
   posicion_id uuid not null,
-  actor uuid not null references auth.users(id),
+  actor uuid references auth.users(id) on delete set null,
   antes jsonb not null,
   despues jsonb not null,
   created_at timestamptz not null default now()

@@ -88,7 +88,7 @@ export default function CoworkPage() {
   // por alcance (todo, o solo las que tienen a alguien de nivel inferior). Antes
   // esto era solo-admin y un rol con "Todos los datos" veía únicamente las suyas.
   const { dataScope, isLoading: alcanceCargando, hayError: alcanceFallo } = usePermissions();
-  const veTodasLasSesiones = isAdmin || dataScope("Cowork") !== "self";
+  const veTodasLasSesiones = dataScope("Cowork") !== "self";
   const [allSessions, setAllSessions] = useState<AdminSessionRow[]>(guardada?.todas ?? []);
   const [enteringId, setEnteringId] = useState<string | null>(null);
 

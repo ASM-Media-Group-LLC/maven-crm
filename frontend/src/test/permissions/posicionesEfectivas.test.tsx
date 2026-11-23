@@ -73,3 +73,22 @@ describe("La posición gobierna las acciones antes que el nivel del rol",()=>{
     await waitFor(()=>expect(result.current.canFunction("N:usr.editar",true)).toBe(false));
   });
 });
+
+
+describe("Alcances efectivos", () => {
+  beforeEach(() => stub.reset());
+  it("el administrador anterior respeta self y la revocación recibida", async () => {
+    const {result,client}=setup("admin", {"Cowork|*":true});
+    stub.setFuncionesPosicion({uid:adminUser.id,aplica:true,total:false,bloqueada:false,checks:{"Cowork|*":true},alcances:{"Cowork|*":"self"}});
+    await client.invalidateQueries({queryKey:["mis-funciones-posicion"]});
+    await waitFor(()=>expect(result.current.isLoading).toBe(false));
+    expect(result.current.dataScope("Cowork")).toBe("self");
+    stub.setFuncionesPosicion({uid:adminUser.id,aplica:true,total:false,bloqueada:false,checks:{"Cowork|*":true},alcances:{"Cowork|*":"subordinates"}});
+    await client.invalidateQueries({queryKey:["mis-funciones-posicion"]});
+    await waitFor(()=>expect(result.current.dataScope("Cowork")).toBe("subordinates"));
+    stub.setFuncionesPosicion({uid:adminUser.id,aplica:true,total:true,bloqueada:false,checks:{},denegadas:["Cowork|*"],alcances:{"Cowork|*":"none"}});
+    await client.invalidateQueries({queryKey:["mis-funciones-posicion"]});
+    await waitFor(()=>expect(result.current.canAccess("Cowork")).toBe(false));
+    expect(result.current.dataScope("Cowork")).toBe("self");
+  });
+});
