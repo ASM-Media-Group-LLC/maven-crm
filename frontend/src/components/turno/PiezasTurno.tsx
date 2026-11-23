@@ -76,7 +76,7 @@ export type EstadoTurno = "fuera" | "puede" | "en_turno" | "en_pausa";
 
 export function TarjetaTurno({
   estado, entrada, horario, desde, faltaSeg, transcurridoSeg = 0, pausaSeg = 0, cupoPausaSeg = 40 * 60,
-  fueraDeHorario = false, onEntrada, onPausa, onVolver, onSalida, botonPausa, t,
+  soloRegistro = false, fueraDeHorario = false, onEntrada, onPausa, onVolver, onSalida, botonPausa, t,
 }: {
   estado: EstadoTurno;
   /** Hora de entrada de hoy («4:00 PM»). */
@@ -94,6 +94,7 @@ export function TarjetaTurno({
   cupoPausaSeg?: number;
   /** Ya pasó su hora de salida: lo que siga no se paga. */
   fueraDeHorario?: boolean;
+  soloRegistro?: boolean;
   onEntrada?: () => void; onPausa?: () => void; onVolver?: () => void; onSalida?: () => void;
   /** Para poner un botón de pausa propio (p. ej. con su menú baño / comida). */
   botonPausa?: ReactNode;
@@ -103,7 +104,7 @@ export function TarjetaTurno({
     return (
       <Marco tono={fueraDeHorario ? "ambar" : "verde"} etiqueta={fueraDeHorario ? t("cowork.turno.fueraDeHorario") : t("cowork.turno.enTurno")} vivo>
         <p className="mt-1.5 font-display text-[28px] font-semibold leading-none tabular-nums text-foreground">{reloj(transcurridoSeg)}</p>
-        <p className="mt-1.5 flex items-center gap-1.5 text-[11px] text-muted-foreground"><ScreenShare className="h-3 w-3" />{t("cowork.turno.seComparte")}</p>
+        <p className="mt-1.5 flex items-center gap-1.5 text-[11px] text-muted-foreground"><ScreenShare className="h-3 w-3" />{t(soloRegistro ? "cowork.jornada.registrando" : "cowork.turno.seComparte")}</p>
         {fueraDeHorario && <p className="mt-1 text-[11px] font-medium text-warning">{t("cowork.turno.noSePaga")}</p>}
         <div className="mt-3 grid grid-cols-2 gap-2">
           {botonPausa ?? <BotonSuave onClick={onPausa} className="h-10 text-sm"><Pause className="h-3.5 w-3.5 fill-current" />{t("cowork.turno.pausa")}</BotonSuave>}
@@ -117,7 +118,7 @@ export function TarjetaTurno({
     return (
       <Marco tono="ambar" etiqueta={t("cowork.turno.enPausa")} vivo>
         <p className="mt-1.5 font-display text-[28px] font-semibold leading-none tabular-nums text-foreground">{reloj(pausaSeg)}</p>
-        <p className="mt-1.5 flex items-center gap-1.5 text-[11px] text-muted-foreground"><Coffee className="h-3 w-3" />{t("cowork.turno.pausaApagado")}</p>
+        <p className="mt-1.5 flex items-center gap-1.5 text-[11px] text-muted-foreground"><Coffee className="h-3 w-3" />{t(soloRegistro ? "cowork.jornada.pausaActiva" : "cowork.turno.pausaApagado")}</p>
         <div className="mt-2 h-1 overflow-hidden rounded-full bg-foreground/[0.08]">
           <div className={`h-full rounded-full ${pasado ? "bg-destructive/70" : "bg-warning/70"}`} style={{ width: `${Math.min(100, (pausaSeg / Math.max(1, cupoPausaSeg)) * 100)}%` }} />
         </div>

@@ -11,6 +11,12 @@ type Oyente = (p: PedidoACowork) => boolean;
 const oyentes = new Set<Oyente>();
 let pendiente: PedidoACowork | null = null;
 
+/** Atiende solo si hay una sala abierta; no deja una pausa pendiente. */
+export function pedirACoworkAhora(p: PedidoACowork): boolean {
+  for (const o of oyentes) if (o(p)) return true;
+  return false;
+}
+
 /** true si Cowork lo atendió ya; false si quedó guardado para cuando se abra. */
 export function pedirACowork(p: PedidoACowork): boolean {
   for (const o of oyentes) if (o(p)) return true;

@@ -4,6 +4,15 @@
 export const PREFIJOS_POSICIONES = ["posiciones."] as const;
 
 export const posiciones = {
+
+  "posiciones.jornada.titulo": { es: "Registro de jornada", en: "Time tracking" },
+  "posiciones.jornada.descripcion": { es: "Independiente del acceso de administrador, la cámara y la pantalla. Al combinar posiciones, una opción desactivada explícitamente prevalece. La duración de las pausas sale de la modalidad elegida.", en: "Independent of administrator access, camera and screen sharing. When positions are combined, an explicitly disabled option takes precedence. Break duration comes from the selected policy." },
+  "posiciones.jornada.registra_horas": { es: "Registrar entrada y salida", en: "Track clock-in and clock-out" },
+  "posiciones.jornada.registra_comida": { es: "Registrar pausa de comida", en: "Track meal breaks" },
+  "posiciones.jornada.registra_bano": { es: "Registrar pausa de baño", en: "Track bathroom breaks" },
+  "posiciones.jornada.heredar": { es: "Heredar configuración", en: "Inherit settings" },
+  "posiciones.jornada.si": { es: "Activado", en: "Enabled" },
+  "posiciones.jornada.no": { es: "Desactivado", en: "Disabled" },
   "posiciones.si": { es: "Sí", en: "Yes" },
   "posiciones.no": { es: "No", en: "No" },
   "posiciones.saldo.modulo": { es: "Costos de Maven", en: "Maven costs" },

@@ -7,6 +7,9 @@ interface Configuracion {
   acceso_total: boolean;
   todas_creadoras: boolean;
   modalidad_id?: string | null;
+  registra_horas?: boolean | null;
+  registra_comida?: boolean | null;
+  registra_bano?: boolean | null;
 }
 export interface CambioPosicion {
   clave: string;
@@ -25,6 +28,8 @@ export function cambiosDePosicion(antes: Configuracion, despues: Configuracion):
   agregar("acceso_total", "posiciones.accesoTotal", antes.acceso_total, despues.acceso_total);
   agregar("todas_creadoras", "posiciones.todasCreadoras", antes.todas_creadoras, despues.todas_creadoras);
   agregar("modalidad_id", "posiciones.pausa", antes.modalidad_id ?? null, despues.modalidad_id ?? null);
+  for (const campo of ["registra_horas", "registra_comida", "registra_bano"] as const)
+    agregar(campo, `posiciones.jornada.${campo}`, antes[campo] ?? null, despues[campo] ?? null);
   for (const seccion of CATALOGO_POSICIONES) for (const grupo of seccion.grupos) for (const fila of grupo.filas) {
     for (const f of fila.funciones) agregar(f.clave, f.etiqueta, !!antes.checks[f.clave], !!despues.checks[f.clave]);
     if (fila.datos === "tres") agregar(`alcance:${fila.fila}`, fila.etiqueta, antes.alcances[fila.fila] ?? "all", despues.alcances[fila.fila] ?? "all");

@@ -45,6 +45,9 @@ export interface Posicion {
   checks: Record<string, boolean>; alcances: Record<string, AlcanceDatos>; orden: number;
   /** La modalidad de pausa que trae el puesto (19/11/2026). */
   modalidad_id?: string | null;
+  registra_horas?: boolean | null;
+  registra_comida?: boolean | null;
+  registra_bano?: boolean | null;
 }
 interface Persona { editable?: boolean; id: string; full_name: string | null; avatar_url: string | null }
 interface Marca { updated_at?: string; user_id: string; protegido: boolean; sin_camara: boolean; deshabilitada: boolean }
@@ -423,7 +426,7 @@ export function PermisosDe({ pos: guardada, personas, asignaciones, onVolver }: 
     mutationFn: async () => {
       const { data, error } = await (supabase as unknown as { rpc: (name: string, args: unknown) => Promise<{ data: Posicion; error: { message: string } | null }> }).rpc("posicion_aplicar_revision", {
         _id: base.id, _revision: base.updated_at,
-        _cambios: { checks: pos.checks, alcances: pos.alcances, acceso_total: pos.acceso_total, todas_creadoras: pos.todas_creadoras, modalidad_id: pos.modalidad_id ?? null },
+        _cambios: { checks: pos.checks, alcances: pos.alcances, acceso_total: pos.acceso_total, todas_creadoras: pos.todas_creadoras, modalidad_id: pos.modalidad_id ?? null, registra_horas: pos.registra_horas ?? null, registra_comida: pos.registra_comida ?? null, registra_bano: pos.registra_bano ?? null },
       });
       if (error) throw new Error(error.message);
       if (!data?.updated_at) throw new Error("No se pudo comprobar la posición guardada");
@@ -435,6 +438,8 @@ export function PermisosDe({ pos: guardada, personas, asignaciones, onVolver }: 
       void qc.invalidateQueries({ queryKey: KEY });
       void qc.invalidateQueries({ queryKey: ["user-permissions"] });
       void qc.invalidateQueries({ queryKey: ["mis-funciones-posicion"] });
+      void qc.invalidateQueries({ queryKey: ["mi-jornada-config"] });
+      void qc.invalidateQueries({ queryKey: ["mi-turno"] });
       toast.success(t("posiciones.revision.aplicado"));
     },
     onError: (error: Error) => toast.error(error.message),
@@ -504,6 +509,25 @@ export function PermisosDe({ pos: guardada, personas, asignaciones, onVolver }: 
           ))}
         </select>
       </div>
+
+      <section className="rounded-panel border border-border bg-card p-4">
+        <h2 className="text-sm font-semibold">{t("posiciones.jornada.titulo")}</h2>
+        <p className="mt-1 text-xs text-muted-foreground">{t("posiciones.jornada.descripcion")}</p>
+        <div className="mt-3 grid gap-3 sm:grid-cols-3">
+          {(["registra_horas", "registra_comida", "registra_bano"] as const).map((campo) => (
+            <label key={campo} className="flex flex-col gap-2 text-sm">
+              <span>{t(`posiciones.jornada.${campo}`)}</span>
+              <select className="h-10 rounded-control border border-input bg-background px-2 text-sm"
+                value={pos[campo] == null ? "heredar" : String(pos[campo])}
+                onChange={(e) => guardar.mutate({ [campo]: e.target.value === "heredar" ? null : e.target.value === "true" })}>
+                <option value="heredar">{t("posiciones.jornada.heredar")}</option>
+                <option value="true">{t("posiciones.jornada.si")}</option>
+                <option value="false">{t("posiciones.jornada.no")}</option>
+              </select>
+            </label>
+          ))}
+        </div>
+      </section>
 
       {CATALOGO_POSICIONES.map((sec) => {
         const clavesSec = sec.grupos.flatMap((g) => g.filas.flatMap((f) => f.funciones.map((x) => x.clave)));
