@@ -13,6 +13,8 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import CoworkCreateDialog from "./CoworkCreateDialog";
+import CoworkAccesosDialog from "./CoworkAccesosDialog";
+import CoworkSolicitud from "./CoworkSolicitud";
 import CoworkLobby from "./CoworkLobby";
 import CoworkHostDashboard from "./CoworkHostDashboard";
 import CoworkParticipantView from "./CoworkParticipantView";
@@ -156,7 +158,7 @@ export default function CoworkPage() {
     sessionId, veTodasLasSesiones: veTodasLasSesiones || alcanceCargando || alcanceFallo, cargando: cowork.loading || autoJoining,
     sesionNoVisible: cowork.sesionNoVisible, estado: cowork.session?.status ?? null,
     membresiasCargadas: cowork.membresiasCargadas, tieneMembresia: !!cowork.myMembership,
-    conCodigo: !!searchParams.get("code") || !!searchParams.get("role"),
+    conCodigo: !!searchParams.get("code") || !!searchParams.get("role") || !!searchParams.get("room") || searchParams.has("solicitud"),
   });
   useEffect(() => {
     if (noEsSuCowork) setSearchParams({}, { replace: true });
@@ -296,7 +298,7 @@ export default function CoworkPage() {
       setRoomCode("");
       // Sin `room`: el código ya la dejó en su sala (y fija). Un `room` que se
       // quedara en la URL la devolvería ahí si luego el supervisor la mueve.
-      setSearchParams({ session: res.sessionId });
+      setSearchParams(res.pendingApproval ? { session: res.sessionId, solicitud: "1" } : { session: res.sessionId });
     } catch (e: any) {
       toast.error(e.message || t("cowork.common.codeError"));
     } finally {
@@ -340,7 +342,7 @@ export default function CoworkPage() {
 
   // Auto-join from invite URL params
   useEffect(() => {
-    if (!sessionId || cowork.loading || autoJoining || autoJoinFailed) return;
+    if (!sessionId || cowork.loading || autoJoining || autoJoinFailed || searchParams.has("solicitud")) return;
 
     const role = searchParams.get("role");
     const code = searchParams.get("code");
@@ -387,7 +389,8 @@ export default function CoworkPage() {
           // está el código de 6 caracteres (joinByCode).
           const ultimaSala = await cowork.getMyLastRoomId(sessionId);
           const sala = salaParaAutoUnir(roomId, ultimaSala);
-          await cowork.joinSession(sessionId, "participant", undefined, sala, { porEnlace: sala === roomId });
+          const result = await cowork.joinSession(sessionId, "participant", undefined, sala, { porEnlace: sala === roomId });
+          if (result.pendingApproval) { setSearchParams({ session: sessionId, solicitud: "1" }, { replace: true }); return; }
         }
         soltarSalaDelEnlace();
         // Silenciosa: sin ruedita ni desmontar la vista (17/11/2026).
@@ -436,6 +439,7 @@ export default function CoworkPage() {
                     : t("cowork.page.subtitleLink")}
               </p>
             </div>
+            <CoworkAccesosDialog />
             {!permissionLoading && canCreateSessions && (
               <Button
                 onClick={() => setShowCreate(true)}
@@ -761,6 +765,15 @@ export default function CoworkPage() {
     );
   }
 
+  if (searchParams.has("solicitud")) {
+    return <CoworkSolicitud key={sessionId} sessionId={sessionId} onBack={() => setSearchParams({})} onEnter={async roomId => {
+      const result = await cowork.joinSession(sessionId, "participant", undefined, roomId);
+      if (result.pendingApproval) return;
+      await cowork.refetch(true);
+      setSearchParams({ session: sessionId }, { replace: true });
+    }} />;
+  }
+
   if (cowork.loading || autoJoining) {
     return <RuedaVigilada alAtascarse={alAtascarse} />;
   }
@@ -777,8 +790,9 @@ export default function CoworkPage() {
         sessionId={sessionId}
         session={cowork.session}
         onJoin={async (role, hostCode, roomId) => {
-          await cowork.joinSession(sessionId, role, hostCode, roomId);
-          cowork.refetch(true);
+          const result = await cowork.joinSession(sessionId, role, hostCode, roomId);
+          if (result.pendingApproval) setSearchParams({ session: sessionId, solicitud: "1" });
+          else cowork.refetch(true);
         }}
       />
     );
