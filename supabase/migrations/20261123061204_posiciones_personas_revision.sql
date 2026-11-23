@@ -18,6 +18,9 @@ begin
   update public.posiciones_borrador set tenant_id=empresa;
   perform set_config('maven.posiciones_aplicando',coalesce(anterior,''),true);
 end $$;
+-- El backfill dispara las comprobaciones diferidas de las claves existentes.
+-- PostgreSQL debe resolverlas antes del siguiente ALTER de esta misma tabla.
+set constraints all immediate;
 alter table public.posiciones_borrador alter column tenant_id set not null;
 alter table public.posiciones_borrador alter column tenant_id set default public.current_tenant_id();
 create index posiciones_empresa_idx on public.posiciones_borrador(tenant_id);
