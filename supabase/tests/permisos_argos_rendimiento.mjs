@@ -19,7 +19,7 @@ await db.exec(oldArgos.replace('public.argos_casos_bloqueo()', 'public.argos_ant
 await db.exec('revoke all on function argos_casos_bloqueo() from public,anon; grant execute on function argos_casos_bloqueo() to authenticated;');
 const metadataSql="select proname,prosecdef,provolatile,proconfig,proacl from pg_proc where oid in ('mis_funciones_posicion()'::regprocedure,'argos_casos_bloqueo()'::regprocedure) order by proname";
 const metadata=(await db.query(metadataSql)).rows;
-await db.exec(sql('../migrations/20261123180844_rendimiento_argos_y_permisos.sql'));
+await db.exec(sql('../migrations/20261123181156_rendimiento_argos_y_permisos.sql'));
 assert.deepEqual((await db.query(metadataSql)).rows,metadata,'Mismos permisos de ejecución y contexto de seguridad');
 const foreign=id(900),foreignTenant=id(901),foreignPosition=id(902);
 await db.query('insert into tenants values($1)',[foreignTenant]);

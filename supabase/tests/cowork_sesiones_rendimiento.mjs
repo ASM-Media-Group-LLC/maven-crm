@@ -45,7 +45,7 @@ await db.exec(`insert into cowork_room_assignments
  from generate_series(1,6000) i; analyze cowork_memberships; analyze cowork_room_assignments;`);
 const baseline=sql('../migrations/20260903120000_cowork_finalizar_seguro.sql')
  .match(/CREATE OR REPLACE FUNCTION public\.cowork_mis_sesiones_activas\(\)[\s\S]*?\$function\$;/)[0];
-const migration=sql('../migrations/20261123180347_rendimiento_cowork_permisos.sql');
+const migration=sql('../migrations/20261123180749_rendimiento_cowork_permisos.sql');
 const actors=[person,delegate,owner,other,id(9999),''];
 const asUser=async(uid,query)=>{
  await db.query("select set_config('test.uid',$1,false)",[uid]);
