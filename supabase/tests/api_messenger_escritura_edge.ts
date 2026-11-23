@@ -1,4 +1,4 @@
-import { sqlMessengerConPosiciones } from "./fixtures/cadena_messenger_posiciones.ts";
+import { sqlMessengerConPosiciones } from "../functions/_tests/cadena_messenger_posiciones.ts";
 // La escritura del Messenger por API DE PUNTA A PUNTA (PR 4): el public-api de verdad
 // (supabase/functions/public-api/index.ts, su Deno.serve capturado) contra la base de
 // verdad (PGlite con el esquema de PROD de los fixtures + las migraciones reales, la

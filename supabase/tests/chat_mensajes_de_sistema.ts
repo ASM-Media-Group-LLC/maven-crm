@@ -1,4 +1,4 @@
-import { sqlMessengerConPosiciones } from "./fixtures/cadena_messenger_posiciones.ts";
+import { sqlMessengerConPosiciones } from "../functions/_tests/cadena_messenger_posiciones.ts";
 // Los avisos de sistema del Messenger los arma la base (migración
 // 20261001100000_chat_mensajes_de_sistema.sql, PR 1b), probados contra un Postgres
 // de verdad (PGlite) cargado con el esquema de PROD del 28/09 y las migraciones

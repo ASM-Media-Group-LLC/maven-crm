@@ -1,4 +1,4 @@
-import { sqlMessengerConPosiciones } from "./fixtures/cadena_messenger_posiciones.ts";
+import { sqlMessengerConPosiciones } from "../functions/_tests/cadena_messenger_posiciones.ts";
 // La agencia en cada conversación y los huecos de la base del Messenger
 // (migración 20260930230000_chat_agencia_y_huecos.sql), probados contra un
 // Postgres de verdad (PGlite) cargado con el esquema de PROD del 28/09 (vuelto a

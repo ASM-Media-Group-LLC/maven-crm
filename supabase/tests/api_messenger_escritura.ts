@@ -1,4 +1,4 @@
-import { sqlMessengerConPosiciones } from "./fixtures/cadena_messenger_posiciones.ts";
+import { sqlMessengerConPosiciones } from "../functions/_tests/cadena_messenger_posiciones.ts";
 // La base de la escritura del Messenger por API (migración
 // 20261001200000_api_messenger_escritura.sql), probada contra un Postgres de verdad
 // (PGlite) cargado con el esquema de PROD: el fixture del 28/09

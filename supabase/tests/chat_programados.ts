@@ -1,4 +1,4 @@
-import { sqlMessengerConPosiciones } from "./fixtures/cadena_messenger_posiciones.ts";
+import { sqlMessengerConPosiciones } from "../functions/_tests/cadena_messenger_posiciones.ts";
 // Mensajes programados del Messenger (migración 20261008170000_chat_programados),
 // probados contra un Postgres de verdad (PGlite) cargado con el esquema de PROD
 // del 28/09 y las migraciones reales del chat que vinieron después (la misma
