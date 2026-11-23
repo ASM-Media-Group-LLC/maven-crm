@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { Download, Loader2, Sparkles } from "lucide-react";
 import { useLanguage } from "@/hooks/useLanguage";
 import { hayLlamadaActiva } from "@/lib/llamadaActiva";
@@ -26,6 +26,7 @@ export function CartelCentral(props: {
   ocupado: boolean;
   ocupadoTexto: string;
   onActualizar: () => void;
+  alternativas?: ReactNode;
 }) {
   return (
     <div
@@ -58,6 +59,7 @@ export function CartelCentral(props: {
             {props.ocupado ? <Loader2 className="h-4 w-4 animate-spin motion-reduce:animate-none" /> : <Download className="h-4 w-4" />}
             {props.ocupado ? props.ocupadoTexto : props.boton}
           </button>
+          {props.alternativas}
         </div>
       </div>
     </div>
