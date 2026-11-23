@@ -16,7 +16,7 @@ vi.mock("@/hooks/useLanguage", () => ({ useLanguage: () => ({ t: (k: keyof typeo
 vi.mock("@/lib/novedadesApp", () => ({ alCambiarTarjeta: () => () => {} }));
 
 const abrir = async () => { await act(async () => { render(<AvisoActualizacionApp />); }); };
-const pulsar = async (name: string) => { await act(async () => { fireEvent.click(screen.getByRole("button", { name, exact: true })); }); };
+const pulsar = async (name: string) => { await act(async () => { fireEvent.click(screen.getByRole("button", { name })); }); };
 const avanzar = async () => { await act(async () => { vi.advanceTimersByTime(ESPERA_REINICIO_MS); }); };
 
 beforeEach(() => {
