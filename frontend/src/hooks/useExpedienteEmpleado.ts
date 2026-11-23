@@ -75,6 +75,9 @@ export function useExpedienteEmpleado(userId: string | null, anio: number, mes: 
     staleTime: 60_000,
     queryFn: async (): Promise<Expediente> => {
       const db = supabase as unknown as RpcDb;
+      const permiso = await supabase.rpc("argos_puede_abrir_expediente" as never, { _target: userId } as never);
+      if (permiso.error) throw permiso.error;
+      if ((permiso.data as unknown) !== true) throw new Error("No tienes acceso al expediente de esta persona");
       const inicioISO = `${desde}T00:00:00-05:00`;
       const finISO = `${hasta}T23:59:59-05:00`;
 

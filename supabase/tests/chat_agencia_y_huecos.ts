@@ -1,3 +1,4 @@
+import { sqlMessengerConPosiciones } from "../functions/_tests/cadena_messenger_posiciones.ts";
 // La agencia en cada conversación y los huecos de la base del Messenger
 // (migración 20260930230000_chat_agencia_y_huecos.sql), probados contra un
 // Postgres de verdad (PGlite) cargado con el esquema de PROD del 28/09 (vuelto a
@@ -303,7 +304,7 @@ const posteriores = [...Deno.readDirSync(DIR_MIG)].map((e) => e.name)
 const CADENA: { n: string; sql: string; obj: string[] }[] = [];
 const SALTADAS: string[] = [];
 for (const n of posteriores) {
-  const sql = Deno.readTextFileSync(new URL(n, DIR_MIG));
+  const sql = sqlMessengerConPosiciones(n, Deno.readTextFileSync(new URL(n, DIR_MIG)));
   const obj = objetivos(sql);
   if (obj.length && !NO_TOCAN_EL_MESSENGER[n]) CADENA.push({ n, sql, obj });
   else SALTADAS.push(n);

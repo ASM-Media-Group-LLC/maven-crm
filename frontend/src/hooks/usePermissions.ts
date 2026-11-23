@@ -4,6 +4,8 @@ import { useAuth } from "@/hooks/useAuth";
 import { useUserRole } from "@/hooks/useUserRole";
 import { moduloEstaOculto } from "@/lib/modulosOcultos";
 import { esPrimeraCarga, leerArranque } from "@/lib/arranque";
+import { useFuncionesPosicion } from "@/hooks/useFuncionesPosicion";
+import { accesoPosicion, decisionPosicion, alcancePosicion } from "@/lib/posiciones/permisos";
 
 interface Permission {
   module: string;
@@ -25,6 +27,8 @@ export const UNIVERSAL_MODULES = ["Dashboard", "Messenger", "Cowork", "Meet", "C
 export const usePermissions = () => {
   const { role, isAdmin, isLoading: roleLoading, isError: roleError, roleConocido, recargarRol } = useUserRole();
   const { user } = useAuth();
+  const funcionesPosicion = useFuncionesPosicion();
+  const posicionSinVerificar = !!user && funcionesPosicion.data === undefined;
 
   const {
     data: permissionsData, isLoading: permsLoading, isError: permsError, refetch: recargarPermisos,
@@ -106,7 +110,11 @@ export const usePermissions = () => {
   // apagarlo por rol con can_access: false, que siempre gana.
 
   const canAccess = (module: string, submodule?: string): boolean => {
-    // Admin always has full access
+    if (posicionSinVerificar) return false;
+    if (!isAdmin && moduloEstaOculto(module, submodule)) return false;
+    const porPosicion = accesoPosicion(funcionesPosicion.data, module, submodule);
+    if (porPosicion !== null) return porPosicion;
+    // Compatibilidad para funciones/personas que siguen en el sistema anterior.
     if (isAdmin) return true;
 
     // Recorte reversible del menú (lib/modulosOcultos.ts): esconde módulos/
@@ -165,6 +173,9 @@ export const usePermissions = () => {
   // Espeja `can_use_module_function()` en la DB, que es la que realmente decide
   // del lado del servidor.
   const explicitPermission = (module: string, submodule: string): boolean | null => {
+    if (posicionSinVerificar) return false;
+    const porPosicion = decisionPosicion(funcionesPosicion.data, `${module}|${submodule}`);
+    if (porPosicion !== null) return porPosicion;
     if (isAdmin) return true;
     const row = permissions.find(
       (p) => p.module === module && p.submodule === submodule,
@@ -173,6 +184,9 @@ export const usePermissions = () => {
   };
 
   const dataScope = (module: string): "all" | "subordinates" | "self" => {
+    if (posicionSinVerificar) return "self";
+    const porPosicion = alcancePosicion(funcionesPosicion.data, module);
+    if (porPosicion !== null) return porPosicion;
     if (isAdmin) return "all";
 
     const perm = permissions.find(
@@ -184,8 +198,9 @@ export const usePermissions = () => {
   return {
     canAccess,
     explicitPermission,
+    canFunction: (clave: string, fallback = false): boolean => posicionSinVerificar ? false : (decisionPosicion(funcionesPosicion.data, clave) ?? fallback),
     dataScope,
-    isLoading: roleLoading || permsLoading,
+    isLoading: roleLoading || permsLoading || funcionesPosicion.isLoading,
     /**
      * No pudimos averiguar qué puede ver esta persona.
      *
@@ -201,8 +216,8 @@ export const usePermissions = () => {
     // cargados, un refetch fallido (foco de ventana, bache de red) se queda
     // con los anteriores y la pantalla no se desmonta. Antes, un fallo en
     // segundo plano reemplazaba el evaluador por "No pudimos verificar".
-    hayError: (roleError && !roleConocido) || (permsError && permissionsData === undefined),
-    reintentar: () => { void recargarRol(); void recargarPermisos(); },
+    hayError: (roleError && !roleConocido) || (permsError && permissionsData === undefined) || (funcionesPosicion.isError && posicionSinVerificar),
+    reintentar: () => { void recargarRol(); void recargarPermisos(); void funcionesPosicion.refetch(); },
     permissions,
   };
 };

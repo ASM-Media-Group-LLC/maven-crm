@@ -1,3 +1,4 @@
+import { usePermissions } from "@/hooks/usePermissions";
 import { useState, useRef, useCallback, useEffect, useImperativeHandle, forwardRef } from "react";
 import MentionAutocomplete from "./MentionAutocomplete";
 import { Paperclip, Send, X, Loader2, FileText, Mic, Baseline, Plus, Camera, ChevronDown } from "lucide-react";
@@ -93,6 +94,8 @@ const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(({
   participants, chatType, aCiegas, compacto = false, onProgramar,
 }, ref) => {
   const { user } = useAuth();
+  const { canFunction } = usePermissions();
+  const puedeAdjuntar = canFunction("N:msg.archivos", true);
   const { t } = useLanguage();
   const [cursorPosition, setCursorPosition] = useState(0);
   // El texto arranca desde el borrador guardado: si te fuiste a otro chat (o
@@ -179,13 +182,14 @@ const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(({
   // "🎬 GIF", "sticker" y "🎤 Nota de voz (m:ss)" son el CONTENIDO del mensaje que
   // se guarda en chat_messages y ven los demás: es dato, no se traduce.
   const sendGifUrl = (mp4Url: string) => {
+    if (!puedeAdjuntar) { toast.error(t("posiciones.funcionNoPermitida")); return; }
     onSendMessage("🎬 GIF", "file" as ChatMessage["type"], mp4Url, "gif.mp4", replyTo?.id);
     onCancelReply();
   };
   // Sticker: el picker da URL FIRMADA (bucket privado, expira) → la copiamos a chat-files
   // (bucket público de Messenger) para una URL permanente y la mandamos como imagen.
   const sendStickerUrl = async (signedUrl: string) => {
-    if (!user) return;
+    if (!user || !puedeAdjuntar) return;
     try {
       const resp = await fetch(signedUrl);
       if (!resp.ok) throw new Error(t("messenger.input.noSePudoLeerSticker"));
@@ -204,6 +208,7 @@ const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(({
   };
 
   const addFilesInternal = useCallback((files: File[]) => {
+    if (!puedeAdjuntar) { toast.error(t("posiciones.funcionNoPermitida")); return; }
     const totalFiles = pendingFiles.length + files.length;
     if (totalFiles > MAX_FILES) {
       toast.error(t("messenger.input.maximoArchivos", { n: MAX_FILES }));
@@ -217,7 +222,7 @@ const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(({
     }
     const newPending: PendingFile[] = files.map(aPendiente);
     setPendingFiles(prev => [...prev, ...newPending]);
-  }, [pendingFiles.length, t]);
+  }, [pendingFiles.length, t, puedeAdjuntar]);
 
   // Expose addFiles to parent via ref
   useImperativeHandle(ref, () => ({
@@ -246,6 +251,7 @@ const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(({
     // Guard: si ya hay una subida en curso, Enter no debe re-disparar el envío
     // (re-subía y duplicaba los archivos porque pendingFiles sigue poblado hasta el final).
     if (uploading) return;
+    if (pendingFiles.length && !puedeAdjuntar) { toast.error(t("posiciones.funcionNoPermitida")); return; }
     if (cuando && !onProgramar) return;
     const anotados: MensajeAProgramar[] = [];
     const emitir: MessageInputProps["onSendMessage"] = cuando
@@ -379,7 +385,7 @@ const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(({
     clearTimeout(typingTimeout.current);
     onSendTyping(false);
     composerRef.current?.focus();
-  }, [text, replyTo, onSendMessage, onCancelReply, onSendTyping, pendingFiles, user, uploadFileWithProgress, uploading, t, conversationId, onProgramar]);
+  }, [text, replyTo, onSendMessage, onCancelReply, onSendTyping, pendingFiles, user, uploadFileWithProgress, uploading, t, conversationId, onProgramar, puedeAdjuntar]);
 
   // Ojo: NO pasarle el evento. `onClick={enviarOProgramar}` le daría el clic
   // como «cuando» y programaría en vez de mandar.
@@ -450,7 +456,7 @@ const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(({
   };
 
   const handleVoiceNoteSend = useCallback(async (blob: Blob, durationSec: number) => {
-    if (!user) return;
+    if (!user || !puedeAdjuntar) return;
     setUploading(true);
     const mimeToExt: Record<string, string> = {
       "audio/webm": "webm",
@@ -477,7 +483,7 @@ const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(({
     onSendMessage(`🎤 Nota de voz (${mins}:${secs.toString().padStart(2, "0")})`, "file" as ChatMessage["type"], urlData.publicUrl, fileName);
     setIsRecording(false);
     setUploading(false);
-  }, [user, onSendMessage, t]);
+  }, [user, onSendMessage, t, puedeAdjuntar]);
 
   return (
     // Borde inferior en el iPhone instalado: el área segura son 34 pt, pero el
@@ -624,7 +630,7 @@ const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(({
               variant="ghost" size="icon"
               className={cn("h-10 shrink-0 rounded-full text-foreground/90 hover:bg-primary/8", compacto ? "w-9" : "w-10")}
               onClick={() => fileInputRef.current?.click()}
-              disabled={uploading}
+              disabled={uploading || !puedeAdjuntar}
               title={t("messenger.input.adjuntarArchivo")}
               aria-label={t("messenger.input.adjuntarArchivo")}
             >
@@ -738,7 +744,7 @@ const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(({
               <Button
                 variant="ghost" size="icon"
                 className="h-10 w-9 shrink-0 rounded-full text-foreground/90 hover:bg-primary/8"
-                onClick={() => setIsRecording(true)}
+                onClick={() => { if (puedeAdjuntar) setIsRecording(true); }}
                 title={t("messenger.input.grabarNotaDeVoz")}
                 aria-label={t("messenger.input.grabarNotaDeVoz")}
               >
@@ -851,7 +857,7 @@ const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(({
               <Button
                 variant="ghost" size="icon"
                 className="h-9 w-9 shrink-0 rounded-full text-muted-foreground hover:bg-primary/8 hover:text-foreground"
-                onClick={() => setIsRecording(true)}
+                onClick={() => { if (puedeAdjuntar) setIsRecording(true); }}
                 title={t("messenger.input.grabarNotaDeVoz")}
               >
                 <Mic className="h-5 w-5" />

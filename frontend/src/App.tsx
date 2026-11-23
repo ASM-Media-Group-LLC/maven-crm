@@ -558,7 +558,7 @@ const App = () => (
                 {/* Cada número de «Los números de hoy» abre su pantalla (Alvaro, 20/11/2026). */}
                 <Route path="/hoy/:cifra" element={<RutaDeVigilancia><CifraDeHoy /></RutaDeVigilancia>} />
                 <Route path="/hr/argos-comparativo" element={<PermissionRoute module="HR" submodule="Monitor IA" argos><HRLayout><ArgosComparativo /></HRLayout></PermissionRoute>} />
-                <Route path="/hr/argos-ajustes" element={<PermissionRoute module="HR" submodule="Monitor IA" soloDueno><HRLayout><ArgosAjustes /></HRLayout></PermissionRoute>} />
+                <Route path="/hr/argos-ajustes" element={<PermissionRoute module="HR" submodule="Monitor IA" funcion="N:argos.ajustes"><HRLayout><ArgosAjustes /></HRLayout></PermissionRoute>} />
                 <Route path="/hr/organizacion/directorio" element={<PermissionRoute module="HR" submodule="Directorio"><HRLayout><HRDirectoryLookup /></HRLayout></PermissionRoute>} />
                 <Route path="/hr/organizacion/organigrama" element={<PermissionRoute module="HR" submodule="Organigrama"><HRLayout><HROrganigrama /></HRLayout></PermissionRoute>} />
                 <Route path="/hr/deducciones" element={<PermissionRoute module="HR" submodule="Deducciones"><HRLayout><HRDeductions /></HRLayout></PermissionRoute>} />

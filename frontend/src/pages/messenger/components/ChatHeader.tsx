@@ -1,3 +1,4 @@
+import { usePermissions } from "@/hooks/usePermissions";
 import { useState, useRef, useEffect } from "react";
 import {
   Video, Phone, Search, MoreVertical, ArrowLeft, Bell, FileText, Users,
@@ -54,6 +55,8 @@ export default function ChatHeader({
 }: ChatHeaderProps) {
   const { user } = useAuth();
   const { t } = useLanguage();
+  const { canFunction } = usePermissions();
+  const funcionLlamar = canFunction("N:msg.llamar", true);
   const { isOnline, getStatus, getStatusText, getStatusColorPersonal } = useOnlinePresence();
 
   const isGroup = conversation.type === "group";
@@ -283,10 +286,10 @@ export default function ChatHeader({
           {/* Llamada de voz (sin cámara) y videollamada, como en Skype. */}
           {puedeLlamar && (
             <>
-              <Button variant="ghost" size="icon" className="h-9 w-9 sm:h-8 sm:w-8 rounded-full hover:bg-primary/8" onClick={() => onStartVideoCall(conversation, "audio")} title={t("messenger.header.llamadaDeVoz")} aria-label={t("messenger.header.llamadaDeVoz")}>
+              <Button disabled={!funcionLlamar} variant="ghost" size="icon" className="h-9 w-9 sm:h-8 sm:w-8 rounded-full hover:bg-primary/8" onClick={() => onStartVideoCall(conversation, "audio")} title={t("messenger.header.llamadaDeVoz")} aria-label={t("messenger.header.llamadaDeVoz")}>
                 <Phone className="h-4 w-4" />
               </Button>
-              <Button variant="ghost" size="icon" className="h-9 w-9 sm:h-8 sm:w-8 rounded-full hover:bg-primary/8" onClick={() => onStartVideoCall(conversation, "video")} title={t("messenger.header.videollamada")}>
+              <Button disabled={!funcionLlamar} variant="ghost" size="icon" className="h-9 w-9 sm:h-8 sm:w-8 rounded-full hover:bg-primary/8" onClick={() => onStartVideoCall(conversation, "video")} title={t("messenger.header.videollamada")}>
                 <Video className="h-4 w-4" />
               </Button>
             </>

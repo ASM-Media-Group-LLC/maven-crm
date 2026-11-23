@@ -1,3 +1,4 @@
+import { sqlMessengerConPosiciones } from "../functions/_tests/cadena_messenger_posiciones.ts";
 // La escritura del Messenger por API DE PUNTA A PUNTA (PR 4): el public-api de verdad
 // (supabase/functions/public-api/index.ts, su Deno.serve capturado) contra la base de
 // verdad (PGlite con el esquema de PROD de los fixtures + las migraciones reales, la
@@ -245,7 +246,7 @@ const NO_CARGAN_AQUI: Record<string, string> = {
 const DIR = new URL("../migrations/", import.meta.url);
 const CADENA = [...Deno.readDirSync(DIR)].map((e) => e.name)
   .filter((x) => /^\d{14}_\w+\.sql$/.test(x) && x.slice(0, 14) > FIXTURE_HASTA && !NO_CARGAN_AQUI[x]).sort()
-  .map((n) => ({ n, sql: Deno.readTextFileSync(new URL(n, DIR)) }))
+  .map((n) => ({ n, sql: sqlMessengerConPosiciones(n, Deno.readTextFileSync(new URL(n, DIR))) }))
   .filter((m) => m.n === NOMBRE_B || tocaAlgo(m.sql));
 
 // ─── La gente, las conversaciones y las keys ─────────────────────────────────

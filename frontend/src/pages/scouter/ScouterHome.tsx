@@ -388,7 +388,7 @@ const ScouterHome = ({ favoritesOnly = false, companyFilter: companyFilterProp, 
   // Ver el pool completo = "Permisos de datos" de Scouter Assist, no el nombre del
   // rol (08/09): con nombres literales, Operations Sales y Closer + no entraban
   // aunque tuvieran "Todos los datos".
-  const isManagerLikeRole = isAdmin || dataScope("Scouter Assist") !== "self";
+  const isManagerLikeRole = dataScope("Scouter Assist") !== "self";
   const onlyAssignedToMe = isSpammer && !isManagerLikeRole;
 
   // Default del status filter:

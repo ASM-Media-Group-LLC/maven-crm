@@ -13,6 +13,7 @@ import { render, screen, fireEvent, within, cleanup, waitFor } from "@testing-li
 import { MemoryRouter } from "react-router-dom";
 import type { ReactNode } from "react";
 
+vi.mock("@/hooks/usePermissions", () => ({ usePermissions: () => ({ canFunction: () => true }) }));
 const idioma = vi.hoisted(() => ({ actual: "es" as "es" | "en" }));
 vi.mock("@/hooks/useLanguage", async (original) => {
   const real = (await original()) as Record<string, unknown>;

@@ -1,3 +1,4 @@
+import { revisarPosicion } from "./permisos-posicion.ts";
 import { corsFor } from "../_shared/cors.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
@@ -262,6 +263,8 @@ serve(async (req) => {
     const miAgencia = await agenciaDePersona(admin, userId);
     const veredicto = await revisarPedido(admin, miAgencia, String(action ?? ""), body ?? {});
     if (!veredicto.ok) return err(req, veredicto.error, veredicto.status);
+    const permisoPosicion = await revisarPosicion(supabase, userId, String(action ?? ""), body ?? {});
+    if (!permisoPosicion.ok) return err(req, permisoPosicion.error, permisoPosicion.status);
 
     // Cowork usa el servidor general para que todos compartan la misma sala.
     const lkUrl = urlDeLiveKit(null);

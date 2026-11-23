@@ -9,6 +9,7 @@
 // Que el frontend esconda botones es UX, no seguridad: cualquiera puede llamar
 // la edge function a mano.
 const MSG: Record<string, string> = {
+  use_position_constructor: "Administra sus posiciones y restricciones en Ajustes → Posiciones → Personas",
   no_caller: "No se pudo identificar quién hace la petición",
   no_user_management_permission: "No tienes permiso para gestionar usuarios",
   role_at_or_above_caller_level: "No puedes asignar un rol de tu mismo nivel o superior",
@@ -19,6 +20,11 @@ const MSG: Record<string, string> = {
   last_admin: "No puedes dejar el sistema sin ningún admin",
   no_target: "Falta el usuario objetivo",
   unknown_action: "Acción no permitida",
+  position_function_denied: "Tu posición no permite esta función",
+  outside_position_scope: "Esta cuenta está fuera del alcance de tu posición",
+  protected_owner: "Solo el dueño puede administrar la cuenta del dueño",
+  protected_user: "Solo el dueño puede administrar esta cuenta protegida",
+  other_agency: "No puedes administrar una cuenta de otra empresa",
 };
 
 // PromiseLike y no Promise: el `rpc()` de supabase-js devuelve un

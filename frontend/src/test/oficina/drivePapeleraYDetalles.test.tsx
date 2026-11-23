@@ -21,6 +21,7 @@ vi.setConfig({ testTimeout: 30_000 });
 
 vi.mock("@/hooks/useLanguage", (original) =>
   import("@/test/messenger/espanolEnTests").then((m) => m.idiomaEnEspanol(original)));
+vi.mock("@/hooks/usePermissions", () => ({ usePermissions: () => ({ canFunction: () => true }) }));
 vi.mock("@/hooks/useAuth", () => ({ useAuth: () => ({ user: { id: "yo" } }) }));
 vi.mock("@/hooks/useUserRole", () => ({ useUserRole: () => ({ isAdmin: false }) }));
 vi.mock("@/hooks/useDirectorioCorreo", () => ({

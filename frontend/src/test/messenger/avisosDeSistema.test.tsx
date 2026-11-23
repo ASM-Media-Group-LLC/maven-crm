@@ -62,6 +62,7 @@ const base = vi.hoisted(() => {
   return { supabase, filas, escrituras };
 });
 
+vi.mock("@/hooks/usePermissions", () => ({ usePermissions: () => ({ canFunction: () => true }) }));
 vi.mock("@/integrations/supabase/client", () => ({ supabase: base.supabase }));
 vi.mock("@/hooks/useAuth", () => ({ useAuth: () => ({ user: { id: "yo" } }) }));
 // La cabecera pregunta a quién no puede llamar (18/11/2026); aquí, a nadie.

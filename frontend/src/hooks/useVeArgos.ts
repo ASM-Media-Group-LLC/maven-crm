@@ -17,7 +17,8 @@ export function useVeArgos(): { veArgos: boolean | null; cargando: boolean; erro
   const q = useQuery({
     enabled: !!user?.id,
     queryKey: ["ve-argos", user?.id ?? null],
-    staleTime: 5 * 60_000,
+    staleTime: 30_000,
+    refetchInterval: 30_000,
     queryFn: async (): Promise<boolean> => {
       const { data, error } = await sinTipar.rpc("ve_argos");
       if (error) throw new Error(error.message);

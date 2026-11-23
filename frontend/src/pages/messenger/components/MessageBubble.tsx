@@ -42,6 +42,7 @@ interface MessageBubbleProps {
   onCopy: () => void;
   onEdit: (content: string) => void;
   onDelete: () => void;
+  puedeBorrar?: boolean;
   onRetry?: () => void;
   replyMessage?: ChatMessage;
   /** Clic en la cita: lleva al mensaje original en la conversación. */
@@ -63,7 +64,7 @@ interface MessageBubbleProps {
 }
 
 const MessageBubble = forwardRef<HTMLDivElement, MessageBubbleProps>(({
-  message, isMe, chatType, profiles, highlight, onReply, onOpenProfile, deletedArchive, onCopy, onEdit, onDelete, onRetry,
+  puedeBorrar = false, message, isMe, chatType, profiles, highlight, onReply, onOpenProfile, deletedArchive, onCopy, onEdit, onDelete, onRetry,
   replyMessage, onIrALaCita, showAvatar, showSender, isLastInGroup,
   reactions, onToggleReaction, readByUsers, deliveredByUsers, totalParticipants,
   threadCount = 0, unreadThreadCount = 0, onOpenThread,
@@ -564,7 +565,7 @@ const MessageBubble = forwardRef<HTMLDivElement, MessageBubbleProps>(({
                         <Edit2 className="h-3.5 w-3.5 mr-2" /> {t("common.edit")}
                       </DropdownMenuItem>
                     )}
-                    <DropdownMenuItem className="text-destructive" onClick={onDelete}>
+                    <DropdownMenuItem disabled={!puedeBorrar} className="text-destructive" onClick={onDelete}>
                       <Trash2 className="h-3.5 w-3.5 mr-2" /> {t("common.delete")}
                     </DropdownMenuItem>
                   </>
@@ -683,6 +684,7 @@ const MemoizedMessageBubble = memo(MessageBubble, (prev, next) => {
   return (
     prev.message === next.message &&
     prev.isMe === next.isMe &&
+    prev.puedeBorrar === next.puedeBorrar &&
     prev.highlight === next.highlight &&
     prev.showAvatar === next.showAvatar &&
     prev.showSender === next.showSender &&

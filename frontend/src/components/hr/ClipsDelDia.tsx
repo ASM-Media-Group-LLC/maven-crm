@@ -1,3 +1,4 @@
+import { usePermissions } from "@/hooks/usePermissions";
 import { formatUI } from "@/lib/formatoHora";
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
@@ -44,11 +45,14 @@ interface Params { userId: string; fecha: string }
 
 export function ClipsDelDia({ userId, fecha }: Params) {
   const { t } = useLanguage();
+  const { canFunction } = usePermissions();
+  const permitido = canFunction("N:argos.video", true);
   const [verClip, setVerClip] = useState<{ url: string; nombre: string } | null>(null);
   const [cargandoId, setCargandoId] = useState<string | null>(null);
 
   const q = useQuery<Clip[]>({
     queryKey: ["argos-clips-dia", userId, fecha],
+    enabled: permitido,
     staleTime: 30_000,
     queryFn: async () => {
       const inicio = `${fecha}T00:00:00-05:00`;
@@ -69,6 +73,7 @@ export function ClipsDelDia({ userId, fecha }: Params) {
   const clips = useMemo(() => q.data ?? [], [q.data]);
 
   const abrir = async (clip: Clip) => {
+    if (!permitido) return;
     setCargandoId(clip.id);
     try {
       const { data, error } = await supabase.storage.from("argos-clips").createSignedUrl(clip.path, 60 * 10);
@@ -81,6 +86,7 @@ export function ClipsDelDia({ userId, fecha }: Params) {
 
   // Si NO hay clips, no mostramos el bloque (silencioso: no ensuciar el
   // expediente con "no hay nada hoy").
+  if (!permitido) return null;
   if (q.isLoading) {
     return (
       <section className="vidrio sube mt-5 p-4 lg:p-5">

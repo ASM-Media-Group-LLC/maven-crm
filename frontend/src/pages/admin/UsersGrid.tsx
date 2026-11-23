@@ -13,6 +13,7 @@ import { useFormato } from "@/hooks/useFormato";
 import { useAuth } from "@/hooks/useAuth";
 import { useLanguage } from "@/hooks/useLanguage";
 import { DriveFullToggle } from "./DriveFullToggle";
+import { usePermisosUsuarios } from "./usePermisosUsuarios";
 
 const roleConfig: Record<string, { icon: React.ReactNode; variant: "default" | "secondary" | "destructive" | "outline" }> = {
   admin: { icon: <Shield className="h-3 w-3" />, variant: "destructive" },
@@ -34,6 +35,7 @@ interface UsersGridProps {
 const UsersGrid = ({ users, onEditRole, onEdit, onResetPassword, onMigrarCorreo, onDelete, onRemoveRole }: UsersGridProps) => {
   const f = useFormato();
   const { t } = useLanguage();
+  const permisos = usePermisosUsuarios();
   const navigate = useNavigate();
   const { toast } = useToast();
   const { user: authUser } = useAuth();
@@ -56,13 +58,13 @@ const UsersGrid = ({ users, onEditRole, onEdit, onResetPassword, onMigrarCorreo,
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
-                    <DropdownMenuItem onClick={() => onEdit(user)}>
+                    <DropdownMenuItem disabled={!permisos.editar || (!user.manageable && user.id !== authUser?.id)} onClick={() => onEdit(user)}>
                       <Pencil className="h-4 w-4 mr-2" /> {t("common.edit")}
                     </DropdownMenuItem>
                     {/* Cambiar correo / crear casilla: TAMBIÉN sobre uno mismo
                         (`manageable` es false en tu propia fila). Ver UsersTable. */}
                     {(user.manageable || user.id === authUser?.id) && (
-                      <DropdownMenuItem onClick={() => onMigrarCorreo(user)}>
+                      <DropdownMenuItem disabled={!permisos.editar} onClick={() => onMigrarCorreo(user)}>
                         <AtSign className="h-4 w-4 mr-2" /> {t("admin.users.changeEmail")}
                       </DropdownMenuItem>
                     )}
@@ -70,13 +72,13 @@ const UsersGrid = ({ users, onEditRole, onEdit, onResetPassword, onMigrarCorreo,
                         candado real vive en las edge functions. */}
                     {user.manageable && (
                       <>
-                        <DropdownMenuItem onClick={() => onEditRole(user)}>
+                        <DropdownMenuItem disabled={!permisos.asignar} onClick={() => onEditRole(user)}>
                           <UserCog className="h-4 w-4 mr-2" /> {t("admin.users.assignRole")}
                         </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => onResetPassword(user)}>
+                        <DropdownMenuItem disabled={!permisos.reset} onClick={() => onResetPassword(user)}>
                           <KeyRound className="h-4 w-4 mr-2" /> {t("admin.users.resetPassword")}
                         </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => onDelete(user)} className="text-destructive">
+                        <DropdownMenuItem disabled={!permisos.desactivar} onClick={() => onDelete(user)} className="text-destructive">
                           <Trash2 className="h-4 w-4 mr-2" /> {t("common.delete")}
                         </DropdownMenuItem>
                       </>
@@ -115,6 +117,7 @@ const UsersGrid = ({ users, onEditRole, onEdit, onResetPassword, onMigrarCorreo,
                     {config.icon}
                     {user.role}
                     <button
+                      disabled={!permisos.asignar || !user.manageable}
                       onClick={(e) => { e.stopPropagation(); onRemoveRole(user); }}
                       title={t("admin.users.removeRoleOf", { role: user.role, name: user.full_name ?? t("admin.thisPerson") })}
                       aria-label={t("admin.users.removeRoleOf", { role: user.role, name: user.full_name ?? t("admin.thisPerson") })}
