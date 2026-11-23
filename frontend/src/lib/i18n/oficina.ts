@@ -771,6 +771,9 @@ export const oficina = {
   "oficina.doc.version": { es: "Versión {n}", en: "Version {n}" },
   "oficina.doc.safe": { es: "El documento está a salvo: lo último guardado sigue en su lugar.", en: "The document is safe: the last saved version is still there." },
   "oficina.doc.opening": { es: "Abriendo el documento…", en: "Opening the document…" },
+  "oficina.doc.cargaLenta": { es: "El documento está tardando más de lo esperado. Puedes reintentar la apertura sin cerrar Maven.", en: "The document is taking longer than expected. You can retry opening it without closing Maven." },
+  "oficina.doc.cargaFallida": { es: "No se pudo completar la conexión con el editor. Intenta abrir el documento de nuevo.", en: "The connection to the editor could not be completed. Try opening the document again." },
+  "oficina.doc.conexionInterrumpida": { es: "Se interrumpió la conexión con el editor. Mantén esta ventana abierta hasta confirmar que tus cambios se guardaron.", en: "The connection to the editor was interrupted. Keep this window open until you confirm your changes were saved." },
   // Costos y conexiones, solo el dueño (Alvaro, 11/11/2026).
   "oficina.costos.titulo": { es: "Costos y conexiones", en: "Costs and connections" },
   "oficina.costos.intro": { es: "Cuánto cuesta cada parte de Maven, pieza por pieza, con el uso real de cada día, y si todo está conectado. Solo lo ves tú.", en: "What each part of Maven costs, item by item, with each day's real usage, and whether everything is connected. Only you can see this." },

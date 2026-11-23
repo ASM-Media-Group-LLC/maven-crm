@@ -59,7 +59,8 @@ function DocumentoAbierto({ id, solo = false }: { id: string | undefined; solo?:
     // En su ventana propia (solo) el editor va SIEMPRE claro, como Google Sheets.
     if (id) abrir.mutate({ id, tema: solo ? "light" : (resolvedTheme === "dark" ? "dark" : "light") });
   });
-  const { estado, error } = useEditorDeOffice(CONTENEDOR, abrir.data, historial);
+  // El contenedor no existe mientras la ficha está cargando.
+  const { estado, error, puedeReintentar } = useEditorDeOffice(CONTENEDOR, doc.data ? abrir.data : undefined, historial);
 
   // Pedir la configuración apenas se sabe qué documento es.
   useEffect(() => {
@@ -198,11 +199,20 @@ function DocumentoAbierto({ id, solo = false }: { id: string | undefined; solo?:
         })()}
 
         {fallo && (
-          <div className="flex items-start gap-2 rounded-panel border border-warning/40 bg-warning/10 px-3 py-2 text-xs">
+          <div role="alert" className="flex flex-wrap items-start gap-2 rounded-panel border border-warning/40 bg-warning/10 px-3 py-2 text-xs">
             <WifiOff className="mt-0.5 h-4 w-4 shrink-0 text-warning" />
-            <p className="text-muted-foreground">
-              {fallo} · {t("oficina.doc.safe")}
+            <p className="min-w-0 flex-1 text-muted-foreground">
+              {fallo}
             </p>
+            {(puedeReintentar || abrir.isError) && (
+              <Button variant="outline" size="sm" className="shrink-0 rounded-full"
+                disabled={abrir.isPending}
+                onClick={() => {
+                  if (id) abrir.mutate({ id, tema: solo ? "light" : (resolvedTheme === "dark" ? "dark" : "light") });
+                }}>
+                {abrir.isPending ? t("oficina.doc.opening") : t("common.retry")}
+              </Button>
+            )}
           </div>
         )}
 
