@@ -13,6 +13,7 @@ await db.exec(sql('../migrations/20261123192546_cowork_solicitudes_acceso.sql'))
 await db.exec(`alter table roles_config add column level int default 0;
 create function actor_level(uid uuid) returns int language sql stable security definer as $$select coalesce(max(rc.level),0) from user_roles ur join roles_config rc on rc.name=ur.role and rc.tenant_id=ur.tenant_id and rc.is_active where ur.user_id=uid$$;`);
 await db.exec(sql('../migrations/20261123192939_cowork_accesos_personas_nuevas.sql'));
+await db.exec(sql('../migrations/20261123193815_cowork_reingreso_con_aprobacion.sql'));
 const session=id(800), room=id(801), room2=id(802),foreignTenant=id(900),foreign=id(901),foreignSession=id(902),foreignRoom=id(903);
 await db.query("insert into cowork_sessions values($1,$2,'Entrenamiento','active')",[session,tenant]);
 for(const rid of [room,room2]) await db.query("insert into cowork_rooms values($1,$2,'Sala',0)",[rid,session]);
@@ -95,4 +96,10 @@ eq(await value('select cowork_puede_gestionar_acceso($1,$2) v',[session,person])
 await db.query("update roles_config set level=20 where name='employee'");
 await db.query("update profiles set equipo='Diseño' where id=$1",[person]);
 eq(await value('select cowork_puede_gestionar_acceso($1,$2) v',[session,person]),false,'Nuevo de otro equipo tampoco');
+await who(person);
+await db.query('delete from cowork_memberships where user_id=$1',[person]);
+eq((await value('select cowork_solicitar_acceso($1,$2) v',[session,room])).estado,'pendiente','Salir y volver requiere una aprobación vigente');
+eq(await value('select count(*)::int v from cowork_memberships where user_id=$1',[person]),0,'Una aprobación antigua no reabre la membresía');
+await who(owner);await resolve(person);
+await who(person);eq((await value('select cowork_mi_solicitud($1) v',[session])).estado,'aprobada','El responsable puede aprobar el reingreso');
 await db.close();console.log(`${n} comprobaciones: solicitudes, aprobaciones, membresía, sala fija, auditoría y aislamiento por empresa y equipo.`);
