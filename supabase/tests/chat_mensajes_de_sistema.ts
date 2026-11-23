@@ -1,3 +1,4 @@
+import { sqlMessengerConPosiciones } from "./fixtures/cadena_messenger_posiciones.ts";
 // Los avisos de sistema del Messenger los arma la base (migración
 // 20261001100000_chat_mensajes_de_sistema.sql, PR 1b), probados contra un Postgres
 // de verdad (PGlite) cargado con el esquema de PROD del 28/09 y las migraciones
@@ -272,7 +273,7 @@ const NO_CARGAN_AQUI: Record<string, string> = {
 const DIR_MIG = new URL("../migrations/", import.meta.url);
 const CADENA: { n: string; sql: string }[] = [...Deno.readDirSync(DIR_MIG)].map((e) => e.name)
   .filter((n) => /^\d{14}_\w+\.sql$/.test(n) && n.slice(0, 14) > FIXTURE_HASTA && !NO_CARGAN_AQUI[n]).sort()
-  .map((n) => ({ n, sql: n === NOMBRE_1B ? MIG_1B : Deno.readTextFileSync(new URL(n, DIR_MIG)) }))
+  .map((n) => ({ n, sql: sqlMessengerConPosiciones(n, n === NOMBRE_1B ? MIG_1B : Deno.readTextFileSync(new URL(n, DIR_MIG))) }))
   .filter((m) => objetivos(m.sql).length > 0);
 const iMia = CADENA.findIndex((m) => m.n === NOMBRE_1B);
 const ANTES = CADENA.slice(0, Math.max(iMia, 0));

@@ -44,5 +44,4 @@ BEGIN
   DELETE FROM notifications WHERE reference_id = _conversation_id AND reference_type = 'conversation';
   DELETE FROM chat_conversations WHERE id = _conversation_id;
 END;
-$function$
-
+$function$;
