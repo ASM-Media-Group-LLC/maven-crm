@@ -150,6 +150,12 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
       setCodigoAbierto(false);
       setNecesitaCodigo(false);
       if (res?.roomName) toast.success(t("cowork.participant.movedByCode", { room: res.roomName }));
+      if (res.sessionId !== cowork.session?.id) {
+        // El código ya se canjeó en el servidor. Refrescar la sesión anterior
+        // dejaba al participante viendo su Cowork de origen.
+        navigate(`/cowork?${new URLSearchParams({ session: res.sessionId })}`);
+        return;
+      }
       cowork.refetch(true);
     } catch (e: unknown) {
       toast.error((e as Error)?.message || t("cowork.common.codeError"));
