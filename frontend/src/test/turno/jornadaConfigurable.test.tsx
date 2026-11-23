@@ -21,7 +21,7 @@ describe("Jornada configurable para administradores y consultores", () => {
     render(<MemoryRouter><TurnoEnMenu /></MemoryRouter>);
     fireEvent.click(screen.getByRole("button", { name: "cowork.turno.marcarEntrada" }));
     expect(screen.getByText("cowork.jornada.aviso")).toBeInTheDocument();
-    fireEvent.click(screen.getAllByRole("button", { name: "cowork.turno.marcarEntrada" }).at(-1)!);
+    fireEvent.click(screen.getAllByRole("button", { name: "cowork.turno.marcarEntrada" }).slice(-1)[0]);
     expect(acciones.entrar.mutate).toHaveBeenCalledWith({ aceptarTerminos: false }, expect.any(Object));
   });
   it("quien está sujeto al aviso debe verlo y aceptarlo explícitamente", () => {
