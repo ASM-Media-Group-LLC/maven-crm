@@ -1,5 +1,5 @@
 import type * as React from "react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft, Check, ChevronDown, ChevronRight, Info, Minus, MoreHorizontal, Plus, Search, ShieldCheck, Users } from "lucide-react";
 import { toast } from "sonner";
@@ -13,7 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
@@ -24,19 +24,18 @@ import { useEsDueno } from "@/hooks/useEsDueno";
 import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
 import { CATALOGO_POSICIONES, type AlcanceDatos, type FilaCatalogo } from "@/lib/posiciones/catalogo";
+import { cambiosDePosicion } from "@/lib/posiciones/cambios";
 import { useModalidades } from "@/hooks/usePausas";
 
-// AJUSTES → POSICIONES (Alvaro, 18/11/2026): la estructura de Blu/Infloww
-// (Settings → Role Settings) con el diseño de Maven. Lista de posiciones →
-// «Ver permisos» → 2 interruptores + tablas Menús | Funciones | Datos que se
-// guardan solas. Pestaña «Personas»: quién va en qué posición y los checks
-// por persona. Es un BORRADOR (tablas *_borrador): nada de aquí cambia el
-// acceso real de nadie hasta que Alvaro dé el «dale». Solo el dueño la ve.
+// Posiciones activas. El editor mantiene un borrador local y muestra el antes y
+// después antes de aplicar una revisión atómica, con control de concurrencia.
+// Las asignaciones de Personas conservan su flujo independiente.
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const sinTipar = supabase as unknown as { from: (t: string) => any };
 
-interface Posicion {
+export interface Posicion {
+  updated_at: string;
   id: string; nombre: string; descripcion: string | null; activa: boolean;
   acceso_total: boolean; todas_creadoras: boolean;
   checks: Record<string, boolean>; alcances: Record<string, AlcanceDatos>; orden: number;
@@ -434,29 +433,56 @@ function DialogoPosicion({ estado, posiciones, onCerrar }: {
 
 // ─── Permisos de una posición (Set permissions) ─────────────────────────────
 
-function PermisosDe({ pos, personas, asignaciones, onVolver }: { pos: Posicion; personas: Persona[]; asignaciones: Asignacion[]; onVolver: () => void }) {
+export function PermisosDe({ pos: guardada, personas, asignaciones, onVolver }: { pos: Posicion; personas: Persona[]; asignaciones: Asignacion[]; onVolver: () => void }) {
   const { t } = useLanguage();
   const qc = useQueryClient();
+  const modalidades = useModalidades();
   // Como Blu: los grupos arrancan cerrados y se abren con la flecha.
   const [abiertos, setAbiertos] = useState<Set<string>>(new Set());
-  const gente = asignaciones.filter((a) => a.posicion_id === pos.id).map((a) => personas.find((p) => p.id === a.user_id)?.full_name).filter(Boolean) as string[];
+  const gente = asignaciones.filter((a) => a.posicion_id === guardada.id).map((a) => personas.find((p) => p.id === a.user_id)?.full_name).filter(Boolean) as string[];
 
-  // Autoguardado como Blu: cada check escribe al instante (optimista).
-  const guardar = useMutation({
-    mutationFn: async (cambio: Partial<Posicion>) => {
-      const { error } = await sinTipar.from("posiciones_borrador").update({ ...cambio, updated_at: new Date().toISOString() }).eq("id", pos.id);
-      if (error) throw error;
+  // El borrador vive en esta pantalla. Nada se escribe hasta confirmar Aplicar.
+  const [base, setBase] = useState(guardada);
+  const [pos, setPos] = useState(guardada);
+  const [revisando, setRevisando] = useState(false);
+  const [saliendo, setSaliendo] = useState(false);
+  const cambios = cambiosDePosicion(base, pos);
+  const pendiente = cambios.length > 0;
+  const conflicto = guardada.updated_at !== base.updated_at;
+  useEffect(() => {
+    if (!pendiente) { setBase(guardada); setPos(guardada); }
+  }, [guardada, pendiente]);
+  useEffect(() => {
+    if (!pendiente) return;
+    const avisar = (event: BeforeUnloadEvent) => { event.preventDefault(); event.returnValue = ""; };
+    window.addEventListener("beforeunload", avisar);
+    return () => window.removeEventListener("beforeunload", avisar);
+  }, [pendiente]);
+  const guardar = { mutate: (cambio: Partial<Posicion>) => setPos((p) => ({ ...p, ...cambio })) };
+  const aplicar = useMutation({
+    mutationFn: async () => {
+      const { data, error } = await (supabase as unknown as { rpc: (name: string, args: unknown) => Promise<{ data: Posicion; error: { message: string } | null }> }).rpc("posicion_aplicar_revision", {
+        _id: base.id, _revision: base.updated_at,
+        _cambios: { checks: pos.checks, alcances: pos.alcances, acceso_total: pos.acceso_total, todas_creadoras: pos.todas_creadoras, modalidad_id: pos.modalidad_id ?? null },
+      });
+      if (error) throw new Error(error.message);
+      if (!data?.updated_at) throw new Error("No se pudo comprobar la posición guardada");
+      return data;
     },
-    onMutate: async (cambio) => {
-      await qc.cancelQueries({ queryKey: KEY });
-      const antes = qc.getQueryData(KEY);
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      qc.setQueryData(KEY, (d: any) => d && { ...d, posiciones: d.posiciones.map((p: Posicion) => (p.id === pos.id ? { ...p, ...cambio } : p)) });
-      return { antes };
+    onSuccess: (actualizada) => {
+      setBase(actualizada); setPos(actualizada); setRevisando(false);
+      qc.setQueryData(KEY, (d: NonNullable<ReturnType<typeof useDatos>["data"]> | undefined) => d && ({ ...d, posiciones: d.posiciones.map((p) => p.id === actualizada.id ? actualizada : p) }));
+      void qc.invalidateQueries({ queryKey: KEY });
+      void qc.invalidateQueries({ queryKey: ["user-permissions"] });
+      toast.success(t("posiciones.revision.aplicado"));
     },
-    onError: (_e, _c, ctx) => { qc.setQueryData(KEY, ctx?.antes); toast.error(t("posiciones.errorGuardar")); },
-    onSettled: () => qc.invalidateQueries({ queryKey: KEY }),
+    onError: (error: Error) => toast.error(error.message),
   });
+  const volver = () => pendiente ? setSaliendo(true) : onVolver();
+  const texto = (value: string | boolean | null) => typeof value === "boolean"
+    ? t(value ? "posiciones.revision.permitido" : "posiciones.revision.denegado")
+    : value && ["all", "subordinates", "self"].includes(value) ? t(`posiciones.datos.${value}` as Parameters<typeof t>[0])
+    : modalidades.data?.modalidades.find((m) => m.id === value)?.nombre ?? value ?? t("posiciones.pausaSinDefinir");
 
   const marcar = (claves: string[], v: boolean) => {
     const checks = { ...pos.checks };
@@ -470,18 +496,23 @@ function PermisosDe({ pos, personas, asignaciones, onVolver }: { pos: Posicion; 
   };
   const alternar = (id: string) => setAbiertos((s) => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n; });
   const bloqueado = pos.acceso_total;
-  const modalidades = useModalidades();
 
   return (
     <>
       <PageHeader
         title={t("posiciones.permisosDe", { nombre: pos.nombre })}
         subtitle={<span className="flex flex-wrap items-center gap-1"><Users className="h-4 w-4" />{gente.join(" · ") || "—"}</span>}
-        actions={<Button variant="outline" onClick={onVolver}><ArrowLeft className="mr-1.5 h-4 w-4" />{t("posiciones.volver")}</Button>}
+        actions={<Button variant="outline" onClick={volver}><ArrowLeft className="mr-1.5 h-4 w-4" />{t("posiciones.volver")}</Button>}
       />
-      <AvisoBorrador />
+      <div className="sticky top-0 z-10 flex flex-wrap items-center justify-between gap-3 rounded-panel border border-border bg-card p-4">
+        <span className="text-sm" role="status">{t(conflicto ? "posiciones.revision.conflicto" : pendiente ? "posiciones.revision.pendientes" : "posiciones.revision.sinCambios", { n: cambios.length })}</span>
+        <div className="flex gap-2">
+          <Button variant="outline" disabled={aplicar.isPending || !pendiente} onClick={() => { setBase(guardada); setPos(guardada); }}>{t("posiciones.revision.descartar")}</Button>
+          <Button disabled={!pendiente || conflicto || aplicar.isPending} onClick={() => setRevisando(true)}>{t("posiciones.revision.revisar")}</Button>
+        </div>
+      </div>
       <div className="flex items-center gap-2 rounded-control border border-border bg-muted/30 px-4 py-2.5 text-sm text-muted-foreground">
-        <Info className="h-4 w-4 shrink-0" />{t("posiciones.autoguardado")}
+        <Info className="h-4 w-4 shrink-0" />{t("posiciones.revision.borrador")}
       </div>
 
       {([["acceso_total", "posiciones.accesoTotal", "posiciones.accesoTotalDesc"], ["todas_creadoras", "posiciones.todasCreadoras", "posiciones.todasCreadorasDesc"]] as const).map(([campo, tit, desc]) => (
@@ -575,6 +606,31 @@ function PermisosDe({ pos, personas, asignaciones, onVolver }: { pos: Posicion; 
           </section>
         );
       })}
+      <Dialog open={revisando} onOpenChange={(open) => !aplicar.isPending && setRevisando(open)}>
+        <DialogContent className="max-h-[85vh] max-w-2xl overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>{t("posiciones.revision.titulo", { nombre: pos.nombre })}</DialogTitle>
+            <DialogDescription>{t("posiciones.revision.personas", { n: gente.length })}</DialogDescription>
+          </DialogHeader>
+          <ul className="divide-y divide-border">
+            {cambios.map((c) => <li key={c.clave} className="py-3 text-sm">
+              <span className="block font-medium">{t(c.etiqueta)}</span>
+              <span className="text-muted-foreground">{texto(c.antes)} → {texto(c.despues)}</span>
+            </li>)}
+          </ul>
+          {conflicto && <p role="alert" className="text-sm text-destructive">{t("posiciones.revision.conflicto")}</p>}
+          <DialogFooter>
+            <Button variant="outline" disabled={aplicar.isPending} onClick={() => setRevisando(false)}>{t("posiciones.revision.seguir")}</Button>
+            <Button disabled={aplicar.isPending || conflicto || !pendiente} onClick={() => aplicar.mutate()}>{t(aplicar.isPending ? "posiciones.revision.aplicando" : "posiciones.revision.aplicar")}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      <AlertDialog open={saliendo} onOpenChange={setSaliendo}>
+        <AlertDialogContent>
+          <AlertDialogHeader><AlertDialogTitle>{t("posiciones.revision.salir")}</AlertDialogTitle><AlertDialogDescription>{t("posiciones.revision.borrador")}</AlertDialogDescription></AlertDialogHeader>
+          <AlertDialogFooter><AlertDialogCancel>{t("posiciones.revision.seguir")}</AlertDialogCancel><AlertDialogAction onClick={onVolver}>{t("posiciones.revision.descartar")}</AlertDialogAction></AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }
