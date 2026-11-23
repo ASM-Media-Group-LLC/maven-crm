@@ -104,9 +104,12 @@ Deno.test("joinSession prefiere la sala fija y solo el enlace (porEnlace) mueve"
   assert(!b.includes("order(\"assigned_at\""));
 });
 
-Deno.test("joinByCode y asignarSala guardan la sala fija", () => {
+Deno.test("el código conserva la sala fija y la asignación usa aprobación atómica autenticada", () => {
   assert(bloque("joinByCode").includes("guardarSalaFija(admin"));
   const a = bloque("asignarSala");
-  assert(a.includes("soloFija: true"));
-  assert(a.includes("guardarSalaFija(admin, { sessionId, userId: target, roomId, por: userId })"));
+  assert(a.includes('await supabase.rpc("cowork_resolver_acceso"'));
+  assert(a.includes('_session: sessionId, _user: target, _room: roomId, _aprobar: true'));
+  assert(!a.includes('admin.rpc('));
+  // La membresía, sala fija y conservación de jornadas desconectadas se prueban
+  // ejecutando SQL real en supabase/tests/cowork_solicitudes_acceso.mjs.
 });
