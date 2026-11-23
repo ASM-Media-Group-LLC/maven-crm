@@ -60,6 +60,14 @@ function guardarPortada(uid: string | null | undefined, cambio: Partial<Pick<typ
 }
 
 export default function CoworkPage() {
+  const [params] = useSearchParams();
+  // Al cambiar de Cowork no se pueden reutilizar la membresía, sala ni errores
+  // del anterior mientras se carga el destino. Cambiar ?room= dentro del mismo
+  // Cowork conserva la instancia y su comportamiento habitual.
+  return <CoworkPorSesion key={params.get("session") ?? "portada"} />;
+}
+
+function CoworkPorSesion() {
   const [searchParams, setSearchParams] = useSearchParams();
   const sessionId = searchParams.get("session");
   const navigate = useNavigate();
@@ -71,6 +79,8 @@ export default function CoworkPage() {
   const [showCreate, setShowCreate] = useState(false);
   const [autoJoining, setAutoJoining] = useState(false);
   const [autoJoinFailed, setAutoJoinFailed] = useState(false);
+  const montado = useRef(true);
+  useEffect(() => { montado.current = true; return () => { montado.current = false; }; }, []);
   
   const [userId, setUserId] = useState<string | null>(null);
   // Quién es, para la portada guardada (ver portadaGuardada arriba).
@@ -379,6 +389,7 @@ export default function CoworkPage() {
           // SALA FIJA (Alvaro, 18/11/2026): el enlace que dio el supervisor la
           // mueve aunque ya tenga sala, y la deja fija ahí.
           const res = await cowork.joinSession(sessionId, "participant", undefined, roomId, { porEnlace: true }) as { roomName?: string };
+          if (!montado.current) return;
           if (res?.roomName) toast.success(t("cowork.participant.salaFijaDelEnlace", { room: res.roomName }));
         } else if (roomId) {
           // El link (`?room=`) es la orden del coordinador: es LA sala a la que
@@ -388,18 +399,22 @@ export default function CoworkPage() {
           // COORDINADORES ignorando el link de Chatters. Para mover a propósito
           // está el código de 6 caracteres (joinByCode).
           const ultimaSala = await cowork.getMyLastRoomId(sessionId);
+          if (!montado.current) return;
           const sala = salaParaAutoUnir(roomId, ultimaSala);
           const result = await cowork.joinSession(sessionId, "participant", undefined, sala, { porEnlace: sala === roomId });
+          if (!montado.current) return;
           if (result.pendingApproval) { setSearchParams({ session: sessionId, solicitud: "1" }, { replace: true }); return; }
         }
+        if (!montado.current) return;
         soltarSalaDelEnlace();
         // Silenciosa: sin ruedita ni desmontar la vista (17/11/2026).
         cowork.refetch(true);
       } catch (e) {
+        if (!montado.current) return;
         console.error("Auto-join failed:", e);
         setAutoJoinFailed(true);
       } finally {
-        setAutoJoining(false);
+        if (montado.current) setAutoJoining(false);
       }
     };
     doJoin();

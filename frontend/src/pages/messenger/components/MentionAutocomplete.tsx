@@ -4,6 +4,7 @@ import { UserAvatar } from "@/components/UserAvatar";
 import { UserProfile } from "../types";
 import { cn } from "@/lib/utils";
 import { useLanguage } from "@/hooks/useLanguage";
+import EnlaceDeMensaje from "./EnlaceDeMensaje";
 
 interface MentionAutocompleteProps {
   text: string;
@@ -106,16 +107,12 @@ export function linkifyText(text: string, keyPrefix = ""): ReactNode[] {
     // El regex es global: `test` mueve lastIndex y se salta matches alternos,
     // por eso se resetea antes de cada prueba.
     ((URL_REGEX.lastIndex = 0), URL_REGEX.test(part)) ? (
-      <a
+      <EnlaceDeMensaje
         key={`${keyPrefix}u${i}`}
         href={part}
-        target="_blank"
-        rel="noopener noreferrer"
-        onClick={(e) => e.stopPropagation()}
-        className="underline hover:opacity-80 break-all"
       >
         {part}
-      </a>
+      </EnlaceDeMensaje>
     ) : (
       <span key={`${keyPrefix}t${i}`}>{part}</span>
     ),
