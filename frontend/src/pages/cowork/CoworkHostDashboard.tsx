@@ -1,3 +1,4 @@
+import CoworkAccesosDialog from "./CoworkAccesosDialog";
 import { usePermissions } from "@/hooks/usePermissions";
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { enHoras } from "@/lib/duracion";
@@ -165,6 +166,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
   // dependencias reconectaría el Hub o la sala al cambiar el idioma.
   const { t } = useLanguage();
   const { canFunction } = usePermissions();
+  const gestionaAccesos = canFunction("N:cowork.miembros", false);
   const administraSalas = canFunction("N:cowork.abrir", true);
   const supervisaPantallas = canFunction("N:cowork.verpantallas", true);
   const { isOnline } = useOnlinePresence();
@@ -2166,6 +2168,9 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
 
           {/* Unassigned members section removed — participants self-join via URL ?room=X */}
 
+          {/* Accesos nuevos y asignación por alcance de la posición. */}
+          <div className="mx-3 mt-3"><CoworkAccesosDialog sessionId={cowork.session?.id} /></div>
+
           {/* Host Requests */}
           <section className="mx-3 mt-3 space-y-2 rounded-2xl border border-border/60 bg-background/50 p-3">
             <div className="flex items-center gap-2">
@@ -2413,7 +2418,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                             <MessageCircle className="mr-2 h-4 w-4" /> {t("cowork.host.messageOnMessenger")}
                           </DropdownMenuItem>
                           <DropdownMenuSub>
-                            <DropdownMenuSubTrigger disabled={moviendo === f.uid}>
+                            <DropdownMenuSubTrigger disabled={!gestionaAccesos || moviendo === f.uid}>
                               {moviendo === f.uid
                                 ? <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                                 : <ArrowRightLeft className="mr-2 h-4 w-4" />}
@@ -2482,7 +2487,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                       </div>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="sm" disabled={moviendo === p.uid} className="h-7 shrink-0 gap-1 rounded-lg px-2 text-[11px] text-muted-foreground hover:text-foreground">
+                          <Button variant="ghost" size="sm" disabled={!gestionaAccesos || moviendo === p.uid} className="h-7 shrink-0 gap-1 rounded-lg px-2 text-[11px] text-muted-foreground hover:text-foreground">
                             {moviendo === p.uid ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ArrowRightLeft className="h-3.5 w-3.5" />}
                             {t("cowork.host.setFixedRoom")}
                           </Button>

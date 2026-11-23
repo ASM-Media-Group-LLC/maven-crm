@@ -141,7 +141,11 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
     if (!isCompleteRoomCode(code)) return;
     setJoiningByCode(true);
     try {
-      const res = await cowork.joinByCode(code) as { roomName?: string };
+      const res = await cowork.joinByCode(code) as { roomName?: string; sessionId: string; pendingApproval?: boolean };
+      if (res.pendingApproval) {
+        navigate(`/cowork?${new URLSearchParams({ session: res.sessionId, solicitud: "1" })}`);
+        return;
+      }
       setRoomCode("");
       setCodigoAbierto(false);
       setNecesitaCodigo(false);

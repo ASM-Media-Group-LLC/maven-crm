@@ -316,6 +316,7 @@ export const posiciones = {
   "posiciones.c.ver_horarios": { es: "Ver horarios", en: "View schedules" },
   "posiciones.c.ver_ingresos": { es: "Ver ingresos", en: "View revenue" },
   "posiciones.c.ver_lista": { es: "Ver lista", en: "View list" },
+  "posiciones.c.gestionar_accesos_cowork": { es: "Gestionar accesos y asignar personas", en: "Manage access and assign people" },
   "posiciones.c.ver_pantallas_de_companeros": { es: "Supervisar pantallas de otras salas", en: "Supervise screens in other rooms" },
   "posiciones.c.ver_pantallazos_y_camaras": { es: "Ver pantallazos y cámaras", en: "View screenshots and cameras" },
   "posiciones.c.ver_parrilla": { es: "Ver parrilla", en: "View grid" },
