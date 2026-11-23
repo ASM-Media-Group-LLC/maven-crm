@@ -6,6 +6,14 @@ import { hayLlamadaActiva } from "@/lib/llamadaActiva";
 import { estadoDelAviso, tocaActualizarAlColgar } from "@/lib/avisoActualizacionApp";
 import { alCambiarTarjeta } from "@/lib/novedadesApp";
 import { CartelCentral } from "@/components/CartelVersionNueva";
+import { RUTA_DESCARGAR_CON_GUIA } from "@/lib/guiaApp";
+
+export const ESPERA_REINICIO_MS = 25_000;
+const CLAVE_POSPUESTA = "maven:actualizacion-pospuesta";
+
+function versionPospuesta(): string | null {
+  try { return sessionStorage.getItem(CLAVE_POSPUESTA); } catch { return null; }
+}
 
 // VERSIÓN NUEVA DE LA APP, SIEMPRE A LA VISTA (Alvaro, 18/11/2026: «que la
 // plataforma te lo ponga enfrente con un botón para que se actualice»).
@@ -18,6 +26,11 @@ export function AvisoActualizacionApp() {
   const [version, setVersion] = useState<string | null>(null);
   const [enLlamada, setEnLlamada] = useState(false);
   const [actualizando, setActualizando] = useState(false);
+  const [fallo, setFallo] = useState(false);
+  const [continuar, setContinuar] = useState(false);
+  const intento = useRef(0);
+  const ocupado = useRef(false);
+  const espera = useRef<number | null>(null);
   const antes = useRef(false);
   // Un aviso a la vez: si está abierta la tarjeta de «qué cambió», la franja espera.
   const [tarjeta, setTarjeta] = useState(false);
@@ -30,9 +43,47 @@ export function AvisoActualizacionApp() {
     return app.alActualizacionLista((v) => { if (v) setVersion(v); });
   }, []);
 
+  useEffect(() => {
+    setFallo(false);
+    setContinuar(!!version && versionPospuesta() === version);
+    setActualizando(false);
+    ocupado.current = false;
+    return () => {
+      intento.current++;
+      if (espera.current !== null) window.clearTimeout(espera.current);
+    };
+  }, [version]);
+
   const actualizar = () => {
+    if (ocupado.current) return;
+    ocupado.current = true;
+    const numero = ++intento.current;
+    setFallo(false);
     setActualizando(true);
-    void escritorio()?.actualizarAhora?.().then((ok) => { if (!ok) setActualizando(false); }).catch(() => setActualizando(false));
+    const recuperar = () => {
+      if (numero !== intento.current) return;
+      intento.current++;
+      ocupado.current = false;
+      if (espera.current !== null) window.clearTimeout(espera.current);
+      setActualizando(false);
+      setFallo(true);
+    };
+    // El true del proceso principal confirma la solicitud, no la instalación.
+    // Si Maven no se cierra, la persona debe poder recuperar su trabajo incluso
+    // con una versión vieja del instalador que no comunica sus errores.
+    espera.current = window.setTimeout(recuperar, ESPERA_REINICIO_MS);
+    try {
+      const solicitud = escritorio()?.actualizarAhora?.();
+      if (!solicitud) { recuperar(); return; }
+      void solicitud.then((ok) => { if (!ok) recuperar(); }).catch(recuperar);
+    } catch { recuperar(); }
+  };
+
+  const seguirTrabajando = () => {
+    if (version) {
+      try { sessionStorage.setItem(CLAVE_POSPUESTA, version); } catch { /* sigue en esta vista */ }
+    }
+    setContinuar(true);
   };
 
   // Llamada: se mira cada 3 s (hayLlamadaActiva no avisa cambios).
@@ -53,16 +104,26 @@ export function AvisoActualizacionApp() {
   const estado = estadoDelAviso(version, enLlamada);
   if (estado === "nada" || tarjeta) return null;
   // Sin llamada: el cartel en el centro, igual que el de la página (18/11/2026).
-  if (estado !== "ofrecerEnLlamada") {
+  if (estado !== "ofrecerEnLlamada" && !continuar) {
     return (
       <CartelCentral
         titulo={t("pwa.app.titulo2")}
-        detalle={t("pwa.app.nuevaDetalle")}
+        detalle={t(fallo ? "pwa.app.noReinicio" : "pwa.app.nuevaDetalle")}
         version={version}
-        boton={t("pwa.app.actualizar")}
+        boton={t(fallo ? "pwa.app.reintentar" : "pwa.app.actualizar")}
         ocupado={actualizando}
         ocupadoTexto={t("pwa.app.actualizando")}
         onActualizar={actualizar}
+        alternativas={fallo ? (
+          <div className="flex w-full flex-col items-center gap-3">
+            <button type="button" onClick={seguirTrabajando} className="w-full rounded-full border border-border px-5 py-2.5 text-sm font-medium text-foreground hover:bg-muted">
+              {t("pwa.app.seguirTrabajando")}
+            </button>
+            <a href={RUTA_DESCARGAR_CON_GUIA} onClick={seguirTrabajando} className="text-sm text-primary underline underline-offset-4">
+              {t("pwa.app.instalarManual")}
+            </a>
+          </div>
+        ) : undefined}
       />
     );
   }
@@ -82,7 +143,7 @@ export function AvisoActualizacionApp() {
             <span className="rounded-full bg-primary/[0.1] px-2 py-0.5 text-[11px] font-medium text-primary tabular-nums">{version}</span>
           </p>
           <p className="text-xs text-muted-foreground">
-            {estado === "ofrecerEnLlamada" ? t("pwa.app.nuevaEnLlamada") : t("pwa.app.nuevaDetalle")}
+            {t(fallo ? "pwa.app.noReinicioBreve" : continuar ? "pwa.app.pendiente" : "pwa.app.nuevaEnLlamada")}
           </p>
         </div>
         <button
@@ -92,7 +153,7 @@ export function AvisoActualizacionApp() {
           className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-primary px-4 py-2 text-xs font-semibold text-primary-foreground transition hover:bg-primary/90 disabled:opacity-70"
         >
           {actualizando ? <Loader2 className="h-3.5 w-3.5 animate-spin motion-reduce:animate-none" /> : <Download className="h-3.5 w-3.5" />}
-          {actualizando ? t("pwa.app.actualizando") : t("pwa.app.actualizar")}
+          {actualizando ? t("pwa.app.actualizando") : t(fallo || continuar ? "pwa.app.reintentar" : "pwa.app.actualizar")}
         </button>
       </div>
     </div>
