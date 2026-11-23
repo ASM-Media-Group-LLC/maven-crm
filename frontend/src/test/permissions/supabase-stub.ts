@@ -1,4 +1,5 @@
 import type { AppRole } from "@/hooks/useUserRole";
+import type { FuncionesPosicion } from "@/lib/posiciones/permisos";
 
 export interface PermissionRow {
   module: string;
@@ -28,6 +29,7 @@ interface StoreState {
   role_permissions: Array<PermissionRow & { role_id: string }>;
   role_groups: RoleGroupRow[];
   errors: Map<string, ErrorShape>;
+  funcionesPosicion?: FuncionesPosicion;
 }
 
 // QueryBuilder que implementa la cadena exacta usada por los hooks de produccion:
@@ -110,6 +112,7 @@ class QueryBuilder {
 
 export interface SupabaseStub {
   client: {
+    rpc: (fn: string) => Promise<{data: unknown; error: ErrorShape | null}>;
     from: (table: string) => QueryBuilder;
     auth: {
       onAuthStateChange: () => { data: { subscription: { unsubscribe: () => void } } };
@@ -122,6 +125,7 @@ export interface SupabaseStub {
   setRolePermissions(configId: string, perms: PermissionRow[]): void;
   setRoleGroup(roleName: string, flags: Partial<Omit<RoleGroupRow, "role_name">>): void;
   setError(table: string, error: ErrorShape): void;
+  setFuncionesPosicion(value: FuncionesPosicion): void;
   reset(): void;
 }
 
@@ -146,6 +150,13 @@ export function createSupabaseStub(): SupabaseStub {
 
   const stub: SupabaseStub = {
     client: {
+      async rpc(fn: string) {
+        if (fn !== "mis_funciones_posicion") return {data: null, error: null};
+        const error = store.errors.get(fn);
+        return {data: error ? null : store.funcionesPosicion ?? {
+          uid: store.user_roles[0]?.user_id, aplica: false, total: false, bloqueada: false, checks: {},
+        }, error: error ?? null};
+      },
       from(table: string): QueryBuilder {
         return new QueryBuilder(store, table);
       },
@@ -193,12 +204,17 @@ export function createSupabaseStub(): SupabaseStub {
       store.errors.set(table, error);
     },
 
+    setFuncionesPosicion(value: FuncionesPosicion): void {
+      store.funcionesPosicion = value;
+    },
+
     reset(): void {
       store.user_roles = [];
       store.roles_config = [];
       store.role_permissions = [];
       store.role_groups = [];
       store.errors.clear();
+      store.funcionesPosicion = undefined;
     },
   };
 

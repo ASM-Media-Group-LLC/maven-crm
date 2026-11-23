@@ -474,6 +474,7 @@ export function PermisosDe({ pos: guardada, personas, asignaciones, onVolver }: 
       qc.setQueryData(KEY, (d: NonNullable<ReturnType<typeof useDatos>["data"]> | undefined) => d && ({ ...d, posiciones: d.posiciones.map((p) => p.id === actualizada.id ? actualizada : p) }));
       void qc.invalidateQueries({ queryKey: KEY });
       void qc.invalidateQueries({ queryKey: ["user-permissions"] });
+      void qc.invalidateQueries({ queryKey: ["mis-funciones-posicion"] });
       toast.success(t("posiciones.revision.aplicado"));
     },
     onError: (error: Error) => toast.error(error.message),
