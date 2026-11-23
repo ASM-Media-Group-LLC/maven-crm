@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { useLanguage } from "@/hooks/useLanguage";
 
 interface ConfigDeApertura {
   servidor: string;
@@ -141,24 +142,34 @@ declare global {
  *  servidor que después atiende al editor, porque lleva adentro su versión y sus
  *  rutas. Pedirlo desde otro lado da un editor que carga y se queda en blanco. */
 let cargando: Promise<void> | null = null;
-function cargarApiDeOnlyOffice(servidor: string): Promise<void> {
+export function cargarApiDeOnlyOffice(servidor: string): Promise<void> {
   if (window.DocsAPI) return Promise.resolve();
   if (cargando) return cargando;
   cargando = new Promise<void>((resolver, rechazar) => {
     const s = document.createElement("script");
     s.src = `${servidor.replace(/\/$/, "")}/web-apps/apps/api/documents/api.js`;
     s.async = true;
-    s.onload = () => resolver();
-    s.onerror = () => {
+    const fallar = () => {
+      clearTimeout(limite);
+      s.onload = s.onerror = null;
+      s.remove();
       cargando = null;
-      rechazar(new Error("No se pudo contactar al servidor de Oficina"));
+      rechazar(new Error("office-api-unavailable"));
     };
+    const limite = setTimeout(fallar, 20_000);
+    s.onload = () => {
+      if (!window.DocsAPI) return fallar();
+      clearTimeout(limite);
+      s.onload = s.onerror = null;
+      resolver();
+    };
+    s.onerror = fallar;
     document.head.appendChild(s);
   });
   return cargando;
 }
 
-type Estado = "cargando" | "listo" | "error";
+type Estado = "cargando" | "abriendo" | "listo" | "error";
 
 /** Lo que la página tiene que saber contestar para que el panel de historial
  *  funcione. El protocolo con ONLYOFFICE lo maneja el hook; de dónde salen los
@@ -178,8 +189,12 @@ export function useEditorDeOffice(
   apertura: ConfigDeApertura | undefined,
   historial?: Historial,
 ) {
+  const { t } = useLanguage();
+  const traducir = useRef(t);
+  traducir.current = t;
   const [estado, setEstado] = useState<Estado>("cargando");
   const [error, setError] = useState<string | null>(null);
+  const [documentoListo, setDocumentoListo] = useState(false);
   const editorRef = useRef<EditorDeOffice | null>(null);
 
   // Los manejadores se arman una sola vez con el editor que todavía no existe,
@@ -192,8 +207,18 @@ export function useEditorDeOffice(
   useEffect(() => {
     if (!apertura) return;
     let vivo = true;
+    let listo = false;
     setEstado("cargando");
     setError(null);
+    setDocumentoListo(false);
+    // El constructor solo crea el iframe. La confirmación de que el archivo
+    // abrió llega por onDocumentReady; una conexión cortada no puede esperar
+    // indefinidamente. No reiniciamos un editor con posibles cambios sin guardar.
+    const limite = setTimeout(() => {
+      if (!vivo || listo) return;
+      setError(traducir.current("oficina.doc.cargaLenta"));
+      setEstado("error");
+    }, 45_000);
 
     cargarApiDeOnlyOffice(apertura.servidor)
       .then(() => {
@@ -207,9 +232,34 @@ export function useEditorDeOffice(
         // el canal viaja JSON. El `config` llega firmado desde la edge y no se
         // toca —se copia— porque `events` es cosa del navegador y ONLYOFFICE
         // nunca se lo manda al servidor.
-        const config = { ...apertura.config } as Record<string, unknown>;
+        // DocsAPI también modifica objetos anidados: no debe tocar el config
+        // firmado que conserva la consulta para una siguiente apertura.
+        const config = structuredClone(apertura.config);
+        const eventos = {
+          onAppReady: () => {
+            if (!vivo || listo) return;
+            // Deja visibles los diálogos del editor (por ejemplo, contraseña).
+            setEstado((actual) => actual === "cargando" ? "abriendo" : actual);
+          },
+          onDocumentReady: () => {
+            if (!vivo) return;
+            listo = true;
+            clearTimeout(limite);
+            setDocumentoListo(true);
+            setError(null);
+            setEstado("listo");
+          },
+          onError: () => {
+            if (!vivo) return;
+            clearTimeout(limite);
+            setError(traducir.current(listo ? "oficina.doc.conexionInterrumpida" : "oficina.doc.cargaFallida"));
+            setEstado("error");
+          },
+        };
+        config.events = eventos;
         if (historialRef.current) {
           config.events = {
+            ...eventos,
             // Abrir el panel: el botón del reloj aparece solo si esto existe.
             onRequestHistory: async () => {
               const h = historialRef.current;
@@ -254,16 +304,17 @@ export function useEditorDeOffice(
         }
 
         editorRef.current = new window.DocsAPI.DocEditor(contenedorId, config);
-        setEstado("listo");
       })
-      .catch((e: Error) => {
+      .catch(() => {
         if (!vivo) return;
-        setError(e.message);
+        clearTimeout(limite);
+        setError(traducir.current("oficina.doc.cargaFallida"));
         setEstado("error");
       });
 
     return () => {
       vivo = false;
+      clearTimeout(limite);
       try {
         editorRef.current?.destroyEditor();
       } catch {
@@ -273,5 +324,5 @@ export function useEditorDeOffice(
     };
   }, [contenedorId, apertura]);
 
-  return { estado, error };
+  return { estado, error, puedeReintentar: estado === "error" && !documentoListo };
 }
