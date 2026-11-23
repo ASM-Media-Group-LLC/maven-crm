@@ -32,12 +32,15 @@ export default function VideosEnMiniatura({ participantes, vozActiva, room, audi
 
   const principal = pantalla ?? remotos.find((p) => p.identity === vozDestacada) ?? remotos[0];
   if (!principal) return null;
-  const otros = remotos.filter((p) => p.identity !== principal.identity);
+  // Durante una presentación se ve a quien presenta; la cámara propia no
+  // debe tapar la pantalla ni sustituir la explicación de la otra persona.
+  const superpuesta = pantalla ? camaras.find((p) => p.identity === pantalla.identity) : yo;
+  const otros = pantalla ? [] : remotos.filter((p) => p.identity !== principal.identity);
   const resto = Math.max(0, otros.length - 3);
   const hayFila = otros.length > 0;
   // Se mantienen las mismas claves cuando una cámara pasa de la fila al
   // primer plano, de modo que su pista sigue adjunta al mismo elemento.
-  const visibles = [principal, ...otros.slice(0, 3), ...(yo ? [yo] : [])];
+  const visibles = [principal, ...otros.slice(0, 3), ...(superpuesta ? [superpuesta] : [])];
 
   return (
     <div
@@ -49,7 +52,7 @@ export default function VideosEnMiniatura({ participantes, vozActiva, room, audi
           key={persona.sid}
           className={persona === principal
             ? "col-span-full min-h-0"
-            : persona.isLocal
+            : persona === superpuesta
               ? cn("absolute right-2 z-10 h-[28%] w-[28%] min-h-12 min-w-16", hayFila ? "bottom-[4.25rem]" : "bottom-2")
               : "min-h-0 min-w-0"
           }

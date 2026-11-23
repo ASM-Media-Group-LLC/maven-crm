@@ -29,7 +29,7 @@ export function useMiniaturaLlamada(activa: boolean) {
   return activa ? estado : null;
 }
 
-export default function BarraMiniaturaLlamada({ nombre, anclada }: { nombre: string; anclada: boolean }) {
+export default function BarraMiniaturaLlamada({ nombre, anclada, onExpandir }: { nombre: string; anclada: boolean; onExpandir?: () => void }) {
   const { t } = useLanguage();
   const puntero = useRef<number | null>(null);
   const cuadro = useRef<number | null>(null);
@@ -77,10 +77,10 @@ export default function BarraMiniaturaLlamada({ nombre, anclada }: { nombre: str
         <GripHorizontal className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
         <span className="truncate">{nombre}</span>
       </div>
-      <button type="button" className={btn} aria-label={anclaje} title={anclaje} onClick={() => accionar("anclaje")}>
+      {!onExpandir && <button type="button" className={btn} aria-label={anclaje} title={anclaje} onClick={() => accionar("anclaje")}>
         {anclada ? <PinOff className="h-3.5 w-3.5" aria-hidden /> : <Pin className="h-3.5 w-3.5" aria-hidden />}
-      </button>
-      <button type="button" className={btn} onClick={() => accionar("expandir")}>
+      </button>}
+      <button type="button" className={btn} onClick={() => onExpandir ? onExpandir() : accionar("expandir")}>
         <Maximize2 className="h-3.5 w-3.5" aria-hidden />
         {t("messenger.miniatura.expandir")}
       </button>

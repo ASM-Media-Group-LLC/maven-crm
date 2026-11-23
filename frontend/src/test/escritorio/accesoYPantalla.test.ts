@@ -8,6 +8,7 @@ import { describe, expect, it } from "vitest";
 //     clic fallaba mudo; ahora la explicación sale en el mismo clic.
 const leer = (g: Record<string, unknown>) => Object.values(g)[0] as string;
 const acceso = leer(import.meta.glob("../../../../desktop/src/acceso.js", { query: "?raw", import: "default", eager: true }));
+const captura = Object.values(import.meta.glob("../../../../desktop/src/compartirPantalla.js", { query: "?raw", import: "default", eager: true }))[0] as string;
 const main = leer(import.meta.glob("../../../../desktop/src/main.js", { query: "?raw", import: "default", eager: true }));
 const preload = leer(import.meta.glob("../../../../desktop/src/preload.js", { query: "?raw", import: "default", eager: true }));
 const login = leer(import.meta.glob("../../pages/Login.tsx", { query: "?raw", import: "default", eager: true }));
@@ -47,9 +48,9 @@ describe("la app recuerda el acceso", () => {
 
 describe("compartir pantalla en Mac sin permiso", () => {
   it("la explicación sale en el mismo clic, no recién en el segundo", () => {
-    const manejador = main.slice(main.indexOf("setDisplayMediaRequestHandler"));
-    const bloque = manejador.slice(manejador.indexOf("if (!pantallaPermitida())"), manejador.indexOf("return responder({});"));
-    expect(bloque).toContain("guiaPermisoPantalla(ventana)");
+    const manejador = captura;
+    const bloque = manejador.slice(manejador.indexOf("if (!pantallaPermitida())"), manejador.indexOf("const fuentes = await"));
+    expect(bloque).toContain("guiaPermisoPantalla(padre, { explicito: !automatica })");
     expect(bloque).not.toMatch(/else\s*\{\s*guiaPermisoPantalla/);
   });
 });

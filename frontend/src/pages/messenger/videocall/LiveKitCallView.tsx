@@ -1,3 +1,4 @@
+import { useMiniaturaNavegador } from "@/components/LlamadaEnVentanaFlotante";
 import { useState, useEffect, useCallback, useMemo, useRef, type ReactNode } from "react";
 import { useEnTurno } from "@/lib/turnoActivo";
 import { ConnectionState, CriticalTimers, RoomEvent, Track, VideoQuality } from "livekit-client";
@@ -208,7 +209,7 @@ const TEXTO_FALLO_CAMARA = {
   otro: { titulo: "messenger.callView.camaraFallo.otroTitulo", detalle: "messenger.callView.camaraFallo.otroDetalle" },
 } as const;
 
-export default function LiveKitCallView({ roomName, displayName, callDisplayName, isAdmin = false, onLeave, initialMicOn = true, initialCamOn = true, initialScreenShareOn = false, initialAudioDeviceId, initialVideoDeviceId, initialAudioOutputDeviceId, initialBackgroundEffect = "none", hideShareLink, hideScreenShare, hideLeaveButton, leaveLabel, leaveIcon, suppressLeaveToast, compact, estadoMiniatura, autoPip = true, autoLeaveOnEmpty, getToken, onMediaStateChange, onFaceStateChange, supervisorEncuadre, onLocalScreenTrack, pantallaSoloParaMi, pantallaVisiblePara, pantallaOpcional = false, camaraOpcional = false, pantallaPrestada = null, sinLatidoDeLlamada, incomingAudioMuted, roomSwitcher, recording, shareLink: shareLinkProp, accionesBarra, guardarChat, encima, hideEndForAll, controlesExtra, sinVideoAjeno = false, telemetria, sinVolverEnError = false, hubDelSupervisor = null, mosaicoDePantallas = false }: LiveKitCallViewProps) {
+export default function LiveKitCallView({ roomName, displayName, callDisplayName, isAdmin = false, onLeave, initialMicOn = true, initialCamOn = true, initialScreenShareOn = false, initialAudioDeviceId, initialVideoDeviceId, initialAudioOutputDeviceId, initialBackgroundEffect = "none", hideShareLink, hideScreenShare, hideLeaveButton, leaveLabel, leaveIcon, suppressLeaveToast, compact, estadoMiniatura: miniaturaApp, autoPip = true, autoLeaveOnEmpty, getToken, onMediaStateChange, onFaceStateChange, supervisorEncuadre, onLocalScreenTrack, pantallaSoloParaMi, pantallaVisiblePara, pantallaOpcional = false, camaraOpcional = false, pantallaPrestada = null, sinLatidoDeLlamada, incomingAudioMuted, roomSwitcher, recording, shareLink: shareLinkProp, accionesBarra, guardarChat, encima, hideEndForAll, controlesExtra, sinVideoAjeno = false, telemetria, sinVolverEnError = false, hubDelSupervisor = null, mosaicoDePantallas = false }: LiveKitCallViewProps) {
   // Lista de salas del navegador (solo Cowork supervisor+): estado del popup.
   const [salasAbiertas, setSalasAbiertas] = useState(false);
   // Las flechas < > de cambiar de sala PREGUNTAN antes (Alvaro, 19/11/2026: en la
@@ -223,6 +224,8 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
   // varias veces por segundo (18/11/2026, guarda: test/videocall/llamadaSinTrabas).
   const lk = useLiveKit();
   const { t } = useLanguage();
+  const miniaturaNavegador = useMiniaturaNavegador();
+  const estadoMiniatura = miniaturaNavegador?.miniatura ? { miniatura: true, anclada: true } : miniaturaApp;
   const enMiniatura = estadoMiniatura?.miniatura === true;
 
   // Silencio local del audio entrante (p.ej. el Hub de Cowork mientras el
@@ -1163,7 +1166,7 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
 
   const room = lk.getRoom();
   const barraMiniatura = enMiniatura
-    ? <BarraMiniaturaLlamada nombre={callDisplayName || roomName} anclada={estadoMiniatura.anclada} />
+    ? <BarraMiniaturaLlamada nombre={callDisplayName || roomName} anclada={estadoMiniatura.anclada} onExpandir={miniaturaNavegador?.miniatura ? miniaturaNavegador.expandir : undefined} />
     : null;
   const videosEnMiniatura = enMiniatura && lk.participants.some((p) => !p.isLocal);
 

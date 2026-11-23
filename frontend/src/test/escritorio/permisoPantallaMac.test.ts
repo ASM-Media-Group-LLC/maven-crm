@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 // saltaba cada rato. La app de computador solo puede tocar la pantalla cuando
 // macOS ya dio el permiso; si falta, pregunta una vez por arranque y no insiste.
 const apps = Object.values(import.meta.glob("../../../../desktop/src/apps.js", { query: "?raw", import: "default", eager: true }))[0] as string;
+const captura = Object.values(import.meta.glob("../../../../desktop/src/compartirPantalla.js", { query: "?raw", import: "default", eager: true }))[0] as string;
 const main = Object.values(import.meta.glob("../../../../desktop/src/main.js", { query: "?raw", import: "default", eager: true }))[0] as string;
 const permiso = Object.values(import.meta.glob("../../../../desktop/src/permisoPantalla.js", { query: "?raw", import: "default", eager: true }))[0] as string;
 
@@ -20,7 +21,7 @@ describe("permiso de pantalla en el Mac (app de computador)", () => {
   });
 
   it("compartir pantalla revisa el permiso antes de buscar pantallas", () => {
-    const manejador = main.slice(main.indexOf("setDisplayMediaRequestHandler"));
+    const manejador = captura;
     const revisa = manejador.indexOf("pantallaPermitida()");
     const busca = manejador.indexOf("desktopCapturer.getSources");
     expect(revisa).toBeGreaterThan(-1);
@@ -32,7 +33,7 @@ describe("permiso de pantalla en el Mac (app de computador)", () => {
   it("la guía no insiste (a lo sumo cada 10 minutos) y ofrece reiniciar", () => {
     // 18/11/2026: antes era una vez por arranque y recién en el SEGUNDO clic;
     // ahora sale en el primero y no se repite antes de 10 minutos.
-    expect(permiso).toMatch(/if \(Date\.now\(\) - ultimaGuia < 10 \* 60_000\) return;/);
+    expect(permiso).toMatch(/if \(!explicito && Date\.now\(\) - ultimaGuia < 10 \* 60_000\) return;/);
     expect(permiso).toContain("app.relaunch()");
     expect(permiso).toContain("Privacy_ScreenCapture");
   });
@@ -49,6 +50,6 @@ describe("permiso de pantalla en el Mac (app de computador)", () => {
   it("macOS pone a Maven en la lista: se llama CGRequestScreenCaptureAccess", () => {
     // 18/11/2026: con desktopCapturer solo, Maven ni aparecía en Ajustes.
     expect(permiso).toContain("CGRequestScreenCaptureAccess");
-    expect(main).toContain("await pedirAMacOS();");
+    expect(captura).toContain("await pedirAMacOS();");
   });
 });
