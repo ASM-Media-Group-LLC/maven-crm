@@ -1,0 +1,17 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Prueba de fondo</title>
+    <style>
+      html, body { margin: 0; background: #000; }
+      video { display: block; width: 1280px; height: 720px; object-fit: contain; }
+      #info { position: fixed; left: 8px; bottom: 8px; color: #fff; font: 14px monospace; background: rgba(0,0,0,.6); padding: 4px 8px; }
+    </style>
+  </head>
+  <body>
+    <video id="salida" autoplay muted playsinline></video>
+    <div id="info">…</div>
+    <script type="module" src="/src/harness/fondoPrueba.ts"></script>
+  </body>
+</html>
