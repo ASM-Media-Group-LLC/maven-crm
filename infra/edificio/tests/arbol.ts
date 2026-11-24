@@ -1,4 +1,4 @@
-// El árbol del edificio (infra/edificio/migraciones/20261119210000_arbol.sql y
+// El árbol del edificio (infra/edificio/migraciones/20261119210500_arbol.sql y
 // 20261119211000_arbol_funciones.sql), probado contra un Postgres de verdad (PGlite).
 //
 //   deno run -A --node-modules-dir=none --no-lock infra/edificio/tests/arbol.ts
@@ -19,7 +19,7 @@
 //   6. Cliente en preparación: sin enlaces; enlaces de un solo uso y con vencimiento.
 //   7. El dueño de la plataforma ve todo; Grace (admin) todo menos precios y cobros.
 //   8. Avisos, historial, «Líder de {Marca}», tarjeta de Kash, saldo de Argos, socios y briefs.
-//  10. Cobros (20261120090000_cobros.sql): precios, eventos de Stripe una vez, bloqueo
+//  10. Cobros (20261120090500_cobros.sql): precios, eventos de Stripe una vez, bloqueo
 //      por pago tras la gracia, la pantalla de entrada, créditos del plan y recargas
 //      sin duplicar, el directorio de la puerta y su tope.
 //  10c. Quién soy (20261120120000_quien_soy.sql): dueño / Grace / admin del cliente / nadie,
@@ -36,9 +36,9 @@ const BASE_AGENCIAS = leer(MIGS + "20261001210000_agencias_base.sql");
 const ARGOS_DUENO = leer(MIGS + "20261102012000_argos_dueno.sql");
 const DOCS_DUENO = leer(MIGS + "20261114130000_documentos_dueno_ve_todo_y_pedir_acceso.sql");
 const CONECTADAS = leer(MIGS + "20261111190000_agencias_conectadas.sql");
-const ARBOL = leer("../migraciones/20261119210000_arbol.sql");
+const ARBOL = leer("../migraciones/20261119210500_arbol.sql");
 const FUNCIONES = leer("../migraciones/20261119211000_arbol_funciones.sql");
-const COBROS = leer("../migraciones/20261120090000_cobros.sql");
+const COBROS = leer("../migraciones/20261120090500_cobros.sql");
 const QUIEN_SOY = leer("../migraciones/20261120120000_quien_soy.sql");
 const vuelta = (sql: string) => sql.split("\n").filter((l) => l.startsWith("--|")).map((l) => l.replace(/^--\| ?/, "")).join("\n");
 

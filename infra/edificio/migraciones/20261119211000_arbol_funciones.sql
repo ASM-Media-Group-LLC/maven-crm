@@ -2,7 +2,7 @@
 -- enlaces de acceso, saldo de Argos, socios y briefs) y las funciones que usan los
 -- paneles del dueño de la plataforma y del admin del cliente.
 -- ⚠️ SOLO PARA EL EDIFICIO maven-agencias (ezeigddgkaemxpshghmu). NUNCA en Kash.
--- Requiere 20261119210000_arbol.sql. Banco: infra/edificio/tests/arbol.ts.
+-- Requiere 20261119210500_arbol.sql. Banco: infra/edificio/tests/arbol.ts.
 --
 -- Todas las funciones son security definer, con search_path fijo y (select auth.uid()).
 -- Los errores empiezan con una clave estable (sin_permiso, paquete_lleno, agencia_llena,

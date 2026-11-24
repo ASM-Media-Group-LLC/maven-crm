@@ -8,6 +8,7 @@
 
 ## Stack y deploy
 
+- 2026-11-24: PR264 (puerta + panel del dueño) en main. El árbol del edificio no entró: `20261119210000_arbol` y `20261120090000_cobros` repetían el número de migraciones de Kash y el «aplicar» las daba por puestas. Renumeradas a `…210500`/`…090500` + guarda que lo impide. Pendiente: aplicar árbol, llave Kash, invitar a rusin24, variables en Dokploy.
 - 2026-11-24: PR283 en main; reconexión/presencia, carga diferida, chat/medidor, caché privada, Auth y vigilantes corregidos. Web y funciones publicadas verificadas a las 06:57 UTC; 4.530 pruebas y tres guardas aprobadas.
 - Informe/PDF en `docs/audits/`; simulacros en `docs/auditorias/infraestructura-2026-11-24/`: 33 conexiones favorable, 165/330 no aprueban con SFU de 2 CPU y generador compartido; no certifica Miami (4 CPU) ni Maven completo.
 - Pendientes antes de ampliar: prueba con generador separado y equipos Mac/Windows, actualización compatible LiveKit/Egress/TURN, restauración de respaldos y aislamiento de organizaciones del edificio. KASH permanece en base separada.
