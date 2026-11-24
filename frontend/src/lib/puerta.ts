@@ -125,6 +125,32 @@ export function destinoDeRespuesta(r: RespuestaDirectorio): Destino {
   return r === "edificio" ? "edificio" : "kash";
 }
 
+/** Un enlace de invitación / «crear mi contraseña» trae la sesión en el #hash
+ *  (access_token=…). Si ese token lo emitió el EDIFICIO (su `iss` es la dirección del
+ *  edificio), este navegador tiene que arrancar contra el edificio aunque nunca haya
+ *  pasado por el login. Con la puerta apagada, o con cualquier cosa rara: null (Kash). */
+export function destinoPorEnlaceDeAcceso(hash: string | null | undefined, env: EnvPuerta): Destino | null {
+  const edificio = configDelEdificio(env);
+  if (!edificio || !hash) return null;
+  try {
+    const token = new URLSearchParams(hash.replace(/^#/, "")).get("access_token");
+    const cuerpo = token?.split(".")[1];
+    if (!cuerpo) return null;
+    const b64 = cuerpo.replace(/-/g, "+").replace(/_/g, "/").padEnd(Math.ceil(cuerpo.length / 4) * 4, "=");
+    const iss = (JSON.parse(atob(b64)) as { iss?: unknown }).iss;
+    if (typeof iss !== "string") return null;
+    return iss === `${edificio.url}/auth/v1` ? "edificio" : null;
+  } catch {
+    return null;
+  }
+}
+
+/** A dónde va el login cuando no hay returnTo: Kash al tablero de siempre; el edificio a
+ *  la casa de la plataforma (/plataforma reparte: clientes, /mi-empresa o /dashboard). */
+export function inicioTrasEntrar(destino: Destino): string {
+  return destino === "edificio" ? "/plataforma" : "/dashboard";
+}
+
 /** El entorno real (import.meta.env), en un solo lugar. */
 export function envDeLaApp(): EnvPuerta {
   return {

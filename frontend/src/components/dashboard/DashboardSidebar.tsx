@@ -35,6 +35,7 @@ import { abrirBuscador } from "./DashboardTopbar";
 import { useLanguage } from "@/hooks/useLanguage";
 import { usePermissions } from "@/hooks/usePermissions";
 import { useEsDueno } from "@/hooks/useEsDueno";
+import { ClientesEnElMenu } from "@/components/dashboard/ClientesEnElMenu";
 import { useVeArgos } from "@/hooks/useVeArgos";
 import { CollapsibleSidebarGroup } from "@/components/dashboard/CollapsibleSidebarGroup";
 import WhatsAppIcon from "@/components/icons/WhatsAppIcon";
@@ -581,6 +582,9 @@ const DashboardSidebar = () => {
             )}
             </Fragment>
           ))}
+          {/* «Clientes» (19/11/2026): el panel de la plataforma. En Kash solo el dueño, y abre
+              app.maven-ai.me/plataforma afuera; ver components/dashboard/ClientesEnElMenu.tsx. */}
+          <ClientesEnElMenu />
         </SidebarMenu>
         <div className="mx-3 my-1.5 h-px bg-border/50 group-data-[collapsible=icon]:mx-2" aria-hidden />
 

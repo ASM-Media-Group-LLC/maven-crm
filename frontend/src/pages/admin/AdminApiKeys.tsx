@@ -30,6 +30,7 @@ import {
   SCOPE_MESSENGER_ESCRITURA, alternarScope, esScopeDeEscritura, esScopeMessenger, escribe, escribioAlgunaVez,
   normalizarNombreVisible, problemaDelNombreVisible, type ProblemaDelNombre,
 } from "./apiKeysEscritura";
+import { SUPABASE_URL } from "@/lib/conexionSupabase";
 
 // Settings → Administración → API keys (SOLO admins).
 // Gestión de la API pública de Maven, estilo Infloww: tabla + modal agrupado por
@@ -124,7 +125,7 @@ const TEXTOS_GRUPO: Record<string, TranslationKey> = {
 
 // También la usa Conectar tu plataforma (las instrucciones que se copian).
 export const API_BASE =
-  `${import.meta.env.VITE_SUPABASE_URL ?? "https://lsagslbkliprespbyhts.supabase.co"}/functions/v1/public-api`;
+  `${SUPABASE_URL}/functions/v1/public-api`;
 
 // Mandar un mensaje: los dos encabezados que exige un POST de escritura. La
 // Idempotency-Key se genera una por mensaje y se repite tal cual en cada reintento.

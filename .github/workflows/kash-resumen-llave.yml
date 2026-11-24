@@ -1,0 +1,111 @@
+name: Kash resumen · llave compartida (Kash ↔ edificio)
+
+# LA TARJETA DE KASH EN EL PANEL DEL DUEÑO (19/11/2026, tanda 5). El edificio lee el
+# resumen de SOLO LECTURA de Kash (edge kash-resumen) con una llave dedicada:
+# KASH_RESUMEN_TOKEN, el MISMO valor en las dos bases.
+#
+# Este workflow genera esa llave al azar y la pone:
+#   · en Kash (lsagslbkliprespbyhts): SOLO el secreto KASH_RESUMEN_TOKEN. Nada más:
+#     ni migraciones, ni datos, ni otros secretos. (Autorizado por Alvaro: es la llave
+#     de la función de solo lectura; ver docs/maven-como-lumina-spec.md, tanda 5.)
+#   · en el edificio (ezeigddgkaemxpshghmu): KASH_RESUMEN_TOKEN + KASH_RESUMEN_URL.
+#
+# El valor NUNCA se imprime (enmascarado, va por archivo con permisos 600 y se borra).
+# Si las dos bases ya tienen la llave, no hace nada (salvo «rotar»).
+
+on:
+  workflow_dispatch:
+    inputs:
+      rotar:
+        description: 'Generar una llave nueva aunque ya exista en las dos bases'
+        type: boolean
+        default: false
+
+concurrency:
+  group: kash-resumen-llave
+  cancel-in-progress: false
+
+env:
+  EDIFICIO_REF: ezeigddgkaemxpshghmu
+  KASH_REF: lsagslbkliprespbyhts
+  SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
+jobs:
+  llave:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Candado — las dos bases son las que deben ser
+        run: |
+          set -euo pipefail
+          source infra/casas/guarda-kash.sh
+          solo_edificio "$EDIFICIO_REF"
+          # En Kash solo se toca UN secreto, y la ref tiene que ser exactamente la de Kash.
+          [ "$KASH_REF" = "lsagslbkliprespbyhts" ] || { echo "::error::ref de Kash inesperada"; exit 1; }
+          [ "$EDIFICIO_REF" != "$KASH_REF" ] || { echo "::error::las dos refs son la misma"; exit 1; }
+          [ -n "${SUPABASE_ACCESS_TOKEN:-}" ] || { echo "::error::Falta el secret SUPABASE_ACCESS_TOKEN"; exit 1; }
+
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: 2.110.0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Generar y poner la llave (sin imprimirla)
+        env:
+          ROTAR: ${{ github.event.inputs.rotar }}
+        run: |
+          set -euo pipefail
+          source infra/casas/guarda-kash.sh
+          solo_edificio "$EDIFICIO_REF"
+          H=(-H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN")
+          nombres() { curl -sS -f "https://api.supabase.com/v1/projects/$1/secrets" "${H[@]}" | jq -r '.[].name'; }
+          EN_KASH="$(nombres "$KASH_REF" | grep -cx KASH_RESUMEN_TOKEN || true)"
+          EN_EDIFICIO="$(nombres "$EDIFICIO_REF" | grep -cx KASH_RESUMEN_TOKEN || true)"
+          if [ "${ROTAR:-false}" != "true" ] && [ "$EN_KASH" = "1" ] && [ "$EN_EDIFICIO" = "1" ]; then
+            echo "Las dos bases ya tienen KASH_RESUMEN_TOKEN: no se cambia (usa «rotar» para una nueva)." | tee -a "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          LLAVE="$(openssl rand -hex 32)"
+          echo "::add-mask::$LLAVE"
+          umask 077
+
+          # 1) Edificio primero: la llave + la dirección de la función de Kash.
+          solo_edificio "$EDIFICIO_REF"
+          E="$RUNNER_TEMP/edificio.env"
+          printf 'KASH_RESUMEN_TOKEN=%s\nKASH_RESUMEN_URL=%s\n' "$LLAVE" "https://$KASH_REF.supabase.co/functions/v1/kash-resumen" > "$E"
+          supabase secrets set --project-ref "$EDIFICIO_REF" --env-file "$E" >/dev/null
+          rm -f "$E"
+
+          # 2) Kash: SOLO este secreto.
+          K="$RUNNER_TEMP/kash.env"
+          printf 'KASH_RESUMEN_TOKEN=%s\n' "$LLAVE" > "$K"
+          [ "$(cut -d= -f1 "$K")" = "KASH_RESUMEN_TOKEN" ] || { rm -f "$K"; echo "::error::en Kash solo va KASH_RESUMEN_TOKEN"; exit 1; }
+          supabase secrets set --project-ref "$KASH_REF" --env-file "$K" >/dev/null
+          rm -f "$K"
+          unset LLAVE
+          echo "Llave nueva puesta en Kash (solo KASH_RESUMEN_TOKEN) y en el edificio (+ KASH_RESUMEN_URL)." | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - name: Nombres que quedaron (sin valores)
+        run: |
+          set -euo pipefail
+          for ref in "$EDIFICIO_REF" "$KASH_REF"; do
+            echo "$ref: $(curl -sS "https://api.supabase.com/v1/projects/$ref/secrets" -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" | jq -r '.[].name' | grep -x 'KASH_RESUMEN_TOKEN\|KASH_RESUMEN_URL' | tr '\n' ' ')" | tee -a "$GITHUB_STEP_SUMMARY"
+          done
+
+      - name: Probar la tarjeta de Kash (refrescar ahora, solo lectura de Kash)
+        continue-on-error: true
+        run: |
+          set -euo pipefail
+          source infra/casas/guarda-kash.sh
+          solo_edificio "$EDIFICIO_REF"
+          # El reloj refrescar-externas corre cada 15 min; aquí solo se mira si ya hay fila.
+          Q="select coalesce(json_agg(json_build_object('nombre', nombre, 'actualizado_at', actualizado_at)), '[]'::json) as kash from public.organizaciones_externas where fuente = 'kash'"
+          curl -sS -X POST "https://api.supabase.com/v1/projects/$EDIFICIO_REF/database/query" \
+            -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" -H "Content-Type: application/json" \
+            -d "$(jq -n --arg q "$Q" '{query: $q, read_only: true}')" | tee -a "$GITHUB_STEP_SUMMARY"

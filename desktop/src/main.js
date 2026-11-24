@@ -419,6 +419,14 @@ ipcMain.handle("maven:memoria", (e) => {
 ipcMain.handle("maven:ultimo-cierre", (e) => (deLaVentana(e) ? leerYBorrarCierres() : []));
 ipcMain.handle("maven:llamada", (e, datos) => (deLaVentana(e) ? avisarLlamada(datos, () => mostrar()) : "cerrada"));
 ipcMain.on("maven:llamada-fin", (e, id) => { if (deLaVentana(e)) cerrarAvisoLlamada(id); });
+// «Clientes» (panel de la plataforma, 19/11/2026): la sesión de la plataforma vive en el
+// NAVEGADOR (la base del edificio), no en esta app (Kash). Abre una página de Maven en el
+// navegador del equipo. Solo https y solo direcciones de Maven.
+ipcMain.handle("maven:abrir-en-navegador", (e, url) => {
+  if (!deLaVentana(e) || typeof url !== "string" || !/^https:\/\//.test(url) || !esDeMaven(url)) return false;
+  shell.openExternal(url);
+  return true;
+});
 
 // ── El número de chats sin leer ──────────────────────────────────────────────
 let insigniaPuesta = false;

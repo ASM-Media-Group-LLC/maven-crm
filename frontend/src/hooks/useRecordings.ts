@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY } from "@/lib/conexionSupabase";
 
 // Grabaciones de Meet/Cowork. La lista y el uso se leen DIRECTO por RLS
 // (ves lo que grabaste + lo que te compartieron; admin ve todo); la edge
@@ -38,12 +39,12 @@ export async function invokeRecordings(
 ): Promise<Record<string, unknown>> {
   const { data: { session } } = await supabase.auth.getSession();
   const res = await fetch(
-    `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/recordings`,
+    `${SUPABASE_URL}/functions/v1/recordings`,
     {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+        apikey: SUPABASE_PUBLISHABLE_KEY,
         Authorization: `Bearer ${session?.access_token}`,
       },
       body: JSON.stringify({ action, ...payload }),

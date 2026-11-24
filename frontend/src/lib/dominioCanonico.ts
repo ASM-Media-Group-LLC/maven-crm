@@ -1,3 +1,4 @@
+import { SUPABASE_URL_KASH } from "@/lib/conexionSupabase";
 // Una sola URL para Maven: app.maven-ai.me
 //
 // Maven se sirve desde varios dominios a propósito:
@@ -76,7 +77,7 @@ function contarVisitaHistorica(): void {
   } catch { /* modo privado: se cuenta igual, no es grave */ }
 
   const cuerpo = JSON.stringify({ host: window.location.hostname, ruta: window.location.pathname });
-  const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/dominio-legacy-hit`;
+  const url = `${SUPABASE_URL_KASH}/functions/v1/dominio-legacy-hit`;
   try {
     // `keepalive` para que el pedido sobreviva a la redirección de la página.
     void fetch(url, { method: "POST", body: cuerpo, headers: { "Content-Type": "application/json" }, keepalive: true })

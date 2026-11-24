@@ -7,6 +7,7 @@
 // persona sigue en la sala de espera: la gente entra y sale justo en ese rato.
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY } from "@/lib/conexionSupabase";
 
 export interface PersonaEnSala {
   id: string;
@@ -22,12 +23,12 @@ export async function pedirQuienesEstan(roomName: string): Promise<PersonaEnSala
   const { data: { session } } = await supabase.auth.getSession();
   if (!session) return [];
   const res = await fetch(
-    `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/livekit-moderate`,
+    `${SUPABASE_URL}/functions/v1/livekit-moderate`,
     {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+        apikey: SUPABASE_PUBLISHABLE_KEY,
         Authorization: `Bearer ${session.access_token}`,
       },
       body: JSON.stringify({ action: "quienesEstan", room: roomName }),

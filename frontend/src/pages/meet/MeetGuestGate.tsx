@@ -7,6 +7,7 @@ import { invitadosNuevos } from "@/lib/avisoDeInvitado";
 import { playCoordinatorRequestSound } from "@/lib/coordinatorRequestSound";
 import { sonarUnaVezEntrePestanas } from "@/lib/sonarUnaVezEntrePestanas";
 import { useLanguage } from "@/hooks/useLanguage";
+import { SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY } from "@/lib/conexionSupabase";
 
 interface GuestRequest {
   id: string;
@@ -40,12 +41,12 @@ export default function MeetGuestGate({ livekitRoom }: { livekitRoom: string }) 
       if (!session) return; // un invitado no admite a otro invitado
       try {
         const res = await fetch(
-          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/meet-room`,
+          `${SUPABASE_URL}/functions/v1/meet-room`,
           {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
-              apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+              apikey: SUPABASE_PUBLISHABLE_KEY,
               Authorization: `Bearer ${session.access_token}`,
             },
             body: JSON.stringify({ action: "resolve", livekitRoom }),
@@ -137,12 +138,12 @@ export default function MeetGuestGate({ livekitRoom }: { livekitRoom: string }) 
     try {
       const { data: { session } } = await supabase.auth.getSession();
       const res = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/meet-room`,
+        `${SUPABASE_URL}/functions/v1/meet-room`,
         {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+            apikey: SUPABASE_PUBLISHABLE_KEY,
             Authorization: `Bearer ${session?.access_token}`,
           },
           body: JSON.stringify({ action: "decideGuest", requestId: request.id, admit }),

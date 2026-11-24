@@ -14,7 +14,11 @@ const flujos: Record<string, string> = {
   funciones: leer(import.meta.glob("../../../../.github/workflows/edificio-funciones.yml", { query: "?raw", import: "default", eager: true })),
   secretos: leer(import.meta.glob("../../../../.github/workflows/edificio-secretos.yml", { query: "?raw", import: "default", eager: true })),
   auth: leer(import.meta.glob("../../../../.github/workflows/edificio-auth.yml", { query: "?raw", import: "default", eager: true })),
+  arbol: leer(import.meta.glob("../../../../.github/workflows/edificio-arbol.yml", { query: "?raw", import: "default", eager: true })),
+  dueno: leer(import.meta.glob("../../../../.github/workflows/edificio-dueno.yml", { query: "?raw", import: "default", eager: true })),
 };
+const llaveKash = leer(import.meta.glob("../../../../.github/workflows/kash-resumen-llave.yml", { query: "?raw", import: "default", eager: true }));
+const migracionesDelEdificio = import.meta.glob("../../../../infra/edificio/migraciones/*.sql", { query: "?raw", import: "default", eager: true });
 const guarda = leer(import.meta.glob("../../../../infra/casas/guarda-kash.sh", { query: "?raw", import: "default", eager: true }));
 const alDia = leer(import.meta.glob("../../../../infra/casas/al-dia.sh", { query: "?raw", import: "default", eager: true }));
 const relojes = leer(import.meta.glob("../../../../infra/casas/edificio-migraciones/20261119230000_edificio_crons.sql", { query: "?raw", import: "default", eager: true }));
@@ -102,5 +106,53 @@ describe("el edificio nunca toca Kash", () => {
     for (const f of funciones) {
       expect(f).not.toMatch(/^(blu-|chatter-|closers?-|promolog-|scouter-|whatsapp-|wa-|tg-|telegram-|zoho-|mail-|creator|creadora|portal-|parrilla-|qa-|fb-scan|x-scan|buzones-|role-email)/);
     }
+  });
+
+  // La puerta prendida (19/11/2026): las migraciones del árbol solo al edificio, con ensayo
+  // antes y «aplicar» a mano; el dueño se invita sin tocar contraseñas.
+  it("el árbol se ensaya antes y solo se aplica a mano, al edificio", () => {
+    const yml = flujos.arbol;
+    expect(yml).toMatch(/workflow_dispatch:/);
+    expect(yml).not.toMatch(/^\s*push:/m);
+    expect(yml).toMatch(/if: github\.event_name == 'workflow_dispatch' && inputs\.aplicar && needs\.ensayo\.outputs\.limpio == 'true'/);
+    expect(yml).toContain("infra/edificio/migraciones/*.sql");
+    expect(yml).toContain("api.supabase.com/v1/projects/$EDIFICIO_REF/database/query");
+  });
+
+  it("las migraciones del edificio traen su candado y no viven en supabase/migrations", () => {
+    const nombres = Object.keys(migracionesDelEdificio).map((r) => r.split("/").pop()!);
+    expect(nombres.length).toBeGreaterThanOrEqual(4);
+    expect(nombres).toContain("20261120120000_quien_soy.sql");
+    for (const [ruta, sql] of Object.entries(migracionesDelEdificio)) {
+      // Kash solo puede aparecer en comentarios («nunca en Kash»).
+      const usos = (sql as string).split("\n").filter((l) => l.includes(KASH) && !l.trim().startsWith("--"));
+      expect(usos, ruta).toEqual([]);
+      // El candado (se niega si ve el tenant de Kash); arbol_funciones va siempre detrás de arbol.
+      if (!ruta.endsWith("_arbol_funciones.sql")) expect(sql as string, ruta).toContain("30869615-f579-4981-8a1f-dbebc61eae2d");
+    }
+    const deKash = Object.keys(migracionesDeKash).map((r) => r.split("/").pop());
+    for (const n of nombres) expect(deKash).not.toContain(n);
+  });
+
+  it("invitar al dueño: solo el edificio, nunca una contraseña", () => {
+    const yml = flujos.dueno;
+    expect(yml).toContain("/auth/v1/invite?redirect_to=");
+    expect(yml).toContain("REDIRECCION: https://app.maven-ai.me/reset-password");
+    expect(yml).toContain("::add-mask::$SERVICIO");
+    expect(yml).toMatch(/supabase projects api-keys --project-ref "\$EDIFICIO_REF"/);
+    expect(yml).not.toMatch(/"password"\s*:|password=|--password/i);
+    expect(yml).toMatch(/on conflict \(user_id\) do update set nivel = 'dueno'/);
+  });
+
+  it("la llave del resumen: en Kash SOLO KASH_RESUMEN_TOKEN, y nunca se imprime", () => {
+    expect(llaveKash).toContain("solo_edificio \"$EDIFICIO_REF\"");
+    expect(llaveKash).toContain("::add-mask::$LLAVE");
+    // Lo único que se escribe en Kash: un env con una sola línea KASH_RESUMEN_TOKEN.
+    const enKash = llaveKash.split("\n").filter((l) => /--project-ref "\$KASH_REF"/.test(l));
+    expect(enKash).toHaveLength(1);
+    expect(enKash[0]).toMatch(/supabase secrets set --project-ref "\$KASH_REF" --env-file "\$K"/);
+    expect(llaveKash).toContain(`printf 'KASH_RESUMEN_TOKEN=%s\\n' "$LLAVE" > "$K"`);
+    expect(llaveKash).not.toMatch(/echo "?\$LLAVE/);
+    expect(llaveKash).not.toMatch(/db push|database\/query"[^\n]*KASH_REF|functions deploy/);
   });
 });

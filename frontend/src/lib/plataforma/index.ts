@@ -1,4 +1,5 @@
 import { ErrorDePlataforma, type PlataformaDatos } from "./tipos";
+import { destinoDeEstaPestana } from "@/lib/puerta";
 
 export * from "./tipos";
 
@@ -6,8 +7,13 @@ export * from "./tipos";
 //
 //   · "mock"    → datos de ejemplo en memoria (mock.ts). Para la demo local y las
 //                 capturas, sin Supabase.
+//   · "edificio" → los datos REALES (supabase.ts): solo cuando esta pestaña está
+//                 conectada al edificio (la puerta la mandó allá). Quién entra a qué lo
+//                 decide quien_soy_en_la_plataforma (dueño / Grace / admin del cliente);
+//                 cualquier otro vuelve a /dashboard.
 //   · "apagada" → lo de siempre: /plataforma y /mi-empresa mandan al tablero y la
-//                 app de Kash sigue EXACTAMENTE igual.
+//                 app de Kash sigue EXACTAMENTE igual (una pestaña de Kash nunca usa
+//                 el modo real).
 //
 // El mock se prende SOLO con bandera:
 //   1. al compilar: VITE_PLATAFORMA=mock (un build de demo, nunca el de producción), o
@@ -16,20 +22,19 @@ export * from "./tipos";
 // En el build de producción el ?plataforma=mock se ignora (guarda en
 // test/plataforma/plataformaGuardas.test.ts).
 //
-// TODO(vagón 2, «misma puerta»): modo "edificio" con el cliente de Supabase del
-// edificio (supabase.ts) cuando app.maven-ai.me sepa a qué base va cada correo.
-
-export type ModoPlataforma = "mock" | "apagada";
+export type ModoPlataforma = "mock" | "edificio" | "apagada";
 
 export const CLAVE_MODO = "maven.plataforma.modo";
 
-export function decidirModo(p: { bandera?: string; dev: boolean; busqueda: string; recordado: string | null }): ModoPlataforma {
+export function decidirModo(p: { bandera?: string; dev: boolean; busqueda: string; recordado: string | null; edificio?: boolean }): ModoPlataforma {
+  // Sin mock pedido: el modo real SOLO en una pestaña del edificio. Kash → apagada.
+  const real: ModoPlataforma = p.edificio === true ? "edificio" : "apagada";
   if (p.bandera === "mock") return "mock";
-  if (!p.dev) return "apagada";
+  if (!p.dev) return real;
   const pedido = new URLSearchParams(p.busqueda).get("plataforma");
   if (pedido === "mock") return "mock";
-  if (pedido === "apagada") return "apagada";
-  return p.recordado === "mock" ? "mock" : "apagada";
+  if (pedido === "apagada") return real;
+  return p.recordado === "mock" ? "mock" : real;
 }
 
 export function modoPlataforma(): ModoPlataforma {
@@ -40,6 +45,7 @@ export function modoPlataforma(): ModoPlataforma {
     dev: !!import.meta.env.DEV,
     busqueda: typeof location !== "undefined" ? location.search : "",
     recordado,
+    edificio: destinoDeEstaPestana() === "edificio",
   });
   try {
     if (import.meta.env.DEV) {

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY } from "@/lib/conexionSupabase";
 
 export interface MeetRoom {
   id: string;
@@ -14,12 +15,12 @@ export interface MeetRoom {
 async function invokeMeet(action: string, payload: Record<string, unknown> = {}) {
   const { data: { session } } = await supabase.auth.getSession();
   const res = await fetch(
-    `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/meet-room`,
+    `${SUPABASE_URL}/functions/v1/meet-room`,
     {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+        apikey: SUPABASE_PUBLISHABLE_KEY,
         Authorization: `Bearer ${session?.access_token}`,
       },
       body: JSON.stringify({ action, ...payload }),

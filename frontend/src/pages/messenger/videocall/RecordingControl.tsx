@@ -9,6 +9,7 @@ import { Loader2, Square } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { useLanguage } from "@/hooks/useLanguage";
+import { SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY } from "@/lib/conexionSupabase";
 
 // Control de grabación DENTRO de la llamada.
 //
@@ -50,12 +51,12 @@ export async function detenerAlSalir(roomName: string, recordingId: string): Pro
     const { data: { session } } = await supabase.auth.getSession();
     if (!session?.access_token) return;
     sessionStorage.removeItem(claveSesion(roomName));
-    await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/recordings`, {
+    await fetch(`${SUPABASE_URL}/functions/v1/recordings`, {
       method: "POST",
       keepalive: true,
       headers: {
         "Content-Type": "application/json",
-        apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+        apikey: SUPABASE_PUBLISHABLE_KEY,
         Authorization: `Bearer ${session.access_token}`,
       },
       body: JSON.stringify({ action: "stop", recording_id: recordingId, room_name: roomName, recipients: [] }),

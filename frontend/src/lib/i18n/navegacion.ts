@@ -95,6 +95,8 @@ export const navegacion = {
   "nav.messenger": { es: "Messenger", en: "Messenger" },
   "nav.cowork": { es: "Cowork", en: "Cowork" },
   "nav.argos": { es: "Argos", en: "Argos" },
+  // «Clientes» (19/11/2026): el panel de la plataforma («Tus clientes»). Solo el dueño.
+  "nav.clientes": { es: "Clientes", en: "Clients" },
   "nav.meet": { es: "Meet", en: "Meet" },
   "nav.recordings": { es: "Grabaciones", en: "Recordings" },
   "nav.controlPanel": { es: "Panel de control", en: "Control Panel" },
