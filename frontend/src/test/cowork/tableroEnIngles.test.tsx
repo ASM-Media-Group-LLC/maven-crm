@@ -92,7 +92,7 @@ vi.mock("@/pages/cowork/CoworkRoomMonitor", async () => {
 vi.mock("@/hooks/useUserRole", () => ({ useUserRole: () => ({ isAdmin: true }) }));
 vi.mock("@/hooks/use-mobile", () => ({ useIsMobile: () => false }));
 vi.mock("@/hooks/ChatProvider", () => ({ useChatShared: () => ({ createDirectChat: () => null }) }));
-vi.mock("@/components/messenger/MessengerDock", () => ({ useMessengerDock: () => ({ abrirDirecto: () => {} }) }));
+vi.mock("@/components/messenger/MessengerDock", () => ({ useMessengerDock: () => ({ abrirChat: () => {} }) }));
 
 // La vista "Pausas y meets": lo que devolverían los dos RPC ya agregado.
 vi.mock("@/hooks/useCoworkPausas", () => ({

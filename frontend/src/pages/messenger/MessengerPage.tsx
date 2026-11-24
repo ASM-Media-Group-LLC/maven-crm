@@ -177,7 +177,7 @@ export default function MessengerPage() {
     if (!c) return;
     if (conversations.some((x) => x.id === c)) {
       selectChat(c);
-      setMensajeDestino(m);
+      if (m) setMensajeDestino(m);
       searchParams.delete("c");
       searchParams.delete("chat");
       searchParams.delete("m");
@@ -260,9 +260,7 @@ export default function MessengerPage() {
   const handleSelectUser = useCallback((userId: string) => {
     // onResolved: si el DM ya existía en el server, reapuntamos la selección al id real
     // (evita quedar en una conv optimista que se elimina bajo el usuario).
-    const convId: string | null = createDirectChat(userId, (realId) => {
-      if (activeChatIdRef.current === convId) selectChat(realId);
-    });
+    const convId = createDirectChat(userId, (realId) => selectChat(realId));
     if (convId) selectChat(convId);
   }, [createDirectChat, selectChat]);
 

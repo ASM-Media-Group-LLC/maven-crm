@@ -100,9 +100,6 @@ export function useMuelleFlotante() {
   // botones dentro de la misma columna.)
   const onPointerDown = useCallback((e: ReactPointerEvent<HTMLElement>) => {
     if (e.button !== 0 && e.pointerType === "mouse") return;
-    // Un arrastre que terminó fuera del botón puede no haber generado clic.
-    // Este toque inicia un gesto nuevo y no debe consumir el clic siguiente.
-    tragarClickRef.current = false;
     dragRef.current = { startX: e.clientX, startY: e.clientY, origX: pos.x, origY: pos.y, moved: false };
 
     const mover = (ev: PointerEvent) => {

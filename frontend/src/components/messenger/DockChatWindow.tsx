@@ -106,7 +106,7 @@ export default function DockChatWindow({
   return (
     <div
       className="glass-panel pointer-events-auto flex flex-col overflow-hidden rounded-t-2xl"
-      style={llenar ? { width: "100%", height: "100%" } : { width: VENTANA_ANCHO, height: VENTANA_ALTO, maxHeight: "calc(100dvh - 16px)" }}
+      style={llenar ? { width: "100%", height: "100%" } : { width: VENTANA_ANCHO, height: VENTANA_ALTO }}
       role="dialog"
       aria-label={t("messenger.dock.chatCon", { name: conversation.displayName })}
     >
