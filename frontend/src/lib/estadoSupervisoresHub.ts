@@ -1,5 +1,5 @@
 // Lo que devuelve hub_estado_supervisores (supabase/migrations/
-// 20261119010000_hub_supervisores_senal_y_avisos.sql), en la forma del chip.
+// 20261119012000_hub_supervisores_senal_y_avisos.sql), en la forma del chip.
 import type { TranslationKey } from "@/lib/i18n";
 
 export type ProblemaDelHub = "ok" | "fuera" | "camara" | "pantalla";
