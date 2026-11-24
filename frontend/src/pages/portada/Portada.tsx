@@ -541,7 +541,7 @@ export default function Portada({ idiomaDeRuta }: { idiomaDeRuta?: Idioma }) {
           <p className="pr-precios-nota">
             {t("portada.precios.nota")}{" "}
             <b>{t("portada.precios.implementacionOpcional")}</b>{" "}
-            <a href="#demo" className="underline underline-offset-4">{t("portada.precios.solicitarCotizacion")}</a>
+            <a href="#demo" onClick={abrirDemo} className="underline underline-offset-4">{t("portada.precios.solicitarCotizacion")}</a>
           </p>
         </div>
       </section>
