@@ -345,3 +345,18 @@ Con **un solo cliente** en el edificio esto no se nota. **Antes del segundo clie
 6. **Sillas.** ¿Admins y supervisores también ocupan silla, como en Lumina? Si se llena, ¿bloquear (decisión del 19/11) o solo avisar y cobrar el paquete siguiente (como Lumina)?
 7. **Extras del Dashboard.** Además de quién entra, ¿quieres ver por cliente la nota de Argos, las horas trabajadas, las tardanzas y el saldo de Argos?
 8. **Reparto con Codex.** Codex está con el cobro (Stripe). ¿Claude toma árbol + panel del cliente + Dashboard, y Codex sigue con cobros?
+
+## Cambio de estructura (24/11/2026, tarde) — SIN «clientes de clientes»
+Alvaro: en Maven no hay revendedores como en Lumina (Jacqueline/Blu era un caso de Lumina). Queda así:
+- **Maven (dueño rusin24 + admins de plataforma) → Organización (= una empresa cliente) → Dueño / Admin / resto.**
+  Sin nivel de líder ni subcuentas. Lo crea Alvaro o un admin de Maven.
+- **Varias sedes o marcas = varias organizaciones separadas**, cada una con su dueño y su cobro.
+- **Niveles:** Dueño y Admin fijos; lo demás (Supervisor, HR, QA, agentes…) lo crea el Admin con **Posiciones**, con el nombre que quiera.
+- **Primer acceso:** al crear la organización se invita al **Dueño**; él invita a sus admins y arma lo demás.
+- **Plan y pagos:** los ven y pagan el **Dueño y los Admins** (supervisores y gente no ven dinero).
+- **Sillas:** cuentan todos menos el Dueño; llena = no se agrega a nadie hasta subir sillas.
+- **Una persona dueña de varias organizaciones:** un solo correo y un **selector de organización** arriba.
+- Técnico: organización = un solo `tenant` (el «cliente directo» de antes, siempre). El nivel «agencias» queda escondido;
+  se conservan las tablas por si un día se prende «tiene subcuentas», sin rehacer nada.
+- Sigue igual: onboarding flexible por organización (días de montaje, prueba, setup, cobro, gracia, pausa), Grace sin precios,
+  cobro por TECH VISUALS LLC, Dashboard por organización (quién usa y quién no), Kash como tarjeta solo de mirar.
