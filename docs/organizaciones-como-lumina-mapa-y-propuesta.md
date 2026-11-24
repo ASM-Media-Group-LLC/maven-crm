@@ -27,6 +27,33 @@
    - **Codex:** cobros (Stripe) y créditos de Argos.
 9. **Arranque:** paso 1, el edificio con datos reales para el dueño. Nada toca Kash, y nada pasa a producción sin el OK de Alvaro.
 
+### Onboarding de clientes (24/11). Lo urgente: dar accesos, montaje, prueba gratis y cobrar
+
+Regla madre: **"Yo soy el dueño y señor de todo esto."** Todo es opcional y flexible **por cliente**. Lo decide el dueño y lo puede cambiar en cualquier momento. Los valores por defecto son solo un punto de partida.
+
+- **Alta de clientes:** la hace el dueño desde su panel con "Nuevo cliente". El cliente nace en preparación, y nadie recibe correos hasta "Activar". Sin registro público por ahora.
+- **En la ficha de cada cliente** (sale en el asistente y se edita después):
+
+| Campo | Qué es | Por defecto |
+|---|---|---|
+| Días de montaje | Tiempo para dejar la cuenta lista. No corre la prueba ni el cobro | 0 |
+| Días de prueba gratis | 0, 7, 14, 30… lo que el dueño ponga | 14 |
+| Setup | Monto (0 si no aplica) y cuándo se cobra: antes de empezar, o con la primera factura | Sin setup |
+| Forma de cobro | Suscripción con tarjeta (Stripe cobra solo cada mes) o factura mensual con link para pagar (tarjeta o transferencia) | — |
+| Plan y sillas | Equipo / Empresa / a la medida, con precio y sillas editables por cliente | — |
+| Qué pasa si no paga | Días de gracia (7 por defecto), y luego pausa automática o solo aviso al dueño | 7 días de gracia |
+
+- **Botones del dueño, siempre a mano:**
+  - Activar, Pausar y Reactivar.
+  - Alargar la prueba.
+  - Regalar o quitar sillas.
+  - Cambiar plan o precio.
+  - Marcar como pagado a mano.
+  - Pasar a demo / marcar como cliente.
+  - Ver como.
+- **El orden natural es montaje → prueba → cobro.** Cada paso puede ser 0, y el dueño puede saltar cualquiera.
+- **Para Codex (cobros):** estos campos son la fuente de verdad del cobro. Stripe (suscripción o checkout de factura) lee de aquí. Nada de precios fijos en el código.
+
 Continúa la especificación del 19/11 (`docs/maven-como-lumina-spec.md`), que sigue vigente. Este documento agrega:
 1. Un mapa preciso de cómo está hecho Lumina por dentro, sacado de su código y su base.
 2. Dónde está Maven hoy.
