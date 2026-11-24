@@ -158,7 +158,7 @@ class Propuesta(Informe):
             rows.append([label]+vals)
         y=self.table(['Partida sin contingencia','230','1.000','3.000','10.000'],rows,[169,75,75,83,CW-402],y,size=8.1)
         y=self.p('App/Realtime/pruebas son provisiones de ingeniería, no cotizaciones de proveedores. Bases: KASH y edificio, laboratorio, PITR en dos proyectos y réplicas según etapa. La copia externa mantiene el volumen actual: nuevos archivos se cotizan aparte.',y,size=8.8)
-        self.note('<b>Fuera de estos totales:</b> implementación, operación humana/guardia, Argos/Promolog e IA, grabaciones, correos/licencias existentes, crecimiento del almacenamiento principal, servicio alterno de archivos y acuerdos empresariales. Se detallan en las páginas siguientes. Conciliar facturas antes de calcular el incremento real.',y,80)
+        self.note('<b>Fuera de estos totales:</b> implementación, operación humana/guardia, Argos/Promolog e IA, grabaciones, correos/licencias existentes, crecimiento del almacenamiento principal, servicio alterno de archivos y acuerdos empresariales. Se detallan en las páginas siguientes. Conciliar facturas antes de calcular el incremento real.',y,65)
 
     def purchase(self):
         y=self.start('Compra inicial propuesta', 'Primero un laboratorio pequeño', 'No contratar decenas de servidores usando hipótesis. La primera compra debe producir evidencia.')
