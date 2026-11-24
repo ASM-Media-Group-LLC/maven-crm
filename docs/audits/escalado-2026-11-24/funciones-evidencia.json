@@ -1,0 +1,188 @@
+{
+  "project": "lsagslbkliprespbyhts",
+  "scope": "solo lectura",
+  "blulog": {
+    "last_date": "2026-10-21",
+    "last_import": "2026-10-21T22:13:52.244526+00:00"
+  },
+  "window_7d": {
+    "end": "2026-11-24T13:30:00Z",
+    "start": "2026-11-17T13:30:00Z"
+  },
+  "observed_at": "2026-11-24T13:37:41.954053+00:00",
+  "promolog_7d": [
+    {
+      "ai": 0,
+      "rows": 243,
+      "latest": "2026-11-23T16:30:07.960743+00:00",
+      "network": "x",
+      "error_reason": "x_read_failed"
+    },
+    {
+      "ai": 3,
+      "rows": 3,
+      "latest": "2026-11-23T16:30:04.672623+00:00",
+      "network": "x",
+      "error_reason": null
+    }
+  ],
+  "argos_config": [
+    {
+      "active": true,
+      "filters": true,
+      "random_review": 0.1,
+      "daily_limit_usd": 1.5,
+      "interval_seconds": 120
+    }
+  ],
+  "cron_summary": {
+    "active": 77,
+    "inactive": 20
+  },
+  "argos_fin_24h": {
+    "rounds": 687,
+    "analyzed_counter_sum": 296,
+    "budget_stopped_rounds": 238,
+    "budget_skipped_counter_sum": 2910
+  },
+  "promolog_last": [
+    {
+      "network": "telegram",
+      "last_entry": "2026-11-01T00:01:06.646374+00:00",
+      "last_without_error": "2026-11-01T00:01:06.646374+00:00"
+    },
+    {
+      "network": "instagram",
+      "last_entry": "2026-11-01T21:45:13.178443+00:00",
+      "last_without_error": "2026-09-21T18:16:02.203217+00:00"
+    },
+    {
+      "network": "x",
+      "last_entry": "2026-11-23T16:30:07.960743+00:00",
+      "last_without_error": "2026-11-23T16:30:04.672623+00:00"
+    },
+    {
+      "network": "facebook",
+      "last_entry": "2026-11-11T22:30:23.745186+00:00",
+      "last_without_error": "2026-11-11T22:30:23.745186+00:00"
+    }
+  ],
+  "inactive_crons": [
+    {
+      "name": "alvaro-pulse",
+      "schedule": "0 16,17,18,20,22,23,0 * * *"
+    },
+    {
+      "name": "fb-scan-daily",
+      "schedule": "30 18 * * *"
+    },
+    {
+      "name": "fb-scan-sweep-2",
+      "schedule": "30 20 * * *"
+    },
+    {
+      "name": "fb-scan-sweep-3",
+      "schedule": "30 0 * * *"
+    },
+    {
+      "name": "fb-scan-sweep-5",
+      "schedule": "30 4 * * *"
+    },
+    {
+      "name": "messenger-webhooks-tick",
+      "schedule": "15 seconds"
+    },
+    {
+      "name": "promolog-manager-tick",
+      "schedule": "0 22 * * *"
+    },
+    {
+      "name": "promolog-story-read-staggered",
+      "schedule": "*/5 18-21 * * *"
+    },
+    {
+      "name": "reporte-baja-actividad-grace",
+      "schedule": "20 15,19,23 * * 1-5"
+    },
+    {
+      "name": "wa-contacts-reresolve-nightly",
+      "schedule": "15 8 * * *"
+    },
+    {
+      "name": "wa-conversation-summarize",
+      "schedule": "5-59/10 * * * *"
+    },
+    {
+      "name": "wa-inbox-analyze-image",
+      "schedule": "2-59/5 * * * *"
+    },
+    {
+      "name": "wa-inbox-transcribe",
+      "schedule": "4-59/10 * * * *"
+    },
+    {
+      "name": "whatsapp-corte-tick",
+      "schedule": "0 16,17,18,19,20,22,0 * * *"
+    },
+    {
+      "name": "whatsapp-followup-tick",
+      "schedule": "*/5 * * * *"
+    },
+    {
+      "name": "whatsapp-horarios-pendientes",
+      "schedule": "25 15,18,21 * * 1-6"
+    },
+    {
+      "name": "whatsapp-members-reconcile",
+      "schedule": "12 * * * *"
+    },
+    {
+      "name": "whatsapp-reminders-drain",
+      "schedule": "6-59/10 * * * *"
+    },
+    {
+      "name": "whatsapp-supervisor-tick",
+      "schedule": "*/15 * * * *"
+    },
+    {
+      "name": "whatsapp-transcribe-watchdog",
+      "schedule": "* * * * *"
+    }
+  ],
+  "promolog_agents": [
+    {
+      "version": "7bf7b8c8",
+      "last_seen": "2026-08-08T06:15:03.532+00:00",
+      "session_counts": {
+        "x": 1,
+        "facebook": 0,
+        "telegram": 1,
+        "instagram": 2
+      },
+      "scheduled_networks": []
+    },
+    {
+      "version": "?",
+      "last_seen": "2026-11-23T21:59:26.794+00:00",
+      "session_counts": {
+        "x": 1,
+        "facebook": 1,
+        "telegram": 1,
+        "instagram": 2
+      },
+      "scheduled_networks": [
+        "instagram",
+        "telegram",
+        "x",
+        "facebook"
+      ]
+    }
+  ],
+  "promolog_dispatch": {
+    "old_running": 3,
+    "last_started": "2026-11-01T21:45:09.036051+00:00",
+    "recorded_cost_30d": 0
+  },
+  "webhook_endpoints": 0,
+  "webhook_deliveries": 0
+}

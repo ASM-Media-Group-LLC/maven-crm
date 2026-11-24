@@ -1,0 +1,275 @@
+{
+  "fecha": "2026-11-24",
+  "estado": "Propuesta; sin compras ni capacidad certificada",
+  "supuestos": {
+    "horas_media_mes": 176,
+    "porcentaje_en_media": 100,
+    "mbps_agregados_por_receptor": 1.5,
+    "margen_trafico": 1.2,
+    "cuota_transferencia_descontada_gb": 0,
+    "usd_gb_reserva_vultr": 0.01,
+    "usd_nodo_8cpu_16gb": 160,
+    "capacidad_por_nodo_hipotesis_no_medida": [
+      100,
+      250
+    ],
+    "reserva_nodos_adicionales": 1,
+    "backup_33_2tb_con_versiones_usd": 300,
+    "excluye": [
+      "Impuestos",
+      "Operación humana y soporte24/7",
+      "Implementación",
+      "IA/Argos/Promolog",
+      "Grabaciones",
+      "Correos y licencias existentes",
+      "Expansión de NAS/almacenamiento principal",
+      "Incrementos por nuevas regiones o HA empresarial"
+    ],
+    "porcentaje_supervisores": 5,
+    "salas_monitor_por_supervisor": 12,
+    "mbps_monitor_por_sala": 0.5,
+    "nota": "Las capacidades por nodo son hipótesis de sensibilidad financiera, NO mediciones de Maven; 230 personas incluye sus monitores. No comprar cantidades antes de probar."
+  },
+  "niveles": [
+    {
+      "concurrentes": 230,
+      "app_reserva": [
+        160,
+        320
+      ],
+      "bd_reserva": [
+        395,
+        465
+      ],
+      "realtime_reserva": [
+        50,
+        150
+      ],
+      "pruebas_reserva": [
+        25,
+        50
+      ],
+      "backup_reserva_usd": 300,
+      "supervisores_supuestos": 12,
+      "monitores_extra": 144,
+      "intensivo": {
+        "personas_en_media": 230,
+        "conexiones_media_con_monitores": 374,
+        "nodos_hipoteticos": [
+          3,
+          5
+        ],
+        "media_gb": 39631.68,
+        "media_reserva_usd": 396.32,
+        "subtotal": [
+          1806.32,
+          2481.32
+        ],
+        "con_contingencia_25": [
+          2300,
+          3150
+        ],
+        "livekit_scale_minutos": 3949440,
+        "livekit_scale_usd": 5142.94
+      },
+      "mixto": {
+        "personas_en_media": 46,
+        "conexiones_media_con_monitores": 190,
+        "nodos_hipoteticos": [
+          2,
+          3
+        ],
+        "media_gb": 13400.64,
+        "media_reserva_usd": 134.01,
+        "subtotal": [
+          1384.01,
+          1899.01
+        ],
+        "con_contingencia_25": [
+          1750,
+          2400
+        ]
+      }
+    },
+    {
+      "concurrentes": 1000,
+      "app_reserva": [
+        350,
+        700
+      ],
+      "bd_reserva": [
+        565,
+        975
+      ],
+      "realtime_reserva": [
+        150,
+        600
+      ],
+      "pruebas_reserva": [
+        75,
+        150
+      ],
+      "backup_reserva_usd": 300,
+      "supervisores_supuestos": 50,
+      "monitores_extra": 600,
+      "intensivo": {
+        "personas_en_media": 1000,
+        "conexiones_media_con_monitores": 1600,
+        "nodos_hipoteticos": [
+          8,
+          17
+        ],
+        "media_gb": 171072.0,
+        "media_reserva_usd": 1710.72,
+        "subtotal": [
+          4430.72,
+          7155.72
+        ],
+        "con_contingencia_25": [
+          5550,
+          8950
+        ],
+        "livekit_scale_minutos": 16896000,
+        "livekit_scale_usd": 23465.6
+      },
+      "mixto": {
+        "personas_en_media": 200,
+        "conexiones_media_con_monitores": 800,
+        "nodos_hipoteticos": [
+          5,
+          9
+        ],
+        "media_gb": 57024.0,
+        "media_reserva_usd": 570.24,
+        "subtotal": [
+          2810.24,
+          4735.24
+        ],
+        "con_contingencia_25": [
+          3550,
+          5950
+        ]
+      }
+    },
+    {
+      "concurrentes": 3000,
+      "app_reserva": [
+        800,
+        1600
+      ],
+      "bd_reserva": [
+        1005,
+        1755
+      ],
+      "realtime_reserva": [
+        500,
+        2000
+      ],
+      "pruebas_reserva": [
+        150,
+        350
+      ],
+      "backup_reserva_usd": 300,
+      "supervisores_supuestos": 150,
+      "monitores_extra": 1800,
+      "intensivo": {
+        "personas_en_media": 3000,
+        "conexiones_media_con_monitores": 4800,
+        "nodos_hipoteticos": [
+          21,
+          49
+        ],
+        "media_gb": 513216.0,
+        "media_reserva_usd": 5132.16,
+        "subtotal": [
+          11247.16,
+          18977.16
+        ],
+        "con_contingencia_25": [
+          14100,
+          23750
+        ],
+        "livekit_scale_minutos": 50688000,
+        "livekit_scale_usd": 71196.8
+      },
+      "mixto": {
+        "personas_en_media": 600,
+        "conexiones_media_con_monitores": 2400,
+        "nodos_hipoteticos": [
+          11,
+          25
+        ],
+        "media_gb": 171072.0,
+        "media_reserva_usd": 1710.72,
+        "subtotal": [
+          6225.72,
+          11715.72
+        ],
+        "con_contingencia_25": [
+          7800,
+          14650
+        ]
+      }
+    },
+    {
+      "concurrentes": 10000,
+      "app_reserva": [
+        2000,
+        4500
+      ],
+      "bd_reserva": [
+        2215,
+        4225
+      ],
+      "realtime_reserva": [
+        2000,
+        8000
+      ],
+      "pruebas_reserva": [
+        400,
+        1000
+      ],
+      "backup_reserva_usd": 300,
+      "supervisores_supuestos": 500,
+      "monitores_extra": 6000,
+      "intensivo": {
+        "personas_en_media": 10000,
+        "conexiones_media_con_monitores": 16000,
+        "nodos_hipoteticos": [
+          65,
+          161
+        ],
+        "media_gb": 1710720.0,
+        "media_reserva_usd": 17107.2,
+        "subtotal": [
+          34422.2,
+          60892.2
+        ],
+        "con_contingencia_25": [
+          43050,
+          76150
+        ],
+        "livekit_scale_minutos": 168960000,
+        "livekit_scale_usd": null
+      },
+      "mixto": {
+        "personas_en_media": 2000,
+        "conexiones_media_con_monitores": 8000,
+        "nodos_hipoteticos": [
+          33,
+          81
+        ],
+        "media_gb": 570240.0,
+        "media_reserva_usd": 5702.4,
+        "subtotal": [
+          17897.4,
+          36687.4
+        ],
+        "con_contingencia_25": [
+          22400,
+          45900
+        ]
+      }
+    }
+  ]
+}
