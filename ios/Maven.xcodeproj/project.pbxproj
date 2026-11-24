@@ -1,0 +1,136 @@
+// !$*UTF8*$!
+{
+    archiveVersion = 1;
+    classes = {};
+    objectVersion = 56;
+    objects = {
+        6D3300000000000000000001 = {
+            isa = PBXProject;
+            buildConfigurationList = 6D3300000000000000000011;
+            compatibilityVersion = "Xcode 14.0";
+            developmentRegion = es;
+            hasScannedForEncodings = 0;
+            knownRegions = (es, Base);
+            mainGroup = 6D3300000000000000000002;
+            productRefGroup = 6D3300000000000000000004;
+            projectDirPath = "";
+            projectRoot = "";
+            targets = (6D3300000000000000000008);
+        };
+        6D3300000000000000000002 = {
+            isa = PBXGroup;
+            children = (6D3300000000000000000003, 6D3300000000000000000004);
+            sourceTree = "<group>";
+        };
+        6D3300000000000000000003 = {
+            isa = PBXGroup;
+            children = (6D3300000000000000000005, 6D3300000000000000000006);
+            path = Maven;
+            sourceTree = "<group>";
+        };
+        6D3300000000000000000004 = {
+            isa = PBXGroup;
+            children = (6D3300000000000000000007);
+            name = Products;
+            sourceTree = "<group>";
+        };
+        6D3300000000000000000005 = {
+            isa = PBXFileReference;
+            lastKnownFileType = sourcecode.swift;
+            path = MavenApp.swift;
+            sourceTree = "<group>";
+        };
+        6D3300000000000000000006 = {
+            isa = PBXFileReference;
+            lastKnownFileType = sourcecode.swift;
+            path = Jornada.swift;
+            sourceTree = "<group>";
+        };
+        6D3300000000000000000007 = {
+            isa = PBXFileReference;
+            explicitFileType = wrapper.application;
+            path = Maven.app;
+            sourceTree = BUILT_PRODUCTS_DIR;
+        };
+        6D3300000000000000000008 = {
+            isa = PBXNativeTarget;
+            buildConfigurationList = 6D3300000000000000000012;
+            buildPhases = (6D3300000000000000000009);
+            buildRules = ();
+            dependencies = ();
+            name = Maven;
+            productName = Maven;
+            productReference = 6D3300000000000000000007;
+            productType = "com.apple.product-type.application";
+        };
+        6D3300000000000000000009 = {
+            isa = PBXSourcesBuildPhase;
+            buildActionMask = 2147483647;
+            files = (6D330000000000000000000A, 6D330000000000000000000B);
+            runOnlyForDeploymentPostprocessing = 0;
+        };
+        6D330000000000000000000A = {
+            isa = PBXBuildFile;
+            fileRef = 6D3300000000000000000005;
+        };
+        6D330000000000000000000B = {
+            isa = PBXBuildFile;
+            fileRef = 6D3300000000000000000006;
+        };
+        6D3300000000000000000011 = {
+            isa = XCConfigurationList;
+            buildConfigurations = (6D3300000000000000000013, 6D3300000000000000000014);
+            defaultConfigurationIsVisible = 0;
+            defaultConfigurationName = Release;
+        };
+        6D3300000000000000000012 = {
+            isa = XCConfigurationList;
+            buildConfigurations = (6D3300000000000000000015, 6D3300000000000000000016);
+            defaultConfigurationIsVisible = 0;
+            defaultConfigurationName = Release;
+        };
+        6D3300000000000000000013 = {
+            isa = XCBuildConfiguration;
+            buildSettings = {};
+            name = Debug;
+        };
+        6D3300000000000000000014 = {
+            isa = XCBuildConfiguration;
+            buildSettings = {};
+            name = Release;
+        };
+        6D3300000000000000000015 = {
+            isa = XCBuildConfiguration;
+            buildSettings = {
+                CURRENT_PROJECT_VERSION = 1;
+                GENERATE_INFOPLIST_FILE = YES;
+                INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+                IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+                MARKETING_VERSION = 0.1.0;
+                PRODUCT_BUNDLE_IDENTIFIER = "me.maven-ai.ios";
+                PRODUCT_NAME = "$(TARGET_NAME)";
+                SDKROOT = iphoneos;
+                SWIFT_VERSION = 5.0;
+                TARGETED_DEVICE_FAMILY = 1;
+            };
+            name = Debug;
+        };
+        6D3300000000000000000016 = {
+            isa = XCBuildConfiguration;
+            buildSettings = {
+                CURRENT_PROJECT_VERSION = 1;
+                GENERATE_INFOPLIST_FILE = YES;
+                INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+                IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+                MARKETING_VERSION = 0.1.0;
+                PRODUCT_BUNDLE_IDENTIFIER = "me.maven-ai.ios";
+                PRODUCT_NAME = "$(TARGET_NAME)";
+                SDKROOT = iphoneos;
+                SWIFT_VERSION = 5.0;
+                TARGETED_DEVICE_FAMILY = 1;
+            };
+            name = Release;
+        };
+    };
+    rootObject = 6D3300000000000000000001;
+}
