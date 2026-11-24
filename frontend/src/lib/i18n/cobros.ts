@@ -24,9 +24,9 @@ export const cobros = {
     es: "Crea tu empresa y pon tu tarjeta. El plan se cobra solo cuando terminen los 14 días; cancela cuando quieras.",
     en: "Create your company and add your card. The plan is charged automatically when the 14 days end; cancel anytime.",
   },
-  "cobros.empezar.setup": {
-    es: "La instalación (USD {usd}, pago único) se cobra al poner la tarjeta.",
-    en: "Setup (USD {usd}, one-time) is charged when you add your card.",
+  "cobros.empezar.implementacionOpcional": {
+    es: "La implementación es opcional y se cotiza según el alcance. No se cobra al contratar el plan.",
+    en: "Implementation is optional and quoted based on scope. It is not charged when you subscribe to a plan.",
   },
   "cobros.empezar.plan": { es: "Plan", en: "Plan" },
   "cobros.empezar.planEquipo": { es: "Equipo · USD 299 al mes · hasta 20 personas", en: "Team · USD 299/month · up to 20 people" },

@@ -1,5 +1,5 @@
 // La API de Stripe por fetch (sin SDK). La llave es STRIPE_SECRET_KEY (una restricted
-// key de la cuenta de Stripe de Lumina, con cobros a nombre de Maven); la pone Alvaro.
+// key de la cuenta propia de Maven bajo TECH VISUALS LLC), guardada como secreto.
 
 // Versión fija: los campos que se leen (invoice.subscription, trial_end) no cambian
 // con la versión de la cuenta. El webhook lee los dos formatos (ver logica.ts).

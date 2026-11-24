@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { useLanguage } from "@/hooks/useLanguage";
 import type { ClaveDePlan, PlanOrganizacion } from "@/lib/plataforma";
-import { DIAS_DE_PRUEBA, LOGO_MAX_BYTES, PLANES, SETUP_USD, correoValido, formatoUsd } from "@/lib/plataforma/planes";
+import { DIAS_DE_PRUEBA, LOGO_MAX_BYTES, PLANES, correoValido, formatoUsd } from "@/lib/plataforma/planes";
 import { cn } from "@/lib/utils";
 import { usePlataforma } from "./contexto";
 import { LogoDeCliente, useTextoDeError } from "./piezas";
@@ -18,7 +18,7 @@ import { LogoDeCliente, useTextoDeError } from "./piezas";
 //   1. Datos  → nombre del cliente + su admin (nombre, correo, idioma).
 //   2. Plan   → Equipo 299 (20), Empresa 599 (50) o Enterprise a medida, y las
 //               opciones especiales del alta a mano (solo el dueño: son de cobro):
-//               días gratis, sin tarjeta, sin setup, precio a medida.
+//               días gratis, sin tarjeta, precio a medida. Implementación aparte.
 //   3. Marca  → nombre + logo (≤ 2 MB) + color de su tarjeta.
 // El cliente nace EN PREPARACIÓN: nadie recibe correos hasta «Activar».
 
@@ -47,7 +47,6 @@ export function NuevoClienteAsistente({ onClose, onCreado }: { onClose: () => vo
   const [entPrecio, setEntPrecio] = useState("");
   const [diasGratis, setDiasGratis] = useState(String(DIAS_DE_PRUEBA));
   const [sinTarjeta, setSinTarjeta] = useState(false);
-  const [sinSetup, setSinSetup] = useState(false);
   const [aMedida, setAMedida] = useState(false);
   const [precioMedida, setPrecioMedida] = useState("");
 
@@ -66,10 +65,10 @@ export function NuevoClienteAsistente({ onClose, onCreado }: { onClose: () => vo
       personas: personasPlan,
       precio_usd: precioPlan,
       argos_usd_mes: plan === "empresa" ? PLANES.empresa.argos_usd_mes : plan === "equipo" ? PLANES.equipo.argos_usd_mes : PLANES.empresa.argos_usd_mes,
-      setup_usd: sinSetup ? 0 : SETUP_USD,
+      setup_usd: 0,
       dias_gratis: Math.max(0, Number(diasGratis) || 0),
       sin_tarjeta: sinTarjeta,
-      sin_setup: sinSetup,
+      sin_setup: true,
       precio_a_medida: plan === "enterprise" || aMedida,
     };
   };
@@ -225,7 +224,7 @@ export function NuevoClienteAsistente({ onClose, onCreado }: { onClose: () => vo
                   )}
                 </div>
                 <label className="flex items-center justify-between gap-2 text-sm"><span>{t("plataforma.nuevo.sinTarjeta")}<span className="block text-xs text-muted-foreground">{t("plataforma.nuevo.sinTarjetaAyuda")}</span></span><Switch checked={sinTarjeta} onCheckedChange={setSinTarjeta} /></label>
-                <label className="flex items-center justify-between gap-2 text-sm"><span>{t("plataforma.nuevo.sinSetup", { usd: formatoUsd(SETUP_USD) })}</span><Switch checked={sinSetup} onCheckedChange={setSinSetup} /></label>
+                <p className="text-xs text-muted-foreground">{t("cobros.empezar.implementacionOpcional")}</p>
               </div>
             ) : (
               <p className="text-xs text-muted-foreground">{t("plataforma.nuevo.especialesSoloDueno")}</p>

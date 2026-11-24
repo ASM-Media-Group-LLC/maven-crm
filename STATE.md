@@ -137,3 +137,8 @@ Ambos sets ya tienen migrations subidas (`20260504100000`, `20260504110000`) per
 4. Edge function secrets en Supabase: `MINIMAX_API_KEY`, `LIVEKIT_URL`, `LIVEKIT_API_KEY`, `LIVEKIT_API_SECRET`, `RESEND_API_KEY`, `SUPABASE_SERVICE_ROLE_KEY`.
 5. `npm run dev` (puerto 8080 por defecto, respeta `PORT` env).
 6. Para deploy: push a `main` → Dokploy redeploys.
+
+## 2026-11-23 · Stripe y contratación de Maven
+- Cuenta Stripe propia de Maven bajo TECH VISUALS LLC activa; planes USD 299/599 con impuestos incluidos, implementación opcional cotizada y cobrada aparte: se elimina el cargo automático de USD 3.000 y su precio del catálogo de alta.
+- Catálogo validado por moneda/periodicidad/impuestos y con categoría SaaS empresarial descargable confirmada; quedan pendientes la clasificación fiscal de implementación, registros del contador y la integración completa (portal, webhooks, base de maven-agencias y prueba de pago). Cobros públicos aún desactivados; KASH solo es cliente.
+- Copia de trabajo fuera de iCloud: /Users/alvaropro/maven-crm. La copia de Documents se conserva; no subir sus duplicados ni secretos.
