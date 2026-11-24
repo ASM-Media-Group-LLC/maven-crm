@@ -1,0 +1,104 @@
+{
+ "persona": 431,
+ "cond": "cortes",
+ "ciudad": "sao",
+ "escenario": "cowork16",
+ "ve_al_otro_ms": 16704,
+ "videos_recibidos": 15,
+ "congelamientos": 271,
+ "congelado_s": 110.9,
+ "resolucion_recibida_mediana": 180,
+ "perdida_video_pct": 10.52,
+ "audio_cortado_pct": 16.28,
+ "rtt_p50_ms": 136,
+ "rtt_p95_ms": 137,
+ "camino": "srflx/udp",
+ "limita_calidad": {
+  "none": 84,
+  "bandwidth": 126
+ },
+ "caidas": 24,
+ "volvio": true,
+ "prendio": {
+  "camara": true,
+  "micro": true
+ },
+ "consola": [
+  [
+   1795099944884,
+   "warning",
+   "GoTrueClient@sb-glzncicyfrjidvkjjaig-auth-token:1 (2.95.3) 2026-11-19T14:52:24.882Z Multiple GoTrueClient instances detected in the same browser context. It is not an error, but this should be avoided"
+  ],
+  [
+   1795099951606,
+   "error",
+   "WebSocket connection to 'ws://144.126.155.175:7880/rtc/v1?access_token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJTSU1jYTg3ZmE1MDczOGUiLCJzdWIiOiIzZmRjYmYyNy0yNWZmLTQ2ZjAtYWU5MC0xMjJmNTNlZTFiMWVf"
+  ],
+  [
+   1795099958373,
+   "warning",
+   "W1119 14:52:38.372000 1880752 gl_context.cc:1060] OpenGL error checking is disabled"
+  ],
+  [
+   1795100001854,
+   "warning",
+   "peerconnection failed disconnected {room: cowork_af02e35e_6, roomID: RM_UN9jPbBp8eko, participant: 3fdcbf27-25ff-46f0-ae90-122f53ee1b1e_3984f0b03520, pID: PA_AEk9Gc6BdKp5}"
+  ],
+  [
+   1795100004711,
+   "info",
+   "[LiveKit] Reconnected successfully"
+  ],
+  [
+   1795100062572,
+   "warning",
+   "peerconnection failed disconnected {room: cowork_af02e35e_6, roomID: RM_UN9jPbBp8eko, participant: 3fdcbf27-25ff-46f0-ae90-122f53ee1b1e_3984f0b03520, pID: PA_AEk9Gc6BdKp5}"
+  ],
+  [
+   1795100065430,
+   "info",
+   "[LiveKit] Reconnected successfully"
+  ],
+  [
+   1795100123684,
+   "warning",
+   "signal disconnected {room: cowork_af02e35e_6, roomID: RM_UN9jPbBp8eko, participant: 3fdcbf27-25ff-46f0-ae90-122f53ee1b1e_3984f0b03520, pID: PA_AEk9Gc6BdKp5}"
+  ],
+  [
+   1795100126291,
+   "info",
+   "[LiveKit] Reconnected successfully"
+  ],
+  [
+   1795100181916,
+   "warning",
+   "peerconnection failed disconnected {room: cowork_af02e35e_6, roomID: RM_UN9jPbBp8eko, participant: 3fdcbf27-25ff-46f0-ae90-122f53ee1b1e_3984f0b03520, pID: PA_AEk9Gc6BdKp5}"
+  ],
+  [
+   1795100184767,
+   "info",
+   "[LiveKit] Reconnected successfully"
+  ],
+  [
+   1795100241869,
+   "warning",
+   "peerconnection failed disconnected {room: cowork_af02e35e_6, roomID: RM_UN9jPbBp8eko, participant: 3fdcbf27-25ff-46f0-ae90-122f53ee1b1e_3984f0b03520, pID: PA_AEk9Gc6BdKp5}"
+  ],
+  [
+   1795100244735,
+   "info",
+   "[LiveKit] Reconnected successfully"
+  ],
+  [
+   1795100303665,
+   "warning",
+   "signal disconnected {room: cowork_af02e35e_6, roomID: RM_UN9jPbBp8eko, participant: 3fdcbf27-25ff-46f0-ae90-122f53ee1b1e_3984f0b03520, pID: PA_AEk9Gc6BdKp5}"
+  ],
+  [
+   1795100306264,
+   "info",
+   "[LiveKit] Reconnected successfully"
+  ]
+ ],
+ "muestras": 70
+}

@@ -1,0 +1,56 @@
+{
+ "persona": 451,
+ "cond": "malo",
+ "ciudad": "mad",
+ "escenario": "sala24",
+ "ve_al_otro_ms": 240586,
+ "videos_recibidos": 5,
+ "congelamientos": 10,
+ "congelado_s": 2.9,
+ "resolucion_recibida_mediana": 180,
+ "perdida_video_pct": 0.02,
+ "audio_cortado_pct": 15.79,
+ "rtt_p50_ms": 194,
+ "rtt_p95_ms": 246,
+ "camino": "srflx/udp",
+ "limita_calidad": {},
+ "caidas": 0,
+ "volvio": true,
+ "prendio": {
+  "camara": false,
+  "micro": false
+ },
+ "consola": [
+  [
+   1795100349877,
+   "warning",
+   "GoTrueClient@sb-glzncicyfrjidvkjjaig-auth-token:1 (2.95.3) 2026-11-19T14:59:09.874Z Multiple GoTrueClient instances detected in the same browser context. It is not an error, but this should be avoided"
+  ],
+  [
+   1795100355081,
+   "warning",
+   "GoTrueClient@sb-glzncicyfrjidvkjjaig-auth-token:1 (2.95.3) 2026-11-19T14:59:15.080Z Multiple GoTrueClient instances detected in the same browser context. It is not an error, but this should be avoided"
+  ],
+  [
+   1795100582725,
+   "error",
+   "WebSocket connection to 'ws://144.126.155.175:7880/rtc/v1?access_token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJTSU1jYTg3ZmE1MDczOGUiLCJzdWIiOiJiZjEyNTA0Zi1hNDhiLTQzODktYTFlYS05YmY5MzBiOWNhMmNf"
+  ],
+  [
+   1795100708782,
+   "info",
+   "[LiveKit] Participant disconnected: e78b4183-402b-4501-b7fb-afedc06769e2_faa2964a5979 Chatter 223"
+  ],
+  [
+   1795100709806,
+   "info",
+   "[LiveKit] Participant disconnected: df145752-a0b4-4adb-9260-762ed31588fc_7771eaac1ff6 Chatter 224"
+  ],
+  [
+   1795100710882,
+   "info",
+   "[LiveKit] Participant disconnected: 4020db86-1586-488b-ba63-e137c6ca5495_a34b59288e87 Chatter 225"
+  ]
+ ],
+ "muestras": 62
+}

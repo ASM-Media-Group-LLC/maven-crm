@@ -1,0 +1,23 @@
+== Simulacro v2 — 2026-11-19_1437 UTC
+esperando la copia (521)…
+== Simulacro v2 — 2026-11-19_1437 UTC
+preparada mia
+preparada mia
+preparada mex
+preparada mex
+preparada sao
+preparada sao
+preparada mad
+preparada mad
+Traceback (most recent call last):
+  File "<string>", line 1, in <module>
+    import sys,json;print(json.load(sys.stdin)['sessionId'])
+                          ~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^
+KeyError: 'sessionId'
+no se creó el Cowork: {"error":"Tu Cowork es «Simulacro llamadas 135542». Entra por ahí."}
+Traceback (most recent call last):
+  File "<string>", line 1, in <module>
+    import sys,json;print(json.load(sys.stdin)['sessionId'])
+                          ~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^
+KeyError: 'sessionId'
+no se creó el Cowork: {"error":"Tu Cowork es «Simulacro llamadas 135542». Entra por ahí."}

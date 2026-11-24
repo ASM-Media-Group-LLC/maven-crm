@@ -1,0 +1,58 @@
+{
+ "persona": 470,
+ "cond": "bueno",
+ "ciudad": "mia",
+ "escenario": "larga",
+ "ve_al_otro_ms": 16468,
+ "videos_recibidos": 7,
+ "congelamientos": 675,
+ "congelado_s": 225.9,
+ "resolucion_recibida_mediana": 180,
+ "perdida_video_pct": 0,
+ "audio_cortado_pct": 0.08,
+ "rtt_p50_ms": 45,
+ "rtt_p95_ms": 49,
+ "camino": "srflx/udp",
+ "limita_calidad": {
+  "none": 1077
+ },
+ "caidas": 0,
+ "volvio": true,
+ "prendio": {
+  "camara": true,
+  "micro": true
+ },
+ "consola": [
+  [
+   1795101123980,
+   "warning",
+   "GoTrueClient@sb-glzncicyfrjidvkjjaig-auth-token:1 (2.95.3) 2026-11-19T15:12:03.978Z Multiple GoTrueClient instances detected in the same browser context. It is not an error, but this should be avoided"
+  ],
+  [
+   1795101124336,
+   "warning",
+   "GoTrueClient@sb-glzncicyfrjidvkjjaig-auth-token:1 (2.95.3) 2026-11-19T15:12:04.335Z Multiple GoTrueClient instances detected in the same browser context. It is not an error, but this should be avoided"
+  ],
+  [
+   1795101127055,
+   "error",
+   "WebSocket connection to 'ws://144.126.155.175:7880/rtc/v1?access_token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJTSU1jYTg3ZmE1MDczOGUiLCJzdWIiOiI4OWNjMDhlMi00MThlLTQ2MjktOGI2Yi0wZWE3MGU1ZTJiYWZf"
+  ],
+  [
+   1795101132704,
+   "warning",
+   "W1119 15:12:12.703000 1880752 gl_context.cc:1060] OpenGL error checking is disabled"
+  ],
+  [
+   1795102618237,
+   "warning",
+   "[Llamadas] El canal de llamadas entrantes esta en: CHANNEL_ERROR — reintentando."
+  ],
+  [
+   1795102618238,
+   "warning",
+   "[Cowork] El canal de presencia está en: CHANNEL_ERROR — el tablero del supervisor no va a recibir estados de nadie."
+  ]
+ ],
+ "muestras": 359
+}

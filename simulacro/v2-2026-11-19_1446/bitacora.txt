@@ -1,0 +1,12 @@
+== Simulacro v2 — 2026-11-19_1446 UTC
+preparada mia
+preparada mex
+preparada sao
+preparada mad
+-- F1: llamadas de 2 entre países (14:46)
+-- F2: Cowork de 16 (14:52)
+-- F3: sala de 24 + 1000 personas en Maven (14:58)
+-- F4: mensajes en vivo (15:06)
+-- F5: llamada larga de 30 min (15:12)
+== Terminó 15:44 UTC · /Users/alvaropro/Documents/Claude/Projects/maven-crm/simulacro/v2-2026-11-19_1446
+resumen listo

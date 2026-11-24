@@ -1,0 +1,86 @@
+{
+ "persona": 455,
+ "cond": "bueno",
+ "ciudad": "sao",
+ "escenario": "sala24",
+ "ve_al_otro_ms": 251414,
+ "videos_recibidos": 2,
+ "congelamientos": 7,
+ "congelado_s": 2.1,
+ "resolucion_recibida_mediana": 180,
+ "perdida_video_pct": 0.03,
+ "audio_cortado_pct": 18.04,
+ "rtt_p50_ms": 133,
+ "rtt_p95_ms": 142,
+ "camino": "prflx/udp",
+ "limita_calidad": {},
+ "caidas": 0,
+ "volvio": true,
+ "prendio": {
+  "camara": false,
+  "micro": false
+ },
+ "consola": [
+  [
+   1795100353319,
+   "warning",
+   "GoTrueClient@sb-glzncicyfrjidvkjjaig-auth-token:1 (2.95.3) 2026-11-19T14:59:13.317Z Multiple GoTrueClient instances detected in the same browser context. It is not an error, but this should be avoided"
+  ],
+  [
+   1795100354344,
+   "warning",
+   "GoTrueClient@sb-glzncicyfrjidvkjjaig-auth-token:1 (2.95.3) 2026-11-19T14:59:14.343Z Multiple GoTrueClient instances detected in the same browser context. It is not an error, but this should be avoided"
+  ],
+  [
+   1795100441913,
+   "warning",
+   "[Recibos] no se pudo marcar entregado: TypeError: Failed to fetch"
+  ],
+  [
+   1795100441914,
+   "warning",
+   "[Recibos] no se pudo marcar entregado: TypeError: Failed to fetch"
+  ],
+  [
+   1795100441914,
+   "error",
+   "[useChat] no pude cargar la lista: TypeError: Failed to fetch"
+  ],
+  [
+   1795100442950,
+   "warning",
+   "GoTrueClient@sb-glzncicyfrjidvkjjaig-auth-token:1 (2.95.3) 2026-11-19T15:00:42.949Z Multiple GoTrueClient instances detected in the same browser context. It is not an error, but this should be avoided"
+  ],
+  [
+   1795100598525,
+   "error",
+   "WebSocket connection to 'ws://144.126.155.175:7880/rtc/v1?access_token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJTSU1jYTg3ZmE1MDczOGUiLCJzdWIiOiI0YmUyNWIwNS1mM2EwLTRiZDgtYmYyNi0xNmZjOTE2ZmYzZTVf"
+  ],
+  [
+   1795100708815,
+   "info",
+   "[LiveKit] Participant disconnected: e78b4183-402b-4501-b7fb-afedc06769e2_faa2964a5979 Chatter 223"
+  ],
+  [
+   1795100709822,
+   "info",
+   "[LiveKit] Participant disconnected: df145752-a0b4-4adb-9260-762ed31588fc_7771eaac1ff6 Chatter 224"
+  ],
+  [
+   1795100710820,
+   "info",
+   "[LiveKit] Participant disconnected: 4020db86-1586-488b-ba63-e137c6ca5495_a34b59288e87 Chatter 225"
+  ],
+  [
+   1795100711829,
+   "info",
+   "[LiveKit] Participant disconnected: ccedd094-8b3e-400a-a4d0-4b583f670ba7_2c21746c116e Chatter 226"
+  ],
+  [
+   1795100714738,
+   "info",
+   "[LiveKit] Participant disconnected: 4e820404-5885-4554-9ee6-6afb1dbc89ea_d71b33579ae2 Chatter 227"
+  ]
+ ],
+ "muestras": 63
+}

@@ -1,0 +1,4 @@
+== Simulacro v2 — 2026-11-19_1436 UTC
+./orquesta.sh: line 23: declare: -A: invalid option
+declare: usage: declare [-afFirtx] [-p] [name[=value] ...]
+./orquesta.sh: line 24: mia: unbound variable

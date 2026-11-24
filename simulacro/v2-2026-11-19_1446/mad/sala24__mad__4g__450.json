@@ -1,0 +1,76 @@
+{
+ "persona": 450,
+ "cond": "4g",
+ "ciudad": "mad",
+ "escenario": "sala24",
+ "ve_al_otro_ms": 254364,
+ "videos_recibidos": 6,
+ "congelamientos": 8,
+ "congelado_s": 2.4,
+ "resolucion_recibida_mediana": 180,
+ "perdida_video_pct": 0.02,
+ "audio_cortado_pct": 17.14,
+ "rtt_p50_ms": 143,
+ "rtt_p95_ms": 171,
+ "camino": "srflx/udp",
+ "limita_calidad": {},
+ "caidas": 0,
+ "volvio": true,
+ "prendio": {
+  "camara": false,
+  "micro": false
+ },
+ "consola": [
+  [
+   1795100345014,
+   "warning",
+   "GoTrueClient@sb-glzncicyfrjidvkjjaig-auth-token:1 (2.95.3) 2026-11-19T14:59:05.011Z Multiple GoTrueClient instances detected in the same browser context. It is not an error, but this should be avoided"
+  ],
+  [
+   1795100348921,
+   "warning",
+   "GoTrueClient@sb-glzncicyfrjidvkjjaig-auth-token:1 (2.95.3) 2026-11-19T14:59:08.919Z Multiple GoTrueClient instances detected in the same browser context. It is not an error, but this should be avoided"
+  ],
+  [
+   1795100414190,
+   "error",
+   "[useChat] no pude cargar las participaciones: TypeError: Failed to fetch"
+  ],
+  [
+   1795100414191,
+   "warning",
+   "[Recibos] no se pudo marcar entregado: TypeError: Failed to fetch"
+  ],
+  [
+   1795100414191,
+   "error",
+   "[useChat] no pude cargar los no leídos: TypeError: Failed to fetch"
+  ],
+  [
+   1795100414191,
+   "warning",
+   "[Recibos] no se pudo marcar entregado: TypeError: Failed to fetch"
+  ],
+  [
+   1795100414191,
+   "warning",
+   "[Recibos] no se pudo marcar entregado: TypeError: Failed to fetch"
+  ],
+  [
+   1795100417758,
+   "warning",
+   "GoTrueClient@sb-glzncicyfrjidvkjjaig-auth-token:1 (2.95.3) 2026-11-19T15:00:17.757Z Multiple GoTrueClient instances detected in the same browser context. It is not an error, but this should be avoided"
+  ],
+  [
+   1795100595381,
+   "error",
+   "WebSocket connection to 'ws://144.126.155.175:7880/rtc/v1?access_token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJTSU1jYTg3ZmE1MDczOGUiLCJzdWIiOiJjYjY4MjRkOS01MjYyLTRjZjktOTBhNy00ZjkwNjQ1NmRjOTZf"
+  ],
+  [
+   1795100708777,
+   "info",
+   "[LiveKit] Participant disconnected: e78b4183-402b-4501-b7fb-afedc06769e2_faa2964a5979 Chatter 223"
+  ]
+ ],
+ "muestras": 63
+}

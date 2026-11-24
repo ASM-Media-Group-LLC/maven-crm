@@ -1,0 +1,103 @@
+{
+ "persona": 435,
+ "cond": "cortes",
+ "ciudad": "mex",
+ "escenario": "cowork16",
+ "ve_al_otro_ms": 13073,
+ "videos_recibidos": 12,
+ "congelamientos": 234,
+ "congelado_s": 110.6,
+ "resolucion_recibida_mediana": 180,
+ "perdida_video_pct": 5.46,
+ "audio_cortado_pct": 9.97,
+ "rtt_p50_ms": 45,
+ "rtt_p95_ms": 55,
+ "camino": "srflx/udp",
+ "limita_calidad": {
+  "none": 213
+ },
+ "caidas": 19,
+ "volvio": true,
+ "prendio": {
+  "camara": true,
+  "micro": true
+ },
+ "consola": [
+  [
+   1795100129765,
+   "info",
+   "[LiveKit] Reconnected successfully"
+  ],
+  [
+   1795100187953,
+   "warning",
+   "signal disconnected {room: cowork_af02e35e_6, roomID: RM_UN9jPbBp8eko, participant: aec7c2d1-3108-4c2b-b339-a95bcc5d4f7b_9e15d0cffe09, pID: PA_8XBtDLTqHSxC}"
+  ],
+  [
+   1795100189449,
+   "warning",
+   "signal disconnected {room: cowork_af02e35e_6, roomID: RM_UN9jPbBp8eko, participant: aec7c2d1-3108-4c2b-b339-a95bcc5d4f7b_9e15d0cffe09, pID: PA_8XBtDLTqHSxC}"
+  ],
+  [
+   1795100189749,
+   "warning",
+   "already attempting reconnect, returning early {room: cowork_af02e35e_6, roomID: RM_UN9jPbBp8eko, participant: aec7c2d1-3108-4c2b-b339-a95bcc5d4f7b_9e15d0cffe09, pID: PA_8XBtDLTqHSxC}"
+  ],
+  [
+   1795100190374,
+   "warning",
+   "reconnect disconnected {room: cowork_af02e35e_6, roomID: RM_UN9jPbBp8eko, participant: aec7c2d1-3108-4c2b-b339-a95bcc5d4f7b_9e15d0cffe09, pID: PA_8XBtDLTqHSxC}"
+  ],
+  [
+   1795100193096,
+   "info",
+   "[LiveKit] Reconnected successfully"
+  ],
+  [
+   1795100247445,
+   "warning",
+   "signal disconnected {room: cowork_af02e35e_6, roomID: RM_UN9jPbBp8eko, participant: aec7c2d1-3108-4c2b-b339-a95bcc5d4f7b_9e15d0cffe09, pID: PA_8XBtDLTqHSxC}"
+  ],
+  [
+   1795100249861,
+   "info",
+   "[LiveKit] Reconnected successfully"
+  ],
+  [
+   1795100260016,
+   "warning",
+   "[Llamadas] El canal de llamadas entrantes esta en: CHANNEL_ERROR — reintentando."
+  ],
+  [
+   1795100260017,
+   "warning",
+   "[Cowork] El canal de presencia está en: CHANNEL_ERROR — el tablero del supervisor no va a recibir estados de nadie."
+  ],
+  [
+   1795100274134,
+   "warning",
+   "[Cowork] El canal de presencia está en: CHANNEL_ERROR — el tablero del supervisor no va a recibir estados de nadie."
+  ],
+  [
+   1795100274135,
+   "warning",
+   "[Llamadas] El canal de llamadas entrantes esta en: CHANNEL_ERROR — reintentando."
+  ],
+  [
+   1795100309214,
+   "info",
+   "[LiveKit] Participant disconnected: 8d762985-7acb-4a5e-b6ee-b425ae35bb54_178207dba6f0 Chatter 203"
+  ],
+  [
+   1795100310150,
+   "info",
+   "[LiveKit] Participant disconnected: 1f5f2b5c-e87c-4a58-a5df-fbaab5935b7c_ccab92d041ef Chatter 204"
+  ],
+  [
+   1795100311145,
+   "info",
+   "[LiveKit] Participant disconnected: d87ed856-f2ae-4e08-804b-ec5cb2a6c0ff_281662155686 Chatter 206"
+  ]
+ ],
+ "muestras": 71
+}

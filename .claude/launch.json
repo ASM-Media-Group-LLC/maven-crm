@@ -34,6 +34,16 @@
       ],
       "port": 8091,
       "autoPort": false
+    },
+    {
+      "name": "Revisar rama (temporal)",
+      "runtimeExecutable": "sh",
+      "runtimeArgs": [
+        "-c",
+        "cd /private/tmp/claude-501/-Users-alvaropro-Documents-Claude-Projects-maven-crm/ad3aca69-af48-4f39-b00b-504947d8adb0/scratchpad/wt-casos && npx vite --port 8081 --strictPort"
+      ],
+      "port": 8081,
+      "autoPort": false
     }
   ]
 }

@@ -1,0 +1,104 @@
+{
+ "persona": 409,
+ "cond": "corte30",
+ "ciudad": "mia",
+ "escenario": "dos",
+ "ve_al_otro_ms": 21131,
+ "videos_recibidos": 1,
+ "congelamientos": 2,
+ "congelado_s": 0.7,
+ "resolucion_recibida_mediana": 360,
+ "perdida_video_pct": 0,
+ "audio_cortado_pct": 0.08,
+ "rtt_p50_ms": 43,
+ "rtt_p95_ms": 56,
+ "camino": "prflx/udp",
+ "limita_calidad": {
+  "none": 138,
+  "bandwidth": 33
+ },
+ "caidas": 4,
+ "volvio": true,
+ "prendio": {
+  "camara": true,
+  "micro": true
+ },
+ "consola": [
+  [
+   1795111792834,
+   "warning",
+   "W1119 18:09:52.832000 1880752 gl_context.cc:1060] OpenGL error checking is disabled"
+  ],
+  [
+   1795111883512,
+   "warning",
+   "peerconnection failed disconnected {room: cowork_4514d967_4, roomID: RM_hW6cBy73V3K5, participant: d5ef7485-5466-4f17-8302-e438c45dcded_38091c2a58c2, pID: PA_6pMNVJ74jdCS}"
+  ],
+  [
+   1795111883743,
+   "warning",
+   "leave-reconnect disconnected {room: cowork_4514d967_4, roomID: RM_hW6cBy73V3K5, participant: d5ef7485-5466-4f17-8302-e438c45dcded_38091c2a58c2, pID: PA_6pMNVJ74jdCS}"
+  ],
+  [
+   1795111898746,
+   "warning",
+   "WebSocket connection to 'ws://144.126.155.175:7880/rtc?access_token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE3OTUxMTIzODYsImlzcyI6IlNJTWNhODdmYTUwNzM4ZSIsIm5hbWUiOiJDaGF0dGVyIDE5MiIsIm5iZiI6MTc"
+  ],
+  [
+   1795111898747,
+   "error",
+   "Abort handler called {room: cowork_4514d967_4, roomID: RM_hW6cBy73V3K5, participant: d5ef7485-5466-4f17-8302-e438c45dcded_38091c2a58c2, pID: PA_6pMNVJ74jdCS, error: ConnectionError: Abort handler call"
+  ],
+  [
+   1795111898747,
+   "warning",
+   "reconnect disconnected {room: cowork_4514d967_4, roomID: RM_hW6cBy73V3K5, participant: d5ef7485-5466-4f17-8302-e438c45dcded_38091c2a58c2, pID: PA_6pMNVJ74jdCS}"
+  ],
+  [
+   1795111899444,
+   "error",
+   "Received leave request while trying to (re)connect {room: cowork_4514d967_4, roomID: RM_hW6cBy73V3K5, participant: d5ef7485-5466-4f17-8302-e438c45dcded_38091c2a58c2, pID: PA_6pMNVJ74jdCS, error: Conne"
+  ],
+  [
+   1795111899449,
+   "warning",
+   "reconnect disconnected {room: cowork_4514d967_4, roomID: RM_hW6cBy73V3K5, participant: d5ef7485-5466-4f17-8302-e438c45dcded_38091c2a58c2, pID: PA_6pMNVJ74jdCS}"
+  ],
+  [
+   1795111900647,
+   "info",
+   "reconnecting, attempt: 2 {room: cowork_4514d967_4, roomID: RM_hW6cBy73V3K5, participant: d5ef7485-5466-4f17-8302-e438c45dcded_38091c2a58c2, pID: PA_6pMNVJ74jdCS}"
+  ],
+  [
+   1795111900650,
+   "info",
+   "[LiveKit] Participant disconnected: c1cc1914-56e7-47d8-9948-7a415a76b0fd_aa84f10b0523 Chatter 193"
+  ],
+  [
+   1795111900650,
+   "info",
+   "[LiveKit] Reconnecting..."
+  ],
+  [
+   1795111900766,
+   "error",
+   "WebSocket connection to 'ws://144.126.155.175:7880/rtc/v1?access_token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE3OTUxMTIzODYsImlzcyI6IlNJTWNhODdmYTUwNzM4ZSIsIm5hbWUiOiJDaGF0dGVyIDE5MiIsIm5iZiI6"
+  ],
+  [
+   1795111900926,
+   "warning",
+   "failed to remove track {room: cowork_4514d967_4, roomID: RM_hW6cBy73V3K5, participant: d5ef7485-5466-4f17-8302-e438c45dcded_38091c2a58c2, pID: PA_XnKCURyYSwcR, error: InvalidAccessError: Failed to exe"
+  ],
+  [
+   1795111900927,
+   "warning",
+   "failed to remove track {room: cowork_4514d967_4, roomID: RM_hW6cBy73V3K5, participant: d5ef7485-5466-4f17-8302-e438c45dcded_38091c2a58c2, pID: PA_XnKCURyYSwcR, error: InvalidAccessError: Failed to exe"
+  ],
+  [
+   1795111902929,
+   "info",
+   "[LiveKit] Reconnected successfully"
+  ]
+ ],
+ "muestras": 58
+}

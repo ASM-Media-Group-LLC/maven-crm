@@ -1,0 +1,56 @@
+{
+ "persona": 447,
+ "cond": "bueno",
+ "ciudad": "mad",
+ "escenario": "sala24",
+ "ve_al_otro_ms": 161202,
+ "videos_recibidos": 6,
+ "congelamientos": 18,
+ "congelado_s": 5.2,
+ "resolucion_recibida_mediana": 180,
+ "perdida_video_pct": 0.01,
+ "audio_cortado_pct": 3.67,
+ "rtt_p50_ms": 104,
+ "rtt_p95_ms": 108,
+ "camino": "srflx/udp",
+ "limita_calidad": {},
+ "caidas": 0,
+ "volvio": true,
+ "prendio": {
+  "camara": false,
+  "micro": false
+ },
+ "consola": [
+  [
+   1795100336056,
+   "warning",
+   "GoTrueClient@sb-glzncicyfrjidvkjjaig-auth-token:1 (2.95.3) 2026-11-19T14:58:56.053Z Multiple GoTrueClient instances detected in the same browser context. It is not an error, but this should be avoided"
+  ],
+  [
+   1795100336864,
+   "warning",
+   "GoTrueClient@sb-glzncicyfrjidvkjjaig-auth-token:1 (2.95.3) 2026-11-19T14:58:56.862Z Multiple GoTrueClient instances detected in the same browser context. It is not an error, but this should be avoided"
+  ],
+  [
+   1795100377067,
+   "warning",
+   "[Recibos] no se pudo marcar entregado: TypeError: Failed to fetch"
+  ],
+  [
+   1795100377068,
+   "warning",
+   "[Recibos] no se pudo marcar entregado: TypeError: Failed to fetch"
+  ],
+  [
+   1795100377879,
+   "warning",
+   "GoTrueClient@sb-glzncicyfrjidvkjjaig-auth-token:1 (2.95.3) 2026-11-19T14:59:37.878Z Multiple GoTrueClient instances detected in the same browser context. It is not an error, but this should be avoided"
+  ],
+  [
+   1795100494578,
+   "error",
+   "WebSocket connection to 'ws://144.126.155.175:7880/rtc/v1?access_token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJTSU1jYTg3ZmE1MDczOGUiLCJzdWIiOiJjZGE5YmQ1Yi1mZGU0LTQzMGMtOGE4Ny04ODMyY2UwNGQ4OTFf"
+  ]
+ ],
+ "muestras": 63
+}

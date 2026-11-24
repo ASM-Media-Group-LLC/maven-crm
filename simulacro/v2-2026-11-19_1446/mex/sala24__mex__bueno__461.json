@@ -1,0 +1,86 @@
+{
+ "persona": 461,
+ "cond": "bueno",
+ "ciudad": "mex",
+ "escenario": "sala24",
+ "ve_al_otro_ms": 225711,
+ "videos_recibidos": 0,
+ "congelamientos": 0,
+ "congelado_s": 0,
+ "resolucion_recibida_mediana": null,
+ "perdida_video_pct": 0,
+ "audio_cortado_pct": 0,
+ "rtt_p50_ms": 45,
+ "rtt_p95_ms": 47,
+ "camino": "srflx/udp",
+ "limita_calidad": {},
+ "caidas": 0,
+ "volvio": true,
+ "prendio": {
+  "camara": false,
+  "micro": false
+ },
+ "consola": [
+  [
+   1795100362369,
+   "warning",
+   "GoTrueClient@sb-glzncicyfrjidvkjjaig-auth-token:1 (2.95.3) 2026-11-19T14:59:22.367Z Multiple GoTrueClient instances detected in the same browser context. It is not an error, but this should be avoided"
+  ],
+  [
+   1795100362748,
+   "warning",
+   "GoTrueClient@sb-glzncicyfrjidvkjjaig-auth-token:1 (2.95.3) 2026-11-19T14:59:22.747Z Multiple GoTrueClient instances detected in the same browser context. It is not an error, but this should be avoided"
+  ],
+  [
+   1795100581934,
+   "error",
+   "WebSocket connection to 'ws://144.126.155.175:7880/rtc/v1?access_token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJTSU1jYTg3ZmE1MDczOGUiLCJzdWIiOiIxYTUwNGJiOS1mMmZlLTQ4ZWUtYmVlNy00YjZkZWJlYmNiZGFf"
+  ],
+  [
+   1795100708740,
+   "info",
+   "[LiveKit] Participant disconnected: e78b4183-402b-4501-b7fb-afedc06769e2_faa2964a5979 Chatter 223"
+  ],
+  [
+   1795100709751,
+   "info",
+   "[LiveKit] Participant disconnected: df145752-a0b4-4adb-9260-762ed31588fc_7771eaac1ff6 Chatter 224"
+  ],
+  [
+   1795100710753,
+   "info",
+   "[LiveKit] Participant disconnected: 4020db86-1586-488b-ba63-e137c6ca5495_a34b59288e87 Chatter 225"
+  ],
+  [
+   1795100711755,
+   "info",
+   "[LiveKit] Participant disconnected: ccedd094-8b3e-400a-a4d0-4b583f670ba7_2c21746c116e Chatter 226"
+  ],
+  [
+   1795100714670,
+   "info",
+   "[LiveKit] Participant disconnected: 4e820404-5885-4554-9ee6-6afb1dbc89ea_d71b33579ae2 Chatter 227"
+  ],
+  [
+   1795100715227,
+   "info",
+   "[LiveKit] Participant disconnected: 9a75ddb1-4a11-4f78-b8fd-3b747ca696d7_108122f75fc8 Chatter 228"
+  ],
+  [
+   1795100717987,
+   "info",
+   "[LiveKit] Participant disconnected: 2ea04f90-610c-4336-96db-7bfb7d4ce2d7_2aecfd84a412 Chatter 229"
+  ],
+  [
+   1795100721220,
+   "info",
+   "[LiveKit] Participant disconnected: cda9bd5b-fde4-430c-8a87-8832ce04d891_5e04d4fcc5e7 Chatter 230"
+  ],
+  [
+   1795100721220,
+   "info",
+   "[LiveKit] Participant disconnected: 2cc12404-fa99-4be2-a010-89a6e79034f8_60a96c0f102c Chatter 231"
+  ]
+ ],
+ "muestras": 63
+}
