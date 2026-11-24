@@ -111,12 +111,14 @@ describe("recuperación de llamadas sin conexiones huérfanas", () => {
 
   it.each(["sin internet", "reconectando", "salir"])("la prueba de velocidad se cancela al %s", async (cambio) => {
     const sala = salaFalsa("cowork_abcd1234_1"); colarSala(sala);
-    let abortar!: ReturnType<typeof vi.fn>;
+    const abortar = vi.fn<() => void>();
     const fetchFn = vi.spyOn(globalThis, "fetch").mockImplementation(async (url, init) => {
       if (String(url).includes("bytes=0")) return new Response(null, { status: 204 });
       return new Promise<Response>((_, rechazar) => {
-        abortar = vi.fn(() => rechazar(new DOMException("Cancelada", "AbortError")));
-        init!.signal!.addEventListener("abort", () => { abortar(); }, { once: true });
+        init!.signal!.addEventListener("abort", () => {
+          abortar();
+          rechazar(new DOMException("Cancelada", "AbortError"));
+        }, { once: true });
       });
     });
     const { result, unmount } = renderHook(() => useLiveKit());
