@@ -16,11 +16,12 @@ const GUARDAR_CADA_MS = 5 * 60_000;
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const sinTipar = supabase as unknown as { from: (t: string) => any };
 
-async function medirPing(): Promise<number | null> {
+async function medirPing(signal: AbortSignal): Promise<number | null> {
+  if (!navigator.onLine) return null;
   const t0 = performance.now();
   try {
     const r = await fetch(`${SUPABASE_URL}/auth/v1/health`, {
-      headers: { apikey: SUPABASE_PUBLISHABLE_KEY }, cache: "no-store", signal: AbortSignal.timeout(8000),
+      headers: { apikey: SUPABASE_PUBLISHABLE_KEY }, cache: "no-store", signal,
     });
     if (!r.ok && r.status >= 500) return null;
     return Math.round(performance.now() - t0);
@@ -29,9 +30,20 @@ async function medirPing(): Promise<number | null> {
   }
 }
 
-async function tomarMuestra(): Promise<MuestraDelEquipo> {
+async function tomarMuestra(signal: AbortSignal): Promise<MuestraDelEquipo> {
   const con = (navigator as Navigator & { connection?: { downlink?: number } }).connection;
-  const [ping, mem] = await Promise.all([medirPing(), escritorio()?.memoria?.().catch(() => null) ?? null]);
+  // La respuesta nativa también tiene límite: una app ocupada no debe acumular
+  // consultas de memoria mientras la anterior sigue esperando.
+  let alAbortar: (() => void) | undefined;
+  const cancelada = new Promise<null>((resolve) => {
+    alAbortar = () => resolve(null);
+    if (signal.aborted) resolve(null);
+    else signal.addEventListener("abort", alAbortar, { once: true });
+  });
+  const [ping, mem] = await Promise.all([
+    medirPing(signal),
+    Promise.race([escritorio()?.memoria?.().catch(() => null) ?? null, cancelada]),
+  ]).finally(() => { if (alAbortar) signal.removeEventListener("abort", alAbortar); });
   return {
     en_linea: navigator.onLine,
     ping_ms: ping,
@@ -60,10 +72,38 @@ export function useMedidorEquipo(): { muestra: MuestraDelEquipo | null; luces: S
   tRef.current = t;
 
   useEffect(() => {
-    if (!escritorio()) return;
+    const app = escritorio();
+    if (!app || !user?.id) return;
     let vivo = true;
+    let visibleNativa = true;
+    let cambiosDeVisibilidad = 0;
+    const escondida = () => document.hidden || !visibleNativa;
+    let enCurso = false;
+    let ultimaRonda = 0;
+    let peticion: AbortController | null = null;
+    anterior.current = null;
+    ultimaGuardada.current = 0;
     const ronda = async () => {
-      const m = await tomarMuestra();
+      if (!vivo || enCurso) return;
+      // En segundo plano conservamos el diagnóstico cada cinco minutos, sin
+      // golpear Auth cada veinte segundos mientras la persona usa otra app.
+      if (escondida() && ultimaRonda && Date.now() - ultimaRonda < GUARDAR_CADA_MS) return;
+      enCurso = true;
+      const inicioRonda = Date.now();
+      ultimaRonda = inicioRonda;
+      const ctrl = new AbortController();
+      peticion = ctrl;
+      const limite = window.setTimeout(() => ctrl.abort(), 8_000);
+      let m: MuestraDelEquipo;
+      try {
+        m = await tomarMuestra(ctrl.signal);
+      } catch {
+        return;
+      } finally {
+        window.clearTimeout(limite);
+        enCurso = false;
+        if (peticion === ctrl) peticion = null;
+      }
       if (!vivo) return;
       setMuestra(m);
       const luces = semaforo(m);
@@ -79,15 +119,39 @@ export function useMedidorEquipo(): { muestra: MuestraDelEquipo | null; luces: S
         });
       }
       anterior.current = luces;
-      if (user && ahora - ultimaGuardada.current >= GUARDAR_CADA_MS) {
-        ultimaGuardada.current = ahora;
+      // La misma referencia de tiempo que el muestreo: si el segundo ping
+      // tarda menos, medir desde el final saltaría un registro entero (10 min).
+      if (user && inicioRonda - ultimaGuardada.current >= GUARDAR_CADA_MS) {
+        ultimaGuardada.current = inicioRonda;
         void sinTipar.from("equipo_salud").insert({ user_id: user.id, datos: { ...m, ...luces } }).then(() => {}, () => {});
       }
     };
     void ronda();
     const id = window.setInterval(() => { void ronda(); }, CADA_MS);
-    return () => { vivo = false; window.clearInterval(id); };
-  }, [user]);
+    const alVolver = () => { if (!escondida()) void ronda(); };
+    // Electron mantiene document.visible para no suspender el audio. Al
+    // minimizar manda su propia señal, que también debe frenar este medidor.
+    const soltarVisibilidad = app.alCambiarVisibilidad?.((visible) => {
+      cambiosDeVisibilidad++;
+      visibleNativa = visible;
+      alVolver();
+    });
+    void app.visible?.().then((visible) => {
+      if (vivo && cambiosDeVisibilidad === 0) visibleNativa = visible;
+    }).catch(() => {});
+    document.addEventListener("visibilitychange", alVolver);
+    window.addEventListener("online", alVolver);
+    window.addEventListener("offline", alVolver);
+    return () => {
+      vivo = false;
+      peticion?.abort();
+      soltarVisibilidad?.();
+      window.clearInterval(id);
+      document.removeEventListener("visibilitychange", alVolver);
+      window.removeEventListener("online", alVolver);
+      window.removeEventListener("offline", alVolver);
+    };
+  }, [user?.id]);
 
   return { muestra, luces: muestra ? semaforo(muestra) : null };
 }

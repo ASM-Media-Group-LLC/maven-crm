@@ -8,6 +8,9 @@
 
 ## Stack y deploy
 
+- 2026-11-24: auditoría de infraestructura y carga; reconexión/presencia, carga diferida, consultas de chat y medición al minimizar reparadas; caché privada retirada, bloqueo Auth compatible y vigilantes corregidos.
+- Evidencia y banco aislado en `docs/audits/infraestructura-base-2026-11-24.md` y `scripts/audit/`; completar lectura 5×/10×, publicación y PDF antes de certificar capacidad. Pendientes: aislamiento entre empresas, restauración de respaldos y prueba física Mac/Windows con internet débil.
+
 | Pieza | Decisión actual |
 |---|---|
 | Frontend | Vite + React 18 + Tailwind 3 + shadcn/ui |

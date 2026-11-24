@@ -99,14 +99,14 @@ describe("versionesDesdePresencia: quién sigue con un Maven anterior al mínimo
 
 describe("la presencia lleva el build (useOnlinePresence)", () => {
   // La presencia es broadcast: el build viaja sin escribir en la base. Se lee el
-  // archivo porque los dos track() (al suscribir y al cambiar de estado) tienen
-  // que llevarlo; con uno solo, quien nunca cambia de estado no lo mandaría.
+  // helper único construye todos los anuncios. Los caminos de suscripción,
+  // cambio de estado y recuperación se ejecutan en presenciaRecuperable.test.tsx.
   const src = FUENTE_PRESENCIA;
-  it("los dos track() llevan `b`", () => {
+  it("el helper compartido track() lleva `b`", () => {
     // Un glob que no carga nada pasaría todo en verde.
     expect(src.length).toBeGreaterThan(1000);
     const tracks = src.split(/\.track\(\{/).slice(1).map((t) => t.slice(0, t.indexOf("});")));
-    expect(tracks).toHaveLength(2);
+    expect(tracks).toHaveLength(1);
     for (const t of tracks) expect(t).toContain("...BUILD_EN_LA_PRESENCIA");
   });
   it("expone versionesConectadas leyendo la presencia, sin consultar la base", () => {

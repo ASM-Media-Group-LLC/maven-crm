@@ -4,7 +4,7 @@ import {
 import { createPortal } from "react-dom";
 import { Minimize2, Maximize2, PhoneOff, PictureInPicture2, GripHorizontal, Volume2, VolumeX, Scaling, Undo2 } from "lucide-react";
 import { useInRouterContext, useNavigate } from "react-router-dom";
-import LiveKitCallView from "@/pages/messenger/videocall/LiveKitCallView";
+import LiveKitCallView from "@/components/VistaDeLlamadaDiferida";
 import { usePipWindow, docPipSupported } from "@/pages/cowork/usePipWindow";
 import { useLanguageSiHay } from "@/hooks/useLanguage";
 import { traducir } from "@/lib/i18n";

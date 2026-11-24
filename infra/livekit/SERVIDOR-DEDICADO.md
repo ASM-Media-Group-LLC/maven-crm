@@ -1,4 +1,28 @@
-# Servidor de llamadas dedicado (cómo está HOY)
+# Servidores de llamadas dedicados — verificado el 24/11/2026
+
+## Mapa actual
+
+| Servicio | Destino | Comprobado en esta auditoría |
+|---|---|---|
+| Llamadas de producción | Miami, `45.32.172.118`, `45-32-172-118.sslip.io` | 4 CPU, 7,75 GiB RAM; LiveKit 1.8.4, Redis, Egress y Caddy; sin reinicios/OOM del SFU en la instantánea |
+| Alternativa de llamadas | St. Louis, `195.26.254.111`, `lk.asmtech.ai` | 8 CPU, 23,47 GiB RAM; LiveKit 1.8.4 y TURN disponibles |
+| Documentos | Mismo VPS de St. Louis | ONLYOFFICE 9.4.0.1 activo; debe conservar recursos al probar cargas |
+| Web | Dokploy, `147.93.3.97`, `app.maven-ai.me` | HTTP 200; falta acceso administrativo para medir recursos internos |
+
+En ambos servidores se comprobó TLS de señalización y TURN 5349 y respuesta
+STUN UDP 3478. Esto no prueba una llamada completa usando TURN desde una red
+corporativa. Certificados observados: Miami vence el 17/02/2027 y St. Louis el
+15/01/2027. La renovación del certificado que usa el SFU requiere verificar su
+recarga sin interrumpir llamadas; no se reinició ninguno durante la auditoría.
+
+El cambio de región queda manual en `.github/workflows/livekit-region.yml`.
+Se retiró el cron del traslado del 20/11, que se habría repetido cada año.
+El simulacro del 24/11 usó contenedores temporales y red interna en St. Louis,
+sin puertos públicos, sin usuarios reales y sin modificar estos servicios.
+Evidencia y límites: [auditoría](../../docs/audits/infraestructura-base-2026-11-24.md)
+y [simulacros](../../docs/auditorias/infraestructura-2026-11-24/README.md).
+
+## Montaje de St. Louis y antecedentes
 
 Desde octubre de 2026 LiveKit ya no vive en el servidor compartido ni en Dokploy
 (lo de `docker-compose.yml` y `README.md` de esta carpeta es el montaje viejo).

@@ -1,5 +1,10 @@
 # LiveKit self-hosted (videollamadas Maven + Cowork)
 
+> **Montaje histórico.** El 24/11/2026 se verificó que las llamadas de producción
+> usan Miami, y St. Louis queda como alternativa. El despliegue compartido en
+> Dokploy descrito debajo es anterior a esa separación. El mapa vigente y sus
+> comprobaciones están en [SERVIDOR-DEDICADO.md](./SERVIDOR-DEDICADO.md).
+
 Servidor de medios WebRTC (SFU) que reemplaza a LiveKit Cloud. Lo consumen las
 edge functions `livekit-token` (videollamada de Messenger) y `cowork-session`
 (Cowork), que firman tokens con la API key/secret de aquí.

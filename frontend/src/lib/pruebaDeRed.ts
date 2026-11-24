@@ -86,22 +86,38 @@ interface Opciones {
   fetchFn?: typeof fetch;
   reloj?: () => number;
   tiempoMaxMs?: number;
+  /** Cancelar al salir de la llamada, perder la red o quedar en segundo plano. */
+  signal?: AbortSignal;
 }
 
 /** Corre la prueba completa. Devuelve null si ni siquiera el ping contestó. */
 export async function medirRed(o: Opciones): Promise<PruebaDeRed | null> {
+  if (o.signal?.aborted) return null;
   const f = o.fetchFn ?? fetch;
   const reloj = o.reloj ?? (() => performance.now());
   const tope = o.tiempoMaxMs ?? TIEMPO_MAX_MS;
   const marca = () => `t=${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
-  const pedir = async (consulta: string, init: RequestInit = {}) => {
+  // Cada transferencia conserva su tope y además obedece al cierre de la
+  // llamada. Se limpia la escucha al terminar: no se acumula cada media hora.
+  const limitar = () => {
     const ctrl = new AbortController();
-    const t = setTimeout(() => ctrl.abort(), tope);
+    const cancelar = () => ctrl.abort();
+    o.signal?.addEventListener("abort", cancelar, { once: true });
+    if (o.signal?.aborted) cancelar();
+    const timer = setTimeout(cancelar, tope);
+    return {
+      signal: ctrl.signal,
+      soltar: () => { clearTimeout(timer); o.signal?.removeEventListener("abort", cancelar); },
+    };
+  };
+  const pedir = async (consulta: string, init: RequestInit = {}) => {
+    const limite = limitar();
     try {
-      return await f(`${o.url}?${consulta}&${marca()}`, { ...init, headers: { ...o.headers, ...(init.headers ?? {}) }, cache: "no-store", signal: ctrl.signal });
+      if (limite.signal.aborted) throw new DOMException("Prueba cancelada", "AbortError");
+      return await f(`${o.url}?${consulta}&${marca()}`, { ...init, headers: { ...o.headers, ...(init.headers ?? {}) }, cache: "no-store", signal: limite.signal });
     } finally {
-      clearTimeout(t);
+      limite.soltar();
     }
   };
 
@@ -117,16 +133,17 @@ export async function medirRed(o: Opciones): Promise<PruebaDeRed | null> {
     return null;
   }
 
+  if (o.signal?.aborted) return null;
+
   // 2) Bajada: se cuentan los bytes que llegan; si se acaba el tiempo, vale lo
   //    que alcanzó a llegar (es una medida real, no un tope).
   let bajada: number | null = null;
   try {
-    const ctrl = new AbortController();
+    const limite = limitar();
     const t0 = reloj();
-    const corte = setTimeout(() => ctrl.abort(), tope);
     let recibidos = 0;
     try {
-      const r = await f(`${o.url}?bytes=${BYTES_BAJADA}&${marca()}`, { headers: o.headers, cache: "no-store", signal: ctrl.signal });
+      const r = await f(`${o.url}?bytes=${BYTES_BAJADA}&${marca()}`, { headers: o.headers, cache: "no-store", signal: limite.signal });
       if (r.ok && r.body) {
         const lector = r.body.getReader();
         try {
@@ -140,9 +157,11 @@ export async function medirRed(o: Opciones): Promise<PruebaDeRed | null> {
         recibidos = (await r.arrayBuffer()).byteLength;
       }
     } catch { /* abortado antes de empezar a llegar */ }
-    clearTimeout(corte);
+    finally { limite.soltar(); }
     bajada = mbpsDe(recibidos, reloj() - t0, latencia);
   } catch { /* sin bajada */ }
+
+  if (o.signal?.aborted) return null;
 
   // 3) Subida: fetch no avisa cuánto lleva subido, así que si se acaba el tiempo
   //    lo único cierto es que la velocidad es MENOR que lo que da el tope.
@@ -155,13 +174,16 @@ export async function medirRed(o: Opciones): Promise<PruebaDeRed | null> {
       const r = await pedir("subir=1", { method: "POST", body: cuerpo, headers: { "Content-Type": "application/octet-stream" } });
       if (r.ok) subida = mbpsDe(BYTES_SUBIDA, reloj() - t0, latencia);
     } catch (e) {
-      if ((e as Error)?.name === "AbortError") {
+      if ((e as Error)?.name === "AbortError" && !o.signal?.aborted) {
         subida = mbpsDe(BYTES_SUBIDA, tope, null);
         subidaTope = true;
       }
     }
   } catch { /* sin subida */ }
 
+  // Salir no es una velocidad mala: jamás se usa una cancelación para bajar
+  // la calidad de una llamada nueva ni para registrar un falso problema de red.
+  if (o.signal?.aborted) return null;
   return {
     subida_mbps: subida,
     bajada_mbps: bajada,
