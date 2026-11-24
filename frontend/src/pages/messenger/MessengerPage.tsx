@@ -254,7 +254,7 @@ export default function MessengerPage() {
 
   const { toggleReaction, getReactionsForMessage, addMessageId } = useReactions(activeChatId);
 
-  useEffect(() => { messages.forEach((m) => addMessageId(m.id)); }, [messages, addMessageId]);
+  useEffect(() => { messages.forEach((m) => addMessageId(m.id, m.conversation_id)); }, [messages, addMessageId]);
   const { getReadBy, getDeliveredBy } = useReadReceipts(activeChatId, messages);
 
   const handleSelectUser = useCallback((userId: string) => {

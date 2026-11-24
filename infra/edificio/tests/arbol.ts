@@ -417,16 +417,22 @@ check((await como(A1O, `select 1 from public.argos_saldo_movimientos`)).length =
 await anda("service_role", `select public.argos_cobrar('${SUELTA}', 1)`, "la agencia suelta tiene su propia billetera");
 
 // ════ 9. Tableros ════════════════════════════════════════════════════════════
+// Los segmentos prueban quién sigue en vivo, pero cerca de medianoche algunos
+// empezaron ayer. Las tres personas tienen capturas de HOY para probar la nota
+// diaria sin depender de la hora del runner; la cuarta solo tiene una de ayer.
 await db.exec(`insert into public.cowork_tiempo_segmentos (user_id, estado, started_at, last_seen_at, seconds) values
   ('${E1}', 'activo', now() - interval '1 hour', now(), 3600), ('${E2}', 'activo', now() - interval '10 minutes', now() - interval '10 seconds', 600),
   ('${E3}', 'activo', now() - interval '2 hours', now() - interval '30 minutes', 5400);
   insert into public.monitor_capturas (user_id, tipo, cara_visible, fuera_de_lugar) values
-  ('${E1}', 'camara', true, null), ('${E1}', 'pantalla', null, false), ('${E1}', 'pantalla', null, true);`);
+  ('${E1}', 'camara', true, null), ('${E1}', 'pantalla', null, false), ('${E1}', 'pantalla', null, true),
+  ('${E2}', 'camara', true, null), ('${E3}', 'camara', true, null);
+  insert into public.monitor_capturas (user_id, tipo, cara_visible, created_at) values
+  ('${E4}', 'camara', true, now() - interval '1 day');`);
 const res = (await como(AA, `select public.resumen_organizacion('${ORG_A}') r`))[0].r;
 const a1 = (res.agencias as Fila[]).find((a) => a.id === A1);
 check(res.paquete === 15 && res.repartidas === 12 && res.libres === 3 && res.ocupadas === 7, `tablero: paquete 15, repartidas 12, libres 3, ocupadas 7 (${res.paquete}/${res.repartidas}/${res.libres}/${res.ocupadas})`);
 check(a1?.personas === 6 && a1?.en_vivo === 2 && a1?.llena === false, `A1: 6 personas, 2 en vivo (el de hace 30 min no) (${a1?.personas}/${a1?.en_vivo})`);
-check(typeof a1?.nota_argos_hoy === "number" && a1?.nota_con_datos === 3, `A1 tiene nota de Argos de hoy (${a1?.nota_argos_hoy}, ${a1?.nota_con_datos} con datos)`);
+check(typeof a1?.nota_argos_hoy === "number" && a1?.nota_con_datos === 3, `A1 tiene nota de Argos de hoy y excluye los datos de ayer (${a1?.nota_argos_hoy}, ${a1?.nota_con_datos} con datos)`);
 check(Number(a1?.argos_gastado_mes_usd) === 15 && a1?.necesita_de_ti === 1, `A1: gastó 15 de Argos este mes; necesita de ti = 1 alerta grave (${a1?.argos_gastado_mes_usd}/${a1?.necesita_de_ti})`);
 check(res.organizacion.plan.precio_usd === 299, "el admin del cliente ve su precio");
 const resG = (await como(GRACE, `select public.resumen_organizacion('${ORG_A}') r`))[0].r;

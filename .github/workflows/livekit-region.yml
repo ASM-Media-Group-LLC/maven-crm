@@ -7,14 +7,11 @@ name: LiveKit — servidor de llamadas (Miami / St. Louis)
 # Decisión de Alvaro (19/11/2026): pasar a Miami a las 6:00 a. m. de Colombia, y
 # si en la primera hora sale peor que St. Louis (más conexiones malas o más
 # ping), volver solo a St. Louis.
-#   · 11:07 UTC (6:07 Bogotá) del 20/11 → miami (el 19/11 GitHub no disparó el horario)
-#   · 12:13 y 13:13 UTC        → revisar: si Miami sale peor que ayer en St. Louis, vuelve
-# También se puede correr a mano: destino = miami | stlouis | revisar.
+# El traslado del 20/11/2026 ya terminó. Se conserva la herramienta manual:
+# destino = miami | stlouis | revisar. Los cron con día/mes se repetían cada año
+# y podían volver a mover producción el 20/11 sin una decisión nueva.
 
 on:
-  schedule:
-    - cron: '7 11 20 11 *'
-    - cron: '13 12,13 20 11 *'
   workflow_dispatch:
     inputs:
       destino:
@@ -39,13 +36,7 @@ jobs:
       - name: Qué toca
         id: que
         run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            echo "accion=${{ inputs.destino }}" >> "$GITHUB_OUTPUT"
-          elif [ "${{ github.event.schedule }}" = "7 11 20 11 *" ]; then
-            echo "accion=miami" >> "$GITHUB_OUTPUT"
-          else
-            echo "accion=revisar" >> "$GITHUB_OUTPUT"
-          fi
+          echo "accion=${{ inputs.destino }}" >> "$GITHUB_OUTPUT"
 
       - name: Guard — token
         run: |

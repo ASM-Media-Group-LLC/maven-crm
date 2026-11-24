@@ -6,6 +6,7 @@ import { pluginMarcaDeBuild } from "./frontend/src/lib/marcaDeBuild";
 import { TARJETAS, conTarjeta } from "./frontend/src/lib/tarjetasDeLink";
 import fs from "node:fs";
 import { pluginIdiomas } from "./scripts/i18n/vitePluginIdiomas";
+import { esChunkPublico } from "./scripts/pwa/cachePublica";
 
 // https://vitejs.dev/config/
 //
@@ -129,12 +130,11 @@ export default defineConfig(({ mode }) => ({
         navigateFallbackDenylist: [/^\/~oauth/, /^\/aportar\//, /^\/subir\//],
         runtimeCaching: [
           {
-            // Los chunks de página: se guardan la primera vez que alguien entra
-            // a esa sección y de ahí en adelante salen de la caché. El hash en
-            // el nombre hace que StaleWhileRevalidate sea seguro — el contenido
-            // de un nombre dado no cambia nunca.
-            urlPattern: /\/assets\/.*\.js$/,
-            handler: "StaleWhileRevalidate",
+            // El hash identifica contenido inmutable: no volver a descargarlo
+            // al regresar a una sección. Solo código de nuestro propio origen;
+            // ninguna respuesta autenticada de APIs entra en esta caché.
+            urlPattern: esChunkPublico,
+            handler: "CacheFirst",
             options: {
               cacheName: "chunks-cache",
               expiration: { maxEntries: 300, maxAgeSeconds: 60 * 60 * 24 * 30 },
@@ -148,22 +148,10 @@ export default defineConfig(({ mode }) => ({
               expiration: { maxEntries: 10, maxAgeSeconds: 300 },
             },
           },
-          {
-            urlPattern: /^https:\/\/.*\.supabase\.co\/rest\/v1\/chat_messages/,
-            handler: "NetworkFirst",
-            options: {
-              cacheName: "chat-messages-cache",
-              expiration: { maxEntries: 100, maxAgeSeconds: 86400 },
-            },
-          },
-          {
-            urlPattern: /^https:\/\/.*\.supabase\.co\/rest\/v1\/chat_conversations/,
-            handler: "NetworkFirst",
-            options: {
-              cacheName: "chat-conversations-cache",
-              expiration: { maxEntries: 50, maxAgeSeconds: 86400 },
-            },
-          },
+          // Las respuestas privadas de chat van siempre a la red con la sesión
+          // actual. CacheStorage no separa Authorization: una URL común puede
+          // pertenecer a dos cuentas distintas en el mismo computador. Las
+          // cachés antiguas se retiran en sw-push.js al activar esta versión.
         ],
       },
     }),

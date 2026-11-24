@@ -1,7 +1,7 @@
 // Handlers de Web Push del service worker de Maven. Este archivo se importa
 // DENTRO del service worker que genera Workbox (ver vite.config.ts ->
 // workbox.importScripts: ["sw-push.js"]), así que corre en el scope del SW y
-// solo agrega dos listeners: `push` y `notificationclick`.
+// agrega los avisos push, navegación y mantenimiento de las cachés públicas.
 //
 // Payloads (los arma la edge `web-push`):
 //   Llamada entrante (action "notify_call"):
@@ -23,6 +23,19 @@
 // disponible" no se va y el botón Recargar no reacciona. No borrar. Y un error
 // de sintaxis acá rompe el SW ENTERO: probar con `npm run build && npm run
 // preview` antes de mergear.
+
+// Las versiones anteriores guardaban respuestas autenticadas de Messenger por
+// URL, sin separar cuentas. Al activar, retirar ÚNICAMENTE esas dos cachés:
+// los borradores, sesiones, archivos públicos y el resto del almacenamiento se
+// conservan. Las respuestas de APIs ya no se cachean (ver vite.config.ts).
+self.addEventListener("activate", function (event) {
+  // Esperar ambas eliminaciones, incluso si una falla: el worker no debe
+  // terminar mientras la otra caché privada todavía se está retirando.
+  event.waitUntil(Promise.allSettled([
+    caches.delete("chat-messages-cache"),
+    caches.delete("chat-conversations-cache"),
+  ]));
+});
 
 // AUTO-UNREGISTER para /aportar/ (Alvaro, 06/11). La página pública de aportes
 // la usan creadoras externas que subieron antes del fix del motor de subida y

@@ -150,3 +150,47 @@ describe("cableado", () => {
     expect(edge).toMatch(/MAX_SUBIDA = 3_000_000/);
   });
 });
+
+describe("cancelar la prueba sin estorbar a la llamada", () => {
+  it("si ya se salió, no envía ni el primer pedido", async () => {
+    const control = new AbortController(); control.abort();
+    const fetchFn = vi.fn() as unknown as typeof fetch;
+    expect(await medirRed({ url: "https://test.invalid", headers: {}, fetchFn, signal: control.signal })).toBeNull();
+    expect(fetchFn).not.toHaveBeenCalled();
+  });
+
+  it.each(["bajada", "subida"])("corta la %s en curso y descarta el resultado sin marcar una red lenta", async (fase) => {
+    const control = new AbortController();
+    let cancelarTransferencia!: () => void;
+    let confirmarInicio!: () => void;
+    const iniciada = new Promise<void>((ok) => { confirmarInicio = ok; });
+    const fetchFn = vi.fn(async (url: string, init?: RequestInit) => {
+      const esTransferencia = fase === "subida" ? init?.method === "POST" : url.includes(`bytes=${BYTES_BAJADA}`);
+      if (esTransferencia) {
+        return new Promise<Response>((_, no) => {
+          cancelarTransferencia = vi.fn(() => no(new DOMException("Cancelada", "AbortError")));
+          init!.signal!.addEventListener("abort", cancelarTransferencia, { once: true });
+          confirmarInicio();
+        });
+      }
+      if (url.includes("bytes=0")) return new Response(null, { status: 204 });
+      return new Response(new Uint8Array(100));
+    });
+    const resultado = medirRed({ url: "https://test.invalid", headers: {}, fetchFn: fetchFn as unknown as typeof fetch, signal: control.signal });
+    await iniciada;
+    control.abort();
+    expect(await resultado).toBeNull();
+    expect(cancelarTransferencia).toHaveBeenCalledTimes(1);
+    if (fase === "bajada") expect(fetchFn.mock.calls.some(([, init]) => init?.method === "POST")).toBe(false);
+  });
+
+  it("al cancelar entre pasos no empieza la siguiente transferencia", async () => {
+    const control = new AbortController();
+    const fetchFn = vi.fn(async () => {
+      control.abort();
+      return new Response(null, { status: 204 });
+    });
+    expect(await medirRed({ url: "https://test.invalid", headers: {}, fetchFn, signal: control.signal })).toBeNull();
+    expect(fetchFn).toHaveBeenCalledTimes(1);
+  });
+});

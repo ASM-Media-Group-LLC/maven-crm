@@ -1,0 +1,553 @@
+{
+  "schema_version": 1,
+  "fecha": "2026-11-24",
+  "ventana": "23/11 06:00 UTC a 24/11 06:00 UTC",
+  "ventana_local": "23/11 01:00 a 24/11 01:00, Nueva York",
+  "base_revision": "d00ba1b44",
+  "delivery": {
+    "estado": "publicada",
+    "resumen": "Código, web, Auth y monitores publicados. Se verificaron pruebas automáticas, archivos activos y sesión administrativa. Quedan pruebas reales en Mac/Windows; no se certifica capacidad 5x/10x.",
+    "commit": "ddd71cc186e9f4bd84618a4ebda9a253326ec45a",
+    "pr_url": "https://github.com/ASM-Media-Group-LLC/maven-crm/pull/283",
+    "verificado_en": "2026-11-24T06:57:22Z",
+    "merge_utc": "2026-11-24T06:52:58Z",
+    "edge_verificado_utc": "2026-11-24T06:53:45Z",
+    "web_estado": "Publicada; nueva versión confirmada",
+    "web_verificado_utc": "2026-11-24T06:57:22Z",
+    "validacion": {
+      "suites": 489,
+      "tests": 4530,
+      "errores_tipo_base": 228,
+      "errores_tipo_head": 228,
+      "errores_tipo_nuevos": 0,
+      "guardas_backend": "aprobadas"
+    },
+    "verificacion": {
+      "web_url": "https://app.maven-ai.me",
+      "http_status": 200,
+      "indice_js": "index-Dnh9Z-Du.js",
+      "build_meta": "1795503316298",
+      "js_incluye_call_view_unavailable": true,
+      "chunk_livekit_call_view_presente": true,
+      "service_worker_sin_cache_privada": true,
+      "sw_push_all_settled_presente": true,
+      "sesion_administrativa_con_nueva_version": true,
+      "alertas_administrativas": 0,
+      "edge_deploy_run_id": 45343758589,
+      "edge_deploy_estado": "success",
+      "mac_windows_fisicos": "No ensayados con dos dispositivos físicos en esta auditoría.",
+      "filas_administrativas": 52,
+      "filas_con_correo": 52,
+      "ultima_comprobacion_tras_nueva_web": true,
+      "guard_frontend_main": "success",
+      "traducir_idiomas": "success",
+      "deploy_edge": "success"
+    }
+  },
+  "auth_verificacion": {
+    "estado": "aplicado en producción; lectura independiente verificada",
+    "verificado_utc": "2026-11-24T06:30:00Z",
+    "cuentas": 72,
+    "bloqueadas": 16,
+    "infinitos_positivos": 0,
+    "infinitos_negativos": 0,
+    "nuevos_bloqueos_compatibles": true,
+    "funcion_solo_cambio_de_fecha": true,
+    "propietario_acl_search_path_security_definer_intactos": true,
+    "definicion_md5": "d150085b1a4b81f0ee8fd2f3648d6f23",
+    "logs_posteriores": {
+      "inicio_utc": "2026-11-24T06:31:00Z",
+      "fin_utc": "2026-11-24T06:33:00Z",
+      "entradas_auth": 23,
+      "estados_observados": [
+        200
+      ],
+      "errores_fecha": 0,
+      "entradas_admin_users": 0,
+      "limite": "No hubo tráfico en /admin/users en esta ventana; no certifica esa ruta por ausencia de errores."
+    },
+    "interfaz": {
+      "verificador": "responsable de entrega",
+      "pagina": "User management",
+      "filas": 52,
+      "alertas": 0,
+      "edito_datos": false,
+      "filas_con_correo": 52,
+      "total_filas": 52,
+      "ruta_verificada": "admin-user-actions list_users -> auth.admin.listUsers",
+      "fundamento": "useAdminUsers.ts obtiene correos únicamente de list_users; la alternativa ante error tendría correos vacíos. Solo se contó el patrón, sin extraer datos personales."
+    }
+  },
+  "baseline": {
+    "auth_registrados": 72,
+    "equipo_no_borrado": 52,
+    "habilitados": 51,
+    "activos_api_24h": 46,
+    "usuarios_llamadas_24h": 39,
+    "pico_usuarios_minuto": 33,
+    "pico_salas_minuto": 23,
+    "muestras_llamadas": 17419,
+    "api_solicitudes": 3124055,
+    "api_5xx": 2580,
+    "api_429": 0,
+    "db_mb": 4019,
+    "db_conexiones": 36,
+    "db_conexiones_max": 160,
+    "db_conexiones_activas": 2,
+    "api_rutas": [
+      {
+        "nombre": "Reacciones de chat",
+        "solicitudes": 271206
+      },
+      {
+        "nombre": "Recibos de chat",
+        "solicitudes": 248059
+      },
+      {
+        "nombre": "Comprobación de Auth",
+        "solicitudes": 243635
+      },
+      {
+        "nombre": "Membresías de Cowork",
+        "solicitudes": 105123
+      }
+    ]
+  },
+  "servidores": {
+    "fuente": "/private/tmp/maven-infra-audit/servidores.json",
+    "miami": {
+      "cpu_24h_promedio_pct": 2.81,
+      "cpu_10min_max_pct": 9.45,
+      "memoria_max_pct": 10.27,
+      "muestras": 143,
+      "cores": 4,
+      "ram_gib": 7.75,
+      "ram_disponible_gib": 6.93,
+      "disco_usado_pct": 11,
+      "livekit_reinicios": 0,
+      "livekit_oom": false,
+      "turn_tls": true,
+      "turn_stun_udp": true,
+      "cert_vence": "2027-02-17",
+      "http200": true
+    },
+    "stlouis": {
+      "cores": 8,
+      "ram_gib": 23.47,
+      "disco_usado_pct": 6,
+      "ram_disponible_gib": 22.33,
+      "livekit_reinicios": null,
+      "turn_tls": true,
+      "turn_stun_udp": true,
+      "cert_vence": "2027-01-15",
+      "http200": true
+    },
+    "nas": {
+      "salud_publica200": true,
+      "nas1_uso_pct": 73,
+      "nas2_uso_pct": 71,
+      "libre_bytes": 13873308925952,
+      "ram_gib": 24,
+      "uptime_dias": 28,
+      "restauracion_verificada": false
+    },
+    "web": {
+      "status200": true,
+      "ttfb_y_transfer_ms_unamuestra": 209,
+      "ssh_disponible": false
+    },
+    "instaladores": {
+      "mac_version": "2.1.2611240012",
+      "mac_zip_bytes": 225185201,
+      "windows_version": "2.0.31",
+      "windows_bytes": 115571016
+    }
+  },
+  "reparaciones": [
+    {
+      "nombre": "Recuperación de llamadas",
+      "problema": "Los reintentos pueden continuar después de salir o usar una autorización vencida.",
+      "accion": "Controlar la autorización, cancelar reintentos al salir y permitir cancelar la prueba de velocidad.",
+      "estado": "Publicado; archivos activos verificados"
+    },
+    {
+      "nombre": "Presencia que se recupera",
+      "problema": "Un canal cerrado puede dejar personas con un estado de conexión incorrecto.",
+      "accion": "Recuperar la presencia al reconectar sin duplicar los canales de comunicación.",
+      "estado": "Publicado; archivos activos verificados"
+    },
+    {
+      "nombre": "Abrir la app con menos trabajo",
+      "problema": "Se descargan componentes pesados antes de necesitarlos.",
+      "accion": "Cargar el motor de llamadas cuando se use, permitir reintentar y ordenar las descargas anticipadas según la red.",
+      "estado": "Publicado; archivos activos verificados"
+    },
+    {
+      "nombre": "Chat y datos privados",
+      "problema": "El chat consulta de más y la caché debe distinguir datos privados de archivos públicos.",
+      "accion": "Consultar solo las reacciones de la conversación y limpiar respuestas privadas de la caché de la web.",
+      "estado": "Publicado; archivos activos verificados"
+    },
+    {
+      "nombre": "Medidor de la app de escritorio",
+      "problema": "Las mediciones frecuentes y solapadas añaden trabajo local innecesario.",
+      "accion": "Medir cada 20 segundos con la app visible y cada 5 minutos minimizada; evitar mediciones simultáneas.",
+      "estado": "Publicado; archivos activos verificados"
+    },
+    {
+      "nombre": "Cuentas bloqueadas y vigilancia",
+      "problema": "Una fecha incompatible rompe consultas de cuentas; dos monitores consultan una columna o un nombre de tarea incorrectos.",
+      "accion": "Auth: directorio con 52/52 correos recuperados y 16 cuentas aún bloqueadas. Además, corrección de tardanzas y del monitor de aportes al NAS.",
+      "estado": "Publicado; servicio comprobado"
+    },
+    {
+      "nombre": "Automatización antigua de regiones",
+      "problema": "Quedó una tarea anual heredada que podía cambiar la región de llamadas.",
+      "accion": "Retirar esa tarea antigua del flujo de automatización y mantener un cambio de región controlado.",
+      "estado": "Publicado; configuración verificada"
+    }
+  ],
+  "bundle": {
+    "reduccion_gzip_pct": 15.1,
+    "antes_bytes": 2886567,
+    "despues_bytes": 2484332,
+    "antes_gzip_bytes": 803847,
+    "despues_gzip_bytes": 682452,
+    "ahorro_gzip_bytes": 121395,
+    "metodo": "JavaScript y CSS de entrada; misma compresión Node zlib en ambas compilaciones.",
+    "nota": "JavaScript y CSS de entrada: de 803.847 a 682.452 bytes con la misma compresión. Menos bytes no equivale a prometer un 15,1 % más de velocidad."
+  },
+  "llamadas": {
+    "muestras_ventana_aproximada": 17418,
+    "excelente_pct": 92.18,
+    "buena_pct": 4.46,
+    "mala_pct": 3.36,
+    "perdidas_muestras": 1,
+    "usuarios_mala_calidad": 23,
+    "mala_calidad_red_media_ms": 154,
+    "mala_calidad_atraso_app_p95_ms": 1470,
+    "region_muestras": 1884,
+    "region_personas": 39,
+    "miami_media_ms": 84.2,
+    "stlouis_media_ms": 124.0,
+    "miami_gana_pct": 95.9
+  },
+  "livekit": {
+    "estado": "Completado en laboratorio; 5x y 10x no aprobados bajo los límites ensayados",
+    "titulo": "El ensayo no valida todavía 165 ni 330 participantes",
+    "resumen": "33 conexiones completaron el ensayo corto sin pérdida observada. Con 165 y 330 aparecieron pérdidas de medios y fallos; esos escenarios no aprueban calidad bajo los límites del laboratorio.",
+    "entorno": "Caso de 33: primer ensayo, servidor de llamadas con 2 núcleos y 2 GiB. Casos de 165/330: segundo ensayo, servidor con 2 núcleos y 3 GiB; generador con 4 núcleos y 6 GiB. Comparten host y red interna. Los servicios existentes no se modificaron.",
+    "topologia": "11 conexiones por sala: 5 emiten y 6 reciben; no todas hablan en ambos sentidos. Vídeo 720p con una vista grande y cuatro pequeñas mediante simulcast. No se probó compartir pantalla.",
+    "duracion_nota": "La duración de la tabla incluye conexión y cierre; se solicitaron 60 segundos por sala después de entrar. La pérdida es el rango entre salas, no un promedio de todos los usuarios.",
+    "casos": [
+      {
+        "participantes": "33 / vídeo",
+        "duracion": "71,0 s total",
+        "salas": 3,
+        "resultado": "90/90 flujos recibidos; pérdida 0 %; sin errores. Resultado favorable del ensayo corto.",
+        "metricas": {
+          "room_logs": 3,
+          "room_summaries": 3,
+          "room_logs_missing_summary": 0,
+          "expected_subscriptions_for_entire_scenario": 90,
+          "received_tracks_in_available_summaries": 90,
+          "expected_tracks_in_available_summaries": 90,
+          "subscriber_errors_in_summaries": 0,
+          "maximum_room_packet_loss_percent": 0.0,
+          "minimum_room_packet_loss_percent": 0.0,
+          "log_alert_counts": {
+            "connection_failed": 0,
+            "publication_failed": 0,
+            "generator_consume_track_panic": 0,
+            "fatal_panic": 0
+          }
+        }
+      },
+      {
+        "participantes": "165 / vídeo",
+        "duracion": "73,5 s total",
+        "salas": 15,
+        "resultado": "450/450 flujos, pero pérdida 7,02-15,06 % por sala y 2 fallos internos del generador. No aprueba calidad.",
+        "metricas": {
+          "room_logs": 15,
+          "room_summaries": 15,
+          "room_logs_missing_summary": 0,
+          "expected_subscriptions_for_entire_scenario": 450,
+          "received_tracks_in_available_summaries": 450,
+          "expected_tracks_in_available_summaries": 450,
+          "subscriber_errors_in_summaries": 0,
+          "maximum_room_packet_loss_percent": 15.056,
+          "minimum_room_packet_loss_percent": 7.02,
+          "log_alert_counts": {
+            "connection_failed": 0,
+            "publication_failed": 0,
+            "generator_consume_track_panic": 2,
+            "fatal_panic": 0
+          }
+        }
+      },
+      {
+        "participantes": "330 / vídeo",
+        "duracion": "117,1 s total",
+        "salas": 30,
+        "resultado": "749/900 flujos; 17 fallos de conexión y 15 fallos del generador. Pérdida 3,99-39,30 %. No aprobado.",
+        "metricas": {
+          "room_logs": 30,
+          "room_summaries": 30,
+          "room_logs_missing_summary": 0,
+          "expected_subscriptions_for_entire_scenario": 900,
+          "received_tracks_in_available_summaries": 749,
+          "expected_tracks_in_available_summaries": 900,
+          "subscriber_errors_in_summaries": 9,
+          "maximum_room_packet_loss_percent": 39.296,
+          "minimum_room_packet_loss_percent": 3.986,
+          "log_alert_counts": {
+            "connection_failed": 17,
+            "publication_failed": 0,
+            "generator_consume_track_panic": 15,
+            "fatal_panic": 0
+          }
+        }
+      },
+      {
+        "participantes": "330 / audio",
+        "duracion": "84,2 s total",
+        "salas": 30,
+        "resultado": "801/900 flujos; 17 fallos de conexión. Pérdida 10,42-30,99 %. No aprobado.",
+        "metricas": {
+          "room_logs": 30,
+          "room_summaries": 30,
+          "room_logs_missing_summary": 0,
+          "expected_subscriptions_for_entire_scenario": 900,
+          "received_tracks_in_available_summaries": 801,
+          "expected_tracks_in_available_summaries": 900,
+          "subscriber_errors_in_summaries": 2,
+          "maximum_room_packet_loss_percent": 30.986,
+          "minimum_room_packet_loss_percent": 10.417,
+          "log_alert_counts": {
+            "connection_failed": 17,
+            "publication_failed": 0,
+            "generator_consume_track_panic": 0,
+            "fatal_panic": 0
+          }
+        }
+      }
+    ],
+    "ensayo_previo": {
+      "participantes": 165,
+      "limite_generador_gib": 2,
+      "generador_sin_memoria": true,
+      "nota": "El primer intento con 165 agotó los 2 GiB del generador; no demuestra un fallo de producción."
+    },
+    "limites": "El indicador de sesiones (gauge) llegó a 471 en vídeo y 351 en audio; no son usuarios únicos verificados. Reconexiones o sesiones aún contadas son causas posibles, no confirmadas. El generador también falló. No reproduce la red real, la app ni Miami, que tiene 4 núcleos.",
+    "siguiente": "Antes de comprar un servidor, repetir con 4 núcleos para llamadas, como Miami, y el generador en otro host; después probar todo el recorrido con la base de datos y las apps de Mac y Windows. Es el siguiente ensayo propuesto, todavía no ejecutado.",
+    "evidencia": "docs/auditorias/infraestructura-2026-11-24/simulacro-r3.json y simulacro-r4.json",
+    "fuentes": [
+      {
+        "ruta": "docs/auditorias/infraestructura-2026-11-24/simulacro-r3.json",
+        "terminado_utc": "2026-11-24T06:26:23.678428+00:00"
+      },
+      {
+        "ruta": "docs/auditorias/infraestructura-2026-11-24/simulacro-r4.json",
+        "terminado_utc": "2026-11-24T06:33:34.883272+00:00"
+      }
+    ]
+  },
+  "sql": {
+    "estado": "prueba aislada completada; optimización experimental descartada",
+    "casos": [
+      {
+        "escala": "1x",
+        "personas": 52,
+        "salas": 42,
+        "asignaciones": 5748,
+        "actual_ms": 11.91,
+        "experimental_ms": 12.96
+      },
+      {
+        "escala": "5x",
+        "personas": 260,
+        "salas": 210,
+        "asignaciones": 28740,
+        "actual_ms": 27.84,
+        "experimental_ms": 20.46
+      },
+      {
+        "escala": "10x",
+        "personas": 520,
+        "salas": 420,
+        "asignaciones": 57480,
+        "actual_ms": 11.06,
+        "experimental_ms": 13.96
+      }
+    ],
+    "lecturas_por_configuracion": 5,
+    "cowork_correccion_previa": {
+      "inicio_utc": "2026-11-23T19:00:00Z",
+      "fin_utc": "2026-11-24T06:00:00Z",
+      "respuestas_ok": 466,
+      "errores": 0,
+      "media_ms": 58.1,
+      "p95_ms": 115
+    }
+  },
+  "monitores": [
+    {
+      "nombre": "Salud general",
+      "cada": "2 minutos",
+      "ejecuciones": 720
+    },
+    {
+      "nombre": "Cortes de llamada",
+      "cada": "5 minutos",
+      "ejecuciones": 288
+    },
+    {
+      "nombre": "Saldo de IA",
+      "cada": "10 minutos",
+      "ejecuciones": 144
+    },
+    {
+      "nombre": "Equipo y turnos",
+      "cada": "3 minutos",
+      "ejecuciones": 480
+    }
+  ],
+  "riesgos": [
+    {
+      "prioridad": "Antes de más empresas",
+      "nombre": "Separación entre clientes",
+      "detalle": "KASH tiene una base separada; allí se encontraron tres tablas sin protección por fila. Las nuevas empresas comparten el edificio y requieren aislamiento por organización/agencia. No se confirmó una fuga.",
+      "siguiente": "Probar acceso a cada base, permisos y presencia entre organizaciones; revisar las tres tablas de KASH sin trasladar ese hallazgo al edificio."
+    },
+    {
+      "prioridad": "Alta",
+      "nombre": "Recuperación de archivos",
+      "detalle": "El NAS responde, pero no hay una restauración completa validada. Dos discos o equipos no demuestran una copia recuperable.",
+      "siguiente": "Restaurar una muestra aislada y medir cuánto se puede recuperar y en cuánto tiempo."
+    },
+    {
+      "prioridad": "Alta",
+      "nombre": "Actualizaciones y redes restrictivas",
+      "detalle": "LiveKit 1.8.4 y Egress 1.9 están por detrás de 1.13.11 (25/10) y 1.15.0 (06/10). Las notas oficiales incluyen mejoras de memoria y Chrome. No se estableció que esto cause la lentitud.",
+      "siguiente": "Probar versiones, reconexión y grabaciones antes de actualizar; validar TURN en 443, hoy disponible en 5349. La actualización de estos servicios está pendiente.",
+      "fuentes": [
+        {
+          "titulo": "LiveKit 1.13.11",
+          "url": "https://github.com/livekit/livekit/releases/tag/v1.13.11"
+        },
+        {
+          "titulo": "LiveKit 1.13.9",
+          "url": "https://github.com/livekit/livekit/releases/tag/v1.13.9"
+        },
+        {
+          "titulo": "Egress 1.15.0",
+          "url": "https://github.com/livekit/egress/releases/tag/v1.15.0"
+        }
+      ]
+    },
+    {
+      "prioridad": "Alta",
+      "nombre": "Servidor de la web",
+      "detalle": "La página responde, pero no se obtuvo acceso SSH. No se comprobaron sus límites internos ni su historial de recursos.",
+      "siguiente": "Completar CPU, memoria, registros y despliegue; una respuesta 200 no certifica capacidad."
+    },
+    {
+      "prioridad": "Antes de prometer 10x",
+      "nombre": "Capacidad y experiencia",
+      "detalle": "El ensayo de 165 y 330 no aprobó calidad con los límites del laboratorio. Su servidor de llamadas tenía 2 núcleos; Miami tiene 4. Esto no demuestra una caída de producción.",
+      "siguiente": "Repetir con 4 núcleos y generador separado; después validar base de datos, Mac, Windows y redes reales."
+    }
+  ],
+  "fuentes": [
+    {
+      "titulo": "Informe técnico y consultas de esta auditoría",
+      "referencia": "docs/audits/infraestructura-base-2026-11-24.md",
+      "url": null
+    },
+    {
+      "titulo": "Muestras de servidores y prueba SQL aislada",
+      "referencia": "servidores.json y maven-cowork-sql-capacidad.json; 24/11/2026",
+      "url": null
+    },
+    {
+      "titulo": "Simulacros aislados de llamadas",
+      "referencia": "docs/auditorias/infraestructura-2026-11-24/simulacro-r3.json y simulacro-r4.json",
+      "url": null
+    },
+    {
+      "titulo": "Tamaño de la entrada web con la misma compresión",
+      "referencia": "baseline-bundle.json y final-bundle.json; 24/11/2026",
+      "url": null
+    },
+    {
+      "titulo": "Supabase Auth: modelo de bloqueo de usuarios",
+      "referencia": "Código oficial",
+      "url": "https://github.com/supabase/auth/blob/master/internal/models/user.go"
+    },
+    {
+      "titulo": "Supabase: protección de datos por fila",
+      "referencia": "Documentación oficial",
+      "url": "https://supabase.com/docs/guides/database/postgres/row-level-security"
+    },
+    {
+      "titulo": "Arquitectura de KASH y de las nuevas organizaciones",
+      "referencia": "client.ts (destino Supabase) y docs/maven-como-lumina-spec.md",
+      "url": null
+    },
+    {
+      "titulo": "Versiones de vídeo y grabación",
+      "referencia": "Notas oficiales consultadas el 24/11/2026.",
+      "enlaces": [
+        {
+          "titulo": "LiveKit 1.13.11",
+          "url": "https://github.com/livekit/livekit/releases/tag/v1.13.11"
+        },
+        {
+          "titulo": "LiveKit 1.13.9",
+          "url": "https://github.com/livekit/livekit/releases/tag/v1.13.9"
+        },
+        {
+          "titulo": "Egress 1.15.0",
+          "url": "https://github.com/livekit/egress/releases/tag/v1.15.0"
+        }
+      ],
+      "url": null
+    }
+  ],
+  "arquitectura": {
+    "kash": "Base separada para la operación actual de KASH.",
+    "clientes_nuevos": "Comparten el edificio maven-agencias; las organizaciones contienen agencias y la separación depende de permisos por fila.",
+    "resumen": "KASH tiene una base separada. Las nuevas empresas comparten el edificio maven-agencias y se separan por organización/agencia mediante permisos por fila; ese aislamiento debe validarse.",
+    "fuentes": [
+      "frontend/src/integrations/supabase/client.ts:35",
+      "docs/maven-como-lumina-spec.md:8",
+      "docs/maven-como-lumina-spec.md:37"
+    ]
+  },
+  "actualizaciones_servicios": {
+    "livekit_instalado": "1.8.4",
+    "livekit_actual_consultado": "1.13.11",
+    "livekit_fecha_publicacion": "2026-10-25",
+    "egress_instalado": "1.9",
+    "egress_actual_consultado": "1.15.0",
+    "egress_fecha_publicacion": "2026-10-06",
+    "fuentes": [
+      {
+        "titulo": "LiveKit 1.13.11",
+        "url": "https://github.com/livekit/livekit/releases/tag/v1.13.11"
+      },
+      {
+        "titulo": "LiveKit 1.13.9",
+        "url": "https://github.com/livekit/livekit/releases/tag/v1.13.9"
+      },
+      {
+        "titulo": "Egress 1.15.0",
+        "url": "https://github.com/livekit/egress/releases/tag/v1.15.0"
+      }
+    ],
+    "causa_de_lentitud_establecida": false,
+    "actualizado_en_produccion": false,
+    "siguiente": "Validar versiones, TURN, reconexión y grabaciones en un entorno separado antes de programar la actualización."
+  }
+}

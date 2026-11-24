@@ -32,6 +32,7 @@ vi.mock("livekit-client", () => ({
     connect: vi.fn(() => conexion.promesa),
     disconnect: vi.fn(),
     on: vi.fn().mockReturnThis(),
+    off: vi.fn().mockReturnThis(),
     once: vi.fn(),
     localParticipant: {
       identity: "user-1",

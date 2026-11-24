@@ -1,0 +1,172 @@
+{
+  "source": "simulacro-livekit-aislado.py; LiveKit CLI local y métricas Prometheus del SFU de prueba",
+  "started_utc": "20261124T062318Z",
+  "finished_utc": "2026-11-24T06:26:23.678428+00:00",
+  "status": "stopped",
+  "cli_version": "lk version 2.19.4",
+  "cli_binary_sha256": "d433794d3aea732a1a0ee09c5556eb4e8036bb3faafab9cf6fb976f23c4f95b2",
+  "images": {
+    "livekit/livekit-server:v1.8.4": {
+      "id": "sha256:621fd87bd64a0c83e1f2418ee0323eb920d00acdd73e5f79b303c64f6cc532af",
+      "digests": [
+        "livekit/livekit-server@sha256:621fd87bd64a0c83e1f2418ee0323eb920d00acdd73e5f79b303c64f6cc532af"
+      ]
+    },
+    "livekit/livekit-cli:latest": {
+      "id": "sha256:25b750bc0ad2045d96e06801a7215968bcbe41dc3f3c42bb75fa1787a80d5328",
+      "digests": [
+        "livekit/livekit-cli@sha256:25b750bc0ad2045d96e06801a7215968bcbe41dc3f3c42bb75fa1787a80d5328"
+      ]
+    },
+    "denoland/deno:latest": {
+      "id": "sha256:a0d88a7fcbd44f062cba2748e19df67d30290ad12aa203c7c1e0b12462c483f0",
+      "digests": [
+        "denoland/deno@sha256:a0d88a7fcbd44f062cba2748e19df67d30290ad12aa203c7c1e0b12462c483f0"
+      ]
+    }
+  },
+  "plan": {
+    "connections": [
+      33,
+      165,
+      330
+    ],
+    "rooms": [
+      3,
+      15,
+      30
+    ],
+    "room": {
+      "publishers": 5,
+      "subscribers": 6
+    },
+    "video": "720p VP8, simulcast, speaker (hasta 6 participantes visibles)",
+    "seconds_per_room_after_join": 60,
+    "extra_audio_330": true,
+    "limits_total": {
+      "cpus": 4,
+      "memory_gb": 4
+    },
+    "network": "Docker --internal, sin puertos publicados, sin servicios reales",
+    "warning": "Carga sintética de SFU y generador en el mismo host; no certifica capacidad de Maven ni calidad WAN."
+  },
+  "host_cpus": 8,
+  "existing_services_unchanged": true,
+  "limitations": [
+    "SFU y generador comparten host y una red Docker interna; no representa internet residencial.",
+    "No ejecuta Maven, Electron, cámaras reales, renderizado, grabación ni permisos de usuarios.",
+    "El pico se obtiene del gauge livekit_participant_total, no de joins acumulados.",
+    "Si el gauge de participantes supera las identidades planeadas, no se interpreta como usuarios únicos ni aforo certificado.",
+    "La pérdida máxima por sala procede de la CLI; no es un promedio global ponderado.",
+    "CPU Docker es una muestra porcentual por contenedor: 100% equivale a un núcleo y puede mostrar ráfagas.",
+    "La referencia de 33 usuarios/minuto no es un censo exacto de sesiones simultáneas."
+  ],
+  "scenarios": [
+    {
+      "media": "video",
+      "target_connections": 33,
+      "target_rooms": 3,
+      "status": "completed",
+      "elapsed_seconds": 71.0,
+      "requested_seconds_after_join": 60,
+      "generator_exit_code": 0,
+      "generator_main_process_oom": false,
+      "gauge_peaks": {
+        "livekit_participant_total": 33.0,
+        "livekit_room_total": 3.0,
+        "livekit_track_published_total": 15.0,
+        "livekit_track_subscribed_total": 90.0
+      },
+      "participant_gauge_exceeds_planned_identities": false,
+      "participant_gauge_interpretation": "Sesiones reportadas por el SFU; se contrastan con las tablas del generador.",
+      "rtc_connected_events_peak": 33.0,
+      "host_cpu_percent_peak": 40.0,
+      "host_available_gib_min": 21.73,
+      "seconds_between_first_and_last_full_target_sample": 49.0,
+      "resources": {
+        "sfu": {
+          "docker_cpu_percent_peak": 243.99,
+          "docker_cpu_percent_mean_all_samples": 130.4,
+          "memory_mib_peak": 182.9
+        },
+        "gen": {
+          "docker_cpu_percent_peak": 252.73,
+          "docker_cpu_percent_mean_all_samples": 169.2,
+          "memory_mib_peak": 427.5
+        }
+      },
+      "sfu_process_cpu_cores_mean_all_samples": 1.09,
+      "subscriber_results": {
+        "room_logs": 3,
+        "room_summaries": 3,
+        "room_logs_missing_summary": 0,
+        "expected_subscriptions_for_entire_scenario": 90,
+        "received_tracks_in_available_summaries": 90,
+        "expected_tracks_in_available_summaries": 90,
+        "subscriber_errors_in_summaries": 0,
+        "maximum_room_packet_loss_percent": 0.0,
+        "minimum_room_packet_loss_percent": 0.0,
+        "log_alert_counts": {
+          "connection_failed": 0,
+          "publication_failed": 0,
+          "generator_consume_track_panic": 0,
+          "fatal_panic": 0
+        }
+      },
+      "all_connections_and_tracks_verified": true
+    },
+    {
+      "media": "video",
+      "target_connections": 165,
+      "target_rooms": 15,
+      "status": "generator_failed",
+      "elapsed_seconds": 100.1,
+      "requested_seconds_after_join": 60,
+      "generator_exit_code": 1,
+      "generator_main_process_oom": true,
+      "gauge_peaks": {
+        "livekit_participant_total": 163.0,
+        "livekit_room_total": 15.0,
+        "livekit_track_published_total": 75.0,
+        "livekit_track_subscribed_total": 425.0
+      },
+      "participant_gauge_exceeds_planned_identities": false,
+      "participant_gauge_interpretation": "Sesiones reportadas por el SFU; se contrastan con las tablas del generador.",
+      "rtc_connected_events_peak": 204.0,
+      "host_cpu_percent_peak": 48.1,
+      "host_available_gib_min": 19.27,
+      "seconds_between_first_and_last_full_target_sample": 0,
+      "resources": {
+        "sfu": {
+          "docker_cpu_percent_peak": 264.89,
+          "docker_cpu_percent_mean_all_samples": 210.0,
+          "memory_mib_peak": 1238.0
+        },
+        "gen": {
+          "docker_cpu_percent_peak": 353.28,
+          "docker_cpu_percent_mean_all_samples": 236.7,
+          "memory_mib_peak": 2038.8
+        }
+      },
+      "sfu_process_cpu_cores_mean_all_samples": 1.78,
+      "subscriber_results": {
+        "room_logs": 15,
+        "room_summaries": 12,
+        "room_logs_missing_summary": 3,
+        "expected_subscriptions_for_entire_scenario": 450,
+        "received_tracks_in_available_summaries": 335,
+        "expected_tracks_in_available_summaries": 360,
+        "subscriber_errors_in_summaries": 2,
+        "maximum_room_packet_loss_percent": 24.181,
+        "minimum_room_packet_loss_percent": 4.175,
+        "log_alert_counts": {
+          "connection_failed": 2,
+          "publication_failed": 0,
+          "generator_consume_track_panic": 9,
+          "fatal_panic": 0
+        }
+      },
+      "all_connections_and_tracks_verified": false
+    }
+  ]
+}
