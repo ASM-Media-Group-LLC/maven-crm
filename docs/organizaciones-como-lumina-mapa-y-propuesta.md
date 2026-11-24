@@ -1,5 +1,32 @@
 # Organizaciones en Maven, igual que en Lumina: mapa y propuesta (24/11/2026)
 
+## ✅ Decisiones de Alvaro (24/11, tren de preguntas). Mandan sobre lo de abajo
+
+1. **Dueño de toda la plataforma Maven: rusin24@gmail.com**, igual que en Lumina. Las cuentas actuales de Kash siguen siendo dueñas solo de Kash.
+2. **Kash queda aparte y sin tocar.** Los clientes nuevos van en el edificio. Kash aparece en el panel del dueño como tarjeta solo para mirar.
+3. **Debajo del admin no hay roles fijos.** El admin crea todas las posiciones (RRHH, supervisores, chatters…), con el nombre y los permisos que quiera.
+   - Eso ya lo hace el sistema de Posiciones de Maven, con sus alcances: todos / subordinados / solo él.
+   - Los únicos niveles fijos son:
+     - Dueño de la plataforma y Equipo de Maven.
+     - Admin del cliente.
+     - Dueño y admin de la agencia.
+   - La gente que trabaja es "Agente" más su posición.
+   - "A quién ve un supervisor" lo decide el alcance de su posición, no un rol aparte.
+4. **Las posiciones las crea el admin del cliente, una vez, para todas sus agencias.** Cada agencia puede agregar las suyas.
+5. **Sillas:** ocupan silla todos menos el dueño de la plataforma y las cuentas de prueba. **Si el paquete se llena, se bloquea.**
+6. **"Activo" en un día** = cualquiera de estas cosas:
+   - marcó entrada del turno;
+   - estuvo en Cowork;
+   - tenía la app abierta (señal de vida);
+   - inició sesión.
+7. **Dashboard del dueño = vista por ORGANIZACIÓN, simple.** Alvaro quiere ver cómo van los clientes que se están poniendo: **quién lo está usando y quién no**. No hay que concentrarse en el detalle por persona; dentro de cada cliente, Maven ya deja hacer lo que quieran.
+   - Por cada cliente: personas, activas ahora / hoy / 7 días / 30 días, cuántos no entran, última vez que se usó, nota de Argos del día, horas trabajadas, tardanzas y saldo de Argos.
+   - "Ver quiénes" queda solo como detalle opcional.
+8. **Reparto del trabajo:**
+   - **Claude:** árbol de clientes, panel del admin, posiciones por cliente y Dashboard.
+   - **Codex:** cobros (Stripe) y créditos de Argos.
+9. **Arranque:** paso 1, el edificio con datos reales para el dueño. Nada toca Kash, y nada pasa a producción sin el OK de Alvaro.
+
 Continúa la especificación del 19/11 (`docs/maven-como-lumina-spec.md`), que sigue vigente. Este documento agrega:
 1. Un mapa preciso de cómo está hecho Lumina por dentro, sacado de su código y su base.
 2. Dónde está Maven hoy.
