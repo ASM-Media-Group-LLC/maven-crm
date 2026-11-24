@@ -1,0 +1,366 @@
+<title>Ficha del empleado, 4 formas</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;600&display=swap">
+<style>
+/* Layout: consola de Maven. Arriba los turnos, debajo tardanzas y «quién está mal ahora»; se baja turno → equipo → persona, siempre en la misma columna. */
+:root{
+  --bg:#0f1829; --panel:rgba(28,40,62,.72); --panel-2:#16223a; --line:rgba(170,195,255,.10);
+  --fg:#e8edf6; --muted:#8e9ab2; --accent:#3d8bfd; --accent-soft:rgba(61,139,253,.16);
+  --ok:#2fc27a; --warn:#f0a93b; --bad:#ef4f5a; --gris:#3a4660; --por:#232f47;
+  --shadow:0 1px 0 rgba(255,255,255,.04) inset,0 18px 40px -24px rgba(0,0,0,.85);
+  --display:"Space Grotesk",ui-sans-serif,system-ui,sans-serif; --body:"Inter",ui-sans-serif,system-ui,sans-serif;
+  color-scheme:dark;
+}
+@media (prefers-color-scheme:light){:root:not([data-theme="dark"]){
+  --bg:#eef2f8; --panel:rgba(255,255,255,.82); --panel-2:#f5f7fb; --line:rgba(20,35,70,.10);
+  --fg:#132036; --muted:#5b6880; --accent:#2a72e8; --accent-soft:rgba(42,114,232,.12);
+  --ok:#17955a; --warn:#b97510; --bad:#d23a46; --gris:#c9d2e2; --por:#e4e9f2;
+  --shadow:0 1px 0 rgba(255,255,255,.7) inset,0 12px 30px -20px rgba(20,35,70,.35); color-scheme:light}}
+:root[data-theme="light"]{
+  --bg:#eef2f8; --panel:rgba(255,255,255,.82); --panel-2:#f5f7fb; --line:rgba(20,35,70,.10);
+  --fg:#132036; --muted:#5b6880; --accent:#2a72e8; --accent-soft:rgba(42,114,232,.12);
+  --ok:#17955a; --warn:#b97510; --bad:#d23a46; --gris:#c9d2e2; --por:#e4e9f2;
+  --shadow:0 1px 0 rgba(255,255,255,.7) inset,0 12px 30px -20px rgba(20,35,70,.35); color-scheme:light}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font-family:var(--body);font-size:14px;line-height:1.45;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:20px 56px}
+.wrap{max-width:1100px;margin:0 auto;display:grid;gap:16px}
+h1,h2,h3{font-family:var(--display);margin:0;font-weight:600;text-wrap:balance}
+h1{font-size:24px} h2{font-size:17px} h3{font:600 11.5px var(--body);letter-spacing:.09em;text-transform:uppercase;color:var(--muted)}
+.muted{color:var(--muted)} .num{font-variant-numeric:tabular-nums}
+.vidrio{background:var(--panel);border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow);backdrop-filter:blur(14px)}
+button{font:inherit;color:inherit}
+button:focus-visible,[tabindex]:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.nota-mock{font-size:12.5px;padding:8px 12px;border-radius:10px;background:var(--accent-soft);color:var(--fg)}
+.cab{display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between;padding:16px 18px}
+.marca{display:flex;gap:12px;align-items:center}
+.ojo{width:44px;height:44px;border-radius:12px;display:grid;place-items:center;background:var(--accent-soft);color:var(--accent);flex:none}
+.seg{display:inline-flex;padding:4px;border-radius:12px;background:var(--panel-2);border:1px solid var(--line);gap:2px}
+.seg button{border:0;background:transparent;padding:7px 13px;border-radius:9px;cursor:pointer;color:var(--muted);font-weight:500}
+.seg button[aria-pressed="true"]{background:var(--accent);color:#fff}
+.icono{border:1px solid var(--line);background:var(--panel-2);border-radius:11px;width:38px;height:38px;display:grid;place-items:center;cursor:pointer;color:var(--muted)}
+.miga{display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-size:13px;color:var(--muted)}
+.miga button{border:0;background:none;padding:2px 4px;cursor:pointer;color:var(--accent);font-weight:500}
+.miga b{color:var(--fg);font-weight:600}
+/* turnos */
+.turnos{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+@media (max-width:820px){.turnos{grid-template-columns:minmax(0,1fr)}}
+.turno{padding:16px;display:grid;gap:10px;text-align:left;border:1px solid var(--line);border-radius:16px;background:var(--panel);cursor:pointer;box-shadow:var(--shadow)}
+.turno:hover{border-color:var(--accent)}
+.turno[aria-current="true"]{border-color:var(--accent);background:linear-gradient(var(--accent-soft),var(--accent-soft)),var(--panel)}
+.turno .t{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.turno .t b{font:600 16px var(--display)}
+.cuenta{display:flex;flex-wrap:wrap;gap:6px}
+.pill{display:inline-flex;gap:6px;align-items:center;font-size:12px;padding:3px 9px;border-radius:99px;background:var(--panel-2);border:1px solid var(--line);white-space:nowrap}
+.dot{width:8px;height:8px;border-radius:50%;flex:none}
+.d-ok{background:var(--ok)} .d-warn{background:var(--warn)} .d-bad{background:var(--bad)} .d-gris{background:var(--gris)}
+.barra{display:grid;grid-template-columns:70px minmax(0,1fr) 44px;gap:10px;align-items:center;font-size:13px}
+.barra i{display:block;height:7px;border-radius:9px;background:var(--por);overflow:hidden}
+.barra i s{display:block;height:100%;border-radius:9px;background:var(--ok)}
+.barra span:last-child{text-align:right}
+/* bloques */
+.dos{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.25fr);gap:16px;align-items:start}
+@media (max-width:900px){.dos{grid-template-columns:minmax(0,1fr)}}
+.bloque{padding:16px;display:grid;gap:10px}
+.bloque .tit{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.fila{display:grid;grid-template-columns:34px minmax(0,1fr) auto;gap:10px;align-items:center;padding:9px 8px;border-radius:12px;cursor:pointer;border:1px solid transparent;text-align:left;background:none;width:100%}
+.fila:hover{background:var(--panel-2);border-color:var(--line)}
+.fila b{font-weight:600;display:block}
+.fila small{color:var(--muted);font-size:12.5px;display:block}
+.av{width:34px;height:34px;border-radius:50%;display:grid;place-items:center;font:600 13px var(--display);background:var(--panel-2);border:2px solid var(--gris);color:var(--fg)}
+.av.ok{border-color:var(--ok)} .av.warn{border-color:var(--warn)} .av.bad{border-color:var(--bad)}
+.min{font:600 13px var(--display);white-space:nowrap}
+.c-bad{color:var(--bad)} .c-warn{color:var(--warn)} .c-ok{color:var(--ok)}
+.sub{font:600 11px var(--body);letter-spacing:.08em;text-transform:uppercase;color:var(--muted);padding:8px 8px 2px}
+.equipos{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:10px}
+.equipo{padding:13px;border-radius:14px;border:1px solid var(--line);background:var(--panel-2);cursor:pointer;text-align:left;display:grid;gap:8px}
+.equipo:hover{border-color:var(--accent)}
+.equipo .t{display:flex;justify-content:space-between;gap:8px;align-items:baseline}
+.equipo .t b{font:600 15px var(--display)}
+/* franja de tiempo */
+.franja{position:relative;height:14px;border-radius:7px;background:var(--por);overflow:hidden;display:flex}
+.franja span{height:100%}
+.f-ok{background:var(--ok)} .f-warn{background:var(--warn)} .f-bad{background:var(--bad)}
+.f-tarde{background:repeating-linear-gradient(135deg,var(--gris) 0 5px,transparent 5px 10px)}
+.f-nada{background:transparent}
+.persona-fila{display:grid;grid-template-columns:34px minmax(0,190px) minmax(0,1fr) 54px;gap:12px;align-items:center;padding:10px 8px;border-radius:12px;cursor:pointer;border:1px solid transparent;background:none;width:100%;text-align:left}
+.persona-fila:hover{background:var(--panel-2);border-color:var(--line)}
+.persona-fila .q{display:grid;gap:6px;min-width:0}
+.persona-fila small{color:var(--muted);font-size:12.5px}
+.nota{font:600 22px var(--display);text-align:right}
+@media (max-width:640px){.persona-fila{grid-template-columns:34px minmax(0,1fr) 46px}.persona-fila .q{grid-column:1/-1;order:3}}
+/* persona */
+.ficha{padding:18px;display:grid;gap:16px}
+.ficha-cab{display:flex;flex-wrap:wrap;gap:14px;align-items:center;justify-content:space-between}
+.quien{display:flex;gap:12px;align-items:center}
+.quien .av{width:48px;height:48px;font-size:17px;border-width:3px}
+.veredicto{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:14px;align-items:center;padding:14px;border-radius:14px;background:var(--panel-2);border:1px solid var(--line);cursor:pointer;text-align:left;width:100%}
+.semaforo{display:grid;gap:4px;padding:6px;border-radius:12px;background:var(--bg);border:1px solid var(--line)}
+.semaforo i{width:12px;height:12px;border-radius:50%;background:var(--por);display:block}
+.semaforo i.on.r{background:var(--bad)} .semaforo i.on.a{background:var(--warn)} .semaforo i.on.v{background:var(--ok)}
+.veredicto p{margin:0;font-size:15px;line-height:1.5}
+.grande{font:600 40px/1 var(--display);text-align:right}
+.grande small{display:block;font:500 11px var(--body);color:var(--muted);letter-spacing:.06em;text-transform:uppercase;margin-top:4px}
+.desglose{display:grid;gap:8px;padding:4px 2px}
+.desglose .barra{grid-template-columns:minmax(0,180px) minmax(0,1fr) 64px}
+.acciones{display:flex;flex-wrap:wrap;gap:8px}
+.btn{display:inline-flex;gap:7px;align-items:center;border:1px solid var(--line);background:var(--panel-2);padding:8px 13px;border-radius:11px;cursor:pointer;font-weight:500;font-size:13px}
+.btn:hover{border-color:var(--accent)}
+.btn.pri{background:var(--accent);color:#fff;border-color:transparent}
+.linea{display:grid;gap:8px}
+.reloj{display:flex;justify-content:space-between;font-size:11.5px;color:var(--muted)}
+.tramos{display:flex;height:46px;border-radius:12px;overflow:hidden;background:var(--por);border:1px solid var(--line)}
+.tramos button{border:0;height:100%;padding:0;cursor:pointer;position:relative}
+.tramos button[aria-pressed="true"]{outline:3px solid var(--fg);outline-offset:-3px;z-index:1}
+.tramos .f-nada{cursor:default}
+.leyenda{display:flex;flex-wrap:wrap;gap:12px;font-size:12px;color:var(--muted)}
+.leyenda span{display:inline-flex;gap:6px;align-items:center}
+.leyenda i{width:14px;height:10px;border-radius:3px;display:inline-block}
+.detalle{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:14px;padding:14px;border-radius:14px;border:1px solid var(--line);background:var(--panel-2)}
+@media (max-width:760px){.detalle{grid-template-columns:minmax(0,1fr)}}
+.pantallazo{aspect-ratio:16/10;max-width:100%;border-radius:10px;border:1px solid var(--line);background:linear-gradient(180deg,var(--panel),var(--bg));display:grid;grid-template-rows:22px 1fr;overflow:hidden}
+.pantallazo .barrita{display:flex;gap:5px;align-items:center;padding:0 8px;background:var(--por)}
+.pantallazo .barrita i{width:7px;height:7px;border-radius:50%;background:var(--gris)}
+.pantallazo .dentro{display:grid;place-items:center;text-align:center;padding:12px;color:var(--muted);font-size:12.5px}
+.pruebas{display:grid;gap:10px;align-content:start}
+.prueba{display:grid;gap:3px}
+.prueba p{margin:0}
+.dice{padding:10px 12px;border-radius:10px;background:var(--bg);border:1px solid var(--line);font-size:13.5px}
+.aviso-l{display:grid;grid-template-columns:48px minmax(0,1fr);gap:8px;font-size:13px}
+.semana{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:8px}
+.dia{border-radius:12px;padding:10px 8px;border:1px solid var(--line);background:var(--panel-2);display:grid;gap:4px;text-align:center}
+.dia b{font:600 20px var(--display)}
+.dia small{color:var(--muted);font-size:11.5px}
+.dia.libre{opacity:.5}
+.mes{display:grid;gap:8px}
+.mes .barra{grid-template-columns:110px minmax(0,1fr) 48px}
+.toast{position:fixed;left:50%;bottom:calc(18px + env(safe-area-inset-bottom,0px));transform:translate(-50%,8px);padding:10px 16px;border-radius:12px;background:var(--fg);color:var(--bg);font-size:13px;opacity:0;transition:.2s;pointer-events:none;max-width:calc(100% - 32px)}
+.toast.on{opacity:1;transform:translate(-50%,0)}
+.ajustes{padding:16px;display:grid;gap:8px}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+.pestanas{display:flex;gap:4px;padding:5px;overflow-x:auto;border-radius:16px}
+.pestanas button{border:0;background:transparent;color:var(--muted);font-weight:600;padding:10px 18px;border-radius:12px;cursor:pointer;white-space:nowrap;display:inline-flex;gap:8px;align-items:center}
+.pestanas button[aria-selected="true"]{background:var(--accent);color:#fff}
+.estado{font-size:11.5px;font-weight:600;padding:3px 9px;border-radius:99px;white-space:nowrap}
+.e-ok{background:color-mix(in srgb,var(--ok) 18%,transparent);color:var(--ok)}
+.e-warn{background:color-mix(in srgb,var(--warn) 18%,transparent);color:var(--warn)}
+.e-bad{background:color-mix(in srgb,var(--bad) 18%,transparent);color:var(--bad)}
+.e-gris{background:var(--por);color:var(--muted)}
+.secciones{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+@media (max-width:760px){.secciones{grid-template-columns:minmax(0,1fr)}}
+.seccion{padding:14px;border-radius:14px;border:1px solid var(--line);background:var(--panel-2);display:grid;gap:8px;align-content:start}
+.kv{display:grid;grid-template-columns:auto minmax(0,1fr);gap:4px 14px;font-size:13px}
+.kv span:nth-child(odd){color:var(--muted)}
+.cambio{font-size:12.5px;padding:10px 12px;border-radius:12px;border:1px dashed var(--line);color:var(--muted)}
+.cambio b{color:var(--fg)}
+.vivo{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.6fr);gap:12px}
+@media (max-width:760px){.vivo{grid-template-columns:minmax(0,1fr)}}
+.marco{border-radius:14px;border:1px solid var(--line);background:linear-gradient(180deg,var(--panel),var(--bg));aspect-ratio:16/10;max-width:100%;display:grid;place-items:center;position:relative;color:var(--muted);text-align:center;padding:12px;font-size:13px}
+.marco .rot{position:absolute;top:10px;left:10px;font-size:11.5px;font-weight:600;padding:3px 9px;border-radius:99px;background:var(--bad);color:#fff;display:inline-flex;gap:6px;align-items:center}
+.marco .rot::before{content:"";width:7px;height:7px;border-radius:50%;background:#fff}
+.tira{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
+.mini-p{border:1px solid var(--line);border-radius:12px;background:var(--panel-2);overflow:hidden;display:grid}
+.mini-p .pantallazo{border:0;border-radius:0}
+.mini-p small{padding:8px 10px;color:var(--muted);font-size:11.5px;display:block}
+.mini-p small b{color:var(--fg)}
+.cal{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:6px}
+.cal .cab-d{font:600 11px var(--body);letter-spacing:.06em;text-transform:uppercase;color:var(--muted);text-align:center;padding:4px 0}
+.cal button,.cal span.v{border-radius:12px;border:1px solid var(--line);background:var(--panel-2);padding:8px 6px;display:grid;gap:2px;text-align:center;min-height:74px;align-content:start}
+.cal button{cursor:pointer}
+.cal button:hover{border-color:var(--accent)}
+.cal button[aria-pressed="true"]{border-color:var(--accent);background:linear-gradient(var(--accent-soft),var(--accent-soft)),var(--panel-2)}
+.cal span.v{opacity:.35;border-style:dashed}
+.cal b{font:600 15px var(--display)}
+.cal small{font-size:11px;color:var(--muted)}
+.cal .tarde{color:var(--warn)}
+@media (max-width:560px){.cal button,.cal span.v{min-height:58px;padding:6px 3px}.cal small.x{display:none}}
+.resumen{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+@media (max-width:640px){.resumen{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.cifra{padding:12px 14px;border-radius:14px;border:1px solid var(--line);background:var(--panel-2);display:grid;gap:2px}
+.cifra b{font:600 26px/1.1 var(--display)}
+.cifra span{font-size:12.5px;color:var(--muted)}
+/* 4 propuestas */
+.opciones{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;padding:6px}
+@media (max-width:760px){.opciones{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.opciones button{border:1px solid transparent;background:transparent;border-radius:12px;padding:10px 12px;text-align:left;cursor:pointer;display:grid;gap:2px}
+.opciones button b{font:600 15px var(--display)}
+.opciones button small{color:var(--muted);font-size:12px}
+.opciones button[aria-pressed="true"]{background:var(--accent);border-color:transparent}
+.opciones button[aria-pressed="true"] b,.opciones button[aria-pressed="true"] small{color:#fff}
+.idea{font-size:13.5px;padding:12px 14px;border-radius:12px;background:var(--accent-soft)}
+.cab-p{display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between}
+/* 1 · todo en una pantalla */
+.tablero{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.3fr) minmax(0,1fr);gap:12px;align-items:start}
+@media (max-width:980px){.tablero{grid-template-columns:minmax(0,1fr)}}
+.col{padding:14px;display:grid;gap:10px}
+.evento{display:grid;grid-template-columns:44px 12px minmax(0,1fr);gap:8px;align-items:start;padding:7px 0;font-size:13px}
+.evento .p{width:10px;height:10px;border-radius:50%;margin-top:4px}
+.evento small{display:block;color:var(--muted);font-size:12px}
+.mini-cal{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px}
+.mini-cal span{aspect-ratio:1;border-radius:7px;display:grid;place-items:center;font-size:11px;background:var(--por);color:var(--muted)}
+.mini-cal span.b{background:color-mix(in srgb,var(--ok) 35%,transparent);color:var(--fg)}
+.mini-cal span.t{background:color-mix(in srgb,var(--warn) 40%,transparent);color:var(--fg)}
+.mini-cal span.h{outline:2px solid var(--accent)}
+.mini-cal span.x{background:transparent}
+/* 2 · semáforos */
+.semas{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+@media (max-width:860px){.semas{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.sema{border-radius:16px;padding:14px;border:1px solid var(--line);background:var(--panel-2);cursor:pointer;text-align:left;display:grid;gap:6px;position:relative;overflow:hidden}
+.sema::before{content:"";position:absolute;inset:0 auto 0 0;width:5px}
+.sema.ok::before{background:var(--ok)} .sema.warn::before{background:var(--warn)} .sema.bad::before{background:var(--bad)}
+.sema[aria-expanded="true"]{border-color:var(--accent)}
+.sema h3{margin:0}
+.sema b{font:600 22px/1.15 var(--display)}
+.sema small{color:var(--muted);font-size:12.5px}
+.puntos{display:flex;gap:6px;flex-wrap:wrap}
+.puntos span{width:26px;height:26px;border-radius:8px;display:grid;place-items:center;font-size:11px;font-weight:600}
+/* 3 · cronología */
+.feed{display:grid;gap:0;position:relative}
+.feed .item{display:grid;grid-template-columns:52px 18px minmax(0,1fr);gap:10px;align-items:start;padding:8px 0}
+.feed .item .hora{font:600 13px var(--display);text-align:right;padding-top:2px}
+.feed .item .linea-v{display:grid;justify-items:center;height:100%}
+.feed .item .linea-v i{width:12px;height:12px;border-radius:50%;margin-top:4px}
+.feed .item .cuerpo{padding:10px 12px;border-radius:12px;background:var(--panel-2);border:1px solid var(--line);display:grid;gap:6px}
+.feed .item.quieto .cuerpo{background:transparent;border-style:dashed;color:var(--muted);padding:6px 12px}
+.feed .item .cuerpo .fila2{display:grid;grid-template-columns:120px minmax(0,1fr);gap:10px;align-items:start}
+@media (max-width:560px){.feed .item .cuerpo .fila2{grid-template-columns:minmax(0,1fr)}}
+.sep{font:600 11.5px var(--body);letter-spacing:.08em;text-transform:uppercase;color:var(--muted);padding:14px 0 4px 80px}
+.vivo-chico{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.vivo-chico .marco{aspect-ratio:16/10;font-size:12px}
+/* 4 · preguntas */
+.pregs{display:grid;gap:10px}
+.preg{border-radius:16px;border:1px solid var(--line);background:var(--panel-2);overflow:hidden}
+.preg>button{width:100%;display:grid;grid-template-columns:minmax(0,1fr) auto 18px;gap:12px;align-items:center;padding:14px 16px;border:0;background:none;cursor:pointer;text-align:left}
+.preg>button span:first-child{font:600 16px var(--display)}
+.resp{font:600 14px var(--display);padding:5px 12px;border-radius:99px;white-space:nowrap}
+.preg .dentro{padding:0 16px 16px;display:grid;gap:10px}
+</style>
+
+<div class="wrap">
+  <header class="vidrio cab">
+    <div><h1>Ficha del empleado · 4 formas de verla</h1><div class="muted">Las cuatro tienen la misma información; cambia cómo se ve.</div></div>
+  </header>
+  <nav class="vidrio opciones" id="opciones" aria-label="Propuestas"></nav>
+  <div class="nota-mock">Todo es real, de Karen Parada (Chatters) hoy 18/11 y en noviembre, sacado de Maven. Los recuadros grises van en lugar de las fotos y del video en vivo.</div>
+  <main id="vista" class="wrap" style="gap:14px"></main>
+</div>
+<div class="toast" id="toast" role="status"></div>
+
+<script>
+const $ = s => document.querySelector(s);
+const fmtMin = m => m>=60 ? `${Math.floor(m/60)} h ${m%60?m%60+" min":""}`.trim() : `${m} min`;
+const toast = t => { const e=$("#toast"); e.textContent=t; e.classList.add("on"); clearTimeout(toast.k); toast.k=setTimeout(()=>e.classList.remove("on"),2600); };
+let S = { op:1, abierto:"malo", sema:"malo" };
+
+const HOY = [
+  {c:"tarde", desde:"8:00", hasta:"9:20", min:80, titulo:"Llegó 1 h 20 min tarde", app:null, dice:null, avisos:[["8:05","Argos la empezó a llamar para que entrara."]]},
+  {c:"ok", desde:"9:20", hasta:"9:41", min:21, titulo:"Trabajando", app:"Maven CRM · chats", dice:"Gestiona chats y ventas con fans de las cuentas de la agencia.", avisos:[]},
+  {c:"warn", desde:"9:41", hasta:"9:45", min:4, titulo:"Distraída", app:"Foto de su cámara", dice:"No está mirando hacia una pantalla.", avisos:[]},
+  {c:"ok", desde:"9:45", hasta:"10:15", min:30, titulo:"Trabajando", app:"Mensaje masivo", dice:"Redacta y configura un mensaje masivo.", avisos:[]},
+  {c:"warn", desde:"10:15", hasta:"10:19", min:4, titulo:"De espaldas a la cámara", app:"Foto de su cámara", dice:"Se ve la parte de atrás de una cabeza frente a un paisaje.", avisos:[]},
+  {c:"ok", desde:"10:19", hasta:"10:35", min:16, titulo:"Trabajando", app:"Bóveda de contenido", dice:"Selecciona archivos en la bóveda de medios.", avisos:[]},
+  {c:"warn", desde:"10:35", hasta:"10:40", min:5, titulo:"Dejó de compartir pantalla", app:null, dice:"No llegaba imagen de su pantalla.", avisos:[["10:35","Voz de Argos: «No estás compartiendo pantalla»."]]},
+  {c:"ok", desde:"10:40", hasta:"11:43", min:63, titulo:"Trabajando", app:"Listas de envío", dice:"Configura y segmenta listas de mensajes masivos.", avisos:[]},
+  {c:"warn", desde:"11:43", hasta:"11:47", min:4, titulo:"De espaldas", app:"Foto de su cámara", dice:"Está de espaldas y no frente a una pantalla de trabajo.", avisos:[]},
+  {c:"ok", desde:"11:47", hasta:"13:23", min:96, titulo:"Trabajando", app:"Chat con un suscriptor", dice:"Gestiona mensajes y ventas con un suscriptor.", avisos:[]},
+  {c:"warn", desde:"13:23", hasta:"14:00", min:37, titulo:"Pausa sin cámara", app:null, dice:"Apagó la cámara; no hubo capturas.", avisos:[["13:23","Voz de Argos: «Tienes la cámara apagada»."]]},
+  {c:"ok", desde:"14:00", hasta:"16:00", min:120, titulo:"Trabajando", app:"Chats con fans", dice:"Responde conversaciones hasta el final del turno.", avisos:[]}
+];
+const MALO = HOY.filter(x=>x.c!=="ok");
+const BIEN_MIN = HOY.filter(x=>x.c==="ok").reduce((a,x)=>a+x.min,0);
+const HIST = [["1",null,"15:48"],["2","b","8:02"],["3","b","8:06"],["4","b","6:08"],["5","b","8:05"],["6","b","8:00"],["8","b","8:06"],["9","b","8:04"],["10","t","8:25"],["11","t","8:12"],["12","t","8:14"],["13","t","8:23"],["14","b","8:06"],["16","b","8:00"],["17","b","8:09"],["18","t","9:20"]];
+const RESUMEN_MES = "16 días trabajados · 5 tardanzas · 72 avisos de Argos · 9 veces fuera de Cowork";
+
+const color = c => c==="tarde"?"var(--gris)":c==="ok"?"var(--ok)":c==="bad"?"var(--bad)":"var(--warn)";
+const cabecera = (extra="") => `<div class="cab-p"><div class="quien"><span class="av warn" style="width:48px;height:48px;font-size:17px;border-width:3px">KP</span><div><h2 style="font-size:20px">Karen Parada</h2><div class="muted">Chatters · Turno AM 8:00–16:00 · <span class="c-ok">● en Cowork ahora</span></div></div></div>${extra||`<div class="acciones"><button class="btn pri" data-acc="Abre su cámara y su pantalla en vivo.">Ver en vivo</button><button class="btn" data-acc="Le sale un cartel y la voz de Argos.">Avisarle</button><button class="btn" data-acc="La llama por Cowork.">Llamar</button><button class="btn" data-acc="Le llega a ella y a su supervisor el resumen del día.">Mandar reporte</button></div>`}</div>`;
+const franja = () => `<div class="tramos" style="height:22px" aria-hidden="true">${HOY.map(x=>`<span class="f-${x.c}" style="width:${x.min/480*100}%"></span>`).join("")}</div><div class="reloj num"><span>8:00</span><span>12:00</span><span>16:00</span></div>`;
+const foto = (t,alto) => `<div class="pantallazo" ${alto?`style="aspect-ratio:${alto}"`:""}><div class="barrita"><i></i><i></i><i></i></div><div class="dentro">${t}</div></div>`;
+const miniCal = () => { let c=["L","M","M","J","V","S","D"].map(x=>`<span class="x">${x}</span>`); for(let i=0;i<6;i++) c.push(`<span class="x"></span>`); const m=Object.fromEntries(HIST.map(h=>[h[0],h[1]])); for(let d=1;d<=30;d++){ const v=m[String(d)]; c.push(`<span class="${d>18?'':v==='t'?'t':v==='b'?'b':''} ${d===18?'h':''}">${d}</span>`);} return `<div class="mini-cal">${c.join("")}</div><div class="leyenda"><span><i style="background:color-mix(in srgb,var(--ok) 35%,transparent)"></i>A tiempo</span><span><i style="background:color-mix(in srgb,var(--warn) 40%,transparent)"></i>Tarde</span></div>`; };
+
+const OPS = [
+ [1,"Todo en una pantalla","Sin pestañas: en vivo, hoy y el mes, lado a lado"],
+ [2,"Semáforos","4 cuadros grandes; tocas uno y abre la prueba"],
+ [3,"Cronología","Lo que pasó, en orden, como un chat"],
+ [4,"Preguntas","Preguntas simples con su respuesta: sí o no"]
+];
+
+function op1(){
+  return `<div class="idea"><b>La idea:</b> nada escondido detrás de pestañas. A la izquierda la ves en vivo; en el centro, lo que pasó hoy (solo lo que importa); a la derecha, cómo viene el mes. Todo de una mirada.</div>
+  <section class="vidrio ficha">${cabecera()}${franja()}</section>
+  <div class="tablero">
+    <section class="vidrio col"><h3>Ahora</h3><div class="marco" style="aspect-ratio:16/10"><span class="rot">EN VIVO</span>Su pantalla</div><div class="marco" style="aspect-ratio:16/10"><span class="rot">EN VIVO</span>Su cámara</div><div class="dice" style="font-size:12.5px"><b>Argos (16:00):</b> usa la mensajería y la videollamada de Maven.</div></section>
+    <section class="vidrio col"><h3>Hoy · lo que importa</h3>
+      ${HOY.map(x=>x.c==="ok"?"":`<div class="evento"><span class="num muted">${x.desde}</span><span class="p" style="background:${color(x.c)}"></span><span><b>${x.titulo}</b> <span class="muted">· ${fmtMin(x.min)}</span><small>${x.dice||x.avisos.map(a=>a[1]).join(" ")}</small>${x.avisos.length&&x.dice?`<small>Aviso: ${x.avisos[0][1]}</small>`:""}</span></div>`).join("")}
+      <div class="evento"><span class="num muted">resto</span><span class="p" style="background:var(--ok)"></span><span><b class="c-ok">Trabajó ${fmtMin(BIEN_MIN)}</b><small>Chats, ventas, mensajes masivos y bóveda de contenido.</small></span></div>
+      <div><button class="btn" data-acc="Abre cada momento con su foto y lo que dijo Argos.">Ver todas las fotos del día</button></div></section>
+    <section class="vidrio col"><h3>Noviembre</h3>${miniCal()}<div class="muted" style="font-size:12.5px">${RESUMEN_MES}</div><div><button class="btn" data-acc="Abre ese día igual que hoy.">Ver otro día</button></div></section>
+  </div>`;
+}
+
+function op2(){
+  const C = {
+    llegada:{c:"warn",t:"Llegada",b:"1 h 20 min tarde",s:"Entró a las 9:20 · salió a las 16:00"},
+    trabajo:{c:"ok",t:"Trabajo",b:`${fmtMin(BIEN_MIN)} bien`,s:"Chats, ventas y mensajes masivos"},
+    malo:{c:"warn",t:"Lo que hizo mal",b:"5 cosas",s:"3 distraída, 1 sin pantalla, 1 pausa de 37 min"},
+    mes:{c:"warn",t:"Este mes",b:"5 tardanzas",s:"16 días · 72 avisos · 9 salidas de Cowork"}
+  };
+  let dentro="";
+  if(S.sema==="llegada") dentro=`<div class="secciones"><div class="seccion"><h3>Llegada de hoy</h3><div class="kv"><span>Horario</span><span>8:00 – 16:00</span><span>Entró</span><span class="c-warn">9:20</span><span>Salió</span><span>16:00</span></div></div>${foto("Foto de su cámara al entrar · 9:20","16/9")}</div>`;
+  if(S.sema==="trabajo") dentro=`<div class="tira">${HOY.filter(x=>x.c==="ok").map(x=>`<div class="mini-p">${foto(x.app)}<small><b>${x.desde}–${x.hasta}</b> · ${x.dice}</small></div>`).join("")}</div>`;
+  if(S.sema==="malo") dentro=`<div class="tira" style="grid-template-columns:repeat(auto-fill,minmax(190px,1fr))">${MALO.filter(x=>x.c!=="tarde").map(x=>`<div class="mini-p">${foto(x.app||"Sin foto en este rato")}<small><b class="c-warn">${x.desde} · ${x.titulo}</b> · ${fmtMin(x.min)}<br>${x.dice}${x.avisos.length?"<br>Aviso de Argos: "+x.avisos[0][1]:""}</small></div>`).join("")}</div><div><button class="btn" data-acc="Ese momento deja de bajarle la nota.">Perdonar uno</button></div>`;
+  if(S.sema==="mes") dentro=`<div style="max-width:380px">${miniCal()}</div>`;
+  return `<div class="idea"><b>La idea:</b> cuatro cuadros con color, como un semáforo. De un vistazo sabes si llegó bien, si trabajó, qué hizo mal y cómo viene el mes. Tocas uno y abajo sale la prueba con fotos.</div>
+  <section class="vidrio ficha">${cabecera()}
+    <div class="semas">${Object.entries(C).map(([k,v])=>`<button class="sema ${v.c}" data-sema="${k}" aria-expanded="${S.sema===k}"><h3>${v.t}</h3><b class="c-${v.c}">${v.b}</b><small>${v.s}</small></button>`).join("")}</div>
+    ${franja()}
+    ${dentro}
+  </section>`;
+}
+
+function op3(){
+  const items=[]; let quieto=0;
+  [...HOY].reverse().forEach(x=>{
+    if(x.c==="ok"){ items.push(`<div class="item quieto"><span class="hora num muted">${x.desde}</span><span class="linea-v"><i style="background:var(--ok)"></i></span><div class="cuerpo">Trabajó ${fmtMin(x.min)} · ${x.dice}</div></div>`); return; }
+    items.push(`<div class="item"><span class="hora num">${x.desde}</span><span class="linea-v"><i style="background:${color(x.c)}"></i></span><div class="cuerpo"><b class="${x.c==='tarde'?'':'c-warn'}">${x.titulo} · ${fmtMin(x.min)}</b><div class="fila2">${foto(x.app||"Sin foto")}<div style="display:grid;gap:4px;font-size:13px">${x.dice?`<span><span class="muted">Argos:</span> ${x.dice}</span>`:""}${x.avisos.map(a=>`<span><span class="muted">${a[0]} aviso:</span> ${a[1]}</span>`).join("")}${x.c!=="tarde"?`<span><button class="btn" style="padding:5px 10px" data-acc="Ese momento deja de bajarle la nota.">Perdonar</button></span>`:""}</div></div></div></div>`);
+  });
+  return `<div class="idea"><b>La idea:</b> como leer un chat. Lo más nuevo arriba. Lo malo sale grande con su foto y lo que dijo Argos; el tiempo que trabajó bien queda en una línea fina. Bajando sigues a los días anteriores.</div>
+  <section class="vidrio ficha">${cabecera()}
+    <div class="vivo-chico"><div class="marco"><span class="rot">EN VIVO</span>Su pantalla</div><div class="marco"><span class="rot">EN VIVO</span>Su cámara</div></div>
+    <div class="feed"><div class="sep">Hoy · miércoles 18</div>${items.join("")}
+      <div class="sep">Ayer · martes 17</div>
+      <div class="item quieto"><span class="hora num muted">8:09</span><span class="linea-v"><i style="background:var(--ok)"></i></span><div class="cuerpo">Entró a tiempo · trabajó hasta las 16:06 · 3 avisos de Argos · salió 1 vez de Cowork</div></div>
+      <div class="sep">Lunes 16</div>
+      <div class="item quieto"><span class="hora num muted">8:00</span><span class="linea-v"><i style="background:var(--ok)"></i></span><div class="cuerpo">Entró a tiempo · trabajó hasta las 16:07 · 10 avisos de Argos</div></div>
+      <div style="padding:8px 0 0 80px"><button class="btn" data-acc="Sigue bajando por sus días anteriores.">Ver más días</button></div>
+    </div>
+  </section>`;
+}
+
+function op4(){
+  const P = [
+    ["ahora","¿Está trabajando ahora?","Sí","ok",`<div class="vivo-chico"><div class="marco"><span class="rot">EN VIVO</span>Su pantalla</div><div class="marco"><span class="rot">EN VIVO</span>Su cámara</div></div><div class="dice"><b>Argos (16:00):</b> usa la mensajería y la videollamada de Maven.</div>`],
+    ["llego","¿Llegó a tiempo?","No · 1 h 20 min tarde","warn",`<div class="kv"><span>Debía entrar</span><span>8:00</span><span>Entró</span><span class="c-warn">9:20</span><span>Salió</span><span>16:00, a tiempo</span></div>${foto("Foto de su cámara al entrar · 9:20","16/7")}`],
+    ["malo","¿Hizo algo mal hoy?","Sí · 5 cosas","warn",`${MALO.filter(x=>x.c!=="tarde").map(x=>`<div class="evento"><span class="num muted">${x.desde}</span><span class="p" style="background:var(--warn)"></span><span><b>${x.titulo}</b> <span class="muted">· ${fmtMin(x.min)}</span><small>${x.dice}${x.avisos.length?" · "+x.avisos[0][1]:""}</small></span></div>`).join("")}<div class="acciones"><button class="btn" data-acc="Abre las fotos de cada momento.">Ver las fotos</button><button class="btn" data-acc="Ese momento deja de bajarle la nota.">Perdonar uno</button></div>`],
+    ["bien","¿Cuánto trabajó bien?",fmtMin(BIEN_MIN)+" de 8 h","ok",`${franja()}<div class="tira">${HOY.filter(x=>x.c==="ok").slice(0,4).map(x=>`<div class="mini-p">${foto(x.app)}<small><b>${x.desde}</b> · ${x.dice}</small></div>`).join("")}</div>`],
+    ["argos","¿Argos tuvo que llamarle la atención?","Sí · 2 veces","warn",`<div class="evento"><span class="num muted">10:35</span><span class="p" style="background:var(--warn)"></span><span>«No estás compartiendo pantalla». <small>Volvió en 5 min.</small></span></div><div class="evento"><span class="num muted">13:23</span><span class="p" style="background:var(--warn)"></span><span>«Tienes la cámara apagada». <small>Volvió a las 14:00.</small></span></div>`],
+    ["mes","¿Cómo viene este mes?","5 tardanzas en 16 días","warn",`<div style="max-width:380px">${miniCal()}</div><div class="muted" style="font-size:12.5px">${RESUMEN_MES}</div>`]
+  ];
+  return `<div class="idea"><b>La idea:</b> en vez de gráficos, las preguntas que tú le harías al supervisor, cada una con su respuesta corta. Tocas una pregunta y abre la prueba.</div>
+  <section class="vidrio ficha">${cabecera()}
+    <div class="pregs">${P.map(([k,q,r,c,d])=>`<div class="preg"><button data-preg="${k}" aria-expanded="${S.abierto===k}"><span>${q}</span><span class="resp e-${c}">${r}</span><span class="muted">${S.abierto===k?"▴":"▾"}</span></button>${S.abierto===k?`<div class="dentro">${d}</div>`:""}</div>`).join("")}</div>
+  </section>`;
+}
+
+function pintar(){
+  $("#opciones").innerHTML = OPS.map(([n,t,s])=>`<button data-op="${n}" aria-pressed="${S.op===n}"><b>${n} · ${t}</b><small>${s}</small></button>`).join("");
+  $("#vista").innerHTML = [op1,op2,op3,op4][S.op-1]();
+}
+document.addEventListener("click", e=>{
+  const b=e.target.closest("button"); if(!b) return; const d=b.dataset;
+  if(d.op){ S.op=+d.op; return pintar(); }
+  if(d.sema){ S.sema=d.sema; return pintar(); }
+  if(d.preg){ S.abierto = S.abierto===d.preg?null:d.preg; return pintar(); }
+  if(d.acc) return toast(d.acc);
+});
+pintar();
+</script>

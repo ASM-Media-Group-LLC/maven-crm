@@ -1,0 +1,110 @@
+<title>Maven en tu computador</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sora:wght@600;800&family=Inter:wght@400;500;600&display=swap">
+<style>
+  /* Una sola columna, como una guía de instalación: bajar → instalar → usar. Colores de Maven. */
+  :root {
+    --fondo: #101827;
+    --tarjeta: #162033;
+    --linea: rgba(255,255,255,.08);
+    --texto: #ffffff;
+    --gris: #8f9ab0;
+    --verde: #bed161;
+    --sobre-verde: #1c2108;
+    --titulo: "Sora", "Inter", system-ui, sans-serif;
+    --cuerpo: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+    color-scheme: dark;
+  }
+  * { box-sizing: border-box; }
+  body { background: var(--fondo); color: var(--texto); font: 16px/1.6 var(--cuerpo); }
+  .caja { max-width: 720px; margin: 0 auto; padding-block: 48px 72px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); display: flex; flex-direction: column; gap: 28px; }
+  h1 { font: 800 clamp(2rem, 6vw, 2.8rem)/1.1 var(--titulo); margin: 0; letter-spacing: -.02em; text-wrap: balance; }
+  h1 em { font-style: normal; color: var(--verde); }
+  .bajada { color: var(--gris); margin: 10px 0 0; max-width: 34rem; }
+  .paso { background: var(--tarjeta); border: 1px solid var(--linea); border-radius: 18px; padding: 24px; display: flex; flex-direction: column; gap: 14px; }
+  .paso h2 { font: 600 1.25rem/1.3 var(--titulo); margin: 0; display: flex; align-items: center; gap: 12px; }
+  .num { flex: none; width: 32px; height: 32px; border-radius: 50%; background: var(--verde); color: var(--sobre-verde); font: 800 .95rem/32px var(--titulo); text-align: center; }
+  .paso p { margin: 0; color: var(--gris); }
+  .paso p b { color: var(--texto); font-weight: 600; }
+  .botones { display: flex; gap: 12px; flex-wrap: wrap; }
+  .btn { display: inline-flex; align-items: center; gap: 8px; text-decoration: none; font-weight: 600; border-radius: 999px; padding: 12px 22px; border: 1px solid var(--verde); color: var(--verde); }
+  .btn.lleno { background: var(--verde); color: var(--sobre-verde); }
+  .btn:focus-visible, .pest button:focus-visible { outline: 2px solid var(--texto); outline-offset: 3px; }
+  .peso { font-weight: 400; opacity: .7; font-size: .85em; }
+  .pest { display: inline-flex; gap: 4px; padding: 4px; border: 1px solid var(--linea); border-radius: 999px; align-self: flex-start; }
+  .pest button { font: 600 .9rem var(--cuerpo); padding: 8px 18px; border-radius: 999px; border: 0; background: transparent; color: var(--gris); cursor: pointer; }
+  .pest button[aria-selected="true"] { background: var(--verde); color: var(--sobre-verde); }
+  ol { margin: 0; padding-left: 1.3em; display: flex; flex-direction: column; gap: 10px; }
+  ol li::marker { color: var(--verde); font-weight: 600; }
+  .aviso { border-left: 3px solid var(--verde); padding: 10px 14px; background: rgba(190,209,97,.07); border-radius: 0 10px 10px 0; color: var(--texto); font-size: .95rem; }
+  .lista { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 12px; }
+  .item { border: 1px solid var(--linea); border-radius: 14px; padding: 16px; }
+  .item b { display: block; font-family: var(--titulo); font-weight: 600; margin-bottom: 4px; }
+  .item span { color: var(--gris); font-size: .93rem; }
+  kbd { font: 600 .85em var(--cuerpo); background: rgba(255,255,255,.08); border: 1px solid var(--linea); border-radius: 6px; padding: 1px 7px; color: var(--texto); }
+  @media (max-width: 560px) { .lista { grid-template-columns: 1fr; } .paso { padding: 20px; } }
+</style>
+
+<div class="caja">
+  <header>
+    <h1>Maven en tu <em>computador</em></h1>
+    <p class="bajada">Es el mismo Maven de siempre, pero en su propia ventana: abre solo al prender el PC, no se cierra con la X y te avisa aunque esté escondido. Se instala una vez y listo.</p>
+  </header>
+
+  <section class="paso">
+    <h2><span class="num">1</span> Bájala</h2>
+    <p>Toca el de tu computador. También están al final de <b>maven-ai.me</b>, donde dice «También en tu computador».</p>
+    <div class="botones">
+      <a class="btn lleno" href="https://lsagslbkliprespbyhts.supabase.co/storage/v1/object/public/descargas/Maven-Mac.dmg">Descargar para Mac <span class="peso">223 MB</span></a>
+      <a class="btn" href="https://lsagslbkliprespbyhts.supabase.co/storage/v1/object/public/descargas/Maven-Windows.exe">Descargar para Windows <span class="peso">120 MB</span></a>
+    </div>
+  </section>
+
+  <section class="paso">
+    <h2><span class="num">2</span> Instálala</h2>
+    <div class="pest" role="tablist">
+      <button id="t-mac" role="tab" aria-selected="true" aria-controls="p-mac">Mac</button>
+      <button id="t-win" role="tab" aria-selected="false" aria-controls="p-win">Windows</button>
+    </div>
+    <div id="p-mac" role="tabpanel" aria-labelledby="t-mac">
+      <ol>
+        <li>Abre el archivo <b>Maven-Mac.dmg</b> que se bajó.</li>
+        <li>Arrastra el ícono de <b>Maven</b> a la carpeta <b>Aplicaciones</b>.</li>
+        <li>Abre Maven desde Aplicaciones. La primera vez sale un mensaje de que Apple no la pudo verificar: toca <b>Listo</b>.</li>
+        <li>Ve a <b>Ajustes del Sistema → Privacidad y seguridad</b>, baja hasta el final y toca <b>Abrir igual</b>. Pon tu clave del Mac.</li>
+        <li>Cuando pida <b>cámara</b> y <b>micrófono</b>, dale Permitir.</li>
+      </ol>
+      <p class="aviso" style="margin-top:14px">El paso 4 se hace una sola vez. Sale porque la app todavía no está firmada con la cuenta de Apple.</p>
+    </div>
+    <div id="p-win" role="tabpanel" aria-labelledby="t-win" hidden>
+      <ol>
+        <li>Abre el archivo <b>Maven-Windows.exe</b> que se bajó.</li>
+        <li>Si sale la pantalla azul «Windows protegió tu PC», toca <b>Más información</b> y luego <b>Ejecutar de todas formas</b>.</li>
+        <li>Se instala sola y abre. Queda un ícono de Maven en el escritorio.</li>
+        <li>Cuando pida <b>cámara</b> y <b>micrófono</b>, dale Permitir.</li>
+      </ol>
+      <p class="aviso" style="margin-top:14px">La pantalla azul sale una sola vez. Sale porque la app todavía no tiene certificado de Windows.</p>
+    </div>
+  </section>
+
+  <section class="paso">
+    <h2><span class="num">3</span> Entra y úsala</h2>
+    <p>Entras con tu <b>correo y contraseña de Maven</b>, los de siempre. Lo que cambia frente al navegador:</p>
+    <div class="lista">
+      <div class="item"><b>Abre sola</b><span>Arranca al prender el computador. Se puede apagar en el menú de la M junto al reloj.</span></div>
+      <div class="item"><b>La X no la cierra</b><span>La esconde junto al reloj: sigues en Cowork y te llegan los avisos.</span></div>
+      <div class="item"><b>Para salir de verdad</b><span>Clic en la M junto al reloj → <b style="display:inline;font-family:inherit">Salir de Maven</b>.</span></div>
+      <div class="item"><b>Número en el ícono</b><span>Muestra cuántos chats tienes sin leer.</span></div>
+      <div class="item"><b>Atajo</b><span><kbd>Control</kbd>+<kbd>Option</kbd>+<kbd>M</kbd> en Mac, <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>M</kbd> en Windows: la trae al frente desde donde estés.</span></div>
+      <div class="item"><b>Se actualiza sola</b><span>Todo lo nuevo de Maven le llega sin bajar nada otra vez.</span></div>
+    </div>
+  </section>
+</div>
+
+<script>
+  const tabs = { mac: [document.getElementById("t-mac"), document.getElementById("p-mac")], win: [document.getElementById("t-win"), document.getElementById("p-win")] };
+  function elegir(k) { for (const [n, [t, p]] of Object.entries(tabs)) { const si = n === k; t.setAttribute("aria-selected", si); p.hidden = !si; } }
+  tabs.mac[0].onclick = () => elegir("mac");
+  tabs.win[0].onclick = () => elegir("win");
+  if (/Windows/i.test(navigator.userAgent)) elegir("win");
+</script>

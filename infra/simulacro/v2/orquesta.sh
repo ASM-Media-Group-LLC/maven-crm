@@ -57,9 +57,13 @@ SESSION=$(echo "$SES" | python3 -c "import sys,json;print(json.load(sys.stdin)['
 sala() { echo "$SES" | python3 -c "import sys,json;print([r for r in json.load(sys.stdin)['rooms'] if r['name']=='$1'][0]['id'])"; }
 nav() { en $1 "SESSION=$SESSION /opt/sim/maquina.sh nav ${@:2}"; }   # pais persona sala cond esc seg comp
 fase() { echo "-- $1 ($(date -u +%H:%M))"; }
+# SOLO="f1 f4" corre solo esas fases (por defecto, todas).
+SOLO=${SOLO:-"f1 f2 f3 f4 f5"}
+toca() { [[ " $SOLO " == *" $1 "* ]]; }
 correr() { todas "/opt/sim/maquina.sh cpu $1"; todas /opt/sim/maquina.sh esperar; }
 
 # F1 · llamadas de 2 entre países
+if toca f1; then
 fase "F1: llamadas de 2 entre países"
 nav mia 401 "$(sala P1)" bueno dos 300; nav mad 402 "$(sala P1)" bueno dos 300
 nav sao 403 "$(sala P2)" bueno dos 300; nav mex 404 "$(sala P2)" bueno dos 300
@@ -68,8 +72,10 @@ nav mad 407 "$(sala P4)" malo dos 300;  nav mex 408 "$(sala P4)" bueno dos 300
 nav mia 409 "$(sala P5)" corte30 dos 300; nav mad 410 "$(sala P5)" bueno dos 300
 nav sao 411 "$(sala P6)" sin_udp dos 300; nav mex 412 "$(sala P6)" wifi_perdidas dos 300
 correr f1
+fi
 
 # F2 · Cowork de 16, 4 por país (2 bueno, 1 4G, 1 con cortes), 2 comparten pantalla
+if toca f2; then
 fase "F2: Cowork de 16"
 C=$(sala "Cowork 16"); n=420
 for r in "${PAISES[@]}"; do
@@ -79,8 +85,10 @@ for r in "${PAISES[@]}"; do
   n=$((n+4))
 done
 correr f2
+fi
 
 # F3 · Sala de 24 (6 por país, 2 pantallas) + 1000 personas usando Maven (250 por país)
+if toca f3; then
 fase "F3: sala de 24 + 1000 personas en Maven"
 S=$(sala "Sala 24"); n=440; i=0
 for r in "${PAISES[@]}"; do
@@ -91,14 +99,17 @@ for r in "${PAISES[@]}"; do
   n=$((n+6)); i=$((i+1))
 done
 correr f3
+fi
 
 # F4 · Mensajes en vivo desde los 4 países (25 personas por país)
+if toca f4; then
 fase "F4: mensajes en vivo"
 i=0; for r in "${PAISES[@]}"; do en $r "/opt/sim/maquina.sh k6 tiempo_real.js vivo -e PARTES=4 -e PARTE=$i -e VUS=25 -e DURACION=5m"; i=$((i+1)); done
 correr f4
+fi
 
 # F5 · Llamada larga
-if [ "${LARGA:-1}" = "1" ]; then
+if toca f5; then
   fase "F5: llamada larga de 30 min"
   L=$(sala "Larga"); n=470
   for r in "${PAISES[@]}"; do nav $r $n "$L" bueno larga 1800; nav $r $((n+1)) "$L" 4g larga 1800; n=$((n+2)); done

@@ -84,25 +84,36 @@ function entrar(n, pos) {
 }
 
 function cargarApp(e, pos) {
-  // Lo que pide el navegador al abrir Maven (useUserRole + usePermissions + banderas).
+  // Lo que pide el navegador al abrir Maven. ARRANQUE=viejo imita la app de hoy
+  // (9-11 peticiones: useUserRole, useRoleTier, usePermissions, examinador,
+  // perfil x3, reloj); ARRANQUE=nuevo, la del PR #247 (una sola rpc mi_arranque).
   const t0 = Date.now();
-  const rs = http.batch([
-    ["GET", `${URL}/rest/v1/user_roles?select=role&user_id=eq.${e.uid}`, null, h(e.token)],
-    ["GET", `${URL}/rest/v1/profiles?select=*&id=eq.${e.uid}`, null, h(e.token)],
-    ["GET", `${URL}/rest/v1/app_flags?select=key,enabled,valor`, null, h(e.token)],
-    ["GET", `${URL}/rest/v1/roles_config?select=id,name`, null, h(e.token)],
-  ]);
-  const bien = rs.every((r) => r.status === 200);
   const k = `${pos}|cargar_app`;
-  ok[k].add(bien); ms[k].add(Date.now() - t0);
+  if ((__ENV.ARRANQUE || "viejo") === "nuevo") {
+    const r = http.post(`${URL}/rest/v1/rpc/mi_arranque`, "{}", h(e.token));
+    ok[k].add(r.status === 200); ms[k].add(Date.now() - t0);
+    return;
+  }
+  const u = (q) => ["GET", `${URL}/rest/v1/${q}`, null, h(e.token)];
+  const rs = http.batch([
+    u(`user_roles?select=role&user_id=eq.${e.uid}`),
+    u(`user_roles?select=role&user_id=eq.${e.uid}`),
+    u(`role_groups?select=role_name,is_admin,is_manager_or_above,is_supervisor_or_above`),
+    u(`role_groups?select=role_name,is_admin,is_manager_or_above,is_supervisor_or_above`),
+    u(`roles_config?select=id,name`),
+    u(`chatter_examinadores?select=permitido&user_id=eq.${e.uid}`),
+    u(`profiles?select=id,full_name,avatar_url,ui_skin,ui_prefs&id=eq.${e.uid}`),
+    u(`profiles?select=id,status,status_color,status_text&id=eq.${e.uid}`),
+    u(`profiles?select=id,full_name,avatar_url,avatar_seed&id=eq.${e.uid}`),
+    u(`app_flags?select=enabled&key=eq.reloj_24h`),
+  ]);
+  let bien = rs.every((r) => r.status === 200);
   if (bien) {
     const rol = (rs[0].json()[0] || {}).role;
-    const rc = (rs[3].json() || []).find((x) => x.name === rol);
-    if (rc) {
-      const r = http.get(`${URL}/rest/v1/role_permissions?select=module,submodule,can_access,data_scope&role_id=eq.${rc.id}`, h(e.token));
-      ok[k].add(r.status === 200);
-    }
+    const rc = (rs[4].json() || []).find((x) => x.name === rol);
+    if (rc) bien = http.get(`${URL}/rest/v1/role_permissions?select=module,submodule,can_access,data_scope&role_id=eq.${rc.id}`, h(e.token)).status === 200;
   }
+  ok[k].add(bien); ms[k].add(Date.now() - t0);
 }
 
 const ACCION = {

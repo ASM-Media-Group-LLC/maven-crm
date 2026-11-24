@@ -1,0 +1,284 @@
+<title>Puestos y permisos de Maven</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;600&display=swap">
+<style>
+/* Layout: consola de Maven — riel de pestañas arriba, lista de puestos a la izquierda, permisos del puesto a la derecha (una columna en celular). */
+:root{
+  --bg:#eef1f6; --panel:rgba(255,255,255,.78); --panel-2:#f6f8fb; --line:rgba(20,30,50,.10);
+  --fg:#141a26; --muted:#5d6678; --accent:#7c5cf0; --accent-soft:rgba(124,92,240,.12);
+  --ok:#1f9d63; --warn:#b7791f; --shadow:0 1px 0 rgba(255,255,255,.6) inset,0 10px 30px -18px rgba(20,30,60,.35);
+  --display:"Space Grotesk",ui-sans-serif,system-ui,sans-serif; --body:"Inter",ui-sans-serif,system-ui,sans-serif;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#0d1016; --panel:rgba(24,29,40,.72); --panel-2:#141922; --line:rgba(200,215,255,.09);
+  --fg:#e7ebf3; --muted:#8d97ab; --accent:#9b84ff; --accent-soft:rgba(155,132,255,.14);
+  --ok:#3fd18b; --warn:#e2a64a; --shadow:0 1px 0 rgba(255,255,255,.04) inset,0 14px 34px -20px rgba(0,0,0,.8); color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0d1016; --panel:rgba(24,29,40,.72); --panel-2:#141922; --line:rgba(200,215,255,.09);
+  --fg:#e7ebf3; --muted:#8d97ab; --accent:#9b84ff; --accent-soft:rgba(155,132,255,.14);
+  --ok:#3fd18b; --warn:#e2a64a; --shadow:0 1px 0 rgba(255,255,255,.04) inset,0 14px 34px -20px rgba(0,0,0,.8); color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font-family:var(--body);font-size:14px;line-height:1.45;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:20px 48px}
+.wrap{max-width:1180px;margin:0 auto;display:grid;gap:16px}
+h1,h2,h3{font-family:var(--display);margin:0;text-wrap:balance;font-weight:600}
+h1{font-size:22px} h2{font-size:17px} h3{font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:600}
+.muted{color:var(--muted)}
+.vidrio{background:var(--panel);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);backdrop-filter:blur(14px)}
+.top{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px}
+.chip{display:inline-flex;align-items:center;gap:6px;font-size:12px;padding:3px 9px;border-radius:999px;background:var(--accent-soft);color:var(--accent);font-weight:500}
+.tabs{display:flex;gap:4px;padding:4px;overflow-x:auto}
+.tab{border:0;background:transparent;color:var(--muted);font:500 13px var(--body);padding:8px 14px;border-radius:9px;cursor:pointer;white-space:nowrap}
+.tab[aria-selected="true"]{background:var(--accent-soft);color:var(--fg)}
+.tab:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.grid{display:grid;grid-template-columns:320px minmax(0,1fr);gap:16px;align-items:start}
+@media (max-width:860px){.grid{grid-template-columns:minmax(0,1fr)}}
+.lista{padding:8px;display:grid;gap:2px}
+.puesto{display:grid;grid-template-columns:minmax(0,1fr) auto auto;align-items:center;gap:10px;padding:10px 10px;border-radius:10px;cursor:pointer;border:1px solid transparent}
+.puesto:hover{background:var(--panel-2)}
+.puesto[aria-current="true"]{background:var(--accent-soft);border-color:var(--line)}
+.puesto b{font-weight:600;display:block}
+.puesto small{color:var(--muted);font-size:12px}
+.n{font-variant-numeric:tabular-nums;color:var(--muted);font-size:12px}
+.sw{position:relative;width:36px;height:20px;border-radius:99px;background:var(--line);border:0;cursor:pointer;flex:none;transition:background .15s}
+.sw::after{content:"";position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.3);transition:left .15s}
+.sw[aria-checked="true"]{background:var(--accent)}
+.sw[aria-checked="true"]::after{left:18px}
+.sw:disabled{opacity:.45;cursor:not-allowed}
+.panel{padding:18px;display:grid;gap:16px;min-width:0}
+.aviso{display:flex;gap:10px;align-items:flex-start;padding:10px 12px;border-radius:10px;background:var(--accent-soft);font-size:13px}
+.grande{display:grid;grid-template-columns:auto minmax(0,1fr);gap:4px 12px;align-items:center;padding:12px 14px;border:1px solid var(--line);border-radius:12px;background:var(--panel-2)}
+.grande b{font-weight:600}
+.grande small{grid-column:2;color:var(--muted);font-size:12.5px}
+.tabla{border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.scroll{overflow-x:auto}
+table{width:100%;border-collapse:collapse;min-width:640px}
+th{font:600 11px var(--body);letter-spacing:.08em;text-transform:uppercase;color:var(--muted);text-align:left;padding:9px 12px;background:var(--panel-2);border-bottom:1px solid var(--line)}
+td{padding:10px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+tr:last-child td{border-bottom:0}
+td.area{width:200px}
+.area label{display:flex;gap:8px;align-items:center;font-weight:600;cursor:pointer}
+.acciones{display:flex;flex-wrap:wrap;gap:6px 14px}
+.acciones label,.datos label{display:inline-flex;gap:6px;align-items:center;font-size:13px;cursor:pointer}
+.datos{display:grid;gap:4px;width:150px}
+input[type=checkbox],input[type=radio]{accent-color:var(--accent);width:15px;height:15px;margin:0}
+.apagada{opacity:.4}
+.trasera{font-size:10.5px;padding:1px 6px;border-radius:99px;border:1px solid var(--warn);color:var(--warn);margin-left:2px;white-space:nowrap}
+.ver{display:grid;grid-template-columns:220px minmax(0,1fr);gap:16px}
+@media (max-width:640px){.ver{grid-template-columns:minmax(0,1fr)}}
+.menu{padding:10px;display:grid;gap:2px;align-content:start}
+.menu div{padding:7px 10px;border-radius:8px;font-size:13px}
+.menu .g{font:600 10.5px var(--body);letter-spacing:.08em;text-transform:uppercase;color:var(--muted);padding:10px 10px 4px}
+.menu .si{background:var(--panel-2)}
+.av{width:30px;height:30px;border-radius:50%;display:grid;place-items:center;background:var(--accent-soft);color:var(--accent);font:600 13px var(--display);flex:none}
+.fila{display:flex;gap:10px;align-items:center;justify-content:space-between;padding:10px 12px;border-bottom:1px solid var(--line);flex-wrap:wrap}
+.fila:last-child{border-bottom:0}
+.btn{border:1px solid var(--line);background:var(--panel-2);color:var(--fg);font:500 13px var(--body);padding:7px 12px;border-radius:9px;cursor:pointer}
+.btn.pri{background:var(--accent);border-color:transparent;color:#fff}
+select{font:13px var(--body);padding:6px 8px;border-radius:8px;border:1px solid var(--line);background:var(--panel-2);color:var(--fg)}
+.toast{position:fixed;right:max(16px,env(safe-area-inset-right,0px));bottom:calc(16px + env(safe-area-inset-bottom,0px));padding:9px 14px;border-radius:10px;background:var(--fg);color:var(--bg);font-size:13px;opacity:0;transform:translateY(6px);transition:.2s;pointer-events:none}
+.toast.on{opacity:1;transform:none}
+.limpieza{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px}
+.limpieza .vidrio{padding:14px;display:grid;gap:8px;align-content:start}
+.tachado{text-decoration:line-through;color:var(--muted)}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+
+<div class="wrap">
+  <div class="top">
+    <div style="display:grid;gap:4px">
+      <h1>Puestos y permisos</h1>
+      <span class="muted">Cómo quedaría Maven, con su gente real y al estilo Blu. Es un mockup: tócalo con confianza, nada se guarda ni cambia en Maven.</span>
+    </div>
+    <span class="chip">Mockup · 18/11</span>
+  </div>
+
+  <div class="vidrio tabs" role="tablist">
+    <button class="tab" role="tab" data-v="puestos" aria-selected="true">Puestos</button>
+    <button class="tab" role="tab" data-v="ver">Ver como este puesto</button>
+    <button class="tab" role="tab" data-v="personas">Quién queda dónde</button>
+    <button class="tab" role="tab" data-v="grupos">Grupos</button>
+    <button class="tab" role="tab" data-v="limpieza">Limpieza de puestos</button>
+  </div>
+
+  <section id="v-puestos" class="grid">
+    <div class="vidrio">
+      <div style="padding:14px 14px 4px;display:flex;justify-content:space-between;align-items:center;gap:8px">
+        <h3>Puestos</h3><button class="btn" id="nuevo">+ Nuevo puesto</button>
+      </div>
+      <div class="lista" id="lista"></div>
+    </div>
+    <div class="vidrio panel" id="panel"></div>
+  </section>
+
+  <section id="v-ver" hidden class="vidrio panel"></section>
+  <section id="v-personas" hidden class="vidrio panel"></section>
+  <section id="v-grupos" hidden class="vidrio panel"></section>
+  <section id="v-limpieza" hidden class="panel" style="padding:0"></section>
+</div>
+<div class="toast" id="toast">Guardado</div>
+
+<script>
+const AREAS=[
+ {g:"General",items:[
+  {id:"inicio",n:"Inicio",a:["Su día","Pulso del equipo","Salud y NAS"]},
+  {id:"admin",n:"Administración",a:["Ver usuarios","Crear usuario","Editar usuario","Resetear contraseña","Editar puestos","Auditoría"]},
+  {id:"rrhh",n:"RR. HH.",a:["Directorio","Asistencia","Horarios","Vacaciones","Incidentes","Nómina"]},
+  {id:"finanzas",n:"Finanzas",a:["Dashboard","Invoices","Nómina","Reportes","Configuración"]}]},
+ {g:"Comunicación",items:[
+  {id:"messenger",n:"Messenger",a:["Chatear","Crear grupos","Borrar conversación"]},
+  {id:"correo",n:"Correo",a:["Su casilla","Casillas compartidas"]},
+  {id:"meet",n:"Meet",a:["Unirse","Crear reunión","Terminar reunión","Grabar"]},
+  {id:"cowork",n:"Cowork",a:["Trabajar en Cowork","Crear sesión","Ser anfitrión","Ver en vivo","Mover de sala"],t:["Ser anfitrión","Ver en vivo"]},
+  {id:"whatsapp",n:"WhatsApp",a:["Bandeja","Asignar conversaciones","Canales","IA"]},
+  {id:"telegram",n:"Telegram",a:["Bandeja","Asignar conversaciones","Cuentas"]}]},
+ {g:"Oficina",items:[
+  {id:"docs",n:"Documentos y hojas",a:["Ver","Crear","Compartir"]},
+  {id:"drive",n:"Drive",a:["Su unidad","Unidad de empresa","Compartir unidades","Ver actividad"],t:["Unidad de empresa"]},
+  {id:"calendario",n:"Calendario",a:["Ver","Crear eventos"]},
+  {id:"grabaciones",n:"Grabaciones",a:["Ver","Descargar","Guardar 30 días más","Borrar"]}]},
+ {g:"Operación",items:[
+  {id:"chatters",n:"Chatters",a:["Workspace","Horarios","Gestionar horarios","Rendimiento","Borrar historial"]},
+  {id:"creadoras",n:"Creadoras",a:["Lista","Perfil","Editar","Datos bancarios","Onboarding","Borrar"]},
+  {id:"personalizados",n:"Personalizados",a:["Tablero","Crear pedido","Aprobar","Gestionar"]},
+  {id:"parrilla",n:"Parrilla",a:["Ver","Editar","Enviar al grupo"]},
+  {id:"promolog",n:"Promolog",a:["Promos","Promobot","Rendimiento"]},
+  {id:"tickets",n:"Tickets",a:["Ver","Crear","Asignar","Editar","Borrar","Plantillas"]},
+  {id:"argos",n:"Argos",a:["Su nota","Notas del equipo","Ver pantalla en vivo","Devolver minutos","Sin cámara obligatoria"],t:["Sin cámara obligatoria"]}]}
+];
+const TODAS=AREAS.flatMap(g=>g.items);
+const DATOS=[["all","Todo"],["grupo","Él y su grupo"],["self","Solo lo suyo"]];
+
+// p(areaId, acciones|"*", datos)
+function arma(def){const m={};TODAS.forEach(a=>m[a.id]={on:false,acc:new Set(),d:"self"});
+  for(const [id,acc,d] of def){const a=TODAS.find(x=>x.id===id);m[id]={on:true,acc:new Set(acc==="*"?a.a:acc),d:d||"self"}}return m}
+const BASE=[["inicio",["Su día"]],["messenger",["Chatear"]],["correo",["Su casilla"]],["meet",["Unirse"]],["cowork",["Trabajar en Cowork"]],["docs",["Ver","Crear"]],["drive",["Su unidad"]],["calendario","*"],["grabaciones",["Ver","Descargar"]],["argos",["Su nota"]]];
+const G=s=>s.split("|").map(x=>x.trim());
+const PUESTOS=[
+ {id:"dueno",n:"Dueño",g:G("Alvaro Stephan Mejía"),fijo:true,total:true,creadoras:true,desc:"Ve todo, siempre. Solo aquí se prende «Acceso total»."},
+ {id:"admin",n:"Admin de la empresa",g:G("Cuenta compartida · admin@maven-ai.me"),total:true,creadoras:true,tag:"Nuevo",desc:"No es de nadie: Argos y Cowork no la vigilan. Maneja puestos, pero no puede crear admins."},
+ {id:"gerencia",n:"Gerencia",g:G("Alvaro René|Jackeline Mejía"),tag:"Antes admin",desc:"Lo que usan para trabajar, sin acceso total.",creadoras:true,p:[...BASE,["inicio",["Su día","Pulso del equipo"],"all"],["admin",["Ver usuarios"],"all"],["rrhh",["Directorio","Asistencia","Horarios"],"all"],["chatters",["Workspace","Horarios","Rendimiento"],"all"],["creadoras",["Lista","Perfil","Editar","Onboarding"],"all"],["personalizados","*","all"],["parrilla",["Ver"],"all"],["tickets","*","all"],["cowork",["Trabajar en Cowork","Ver en vivo"],"all"],["argos",["Su nota","Notas del equipo","Ver pantalla en vivo"],"all"],["drive",["Su unidad","Unidad de empresa","Ver actividad"],"all"]]},
+ {id:"corhh",n:"Coordinación de RR. HH.",g:G("Grace Gelves M."),tag:"Antes admin",desc:"Maneja gente y puestos. No ve Finanzas ni crea admins.",p:[...BASE,["inicio",["Su día","Pulso del equipo"],"all"],["admin",["Ver usuarios","Crear usuario","Editar usuario","Resetear contraseña","Editar puestos"],"all"],["rrhh","*","all"],["chatters",["Workspace","Horarios","Gestionar horarios","Rendimiento"],"all"],["cowork",["Trabajar en Cowork","Crear sesión","Ser anfitrión","Ver en vivo","Mover de sala"],"all"],["argos",["Su nota","Notas del equipo","Ver pantalla en vivo","Devolver minutos"],"all"]]},
+ {id:"rrhh",n:"RR. HH.",g:G("Andrea Palacio"),desc:"Asigna puestos a la gente, sin crear ni cambiar puestos.",p:[...BASE,["rrhh",["Directorio","Asistencia","Horarios","Vacaciones","Incidentes"],"all"],["admin",["Ver usuarios","Editar usuario"],"all"],["argos",["Su nota","Notas del equipo","Ver pantalla en vivo","Devolver minutos"],"all"],["cowork",["Trabajar en Cowork","Crear sesión","Ser anfitrión","Ver en vivo"],"all"]]},
+ {id:"finanzas",n:"Finanzas",g:G("Angie Ramirez|Daison Tapiero|Keila Suarez"),desc:"Dinero y nómina.",p:[...BASE,["finanzas","*","all"],["rrhh",["Directorio","Nómina"],"all"]]},
+ {id:"ops",n:"Operaciones",g:G("Luis Carlos Ortega Roman"),desc:"Antes «Operations Sales». Anfitrión de Cowork, como hoy.",creadoras:true,p:[...BASE,["creadoras","*","all"],["personalizados","*","all"],["parrilla","*","all"],["promolog","*","all"],["tickets","*","all"],["chatters",["Workspace","Horarios","Rendimiento"],"all"],["cowork",["Trabajar en Cowork","Crear sesión","Ser anfitrión","Ver en vivo","Mover de sala"],"all"]]},
+ {id:"sup",n:"Chatter Supervisor",g:G("Breyner Garzon|Daniel Ospina|Vanessa Giraldo"),desc:"Ve y maneja a su grupo. Anfitriones de Cowork, como hoy.",p:[...BASE,["chatters",["Workspace","Horarios","Gestionar horarios","Rendimiento"],"grupo"],["cowork",["Trabajar en Cowork","Crear sesión","Ser anfitrión","Ver en vivo","Mover de sala"],"grupo"],["argos",["Su nota","Notas del equipo","Ver pantalla en vivo"],"grupo"],["personalizados",["Tablero","Aprobar"],"grupo"],["whatsapp",["Bandeja","Asignar conversaciones"],"grupo"]]},
+ {id:"chatter",n:"Chatter",g:G("Alejandra Hurtado|Ana Escobar|Andres Ramos|Brayan Hernandez|Camila Sogamoso|Claudia Giraldo|Daniel Velez|Delsys Fuentes|Diego Martinez|Erick Mosquera|Gian Estarita|John Idrobo|Jonathan Hurtado|Juan Castellanos|Juan Velez|Julian Burbano|Julian Rojas|Karem Gomez|Karen Parada|Lina Perez|Luis Mercado|María de los Ángeles Suárez|Nicole Rodriguez|Thianny Mosquera|Valentina Duarte|Xiorangel Caraballo|Yerson Espinosa"),desc:"Su trabajo y nada más.",p:[...BASE,["chatters",["Workspace","Horarios"],"self"],["personalizados",["Tablero","Crear pedido"],"self"]]},
+ {id:"pr",n:"PR",g:G("Carolina Jaramillo|Fabiana Durán|Lorena Lozano"),desc:"Promos y parrilla. Drive de empresa, como hoy (las 3 lo tienen).",p:[...BASE,["parrilla","*","all"],["promolog","*","all"],["creadoras",["Lista","Perfil"],"all"],["drive",["Su unidad","Unidad de empresa"],"all"]]},
+ {id:"editor",n:"Editor",g:G("David Aunta|Maria Villegas"),desc:"Contenido de las creadoras.",p:[...BASE,["personalizados",["Tablero","Gestionar"],"all"]]},
+ {id:"warming",n:"Warming",g:G("Miguel Garcia"),desc:"Cuentas y mensajes.",p:[...BASE,["whatsapp","*","all"],["telegram","*","all"],["promolog",["Promos"],"all"]]},
+ {id:"warmingd",n:"Warming + Drive",g:G("Isabel Tuiran"),tag:"Nuevo",desc:"Igual que Warming, más el Drive de empresa que ella ya tiene.",p:[...BASE,["whatsapp","*","all"],["telegram","*","all"],["promolog",["Promos"],"all"],["drive",["Su unidad","Unidad de empresa"],"all"]]},
+ {id:"closer",n:"Closer",g:G("Daniel Felipe Duque Cortes|Juan Pachas"),desc:"Ventas con creadoras.",p:[...BASE,["creadoras",["Lista","Perfil","Onboarding"],"self"],["tickets",["Ver","Crear"],"self"]]},
+ {id:"closerd",n:"Closer + Drive",g:G("Brayan Esneider Castaño Hoyos"),tag:"Nuevo",desc:"Hoy no tiene puesto en Maven (en Blu es Closer) y sí tiene Drive de empresa.",p:[...BASE,["creadoras",["Lista","Perfil","Onboarding"],"self"],["tickets",["Ver","Crear"],"self"],["drive",["Su unidad","Unidad de empresa"],"all"]]},
+ {id:"freelance",n:"Freelance",g:G("Jaime Baeza|Lukas Stankus"),desc:"Lo mínimo para trabajar.",p:[["messenger",["Chatear"]],["meet",["Unirse"]],["cowork",["Trabajar en Cowork"]],["drive",["Su unidad"]]]},
+ {id:"agente",n:"Agente + Comunicación",g:G("Michel Zarate"),desc:"Chat y bandejas.",p:[...BASE,["whatsapp",["Bandeja"],"self"],["telegram",["Bandeja"],"self"]]}
+];
+PUESTOS.forEach(p=>p.gente=p.id==="admin"?1:p.g.length);
+const estado={};
+PUESTOS.forEach(p=>{estado[p.id]={on:true,total:!!p.total,creadoras:!!p.creadoras,m:arma(p.p||[])}});
+let sel="corhh";
+
+const $=s=>document.querySelector(s);
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+let tt;function guardado(t="Guardado"){const e=$("#toast");e.textContent=t;e.classList.add("on");clearTimeout(tt);tt=setTimeout(()=>e.classList.remove("on"),1300)}
+
+function lista(){
+  $("#lista").innerHTML=PUESTOS.map(p=>{const e=estado[p.id];return `
+  <div class="puesto" role="button" tabindex="0" data-id="${p.id}" aria-current="${p.id===sel}">
+    <div style="min-width:0"><b>${esc(p.n)} ${p.tag?`<span class="trasera">${p.tag}</span>`:""}</b><small>${esc(p.desc)}</small></div>
+    <span class="n">${p.id==="admin"?"cuenta":p.gente+(p.gente===1?" persona":" personas")}</span>
+    <button class="sw" role="switch" aria-label="Puesto activo" aria-checked="${e.on}" data-sw="${p.id}" ${p.fijo?"disabled":""}></button>
+  </div>`}).join("");
+}
+function panel(){
+  const p=PUESTOS.find(x=>x.id===sel),e=estado[sel],bloq=p.fijo||e.total;
+  let h=`<div class="top"><div style="display:grid;gap:2px"><h2>${esc(p.n)}</h2><span class="muted">${p.gente} ${p.gente===1?"persona":"personas"} · ${esc(p.desc)}</span></div>
+    <div style="display:flex;gap:8px"><button class="btn" data-ir="ver">Ver como este puesto</button></div></div>
+  <div style="display:flex;flex-wrap:wrap;gap:6px">${p.g.map(x=>`<span class="chip" style="background:var(--panel-2);color:var(--fg)"><span class="av" style="width:20px;height:20px;font-size:11px">${esc(x[0])}</span>${esc(x)}</span>`).join("")}</div>
+  <div class="aviso"><span>💾</span><span>Cada cambio se guarda solo, como en Blu. Le llega a la gente de este puesto la próxima vez que abra Maven.</span></div>
+  <div class="grande"><button class="sw" role="switch" aria-label="Acceso total" aria-checked="${e.total}" data-g="total" ${p.fijo?"disabled":""}></button><b>Acceso total</b>
+   <small>Le da todo, también lo que se agregue a Maven después. Mientras esté prendido, la tabla de abajo no cuenta.</small></div>
+  <div class="grande"><button class="sw" role="switch" aria-label="Todas las creadoras" aria-checked="${e.creadoras}" data-g="creadoras" ${p.fijo?"disabled":""}></button><b>Todas las creadoras</b>
+   <small>Ve a todas las creadoras de hoy y las que entren después. Apagado, se le asignan una por una.</small></div>`;
+  for(const g of AREAS){
+    h+=`<div style="display:grid;gap:8px"><h3>${g.g}</h3><div class="tabla scroll"><table><thead><tr><th>Menú</th><th>Qué puede hacer</th><th>Qué datos ve</th></tr></thead><tbody>`;
+    for(const a of g.items){const s=e.m[a.id],on=bloq||s.on;
+      h+=`<tr class="${on?"":"apagada"}"><td class="area"><label><input type="checkbox" data-a="${a.id}" ${on?"checked":""} ${bloq?"disabled":""}> ${esc(a.n)}</label></td>
+      <td><div class="acciones">${a.a.map(x=>`<label><input type="checkbox" data-a="${a.id}" data-x="${esc(x)}" ${(bloq||s.acc.has(x))?"checked":""} ${(bloq||!s.on)?"disabled":""}>${esc(x)}${(a.t||[]).includes(x)?'<span class="trasera" title="Hoy esto se da por una lista aparte">antes aparte</span>':""}</label>`).join("")}</div></td>
+      <td><div class="datos">${DATOS.map(([v,l])=>`<label><input type="radio" name="d-${a.id}" data-a="${a.id}" data-d="${v}" ${(bloq?v==="all":s.d===v)?"checked":""} ${(bloq||!s.on)?"disabled":""}>${l}</label>`).join("")}</div></td></tr>`}
+    h+=`</tbody></table></div></div>`;
+  }
+  $("#panel").innerHTML=h;
+}
+function ver(){
+  const opts=PUESTOS.map(p=>`<option value="${p.id}" ${p.id===sel?"selected":""}>${esc(p.n)}</option>`).join("");
+  const e=estado[sel],tot=e.total||PUESTOS.find(x=>x.id===sel).fijo;
+  let m="";for(const g of AREAS){const its=g.items.filter(a=>tot||e.m[a.id].on);if(!its.length)continue;
+    m+=`<div class="g">${g.g}</div>`+its.map(a=>`<div class="si">${esc(a.n)}</div>`).join("")}
+  let det="";for(const g of AREAS)for(const a of g.items){const s=e.m[a.id];if(!(tot||s.on))continue;
+    const acc=tot?a.a:[...s.acc];const d=tot?"Todo":DATOS.find(x=>x[0]===s.d)[1];
+    det+=`<div class="fila"><b>${esc(a.n)}</b><span class="muted" style="flex:1;min-width:200px">${acc.length?acc.map(esc).join(" · "):"Solo ver"}</span><span class="chip">${d}</span></div>`}
+  $("#v-ver").innerHTML=`<div class="top"><div style="display:grid;gap:2px"><h2>Ver como este puesto</h2><span class="muted">El menú y lo que puede hacer alguien con este puesto, sin entrar con su cuenta.</span></div>
+    <label style="display:flex;gap:8px;align-items:center">Puesto <select id="verSel">${opts}</select></label></div>
+    <div class="ver"><div class="vidrio menu"><div class="g" style="padding-top:4px">Menú de Maven</div>${m||'<div class="muted">No ve nada.</div>'}</div>
+    <div class="tabla">${det||'<div class="fila muted">Sin permisos.</div>'}</div></div>`;
+  $("#verSel").onchange=ev=>{sel=ev.target.value;ver();lista()};
+}
+function personas(){
+  const filas=PUESTOS.flatMap(p=>p.g.map(n=>({n,p})));
+  const cambio={"Alvaro René":"Deja de ser admin","Jackeline Mejía":"Deja de ser admin","Grace Gelves M.":"Deja de ser admin; maneja gente y puestos","Brayan Esneider Castaño Hoyos":"Hoy no tiene puesto","Isabel Tuiran":"Puesto propio para no darle Drive a Miguel","Luis Carlos Ortega Roman":"Cambia el nombre del puesto","Cuenta compartida · admin@maven-ai.me":"Cuenta nueva"};
+  const cambian=filas.filter(f=>cambio[f.n]);
+  $("#v-personas").innerHTML=`<div class="top"><div style="display:grid;gap:2px"><h2>Quién queda dónde</h2><span class="muted">${filas.length-1} personas y la cuenta de la empresa. Todos ven lo mismo que hoy, salvo los ${cambian.length} marcados.</span></div></div>
+  <div class="grande"><span class="chip">${cambian.length}</span><b>Los que cambian</b><small>${cambian.map(f=>`<b>${esc(f.n)}</b>: ${cambio[f.n]}`).join(" · ")}</small></div>
+  <div class="grande"><span class="chip">1</span><b>A la papelera</b><small>La cuenta «Test» (no es de nadie). Queda 30 días en la papelera, como todas.</small></div>
+  <div class="tabla">${filas.map(f=>`<div class="fila"><div style="display:flex;gap:10px;align-items:center;min-width:0"><div class="av">${esc(f.n[0])}</div><b>${esc(f.n)}</b></div><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">${cambio[f.n]?`<span class="trasera">${cambio[f.n]}</span>`:""}<span class="chip">${esc(f.p.n)}</span></div></div>`).join("")}</div>`;
+}
+const GRUPOS=[["Chatters de Breyner","Breyner Garzon"],["Chatters de Daniel","Daniel Ospina"],["Chatters de Vanessa","Vanessa Giraldo"],["PR","Carolina Jaramillo"],["Finanzas","Angie Ramirez"],["Oficina","Grace Gelves M."]];
+function grupos(){
+  $("#v-grupos").innerHTML=`<div class="top"><div style="display:grid;gap:2px"><h2>Grupos</h2><span class="muted">Ordenan a la gente en equipos, como en Blu. No dan permisos: deciden quién es «su grupo» para el supervisor.</span></div></div>
+  <div class="aviso"><span>ℹ️</span><span>Cada chatter queda en el grupo de su supervisor de hoy (el de su Cowork). RR. HH. lo cambia cuando haga falta.</span></div>
+  <div class="tabla">${GRUPOS.map(([n,j])=>`<div class="fila"><div style="display:flex;gap:10px;align-items:center"><div class="av">${n[0]}</div><div><b>${n}</b><div class="muted" style="font-size:12px">Encargado: ${j}</div></div></div></div>`).join("")}</div>
+  <div class="grande"><span class="chip">Así funciona</span><b>Chatter Supervisor con «Él y su grupo»</b><small>Vanessa ve el Argos, el Cowork en vivo y los horarios de sus chatters, y de nadie más.</small></div>`;
+}
+function limpieza(){
+  const vacios=["manager","supervisor","Team Leader","Coordinador Supervisor","Coordinador","Básico","employee","agent","spammer","LLG","Closer +"];
+  $("#v-limpieza").innerHTML=`<div class="limpieza">
+   <div class="vidrio"><h3>Quién manda en los puestos</h3>
+     <div><b>Tú (Dueño)</b> <span class="muted">· lo único que puede prender «Acceso total»</span></div>
+     <div><b>Admin de la empresa</b> <span class="muted">· crea y edita puestos, sin crear admins</span></div>
+     <div><b>Coordinación de RR. HH. (Grace)</b> <span class="muted">· crea y edita puestos, sin acceso total</span></div>
+     <div><b>RR. HH. (Andrea)</b> <span class="muted">· solo pone a cada persona en un puesto</span></div></div>
+   <div class="vidrio"><h3>Se borran ${vacios.length} puestos (no tienen a nadie)</h3>${vacios.map(v=>`<div class="tachado">${v}</div>`).join("")}</div>
+   <div class="vidrio"><h3>Lo que hoy va por fuera, ahora en el puesto</h3>
+     <div><b>Anfitriones de Cowork</b> <span class="muted">→ ya eran los 3 supervisores, Luis y Andrea: queda en sus puestos</span></div>
+     <div><b>Drive de empresa</b> <span class="muted">→ las 3 de PR en su puesto; Isabel y Brayan en puesto propio; René en Gerencia</span></div>
+     <div><b>Admins personales</b> <span class="muted">→ una sola cuenta de la empresa</span></div>
+     <div><b>Módulos escondidos en el código</b> <span class="muted">→ se apagan desmarcando el menú</span></div></div>
+   <div class="vidrio"><h3>La regla que queda</h3>
+     <div>Una persona = <b>un puesto</b> + <b>un grupo</b>.</div><div>Sin excepciones por persona.</div>
+     <div class="muted">Antes de subir, una prueba compara persona por persona antes y después. Solo cambian los marcados en «Quién queda dónde».</div></div></div>`;
+}
+document.addEventListener("click",ev=>{
+  const t=ev.target;
+  const tab=t.closest(".tab");if(tab){mostrar(tab.dataset.v);return}
+  const ir=t.closest("[data-ir]");if(ir){mostrar(ir.dataset.ir);return}
+  const sw=t.closest("[data-sw]");if(sw){ev.stopPropagation();const e=estado[sw.dataset.sw];e.on=!e.on;sw.setAttribute("aria-checked",e.on);guardado(e.on?"Puesto prendido":"Puesto apagado");return}
+  const g=t.closest("[data-g]");if(g){const e=estado[sel];e[g.dataset.g]=!e[g.dataset.g];panel();guardado();return}
+  const p=t.closest(".puesto");if(p){sel=p.dataset.id;lista();panel();return}
+  if(t.id==="nuevo")guardado("En el mockup no se crean puestos");
+});
+document.addEventListener("keydown",ev=>{const p=ev.target.closest&&ev.target.closest(".puesto");if(p&&(ev.key==="Enter"||ev.key===" ")){ev.preventDefault();sel=p.dataset.id;lista();panel()}});
+document.addEventListener("change",ev=>{
+  const t=ev.target;if(!t.dataset.a)return;const s=estado[sel].m[t.dataset.a];
+  if(t.dataset.x){t.checked?s.acc.add(t.dataset.x):s.acc.delete(t.dataset.x)}
+  else if(t.dataset.d){s.d=t.dataset.d}
+  else{s.on=t.checked;if(s.on&&!s.acc.size){const a=TODAS.find(x=>x.id===t.dataset.a);s.acc.add(a.a[0])}}
+  panel();guardado();
+});
+function mostrar(v){
+  document.querySelectorAll(".tab").forEach(b=>b.setAttribute("aria-selected",b.dataset.v===v));
+  ["puestos","ver","personas","grupos","limpieza"].forEach(x=>$("#v-"+x).hidden=x!==v);
+  if(v==="ver")ver();if(v==="grupos")grupos();if(v==="personas")personas();if(v==="limpieza")limpieza();if(v==="puestos"){lista();panel()}
+}
+lista();panel();
+</script>

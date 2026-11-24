@@ -1,0 +1,323 @@
+<title>Ficha del empleado en Argos</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;600&display=swap">
+<style>
+/* Layout: consola de Maven. Arriba los turnos, debajo tardanzas y «quién está mal ahora»; se baja turno → equipo → persona, siempre en la misma columna. */
+:root{
+  --bg:#0f1829; --panel:rgba(28,40,62,.72); --panel-2:#16223a; --line:rgba(170,195,255,.10);
+  --fg:#e8edf6; --muted:#8e9ab2; --accent:#3d8bfd; --accent-soft:rgba(61,139,253,.16);
+  --ok:#2fc27a; --warn:#f0a93b; --bad:#ef4f5a; --gris:#3a4660; --por:#232f47;
+  --shadow:0 1px 0 rgba(255,255,255,.04) inset,0 18px 40px -24px rgba(0,0,0,.85);
+  --display:"Space Grotesk",ui-sans-serif,system-ui,sans-serif; --body:"Inter",ui-sans-serif,system-ui,sans-serif;
+  color-scheme:dark;
+}
+@media (prefers-color-scheme:light){:root:not([data-theme="dark"]){
+  --bg:#eef2f8; --panel:rgba(255,255,255,.82); --panel-2:#f5f7fb; --line:rgba(20,35,70,.10);
+  --fg:#132036; --muted:#5b6880; --accent:#2a72e8; --accent-soft:rgba(42,114,232,.12);
+  --ok:#17955a; --warn:#b97510; --bad:#d23a46; --gris:#c9d2e2; --por:#e4e9f2;
+  --shadow:0 1px 0 rgba(255,255,255,.7) inset,0 12px 30px -20px rgba(20,35,70,.35); color-scheme:light}}
+:root[data-theme="light"]{
+  --bg:#eef2f8; --panel:rgba(255,255,255,.82); --panel-2:#f5f7fb; --line:rgba(20,35,70,.10);
+  --fg:#132036; --muted:#5b6880; --accent:#2a72e8; --accent-soft:rgba(42,114,232,.12);
+  --ok:#17955a; --warn:#b97510; --bad:#d23a46; --gris:#c9d2e2; --por:#e4e9f2;
+  --shadow:0 1px 0 rgba(255,255,255,.7) inset,0 12px 30px -20px rgba(20,35,70,.35); color-scheme:light}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font-family:var(--body);font-size:14px;line-height:1.45;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:20px 56px}
+.wrap{max-width:1100px;margin:0 auto;display:grid;gap:16px}
+h1,h2,h3{font-family:var(--display);margin:0;font-weight:600;text-wrap:balance}
+h1{font-size:24px} h2{font-size:17px} h3{font:600 11.5px var(--body);letter-spacing:.09em;text-transform:uppercase;color:var(--muted)}
+.muted{color:var(--muted)} .num{font-variant-numeric:tabular-nums}
+.vidrio{background:var(--panel);border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow);backdrop-filter:blur(14px)}
+button{font:inherit;color:inherit}
+button:focus-visible,[tabindex]:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.nota-mock{font-size:12.5px;padding:8px 12px;border-radius:10px;background:var(--accent-soft);color:var(--fg)}
+.cab{display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between;padding:16px 18px}
+.marca{display:flex;gap:12px;align-items:center}
+.ojo{width:44px;height:44px;border-radius:12px;display:grid;place-items:center;background:var(--accent-soft);color:var(--accent);flex:none}
+.seg{display:inline-flex;padding:4px;border-radius:12px;background:var(--panel-2);border:1px solid var(--line);gap:2px}
+.seg button{border:0;background:transparent;padding:7px 13px;border-radius:9px;cursor:pointer;color:var(--muted);font-weight:500}
+.seg button[aria-pressed="true"]{background:var(--accent);color:#fff}
+.icono{border:1px solid var(--line);background:var(--panel-2);border-radius:11px;width:38px;height:38px;display:grid;place-items:center;cursor:pointer;color:var(--muted)}
+.miga{display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-size:13px;color:var(--muted)}
+.miga button{border:0;background:none;padding:2px 4px;cursor:pointer;color:var(--accent);font-weight:500}
+.miga b{color:var(--fg);font-weight:600}
+/* turnos */
+.turnos{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+@media (max-width:820px){.turnos{grid-template-columns:minmax(0,1fr)}}
+.turno{padding:16px;display:grid;gap:10px;text-align:left;border:1px solid var(--line);border-radius:16px;background:var(--panel);cursor:pointer;box-shadow:var(--shadow)}
+.turno:hover{border-color:var(--accent)}
+.turno[aria-current="true"]{border-color:var(--accent);background:linear-gradient(var(--accent-soft),var(--accent-soft)),var(--panel)}
+.turno .t{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.turno .t b{font:600 16px var(--display)}
+.cuenta{display:flex;flex-wrap:wrap;gap:6px}
+.pill{display:inline-flex;gap:6px;align-items:center;font-size:12px;padding:3px 9px;border-radius:99px;background:var(--panel-2);border:1px solid var(--line);white-space:nowrap}
+.dot{width:8px;height:8px;border-radius:50%;flex:none}
+.d-ok{background:var(--ok)} .d-warn{background:var(--warn)} .d-bad{background:var(--bad)} .d-gris{background:var(--gris)}
+.barra{display:grid;grid-template-columns:70px minmax(0,1fr) 44px;gap:10px;align-items:center;font-size:13px}
+.barra i{display:block;height:7px;border-radius:9px;background:var(--por);overflow:hidden}
+.barra i s{display:block;height:100%;border-radius:9px;background:var(--ok)}
+.barra span:last-child{text-align:right}
+/* bloques */
+.dos{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.25fr);gap:16px;align-items:start}
+@media (max-width:900px){.dos{grid-template-columns:minmax(0,1fr)}}
+.bloque{padding:16px;display:grid;gap:10px}
+.bloque .tit{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.fila{display:grid;grid-template-columns:34px minmax(0,1fr) auto;gap:10px;align-items:center;padding:9px 8px;border-radius:12px;cursor:pointer;border:1px solid transparent;text-align:left;background:none;width:100%}
+.fila:hover{background:var(--panel-2);border-color:var(--line)}
+.fila b{font-weight:600;display:block}
+.fila small{color:var(--muted);font-size:12.5px;display:block}
+.av{width:34px;height:34px;border-radius:50%;display:grid;place-items:center;font:600 13px var(--display);background:var(--panel-2);border:2px solid var(--gris);color:var(--fg)}
+.av.ok{border-color:var(--ok)} .av.warn{border-color:var(--warn)} .av.bad{border-color:var(--bad)}
+.min{font:600 13px var(--display);white-space:nowrap}
+.c-bad{color:var(--bad)} .c-warn{color:var(--warn)} .c-ok{color:var(--ok)}
+.sub{font:600 11px var(--body);letter-spacing:.08em;text-transform:uppercase;color:var(--muted);padding:8px 8px 2px}
+.equipos{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:10px}
+.equipo{padding:13px;border-radius:14px;border:1px solid var(--line);background:var(--panel-2);cursor:pointer;text-align:left;display:grid;gap:8px}
+.equipo:hover{border-color:var(--accent)}
+.equipo .t{display:flex;justify-content:space-between;gap:8px;align-items:baseline}
+.equipo .t b{font:600 15px var(--display)}
+/* franja de tiempo */
+.franja{position:relative;height:14px;border-radius:7px;background:var(--por);overflow:hidden;display:flex}
+.franja span{height:100%}
+.f-ok{background:var(--ok)} .f-warn{background:var(--warn)} .f-bad{background:var(--bad)}
+.f-tarde{background:repeating-linear-gradient(135deg,var(--gris) 0 5px,transparent 5px 10px)}
+.f-nada{background:transparent}
+.persona-fila{display:grid;grid-template-columns:34px minmax(0,190px) minmax(0,1fr) 54px;gap:12px;align-items:center;padding:10px 8px;border-radius:12px;cursor:pointer;border:1px solid transparent;background:none;width:100%;text-align:left}
+.persona-fila:hover{background:var(--panel-2);border-color:var(--line)}
+.persona-fila .q{display:grid;gap:6px;min-width:0}
+.persona-fila small{color:var(--muted);font-size:12.5px}
+.nota{font:600 22px var(--display);text-align:right}
+@media (max-width:640px){.persona-fila{grid-template-columns:34px minmax(0,1fr) 46px}.persona-fila .q{grid-column:1/-1;order:3}}
+/* persona */
+.ficha{padding:18px;display:grid;gap:16px}
+.ficha-cab{display:flex;flex-wrap:wrap;gap:14px;align-items:center;justify-content:space-between}
+.quien{display:flex;gap:12px;align-items:center}
+.quien .av{width:48px;height:48px;font-size:17px;border-width:3px}
+.veredicto{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:14px;align-items:center;padding:14px;border-radius:14px;background:var(--panel-2);border:1px solid var(--line);cursor:pointer;text-align:left;width:100%}
+.semaforo{display:grid;gap:4px;padding:6px;border-radius:12px;background:var(--bg);border:1px solid var(--line)}
+.semaforo i{width:12px;height:12px;border-radius:50%;background:var(--por);display:block}
+.semaforo i.on.r{background:var(--bad)} .semaforo i.on.a{background:var(--warn)} .semaforo i.on.v{background:var(--ok)}
+.veredicto p{margin:0;font-size:15px;line-height:1.5}
+.grande{font:600 40px/1 var(--display);text-align:right}
+.grande small{display:block;font:500 11px var(--body);color:var(--muted);letter-spacing:.06em;text-transform:uppercase;margin-top:4px}
+.desglose{display:grid;gap:8px;padding:4px 2px}
+.desglose .barra{grid-template-columns:minmax(0,180px) minmax(0,1fr) 64px}
+.acciones{display:flex;flex-wrap:wrap;gap:8px}
+.btn{display:inline-flex;gap:7px;align-items:center;border:1px solid var(--line);background:var(--panel-2);padding:8px 13px;border-radius:11px;cursor:pointer;font-weight:500;font-size:13px}
+.btn:hover{border-color:var(--accent)}
+.btn.pri{background:var(--accent);color:#fff;border-color:transparent}
+.linea{display:grid;gap:8px}
+.reloj{display:flex;justify-content:space-between;font-size:11.5px;color:var(--muted)}
+.tramos{display:flex;height:46px;border-radius:12px;overflow:hidden;background:var(--por);border:1px solid var(--line)}
+.tramos button{border:0;height:100%;padding:0;cursor:pointer;position:relative}
+.tramos button[aria-pressed="true"]{outline:3px solid var(--fg);outline-offset:-3px;z-index:1}
+.tramos .f-nada{cursor:default}
+.leyenda{display:flex;flex-wrap:wrap;gap:12px;font-size:12px;color:var(--muted)}
+.leyenda span{display:inline-flex;gap:6px;align-items:center}
+.leyenda i{width:14px;height:10px;border-radius:3px;display:inline-block}
+.detalle{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:14px;padding:14px;border-radius:14px;border:1px solid var(--line);background:var(--panel-2)}
+@media (max-width:760px){.detalle{grid-template-columns:minmax(0,1fr)}}
+.pantallazo{aspect-ratio:16/10;max-width:100%;border-radius:10px;border:1px solid var(--line);background:linear-gradient(180deg,var(--panel),var(--bg));display:grid;grid-template-rows:22px 1fr;overflow:hidden}
+.pantallazo .barrita{display:flex;gap:5px;align-items:center;padding:0 8px;background:var(--por)}
+.pantallazo .barrita i{width:7px;height:7px;border-radius:50%;background:var(--gris)}
+.pantallazo .dentro{display:grid;place-items:center;text-align:center;padding:12px;color:var(--muted);font-size:12.5px}
+.pruebas{display:grid;gap:10px;align-content:start}
+.prueba{display:grid;gap:3px}
+.prueba p{margin:0}
+.dice{padding:10px 12px;border-radius:10px;background:var(--bg);border:1px solid var(--line);font-size:13.5px}
+.aviso-l{display:grid;grid-template-columns:48px minmax(0,1fr);gap:8px;font-size:13px}
+.semana{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:8px}
+.dia{border-radius:12px;padding:10px 8px;border:1px solid var(--line);background:var(--panel-2);display:grid;gap:4px;text-align:center}
+.dia b{font:600 20px var(--display)}
+.dia small{color:var(--muted);font-size:11.5px}
+.dia.libre{opacity:.5}
+.mes{display:grid;gap:8px}
+.mes .barra{grid-template-columns:110px minmax(0,1fr) 48px}
+.toast{position:fixed;left:50%;bottom:calc(18px + env(safe-area-inset-bottom,0px));transform:translate(-50%,8px);padding:10px 16px;border-radius:12px;background:var(--fg);color:var(--bg);font-size:13px;opacity:0;transition:.2s;pointer-events:none;max-width:calc(100% - 32px)}
+.toast.on{opacity:1;transform:translate(-50%,0)}
+.ajustes{padding:16px;display:grid;gap:8px}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+.pestanas{display:flex;gap:4px;padding:5px;overflow-x:auto;border-radius:16px}
+.pestanas button{border:0;background:transparent;color:var(--muted);font-weight:600;padding:10px 18px;border-radius:12px;cursor:pointer;white-space:nowrap;display:inline-flex;gap:8px;align-items:center}
+.pestanas button[aria-selected="true"]{background:var(--accent);color:#fff}
+.estado{font-size:11.5px;font-weight:600;padding:3px 9px;border-radius:99px;white-space:nowrap}
+.e-ok{background:color-mix(in srgb,var(--ok) 18%,transparent);color:var(--ok)}
+.e-warn{background:color-mix(in srgb,var(--warn) 18%,transparent);color:var(--warn)}
+.e-bad{background:color-mix(in srgb,var(--bad) 18%,transparent);color:var(--bad)}
+.e-gris{background:var(--por);color:var(--muted)}
+.secciones{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+@media (max-width:760px){.secciones{grid-template-columns:minmax(0,1fr)}}
+.seccion{padding:14px;border-radius:14px;border:1px solid var(--line);background:var(--panel-2);display:grid;gap:8px;align-content:start}
+.kv{display:grid;grid-template-columns:auto minmax(0,1fr);gap:4px 14px;font-size:13px}
+.kv span:nth-child(odd){color:var(--muted)}
+.cambio{font-size:12.5px;padding:10px 12px;border-radius:12px;border:1px dashed var(--line);color:var(--muted)}
+.cambio b{color:var(--fg)}
+.vivo{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.6fr);gap:12px}
+@media (max-width:760px){.vivo{grid-template-columns:minmax(0,1fr)}}
+.marco{border-radius:14px;border:1px solid var(--line);background:linear-gradient(180deg,var(--panel),var(--bg));aspect-ratio:16/10;max-width:100%;display:grid;place-items:center;position:relative;color:var(--muted);text-align:center;padding:12px;font-size:13px}
+.marco .rot{position:absolute;top:10px;left:10px;font-size:11.5px;font-weight:600;padding:3px 9px;border-radius:99px;background:var(--bad);color:#fff;display:inline-flex;gap:6px;align-items:center}
+.marco .rot::before{content:"";width:7px;height:7px;border-radius:50%;background:#fff}
+.tira{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
+.mini-p{border:1px solid var(--line);border-radius:12px;background:var(--panel-2);overflow:hidden;display:grid}
+.mini-p .pantallazo{border:0;border-radius:0}
+.mini-p small{padding:8px 10px;color:var(--muted);font-size:11.5px;display:block}
+.mini-p small b{color:var(--fg)}
+.cal{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:6px}
+.cal .cab-d{font:600 11px var(--body);letter-spacing:.06em;text-transform:uppercase;color:var(--muted);text-align:center;padding:4px 0}
+.cal button,.cal span.v{border-radius:12px;border:1px solid var(--line);background:var(--panel-2);padding:8px 6px;display:grid;gap:2px;text-align:center;min-height:74px;align-content:start}
+.cal button{cursor:pointer}
+.cal button:hover{border-color:var(--accent)}
+.cal button[aria-pressed="true"]{border-color:var(--accent);background:linear-gradient(var(--accent-soft),var(--accent-soft)),var(--panel-2)}
+.cal span.v{opacity:.35;border-style:dashed}
+.cal b{font:600 15px var(--display)}
+.cal small{font-size:11px;color:var(--muted)}
+.cal .tarde{color:var(--warn)}
+@media (max-width:560px){.cal button,.cal span.v{min-height:58px;padding:6px 3px}.cal small.x{display:none}}
+.resumen{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+@media (max-width:640px){.resumen{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.cifra{padding:12px 14px;border-radius:14px;border:1px solid var(--line);background:var(--panel-2);display:grid;gap:2px}
+.cifra b{font:600 26px/1.1 var(--display)}
+.cifra span{font-size:12.5px;color:var(--muted)}
+</style>
+
+<div class="wrap">
+  <div class="miga"><span class="muted">Argos ›</span> <span class="muted">El día ›</span> <span class="muted">Chatters ›</span> <b>Karen Parada</b></div>
+
+  <header class="vidrio ficha" style="gap:14px">
+    <div class="ficha-cab">
+      <div class="quien"><span class="av warn" style="width:56px;height:56px;font-size:19px;border-width:3px">KP</span>
+        <div><h1 style="font-size:24px">Karen Parada</h1><div class="muted">Chatters · Turno AM 8:00–16:00 · supervisor: Daniel Ospina</div>
+        <div style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap"><span class="estado e-ok">● En Cowork ahora</span><span class="estado e-gris">Sala Chatters AM</span><span class="estado e-gris">Hace 16 días con Argos</span></div></div></div>
+      <div class="acciones">
+        <button class="btn pri" data-tab="vivo">Ver en vivo</button>
+        <button class="btn" data-acc="Le sale un cartel y la voz de Argos con tu aviso.">Avisarle</button>
+        <button class="btn" data-acc="La llama por Cowork.">Llamar</button>
+        <button class="btn" data-acc="Le llega a ella y a su supervisor el resumen del día.">Mandar reporte</button>
+      </div>
+    </div>
+    <nav class="pestanas" role="tablist" aria-label="Qué quieres ver" id="pestanas" style="background:var(--panel-2);border:1px solid var(--line)"></nav>
+  </header>
+
+  <div class="nota-mock">Propuesta de la ficha del empleado. Todo lo de Karen Parada es real, sacado de Maven: su día de hoy, lo que dijo Argos, sus avisos y sus 16 días de historial. Lo único de ejemplo es la nota, y los cuadros grises reemplazan las fotos.</div>
+  <main id="vista" class="wrap" style="gap:16px"></main>
+</div>
+<div class="toast" id="toast" role="status"></div>
+
+<script>
+const $ = s => document.querySelector(s);
+const fmtMin = m => m>=60 ? `${Math.floor(m/60)} h ${m%60?m%60+" min":""}`.trim() : `${m} min`;
+const toast = t => { const e=$("#toast"); e.textContent=t; e.classList.add("on"); clearTimeout(toast.k); toast.k=setTimeout(()=>e.classList.remove("on"),2800); };
+let S = { tab:"hoy", tramo:10, desglose:false, dia:"18" };
+
+/* Su día real de hoy (18/11), de las capturas, alertas y avisos de Argos. */
+const HOY = [
+  {c:"tarde", desde:"8:00", hasta:"9:20", min:80, titulo:"No había llegado", resumen:"Entró a las 9:20: 1 h 20 min tarde.", app:null, dice:null, avisos:[["8:05","Argos la empezó a llamar: «No has entrado a Cowork»."],["9:20","Entró a Cowork con cámara y pantalla."]]},
+  {c:"ok", desde:"9:20", hasta:"9:41", min:21, titulo:"Trabajando", resumen:"Atendía chats con cámara y pantalla.", app:"Maven CRM · mensajería", dice:"«Uso del CRM de mensajería para gestionar chats y ventas con fans de las cuentas de la agencia.»", avisos:[]},
+  {c:"warn", desde:"9:41", hasta:"9:45", min:4, titulo:"Argos la vio distraída", resumen:"En la cámara no estaba mirando su pantalla.", app:"Foto de su cámara", dice:"«La persona no está en un entorno de oficina y no se encuentra mirando hacia una pantalla.»", avisos:[["9:41","Quedó anotado. No hizo falta llamarla: volvió sola."]]},
+  {c:"ok", desde:"9:45", hasta:"10:15", min:30, titulo:"Trabajando", resumen:"Preparaba un mensaje masivo.", app:"Plataforma de creadoras", dice:"«Redactando y configurando un mensaje masivo en la plataforma.»", avisos:[]},
+  {c:"warn", desde:"10:15", hasta:"10:19", min:4, titulo:"Argos la vio distraída", resumen:"De espaldas a la cámara.", app:"Foto de su cámara", dice:"«Se observa la parte posterior de una cabeza frente a un paisaje montañoso.»", avisos:[["10:15","Quedó anotado."]]},
+  {c:"ok", desde:"10:19", hasta:"10:35", min:16, titulo:"Trabajando", resumen:"Elegía contenido para enviar.", app:"Bóveda de contenido", dice:"«Se encuentra seleccionando archivos dentro de la bóveda de medios de la plataforma.»", avisos:[]},
+  {c:"warn", desde:"10:35", hasta:"10:40", min:5, titulo:"Dejó de compartir pantalla", resumen:"Siguió en Cowork, pero sin pantalla.", app:null, dice:"No llegaba imagen de su pantalla.", avisos:[["10:35","Voz de Argos: «No estás compartiendo pantalla»."],["10:40","Volvió a compartir."]]},
+  {c:"ok", desde:"10:40", hasta:"11:43", min:63, titulo:"Trabajando", resumen:"Mensajes masivos y listas de envío.", app:"Maven CRM · listas de envío", dice:"«Configuración y segmentación de listas para el envío de mensajes masivos en el CRM.»", avisos:[]},
+  {c:"warn", desde:"11:43", hasta:"11:47", min:4, titulo:"Argos la vio distraída", resumen:"De espaldas, sin mirar la pantalla.", app:"Foto de su cámara", dice:"«La persona se encuentra de espaldas y no está frente a una pantalla de trabajo.»", avisos:[["11:43","Quedó anotado."]]},
+  {c:"ok", desde:"11:47", hasta:"13:23", min:96, titulo:"Trabajando", resumen:"Ventas y conversaciones con suscriptores.", app:"Maven CRM · chat con un suscriptor", dice:"«Gestionando mensajes y ventas con un suscriptor en la plataforma de trabajo.»", avisos:[]},
+  {c:"warn", desde:"13:23", hasta:"14:00", min:37, titulo:"Pausa sin cámara", resumen:"Apagó la cámara y no hubo capturas durante 37 min.", app:null, dice:"Sin capturas en este rato.", avisos:[["13:23","Voz de Argos: «Tienes la cámara apagada»."],["14:00","Volvió con cámara y pantalla."]]},
+  {c:"ok", desde:"14:00", hasta:"16:00", min:120, titulo:"Trabajando", resumen:"Chats con fans hasta el final del turno.", app:"Maven CRM · conversaciones", dice:"«Usa la plataforma de mensajería y gestión de fans para responder conversaciones.»", avisos:[]}
+];
+const ULTIMOS = [["16:00","Maven · mensajería y videollamada"],["15:40","Maven Cowork · sala de trabajo"],["15:20","Bóveda · visor de medios"],["15:00","Maven CRM · chats con fans"],["14:40","Maven CRM · conversaciones"],["14:20","Maven Messenger · coordinación"]];
+/* Su historial real en noviembre. [día, semana, entró, salió, cara %, avisos, salidas de Cowork] */
+const HIST = [
+  ["1","dom","15:48","16:05",null,0,0],["2","lun","8:02","15:58",null,0,0],["3","mar","8:06","23:49",null,0,0],["4","mié","6:08","16:17",20,0,0],
+  ["5","jue","8:05","16:29",93,0,0],["6","vie","8:00","16:09",95,0,0],["8","dom","8:06","16:03",88,0,0],["9","lun","8:04","16:05",84,2,0],
+  ["10","mar","8:25","16:07",88,19,0],["11","mié","8:12","16:03",87,17,1],["12","jue","8:14","16:13",93,4,4],["13","vie","8:23","16:01",85,5,1],
+  ["14","sáb","8:06","16:14",95,10,2],["16","lun","8:00","16:07",87,10,0],["17","mar","8:09","16:06",98,3,1],["18","mié","9:20","16:00",100,2,0]
+];
+const tardeMin = h => { const [a,b]=h.split(":").map(Number); return a*60+b-480; };
+const esTarde = h => { const m=tardeMin(h); return m>10 && m<240; };
+
+function tabHoy(){
+  const t = HOY[S.tramo];
+  const ver = `<button class="veredicto" id="ver-nota" aria-expanded="${S.desglose}"><span class="semaforo" aria-hidden="true"><i></i><i class="on a"></i><i></i></span>
+    <p><b>Llegó 1 h 20 min tarde.</b> El resto del día trabajó: chats, ventas y mensajes masivos, con la cara en cámara el 100 % del tiempo. Argos la vio de espaldas o distraída 3 veces, le avisó 2 y tuvo una pausa sin cámara de 37 min.<br><span class="muted" style="font-size:12.5px">Toca para ver cómo se arma la nota.</span></p>
+    <span class="grande num c-warn">61<small>nota de hoy</small></span></button>
+    ${S.desglose?`<div class="desglose"><div class="barra"><span>Horas trabajadas · 6,1 h de 8 h</span><i><s style="width:76%;background:var(--warn)"></s></i><span class="num">34 / 45</span></div><div class="barra"><span>Atención mientras estuvo</span><i><s style="width:80%;background:var(--ok)"></s></i><span class="num">28 / 35</span></div><div class="barra"><span>Pausas · 37 min de más</span><i><s style="width:0%"></s></i><span class="num">0 / 20</span></div><div class="muted" style="font-size:12.5px">El reparto de la nota es de ejemplo. La tardanza va aparte, como sanción, y no toca la nota.</div></div>`:""}`;
+  return `<section class="vidrio ficha">${ver}
+    <div class="linea"><div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap"><h3>Qué hizo hoy, tramo por tramo</h3><span class="muted" style="font-size:12.5px">toca un tramo para ver la prueba</span></div>
+      <div class="tramos" role="group" aria-label="Tramos del turno">${HOY.map((x,i)=>`<button class="f-${x.c}" style="width:${Math.max(x.min/480*100,1.2)}%" aria-pressed="${i===S.tramo}" data-tramo="${i}" title="${x.desde}–${x.hasta} · ${x.titulo}" aria-label="${x.desde} a ${x.hasta}: ${x.titulo}"></button>`).join("")}</div>
+      <div class="reloj num"><span>8:00</span><span>10:00</span><span>12:00</span><span>14:00</span><span>16:00</span></div>
+      <div class="leyenda"><span><i class="f-ok"></i>Trabajando</span><span><i class="f-warn"></i>Distraída, sin cámara o sin pantalla</span><span><i class="f-bad"></i>Fuera de Cowork</span><span><i class="f-tarde" style="border:1px solid var(--line)"></i>No había llegado</span></div></div>
+    <div class="detalle"><div class="pruebas"><div class="prueba"><h3>${t.desde} – ${t.hasta} · ${fmtMin(t.min)}</h3><p style="font:600 18px var(--display)" class="${t.c==='ok'?'c-ok':t.c==='warn'?'c-warn':''}">${t.titulo}</p><p class="muted">${t.resumen}</p></div>
+      ${t.app?`<div class="pantallazo" role="img" aria-label="Prueba"><div class="barrita"><i></i><i></i><i></i></div><div class="dentro">${t.app.startsWith("Foto de su cámara")?"Foto de su cámara a las "+t.desde:"Pantallazo de las "+t.desde}<br><b style="color:var(--fg)">${t.app}</b></div></div>`:`<div class="dice muted">${t.c==="tarde"?"Sin fotos: todavía no había entrado.":"Sin fotos en este rato."}</div>`}
+      </div><div class="pruebas">${t.dice?`<div class="prueba"><h3>Lo que dijo Argos</h3><div class="dice">${t.dice}</div></div>`:""}
+        <div class="prueba"><h3>Avisos de Argos</h3>${t.avisos.length?t.avisos.map(([h,x])=>`<div class="aviso-l"><span class="num muted">${h}</span><span>${x}</span></div>`).join(""):`<div class="muted">No hizo falta avisarle.</div>`}</div>
+        ${t.c==="ok"?"":`<div><button class="btn" data-acc="Ese tramo queda justificado y deja de bajarle la nota. Queda anotado quién lo perdonó.">Perdonar este tramo</button></div>`}</div></div>
+    <div class="secciones">
+      <div class="seccion"><h3>Llegada y salida</h3><div class="kv"><span>Horario</span><span>8:00 – 16:00</span><span>Entró</span><span class="c-warn">9:20 · 1 h 20 min tarde</span><span>Salió</span><span>16:00 · a tiempo</span><span>Pausas</span><span>37 min sin cámara (13:23–14:00)</span></div><div class="acciones"><button class="btn" data-acc="La foto de su cámara al entrar.">Prueba de la tardanza</button><button class="btn" data-acc="El correo que le llegó a ella, a su jefe y a RR. HH.">Ver el correo que llegó</button></div></div>
+      <div class="seccion"><h3>En qué trabajó</h3>${[["Maven CRM · chats y ventas",210],["Mensajes masivos",75],["Bóveda de contenido",45],["Maven Messenger y Cowork",30]].map(([a,m])=>`<div class="barra" style="grid-template-columns:minmax(0,1fr) 80px 60px"><span>${a}</span><i><s style="width:${m/210*100}%"></s></i><span class="num">${fmtMin(m)}</span></div>`).join("")}<small class="muted">Los minutos son aproximados, contados a partir de sus pantallazos.</small></div>
+    </div>
+  </section>`;
+}
+
+function tabVivo(){
+  return `<section class="vidrio ficha">
+    <div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:center"><h2>Karen, ahora mismo</h2><span class="estado e-ok">● Trabajando · sala Chatters AM</span></div>
+    <div class="vivo">
+      <div class="marco"><span class="rot">EN VIVO</span>Su cámara<br>(aquí se ve en directo)</div>
+      <div class="marco"><span class="rot">EN VIVO</span>Su pantalla<br>(aquí se ve en directo)</div>
+    </div>
+    <div class="dice"><b>Lo último que dijo Argos (16:00):</b> «Uso de la plataforma de mensajería interna y videollamada de Maven CRM para comunicación del equipo.»</div>
+    <div class="acciones"><button class="btn" data-acc="Le sale un cartel y la voz de Argos con tu aviso.">Avisarle</button><button class="btn" data-acc="La llama por Cowork.">Llamar</button><button class="btn" data-acc="Graba su pantalla desde ahora hasta que lo pares.">Grabar su pantalla</button></div>
+    <h3>Sus últimos pantallazos</h3>
+    <div class="tira">${ULTIMOS.map(([h,a])=>`<div class="mini-p"><div class="pantallazo"><div class="barrita"><i></i><i></i><i></i></div><div class="dentro">${a}</div></div><small><b>${h}</b> · bien</small></div>`).join("")}</div>
+  </section>`;
+}
+
+function tabHistorial(){
+  const dias = Object.fromEntries(HIST.map(h=>[h[0],h]));
+  const celdas=[]; // nov 2026: el 1 cae domingo; semanas lunes a domingo → 6 vacías antes
+  for(let i=0;i<6;i++) celdas.push(`<span></span>`);
+  for(let d=1; d<=30; d++){
+    const h=dias[String(d)];
+    if(d>18){ celdas.push(`<span class="v"><b class="num">${d}</b></span>`); continue; }
+    if(!h){ celdas.push(`<span class="v"><b class="num">${d}</b><small>libre</small></span>`); continue; }
+    const tarde=esTarde(h[2]);
+    celdas.push(`<button data-dia="${d}" aria-pressed="${S.dia===String(d)}"><b class="num">${d}</b><small class="num ${tarde?'tarde':''}">${h[2]}</small><small class="x">${h[5]?h[5]+" avisos":"sin avisos"}</small></button>`);
+  }
+  const h = dias[S.dia];
+  const tarde = esTarde(h[2]);
+  const totAv = HIST.reduce((a,x)=>a+x[5],0), totSal = HIST.reduce((a,x)=>a+x[6],0), totTarde = HIST.filter(x=>esTarde(x[2])).length;
+  return `<section class="vidrio ficha">
+    <div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:center"><h2>Su historial · noviembre</h2><div class="seg"><button aria-pressed="false" data-acc="Ve a octubre.">‹ Oct</button><button aria-pressed="true">Nov</button></div></div>
+    <div class="resumen">
+      <div class="cifra"><b class="num">16</b><span>días trabajados</span></div>
+      <div class="cifra"><b class="num c-warn">${totTarde}</b><span>llegó tarde</span></div>
+      <div class="cifra"><b class="num">${totAv}</b><span>avisos de Argos</span></div>
+      <div class="cifra"><b class="num">${totSal}</b><span>veces fuera de Cowork</span></div>
+    </div>
+    <div class="cal">${["Lun","Mar","Mié","Jue","Vie","Sáb","Dom"].map(x=>`<div class="cab-d">${x}</div>`).join("")}${celdas.join("")}</div>
+    <div class="leyenda"><span>La hora de cada día es cuándo entró; <span class="c-warn">en amarillo</span>, si llegó tarde.</span></div>
+    <div class="detalle" style="grid-template-columns:minmax(0,1fr)">
+      <div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:center"><h3>${h[1]} ${h[0]} de noviembre</h3>${S.dia==="18"?`<button class="btn pri" data-tab="hoy">Ver su día tramo por tramo</button>`:`<button class="btn pri" data-acc="Se abre ese día tramo por tramo, igual que en «Hoy».">Ver su día tramo por tramo</button>`}</div>
+      <div class="kv"><span>Entró</span><span class="${tarde?'c-warn':''}">${h[2]}${tarde?" · "+tardeMin(h[2])+" min tarde":""}</span><span>Salió</span><span>${h[3]}</span><span>Cara en cámara</span><span>${h[4]==null?"sin medir (Argos aún no la medía)":h[4]+" %"}</span><span>Avisos de Argos</span><span>${h[5]}</span><span>Veces fuera de Cowork</span><span>${h[6]}</span></div>
+    </div>
+    <p class="muted" style="margin:0;font-size:12.5px">Datos reales de Maven. Del 1 al 3 Argos todavía no medía la cámara, por eso salen en blanco.</p>
+  </section>`;
+}
+
+function pintar(){
+  const T=[["hoy","Hoy"],["vivo","En vivo"],["historial","Historial"]];
+  $("#pestanas").innerHTML = T.map(([k,l])=>`<button role="tab" aria-selected="${S.tab===k}" data-tab="${k}">${k==="vivo"?'<span class="dot d-bad"></span>':''}${l}</button>`).join("");
+  $("#vista").innerHTML = (S.tab==="hoy"?tabHoy():S.tab==="vivo"?tabVivo():tabHistorial()) +
+    `<div class="cambio"><b>Cómo se usa:</b> esta ficha se abre al tocar a cualquier persona en Argos (Dónde está, El día, En vivo o Llamadas). Arriba siempre ves quién es y qué está haciendo ahora. Debajo eliges <b>Hoy</b> (qué hizo, tramo por tramo, con pruebas), <b>En vivo</b> (su cámara y su pantalla en directo) o <b>Historial</b> (todos sus días, uno por uno).</div>`;
+}
+document.addEventListener("click", e=>{
+  const b=e.target.closest("button"); if(!b) return; const d=b.dataset;
+  if(d.tab){ S.tab=d.tab; pintar(); return window.scrollTo({top:0,behavior:"smooth"}); }
+  if(d.tramo){ S.tramo=+d.tramo; return pintar(); }
+  if(d.dia){ S.dia=d.dia; return pintar(); }
+  if(b.id==="ver-nota"){ S.desglose=!S.desglose; return pintar(); }
+  if(d.acc) return toast(d.acc);
+});
+pintar();
+</script>

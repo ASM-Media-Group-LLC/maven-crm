@@ -1,0 +1,123 @@
+<title>El castillo de Maven</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;700&family=Nunito:wght@400;600;700&display=swap">
+<style>
+  /* Un libro de cuentos: una página por piso del castillo, de arriba (el rey) hacia abajo. */
+  :root {
+    --fondo: #f7f6ee;
+    --hoja: #ffffff;
+    --tinta: #1d2433;
+    --suave: #5d6577;
+    --verde: #7f9a1e;
+    --verde-claro: #eef3d6;
+    --linea: rgba(29,36,51,.10);
+    --titulo: "Fredoka", "Nunito", system-ui, sans-serif;
+    --cuerpo: "Nunito", system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+    --fondo: #101827; --hoja: #162033; --tinta: #f2f4f8; --suave: #9aa4b8;
+    --verde: #bed161; --verde-claro: rgba(190,209,97,.10); --linea: rgba(255,255,255,.08); color-scheme: dark; } }
+  :root[data-theme="dark"] {
+    --fondo: #101827; --hoja: #162033; --tinta: #f2f4f8; --suave: #9aa4b8;
+    --verde: #bed161; --verde-claro: rgba(190,209,97,.10); --linea: rgba(255,255,255,.08); color-scheme: dark; }
+  * { box-sizing: border-box; }
+  body { background: var(--fondo); color: var(--tinta); font: 17px/1.65 var(--cuerpo); }
+  .libro { max-width: 720px; margin: 0 auto; padding-block: 40px 72px;
+    padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+    display: flex; flex-direction: column; gap: 22px; }
+  h1 { font: 700 clamp(2rem, 7vw, 2.9rem)/1.1 var(--titulo); margin: 0; text-wrap: balance; }
+  h1 span { color: var(--verde); }
+  .intro { color: var(--suave); margin: 8px 0 0; }
+  .piso { background: var(--hoja); border: 1px solid var(--linea); border-radius: 22px; padding: 22px 22px 20px;
+    display: grid; grid-template-columns: 64px minmax(0,1fr); gap: 16px; align-items: start; }
+  .dibujo { width: 64px; height: 64px; border-radius: 18px; background: var(--verde-claro); display: grid; place-items: center; font-size: 34px; }
+  .piso h2 { font: 700 1.3rem/1.25 var(--titulo); margin: 0; display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: baseline; }
+  .cuantos { font: 700 .8rem var(--cuerpo); color: var(--verde); letter-spacing: .04em; text-transform: uppercase; }
+  .piso p { margin: 6px 0 0; }
+  .quienes { margin-top: 10px; display: flex; flex-wrap: wrap; gap: 6px; }
+  .quienes span { font-size: .85rem; padding: 3px 10px; border-radius: 999px; border: 1px solid var(--linea); color: var(--suave); }
+  .ojo { border: 2px dashed var(--verde); border-radius: 22px; padding: 18px 22px; }
+  .ojo h2 { font: 700 1.2rem var(--titulo); margin: 0 0 6px; }
+  .ojo ul { margin: 0; padding-left: 1.2em; display: flex; flex-direction: column; gap: 6px; }
+  .fin { text-align: center; font: 600 1.1rem var(--titulo); color: var(--suave); }
+  @media (max-width: 480px) { .piso { grid-template-columns: 1fr; } .dibujo { width: 52px; height: 52px; font-size: 28px; } }
+</style>
+
+<div class="libro">
+  <header>
+    <h1>El castillo de <span>Maven</span></h1>
+    <p class="intro">Había una vez un castillo con 56 personas y 14 tipos de llaves. Cada llave (un «rol») abre unas puertas y otras no. Vamos piso por piso, de arriba hacia abajo.</p>
+  </header>
+
+  <section class="piso"><div class="dibujo" aria-hidden="true">👑</div><div>
+    <h2>El rey <span class="cuantos">1 persona</span></h2>
+    <p>Álvaro es el dueño del castillo. Tiene todas las llaves y la última palabra en todo.</p>
+    <div class="quienes"><span>Álvaro Stephan</span></div></div></section>
+
+  <section class="piso"><div class="dibujo" aria-hidden="true">🗝️</div><div>
+    <h2>Los guardianes de las llaves · admin <span class="cuantos">4 más</span></h2>
+    <p>Abren casi todas las puertas: ven a todos, arreglan cuentas y cambian permisos. Argos no los vigila.</p>
+    <div class="quienes"><span>Álvaro René</span><span>Grace Gelves</span><span>Jackeline Mejía</span><span>Juan Pachas</span></div></div></section>
+
+  <section class="piso"><div class="dibujo" aria-hidden="true">🧭</div><div>
+    <h2>El capitán · Operations Sales <span class="cuantos">1 persona</span></h2>
+    <p>Luis manda sobre tres cuartos del castillo: Chatters, PR y Editores. Es anfitrión de sus Cowork y puede avisar.</p>
+    <div class="quienes"><span>Luis Carlos</span></div></div></section>
+
+  <section class="piso"><div class="dibujo" aria-hidden="true">🛡️</div><div>
+    <h2>Los cuidadores · Chatter Supervisor <span class="cuantos">3 personas</span></h2>
+    <p>Cuidan a los chatters en Cowork: los miran, les atienden pedidos y les avisan. Desde hoy los tres tienen la misma llave.</p>
+    <div class="quienes"><span>Daniel Ospina</span><span>Breyner Garzón</span><span>Vanessa Giraldo</span></div></div></section>
+
+  <section class="piso"><div class="dibujo" aria-hidden="true">💬</div><div>
+    <h2>Los conversadores · Chatter <span class="cuantos">30 cuentas</span></h2>
+    <p>El ejército más grande. Hablan con los clientes todo el día desde Cowork. Solo ven lo suyo.</p>
+    <div class="quienes"><span>Alejandra H.</span><span>Ana E.</span><span>Brayan H.</span><span>Camila S.</span><span>Claudia G.</span><span>Daniel V.</span><span>Delsys F.</span><span>Diego M.</span><span>Erick M.</span><span>Gian E.</span><span>John I.</span><span>Jonathan H.</span><span>Juan C.</span><span>Juan V.</span><span>Julián B.</span><span>Julián R.</span><span>Karem G.</span><span>Karen P.</span><span>Lina P.</span><span>Luis M.</span><span>María</span><span>Nicole R.</span><span>Paul S.</span><span>Valentina D.</span><span>Xiorangel C.</span><span>Yerson E.</span><span>+ 4 cuentas de práctica</span></div></div></section>
+
+  <section class="piso"><div class="dibujo" aria-hidden="true">📣</div><div>
+    <h2>Los pregoneros · PR <span class="cuantos">3 personas</span></h2>
+    <p>Cuentan al mundo lo que pasa en el castillo: redes y promoción.</p>
+    <div class="quienes"><span>Carolina J.</span><span>Fabiana D.</span><span>Lorena L.</span></div></div></section>
+
+  <section class="piso"><div class="dibujo" aria-hidden="true">🔥</div><div>
+    <h2>Los que encienden el fuego · Warming <span class="cuantos">2 personas</span></h2>
+    <p>Calientan las cuentas nuevas para que estén listas antes de vender.</p>
+    <div class="quienes"><span>Isabel T.</span><span>Miguel G.</span></div></div></section>
+
+  <section class="piso"><div class="dibujo" aria-hidden="true">🤝</div><div>
+    <h2>El que cierra el trato · closer <span class="cuantos">1 persona</span></h2>
+    <p>Cuando un cliente ya casi dice sí, él cierra la venta.</p>
+    <div class="quienes"><span>Daniel Felipe</span></div></div></section>
+
+  <section class="piso"><div class="dibujo" aria-hidden="true">🪙</div><div>
+    <h2>Los del tesoro · Finanzas <span class="cuantos">3 personas</span></h2>
+    <p>Cuentan las monedas: pagos, cobros y cuentas del castillo.</p>
+    <div class="quienes"><span>Angie R.</span><span>Daison T.</span><span>Keila S.</span></div></div></section>
+
+  <section class="piso"><div class="dibujo" aria-hidden="true">🧑‍🤝‍🧑</div><div>
+    <h2>Los cuidadores de la gente · HHRR <span class="cuantos">3 cuentas</span></h2>
+    <p>Recursos humanos: contratos, horarios, faltas y minutos de gracia.</p>
+    <div class="quienes"><span>Andrea P.</span><span>Lina P.</span><span>cuenta «hhrr»</span></div></div></section>
+
+  <section class="piso"><div class="dibujo" aria-hidden="true">📋</div><div>
+    <h2>Los ordenadores · Coordinador <span class="cuantos">2 personas</span></h2>
+    <p>María es «Coordinador Supervisor» y David es «Coordinador»: organizan el trabajo del día.</p>
+    <div class="quienes"><span>María Villegas</span><span>David Aunta</span></div></div></section>
+
+  <section class="piso"><div class="dibujo" aria-hidden="true">🎒</div><div>
+    <h2>Los viajeros sueltos <span class="cuantos">3 personas</span></h2>
+    <p>Cada uno con una llave propia: Michel es «Agente + Comunicación», Jaime tiene la llave genérica «employee» y Lukas la genérica «agent».</p>
+    <div class="quienes"><span>Michel Z.</span><span>Jaime B.</span><span>Lukas S.</span></div></div></section>
+
+  <section class="ojo">
+    <h2>Lo que hay que ordenar</h2>
+    <ul>
+      <li>María es «Coordinador Supervisor», pero el castillo todavía la trata como agente.</li>
+      <li>Jaime («employee») y Lukas («agent») tienen llaves genéricas que no dicen qué hacen.</li>
+      <li>Hay 4 cuentas dobles de práctica en Chatters: «Breyner Chat», «Vanessa Chat», «Erick Chat» y «Camila Sogamoso2».</li>
+      <li>La cuenta «hhrr» no es una persona: es una cuenta compartida.</li>
+    </ul>
+  </section>
+
+  <p class="fin">Y así, cada quien con su llave, el castillo trabaja feliz. Fin.</p>
+</div>
