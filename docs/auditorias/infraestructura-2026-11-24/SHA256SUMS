@@ -1,0 +1,5 @@
+db06a023a92e82f770bc5926c11aef300200d3d95c69e4511446d48f686af0f7  scripts/audit/simulacro-livekit-aislado.py
+741a86b130cf9919d618a575b7a7cd5d7fd8e86f3d35f3072d07f897cccab26f  scripts/audit/analizar_simulacro.py
+3ac8a6579a42ccaaacf98bc71e03bbaa3949c39a8b1c08d9f10b0a609b5568da  docs/auditorias/infraestructura-2026-11-24/simulacro-r3.json
+456170f85e2e1deaf6f94a822f632ad9d3fa921da2b5ab7c3e72faae8bc7bc7a  docs/auditorias/infraestructura-2026-11-24/simulacro-r4.json
+26e249c4966743a5a9be7d16dd648bd0f10f101775ae6f404df71a01c5e1dfc3  docs/auditorias/infraestructura-2026-11-24/README.md
