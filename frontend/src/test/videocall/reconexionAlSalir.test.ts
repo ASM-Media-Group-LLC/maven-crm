@@ -116,7 +116,7 @@ describe("recuperación de llamadas sin conexiones huérfanas", () => {
       if (String(url).includes("bytes=0")) return new Response(null, { status: 204 });
       return new Promise<Response>((_, rechazar) => {
         abortar = vi.fn(() => rechazar(new DOMException("Cancelada", "AbortError")));
-        init!.signal!.addEventListener("abort", abortar, { once: true });
+        init!.signal!.addEventListener("abort", () => { abortar(); }, { once: true });
       });
     });
     const { result, unmount } = renderHook(() => useLiveKit());
