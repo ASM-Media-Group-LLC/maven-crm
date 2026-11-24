@@ -1,6 +1,6 @@
 # Estado del Proyecto — Maven CRM (v3)
 
-- 24/11/2026 · Propuesta navegable de Argos en `docs/propuestas/argos-navegacion.html`: resumen, detalle lateral, episodios agrupados, revisión individual e historial del Hub. Datos ficticios; pendiente cerrar preguntas 6–9, mapear todos los campos existentes e implementar en producción.
+- 24/11/2026 · Propuesta navegable de Argos en `docs/propuestas/argos-navegacion.html`: resumen, detalle lateral, episodios agrupados, revisión individual e historial del Hub. La vista local actual está en `frontend/argos-preview.html` y usa el tema y los componentes visuales de Maven con datos ficticios. Las preguntas 6–9 quedaron resueltas; queda pendiente integrar las vistas y datos de producción.
 
 
 > Última actualización: 2026-10-14 · Mantenedor: Alvaro (ASM Tech) · Repo: `ASM-Media-Group-LLC/maven-crm`
