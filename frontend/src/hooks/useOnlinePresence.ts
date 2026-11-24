@@ -1,5 +1,8 @@
 import { createContext, useContext, useEffect, useState, useCallback, useRef, ReactNode } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import type { RealtimeChannel } from "@supabase/supabase-js";
+import { escucharLaVuelta } from "@/hooks/useReanudarAlVolver";
+import { ESTADOS_MUERTOS, esperaDeReconexion } from "@/hooks/useCanalQueRevive";
 import { useAuth } from "@/hooks/useAuth";
 import { leerArranque } from "@/lib/arranque";
 import { esCuentaDeCreadora } from "@/lib/portal/cuenta";
@@ -9,6 +12,19 @@ import { BUILD_PROPIO, versionesDesdePresencia, type PersonaConVersionVieja } fr
 /** El build de esta pestaña en la presencia (`b`). Sin build conocido no va: del
  *  otro lado, «sin b» se cuenta como versión vieja, que es lo prudente. */
 const BUILD_EN_LA_PRESENCIA: { b?: number } = BUILD_PROPIO > 0 ? { b: BUILD_PROPIO } : {};
+
+// También sobrevive a desmontar/remontar el proveedor mientras el servidor
+// acusa el cierre. Abrir otro canal antes de ese acuse puede borrarlo por topic.
+const cierresDePresencia = new Map<RealtimeChannel, Promise<boolean>>();
+function retirarPresencia(canal: RealtimeChannel): Promise<boolean> {
+  const enCurso = cierresDePresencia.get(canal);
+  if (enCurso) return enCurso;
+  const cierre = Promise.resolve().then(() => supabase.removeChannel(canal))
+    .then((resultado) => resultado === "ok", () => false)
+    .finally(() => { cierresDePresencia.delete(canal); });
+  cierresDePresencia.set(canal, cierre);
+  return cierre;
+}
 
 /** "No molestar" se quitó: pintaba el mismo rojo que "Ocupado" y no tenía
  *  ningún efecto funcional. "offline" es aparecer como desconectado (solo
@@ -70,7 +86,14 @@ export function OnlinePresenceProvider({ children }: { children: ReactNode }) {
   const [myStatusText, setMyStatusTextState] = useState("");
   const [myStatusColor, setMyStatusColorState] = useState<string | null>(null);
   const [statusColors, setStatusColors] = useState<Record<string, string>>({});
-  const channelRef = useRef<any>(null);
+  const channelRef = useRef<RealtimeChannel | null>(null);
+  const conectadoRef = useRef(false);
+  const recuperarRef = useRef<(() => void) | null>(null);
+  const publicadaRef = useRef<(() => void) | null>(null);
+  // El topic es compartido. Hasta confirmar el cierre anterior NO se puede
+  // pedir otro: el SDK devolvería el mismo canal, o el leave tardío lo borraría.
+  const porRetirarRef = useRef<RealtimeChannel | null>(null);
+  const cierrePendienteRef = useRef<Promise<boolean>>(Promise.resolve(true));
   const myStatusRef = useRef<UserStatus>("available");
   const myStatusTextRef = useRef("");
   const myStatusColorRef = useRef<string | null>(null);
@@ -86,70 +109,131 @@ export function OnlinePresenceProvider({ children }: { children: ReactNode }) {
   /** Publica mi presencia con el estado indicado (o el actual si no se pasa). */
   const track = useCallback((status?: UserStatus) => {
     const channel = channelRef.current;
-    if (!channel || !userIdRef.current) return;
+    if (!channel || !conectadoRef.current || !userIdRef.current) return;
     void channel.track({
       user_id: userIdRef.current,
       online_at: new Date().toISOString(),
-      status: status ?? myStatusRef.current,
+      status: myStatusRef.current === "offline" ? "offline" : (status ?? myStatusRef.current),
       status_text: myStatusTextRef.current || null,
       status_color: myStatusColorRef.current || null,
       ...BUILD_EN_LA_PRESENCIA,
-    });
+    }).then((resultado) => {
+      if (channelRef.current !== channel) return;
+      if (resultado === "ok") publicadaRef.current?.();
+      else recuperarRef.current?.();
+    }).catch(() => { if (channelRef.current === channel) recuperarRef.current?.(); });
   }, []);
 
-  // Single channel subscription — depends only on user identity
+  // Un mismo canal para todos; recuperarlo no puede separar las presencias en
+  // topics versionados como los canales de cambios de tablas.
   useEffect(() => {
+    setOnlineUsers(new Set());
+    setUserStatuses({}); setStatusTexts({}); setStatusColors({});
     if (!user?.id) return;
+    let cancelado = false;
+    let abriendo = false;
+    let intento = 0;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    let propio: RealtimeChannel | null = null;
 
-    const presenceChannel = supabase.channel("online-users", {
-      config: { presence: { key: user.id } },
-    });
-
-    channelRef.current = presenceChannel;
-
-    const syncState = () => {
-      const state = presenceChannel.presenceState();
-      const ids = new Set<string>();
-      const statuses: Record<string, UserStatus> = {};
-      const texts: Record<string, string> = {};
-      const colors: Record<string, string> = {};
-      Object.entries(state).forEach(([key, presences]) => {
-        const latest = (presences as any[])?.[0];
-        // "Desconectado" tiene que serlo de verdad: si solo cambiáramos el color
-        // seguiría contando en "X en línea", y el estado sería mentira.
-        if (latest?.status !== "offline") ids.add(key);
-        if (latest?.status) statuses[key] = latest.status as UserStatus;
-        if (latest?.status_text) texts[key] = latest.status_text as string;
-        if (latest?.status_color) colors[key] = latest.status_color as string;
-      });
-      setOnlineUsers(ids);
-      setUserStatuses(statuses);
-      setStatusTexts(texts);
-      setStatusColors(colors);
+    const cancelarTimer = () => { if (timer !== null) clearTimeout(timer); timer = null; };
+    const retirar = (canal: RealtimeChannel) => {
+      porRetirarRef.current = canal;
+      const cierre = retirarPresencia(canal).then((retirado) => {
+        if (!retirado) return false;
+        if (porRetirarRef.current === canal) porRetirarRef.current = null;
+        return true;
+      }).catch(() => false);
+      cierrePendienteRef.current = cierre;
+      return cierre;
     };
-
-    presenceChannel
-      .on("presence", { event: "sync" }, syncState)
-      .on("presence", { event: "join" }, syncState)
-      .on("presence", { event: "leave" }, syncState)
-      .subscribe(async (status) => {
-        if (status === "SUBSCRIBED") {
-          await presenceChannel.track({
-            user_id: user.id,
-            online_at: new Date().toISOString(),
-            // Si Maven se abre ya en segundo plano, no anunciar "Disponible".
-            status: document.hidden ? "away" : myStatusRef.current,
-            status_text: myStatusTextRef.current || null,
-            ...BUILD_EN_LA_PRESENCIA,
-          });
+    const programar = () => {
+      if (cancelado || timer !== null) return;
+      conectadoRef.current = false;
+      timer = setTimeout(() => { timer = null; void abrir(); }, esperaDeReconexion(intento++));
+    };
+    const abrir = async () => {
+      if (cancelado || abriendo || navigator.onLine === false) return;
+      abriendo = true;
+      try {
+        await cierrePendienteRef.current;
+        await Promise.all(cierresDePresencia.values());
+        if (cancelado) return;
+        const anterior = channelRef.current ?? porRetirarRef.current
+          ?? supabase.getChannels().find((canal) => canal.topic === "realtime:online-users");
+        if (anterior) {
+          channelRef.current = null;
+          conectadoRef.current = false;
+          if (!await retirar(anterior)) { programar(); return; }
         }
-      });
+        if (cancelado) return;
+        const presenceChannel = supabase.channel("online-users", {
+          config: { presence: { key: user.id } },
+        });
+        propio = presenceChannel;
+        channelRef.current = presenceChannel;
+        const vigente = () => !cancelado && channelRef.current === presenceChannel;
+        const syncState = () => {
+          if (!vigente()) return;
+          const state = presenceChannel.presenceState();
+          const ids = new Set<string>();
+          const statuses: Record<string, UserStatus> = {};
+          const texts: Record<string, string> = {};
+          const colors: Record<string, string> = {};
+          Object.entries(state).forEach(([key, presences]) => {
+            const latest = (presences as any[])?.[0];
+            // "Desconectado" tiene que serlo de verdad: si solo cambiáramos el color
+            // seguiría contando en "X en línea", y el estado sería mentira.
+            if (latest?.status !== "offline") ids.add(key);
+            if (latest?.status) statuses[key] = latest.status as UserStatus;
+            if (latest?.status_text) texts[key] = latest.status_text as string;
+            if (latest?.status_color) colors[key] = latest.status_color as string;
+          });
+          setOnlineUsers(ids);
+          setUserStatuses(statuses);
+          setStatusTexts(texts);
+          setStatusColors(colors);
+
+        };
+        presenceChannel
+          .on("presence", { event: "sync" }, syncState)
+          .on("presence", { event: "join" }, syncState)
+          .on("presence", { event: "leave" }, syncState)
+          .subscribe((estado) => {
+            if (!vigente()) return;
+            if (estado === "SUBSCRIBED") {
+              cancelarTimer();
+              conectadoRef.current = true;
+              // El último estado (incluido el color) debe volver con la red.
+              track(document.hidden ? "away" : myStatusRef.current);
+            } else if (ESTADOS_MUERTOS.has(estado)) programar();
+          });
+      } catch { programar(); }
+      finally { abriendo = false; }
+    };
+    recuperarRef.current = programar;
+    // Estar suscrito no basta si track sigue rechazado: aflojar el freno solo
+    // cuando el servidor confirmó la presencia evita reconectar cada segundo.
+    publicadaRef.current = () => { intento = 0; };
+    const dejarDeEscuchar = escucharLaVuelta(() => {
+      if (cancelado) return;
+      if (conectadoRef.current) { track(document.hidden ? "away" : myStatusRef.current); return; }
+      cancelarTimer();
+      void abrir();
+    });
+    void abrir();
 
     return () => {
-      channelRef.current = null;
-      supabase.removeChannel(presenceChannel);
+      cancelado = true;
+      cancelarTimer();
+      dejarDeEscuchar();
+      recuperarRef.current = null;
+      publicadaRef.current = null;
+      conectadoRef.current = false;
+      if (channelRef.current === propio) channelRef.current = null;
+      if (propio && porRetirarRef.current !== propio) void retirar(propio);
     };
-  }, [user?.id]);
+  }, [user?.id, track]);
 
   // Mi estado guardado: se lee de profiles al entrar (sobrevive al refresh) y se
   // vuelve a publicar en la presencia con el texto Y la luz.

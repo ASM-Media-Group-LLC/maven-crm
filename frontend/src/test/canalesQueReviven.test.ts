@@ -27,12 +27,9 @@ const esDeMessenger = (ruta: string) =>
   /\/frontend\/src\/hooks\/(useChat|useReactions|useReadReceipts|useMentionedConversations|useMessengerNotifications|useUnreadChatCount|usePinnedChats|useArchivedChats|useTypingInbox|useOnlinePresence|useCanalQueRevive|canalDelChat|useMailbox|useEtiquetasCorreo|useHiloCompleto)\./.test(ruta);
 
 // Deuda anotada a propósito, no olvido. Cada entrada lleva su porqué.
-const EXCEPCIONES: Record<string, string> = {
-  // Presencia: el topic tiene que ser el MISMO para todos (versionarlo dejaría a
-  // cada persona en una sala distinta) y revivirlo exige re-track(). Va en su
-  // propio PR, con prueba en vivo.
-  "/frontend/src/hooks/useOnlinePresence.ts": "presencia — PR aparte",
-};
+// useOnlinePresence ya recupera su topic compartido y vuelve a publicar;
+// sus caídas y reentradas se ejercitan en presenciaRecuperable.test.tsx.
+const EXCEPCIONES: Record<string, string> = {};
 
 describe("canales de realtime de Messenger", () => {
   // El hook mismo se salta: su comentario cita el `.subscribe()` que vino a matar.

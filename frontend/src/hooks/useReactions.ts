@@ -32,42 +32,57 @@ export function useReactions(conversationId: string | null) {
   const [reactions, setReactions] = useState<Reaction[]>([]);
   const messageIdsRef = useRef<Set<string>>(new Set());
   const reactionsRef = useRef<Reaction[]>([]);
+  const conversationRef = useRef(conversationId);
+  conversationRef.current = conversationId;
+  const cargaRef = useRef<{ conversacion: string } | null>(null);
+  const loadTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Cuándo fue el último toggle: el repaso (reemplazo total) se salta si hay uno
   // recién hecho, para no pisar la reacción optimista mientras la base confirma.
   const ultimoToggleRef = useRef(0);
 
   useEffect(() => { reactionsRef.current = reactions; }, [reactions]);
 
-  // Load reactions only for tracked message IDs (not all messages in conversation)
+  // Solo los mensajes de la conversación actual. Una red lenta no debe
+  // acumular otra lectura cada 7 s mientras la anterior todavía espera.
   const loadReactionsForMessages = useCallback(async (msgIds: string[]) => {
-    if (msgIds.length === 0) return;
-    const chunks: string[][] = [];
-    for (let i = 0; i < msgIds.length; i += 100) {
-      chunks.push(msgIds.slice(i, i + 100));
+    if (!conversationId || msgIds.length === 0 || navigator.onLine === false) return;
+    if (cargaRef.current?.conversacion === conversationId) return;
+    const carga = { conversacion: conversationId };
+    cargaRef.current = carga;
+    const ultimoToggleAlSalir = ultimoToggleRef.current;
+    const sigueVigente = () => cargaRef.current === carga && conversationRef.current === conversationId;
+    try {
+      const allReactions: Reaction[] = [];
+      for (let i = 0; i < msgIds.length; i += 100) {
+        if (!sigueVigente()) return;
+        const { data, error } = await supabase.from("chat_reactions").select("*").in("message_id", msgIds.slice(i, i + 100));
+        // Un fallo NO es «sin reacciones»: se conserva la última lectura buena.
+        if (error) return;
+        if (data) allReactions.push(...(data as Reaction[]));
+      }
+      // Cambiar de chat o reaccionar mientras la consulta viaja invalida esa
+      // respuesta: no puede borrar el estado nuevo ni pisar la acción optimista.
+      if (sigueVigente() && ultimoToggleRef.current === ultimoToggleAlSalir) setReactions(allReactions);
+    } catch {
+      // Si la red corta la petición, el siguiente repaso vuelve a intentarlo.
+    } finally {
+      if (cargaRef.current === carga) cargaRef.current = null;
     }
-    const results = await Promise.all(
-      chunks.map(chunk =>
-        supabase.from("chat_reactions").select("*").in("message_id", chunk)
-      )
-    );
-    // Un fallo NO es "sin reacciones": si alguna tanda falló, conservar lo que hay
-    // (si no, se borrarían en pantalla hasta el próximo repaso). Reintenta luego.
-    if (results.some((r) => r.error)) return;
-    const allReactions: Reaction[] = [];
-    for (const { data } of results) {
-      if (data) allReactions.push(...(data as Reaction[]));
-    }
-    setReactions(allReactions);
-  }, []);
+  }, [conversationId]);
 
-  // When conversation changes, clear and reload
   useEffect(() => {
-    if (!conversationId) {
-      setReactions([]);
-      messageIdsRef.current = new Set();
-      return;
-    }
-    // Reactions will load when addMessageId is called with the visible messages
+    // Antes se limpiaba SOLO al cerrar el chat (null). Al pasar de A a B,
+    // quedaban los ids de A y cada repaso consultaba todos los chats visitados.
+    messageIdsRef.current = new Set();
+    reactionsRef.current = [];
+    setReactions([]);
+    ultimoToggleRef.current = 0;
+    cargaRef.current = null;
+    return () => {
+      cargaRef.current = null;
+      if (loadTimerRef.current) clearTimeout(loadTimerRef.current);
+      loadTimerRef.current = null;
+    };
   }, [conversationId]);
 
   // Realtime: apply payloads inline instead of full refresh
@@ -98,7 +113,7 @@ export function useReactions(conversationId: string | null) {
   useEffect(() => {
     if (!conversationId) return;
     const repasar = () => {
-      if (document.visibilityState !== "visible") return;
+      if (document.visibilityState !== "visible" || navigator.onLine === false) return;
       // Hay un toggle recién hecho: esperar al próximo tick para no pisar la
       // reacción optimista antes de que la base la confirme.
       if (Date.now() - ultimoToggleRef.current < 2500) return;
@@ -116,7 +131,7 @@ export function useReactions(conversationId: string | null) {
   }, [conversationId, salud, loadReactionsForMessages]);
 
   const toggleReaction = useCallback(async (messageId: string, emoji: string) => {
-    if (!user) return;
+    if (!user || !conversationId) return;
     ultimoToggleRef.current = Date.now();
 
     const current = reactionsRef.current;
@@ -127,6 +142,7 @@ export function useReactions(conversationId: string | null) {
     if (existing) {
       setReactions(prev => prev.filter(r => r.id !== existing.id));
       const { error } = await supabase.from("chat_reactions").delete().eq("id", existing.id);
+      if (conversationRef.current !== conversationId) return;
       if (error) {
         setReactions(prev =>
           prev.find(r => r.id === existing.id) ? prev : [...prev, existing]
@@ -151,6 +167,7 @@ export function useReactions(conversationId: string | null) {
       emoji,
     }).select().single();
 
+    if (conversationRef.current !== conversationId) return;
     if (data) {
       setReactions(prev => {
         const withoutTemp = prev.filter(r => r.id !== tempId);
@@ -161,25 +178,24 @@ export function useReactions(conversationId: string | null) {
     } else if (error) {
       setReactions(prev => prev.filter(r => r.id !== tempId));
     }
-  }, [user]);
+  }, [user, conversationId]);
 
   // Track message IDs and trigger initial load when batch is complete
-  const pendingIdsRef = useRef<string[]>([]);
-  const loadTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const addMessageId = useCallback((msgId: string) => {
-    if (messageIdsRef.current.has(msgId)) return;
+  const addMessageId = useCallback((msgId: string, delChat: string | null = conversationId) => {
+    // useMessages conserva la lista anterior durante el primer render del
+    // cambio de chat. No volver a meter esos ids justo después de limpiarlos.
+    if (!conversationId || delChat !== conversationId || messageIdsRef.current.has(msgId)) return;
     messageIdsRef.current.add(msgId);
-    pendingIdsRef.current.push(msgId);
 
     // Debounce: wait for batch of addMessageId calls to finish, then load
     if (loadTimerRef.current) clearTimeout(loadTimerRef.current);
     loadTimerRef.current = setTimeout(() => {
       const ids = Array.from(messageIdsRef.current);
-      pendingIdsRef.current = [];
-      loadReactionsForMessages(ids);
+      loadTimerRef.current = null;
+      void loadReactionsForMessages(ids);
     }, 100);
-  }, [loadReactionsForMessages]);
+  }, [conversationId, loadReactionsForMessages]);
 
   const getReactionsForMessage = useCallback((messageId: string): ReactionGroup[] => {
     const msgReactions = reactions.filter(r => r.message_id === messageId);

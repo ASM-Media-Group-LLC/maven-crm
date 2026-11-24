@@ -652,13 +652,14 @@ export function useLiveKit() {
   // video (lib/videoAjeno.ts). Lo fija connect() para la conexión vigente.
   const soloAudioRef = useRef(false);
   /** Corre la prueba de velocidad con la sesión de la persona. Nunca tira. */
-  const correrPruebaDeRed = useCallback(async (): Promise<PruebaDeRed | null> => {
+  const correrPruebaDeRed = useCallback(async (signal: AbortSignal): Promise<PruebaDeRed | null> => {
     try {
       const { data: { session } } = await supabase.auth.getSession();
-      if (!session?.access_token) return null;
+      if (!session?.access_token || signal.aborted) return null;
       return await medirRed({
         url: `${SUPABASE_URL}/functions/v1/prueba-de-red`,
         headers: { apikey: SUPABASE_PUBLISHABLE_KEY, Authorization: `Bearer ${session.access_token}` },
+        signal,
       });
     } catch {
       return null;
@@ -670,6 +671,16 @@ export function useLiveKit() {
     pararMuestreoRef.current?.();
     const retraso = medirRetraso();
     const trabas = medirTrabas();
+    let detenido = false;
+    let muestreando = false;
+    let pruebaDeLaSala: AbortController | null = null;
+    const sigueVigente = () => !detenido && roomRef.current === room && room.state === ConnectionState.Connected;
+    const cancelarPrueba = () => pruebaDeLaSala?.abort();
+    const alCambiarConexion = (estado: ConnectionState) => { if (estado !== ConnectionState.Connected) cancelarPrueba(); };
+    const alOcultar = () => { if (document.visibilityState !== "visible") cancelarPrueba(); };
+    room.on(RoomEvent.ConnectionStateChanged, alCambiarConexion);
+    window.addEventListener("offline", cancelarPrueba);
+    document.addEventListener("visibilitychange", alOcultar);
     // El audio del minuto (lib/audioDeLlamada.ts): lo acumulado en la muestra anterior.
     let contadoresAudio: ContadoresDeAudio | null = null;
     // Modo ahorro (lib/modoAhorro.ts): con la subida lenta, cámara en calidad
@@ -762,8 +773,9 @@ export function useLiveKit() {
     };
     let vueltaRegiones = 0;
     const tomar = async () => {
+      if (!sigueVigente() || muestreando) return;
+      muestreando = true;
       try {
-        if (roomRef.current !== room || room.state !== ConnectionState.Connected) return;
         const [cam, pant, mic] = await Promise.all([
           leer(Track.Source.Camera), leer(Track.Source.ScreenShare), leer(Track.Source.Microphone),
         ]);
@@ -798,6 +810,7 @@ export function useLiveKit() {
           contadoresAudio = armado.contadores;
           audio = armado.audio;
         } catch { /* sin audio en la muestra, pero con llamada */ }
+        if (!sigueVigente()) return;
         ultimaMuestraRef.current = muestra;
         marcarLlamadaEnCurso(room.name); // la marca de «sigue viva» se renueva
         // Si la cancelación de ruido está corriendo de verdad (lib/estadoNC.ts).
@@ -817,8 +830,11 @@ export function useLiveKit() {
           enCurso: pruebaEnCursoRef.current,
         })) {
           pruebaEnCursoRef.current = true;
+          const control = new AbortController();
+          pruebaDeLaSala = control;
           try {
-            const r = await correrPruebaDeRed();
+            const r = await correrPruebaDeRed(control.signal);
+            if (control.signal.aborted || !sigueVigente()) return;
             if (r && (r.subida_mbps !== null || r.bajada_mbps !== null)) {
               prueba = r;
               ultimaPruebaRef.current = { resultado: r, at: Date.now() };
@@ -828,8 +844,10 @@ export function useLiveKit() {
             }
           } finally {
             pruebaEnCursoRef.current = false;
+            if (pruebaDeLaSala === control) pruebaDeLaSala = null;
           }
         }
+        if (!sigueVigente()) return;
         const estabaEnAhorro = ahorroRef.current.activo;
         // La prueba de velocidad vale una hora: mientras diga que la subida es
         // floja, el ahorro sigue (no se apaga porque la llamada ya use poco).
@@ -856,6 +874,7 @@ export function useLiveKit() {
         const memoria = await leerMemoria();
         // Cada 10 minutos: qué tan lejos queda cada servidor de llamadas (lib/pingRegiones.ts).
         const regiones = (vueltaRegiones++ % MEDIR_REGIONES_CADA === 0) ? await medirRegiones() : null;
+        if (!sigueVigente()) return;
         const filaDeSalud = { sala: room.name, datos: { ...muestra, ...memoria, ahorro: ahorro.activo, nc, nc_info: { ...(ncInfo ?? {}), ruido_usuario: ncUsuarioRef.current ? "si" as const : "no" as const }, perfil_cam: perfilCam, transporte: transporteDeLaLlamada(), ...(prueba ? { prueba } : {}), ...(trabasDelMinuto.length ? { trabas: trabasDelMinuto } : {}), ...(audio ? { audio } : {}), ...(regiones ? { regiones } : {}), ...(falloCamaraParaSaludRef.current ? { cam_fallo: falloCamaraParaSaludRef.current } : {}) } };
         falloCamaraParaSaludRef.current = null;
         if (telemetriaRef.current) telemetriaRef.current.salud(filaDeSalud);
@@ -863,6 +882,7 @@ export function useLiveKit() {
           .insert(filaDeSalud)
           .then(({ error }) => { if (error) console.warn("[llamada_salud]", error.message); });
       } catch { /* medir jamás rompe la llamada */ }
+      finally { muestreando = false; }
     };
     const primera = window.setTimeout(() => { void tomar(); }, 15_000);
     const cada = window.setInterval(() => { void tomar(); }, MUESTRA_CADA_MS);
@@ -915,6 +935,11 @@ export function useLiveKit() {
     const primeraMirada = window.setTimeout(() => { void mirarTransporte(); }, PRIMERA_MIRADA_MS);
     const vigiaTransporte = window.setInterval(() => { void mirarTransporte(); }, MIRAR_TRANSPORTE_CADA_MS);
     pararMuestreoRef.current = () => {
+      detenido = true;
+      cancelarPrueba();
+      room.off(RoomEvent.ConnectionStateChanged, alCambiarConexion);
+      window.removeEventListener("offline", cancelarPrueba);
+      document.removeEventListener("visibilitychange", alOcultar);
       window.clearTimeout(primera);
       window.clearInterval(cada);
       window.clearTimeout(primeraMirada);
@@ -927,7 +952,7 @@ export function useLiveKit() {
       if (aplicarCamaraRef.current === aplicarCamara) aplicarCamaraRef.current = null;
       pararMuestreoRef.current = null;
     };
-  }, [senalesDeSubida]);
+  }, [senalesDeSubida, correrPruebaDeRed]);
   // Nos sacaron porque esta misma cuenta entró desde otra pestaña o equipo.
   // Va aparte de `error` a propósito: no se rompió nada, y sobre todo NO se
   // reintenta — reintentar es lo que arma la pelea infinita entre las dos.
@@ -1846,6 +1871,7 @@ export function useLiveKit() {
       // duración (Argos › Llamadas: «cuánto tardó en volver», 18/11/2026).
       let inicioDelCorte: number | null = null;
       room.on(RoomEvent.Reconnecting, () => {
+        if (roomRef.current !== room) return;
         setIsReconnecting(true);
         inicioDelCorte = Date.now();
         anotarCorte("parpadeo", room.name);
@@ -1853,6 +1879,7 @@ export function useLiveKit() {
       });
 
       room.on(RoomEvent.Reconnected, () => {
+        if (roomRef.current !== room) return;
         setIsReconnecting(false);
         const duracion_ms = inicioDelCorte != null ? Date.now() - inicioDelCorte : null;
         inicioDelCorte = null;
@@ -2336,6 +2363,9 @@ export function useLiveKit() {
   programarReentradaRef.current = (razon?: DisconnectReason | null) => {
     const datos = ultimaConexionRef.current;
     if (!datos) return; // salió a propósito: no hay a dónde volver
+    // Disconnected y el rechazo de connect pueden avisar la MISMA caída. Una
+    // sola espera evita duplicar relojes y gastar dos intentos por un corte.
+    if (reentradaTimerRef.current != null || esperaDeRedRef.current) return;
     soltarEsperaDeRed(esperaDeRedRef);
     // Nunca se rinde (18/11/2026): a los 10 intentos se anota una vez y sigue
     // cada 30 s con «reconectando…» (ESPERA_SIN_FIN_MS).
@@ -2360,8 +2390,13 @@ export function useLiveKit() {
         return;
       }
       soltarEsperaDeRed(esperaDeRedRef);
-      connect(d.roomName, d.participantName, d.isAdmin, d.options)
-        .catch(() => programarReentradaRef.current(razon));
+      const entrando = connect(d.roomName, d.participantName, d.isAdmin, d.options);
+      const intentoDeReentrada = intentoRef.current;
+      entrando.catch(() => {
+        // Cambiar de llamada o salir invalida esta promesa. Su error tardío no
+        // puede volver a conectar (y cortar) la sala que la persona abrió después.
+        if (intentoDeReentrada === intentoRef.current) programarReentradaRef.current(razon);
+      });
     };
     // Volvió la red: no se espera el resto de la pausa, se intenta en el acto.
     esperaDeRedRef.current = intentar;
@@ -2392,8 +2427,13 @@ export function useLiveKit() {
       setEquipoDormido(false);
       const d = ultimaConexionRef.current;
       if (!d) return;
-      connect(d.roomName, d.participantName, d.isAdmin, d.options)
-        .catch(() => programarReentradaRef.current(razon));
+      const entrando = connect(d.roomName, d.participantName, d.isAdmin, d.options);
+      const intentoDeReentrada = intentoRef.current;
+      entrando.catch(() => {
+        // Cambiar de llamada o salir invalida esta promesa. Su error tardío no
+        // puede volver a conectar (y cortar) la sala que la persona abrió después.
+        if (intentoDeReentrada === intentoRef.current) programarReentradaRef.current(razon);
+      });
     };
     const alVolverALaPestana = () => { if (document.visibilityState === "visible") volver(); };
     // Sin «focus»: al despertar, el navegador puede devolverle el foco a la
@@ -3187,6 +3227,20 @@ export function useLiveKit() {
   // ── Cleanup on unmount ────────────────────────────────────────
   useEffect(() => {
     return () => {
+      // Desmontar también es salir: antes el token o el reloj de una caída
+      // podían abrir una sala nueva sin vista ni botones para cerrarla.
+      ultimaConexionRef.current = null;
+      intentoRef.current++;
+      connectingRef.current = false;
+      if (reentradaTimerRef.current != null) {
+        clearTimeout(reentradaTimerRef.current);
+        reentradaTimerRef.current = null;
+      }
+      soltarEsperaDeRed(esperaDeRedRef);
+      soltarEsperaDeLaPersona(esperaDeLaPersonaRef);
+      const sala = roomRef.current;
+      roomRef.current = null; // los eventos tardíos de esta sala ya no son vigentes
+      if (sala) quitarLlamadaActiva(sala.name);
       clearSyncInterval();
       clearBackgroundReapplyTimer();
       cleanupAudioResumeListeners();
@@ -3195,7 +3249,7 @@ export function useLiveKit() {
       if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current);
       try { ncProcessorRef.current?.destroy(); } catch {}
       void disposeBackgroundProcessor();
-      roomRef.current?.disconnect(true);
+      void sala?.disconnect(true);
     };
   }, [clearSyncInterval, clearBackgroundReapplyTimer, cleanupAudioResumeListeners, disposeBackgroundProcessor]);
 

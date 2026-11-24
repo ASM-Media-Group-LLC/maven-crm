@@ -92,7 +92,7 @@ async function chequearArgos(): Promise<Senal> {
 
 async function chequearCrons(): Promise<Senal> {
   // cron.job_run_details: el último run de los crons críticos.
-  const nombres = ["detectar-tardanzas", "drive-aporte-nas-ping"]; // los que tienen ritmo <2h
+  const nombres = ["detectar-tardanzas", "drive-aporte-nas"]; // los nombres reales de cron.job
   const resultados: Array<{ nombre: string; hace_min: number | null }> = [];
   for (const jobname of nombres) {
     // Usamos un RPC inline con sql; si no, consultamos cron.job y cron.job_run_details.

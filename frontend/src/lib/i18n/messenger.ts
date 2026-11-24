@@ -517,6 +517,8 @@ export const messenger = {
   "messenger.call.chat": { es: "Chat", en: "Chat" },
 
   // Llamada: la vista de la llamada (LiveKitCallView).
+  "messenger.callView.cargaFallo": { es: "No se pudo preparar la llamada. Revisa la conexión e inténtalo de nuevo.", en: "The call could not be loaded. Check your connection and try again." },
+  "messenger.callView.reintentarCarga": { es: "Reintentar", en: "Try again" },
   "messenger.callView.tocaCompartir": { es: "Toca «Compartir pantalla» para volver a compartirla", en: "Tap “Share screen” to share it again" },
   "messenger.callView.compartirEnVentanaPrincipal": { es: "Toca «Compartir pantalla» en la ventana principal de la llamada", en: "Select “Share screen” in the main call window" },
   "messenger.callView.confirmarSalirGrabando": { es: "Estás grabando esta reunión. Si sales, la grabación se detiene y queda guardada en Grabaciones. ¿Salir?", en: "You're recording this meeting. If you leave, the recording stops and is saved in Recordings. Leave?" },

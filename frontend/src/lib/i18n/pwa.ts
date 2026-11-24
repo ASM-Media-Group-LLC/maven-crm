@@ -42,7 +42,7 @@ export const pwa = {
   "pwa.novedades.n1.videoPausa": { es: "Con Maven minimizado, el video de tus compañeros se pausa: la app gasta mucha menos memoria y tu computador va más rápido.", en: "With Maven minimized, your teammates' video pauses: the app uses much less memory and your computer runs faster." },
   "pwa.novedades.n1.permisoMac": { es: "En Mac, el aviso de «grabar pantalla» ya no sale cada rato.", en: "On Mac, the «screen recording» prompt no longer pops up over and over." },
   "pwa.medidor.titulo": { es: "Conexión y rendimiento", en: "Connection and performance" },
-  "pwa.medidor.cada": { es: "Se mide cada 20 s", en: "Measured every 20 s" },
+  "pwa.medidor.cada": { es: "Cada 20 s aquí · cada 5 min en segundo plano", en: "Every 20 s here · every 5 min in the background" },
   "pwa.medidor.internet": { es: "Internet", en: "Internet" },
   "pwa.medidor.computador": { es: "Procesador", en: "Processor" },
   "pwa.medidor.memoria": { es: "Memoria RAM", en: "RAM" },

@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Minus, X, Maximize2, Users } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -70,7 +70,8 @@ export default function DockChatWindow({
     sendMessage, sendTyping, editMessage, deleteMessage, retryMessage,
   } = useMessages(conversation.id, alLlegarMensaje, destinatariosDelTecleo);
 
-  const { toggleReaction, getReactionsForMessage } = useReactions(conversation.id);
+  const { toggleReaction, getReactionsForMessage, addMessageId } = useReactions(conversation.id);
+  useEffect(() => { messages.forEach((m) => addMessageId(m.id, m.conversation_id)); }, [messages, addMessageId]);
   const { getReadBy, getDeliveredBy } = useReadReceipts(conversation.id, messages);
 
   const isGroup = conversation.type === "group";

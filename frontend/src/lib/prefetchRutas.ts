@@ -60,12 +60,13 @@ const IMPORTADORES: Record<string, () => Promise<unknown>> = {
  *  ráfaga que compita con lo que la persona sí está mirando. */
 export const ESPACIO_ENTRE_CHUNKS_MS = 1_500;
 
-/** ¿La red pide que no gastemos de más? Modo ahorro de datos, o 2G. */
+/** La precarga es opcional: sin red, ahorro de datos o 3G, se espera. */
 function redEscasa(): boolean {
+  if (navigator.onLine === false) return true;
   const c = (navigator as Navigator & { connection?: { saveData?: boolean; effectiveType?: string } }).connection;
   if (!c) return false;
   if (c.saveData) return true;
-  return c.effectiveType === "slow-2g" || c.effectiveType === "2g";
+  return c.effectiveType === "slow-2g" || c.effectiveType === "2g" || c.effectiveType === "3g";
 }
 
 function enOcio(fn: () => void): () => void {
@@ -83,14 +84,24 @@ function enOcio(fn: () => void): () => void {
  *  las pruebas le pasan uno propio para no arrastrar páginas reales. */
 export function crearPrecargador(importadores: Record<string, () => Promise<unknown>>) {
   const hechas = new Set<string>();
+  const cargando = new Map<string, Promise<void>>();
 
   /** Precarga una ruta. Idempotente, nunca lanza: un chunk que no baja hoy
    *  bajará al hacer clic, como siempre. */
-  const precargarRuta = (url: string): void => {
+  const precargarRuta = (url: string): Promise<void> | undefined => {
     const imp = importadores[url];
-    if (!imp || hechas.has(url)) return;
+    if (!imp || hechas.has(url)) return cargando.get(url);
     hechas.add(url);
-    imp().catch(() => { hechas.delete(url); });
+    try {
+      const carga = imp()
+        .then(() => {}, () => { hechas.delete(url); })
+        .finally(() => { cargando.delete(url); });
+      cargando.set(url, carga);
+      return carga;
+    } catch {
+      hechas.delete(url);
+      return;
+    }
   };
 
   /**
@@ -98,25 +109,30 @@ export function crearPrecargador(importadores: Record<string, () => Promise<unkn
    * para cancelar lo que falte (al desmontar, al cambiar de rol).
    */
   const precargarEnOcio = (urls: string[]): (() => void) => {
-    const pendientes = urls.filter((u) => importadores[u] && !hechas.has(u));
+    const pendientes = [...new Set(urls)].filter((u) => importadores[u] && !hechas.has(u));
     if (!pendientes.length || redEscasa()) return () => {};
     let cancelado = false;
     let cancelarPaso: (() => void) | null = null;
 
     const siguiente = () => {
       if (cancelado) return;
-      const url = pendientes.shift();
-      if (!url) return;
-      // En llamada no se precarga nada: se vuelve a mirar en un rato.
-      if (estaEnLlamadaDeMaven()) {
-        pendientes.unshift(url);
+      if (!pendientes.length) return;
+      // La red puede empeorar entre dos descargas. No se compite con una
+      // llamada ni con la pestaña que la persona tiene al frente.
+      if (redEscasa() || document.hidden || estaEnLlamadaDeMaven()) {
         const t = window.setTimeout(siguiente, 15_000);
         cancelarPaso = () => window.clearTimeout(t);
         return;
       }
-      precargarRuta(url);
-      const t = window.setTimeout(() => { cancelarPaso = enOcio(siguiente); }, ESPACIO_ENTRE_CHUNKS_MS);
-      cancelarPaso = () => window.clearTimeout(t);
+      const url = pendientes.shift()!;
+      // Antes el siguiente chunk arrancaba 1,5 s después, aunque este todavía
+      // bajara. Una conexión lenta acumulaba todas las secciones en paralelo.
+      // El respiro empieza DESPUÉS de que termina (o falla) la descarga actual.
+      void Promise.resolve(precargarRuta(url)).then(() => {
+        if (cancelado) return;
+        const t = window.setTimeout(() => { cancelarPaso = enOcio(siguiente); }, ESPACIO_ENTRE_CHUNKS_MS);
+        cancelarPaso = () => window.clearTimeout(t);
+      });
     };
 
     cancelarPaso = enOcio(siguiente);

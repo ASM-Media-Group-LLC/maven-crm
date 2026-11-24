@@ -12,7 +12,7 @@ const { crearPrecargador, ESPACIO_ENTRE_CHUNKS_MS } = await import("@/lib/prefet
 
 describe("precarga de secciones", () => {
   beforeEach(() => { vi.useFakeTimers(); enLlamada = false; });
-  afterEach(() => { vi.useRealTimers(); });
+  afterEach(() => { vi.useRealTimers(); vi.restoreAllMocks(); });
 
   it("precarga una ruta una sola vez, aunque pases el mouse diez veces", () => {
     const messenger = vi.fn(() => Promise.resolve());
@@ -65,4 +65,59 @@ describe("precarga de secciones", () => {
     await vi.advanceTimersByTimeAsync(60_000);
     expect(b).not.toHaveBeenCalled();
   });
+
+  it("espera a que una descarga lenta termine antes de pedir la siguiente", async () => {
+    let terminar!: () => void;
+    const a = vi.fn(() => new Promise<void>((resolve) => { terminar = resolve; }));
+    const b = vi.fn(() => Promise.resolve());
+    const { precargarEnOcio } = crearPrecargador({ "/a": a, "/b": b });
+    precargarEnOcio(["/a", "/b"]);
+    await vi.advanceTimersByTimeAsync(30_000);
+    expect(a).toHaveBeenCalledTimes(1);
+    expect(b).not.toHaveBeenCalled();
+    terminar();
+    await vi.advanceTimersByTimeAsync(ESPACIO_ENTRE_CHUNKS_MS + 1_300);
+    expect(b).toHaveBeenCalledTimes(1);
+  });
+
+  it("si se pierde la conexión entre descargas, espera y retoma al recuperarla", async () => {
+    const online = vi.spyOn(navigator, "onLine", "get").mockReturnValue(true);
+    const a = vi.fn(() => Promise.resolve()), b = vi.fn(() => Promise.resolve());
+    const { precargarEnOcio } = crearPrecargador({ "/a": a, "/b": b });
+    precargarEnOcio(["/a", "/b"]);
+    await vi.advanceTimersByTimeAsync(1_300);
+    online.mockReturnValue(false);
+    await vi.advanceTimersByTimeAsync(30_000);
+    expect(b).not.toHaveBeenCalled();
+    online.mockReturnValue(true);
+    await vi.advanceTimersByTimeAsync(15_000);
+    expect(b).toHaveBeenCalledTimes(1);
+  });
+
+  it("una pestaña oculta pausa la cola y al volver sigue", async () => {
+    const hidden = vi.spyOn(document, "hidden", "get").mockReturnValue(true);
+    const a = vi.fn(() => Promise.resolve());
+    const { precargarEnOcio } = crearPrecargador({ "/a": a });
+    precargarEnOcio(["/a"]);
+    await vi.advanceTimersByTimeAsync(20_000);
+    expect(a).not.toHaveBeenCalled();
+    hidden.mockReturnValue(false);
+    await vi.advanceTimersByTimeAsync(15_000);
+    expect(a).toHaveBeenCalledTimes(1);
+  });
+
+  it("cancelar durante una descarga lenta no deja una cola huérfana", async () => {
+    let terminar!: () => void;
+    const a = vi.fn(() => new Promise<void>((resolve) => { terminar = resolve; }));
+    const b = vi.fn(() => Promise.resolve());
+    const { precargarEnOcio } = crearPrecargador({ "/a": a, "/b": b });
+    const cancelar = precargarEnOcio(["/a", "/b"]);
+    await vi.advanceTimersByTimeAsync(1_300);
+    cancelar();
+    terminar();
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(b).not.toHaveBeenCalled();
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
 });

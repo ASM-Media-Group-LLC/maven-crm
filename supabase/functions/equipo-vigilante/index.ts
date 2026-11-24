@@ -56,17 +56,18 @@ async function detectarVideos(): Promise<Nueva[]> {
 
 async function detectarTardanzas(): Promise<Nueva[]> {
   const hace10 = new Date(Date.now() - 10 * 60_000).toISOString();
-  const { data } = await admin.from("tardanzas_registro")
-    .select("id, user_id, min_tarde, created_at")
+  const { data, error } = await admin.from("tardanzas_registro")
+    .select("id, user_id, tarde_min, created_at")
     .eq("correo_enviado", true)
     .gte("created_at", hace10);
-  const lista = (data ?? []) as Array<{ id: string; user_id: string; min_tarde: number | null; created_at: string }>;
+  if (error) throw new Error(`No se pudieron revisar las tardanzas: ${error.message}`);
+  const lista = (data ?? []) as Array<{ id: string; user_id: string; tarde_min: number | null; created_at: string }>;
   const salidas: Nueva[] = [];
   for (const t of lista) {
     const nombre = await nombreDe(t.user_id);
     salidas.push({
       userId: t.user_id, tipo: "tardanza",
-      mensaje: `${nombre} llegó ${t.min_tarde ?? "?"} min tarde`,
+      mensaje: `${nombre} llegó ${t.tarde_min ?? "?"} min tarde`,
       url: `${APP_URL}/hr/expediente/${t.user_id}`,
       ref: { tardanza_id: t.id },
     });
