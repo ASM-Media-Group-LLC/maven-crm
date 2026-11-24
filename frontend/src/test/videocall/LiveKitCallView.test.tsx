@@ -287,6 +287,21 @@ describe("LiveKitCallView", () => {
     }
   });
 
+  it("durante una presentación muestra su pantalla y su cámara, sin sustituirla por la propia", () => {
+    lkState.participants = [
+      makeParticipant(),
+      makeParticipant({ sid: "camara-remota", identity: "user-2", name: "Presentadora", isLocal: false }),
+      makeParticipant({ sid: "camara-remota-screen", identity: "user-2", name: "Pantalla presentada", isLocal: false, isScreenSharing: true, esTileDePantalla: true }),
+      makeParticipant({ sid: "otra", identity: "user-3", name: "Otra persona", isLocal: false }),
+    ];
+    render(<LiveKitCallView {...defaultProps} estadoMiniatura={{ miniatura: true, anclada: true }} />);
+    const mini = within(screen.getByTestId("video-miniatura-llamada"));
+    expect(within(screen.getByTestId("video-miniatura-principal")).getByText("Pantalla presentada")).toBeInTheDocument();
+    expect(mini.getByText("Presentadora").parentElement).toHaveClass("absolute");
+    expect(mini.queryByText("Tú")).not.toBeInTheDocument();
+    expect(mini.queryByText("Otra persona")).not.toBeInTheDocument();
+  });
+
   it("sigue una voz sostenida solo en la miniatura grupal y restaura la vista completa", () => {
     vi.useFakeTimers();
     try {

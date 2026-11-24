@@ -8,12 +8,11 @@
 export const CLAVE_PREFERENCIA = "maven.abrirEnApp";
 export type Preferencia = "siempre" | "nunca" | null;
 
-/** Rutas públicas o de invitados: ahí no se ofrece la app (quien entra puede no tenerla). */
+/** Rutas informativas: no interrumpirlas con la invitación a abrir la app. */
 const RUTAS_PUBLICAS = [
   /^\/$/, /^\/(es|en|de|fr|it|pt)(\/|$)/, /^\/(login|register|forgot-password|reset-password|privacidad|documentation|diagnostico-pantalla|concept|credentials)(\/|$)/,
-  // Los links de reunión (/entrar, /unirse) SÍ se ofrecen a quien tiene sesión
-  // (Alvaro, 18/11/2026: «me mandan un meeting por WhatsApp y no me lleva a la
-  // app»). El invitado de afuera no tiene sesión: a él nunca se le ofrece.
+  // Las reuniones (/entrar, /unirse) se ofrecen incluso sin sesión en el navegador.
+  // Los invitados conservan la opción de continuar en el navegador.
   /^\/(aportar|subir|chatter|hoja)\//, /^\/portal(\/|$)/,
   // La guía para instalar la app (/app, lib/guiaApp.ts): quien la abre todavía
   // no la tiene, y con «Siempre» elegido lo mandaría a una app que no existe.
@@ -21,9 +20,11 @@ const RUTAS_PUBLICAS = [
   /^\/app(\/|$)/,
 ];
 
-/** ¿Hay que ofrecer abrir en la app? Solo en un navegador de computador, con sesión. */
+/** ¿Hay que ofrecer abrir en la app? En computador, con sesión o en un enlace público de reunión. */
 export function debeOfrecerApp(p: { ua: string; enApp: boolean; conSesion: boolean; ruta: string }): boolean {
-  if (p.enApp || !p.conSesion) return false;
+  if (p.enApp) return false;
+  const reunion = /^\/(entrar|unirse)\/[^/]+\/?$/.test(p.ruta);
+  if (!p.conSesion && !reunion) return false;
   if (/Android|iPhone|iPad|iPod|Mobile/i.test(p.ua)) return false;
   if (!/Macintosh|Windows/i.test(p.ua)) return false;
   return !RUTAS_PUBLICAS.some((re) => re.test(p.ruta));

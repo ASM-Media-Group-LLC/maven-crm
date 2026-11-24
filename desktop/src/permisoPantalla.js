@@ -104,8 +104,8 @@ let ultimaGuia = 0;
 /** Explica cómo dar el permiso y ofrece arreglarlo solo. A lo sumo una vez cada
  *  10 minutos: Cowork vuelve a pedir la pantalla solo tras una caída y no tiene
  *  que llenar de avisos. */
-async function guiaPermisoPantalla(ventana) {
-  if (Date.now() - ultimaGuia < 10 * 60_000) return;
+async function guiaPermisoPantalla(ventana, { explicito = false } = {}) {
+  if (!explicito && Date.now() - ultimaGuia < 10 * 60_000) return;
   ultimaGuia = Date.now();
   const opciones = {
     type: "warning",

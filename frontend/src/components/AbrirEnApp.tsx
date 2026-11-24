@@ -20,7 +20,7 @@ export function AbrirEnApp() {
   const { user } = useAuth();
   const { t } = useLanguage();
   const [modo, setModo] = useState<"oculto" | "ofrecer" | "abriendo">("oculto");
-  const decidido = useRef(false);
+  const decidido = useRef<string | null>(null);
 
   // Dentro de la app: un link maven:// abre su ruta sin recargar (no corta llamadas).
   useEffect(() => {
@@ -29,16 +29,19 @@ export function AbrirEnApp() {
     return app.alAbrirRuta((ruta) => navigate(ruta));
   }, [navigate]);
 
-  // En el navegador: se decide UNA vez por pestaña, con la primera ruta con sesión.
+  // Cada enlace de reunión puede ofrecer la app aunque la sesión solo exista allí.
   useEffect(() => {
-    if (decidido.current || !user) return;
-    decidido.current = true;
+    const ruta = `${pathname}${search}${hash}`;
+    if (decidido.current === ruta) return;
     const ua = navigator.userAgent || "";
-    const tactil = (navigator.maxTouchPoints ?? 0) > 1; // iPad se hace pasar por Mac
-    if (tactil || !debeOfrecerApp({ ua, enApp: !!escritorio(), conSesion: true, ruta: pathname })) return;
+    const tactil = /Macintosh/i.test(ua) && (navigator.maxTouchPoints ?? 0) > 1; // iPad se hace pasar por Mac
+    if (tactil || !debeOfrecerApp({ ua, enApp: !!escritorio(), conSesion: !!user, ruta: pathname })) {
+      setModo("oculto");
+      return;
+    }
+    decidido.current = ruta;
     const pref = leerPreferencia();
     if (pref === "nunca") return;
-    const ruta = `${pathname}${search}${hash}`;
     if (pref === "siempre") {
       window.location.href = enlaceDeApp(ruta);
       setModo("abriendo");

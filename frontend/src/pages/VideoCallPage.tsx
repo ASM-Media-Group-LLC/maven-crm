@@ -55,7 +55,7 @@ export default function VideoCallPage() {
   const pideApp = salaPideApp(roomName);
   const bloqueada = pideApp && (!soloApp.listo || soloApp.estado === "bloqueo");
   const conectada = joined && !bloqueada;
-  const estadoMiniatura = useMiniaturaLlamada(esDelMessenger && conectada);
+  const estadoMiniatura = useMiniaturaLlamada(conectada);
   const [coworkRedirecting, setCoworkRedirecting] = useState(() => {
     // Synchronously detect cowork rooms to block rendering from the start
     return !!roomName && (roomName.startsWith("cowork_hub_") || roomName.startsWith("cowork_"));

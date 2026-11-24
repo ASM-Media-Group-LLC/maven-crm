@@ -11,12 +11,13 @@
 // maven:mostrar-esta-ventana.
 const { screen } = require("electron");
 const controlesPorVentana = new WeakMap();
+const dialogosPorVentana = new WeakMap();
 
 /** ¿Esta dirección es una llamada (Messenger) o un Meet de Maven? */
 function esLlamada(url) {
   try {
     const { pathname } = new URL(url);
-    return pathname.startsWith("/call/") || pathname.startsWith("/meet/");
+    return /^\/(call|meet|entrar|unirse)\/[^/]+/.test(pathname);
   } catch {
     return false;
   }
@@ -38,6 +39,7 @@ function lugarDeLaVentanita(area, ultimaPosicion, conControles = false) {
 }
 
 function prepararVentanaDeLlamada(hija) {
+  if (controlesPorVentana.has(hija)) return;
   let antes = null; // tamaño y lugar antes de achicarla
   let ultimaPosicion = null;
   let anclada = true;
@@ -53,7 +55,7 @@ function prepararVentanaDeLlamada(hija) {
   };
 
   const achicar = () => {
-    if (hija.isDestroyed() || antes || hija.isMinimized() || hija.isFullScreen()) return;
+    if (hija.isDestroyed() || antes || hija.isMinimized() || hija.isFullScreen() || dialogosPorVentana.get(hija)) return;
     antes = { bounds: hija.getBounds(), maximizada: hija.isMaximized() };
     if (hija.isMaximized()) hija.unmaximize();
     const area = screen.getDisplayMatching(ultimaPosicion ?? antes.bounds).workArea;
@@ -134,4 +136,17 @@ function mostrarVentana(w) {
   return true;
 }
 
-module.exports = { esLlamada, lugarDeLaVentanita, prepararVentanaDeLlamada, mostrarVentana, controlarMiniatura, arrastrarMiniatura };
+/** Mantiene visible la llamada mientras un selector o permiso le quita el foco. */
+function mantenerDuranteDialogo(w) {
+  if (!w || w.isDestroyed()) return () => {};
+  dialogosPorVentana.set(w, (dialogosPorVentana.get(w) || 0) + 1);
+  mostrarVentana(w);
+  let terminado = false;
+  return () => {
+    if (terminado) return;
+    terminado = true;
+    dialogosPorVentana.set(w, Math.max(0, (dialogosPorVentana.get(w) || 1) - 1));
+  };
+}
+
+module.exports = { esLlamada, lugarDeLaVentanita, prepararVentanaDeLlamada, mostrarVentana, controlarMiniatura, arrastrarMiniatura, mantenerDuranteDialogo };

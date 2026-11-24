@@ -1,3 +1,4 @@
+import { useMiniaturaLlamada } from "@/pages/messenger/videocall/BarraMiniaturaLlamada";
 import { useState } from "react";
 import { useParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -21,6 +22,7 @@ export default function MeetLinkPage() {
   const { link: rawLink } = useParams<{ link: string }>();
   const link = (rawLink || "").trim();
   const { estado, error, nombreSala, agendadaPara, miNombre, llamada, revisar, entrar, getToken, salir } = useMeetLink(link);
+  const estadoMiniatura = useMiniaturaLlamada(estado === "adentro" && !!llamada);
   const [nombre, setNombre] = useState("");
   const [sali, setSali] = useState(false);
 
@@ -34,6 +36,7 @@ export default function MeetLinkPage() {
       <div className="h-screen w-screen bg-background">
         <LlamadaEnVentanaFlotante activa>
           <LiveKitCallView
+            estadoMiniatura={estadoMiniatura}
             autoPip={!docPipSupported()}
             roomName={llamada.room}
             displayName={miNombre || nombre.trim()}

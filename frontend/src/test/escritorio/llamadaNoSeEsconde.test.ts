@@ -32,6 +32,7 @@ describe("la ventana de la llamada", () => {
         isDestroyed: () => false, isMinimized: () => false, isFullScreen: () => false,
         isFocused: () => false, isMaximized: () => false,
         setAlwaysOnTop: vi.fn(), setVisibleOnAllWorkspaces: vi.fn(),
+        show: vi.fn(), focus: vi.fn(),
         webContents: { isDestroyed: () => false, send: vi.fn() },
         on: (evento: string, fn: () => void) => eventos.set(evento, fn),
       };
@@ -41,12 +42,17 @@ describe("la ventana de la llamada", () => {
         prepararVentanaDeLlamada: (_hija: typeof hija) => {},
         controlarMiniatura: (_hija: typeof hija, _accion: string): unknown => null,
         arrastrarMiniatura: (_hija: typeof hija, _fase: string) => {},
+        mantenerDuranteDialogo: (_hija: typeof hija): (() => void) => () => {},
       } };
       new Function("require", "module", ventana)(() => electron, modulo);
-      const { prepararVentanaDeLlamada, controlarMiniatura, arrastrarMiniatura } = modulo.exports;
+      const { prepararVentanaDeLlamada, controlarMiniatura, arrastrarMiniatura, mantenerDuranteDialogo } = modulo.exports;
       prepararVentanaDeLlamada(hija);
       controlarMiniatura(hija, "estado");
       const perderFoco = () => { eventos.get("blur")?.(); vi.advanceTimersByTime(400); };
+      const terminarDialogo = mantenerDuranteDialogo(hija);
+      perderFoco();
+      expect(bounds).toEqual(original);
+      terminarDialogo();
       perderFoco();
       expect(bounds.width).toBeLessThan(original.width);
       expect(hija.setAlwaysOnTop).toHaveBeenLastCalledWith(true, "floating");
@@ -72,8 +78,15 @@ describe("la ventana de la llamada", () => {
     }
   });
 
-  it("es una llamada /call/ o un Meet /meet/", () => {
-    expect(ventana).toMatch(/pathname\.startsWith\("\/call\/"\) \|\| pathname\.startsWith\("\/meet\/"\)/);
+  it("reconoce llamadas y enlaces públicos, pero no rutas de otras áreas", () => {
+    const modulo = { exports: {} as { esLlamada: (url: string) => boolean } };
+    new Function("require", "module", ventana)(() => ({ screen: {} }), modulo);
+    for (const ruta of ["/call/abc", "/meet/abc", "/entrar/F4KP43", "/unirse/abc"]) {
+      expect(modulo.exports.esLlamada("https://app.maven-ai.me" + ruta)).toBe(true);
+    }
+    for (const ruta of ["/cowork", "/meetings", "/entrar/", "/login"]) {
+      expect(modulo.exports.esLlamada("https://app.maven-ai.me" + ruta)).toBe(false);
+    }
   });
 
   it("«Volver a la llamada» solo lo pide una ventana de llamada de Maven, para sí misma", () => {
