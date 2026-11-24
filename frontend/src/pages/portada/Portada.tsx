@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type CSSProperties, type MouseEvent } from "react";
 import { MarcaMaven } from "@/components/MarcaM";
 import {
-  ArrowRight, Check, CheckSquare, ChevronDown, Eye, FileText, HardDrive, Laptop, Mail, MessageSquare, Monitor, MonitorUp, UserCheck, Video,
+  ArrowRight, Check, CheckSquare, ChevronDown, Clock3, Eye, FileText, HardDrive, Laptop, Mail, Menu, MessageSquare, Monitor, MonitorUp, UserCheck, Video, X,
   type LucideIcon,
 } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
@@ -72,6 +72,13 @@ const PASOS: [K, K][] = [
   ["portada.paso3", "portada.paso3Texto"],
 ];
 
+const SECCIONES: { enlace: string; nombre: K }[] = [
+  { enlace: "#como-funciona", nombre: "portada.nav.como" },
+  { enlace: "#empresas", nombre: "portada.nav.empresas" },
+  { enlace: "#precios", nombre: "portada.nav.precios" },
+  { enlace: "#descargas", nombre: "portada.nav.descargas" },
+];
+
 const FUNCIONES: { Icono: LucideIcon; nombre: K; texto: K }[] = [
   { Icono: Video, nombre: "portada.f.cowork", texto: "portada.f.coworkTexto" },
   { Icono: MonitorUp, nombre: "portada.f.reuniones", texto: "portada.f.reunionesTexto" },
@@ -82,6 +89,12 @@ const FUNCIONES: { Icono: LucideIcon; nombre: K; texto: K }[] = [
   { Icono: CheckSquare, nombre: "portada.f.tareas", texto: "portada.f.tareasTexto" },
   { Icono: HardDrive, nombre: "portada.f.almacenamiento", texto: "portada.f.almacenamientoTexto" },
   { Icono: UserCheck, nombre: "portada.f.accesos", texto: "portada.f.accesosTexto" },
+];
+
+const EJEMPLOS: { Icono: LucideIcon; nombre: K; texto: K }[] = [
+  { Icono: Clock3, nombre: "portada.ejemplo.horas", texto: "portada.ejemplo.horasTexto" },
+  { Icono: Video, nombre: "portada.ejemplo.invitados", texto: "portada.ejemplo.invitadosTexto" },
+  { Icono: CheckSquare, nombre: "portada.ejemplo.acuerdos", texto: "portada.ejemplo.acuerdosTexto" },
 ];
 
 const EQUIPOS: K[] = [
@@ -351,6 +364,9 @@ function BajarApp() {
 
 export default function Portada({ idiomaDeRuta }: { idiomaDeRuta?: Idioma }) {
   const raiz = useRef<HTMLDivElement>(null);
+  const botonMenu = useRef<HTMLButtonElement>(null);
+  const menuMovil = useRef<HTMLElement>(null);
+  const [menuAbierto, setMenuAbierto] = useState(false);
   const { t, language, setLanguage } = useLanguage();
 
   // /de, /fr…: la dirección manda el idioma (y queda como el de esta persona).
@@ -408,6 +424,27 @@ export default function Portada({ idiomaDeRuta }: { idiomaDeRuta?: Idioma }) {
     requestAnimationFrame(() => document.getElementById("demo")?.scrollIntoView({ behavior: "smooth" }));
   };
 
+  useEffect(() => {
+    if (!menuAbierto) return;
+    const alTocarAfuera = (e: PointerEvent) => {
+      if (!(e.target instanceof Node)) return;
+      if (!menuMovil.current?.contains(e.target) && !botonMenu.current?.contains(e.target)) {
+        setMenuAbierto(false);
+      }
+    };
+    const alPulsarEscape = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      setMenuAbierto(false);
+      botonMenu.current?.focus();
+    };
+    document.addEventListener("pointerdown", alTocarAfuera);
+    document.addEventListener("keydown", alPulsarEscape);
+    return () => {
+      document.removeEventListener("pointerdown", alTocarAfuera);
+      document.removeEventListener("keydown", alPulsarEscape);
+    };
+  }, [menuAbierto]);
+
   // La portada es la única pantalla pública y va en oscuro sí o sí: el
   // `data-theme` del visitante no debe poder dejarla ilegible.
   return (
@@ -416,17 +453,49 @@ export default function Portada({ idiomaDeRuta }: { idiomaDeRuta?: Idioma }) {
         <div className="pr-caja pr-nav-in">
           <Link to="/" aria-label="Maven" style={{ textDecoration: "none" }}><Marca /></Link>
           <nav className="pr-nav-links" aria-label={t("portada.nav.secciones")}>
-            <a href="#como-funciona">{t("portada.nav.como")}</a>
-            <a href="#empresas">{t("portada.nav.empresas")}</a>
-            <a href="#precios">{t("portada.nav.precios")}</a>
-            <a href="#descargas">{t("portada.nav.descargas")}</a>
+            {SECCIONES.map(({ enlace, nombre }) => <a key={enlace} href={enlace}>{t(nombre)}</a>)}
           </nav>
           <div className="pr-nav-cta">
             <Link className="pr-btn pr-btn-fantasma" to="/login">{t("portada.nav.entrar")}</Link>
             <a className="pr-btn pr-btn-contorno-verde" href="#demo" onClick={abrirDemo}>{t("portada.cta.demo")}</a>
             <SelectorIdioma />
+            <button
+              ref={botonMenu}
+              type="button"
+              className="pr-menu-boton"
+              aria-label={t(menuAbierto ? "portada.nav.cerrarMenu" : "portada.nav.abrirMenu")}
+              aria-expanded={menuAbierto}
+              aria-controls="pr-menu-movil"
+              onClick={() => setMenuAbierto((abierto) => !abierto)}
+            >
+              {menuAbierto ? <X aria-hidden="true" /> : <Menu aria-hidden="true" />}
+            </button>
           </div>
         </div>
+        <nav
+          id="pr-menu-movil"
+          className="pr-menu-movil"
+          aria-label={t("portada.nav.secciones")}
+          ref={menuMovil}
+          hidden={!menuAbierto}
+        >
+          <div className="pr-caja pr-menu-enlaces">
+            {SECCIONES.map(({ enlace, nombre }) => (
+              <a key={enlace} href={enlace} onClick={() => setMenuAbierto(false)}>{t(nombre)}</a>
+            ))}
+            <Link to="/login" onClick={() => setMenuAbierto(false)}>{t("portada.nav.entrar")}</Link>
+            <a
+              href="#demo"
+              className="pr-menu-demo"
+              onClick={(e) => {
+                setMenuAbierto(false);
+                abrirDemo(e);
+              }}
+            >
+              {t("portada.cta.demo")}
+            </a>
+          </div>
+        </nav>
       </header>
 
       <section className="pr-hero">
@@ -480,6 +549,17 @@ export default function Portada({ idiomaDeRuta }: { idiomaDeRuta?: Idioma }) {
               </article>
             ))}
           </div>
+          <section className="pr-ejemplos pr-aparece" aria-labelledby="pr-ejemplos-titulo">
+            <h3 id="pr-ejemplos-titulo">{t("portada.ejemplo.titulo")}</h3>
+            <ul>
+              {EJEMPLOS.map(({ Icono, nombre, texto }) => (
+                <li key={nombre}>
+                  <Icono aria-hidden="true" strokeWidth={1.6} />
+                  <div><h4>{t(nombre)}</h4><p>{t(texto)}</p></div>
+                </li>
+              ))}
+            </ul>
+          </section>
         </div>
       </section>
 

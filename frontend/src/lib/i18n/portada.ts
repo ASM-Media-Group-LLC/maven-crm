@@ -14,6 +14,8 @@ export const portada = {
   "portada.nav.precios": { es: "Precios", en: "Pricing" },
   "portada.nav.descargas": { es: "Descargas", en: "Downloads" },
   "portada.nav.entrar": { es: "Entrar", en: "Sign in" },
+  "portada.nav.abrirMenu": { es: "Abrir menú", en: "Open menu" },
+  "portada.nav.cerrarMenu": { es: "Cerrar menú", en: "Close menu" },
   "portada.cta.demo": { es: "Pedir una demo", en: "Request a demo" },
 
   "portada.hero.linea1": { es: "La oficina,", en: "The office," },
@@ -51,6 +53,13 @@ export const portada = {
   "portada.f.almacenamientoTexto": { es: "Los archivos de tu empresa en tu propio espacio, compartidos por área.", en: "Your company's files in your own space, shared by area." },
   "portada.f.accesos": { es: "Tú apruebas quién entra", en: "You approve who gets in" },
   "portada.f.accesosTexto": { es: "Nadie entra sin tu permiso, y cada rol ve solo lo suyo.", en: "No one gets in without your permission, and each role sees only what's theirs." },
+  "portada.ejemplo.titulo": { es: "Aprovecha Maven en tu día a día", en: "Get more out of Maven every day" },
+  "portada.ejemplo.horas": { es: "Revisa las horas al cerrar el turno", en: "Review hours at the end of a shift" },
+  "portada.ejemplo.horasTexto": { es: "Consulta entradas, salidas y pausas para saber cuánto tiempo trabajó el equipo.", en: "Review clock-ins, clock-outs, and breaks to see how much time the team worked." },
+  "portada.ejemplo.invitados": { es: "Invita a un cliente por enlace", en: "Invite a client with a link" },
+  "portada.ejemplo.invitadosTexto": { es: "Comparte el enlace de la reunión y admite a tu invitado desde la sala de espera.", en: "Share a meeting link and admit your guest from the waiting room." },
+  "portada.ejemplo.acuerdos": { es: "Dale seguimiento a lo acordado", en: "Follow up on what was agreed" },
+  "portada.ejemplo.acuerdosTexto": { es: "Crea una tarea con responsable y fecha para revisar el avance después de la reunión.", en: "Create a task with an owner and a due date to track progress after the meeting." },
 
   "portada.equipos.ceja": { es: "Para empresas", en: "For companies" },
   "portada.equipos.titulo": { es: "Para cualquier equipo remoto", en: "For any remote team" },
