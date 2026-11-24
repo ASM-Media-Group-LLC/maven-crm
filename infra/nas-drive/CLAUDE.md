@@ -20,15 +20,17 @@ Desde la copia del repo, con respaldo y sin reiniciar a ciegas:
 
 ```bash
 cd ~/Projects/maven-crm/infra/nas-drive
-for f in server.mjs firma.mjs zip.mjs miniaturas.mjs indice.mjs tipos.mjs; do
+for f in server.mjs firma.mjs zip.mjs miniaturas.mjs papelera.mjs indice.mjs tipos.mjs; do
   cp ~/maven-nas-drive/$f ~/maven-nas-drive/$f.antes-$(date +%d-%m) 2>/dev/null; cp $f ~/maven-nas-drive/$f
 done
-node --check ~/maven-nas-drive/server.mjs
+# Carga server.mjs con TODO lo que importa, sin arrancarlo: si falta un archivo, falla aquí y no en el reinicio.
+# (la ruta NO va como argumento: con ella en argv[1], server.mjs se creería el principal y arrancaría)
+node -e 'import(process.env.HOME + "/maven-nas-drive/server.mjs").then(() => console.log("server.mjs carga bien"))'
 launchctl kickstart -k gui/$(id -u)/ai.maven.nas-drive
 tail -5 ~/maven-nas-drive/servidor.log && curl -s http://127.0.0.1:8790/salud
 ```
 
-- `server.mjs` importa `firma.mjs`, `zip.mjs` y `miniaturas.mjs`: si falta uno, no arranca. Se copian juntos.
+- `server.mjs` importa `firma.mjs`, `zip.mjs`, `miniaturas.mjs` y `papelera.mjs` (`indice.mjs` también usa `papelera.mjs`): si falta uno, no arranca. Se copian juntos.
 - El reinicio a veces lo bloquea el clasificador de comandos; entonces lo corre Jhon. Después del reinicio, mirar siempre `servidor.log` y `/salud`.
 - Agregar un disco = sumarlo a `RAICES` en `~/maven-nas-drive/.env`, reiniciar y tocar «Permitir» en la pantalla.
 
@@ -44,6 +46,7 @@ tail -5 ~/maven-nas-drive/servidor.log && curl -s http://127.0.0.1:8790/salud
 ## Lo que no se hace desde aquí
 
 - No se borra nada del NAS a mano: lo que se elimina en Maven lo quita el propio servidor, y las limpiezas de Google solo borran **archivos** ya verificados en el NAS, nunca carpetas ni unidades. Los scripts de vaciado los lanza Jhon.
+- Lo que se borra para siempre en Maven no desaparece en el acto: pasa 30 días en `<raíz>/.borrados/AAAA-MM-DD/<agencia>/<id>` (mismo disco) y la purga la hace `indice.mjs` cada noche. No se vacía `.borrados` a mano para «hacer lugar»: es la única red si alguien borró por error. Cómo recuperar algo: `README.md`, «La papelera del disco».
 - No se toca el usuario `maven-ci` ni se le da acceso a los discos: su aislamiento es lo que protege el NAS de un PR malicioso.
 - No se imprimen ni se copian los secretos de `~/maven-nas-drive/.env` (`DRIVE_SECRETO`, `RAICES`, `ORIGENES`, `PUERTO`, `HOST`, `MAVEN_FUNCIONES`). El mismo secreto vive en Supabase como `DRIVE_SECRETO`, junto con `DRIVE_NAS_URL`.
 - No hay copia de seguridad del Drive ni los discos son espejo (decisión de Jhon, 28/09/2026). Un disco muerto son archivos perdidos: cualquier operación sobre `/Volumes` se piensa dos veces.

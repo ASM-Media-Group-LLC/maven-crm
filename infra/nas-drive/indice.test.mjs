@@ -139,3 +139,18 @@ test("JSON por partes: vacío y con una fila también es JSON válido", () => {
     assert.deepEqual(j, { generado: "2026-10-03T07:15:00Z", agencia_id: A, filas });
   }
 });
+
+test("⚠️ cada noche purga la papelera del disco y los temporales, aunque Maven no conteste; y el servidor limpia al arrancar", async () => {
+  const fuente = await fs.readFile(new URL("./indice.mjs", import.meta.url), "utf8");
+  const principal = fuente.slice(fuente.indexOf("if (import.meta.url === `file://${process.argv[1]}`)"));
+  const indice = principal.indexOf("await pedirIndice(");
+  const purga = principal.indexOf("await purgarPapelera(raices)");
+  const limpieza = principal.indexOf("await limpiarTemporales(raices)");
+  assert.ok(indice > -1 && purga > indice && limpieza > purga, "después del índice");
+  // FUERA del try del índice: si pedirIndice falla, igual corren.
+  assert.ok(principal.lastIndexOf("FALLÓ: ${e.message}", purga) > indice, "el catch del índice termina antes");
+  assert.ok(principal.indexOf("process.exit(", indice) > limpieza, "y antes de salir");
+  const servidor = await fs.readFile(new URL("./server.mjs", import.meta.url), "utf8");
+  const arranque = servidor.slice(servidor.indexOf("if (import.meta.url === `file://${process.argv[1]}`)"));
+  assert.ok(arranque.indexOf("limpiarTemporales(conf.raices)") > -1 && arranque.indexOf("limpiarTemporales(conf.raices)") < arranque.indexOf("s.listen("));
+});

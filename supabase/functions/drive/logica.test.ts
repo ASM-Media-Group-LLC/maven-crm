@@ -348,3 +348,97 @@ Deno.test("descargar: en el .zip también, y las carpetas no cambian", () => {
   const { l } = armarListaDelZip([carpeta], hijos);
   assert(JSON.stringify(l.map((e) => e.n)) === JSON.stringify(["REELS/", "REELS/Video 7.mov", "REELS/Video 7.mp4"]), JSON.stringify(l));
 });
+
+// ── Borrar para siempre: leer TODO lo de adentro antes de tocar nada ─────────
+// (auditoría del 19/10: sin páginas ni tramos, lo que pasaba de 1000 hijos
+// quedaba en el NAS sin ficha; el CASCADE se llevaba las fichas igual)
+import { type FichaParaPurgar, type HijosParaPurgar, loQueCuelgaDe, PAGINA_PURGA, PROFUNDIDAD_PURGA, TRAMO_PURGA } from "./logica.ts";
+
+/** Una base falsa que contesta como PostgREST: corta en `tope` filas sin
+ *  avisar y, con más de 150 ids en el filtro, la URL no pasa. */
+function baseFalsa(filas: (FichaParaPurgar & { parent_id: string })[], tope = 1000) {
+  const consultas: number[] = [];
+  const hijosDe: HijosParaPurgar = async (madres, despuesDe) => {
+    consultas.push(madres.length);
+    if (madres.length > TRAMO_PURGA) return { data: null, error: { message: "414 URI Too Long" } };
+    const set = new Set(madres);
+    const data = filas.filter((f) => set.has(f.parent_id) && (despuesDe === null || f.id > despuesDe))
+      .sort((a, b) => (a.id < b.id ? -1 : 1)).slice(0, Math.min(tope, PAGINA_PURGA))
+      .map(({ id, tipo, storage_key }) => ({ id, tipo, storage_key }));
+    return { data, error: null };
+  };
+  return { hijosDe, consultas };
+}
+
+/** Una carpeta con 2500 archivos sueltos y 400 subcarpetas de 3 archivos. */
+function arbolGrande(raiz: string) {
+  const filas: (FichaParaPurgar & { parent_id: string })[] = [];
+  const archivo = (madre: string) => {
+    const id = crypto.randomUUID();
+    filas.push({ id, parent_id: madre, tipo: "archivo", storage_key: `t/${id}` });
+  };
+  for (let i = 0; i < 2500; i++) archivo(raiz);
+  for (let i = 0; i < 400; i++) {
+    const c = crypto.randomUUID();
+    filas.push({ id: c, parent_id: raiz, tipo: "carpeta", storage_key: null });
+    for (let j = 0; j < 3; j++) archivo(c);
+  }
+  return filas;
+}
+
+Deno.test("⚠️ borrar para siempre: más de 1000 hijos y más de 150 carpetas, se leen TODOS", async () => {
+  const raiz = crypto.randomUUID();
+  const filas = arbolGrande(raiz);
+  // Con el tope de Supabase (1000) y con uno menor: cortar en «menos de 1000» se perdería filas.
+  for (const tope of [1000, 400]) {
+    const { hijosDe, consultas } = baseFalsa(filas, tope);
+    const r = await loQueCuelgaDe(hijosDe, raiz);
+    assert(r.claves.length === 2500 + 400 * 3, `tope ${tope}: ${r.claves.length} archivos de ${2500 + 1200}`);
+    assert(new Set(r.claves).size === r.claves.length, "sin repetidos");
+    assert(r.archivos.length === 3700 && r.fichas.length === 4100, `fichas ${r.fichas.length}`);
+    assert(consultas.every((n) => n <= TRAMO_PURGA), "nunca más de 150 ids en una consulta");
+  }
+});
+
+Deno.test("⚠️ borrar para siempre: un error en CUALQUIER página frena todo (no es «no hay nada»)", async () => {
+  const raiz = crypto.randomUUID();
+  const { hijosDe } = baseFalsa(arbolGrande(raiz));
+  for (const fallaEn of [1, 3, 6]) {
+    let n = 0;
+    const conFalla: HijosParaPurgar = (m, d) => (++n === fallaEn ? Promise.resolve({ data: null, error: { message: "timeout" } }) : hijosDe(m, d));
+    const e = await loQueCuelgaDe(conFalla, raiz).then(() => null, (x) => x as HttpError);
+    assert(e instanceof HttpError && e.status === 500 && /no se borró nada/.test(e.message), `falla en la consulta ${fallaEn}: ${e?.message}`);
+  }
+  // Sin error pero sin datos: tampoco es «vacío».
+  const nulo: HijosParaPurgar = () => Promise.resolve({ data: null, error: null });
+  assert((await loQueCuelgaDe(nulo, raiz).then(() => null, (x) => x)) instanceof HttpError, "data null sin error");
+});
+
+Deno.test("borrar para siempre: un archivo suelto, un ciclo y lo demasiado hondo", async () => {
+  // Un archivo suelto: nada adentro, una consulta.
+  const solo = baseFalsa([]);
+  const r = await loQueCuelgaDe(solo.hijosDe, crypto.randomUUID());
+  assert(r.claves.length === 0 && solo.consultas.length === 1, "archivo suelto");
+  // Un ciclo (lo impide un trigger) no cuelga el recorrido.
+  const [a, b] = [crypto.randomUUID(), crypto.randomUUID()];
+  const ciclo = baseFalsa([
+    { id: b, parent_id: a, tipo: "carpeta", storage_key: null },
+    { id: a, parent_id: b, tipo: "carpeta", storage_key: null },
+  ]);
+  assert((await loQueCuelgaDe(ciclo.hijosDe, a)).fichas.length === 1, "ciclo");
+  // Una cadena más honda que el tope: se avisa, no se borra a medias.
+  const cadena: (FichaParaPurgar & { parent_id: string })[] = [];
+  const raiz = crypto.randomUUID();
+  let madre = raiz;
+  for (let i = 0; i <= PROFUNDIDAD_PURGA; i++) {
+    const id = crypto.randomUUID();
+    cadena.push({ id, parent_id: madre, tipo: "carpeta", storage_key: null });
+    madre = id;
+  }
+  const e = await loQueCuelgaDe(baseFalsa(cadena).hijosDe, raiz).then(() => null, (x) => x as HttpError);
+  assert(e instanceof HttpError && e.status === 409, `demasiado hondo: ${e?.message}`);
+  // Una base que ignora el cursor (siempre la misma página) no cuelga.
+  const pegada = baseFalsa(arbolGrande(raiz)).hijosDe;
+  const sinCursor: HijosParaPurgar = (m) => pegada(m, null);
+  assert((await loQueCuelgaDe(sinCursor, raiz).then(() => null, (x) => x)) instanceof HttpError, "misma página dos veces");
+});

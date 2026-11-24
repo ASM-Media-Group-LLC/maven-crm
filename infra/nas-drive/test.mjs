@@ -13,6 +13,7 @@ import { crearServidor, MAX_ENTRADAS_ZIP, MAX_PERMISO_ZIP, MAX_POR_PEDIDO, rutaD
 import { firmar, verificar } from "./firma.mjs";
 import { armarZip, cabeceraLocal, cierre, crc32, crc32Js, descriptor, entradaCentral, LIMITE_32, necesitaZip64, tamanoDelZip } from "./zip.mjs";
 import { crearCola, LADO_VISTA, rutaEnCache } from "./miniaturas.mjs";
+import { CARPETA_BORRADOS, fechaDe, limpiarTemporales, mandarALaPapelera, purgarPapelera } from "./papelera.mjs";
 
 const SECRETO = "s".repeat(40);
 let dir, conf, srv, base;
@@ -190,6 +191,167 @@ test("borrar lo saca de los dos discos", async () => {
   await fetch(url({ op: "put", k, max: 10 }), { method: "PUT", body: "x" });
   assert.equal((await fetch(url({ op: "borrar", k }), { method: "DELETE" })).status, 204);
   assert.equal((await fetch(url({ op: "get", k }))).status, 404);
+});
+
+// ── La papelera del disco (auditoría del 19/10: NAS1 y NAS2 son la única copia) ──
+
+/** El disco donde quedó un archivo (el servidor elige el de más lugar). */
+const discoDe = async (k) => (await Promise.all(conf.raices.map(async (r) => ((await fs.stat(path.join(r, k)).catch(() => null)) ? r : null)))).find(Boolean);
+const raicesSueltas = async () => {
+  const d = await fs.mkdtemp(path.join(os.tmpdir(), "nas-papelera-"));
+  return { d, raices: [path.join(d, "NAS1"), path.join(d, "NAS2")] };
+};
+/** Pone la fecha de cambio de una ruta `horas` atrás. */
+const envejecer = (p, horas) => { const t = new Date(Date.now() - horas * 3_600_000); return fs.utimes(p, t, t); };
+
+test("⚠️ borrar NO borra: lo mueve a <raíz>/.borrados/<fecha>/<agencia>/<id>, en el mismo disco y con los mismos bytes", async () => {
+  const k = clave();
+  const datos = Buffer.from("lo único que hay de este archivo");
+  await fetch(url({ op: "put", k, max: 100 }), { method: "PUT", body: datos });
+  const raiz = await discoDe(k);
+  const antes = await fs.stat(path.join(raiz, k));
+  assert.equal((await fetch(url({ op: "borrar", k }), { method: "DELETE" })).status, 204);
+  assert.equal((await fetch(url({ op: "get", k }))).status, 404, "para Maven ya no está");
+  const enPapelera = path.join(raiz, CARPETA_BORRADOS, fechaDe(), k);
+  assert.ok((await fs.readFile(enPapelera)).equals(datos), "pero el archivo sigue entero en la papelera");
+  assert.equal((await fs.stat(enPapelera)).ino, antes.ino, "movido (rename), no copiado");
+  const otro = conf.raices.find((r) => r !== raiz);
+  assert.equal(await fs.stat(path.join(otro, CARPETA_BORRADOS, fechaDe(), k)).catch(() => null), null, "el otro disco no se toca");
+  // Borrar lo que no está sigue siendo 204 (la edge reintenta sin miedo).
+  assert.equal((await fetch(url({ op: "borrar", k }), { method: "DELETE" })).status, 204);
+});
+
+test("⚠️ borrar un importado de Google mueve SU enlace: el archivo bajado de Google sigue donde estaba", async () => {
+  const id = randomUUID();
+  const k = `${agencia}/google/${id}`;
+  // Como importar.mjs: el archivo de Google en el disco y un enlace duro en el Drive.
+  const deGoogle = path.join(conf.raices[0], "Unidad de prueba", `${id}.pdf`);
+  await fs.mkdir(path.dirname(deGoogle), { recursive: true });
+  await fs.writeFile(deGoogle, "el original de Google");
+  await fs.mkdir(path.join(conf.raices[0], agencia, "google"), { recursive: true });
+  await fs.link(deGoogle, path.join(conf.raices[0], k));
+  assert.equal((await fetch(url({ op: "borrar", k }), { method: "DELETE" })).status, 204);
+  assert.equal(await fs.readFile(deGoogle, "utf8"), "el original de Google");
+  const enPapelera = path.join(conf.raices[0], CARPETA_BORRADOS, fechaDe(), agencia, "google", id);
+  assert.equal((await fs.stat(enPapelera)).ino, (await fs.stat(deGoogle)).ino, "el enlace, en la papelera");
+});
+
+test("papelera: la misma clave borrada dos veces el mismo día no pisa a la primera", async () => {
+  const { d, raices: [raiz] } = await raicesSueltas();
+  const k = `${agencia}/${randomUUID()}`;
+  await fs.mkdir(path.join(raiz, agencia), { recursive: true });
+  await fs.writeFile(path.join(raiz, k), "uno");
+  const primero = await mandarALaPapelera(raiz, k);
+  await fs.writeFile(path.join(raiz, k), "dos");
+  const segundo = await mandarALaPapelera(raiz, k);
+  assert.equal(await fs.readFile(primero, "utf8"), "uno");
+  assert.equal(segundo, `${primero}.2`);
+  assert.equal(await fs.readFile(segundo, "utf8"), "dos");
+  assert.equal(await mandarALaPapelera(raiz, k), null, "lo que no está, no se mueve");
+  // Una carpeta con nombre de clave no se mueve entera.
+  const carpeta = `${agencia}/${randomUUID()}`;
+  await fs.mkdir(path.join(raiz, carpeta, randomUUID()), { recursive: true });
+  await assert.rejects(mandarALaPapelera(raiz, carpeta), /carpeta/);
+  await fs.access(path.join(raiz, carpeta));
+  await fs.rm(d, { recursive: true, force: true });
+});
+
+test("⚠️ papelera: la noche purga los días de hace MÁS de 30, y nada más", async () => {
+  const { d, raices } = await raicesSueltas();
+  const ahora = new Date("2026-10-20T15:00:00Z"); // 10:00 en Bogotá
+  const poner = async (raiz, ...partes) => {
+    const p = path.join(raiz, CARPETA_BORRADOS, ...partes);
+    await fs.mkdir(path.dirname(p), { recursive: true });
+    await fs.writeFile(p, "x");
+    return p;
+  };
+  const viejo = await poner(raices[0], "2026-09-19", agencia, randomUUID()); // 31 días
+  const justo = await poner(raices[0], "2026-09-20", agencia, randomUUID()); // 30 días: se queda
+  const hoy = await poner(raices[0], "2026-10-20", agencia, randomUUID());
+  const raro = await poner(raices[0], "no-es-una-fecha", "x");
+  const enElOtro = await poner(raices[1], "2026-08-01", agencia, randomUUID());
+  // Una .borrados que es un enlace a otra carpeta: no se sigue.
+  const ajena = path.join(d, "ajena");
+  await fs.mkdir(path.join(ajena, "2020-01-01"), { recursive: true });
+  await fs.writeFile(path.join(ajena, "2020-01-01", "x"), "no tocar");
+  const conEnlace = path.join(d, "NAS3");
+  await fs.mkdir(conEnlace);
+  await fs.symlink(ajena, path.join(conEnlace, CARPETA_BORRADOS));
+
+  const r = await purgarPapelera([...raices, conEnlace, path.join(d, "no-montado")], { ahora });
+  assert.deepEqual(r.errores, []);
+  assert.deepEqual(r.purgadas.sort(), [path.dirname(path.dirname(enElOtro)), path.dirname(path.dirname(viejo))].sort());
+  for (const queda of [justo, hoy, raro]) await fs.access(queda);
+  assert.equal(await fs.readFile(path.join(ajena, "2020-01-01", "x"), "utf8"), "no tocar");
+  await fs.rm(d, { recursive: true, force: true });
+});
+
+test("⚠️ limpieza: lo de más de 24 h en .partes, .tmp y .miniaturas/.tmp se va; lo vivo y los archivos del Drive, no", async () => {
+  const { d, raices: [raiz] } = await raicesSueltas();
+  const archivo = async (...partes) => {
+    const p = path.join(raiz, ...partes);
+    await fs.mkdir(path.dirname(p), { recursive: true });
+    await fs.writeFile(p, "x");
+    return p;
+  };
+  // Una subida abandonada hace dos días (la carpeta y sus partes).
+  const vieja = path.join(raiz, ".partes", randomUUID());
+  await envejecer(await archivo(".partes", path.basename(vieja), "0"), 48);
+  await envejecer(vieja, 48);
+  // Una subida que sigue llegando: la carpeta es vieja pero la última parte es de ahora.
+  const viva = path.join(raiz, ".partes", randomUUID());
+  await envejecer(await archivo(".partes", path.basename(viva), "0"), 48);
+  await archivo(".partes", path.basename(viva), "1");
+  await envejecer(viva, 48);
+  const tmpViejo = await archivo(".tmp", randomUUID());
+  await envejecer(tmpViejo, 25);
+  const tmpNuevo = await archivo(".tmp", randomUUID());
+  // Una miniatura que se cortó: un enlace DURO al archivo del Drive.
+  const delDrive = await archivo(agencia, randomUUID());
+  const mini = path.join(raiz, ".miniaturas", ".tmp", randomUUID());
+  await fs.mkdir(mini, { recursive: true });
+  await fs.link(delDrive, path.join(mini, "archivo.pdf"));
+  await envejecer(delDrive, 72);
+  await envejecer(mini, 72);
+  // Un archivo del Drive viejísimo, y uno en la papelera: no son temporales.
+  const viejisimo = await archivo(agencia, randomUUID());
+  await envejecer(viejisimo, 24 * 400);
+  const borrado = await archivo(CARPETA_BORRADOS, fechaDe(), agencia, randomUUID());
+  await envejecer(borrado, 24 * 10);
+
+  const r = await limpiarTemporales([raiz, path.join(d, "no-montado")]);
+  assert.deepEqual(r.errores, []);
+  assert.deepEqual(r.borradas.sort(), [vieja, tmpViejo, mini].sort());
+  for (const queda of [viva, tmpNuevo, delDrive, viejisimo, borrado]) await fs.access(queda);
+  assert.equal(await fs.readFile(delDrive, "utf8"), "x", "borrar el enlace de la miniatura no toca el archivo");
+  await fs.rm(d, { recursive: true, force: true });
+});
+
+test("⚠️ la edge lee TODO lo de adentro antes de borrar para siempre: páginas, tramos y cualquier error frena", async () => {
+  // El comportamiento lo prueba supabase/functions/drive/logica.test.ts (Deno);
+  // esto mira que index.ts lo use y en ese orden.
+  const edge = await fs.readFile(new URL("../../supabase/functions/drive/index.ts", import.meta.url), "utf8");
+  const logica = await fs.readFile(new URL("../../supabase/functions/drive/logica.ts", import.meta.url), "utf8");
+  const entre = (texto, desde, hasta) => {
+    const a = texto.indexOf(desde);
+    assert.ok(a > -1, `no está «${desde}»`);
+    return texto.slice(a, texto.indexOf(hasta, a + 1));
+  };
+  const rama = entre(edge, 'if (accion === "borrar_para_siempre")', 'if (accion === "crear_unidad")');
+  const leer = rama.indexOf("await loQueCuelgaDe(hijosDe, id)");
+  const nas = rama.indexOf('{ op: "borrar", k }');
+  const releer = rama.lastIndexOf("await loQueCuelgaDe(hijosDe, id)");
+  const ficha = rama.indexOf('admin.from("drive_items").delete()');
+  assert.ok(leer > -1 && leer < nas && nas < releer && releer < ficha, "leer todo → NAS → volver a mirar → la ficha");
+  assert.match(rama, /\.in\("parent_id", madres\)\.order\("id"\)\.limit\(PAGINA_PURGA\)/);
+  assert.match(rama, /q = q\.gt\("id", despuesDe\)/);
+  assert.doesNotMatch(rama, /\?\? \[\]/, "un error no es «no hay nada»");
+  assert.doesNotMatch(rama, /\.in\("parent_id", nivel\)/);
+  assert.match(logica, /export const TRAMO_PURGA = 150;/);
+  assert.match(logica, /export const PAGINA_PURGA = 1000;/);
+  const recorrido = entre(logica, "export async function loQueCuelgaDe", "\n}\n");
+  assert.match(recorrido, /if \(error \|\| !data\) \{\n\s+throw new HttpError/);
+  assert.match(recorrido, /if \(!data\.length\) break;/);
 });
 
 test("CORS: solo el origen de Maven, y la pregunta previa contesta 204", async () => {

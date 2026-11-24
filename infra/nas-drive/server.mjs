@@ -32,6 +32,7 @@ import { Readable, Transform } from "node:stream";
 import { verificar, recibo } from "./firma.mjs";
 import { armarZip, tamanoDelZip } from "./zip.mjs";
 import { CARPETA_CACHE, crearCola, extensionValida, LADO_MINIATURA, LADO_VISTA, LADOS, miniaturaDe, rutaEnCache, servirMiniatura } from "./miniaturas.mjs";
+import { limpiarTemporales, mandarALaPapelera, resumen } from "./papelera.mjs";
 
 export const MAX_POR_PEDIDO = 95 * 1024 * 1024; // el proxy de Cloudflare corta en 100 MB
 const CLAVE_OK = /^[0-9a-f-]{36}(\/[0-9a-f-]{36}){1,2}$/;
@@ -248,10 +249,13 @@ async function completar(conf, res, d) {
   return json(res, 200, { ...r, recibo: recibo(conf.secreto, { k: d.k, ...r }) });
 }
 
+/** Borrar NO borra: lo pasa a la papelera del mismo disco, 30 días
+ *  (papelera.mjs). NAS1 y NAS2 son la única copia del Drive: un borrado por
+ *  error tiene que poder deshacerse a mano. */
 async function borrar(conf, res, d) {
   for (const r of conf.raices) {
-    // Su miniatura y su versión para mirar también (antes de borrar: el
-    // nombre sale del tamaño).
+    // Su miniatura y su versión para mirar sí se borran (se rehacen solas),
+    // antes de moverlo: el nombre sale del tamaño.
     const s = await fsp.stat(path.join(r, d.k)).catch(() => null);
     if (s) {
       for (const lado of LADOS) {
@@ -260,7 +264,7 @@ async function borrar(conf, res, d) {
         await fsp.rm(`${mini}.no`, { force: true });
       }
     }
-    await fsp.rm(path.join(r, d.k), { force: true });
+    await mandarALaPapelera(r, d.k);
   }
   res.writeHead(204);
   res.end();
@@ -492,6 +496,10 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   // ⚠️ Si el servidor se cayó a mitad de una miniatura, en .tmp quedó un enlace
   // DURO al archivo: borrar el archivo no liberaría su lugar. Se limpia al arrancar.
   for (const r of conf.raices) fs.rmSync(path.join(r, CARPETA_CACHE, ".tmp"), { recursive: true, force: true });
+  // Y lo que una subida cortada dejó en .partes y .tmp hace más de 24 h (cada
+  // noche lo repite indice.mjs). Sin esperar: solo toca lo viejo, así que
+  // puede correr mientras el servidor ya atiende.
+  limpiarTemporales(conf.raices).then((r) => console.log(resumen("temporales de más de 24 h", r)), (e) => console.error("[nas-drive] limpieza", e));
   const s = crearServidor(conf);
   // Subidas largas por el túnel: el límite por defecto de Node (5 min) cortaría
   // una parte de 95 MB con una conexión lenta.
