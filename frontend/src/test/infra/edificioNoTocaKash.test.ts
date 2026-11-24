@@ -27,7 +27,7 @@ const migracionesDeKash = import.meta.glob("../../../../supabase/migrations/*.sq
 const soloEdificio = leer(import.meta.glob("../../../../infra/casas/funciones-solo-edificio.txt", { query: "?raw", import: "default", eager: true }));
 const deployDeKash = leer(import.meta.glob("../../../../.github/workflows/deploy-edge-functions.yml", { query: "?raw", import: "default", eager: true }));
 const configToml = leer(import.meta.glob("../../../../supabase/config.toml", { query: "?raw", import: "default", eager: true }));
-const migracionCobros = leer(import.meta.glob("../../../../infra/edificio/migraciones/20261120090000_cobros.sql", { query: "?raw", import: "default", eager: true }));
+const migracionCobros = leer(import.meta.glob("../../../../infra/edificio/migraciones/20261120090500_cobros.sql", { query: "?raw", import: "default", eager: true }));
 const lista = (txt: string) => txt.split("\n").map((l) => l.replace(/#.*/, "").trim()).filter(Boolean);
 
 describe("el edificio nunca toca Kash", () => {
@@ -92,7 +92,7 @@ describe("el edificio nunca toca Kash", () => {
     expect(migracionCobros).toContain("30869615-f579-4981-8a1f-dbebc61eae2d");
     expect(migracionCobros).not.toContain(KASH);
     for (const [ruta, sql] of Object.entries(migracionesDeKash)) {
-      expect(ruta).not.toMatch(/20261120090000_cobros\.sql$/);
+      expect(ruta).not.toMatch(/20261120090500_cobros\.sql$/);
       expect(sql as string).not.toMatch(/create table public\.(stripe_eventos|precios_plataforma|puerta_intentos)/);
     }
   });
@@ -154,5 +154,13 @@ describe("el edificio nunca toca Kash", () => {
     expect(llaveKash).toContain(`printf 'KASH_RESUMEN_TOKEN=%s\\n' "$LLAVE" > "$K"`);
     expect(llaveKash).not.toMatch(/echo "?\$LLAVE/);
     expect(llaveKash).not.toMatch(/db push|database\/query"[^\n]*KASH_REF|functions deploy/);
+  });
+  it("las migraciones del edificio no repiten el número de ninguna de Kash (el aplicar compara por número)", () => {
+    const version = (ruta: string) => ruta.split("/").pop()!.slice(0, 14);
+    const deKash = new Set(Object.keys(migracionesDeKash).map(version));
+    const delArbol = Object.keys(migracionesDelEdificio).map(version);
+    expect(delArbol.length).toBeGreaterThan(0);
+    expect(delArbol.filter((v) => deKash.has(v))).toEqual([]);
+    expect(new Set(delArbol).size).toBe(delArbol.length);
   });
 });

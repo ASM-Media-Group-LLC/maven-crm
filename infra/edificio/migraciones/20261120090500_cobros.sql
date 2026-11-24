@@ -1,6 +1,6 @@
 -- VAGÓN 7 · COBROS CON STRIPE, BLOQUEO POR PAGO Y LA PUERTA (19/11/2026, tanda 8).
 -- ⚠️ SOLO PARA EL EDIFICIO maven-agencias (ezeigddgkaemxpshghmu). NUNCA en Kash.
--- Va DESPUÉS de 20261119210000_arbol.sql y
+-- Va DESPUÉS de 20261119210500_arbol.sql y
 -- 20261119211000_arbol_funciones.sql. Spec: docs/maven-como-lumina-spec.md (tandas 5, 7 y 8).
 -- Banco: infra/edificio/tests/arbol.ts (sección «Cobros»).
 --
@@ -59,7 +59,7 @@ begin
     raise exception 'cobros: esta base tiene el tenant de Kash; esta migración es SOLO para el edificio maven-agencias';
   end if;
   if to_regclass('public.organizaciones') is null or to_regproc('public.argos_acreditar') is null then
-    raise exception 'cobros: falta el árbol (20261119210000_arbol.sql y 20261119211000_arbol_funciones.sql)';
+    raise exception 'cobros: falta el árbol (20261119210500_arbol.sql y 20261119211000_arbol_funciones.sql)';
   end if;
 end $$;
 

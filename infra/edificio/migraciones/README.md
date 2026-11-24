@@ -17,7 +17,7 @@ deno run -A --node-modules-dir=none --no-lock infra/edificio/tests/arbol.ts
 
 | Archivo | Qué trae |
 |---|---|
-| `20261119210000_arbol.sql` | Clientes, admins del cliente, agencia en foco, ayudantes, reglas de sillas, políticas ampliadas, niveles de la plataforma |
+| `20261119210500_arbol.sql` | Clientes, admins del cliente, agencia en foco, ayudantes, reglas de sillas, políticas ampliadas, niveles de la plataforma |
 | `20261119211000_arbol_funciones.sql` | Pedidos de sillas, historial, avisos, enlaces, saldo de Argos, socios, briefs, Kash para mirar y las funciones de los paneles |
 
 ### El árbol
@@ -147,7 +147,7 @@ Medido en el edificio el 19/11 (710 políticas; 103 filtran por `current_tenant_
 
 | Archivo | Qué trae |
 |---|---|
-| `20261120090000_cobros.sql` | Estado `bloqueada`, `precios_plataforma`, `stripe_eventos` (cada evento una vez), tope de la puerta, funciones del cobro y del bloqueo, créditos de Argos desde Stripe y los relojes |
+| `20261120090500_cobros.sql` | Estado `bloqueada`, `precios_plataforma`, `stripe_eventos` (cada evento una vez), tope de la puerta, funciones del cobro y del bloqueo, créditos de Argos desde Stripe y los relojes |
 
 Va DESPUÉS de las dos del árbol. Se aplica igual (MCP `apply_migration` con
 `project_id = ezeigddgkaemxpshghmu`, con el OK de Alvaro). El banco del árbol la carga encima y la prueba.

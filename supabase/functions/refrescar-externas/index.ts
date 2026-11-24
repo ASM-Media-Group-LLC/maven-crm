@@ -1,5 +1,5 @@
 // REFRESCAR-EXTERNAS — solo en el EDIFICIO (maven-agencias). La despierta un reloj cada
-// 15 min (infra/edificio/migraciones/20261120090000_cobros.sql) con X-Cron-Token.
+// 15 min (infra/edificio/migraciones/20261120090500_cobros.sql) con X-Cron-Token.
 //
 // Le pide a Kash su resumen de SOLO LECTURA (función kash-resumen, con la llave dedicada
 // KASH_RESUMEN_TOKEN) y lo guarda en organizaciones_externas (fuente = 'kash'): la
