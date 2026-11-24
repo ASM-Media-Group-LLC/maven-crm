@@ -30,19 +30,21 @@ function elegirFuente(fuentes, padre) {
       if (listo) return;
       listo = true;
       ipc.removeHandler("selector:fuentes");
-      ipc.removeListener("selector:elegir", elegido);
+      ipc.removeHandler("selector:elegir");
       padre.removeListener("closed", cancelado);
       if (error) rechazar(error);
       else resolver(fuentes.find((f) => f.id === id) || null);
       if (!selector.isDestroyed()) selector.close();
     };
-    const elegido = (_e, id) => terminar(id);
     const cancelado = () => terminar(null);
     // Los canales solo aceptan mensajes del selector que abrió esta solicitud.
     ipc.handle("selector:fuentes", () => fuentes.map((f) => ({
       id: f.id, nombre: f.name, pantalla: f.id.startsWith("screen:"), imagen: f.thumbnail.toDataURL(),
     })));
-    ipc.on("selector:elegir", elegido);
+    ipc.handle("selector:elegir", (_e, id) => {
+      if (id !== null && !fuentes.some((f) => f.id === id)) throw new Error("unknown screen source");
+      terminar(id);
+    });
     padre.once("closed", cancelado);
     selector.on("closed", cancelado);
     selector.once("ready-to-show", () => { selector.show(); selector.focus(); });

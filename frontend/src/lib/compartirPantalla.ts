@@ -49,7 +49,9 @@ export function motivoDeFalloAlCompartir(err: unknown): string | null {
   // traducir() y no un texto fijo: el motivo es la descripción del aviso que ve
   // quien tocó el botón, en su idioma (hooks/useLiveKit → toggleScreenShare).
   if (!puedeCompartirPantalla()) {
-    return traducir("shared.screenShare.phones");
+    return traducir(typeof navigator !== "undefined" && esNavegadorMovil()
+      ? "shared.screenShare.phones"
+      : "shared.call.screenShareUnavailableDesc");
   }
   const nombre = (err as { name?: string } | null)?.name;
   if (nombre === "NotAllowedError" || nombre === "AbortError") return null;  // canceló

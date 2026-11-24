@@ -16,6 +16,7 @@ class EventEmitter {
 const path = { join: (...parts: string[]) => parts.join("/") };
 
 const codigo = Object.values(import.meta.glob("../../../../desktop/src/compartirPantalla.js", { query: "?raw", import: "default", eager: true }))[0] as string;
+const html = Object.values(import.meta.glob("../../../../desktop/src/selector.html", { query: "?raw", import: "default", eager: true }))[0] as string;
 
 function preparar() {
   const ventanas: Ventana[] = [];
@@ -73,6 +74,18 @@ function preparar() {
 }
 const siguiente = async () => { await Promise.resolve(); await Promise.resolve(); };
 
+function abrirSelector(ventana: ReturnType<typeof preparar>["ventanas"][number]) {
+  const documento = new DOMParser().parseFromString(html, "text/html");
+  const script = documento.querySelector("script")!.textContent!;
+  const handlers = ventana.webContents.ipc.handlers;
+  const invocar = async (canal: string, ...args: unknown[]) => handlers.get(canal)!({}, ...args);
+  new Function("window", "document", "addEventListener", script)({ selector: {
+    fuentes: () => invocar("selector:fuentes"),
+    elegir: (id: string | null) => invocar("selector:elegir", id),
+  } }, documento, () => {});
+  return documento;
+}
+
 describe("compartir desde la ventana que lo solicita", () => {
   it("Cowork automático no omite el selector de la llamada y cada selector tiene sus propios canales", async () => {
     const p = preparar();
@@ -91,16 +104,63 @@ describe("compartir desde la ventana que lo solicita", () => {
     expect(selector.show).toHaveBeenCalled();
     expect(selector.focus).toHaveBeenCalled();
     expect(p.mantenerDuranteDialogo).toHaveBeenCalledWith(llamada);
-    selector.webContents.ipc.emit("selector:elegir", {}, "window:2");
+    selector.webContents.ipc.handlers.get("selector:elegir")!({}, "window:2");
     await manual.terminado;
     expect(manual.responder).toHaveBeenCalledTimes(1);
     expect(manual.responder).toHaveBeenCalledWith(expect.objectContaining({ video: expect.objectContaining({ id: "window:2" }) }));
     expect(selector2.webContents.ipc.handlers.has("selector:fuentes")).toBe(true);
-    selector2.webContents.ipc.emit("selector:elegir", {}, null);
+    selector2.webContents.ipc.handlers.get("selector:elegir")!({}, null);
     await manual2.terminado;
     expect(manual2.responder).toHaveBeenCalledExactlyOnceWith({});
     expect(p.liberar).toHaveBeenCalledTimes(2);
     expect(p.showMessageBox).not.toHaveBeenCalled();
+  });
+
+  it("una ventana elegida y confirmada en el selector real llega a la llamada", async () => {
+    const p = preparar();
+    const llamada = new p.Ventana();
+    const pedido = p.pedir(llamada);
+    await siguiente();
+    const ventana = p.ventanas.find((w) => w.opciones.parent === llamada)!;
+    const selector = abrirSelector(ventana);
+    await siguiente();
+    const compartir = selector.querySelector<HTMLButtonElement>("#compartir")!;
+    expect(compartir.disabled).toBe(true);
+    expect(selector.querySelector("[role=status]")?.textContent).toContain("Selecciona una pantalla");
+    selector.querySelector<HTMLButtonElement>('[data-tipo="ventana"]')!.click();
+    const fuente = selector.querySelector<HTMLButtonElement>(".fuente")!;
+    fuente.click();
+    expect(fuente.isConnected).toBe(true);
+    expect(fuente.getAttribute("aria-pressed")).toBe("true");
+    compartir.click();
+    await pedido.terminado;
+    expect(ventana.isDestroyed()).toBe(true);
+    expect(pedido.responder).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ video: expect.objectContaining({ id: "window:2" }) }));
+    expect(p.liberar).toHaveBeenCalledOnce();
+  });
+
+  it("el selector informa un rechazo y deja reintentar sin perder la fuente", async () => {
+    const p = preparar();
+    const llamada = new p.Ventana();
+    const pedido = p.pedir(llamada);
+    await siguiente();
+    const ventana = p.ventanas.find((w) => w.opciones.parent === llamada)!;
+    const handlers = ventana.webContents.ipc.handlers;
+    const elegir = handlers.get("selector:elegir")!;
+    handlers.set("selector:elegir", () => { throw new Error("selector unavailable"); });
+    const selector = abrirSelector(ventana);
+    await siguiente();
+    const compartir = selector.querySelector<HTMLButtonElement>("#compartir")!;
+    selector.querySelector<HTMLButtonElement>(".fuente")!.click();
+    compartir.click();
+    await siguiente();
+    expect(selector.querySelector("[role=status]")?.textContent).toContain("Intenta de nuevo");
+    expect(compartir.disabled).toBe(false);
+    expect(pedido.responder).not.toHaveBeenCalled();
+    handlers.set("selector:elegir", elegir);
+    compartir.click();
+    await pedido.terminado;
+    expect(pedido.responder).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ video: expect.objectContaining({ id: "screen:1" }) }));
   });
 
   it("denegar permiso explica el bloqueo en la llamada y nunca enumera pantallas", async () => {

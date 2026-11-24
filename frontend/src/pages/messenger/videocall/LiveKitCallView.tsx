@@ -29,7 +29,6 @@ import type { ConexionSala } from "@/lib/coworkTiempoRegla";
 import type { DestinoDeTelemetria } from "@/lib/saludDeLlamada";
 import { cn } from "@/lib/utils";
 import { ajustarConEstaGente, aplicaCalidadPorVoz, calidadDeCamara } from "@/lib/calidadPorVoz";
-import { puedeCompartirPantalla } from "@/lib/compartirPantalla";
 import { toast } from "sonner";
 import { useFaceWatch, faceStateLabel, type FaceWatch } from "@/hooks/useFaceWatch";
 import { useFaceNudge, useScreenShareNudge } from "@/hooks/useFaceNudge";
@@ -903,11 +902,19 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
   const apagadaAManoRef = useRef(false);
   apagadaAManoRef.current = pantallaApagadaAMano;
   const pantallaNegraRef = useRef(false);
+  const expandirMiniaturaNavegador = miniaturaNavegador?.miniatura ? miniaturaNavegador.expandir : undefined;
   const alternarPantallaDesdeBoton = useCallback(() => {
     const l = lkRef.current;
+    // En la miniatura web el clic ocurre en otro documento. El selector del
+    // navegador puede exigir un clic en la ventana que inicia la captura.
+    if (expandirMiniaturaNavegador && !l.isScreenSharing) {
+      expandirMiniaturaNavegador();
+      toast.info(t("messenger.callView.compartirEnVentanaPrincipal"));
+      return;
+    }
     if (enHubVigilado) setPantallaApagadaAMano(l.isScreenSharing);
     return l.toggleScreenShare();
-  }, [enHubVigilado]);
+  }, [enHubVigilado, expandirMiniaturaNavegador, t]);
   useEffect(() => {
     if (!pantallaSola) return;
     const tic = () => {
@@ -1670,9 +1677,7 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
         onVideoInputChange={handleVideoInputChange}
         onOpenVideoSettings={() => setVideoSettingsOpen(true)}
         onOpenMetrics={() => setMetricsOpen(true)}
-        // Los teléfonos no exponen getDisplayMedia: el botón sobraba y hacía
-        // envolver la fila de controles en dos renglones (Jhon, 10/09).
-        hideScreenShare={hideScreenShare || !puedeCompartirPantalla()}
+        hideScreenShare={hideScreenShare}
         hideLeaveButton={hideLeaveButton}
         miniaturaDeEscritorio={enMiniatura}
         leaveLabel={leaveLabel}
