@@ -54,10 +54,16 @@ describe("saber si se puede compartir pantalla", () => {
 describe("qué se le dice a la persona", () => {
   it("en un teléfono, el motivo real y qué hacer en su lugar", () => {
     conGetDisplayMedia(false); conPuntero(true);
+    vi.spyOn(navigator, "userAgent", "get").mockReturnValue("Mozilla/5.0 (iPhone) Mobile");
     const m = motivoDeFalloAlCompartir(new Error("lo que sea"));
     expect(m).toContain("teléfonos");
     expect(m).toContain("computadora");
     expect(m).toContain("Hazlo");   // neutro, sin voseo
+  });
+
+  it("si la captura no está disponible en escritorio, explica dónde reintentar", () => {
+    conGetDisplayMedia(false); conPuntero(false);
+    expect(motivoDeFalloAlCompartir(null)).toContain("ventana principal de la llamada");
   });
 
   // Cerrar el diálogo del navegador es una decisión, no un error. Avisarla

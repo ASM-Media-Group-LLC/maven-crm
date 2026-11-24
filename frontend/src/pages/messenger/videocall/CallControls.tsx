@@ -487,12 +487,26 @@ export default function CallControls({
   const anchoBoton = compact ? (tactil ? "w-9" : "w-8") : "w-11";
   const iconSize = compact && !tactil ? "h-3.5 w-3.5" : "h-[18px] w-[18px]";
 
+  const botonDePantalla = !hideScreenShare && (
+    <ControlBtn
+      icon={isScreenSharing ? MonitorOff : Monitor}
+      active={isScreenSharing || undefined}
+      onClick={onToggleScreenShare}
+      // Si la captura no está disponible, el mismo botón explica el motivo.
+      label={t("messenger.call.compartirPantalla")}
+      className={puedeCompartir ? undefined : "opacity-60"}
+      compact={compact || miniaturaDeEscritorio}
+      tactil={tactil}
+    />
+  );
+
   if (miniaturaDeEscritorio) {
     const LeaveIcon = leaveIcon ?? PhoneOff;
     return (
       <div className="flex shrink-0 items-center justify-center gap-2 bg-background px-2 pb-1.5 pt-1">
         <ControlBtn icon={isMicOn ? Mic : MicOff} active={isMicOn} onClick={onToggleMic} label={t("messenger.call.microfono")} compact />
         <ControlBtn icon={isCamOn ? VideoIcon : VideoOff} active={isCamOn} onClick={onToggleCam} label={t("messenger.input.camara")} compact />
+        {botonDePantalla}
         {!hideLeaveButton && (
           <button type="button" onClick={onLeave} aria-label={leaveLabel || t("messenger.call.colgar")}
             className="flex h-8 w-12 items-center justify-center rounded-full bg-destructive text-destructive-foreground hover:bg-destructive/90">
@@ -635,28 +649,7 @@ export default function CallControls({
           </div>
         )}
 
-        {!hideScreenShare && (
-          <ControlBtn
-            icon={isScreenSharing ? MonitorOff : Monitor}
-            active={!isScreenSharing ? undefined : true}
-            onClick={onToggleScreenShare}
-            // El botón sigue tocándose aunque el teléfono no pueda compartir:
-            // así el toque explica POR QUÉ no se puede. Deshabilitarlo sería
-            // peor — en una pantalla táctil no hay hover, o sea que nadie
-            // llegaría a leer el motivo.
-            //
-            // El NOMBRE no cambia con la detección, a propósito. Atarlo a
-            // `puedeCompartir` hacía que el botón se llamara distinto en
-            // cualquier entorno donde `navigator.mediaDevices` no exista —
-            // empezando por los tests, que fue donde se notó. Un control que
-            // cambia de nombre accesible según una detección es peor que uno
-            // que siempre se llama igual y explica al tocarlo.
-            label={t("messenger.call.compartirPantalla")}
-            className={puedeCompartir ? undefined : "opacity-60"}
-            compact={compact}
-            tactil={tactil}
-          />
-        )}
+        {botonDePantalla}
 
         {/* Reactions — el z-[200] del content NO es decorativo: sin él el menú
             se dibuja detrás del Supervisor Hub (z-120) y de la ventanita de

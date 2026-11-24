@@ -2943,7 +2943,7 @@ export function useLiveKit() {
       // para que el mensaje diga el motivo real en vez de un error del navegador.
       if (newState && !puedeCompartirPantalla()) {
         toast.info(traducir("shared.call.screenShareUnavailable"), {
-          description: traducir("shared.call.screenShareUnavailableDesc"),
+          description: motivoDeFalloAlCompartir(null) ?? undefined,
         });
         return;
       }

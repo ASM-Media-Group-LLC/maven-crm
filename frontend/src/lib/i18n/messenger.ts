@@ -518,6 +518,7 @@ export const messenger = {
 
   // Llamada: la vista de la llamada (LiveKitCallView).
   "messenger.callView.tocaCompartir": { es: "Toca «Compartir pantalla» para volver a compartirla", en: "Tap “Share screen” to share it again" },
+  "messenger.callView.compartirEnVentanaPrincipal": { es: "Toca «Compartir pantalla» en la ventana principal de la llamada", en: "Select “Share screen” in the main call window" },
   "messenger.callView.confirmarSalirGrabando": { es: "Estás grabando esta reunión. Si sales, la grabación se detiene y queda guardada en Grabaciones. ¿Salir?", en: "You're recording this meeting. If you leave, the recording stops and is saved in Recordings. Leave?" },
   "messenger.callView.llamadaFinalizada": { es: "Llamada finalizada", en: "Call ended" },
   "messenger.callView.noSePudoAplicar": { es: "No se pudo aplicar la acción", en: "Couldn't apply the action" },

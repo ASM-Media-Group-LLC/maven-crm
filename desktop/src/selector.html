@@ -20,7 +20,8 @@
   .fuente.elegida { border-color: #bed161; }
   .fuente img { width: 100%; aspect-ratio: 16/10; object-fit: contain; background: #0a0f1a; border-radius: 8px; display: block; }
   .fuente span { display: block; margin-top: 6px; font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: #cfd5e1; }
-  footer { display: flex; justify-content: flex-end; gap: 10px; padding: 14px 22px 18px; border-top: 1px solid rgba(255,255,255,.06); }
+  footer { display: flex; align-items: center; justify-content: flex-end; gap: 10px; padding: 14px 22px 18px; border-top: 1px solid rgba(255,255,255,.06); }
+  #estado { margin-right: auto; }
   footer button { font: inherit; border-radius: 999px; padding: 9px 22px; cursor: pointer; border: 1px solid rgba(255,255,255,.22); background: transparent; color: #fff; }
   footer button.ok { background: #bed161; color: #1c2108; border-color: #bed161; font-weight: 600; }
   footer button.ok:disabled { opacity: .4; cursor: default; }
@@ -38,13 +39,31 @@
 </nav>
 <main id="lista"></main>
 <footer>
+  <p id="estado" role="status">Buscando pantallas y ventanas…</p>
   <button id="cancelar">Cancelar</button>
   <button id="compartir" class="ok" disabled>Compartir</button>
 </footer>
 <script>
-  let fuentes = [], tipo = "pantalla", elegida = null;
+  let fuentes = [], tipo = "pantalla", elegida = null, enviando = false;
   const lista = document.getElementById("lista");
   const btn = document.getElementById("compartir");
+  const estado = document.getElementById("estado");
+  const instruccion = () => tipo === "pantalla" ? "Selecciona una pantalla para compartir." : "Selecciona una ventana para compartir.";
+
+  async function confirmar(id) {
+    if (enviando) return;
+    enviando = true;
+    btn.disabled = true;
+    estado.textContent = id === null ? "Cerrando…" : "Abriendo tu selección…";
+    try {
+      await window.selector.elegir(id);
+    } catch {
+      enviando = false;
+      btn.disabled = elegida === null;
+      estado.textContent = "No se pudo confirmar. Intenta de nuevo o cierra el selector.";
+    }
+  }
+
   function pintar() {
     lista.textContent = "";
     const visibles = fuentes.filter((f) => f.pantalla === (tipo === "pantalla"));
@@ -58,25 +77,43 @@
     }
     visibles.forEach((f, i) => {
       const b = document.createElement("button");
-      b.className = "fuente" + (f.id === elegida ? " elegida" : "");
+      b.className = "fuente";
+      b.setAttribute("aria-pressed", "false");
       const img = document.createElement("img"); img.src = f.imagen; img.alt = "";
       const s = document.createElement("span");
       s.textContent = f.pantalla ? (visibles.length > 1 ? "Pantalla " + (i + 1) : "Toda la pantalla") : f.nombre;
       b.append(img, s);
-      b.onclick = () => { elegida = f.id; btn.disabled = false; pintar(); };
-      b.ondblclick = () => window.selector.elegir(f.id);
+      b.onclick = () => {
+        if (enviando) return;
+        elegida = f.id;
+        for (const opcion of lista.querySelectorAll(".fuente")) {
+          opcion.classList.toggle("elegida", opcion === b);
+          opcion.setAttribute("aria-pressed", String(opcion === b));
+        }
+        btn.disabled = false;
+        estado.textContent = s.textContent;
+      };
+      b.ondblclick = () => { void confirmar(f.id); };
       lista.appendChild(b);
     });
   }
   document.querySelectorAll("nav button").forEach((b) => b.onclick = () => {
+    if (enviando || tipo === b.dataset.tipo) return;
     tipo = b.dataset.tipo; elegida = null; btn.disabled = true;
     document.querySelectorAll("nav button").forEach((x) => x.classList.toggle("activo", x === b));
+    estado.textContent = instruccion();
     pintar();
   });
-  document.getElementById("cancelar").onclick = () => window.selector.elegir(null);
-  btn.onclick = () => elegida && window.selector.elegir(elegida);
-  addEventListener("keydown", (e) => { if (e.key === "Escape") window.selector.elegir(null); });
-  window.selector.fuentes().then((f) => { fuentes = f; pintar(); });
+  document.getElementById("cancelar").onclick = () => { void confirmar(null); };
+  btn.onclick = () => { if (elegida !== null) void confirmar(elegida); };
+  addEventListener("keydown", (e) => { if (e.key === "Escape") void confirmar(null); });
+  window.selector.fuentes().then((f) => {
+    fuentes = f;
+    estado.textContent = instruccion();
+    pintar();
+  }).catch(() => {
+    estado.textContent = "No se pudieron cargar las pantallas. Cierra el selector y vuelve a intentarlo.";
+  });
 </script>
 </body>
 </html>
