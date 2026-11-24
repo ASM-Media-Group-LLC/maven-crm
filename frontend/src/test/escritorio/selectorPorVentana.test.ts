@@ -1,6 +1,19 @@
 import { describe, it, expect, vi } from "vitest";
-import { EventEmitter } from "node:events";
-import path from "node:path";
+// Doble de los eventos de Electron sin depender de tipos de Node en el frontend.
+class EventEmitter {
+  listeners = new Map<string, Set<(...args: unknown[]) => void>>();
+  on(name: string, fn: (...args: unknown[]) => void) {
+    if (!this.listeners.has(name)) this.listeners.set(name, new Set());
+    this.listeners.get(name)!.add(fn); return this;
+  }
+  once(name: string, fn: (...args: unknown[]) => void) {
+    const once = (...args: unknown[]) => { this.removeListener(name, once); fn(...args); };
+    return this.on(name, once);
+  }
+  removeListener(name: string, fn: (...args: unknown[]) => void) { this.listeners.get(name)?.delete(fn); return this; }
+  emit(name: string, ...args: unknown[]) { for (const fn of [...(this.listeners.get(name) ?? [])]) fn(...args); }
+}
+const path = { join: (...parts: string[]) => parts.join("/") };
 
 const codigo = Object.values(import.meta.glob("../../../../desktop/src/compartirPantalla.js", { query: "?raw", import: "default", eager: true }))[0] as string;
 
@@ -120,7 +133,7 @@ describe("compartir desde la ventana que lo solicita", () => {
     llamada.close();
     await pedido.terminado;
     expect(pedido.responder).toHaveBeenCalledExactlyOnceWith({});
-    expect(p.ventanas.at(-1)?.isDestroyed()).toBe(true);
+    expect(p.ventanas[p.ventanas.length - 1]?.isDestroyed()).toBe(true);
     expect(p.liberar).toHaveBeenCalledOnce();
   });
 });
