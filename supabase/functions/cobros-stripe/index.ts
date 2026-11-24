@@ -1,11 +1,11 @@
 // COBROS DE MAVEN CON STRIPE — solo en el EDIFICIO (maven-agencias, ezeigddgkaemxpshghmu).
 // Kash no cobra por aquí y esta función NO se publica en Kash (infra/casas/funciones-solo-edificio.txt).
-// Decisión de Alvaro (19/11/2026, tanda 8): cuenta de Stripe de Lumina, cobros a nombre de Maven.
+// Decisión de Alvaro (23/11/2026): cuenta propia de Maven bajo TECH VISUALS LLC.
 //
 // Acciones (POST {accion, …}):
 //   registro            público (con tope por IP): crea la cuenta, el cliente (activa, una
 //                       agencia), su admin y el Checkout de Stripe (14 días gratis, tarjeta
-//                       obligatoria, setup USD 3.000 como pago único) → {url}.
+//                       obligatoria; implementación opcional cotizada aparte) → {url}.
 //   checkout-registro   admin del cliente: vuelve a abrir el Checkout si no terminó de poner la tarjeta.
 //   portal              admin del cliente (o el dueño): portal de Stripe (tarjeta y facturas) → {url}.
 //   checkout-recarga    admin del cliente (o el dueño): recarga de Argos (paga 25 → 50 de crédito) → {url}.
@@ -32,7 +32,6 @@ import {
   type EstadoOrg,
   esPlan,
   leerEvento,
-  montoDeProducto,
   type NombrePlan,
   opcionesEspeciales,
   paramsCheckoutRecarga,
@@ -41,11 +40,11 @@ import {
   planDe,
   type Precios,
   preciosDeFilas,
-  PRODUCTOS_MAVEN,
   validarRegistro,
   verificarFirmaStripe,
 } from "./logica.ts";
 import { ErrorStripe, type Json, stripe } from "./stripe.ts";
+import { prepararCatalogo } from "./catalogo.ts";
 
 const cors = (req: Request) =>
   corsFor(req, { "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type", "Access-Control-Allow-Methods": "POST, OPTIONS" });
@@ -215,7 +214,7 @@ async function webhook(req: Request, db: SupabaseClient): Promise<Response> {
   const leido = leerEvento(evento);
   if (!leido.ev) return responder(req, { ok: true, ignorado: evento?.type ?? null });
 
-  // La cuenta de Stripe es la de Lumina: un evento que no es de un cliente de Maven se ignora.
+  // Un evento que no corresponde a una organización de Maven se ignora.
   let orgId = leido.organizacionId;
   if (!orgId && leido.customer) {
     const { data } = await db.from("organizaciones").select("id").eq("cobro->>stripe_customer_id", leido.customer).maybeSingle();
@@ -297,12 +296,12 @@ async function registro(req: Request, db: SupabaseClient, b: Json): Promise<Resp
     await rpc(db, "crear_agencia", { _org: orgId, _nombre: empresa, _sillas: p.personas, _slug: null });
     await rpc(db, "agregar_admin_organizacion", { _org: orgId, _user: userId, _principal: true });
     await rpc(db, "activar_organizacion", { _org: orgId });
-    await actualizarCobro(db, orgId, { origen: "registro", estado_pago: "pendiente_checkout", correo });
+    await actualizarCobro(db, orgId, { origen: "registro", estado_pago: "pendiente_checkout", correo, sin_setup: true });
     const org = (await leerOrg(db, orgId))!;
     const customer = await asegurarCustomer(db, org, correo);
     const sesion = await stripe("POST", "checkout/sessions", paramsCheckoutSuscripcion({
       precios, plan, organizacionId: orgId, customer, appUrl: appUrl(),
-      diasPrueba: precios.prueba.dias, sinSetup: false, precioAMedidaUsd: null, origen: "registro", idioma,
+      diasPrueba: precios.prueba.dias, sinSetup: true, precioAMedidaUsd: null, origen: "registro", idioma,
     }), { idem: `maven-registro-${orgId}` });
     return responder(req, { ok: true, url: sesion.url, organizacion_id: orgId });
   } catch (e) {
@@ -367,7 +366,7 @@ async function accionAutenticada(req: Request, db: SupabaseClient, accion: strin
     const s = await stripe("POST", "checkout/sessions", paramsCheckoutSuscripcion({
       precios, plan, organizacionId: org.id, customer, appUrl: appUrl(),
       diasPrueba: ep === "cancelada" ? 0 : Number(org.cobro?.dias_gratis ?? precios.prueba.dias),
-      sinSetup: org.cobro?.sin_setup === true || ep === "cancelada",
+      sinSetup: true,
       precioAMedidaUsd: org.cobro?.precio_a_medida ?? null,
       origen: org.cobro?.origen === "dueno" ? "dueno" : "registro",
     }));
@@ -423,40 +422,7 @@ async function suscribirCliente(req: Request, db: SupabaseClient, q: Quien, b: J
 /** Crea en Stripe lo que falte (idempotente por lookup_key) y guarda los ids en precios_plataforma. */
 async function prepararProductos(db: SupabaseClient): Promise<Json> {
   const precios = await leerPrecios(db);
-  const productos: Record<string, string> = { ...(precios.stripe.productos ?? {}) } as Record<string, string>;
-  const ids: Record<string, string> = { ...(precios.stripe.precios ?? {}) } as Record<string, string>;
-  const hecho: Json = {};
-  for (const p of PRODUCTOS_MAVEN) {
-    const monto = montoDeProducto(precios, p.clave);
-    const q = new URLSearchParams({ "lookup_keys[]": p.lookup, active: "true", "expand[]": "data.product" });
-    const ya = (await stripe("GET", "prices", q)).data?.[0] as Json | undefined;
-    if (ya && ya.unit_amount === monto && !!ya.recurring === p.mensual) {
-      productos[p.clave] = typeof ya.product === "string" ? ya.product : ya.product.id;
-      ids[p.clave] = ya.id;
-      hecho[p.clave] = "ya_estaba";
-      continue;
-    }
-    let producto = productos[p.clave] ?? (typeof ya?.product === "object" ? ya.product.id : ya?.product);
-    if (!producto) {
-      const buscado = await stripe("GET", "products/search", new URLSearchParams({ query: `metadata['maven_clave']:'${p.clave}'` }));
-      producto = buscado.data?.[0]?.id;
-    }
-    if (!producto) {
-      const nuevo = await stripe("POST", "products", new URLSearchParams({
-        name: p.nombre, "metadata[maven]": "1", "metadata[maven_clave]": p.clave,
-      }), { idem: `maven-producto-${p.clave}` });
-      producto = nuevo.id;
-    }
-    const params = new URLSearchParams({
-      product: producto!, currency: "usd", unit_amount: String(monto), lookup_key: p.lookup, transfer_lookup_key: "true",
-      "metadata[maven]": "1", "metadata[maven_clave]": p.clave,
-    });
-    if (p.mensual) params.set("recurring[interval]", "month");
-    const precio = await stripe("POST", "prices", params);
-    productos[p.clave] = producto!;
-    ids[p.clave] = precio.id;
-    hecho[p.clave] = ya ? "precio_nuevo" : "creado";
-  }
+  const { productos, precios: ids, hecho } = await prepararCatalogo(precios, stripe);
   const { error } = await db.from("precios_plataforma")
     .upsert({ clave: "stripe", valor: { productos, precios: ids }, actualizado_at: new Date().toISOString() }, { onConflict: "clave" });
   if (error) throw new Error(`no se guardaron los ids de Stripe: ${error.message}`);

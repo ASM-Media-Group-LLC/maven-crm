@@ -92,7 +92,8 @@ export const portada = {
   "portada.plan.enterprise4": { es: "Instalación e integraciones a tu medida", en: "Custom installation and integrations" },
   "portada.plan.enterprise5": { es: "Acompañamiento dedicado", en: "Dedicated support" },
   "portada.precios.nota": { es: "Precio fijo por empresa, no por persona.", en: "A fixed price per company, not per person." },
-  "portada.precios.notaInstalacion": { es: "Instalación e integraciones a la medida para tu empresa: desde USD\u00a03.000, pago único.", en: "Custom installation and integrations for your company: from USD\u00a03,000, one-time payment." },
+  "portada.precios.implementacionOpcional": { es: "Implementación opcional, con cotización según el alcance y el tiempo de trabajo. Se contrata y cobra por separado.", en: "Optional implementation, quoted based on scope and time required. Agreed and billed separately." },
+  "portada.precios.solicitarCotizacion": { es: "Solicitar cotización", en: "Request a quote" },
 
   "portada.cierre.titulo": { es: "Tu equipo,", en: "Your team," },
   "portada.cierre.tituloAcento": { es: "trabajando de verdad.", en: "really working." },
