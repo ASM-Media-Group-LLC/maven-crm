@@ -1,0 +1,22 @@
+import React from 'react';
+import { createRoot } from 'react-dom/client';
+import { LanguageProvider } from './src/hooks/useLanguage';
+import VideosEnMiniatura from './src/pages/messenger/videocall/VideosEnMiniatura';
+import Barra from './src/pages/messenger/videocall/BarraMiniaturaLlamada';
+import './src/index.css';
+import diccionario from './src/lib/diccionario';
+import { registrarDiccionario, cargarIdioma, fijarIdioma } from './src/lib/i18n';
+registrarDiccionario(diccionario); await cargarIdioma('es'); fijarIdioma('es'); localStorage.setItem('app-language','es');
+const dark = !location.search.includes('light');
+document.documentElement.classList.toggle('dark', dark);
+document.documentElement.style.setProperty('--primary', '215 55% 24%');
+const canvas = document.createElement('canvas'); canvas.width=1280;canvas.height=720;
+const c=canvas.getContext('2d')!;
+c.fillStyle='#f8fafc';c.fillRect(0,0,1280,720);c.fillStyle='#17324d';c.fillRect(0,0,1280,90);c.fillStyle='white';c.font='32px sans-serif';c.fillText('Plan semanal · Documento de prueba',50,55);c.fillStyle='#26384a';c.font='26px sans-serif';['Prioridades del equipo','1. Revisar la propuesta','2. Compartir resultados','3. Coordinar la próxima reunión'].forEach((t,i)=>c.fillText(t,60,160+i*100));
+const stream=canvas.captureStream(1); setInterval(()=>{c.fillStyle="#18334d";c.fillRect(0,719,1280,1)},500);
+const screenTrack={attach:(el:HTMLVideoElement)=>{el.src="/qa-screen.mp4";el.loop=true;el.muted=true},detach:(el:HTMLVideoElement)=>{el.removeAttribute("src")}};
+const pubs=new Map([['screen',{source:'screen_share',track:screenTrack}]]);
+const room={remoteParticipants:new Map([['presenter',{videoTrackPublications:pubs,audioTrackPublications:new Map(),on:()=>{},off:()=>{}}]]),on:()=>{},off:()=>{}};
+const p={sid:'presenter',identity:'presenter',name:'Presentadora de prueba',isLocal:false,isSpeaking:false,isMuted:true,isCameraOff:true,isScreenSharing:false,hasVideoTrack:false,reactions:[],connectionQuality:'excellent'};
+function App(){return <LanguageProvider><main className="bg-background text-foreground p-8 min-h-screen"><h1 className="text-xl mb-5">Miniatura de llamada · presentación</h1><div className="border border-border rounded-xl overflow-hidden bg-card flex flex-col" style={{width:400,height:310}}><Barra nombre="Reunión del equipo" anclada onExpandir={()=>{}}/><div className="flex-1 min-h-0 p-2"><VideosEnMiniatura participantes={[p,{...p,sid:'presenter-screen',isCameraOff:false,isScreenSharing:true,esTileDePantalla:true,hasVideoTrack:true}]} vozActiva={null} room={room as any}/></div><div className="text-xs border-t border-border p-2 text-center">Micrófono · Cámara · Compartir · Colgar</div></div></main></LanguageProvider>}
+createRoot(document.getElementById('root')!).render(<App/>);

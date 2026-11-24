@@ -1,7 +1,7 @@
 {
   "name": "maven-escritorio",
   "productName": "Maven",
-  "version": "2.0.0",
+  "version": "2.1.2611232358",
   "description": "Maven para el computador (Mac y Windows)",
   "author": "ASM Media Group LLC",
   "private": true,
@@ -16,8 +16,23 @@
     "appId": "me.maven-ai.escritorio",
     "productName": "Maven",
     "copyright": "ASM Media Group LLC",
-    "protocols": [{ "name": "Maven", "schemes": ["maven"] }],
-    "electronLanguages": ["en-US", "es", "es-419", "de", "fr", "it", "pt-BR"],
+    "protocols": [
+      {
+        "name": "Maven",
+        "schemes": [
+          "maven"
+        ]
+      }
+    ],
+    "electronLanguages": [
+      "en-US",
+      "es",
+      "es-419",
+      "de",
+      "fr",
+      "it",
+      "pt-BR"
+    ],
     "directories": {
       "output": "dist",
       "buildResources": "build"
