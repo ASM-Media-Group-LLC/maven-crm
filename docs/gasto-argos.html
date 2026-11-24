@@ -1,0 +1,127 @@
+<title>Cuánto gasta Argos</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;700&display=swap">
+<style>
+/* Layout: una sola columna de lectura; arriba el número que importa, después
+   de dónde sale, ejemplos con la cuenta hecha y lo que NO cuesta. */
+:root {
+  --bg: #f4f6fa; --card: #ffffff; --fg: #141a26; --muted: #5b6577; --line: #dde2ec;
+  --accent: #6d4fd8; --accent-soft: #ece7fd; --ok: #1f8a5b; --ok-soft: #e3f4ec; --warn: #b26a00; --warn-soft: #fdf0dc;
+  --display: "Space Grotesk", "Inter", system-ui, sans-serif;
+  --body: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #0f131c; --card: #171d29; --fg: #e8ecf4; --muted: #9aa4b6; --line: #262e3d;
+  --accent: #a48cff; --accent-soft: #261f45; --ok: #4fd296; --ok-soft: #12291f; --warn: #f0b04f; --warn-soft: #2e2311; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #0f131c; --card: #171d29; --fg: #e8ecf4; --muted: #9aa4b6; --line: #262e3d;
+  --accent: #a48cff; --accent-soft: #261f45; --ok: #4fd296; --ok-soft: #12291f; --warn: #f0b04f; --warn-soft: #2e2311; color-scheme: dark }
+body { background: var(--bg); color: var(--fg); font-family: var(--body); font-size: 16px; line-height: 1.55; }
+main { max-width: 760px; margin: 0 auto; padding-block: 32px 56px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); display: grid; gap: 28px; }
+h1, h2 { font-family: var(--display); text-wrap: balance; margin: 0; letter-spacing: -0.01em; }
+h1 { font-size: clamp(28px, 6vw, 40px); }
+h2 { font-size: 21px; }
+p { margin: 0; }
+.eyebrow { font-size: 12px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); font-weight: 600; }
+.lead { color: var(--muted); max-width: 62ch; }
+.big { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.tile { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 16px; display: grid; gap: 4px; min-width: 0; }
+.tile b { font-family: var(--display); font-size: 28px; font-variant-numeric: tabular-nums; }
+.tile.main { background: var(--accent-soft); border-color: transparent; }
+.tile.main b { color: var(--accent); }
+.tile span { color: var(--muted); font-size: 14px; }
+section { display: grid; gap: 12px; }
+.flow { display: grid; gap: 10px; }
+.step { display: grid; grid-template-columns: 34px minmax(0,1fr); gap: 12px; align-items: start; background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 14px; }
+.step .n { width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; font-family: var(--display); font-weight: 700; background: var(--accent-soft); color: var(--accent); }
+.step strong { display: block; }
+.step p { color: var(--muted); font-size: 15px; }
+.pill { display: inline-block; font-size: 12px; font-weight: 600; padding: 2px 9px; border-radius: 99px; margin-left: 6px; vertical-align: 2px; }
+.pill.free { background: var(--ok-soft); color: var(--ok); }
+.pill.paid { background: var(--accent-soft); color: var(--accent); }
+.ej { display: grid; gap: 10px; }
+.cuenta { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; display: grid; gap: 6px; }
+.cuenta .q { font-weight: 600; }
+.cuenta code { font-family: var(--body); font-variant-numeric: tabular-nums; color: var(--muted); font-size: 15px; }
+.cuenta .r { font-family: var(--display); font-weight: 700; color: var(--accent); font-variant-numeric: tabular-nums; }
+.tabla-wrap { overflow-x: auto; background: var(--card); border: 1px solid var(--line); border-radius: 12px; }
+table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; font-size: 15px; }
+th, td { text-align: left; padding: 10px 14px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+th { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); font-weight: 600; }
+td.num, th.num { text-align: right; }
+tr:last-child td { border-bottom: 0; }
+.nota { background: var(--warn-soft); color: var(--fg); border-radius: 12px; padding: 14px 16px; display: grid; gap: 4px; }
+.nota strong { color: var(--warn); }
+ul.gratis { margin: 0; padding-left: 20px; display: grid; gap: 6px; }
+.pie { color: var(--muted); font-size: 13px; }
+@media (max-width: 560px) { .big { grid-template-columns: 1fr; } }
+</style>
+
+<main>
+  <header style="display:grid;gap:10px">
+    <span class="eyebrow">Argos · datos reales del 14 al 17 de noviembre</span>
+    <h1>Cuánto gasta Argos</h1>
+    <p class="lead">Lo único que Argos paga es la IA de Google (Gemini) cuando <strong>mira un pantallazo</strong> y dice qué está haciendo la persona. Cada foto que mira cuesta <strong>USD 0,0022</strong>, o sea unos 9 pesos colombianos. Todo lo demás va dentro de lo que ya se paga.</p>
+  </header>
+
+  <div class="big">
+    <div class="tile main"><span>Un día completo de trabajo</span><b>~USD 11</b><span>unos 5.000 pantallazos mirados</span></div>
+    <div class="tile"><span>Al mes</span><b>~USD 330</b><span>si todos los días son así</span></div>
+    <div class="tile"><span>Por persona al día</span><b>~USD 0,40</b><span>entre 25 y 34 personas vigiladas</span></div>
+  </div>
+
+  <section>
+    <h2>Dónde se gasta, paso a paso</h2>
+    <div class="flow">
+      <div class="step"><span class="n">1</span><div><strong>Foto de la cámara cada minuto <span class="pill free">gratis</span></strong><p>La saca el navegador de cada persona. Se guarda y se ve en el expediente. No pasa por la IA.</p></div></div>
+      <div class="step"><span class="n">2</span><div><strong>Pantallazo cada minuto <span class="pill free">gratis</span></strong><p>Igual que la cámara: se guarda. Unos 11.000 al día entre todos.</p></div></div>
+      <div class="step"><span class="n">3</span><div><strong>La IA mira 1 de cada 2 pantallazos <span class="pill paid">USD 0,0022 c/u</span></strong><p>Aquí está casi todo el gasto. Dice qué programa usa y si es de trabajo («CRM Maven · gestionando chats con fans»). Unos 400 a 500 por hora en el turno de día.</p></div></div>
+      <div class="step"><span class="n">4</span><div><strong>«No se te ve la cara»: la IA confirma <span class="pill paid">nuevo, solo si hay duda</span></strong><p>Desde hoy, solo cuando el detector del computador no encuentra la cara por ~9 segundos se manda UNA foto a la IA. Como mucho una por minuto por persona mientras dure la duda.</p></div></div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Ejemplos con la cuenta hecha</h2>
+    <div class="ej">
+      <div class="cuenta"><span class="q">Una hora del turno de día (hoy de 9 a 10 a. m.)</span><code>413 pantallazos mirados × USD 0,0022</code><span class="r">= USD 0,91 esa hora</span></div>
+      <div class="cuenta"><span class="q">Un chatter en su turno de 8 horas</span><code>480 pantallazos → la IA mira la mitad, 240 × USD 0,0022</code><span class="r">= USD 0,53 por su turno</span></div>
+      <div class="cuenta"><span class="q">El domingo 15 de noviembre, todo el equipo</span><code>5.118 pantallazos mirados × USD 0,0022</code><span class="r">= USD 11,26 el día</span></div>
+      <div class="cuenta"><span class="q">Una recarga de USD 20 en Google</span><code>USD 20 ÷ ~USD 11 al día</code><span class="r">= dura casi 2 días</span></div>
+      <div class="cuenta"><span class="q">La confirmación de cara (lo nuevo), un día con muchas dudas</span><code>300 dudas en todo el equipo × ≤ USD 0,002</code><span class="r">≤ USD 0,60 el día</span></div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Día por día</h2>
+    <div class="tabla-wrap">
+      <table>
+        <thead><tr><th>Día</th><th class="num">Personas</th><th class="num">Pantallazos</th><th class="num">Mirados por la IA</th><th class="num">Gasto</th></tr></thead>
+        <tbody>
+          <tr><td>Vie 14 nov</td><td class="num">31</td><td class="num">10.984</td><td class="num">4.896</td><td class="num">USD 10,77</td></tr>
+          <tr><td>Dom 15 nov</td><td class="num">25</td><td class="num">10.114</td><td class="num">5.118</td><td class="num">USD 11,26</td></tr>
+          <tr><td>Lun 16 nov</td><td class="num">32</td><td class="num">13.970</td><td class="num">1.498</td><td class="num">USD 3,30</td></tr>
+          <tr><td>Mar 17 nov (hasta las 3 p. m.)</td><td class="num">34</td><td class="num">6.997</td><td class="num">3.095</td><td class="num">USD 6,81</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="pie">El lunes 16 gastó poco porque Argos estuvo apagado buena parte del día: se acabó el saldo de Google.</p>
+  </section>
+
+  <section>
+    <h2>Lo que Argos NO paga aparte</h2>
+    <ul class="gratis">
+      <li><strong>La voz de Javi y Mario</strong> (avisos hablados): va dentro de tu plan de ElevenLabs. USD 0.</li>
+      <li><strong>Guardar las fotos</strong>: van a la base de Maven y después al NAS. Ya se pagan con Supabase.</li>
+      <li><strong>El vigía cada 2 minutos</strong> (quién está fuera, sin pantalla, en pausa de más): corre en la base. Sin costo extra.</li>
+      <li><strong>Las fotos de cámara</strong>: no las mira la IA, salvo la confirmación de cara de arriba.</li>
+    </ul>
+  </section>
+
+  <div class="nota">
+    <strong>Para que no se vuelva a apagar</strong>
+    <p>Con USD 20 Argos dura menos de 2 días. Si prendes la recarga automática en Google AI Studio (Billing), no se vuelve a quedar sin saldo. Y anota en Maven › Costos la recarga de USD 20 de hoy: la tarjeta de saldo todavía no la tiene.</p>
+  </div>
+
+  <p class="pie">Precio por foto medido el 13/11 con la factura de Google AI Studio: USD 3,46 por ~1.600 fotos. Conteos sacados de la base de Maven el 17/11/2026 a las 3 p. m. (hora de Colombia).</p>
+</main>

@@ -1,0 +1,142 @@
+<title>¿Argos al 80 % atrapa lo mismo?</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;700&display=swap">
+<style>
+/* Layout: misma familia que «Las fotos de Argos hoy». Primero la respuesta,
+   después la prueba caso por caso con las malas reales de hoy, el caso dudoso,
+   cómo asegurarlo del todo y la opción aún más barata con precios. */
+:root {
+  --bg: #f3f5f9; --card: #ffffff; --fg: #141a26; --muted: #5b6577; --line: #dde2ec;
+  --accent: #6d4fd8; --accent-soft: #ece7fd;
+  --free: #1f8a5b; --free-soft: #e2f3ea; --paid: #c24a2c; --paid-soft: #fbe7e1; --warn: #a86400; --warn-soft: #fbf0dd;
+  --display: "Space Grotesk", "Inter", system-ui, sans-serif;
+  --body: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #0f131c; --card: #171d29; --fg: #e8ecf4; --muted: #9aa4b6; --line: #283041;
+  --accent: #a48cff; --accent-soft: #261f45; --free: #4fd296; --free-soft: #11281e; --paid: #ff8a6b; --paid-soft: #33180f; --warn: #f0b04f; --warn-soft: #2e2311; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #0f131c; --card: #171d29; --fg: #e8ecf4; --muted: #9aa4b6; --line: #283041;
+  --accent: #a48cff; --accent-soft: #261f45; --free: #4fd296; --free-soft: #11281e; --paid: #ff8a6b; --paid-soft: #33180f; --warn: #f0b04f; --warn-soft: #2e2311; color-scheme: dark }
+body { background: var(--bg); color: var(--fg); font-family: var(--body); font-size: 17px; line-height: 1.55; }
+main { max-width: 700px; margin: 0 auto; padding-block: 32px 60px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); display: grid; gap: 18px; }
+h1, h2 { font-family: var(--display); text-wrap: balance; margin: 0; letter-spacing: -0.01em; }
+h1 { font-size: clamp(28px, 7vw, 40px); }
+h2 { font-size: 20px; }
+p { margin: 0; }
+.eyebrow { font-size: 12px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); font-weight: 600; }
+.lead { color: var(--muted); }
+.card { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 18px; display: grid; gap: 12px; }
+.resp { background: var(--accent-soft); border-radius: 16px; padding: 20px; display: grid; gap: 8px; }
+.big { font-family: var(--display); font-size: 40px; font-weight: 700; color: var(--accent); line-height: 1.05; font-variant-numeric: tabular-nums; }
+.free { color: var(--free); } .paid { color: var(--paid); } .warn { color: var(--warn); }
+.grupos { display: grid; gap: 10px; }
+.grupo { display: grid; grid-template-columns: 74px minmax(0,1fr); gap: 14px; align-items: center; border-radius: 12px; padding: 12px 14px; }
+.grupo .n { font-family: var(--display); font-size: 32px; font-weight: 700; text-align: center; font-variant-numeric: tabular-nums; }
+.grupo p { font-size: 15px; color: var(--muted); }
+.grupo strong { color: var(--fg); display: block; font-size: 16px; }
+.g-ok { background: var(--free-soft); } .g-ok .n { color: var(--free); }
+.g-cont { background: var(--accent-soft); } .g-cont .n { color: var(--accent); }
+.g-duda { background: var(--warn-soft); } .g-duda .n { color: var(--warn); }
+.puntos { display: flex; flex-wrap: wrap; gap: 5px; }
+.puntos i { width: 16px; height: 16px; border-radius: 4px; display: block; }
+.ley { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 14px; color: var(--muted); }
+.dot { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 6px; }
+.ej { display: grid; gap: 8px; }
+.ejf { display: grid; grid-template-columns: 58px minmax(0,1fr); gap: 10px; font-size: 15px; align-items: start; }
+.ejf .h { color: var(--muted); font-variant-numeric: tabular-nums; }
+.ejf .q small { display: block; color: var(--muted); font-size: 13px; }
+svg.dib { width: 100%; height: auto; display: block; }
+svg.dib text { font-family: var(--body); fill: var(--fg); }
+table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; font-size: 15px; }
+.tw { overflow-x: auto; }
+th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); font-weight: 600; }
+td.n, th.n { text-align: right; white-space: nowrap; }
+tr:last-child td { border-bottom: 0; }
+tr.mejor td { background: var(--free-soft); }
+.pie { color: var(--muted); font-size: 13px; }
+</style>
+
+<main>
+  <header style="display:grid;gap:8px">
+    <span class="eyebrow">Prueba con las malas reales de hoy · hasta las 4:30 p. m.</span>
+    <h1>¿Argos al 80 % atrapa lo mismo?</h1>
+  </header>
+
+  <div class="resp">
+    <span class="eyebrow">La respuesta corta</span>
+    <div class="big">31 de 32</div>
+    <p>Hoy Argos marcó <strong>37 fotos malas</strong>. Son <strong>32 escapadas</strong> distintas: a veces una misma escapada salió en 2 o 3 fotos seguidas. Con el filtro de «¿cambió la pantalla?» se habrían atrapado <strong>31 de las 32 (97 %)</strong>. La que falta es un caso en el que la propia IA se contradijo; abajo está explicado.</p>
+  </div>
+
+  <div class="card">
+    <h2>Las 37 fotos malas, una por una</h2>
+    <p class="lead">Para cada foto mala miré qué tenía la persona en la pantalla justo antes.</p>
+    <div class="puntos" role="img" aria-label="31 verdes, 5 morados, 1 amarillo">
+      <i style="background:var(--free)"></i><i style="background:var(--free)"></i><i style="background:var(--free)"></i><i style="background:var(--free)"></i><i style="background:var(--free)"></i><i style="background:var(--free)"></i><i style="background:var(--free)"></i><i style="background:var(--free)"></i><i style="background:var(--free)"></i><i style="background:var(--free)"></i><i style="background:var(--free)"></i><i style="background:var(--free)"></i><i style="background:var(--free)"></i><i style="background:var(--free)"></i><i style="background:var(--free)"></i><i style="background:var(--free)"></i><i style="background:var(--free)"></i><i style="background:var(--free)"></i><i style="background:var(--free)"></i><i style="background:var(--free)"></i><i style="background:var(--free)"></i><i style="background:var(--free)"></i><i style="background:var(--free)"></i><i style="background:var(--free)"></i><i style="background:var(--free)"></i><i style="background:var(--free)"></i><i style="background:var(--free)"></i><i style="background:var(--free)"></i><i style="background:var(--free)"></i><i style="background:var(--free)"></i><i style="background:var(--free)"></i>
+      <i style="background:var(--accent)"></i><i style="background:var(--accent)"></i><i style="background:var(--accent)"></i><i style="background:var(--accent)"></i><i style="background:var(--accent)"></i>
+      <i style="background:var(--warn)"></i>
+    </div>
+    <div class="ley"><span><i class="dot" style="background:var(--free)"></i>cambió de app: se atrapa</span><span><i class="dot" style="background:var(--accent)"></i>seguía en lo mismo: ya estaba atrapada</span><span><i class="dot" style="background:var(--warn)"></i>dudosa</span></div>
+    <div class="grupos">
+      <div class="grupo g-ok"><span class="n">31</span><div><strong>Venía del CRM o de otra app de trabajo y saltó a otra cosa (84 %)</strong><p>Del CRM a Instagram, de Messenger a YouTube, de la bóveda a pantalla negra. La pantalla cambia muchísimo, así que esa foto se manda y Argos la marca igual que hoy.</p></div></div>
+      <div class="grupo g-cont"><span class="n">5</span><div><strong>Seguía en la misma escapada (14 %)</strong><p>Segunda o tercera foto de algo que ya se había marcado un minuto antes. El filtro quizás no las manda, pero la escapada ya estaba atrapada y la alerta ya estaba abierta.</p></div></div>
+      <div class="grupo g-duda"><span class="n">1</span><div><strong>La dudosa (3 %)</strong><p>Una persona estaba en el Explorador de archivos de Windows. A las 10:17 la IA dijo «está bien» y a las 10:19, con la misma pantalla, dijo «está mal». Con el filtro, la de las 10:19 no se manda porque es igual, y queda lo que dijo primero: «está bien».</p></div></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Ejemplos reales de hoy</h2>
+    <div class="ej">
+      <div class="ejf"><span class="h">10:59</span><span class="q"><strong>CRM de OnlyFans → Instagram, historias</strong><small>Pantalla totalmente distinta: se manda y se atrapa. ✔</small></span></div>
+      <div class="ejf"><span class="h">10:27</span><span class="q"><strong>CRM → YouTube</strong><small>Se atrapa. ✔</small></span></div>
+      <div class="ejf"><span class="h">15:01</span><span class="q"><strong>Cowork → pantalla negra</strong><small>Se atrapa. ✔ Lo de las 15:03 ya era la misma escapada.</small></span></div>
+      <div class="ejf"><span class="h">12:27</span><span class="q"><strong>CRM → Instagram</strong><small>Se atrapa. ✔ La de las 12:30, también en Instagram, ya estaba atrapada.</small></span></div>
+      <div class="ejf"><span class="h">11:41</span><span class="q"><strong>Bóveda → Instagram dentro de AnyDesk</strong><small>Se atrapa por la foto. ✔ Ojo: aquí el nombre de la app dice «AnyDesk», no «Instagram» (ver la opción más barata).</small></span></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Sobre la dudosa: ¿es un problema?</h2>
+    <p>Más bien no. El Explorador de archivos casi siempre es trabajo (bajar y subir fotos de las creadoras), y hoy la IA lo marcó como malo 10 veces. Con el filtro, si estaba bien la primera vez, sigue bien. Si de verdad queremos que el Explorador cuente como «no trabajo», se agrega a la lista y se marca siempre, gratis y sin contradicciones.</p>
+  </div>
+
+  <div class="card">
+    <h2>Cómo asegurarlo al 100 % antes de ahorrar un peso</h2>
+    <svg class="dib" viewBox="0 0 640 150" role="img" aria-label="Semana de prueba: Argos sigue mirando todo y el filtro solo anota qué habría saltado">
+      <rect x="10" y="20" width="190" height="90" rx="12" fill="var(--accent-soft)" stroke="var(--accent)" stroke-width="2"/>
+      <text x="105" y="56" text-anchor="middle" font-size="15" font-weight="700">Semana de prueba</text>
+      <text x="105" y="80" text-anchor="middle" font-size="13">Argos sigue mirando todo</text>
+      <path d="M205 65h45" stroke="var(--muted)" stroke-width="2"/>
+      <rect x="255" y="20" width="190" height="90" rx="12" fill="var(--card)" stroke="var(--fg)" stroke-width="2"/>
+      <text x="350" y="56" text-anchor="middle" font-size="15" font-weight="700">El filtro solo anota</text>
+      <text x="350" y="80" text-anchor="middle" font-size="13">«esta la habría saltado»</text>
+      <path d="M450 65h45" stroke="var(--muted)" stroke-width="2"/>
+      <rect x="500" y="20" width="130" height="90" rx="12" fill="var(--free-soft)" stroke="var(--free)" stroke-width="2"/>
+      <text x="565" y="56" text-anchor="middle" font-size="15" font-weight="700">Se cuenta</text>
+      <text x="565" y="80" text-anchor="middle" font-size="13">¿saltó alguna mala?</text>
+      <text x="320" y="138" text-anchor="middle" font-size="13" style="fill:var(--muted)">Si en una semana no saltó ninguna escapada, se prende de verdad.</text>
+    </svg>
+    <p>Así no se pierde nada mientras se prueba, y al final tienes el número exacto: cuánto se ahorra y cuántas malas se habrían escapado (hoy: 0 escapadas reales, 1 dudosa).</p>
+  </div>
+
+  <div class="card">
+    <h2>¿Hay algo aún más barato? Sí</h2>
+    <p>La app de Maven para computador ya sabe <strong>el nombre de la app y de la página</strong> que la persona tiene al frente. Con eso, casi todas las malas de hoy se ven <strong>gratis</strong>, sin mandar foto: el nombre dice «Instagram», «YouTube», «X», «Venice AI» o «pantalla bloqueada».</p>
+    <p>Solo se le pregunta a la IA cuando el nombre no alcanza: una app que no está en la lista, o programas como AnyDesk, que muestran otra pantalla adentro. Y en vez de la IA de siempre, una más chica, que cuesta unas 7 veces menos.</p>
+    <div class="tw">
+      <table>
+        <thead><tr><th>Opción</th><th class="n">Al día</th><th class="n">Al mes</th><th>Qué hace falta</th></tr></thead>
+        <tbody>
+          <tr><td>Como hoy</td><td class="n">~USD 11</td><td class="n">~USD 330</td><td>Nada</td></tr>
+          <tr><td>Filtro «¿cambió?» (80 %)</td><td class="n">~USD 2,20</td><td class="n">~USD 65</td><td>Funciona en el navegador y en la app</td></tr>
+          <tr class="mejor"><td><strong>Filtro + nombre de la app + IA chica</strong></td><td class="n"><strong>~USD 0,50–1</strong></td><td class="n"><strong>~USD 15–30</strong></td><td>Que todo el equipo use la app de computador</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="pie">Lo de la opción más barata es estimado: depende de cuántas pantallas no se puedan reconocer por el nombre. También se mide en la semana de prueba.</p>
+  </div>
+
+  <p class="pie">Datos de la base de Maven del 17/11/2026 hasta las 4:30 p. m. (hora de Colombia): todas las fotos de pantalla que la IA marcó como «fuera de lugar», comparadas con la foto anterior de la misma persona. Precio por mirada: factura de Google del 13/11 (USD 0,0022).</p>
+</main>

@@ -1,0 +1,184 @@
+<title>Argos más barato</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;700&display=swap">
+<style>
+/* Layout: una columna. Arriba el antes/después; en medio el embudo dibujado
+   capa por capa con su ejemplo; al final un día real y lo que hay que decidir. */
+:root {
+  --bg: #f3f5f9; --card: #ffffff; --fg: #141a26; --muted: #5b6577; --line: #dde2ec;
+  --accent: #6d4fd8; --accent-soft: #ece7fd;
+  --free: #1f8a5b; --free-soft: #e2f3ea;
+  --cheap: #1f6fbf; --cheap-soft: #e2eefb;
+  --paid: #c24a2c; --paid-soft: #fbe7e1;
+  --display: "Space Grotesk", "Inter", system-ui, sans-serif;
+  --body: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #0f131c; --card: #171d29; --fg: #e8ecf4; --muted: #9aa4b6; --line: #283041;
+  --accent: #a48cff; --accent-soft: #261f45; --free: #4fd296; --free-soft: #11281e;
+  --cheap: #6fb0ff; --cheap-soft: #10233a; --paid: #ff8a6b; --paid-soft: #33180f; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #0f131c; --card: #171d29; --fg: #e8ecf4; --muted: #9aa4b6; --line: #283041;
+  --accent: #a48cff; --accent-soft: #261f45; --free: #4fd296; --free-soft: #11281e;
+  --cheap: #6fb0ff; --cheap-soft: #10233a; --paid: #ff8a6b; --paid-soft: #33180f; color-scheme: dark }
+body { background: var(--bg); color: var(--fg); font-family: var(--body); font-size: 16px; line-height: 1.55; }
+main { max-width: 780px; margin: 0 auto; padding-block: 32px 60px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); display: grid; gap: 34px; }
+h1, h2, h3 { font-family: var(--display); text-wrap: balance; margin: 0; letter-spacing: -0.01em; }
+h1 { font-size: clamp(28px, 6vw, 42px); }
+h2 { font-size: 22px; }
+h3 { font-size: 17px; }
+p { margin: 0; }
+.eyebrow { font-size: 12px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); font-weight: 600; }
+.lead { color: var(--muted); max-width: 62ch; }
+section { display: grid; gap: 14px; }
+.card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 18px; }
+svg { display: block; width: 100%; height: auto; max-width: 100%; }
+svg text { font-family: var(--body); fill: var(--fg); }
+svg .muted { fill: var(--muted); }
+.capa { display: grid; grid-template-columns: 64px minmax(0, 1fr); gap: 14px; align-items: start; }
+.capa + .capa { border-top: 1px dashed var(--line); padding-top: 16px; margin-top: 16px; }
+.icono { width: 64px; height: 64px; border-radius: 16px; display: grid; place-items: center; }
+.icono svg { width: 38px; height: 38px; }
+.capa p { color: var(--muted); font-size: 15px; }
+.capa .ej { margin-top: 8px; font-size: 14px; background: var(--bg); border-radius: 10px; padding: 10px 12px; color: var(--fg); }
+.tag { display: inline-block; font-size: 12px; font-weight: 700; padding: 2px 9px; border-radius: 99px; margin-left: 6px; vertical-align: 2px; }
+.t-free { background: var(--free-soft); color: var(--free); }
+.t-cheap { background: var(--cheap-soft); color: var(--cheap); }
+.t-paid { background: var(--paid-soft); color: var(--paid); }
+.dia { display: grid; gap: 8px; }
+.fila { display: grid; grid-template-columns: 74px minmax(0,1fr) auto; gap: 10px; align-items: center; font-size: 15px; background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; }
+.fila .h { font-variant-numeric: tabular-nums; color: var(--muted); font-size: 14px; }
+.fila .q { min-width: 0; }
+.fila .q small { display: block; color: var(--muted); font-size: 13px; }
+.rapido { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.rapido .card { display: grid; gap: 6px; }
+.rapido b { font-family: var(--display); font-size: 22px; color: var(--free); }
+.rapido p { color: var(--muted); font-size: 15px; }
+ol.decidir { margin: 0; padding-left: 22px; display: grid; gap: 10px; }
+ol.decidir li span { color: var(--muted); display: block; font-size: 15px; }
+.pie { color: var(--muted); font-size: 13px; }
+@media (max-width: 560px) { .rapido { grid-template-columns: 1fr; } .fila { grid-template-columns: 58px minmax(0,1fr); } .fila .tag { grid-column: 2; justify-self: start; margin-left: 0; } }
+</style>
+
+<main>
+  <header style="display:grid;gap:10px">
+    <span class="eyebrow">Propuesta para bajar el gasto de Argos</span>
+    <h1>Argos más barato</h1>
+    <p class="lead">Hoy la IA cara mira un pantallazo de cada persona más o menos cada 2 minutos, y en el <strong>99 % de los casos</strong> dice lo mismo: «está en el CRM, todo bien». En los últimos 3 días miró 12.612 pantallazos y solo 141 estaban fuera de lugar. Esa es la plata que se puede ahorrar.</p>
+  </header>
+
+  <!-- ANTES / DESPUÉS -->
+  <section class="card" aria-label="Gasto antes y después">
+    <h2 style="margin-bottom:8px">Antes y después, al mes</h2>
+    <svg viewBox="0 0 640 170" role="img" aria-label="Hoy unos 330 dólares al mes; con los filtros unos 35 a 45">
+      <text x="0" y="34" font-size="15" font-weight="600">Hoy</text>
+      <rect x="110" y="16" width="440" height="30" rx="8" fill="var(--paid)"/>
+      <text x="560" y="37" font-size="17" font-weight="700">~USD 330</text>
+      <text x="0" y="94" font-size="15" font-weight="600">Con filtros</text>
+      <rect x="110" y="76" width="53" height="30" rx="8" fill="var(--free)"/>
+      <text x="172" y="97" font-size="17" font-weight="700">~USD 35–45</text>
+      <text x="0" y="146" font-size="13" class="muted">Mismo Argos, los mismos avisos. La IA cara solo mira cuando hay algo raro.</text>
+    </svg>
+  </section>
+
+  <!-- EL EMBUDO -->
+  <section>
+    <h2>La idea: un embudo de 4 filtros</h2>
+    <p class="lead">Cada pantallazo pasa por filtros de más barato a más caro. Solo lo que nadie pudo resolver llega a Argos detallado.</p>
+    <div class="card">
+      <svg viewBox="0 0 640 330" role="img" aria-label="Embudo: 5.000 pantallazos al día, 2.500 siguen tras el filtro 1, 1.000 tras el filtro 2, 1.000 los ve la IA chica, 200 llegan a Argos detallado">
+        <polygon points="40,10 600,10 540,80 100,80" fill="var(--free-soft)" stroke="var(--free)" stroke-width="1.5"/>
+        <text x="320" y="40" text-anchor="middle" font-size="15" font-weight="700">1 · ¿Cambió la pantalla?</text>
+        <text x="320" y="62" text-anchor="middle" font-size="13" class="muted">5.000 al día → la mitad no cambió: se copia lo de antes</text>
+
+        <polygon points="100,88 540,88 490,158 150,158" fill="var(--free-soft)" stroke="var(--free)" stroke-width="1.5"/>
+        <text x="320" y="118" text-anchor="middle" font-size="15" font-weight="700">2 · ¿Qué app tiene al frente?</text>
+        <text x="320" y="140" text-anchor="middle" font-size="13" class="muted">2.500 → app de trabajo conocida: listo, sin IA</text>
+
+        <polygon points="150,166 490,166 440,236 200,236" fill="var(--cheap-soft)" stroke="var(--cheap)" stroke-width="1.5"/>
+        <text x="320" y="196" text-anchor="middle" font-size="15" font-weight="700">3 · IA chica: ¿trabajo?</text>
+        <text x="320" y="218" text-anchor="middle" font-size="13" class="muted">1.000 → sí / no / no sé</text>
+
+        <polygon points="200,244 440,244 400,314 240,314" fill="var(--paid-soft)" stroke="var(--paid)" stroke-width="1.5"/>
+        <text x="320" y="274" text-anchor="middle" font-size="15" font-weight="700">4 · Argos detallado</text>
+        <text x="320" y="296" text-anchor="middle" font-size="13" class="muted">~200: lo raro + una revisión al azar</text>
+      </svg>
+    </div>
+  </section>
+
+  <!-- CAPAS EXPLICADAS -->
+  <section>
+    <h2>Cada filtro, con un ejemplo</h2>
+    <div class="card">
+      <div class="capa">
+        <div class="icono" style="background:var(--free-soft)"><svg viewBox="0 0 40 40" aria-hidden="true"><rect x="3" y="7" width="15" height="11" rx="2" fill="none" stroke="var(--free)" stroke-width="2.4"/><rect x="22" y="7" width="15" height="11" rx="2" fill="none" stroke="var(--free)" stroke-width="2.4"/><path d="M12 28h16" stroke="var(--free)" stroke-width="2.6" stroke-linecap="round"/><path d="M12 33h16" stroke="var(--free)" stroke-width="2.6" stroke-linecap="round"/></svg></div>
+        <div>
+          <h3>1 · ¿Cambió la pantalla? <span class="tag t-free">gratis</span></h3>
+          <p>El computador de la persona compara el pantallazo nuevo con el anterior. Si es casi igual, no se manda a la IA: vale lo mismo que la última vez.</p>
+          <div class="ej"><strong>Ejemplo:</strong> Daniela lleva 20 minutos en el mismo chat del CRM. Son 10 pantallazos casi iguales y la IA mira solo el primero.</div>
+        </div>
+      </div>
+      <div class="capa">
+        <div class="icono" style="background:var(--free-soft)"><svg viewBox="0 0 40 40" aria-hidden="true"><rect x="4" y="6" width="32" height="22" rx="3" fill="none" stroke="var(--free)" stroke-width="2.4"/><path d="M4 12h32" stroke="var(--free)" stroke-width="2.4"/><circle cx="8" cy="9" r="1.2" fill="var(--free)"/><path d="M14 34h12M20 28v6" stroke="var(--free)" stroke-width="2.4" stroke-linecap="round"/><path d="M12 20l4 3 8-7" fill="none" stroke="var(--free)" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+        <div>
+          <h3>2 · ¿Qué app tiene al frente? <span class="tag t-free">gratis</span></h3>
+          <p>La app de Maven para computador ya sabe qué programa y qué página está usando cada persona; lo agregamos hoy. Con una lista de apps de trabajo, se sabe sin IA.</p>
+          <div class="ej"><strong>Ejemplo:</strong> al frente está «Maven · Messenger» o «OnlyFans · Chats»: es trabajo. Si dice «YouTube · música» o «Instagram», pasa directo a revisión.</div>
+        </div>
+      </div>
+      <div class="capa">
+        <div class="icono" style="background:var(--cheap-soft)"><svg viewBox="0 0 40 40" aria-hidden="true"><circle cx="17" cy="17" r="10" fill="none" stroke="var(--cheap)" stroke-width="2.6"/><path d="M25 25l9 9" stroke="var(--cheap)" stroke-width="3" stroke-linecap="round"/></svg></div>
+        <div>
+          <h3>3 · IA chica <span class="tag t-cheap">~7 veces más barata</span></h3>
+          <p>Un modelo liviano de Google mira el pantallazo en tamaño reducido y responde solo una palabra: sí, no o no sé.</p>
+          <div class="ej"><strong>Ejemplo:</strong> una hoja de Excel con montos responde «sí, trabajo» y ahí termina. Una página de compras en línea responde «no» y sube al filtro 4.</div>
+        </div>
+      </div>
+      <div class="capa">
+        <div class="icono" style="background:var(--paid-soft)"><svg viewBox="0 0 40 40" aria-hidden="true"><path d="M3 20s6-11 17-11 17 11 17 11-6 11-17 11S3 20 3 20z" fill="none" stroke="var(--paid)" stroke-width="2.4"/><circle cx="20" cy="20" r="5" fill="var(--paid)"/></svg></div>
+        <div>
+          <h3>4 · Argos detallado <span class="tag t-paid">el de hoy</span></h3>
+          <p>La IA de siempre, con el detalle de siempre («Instagram personal, viendo reels»). Solo para lo que los filtros marcaron, más una revisión al azar por persona cada hora, para que nadie aprenda a engañar a los filtros.</p>
+          <div class="ej"><strong>Ejemplo:</strong> a Kevin le marcaron «no» en el filtro 3. Argos detallado confirma «Netflix», abre la alerta y avisa al supervisor, igual que hoy.</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- UN DÍA -->
+  <section>
+    <h2>Una mañana de una chatter, pantallazo por pantallazo</h2>
+    <div class="dia">
+      <div class="fila"><span class="h">8:02</span><span class="q">Entra al CRM<small>Primera foto del día</small></span><span class="tag t-paid">Argos detallado</span></div>
+      <div class="fila"><span class="h">8:04–8:40</span><span class="q">Sigue en el mismo chat<small>18 fotos casi iguales</small></span><span class="tag t-free">filtro 1 · gratis</span></div>
+      <div class="fila"><span class="h">8:42</span><span class="q">Cambia a Messenger de Maven<small>La app de computador dice «Maven · Messenger»</small></span><span class="tag t-free">filtro 2 · gratis</span></div>
+      <div class="fila"><span class="h">9:10</span><span class="q">Abre una hoja de Google Sheets<small>No está en la lista; la IA chica dice «sí, trabajo»</small></span><span class="tag t-cheap">filtro 3 · barato</span></div>
+      <div class="fila"><span class="h">9:15</span><span class="q">Abre Instagram<small>La IA chica dice «no»</small></span><span class="tag t-paid">Argos detallado</span></div>
+      <div class="fila"><span class="h">9:30</span><span class="q">Revisión al azar de la hora<small>Para que el embudo no se pueda burlar</small></span><span class="tag t-paid">Argos detallado</span></div>
+    </div>
+    <p class="pie">Hoy esa mañana serían unas 45 miradas de la IA cara (~USD 0,10). Con el embudo son 3 de la cara y 1 de la chica (~USD 0,01).</p>
+  </section>
+
+  <!-- RÁPIDO -->
+  <section>
+    <h2>Dos arreglos rápidos que bajan casi la mitad desde ya</h2>
+    <p class="lead">No necesitan el embudo; se pueden hacer primero.</p>
+    <div class="rapido">
+      <div class="card"><h3>Foto más chica para la IA</h3><b>−30 a −40 %</b><p>Hoy el pantallazo va a 1.600 px. Para decir qué programa es, alcanza con 1.024 px, y la IA cobra según el tamaño de la imagen. El pantallazo grande se sigue guardando para el expediente.</p></div>
+      <div class="card"><h3>Respuesta más corta</h3><b>−10 a −20 %</b><p>Hoy se le deja escribir hasta 600 palabras-pieza. El veredicto real cabe en unas 80.</p></div>
+    </div>
+  </section>
+
+  <!-- DECIDIR -->
+  <section class="card">
+    <h2 style="margin-bottom:12px">Lo que tendrías que decidir</h2>
+    <ol class="decidir">
+      <li>¿Arrancamos por los dos arreglos rápidos y después el embudo, o todo junto?<span>Recomendado: los rápidos ya (se nota mañana mismo) y el embudo en una semana de prueba, midiendo que no se escape nada.</span></li>
+      <li>¿Qué apps cuentan como trabajo en el filtro 2?<span>Ejemplo: Maven, OnlyFans, Fansly, Infloww, Google Sheets y Drive. Cada área puede tener su lista.</span></li>
+      <li>¿Cada cuánto la revisión al azar con Argos detallado?<span>Cada hora por persona cuesta unos USD 0,50 al día en todo el equipo; cada 30 minutos, el doble.</span></li>
+      <li>¿Pedimos a todo el equipo que use la app de computador?<span>El filtro 2 solo funciona ahí. En el navegador quedan los filtros 1, 3 y 4, que igual bajan bastante.</span></li>
+    </ol>
+  </section>
+
+  <p class="pie">Datos de la base de Maven, 14 al 17/11/2026: unos 5.000 pantallazos mirados por día a USD 0,0022 cada uno (factura de Google del 13/11). Los ahorros de los filtros 1 a 3 son estimados: se miden en la semana de prueba antes de apagar nada.</p>
+</main>

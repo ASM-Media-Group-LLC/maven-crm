@@ -1,0 +1,199 @@
+<title>Cómo funciona Argos</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;700&display=swap">
+<style>
+/* Layout: igual que «Las fotos de Argos hoy». Primero las piezas de Argos con
+   su precio, después la respuesta a la pregunta (¿se nota el filtro?) con
+   dibujos, y al final cuánto cuesta cada camino. */
+:root {
+  --bg: #f3f5f9; --card: #ffffff; --fg: #141a26; --muted: #5b6577; --line: #dde2ec;
+  --accent: #6d4fd8; --accent-soft: #ece7fd;
+  --free: #1f8a5b; --free-soft: #e2f3ea; --paid: #c24a2c; --paid-soft: #fbe7e1; --warn: #a86400; --warn-soft: #fbf0dd;
+  --display: "Space Grotesk", "Inter", system-ui, sans-serif;
+  --body: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #0f131c; --card: #171d29; --fg: #e8ecf4; --muted: #9aa4b6; --line: #283041;
+  --accent: #a48cff; --accent-soft: #261f45; --free: #4fd296; --free-soft: #11281e; --paid: #ff8a6b; --paid-soft: #33180f; --warn: #f0b04f; --warn-soft: #2e2311; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #0f131c; --card: #171d29; --fg: #e8ecf4; --muted: #9aa4b6; --line: #283041;
+  --accent: #a48cff; --accent-soft: #261f45; --free: #4fd296; --free-soft: #11281e; --paid: #ff8a6b; --paid-soft: #33180f; --warn: #f0b04f; --warn-soft: #2e2311; color-scheme: dark }
+body { background: var(--bg); color: var(--fg); font-family: var(--body); font-size: 17px; line-height: 1.55; }
+main { max-width: 700px; margin: 0 auto; padding-block: 32px 60px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); display: grid; gap: 18px; }
+h1, h2 { font-family: var(--display); text-wrap: balance; margin: 0; letter-spacing: -0.01em; }
+h1 { font-size: clamp(28px, 7vw, 40px); }
+h2 { font-size: 20px; }
+p { margin: 0; }
+.eyebrow { font-size: 12px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); font-weight: 600; }
+.lead { color: var(--muted); }
+.card { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 18px; display: grid; gap: 12px; }
+.pieza { display: grid; grid-template-columns: 52px minmax(0,1fr) auto; gap: 12px; align-items: center; padding-block: 10px; border-top: 1px solid var(--line); }
+.pieza:first-of-type { border-top: 0; }
+.pieza svg { width: 52px; height: 52px; display: block; }
+.pieza .q { min-width: 0; }
+.pieza .q strong { display: block; }
+.pieza .q span { color: var(--muted); font-size: 15px; }
+.precio { font-family: var(--display); font-weight: 700; font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; font-size: 15px; }
+.precio small { display: block; font-family: var(--body); font-weight: 500; color: var(--muted); font-size: 12px; }
+.free { color: var(--free); }
+.paid { color: var(--paid); }
+.warn { color: var(--warn); }
+.total { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; background: var(--paid-soft); border-radius: 12px; padding: 12px 14px; font-weight: 600; }
+.total b { font-family: var(--display); color: var(--paid); font-variant-numeric: tabular-nums; }
+.resp { background: var(--accent-soft); border-radius: 16px; padding: 20px; display: grid; gap: 8px; }
+.resp .si { font-family: var(--display); font-size: 34px; font-weight: 700; color: var(--accent); line-height: 1.1; }
+svg.dib { width: 100%; height: auto; display: block; }
+svg.dib text { font-family: var(--body); fill: var(--fg); }
+.ojo { background: var(--warn-soft); border-radius: 16px; padding: 18px; display: grid; gap: 10px; }
+.ojo h2 { color: var(--warn); }
+.ojo ol { margin: 0; padding-left: 22px; display: grid; gap: 10px; }
+.ojo li span { display: block; color: var(--muted); font-size: 15px; }
+table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; font-size: 15px; }
+.tw { overflow-x: auto; }
+th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--line); }
+th { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); font-weight: 600; }
+td.n, th.n { text-align: right; white-space: nowrap; }
+tr:last-child td { border-bottom: 0; }
+.pie { color: var(--muted); font-size: 13px; }
+@media (max-width: 480px) { .pieza { grid-template-columns: 40px minmax(0,1fr); } .pieza svg { width: 40px; height: 40px; } .precio { grid-column: 2; text-align: left; } }
+</style>
+
+<main>
+  <header style="display:grid;gap:8px">
+    <span class="eyebrow">Argos por dentro · con precios</span>
+    <h1>Cómo funciona Argos</h1>
+    <p class="lead">Argos son 8 piezas. Solo una cuesta plata de verdad todos los días. Aquí va cada una, qué hace y cuánto cuesta.</p>
+  </header>
+
+  <!-- LAS PIEZAS -->
+  <div class="card">
+    <h2>Las 8 piezas de Argos</h2>
+
+    <div class="pieza">
+      <svg viewBox="0 0 52 52" aria-hidden="true"><rect width="52" height="52" rx="14" fill="var(--free-soft)"/><rect x="12" y="17" width="28" height="20" rx="4" fill="none" stroke="var(--free)" stroke-width="3"/><circle cx="26" cy="27" r="5" fill="none" stroke="var(--free)" stroke-width="3"/></svg>
+      <div class="q"><strong>1 · Foto de la cámara</strong><span>Una por minuto por persona. Se guarda para el expediente.</span></div>
+      <div class="precio free">USD 0<small>gratis</small></div>
+    </div>
+
+    <div class="pieza">
+      <svg viewBox="0 0 52 52" aria-hidden="true"><rect width="52" height="52" rx="14" fill="var(--free-soft)"/><rect x="11" y="14" width="30" height="20" rx="3" fill="none" stroke="var(--free)" stroke-width="3"/><path d="M20 40h12M26 34v6" stroke="var(--free)" stroke-width="3" stroke-linecap="round"/></svg>
+      <div class="q"><strong>2 · Pantallazo</strong><span>Uno por minuto por persona. Se guarda para el expediente.</span></div>
+      <div class="precio free">USD 0<small>gratis</small></div>
+    </div>
+
+    <div class="pieza">
+      <svg viewBox="0 0 52 52" aria-hidden="true"><rect width="52" height="52" rx="14" fill="var(--free-soft)"/><circle cx="26" cy="24" r="9" fill="none" stroke="var(--free)" stroke-width="3"/><path d="M14 40c3-6 7-8 12-8s9 2 12 8" fill="none" stroke="var(--free)" stroke-width="3"/></svg>
+      <div class="q"><strong>3 · Detector de cara</strong><span>Corre en el computador de cada persona, cada 3 segundos. Si duda, pide confirmación a la IA (pieza 5).</span></div>
+      <div class="precio free">USD 0<small>gratis</small></div>
+    </div>
+
+    <div class="pieza">
+      <svg viewBox="0 0 52 52" aria-hidden="true"><rect width="52" height="52" rx="14" fill="var(--paid-soft)"/><path d="M8 26s7-12 18-12 18 12 18 12-7 12-18 12S8 26 8 26z" fill="none" stroke="var(--paid)" stroke-width="3"/><circle cx="26" cy="26" r="5" fill="var(--paid)"/></svg>
+      <div class="q"><strong>4 · La IA mira el pantallazo</strong><span>La IA de Google dice qué está haciendo la persona y si es trabajo. Cada ~2 minutos por persona. <strong class="paid" style="display:inline">Aquí está casi toda la plata.</strong></span></div>
+      <div class="precio paid">USD 0,0022<small>por mirada · ~USD 7–11 al día</small></div>
+    </div>
+
+    <div class="pieza">
+      <svg viewBox="0 0 52 52" aria-hidden="true"><rect width="52" height="52" rx="14" fill="var(--warn-soft)"/><circle cx="26" cy="23" r="8" fill="none" stroke="var(--warn)" stroke-width="3"/><path d="M22 23l3 3 6-6" fill="none" stroke="var(--warn)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/><path d="M14 40c3-5 7-7 12-7s9 2 12 7" fill="none" stroke="var(--warn)" stroke-width="3"/></svg>
+      <div class="q"><strong>5 · La IA confirma la cara</strong><span>Nuevo desde hoy. Solo cuando el detector duda; como mucho una vez por minuto por persona.</span></div>
+      <div class="precio warn">≤ USD 0,002<small>por duda · ≤ USD 0,60 al día</small></div>
+    </div>
+
+    <div class="pieza">
+      <svg viewBox="0 0 52 52" aria-hidden="true"><rect width="52" height="52" rx="14" fill="var(--free-soft)"/><circle cx="26" cy="26" r="13" fill="none" stroke="var(--free)" stroke-width="3"/><path d="M26 18v8l6 4" fill="none" stroke="var(--free)" stroke-width="3" stroke-linecap="round"/></svg>
+      <div class="q"><strong>6 · El vigía</strong><span>Cada 2 minutos revisa quién está fuera de Cowork, sin pantalla o en pausa de más, y abre las alertas.</span></div>
+      <div class="precio free">USD 0<small>va en la base</small></div>
+    </div>
+
+    <div class="pieza">
+      <svg viewBox="0 0 52 52" aria-hidden="true"><rect width="52" height="52" rx="14" fill="var(--free-soft)"/><path d="M16 22h6l8-7v22l-8-7h-6z" fill="none" stroke="var(--free)" stroke-width="3" stroke-linejoin="round"/><path d="M35 20c2 3 2 9 0 12" fill="none" stroke="var(--free)" stroke-width="3" stroke-linecap="round"/></svg>
+      <div class="q"><strong>7 · La voz (Javi y Mario)</strong><span>Los avisos hablados. Son audios ya grabados.</span></div>
+      <div class="precio free">USD 0<small>dentro de tu ElevenLabs</small></div>
+    </div>
+
+    <div class="pieza">
+      <svg viewBox="0 0 52 52" aria-hidden="true"><rect width="52" height="52" rx="14" fill="var(--free-soft)"/><rect x="12" y="16" width="28" height="20" rx="3" fill="none" stroke="var(--free)" stroke-width="3"/><path d="M12 18l14 10 14-10" fill="none" stroke="var(--free)" stroke-width="3" stroke-linejoin="round"/></svg>
+      <div class="q"><strong>8 · Avisos y correos</strong><span>Notificación al supervisor y a RR. HH., y el correo de minutos de gracia.</span></div>
+      <div class="precio free">USD 0<small>dentro de Resend</small></div>
+    </div>
+
+    <div class="total"><span>Lo que Argos cuesta de verdad, al día</span><b>~USD 7–11 (casi todo la pieza 4)</b></div>
+  </div>
+
+  <!-- LA PREGUNTA -->
+  <div class="resp">
+    <span class="eyebrow">Tu pregunta</span>
+    <h2>«Si comparo una foto con la otra y cuando cambia la mando, ¿Argos se pone peor?»</h2>
+    <div class="si">No. Se encuentra lo mismo.</div>
+    <p>Lo malo siempre cambia la pantalla: abrir YouTube, Instagram o una película se ve distinto al CRM. Esa foto sí se manda y Argos la juzga igual que hoy. Lo único que se deja de pagar es mirar 10 veces la misma pantalla del CRM.</p>
+    <p><strong>Ojo con una palabra:</strong> «cambió» no es «lo reporta». Si la pantalla cambió, la foto va a Argos, y Argos decide. Si abrió otro chat del CRM, Argos dice «trabajando» y no pasa nada.</p>
+  </div>
+
+  <!-- DIBUJO -->
+  <div class="card">
+    <h2>Lo que pasa con cada foto</h2>
+    <svg class="dib" viewBox="0 0 640 250" role="img" aria-label="Foto igual: no se manda. Foto distinta: va a Argos, que dice trabajando o abre alerta.">
+      <defs><marker id="fl" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="var(--muted)"/></marker></defs>
+      <rect x="10" y="95" width="120" height="60" rx="10" fill="var(--accent-soft)" stroke="var(--accent)" stroke-width="2"/>
+      <text x="70" y="122" text-anchor="middle" font-size="14" font-weight="700">Foto nueva</text>
+      <text x="70" y="141" text-anchor="middle" font-size="12">cada minuto</text>
+      <path d="M130 125h40" stroke="var(--muted)" stroke-width="2" marker-end="url(#fl)"/>
+      <polygon points="240,80 310,125 240,170 170,125" fill="var(--card)" stroke="var(--fg)" stroke-width="2"/>
+      <text x="240" y="121" text-anchor="middle" font-size="13" font-weight="700">¿Igual a</text>
+      <text x="240" y="138" text-anchor="middle" font-size="13" font-weight="700">la anterior?</text>
+      <path d="M240 80V40h80" stroke="var(--muted)" stroke-width="2" fill="none" marker-end="url(#fl)"/>
+      <text x="252" y="64" font-size="12">sí</text>
+      <rect x="325" y="15" width="300" height="50" rx="10" fill="var(--free-soft)" stroke="var(--free)" stroke-width="2"/>
+      <text x="475" y="37" text-anchor="middle" font-size="14" font-weight="700" style="fill:var(--free)">No se manda · USD 0</text>
+      <text x="475" y="55" text-anchor="middle" font-size="12">sigue «trabajando» como hace 1 minuto</text>
+      <path d="M310 125h50" stroke="var(--muted)" stroke-width="2" marker-end="url(#fl)"/>
+      <text x="320" y="117" font-size="12">no</text>
+      <circle cx="405" cy="125" r="38" fill="var(--paid-soft)" stroke="var(--paid)" stroke-width="2"/>
+      <text x="405" y="122" text-anchor="middle" font-size="13" font-weight="700">Argos</text>
+      <text x="405" y="139" text-anchor="middle" font-size="11">USD 0,0022</text>
+      <path d="M443 112l40-28" stroke="var(--muted)" stroke-width="2" marker-end="url(#fl)"/>
+      <path d="M443 138l40 28" stroke="var(--muted)" stroke-width="2" marker-end="url(#fl)"/>
+      <rect x="488" y="78" width="140" height="40" rx="10" fill="var(--free-soft)" stroke="var(--free)" stroke-width="2"/>
+      <text x="558" y="103" text-anchor="middle" font-size="13" font-weight="700">«Trabajando»</text>
+      <rect x="488" y="150" width="140" height="40" rx="10" fill="var(--paid-soft)" stroke="var(--paid)" stroke-width="2"/>
+      <text x="558" y="175" text-anchor="middle" font-size="13" font-weight="700">Alerta, igual que hoy</text>
+      <text x="320" y="230" text-anchor="middle" font-size="12" style="fill:var(--muted)">Lo malo siempre cae por el «no»: abrir otra cosa cambia la pantalla.</text>
+    </svg>
+  </div>
+
+  <!-- LOS DOS PELIGROS -->
+  <div class="ojo">
+    <h2>Dos cosas a cuidar para que funcione</h2>
+    <ol>
+      <li><strong>En un chat la pantalla se mueve todo el tiempo.</strong><span>Llega un mensaje y la foto ya no es idéntica. Si el filtro es muy delicado, casi todo cuenta como «cambió» y se ahorra poco. Por eso compara en grande (¿es la misma app y el mismo diseño?), no píxel por píxel.</span></li>
+      <li><strong>Que nadie aprenda a burlarlo.</strong><span>Alguien podría dejar el CRM quieto y ponerse con el celular. Para eso: Argos mira igual al menos una vez cada 10 minutos aunque la pantalla no cambie, y el celular lo ve la cámara, no la pantalla.</span></li>
+    </ol>
+  </div>
+
+  <!-- PRECIOS -->
+  <div class="card">
+    <h2>Cuánto costaría, según cuántas fotos salgan iguales</h2>
+    <p class="lead">Con los números de hoy: 3.260 miradas a USD 0,0022. El mes es de 30 días al ritmo de un día completo (~5.000 miradas).</p>
+    <div class="tw">
+      <table>
+        <thead><tr><th>Fotos iguales</th><th class="n">Miradas hoy</th><th class="n">Hoy</th><th class="n">Al mes</th><th class="n">Ahorro</th></tr></thead>
+        <tbody>
+          <tr><td>Como hoy (0 %)</td><td class="n">3.260</td><td class="n">USD 7,17</td><td class="n">~USD 330</td><td class="n">—</td></tr>
+          <tr><td>50 %</td><td class="n">1.630</td><td class="n">USD 3,59</td><td class="n">~USD 165</td><td class="n free">50 %</td></tr>
+          <tr><td>70 %</td><td class="n">978</td><td class="n">USD 2,15</td><td class="n">~USD 100</td><td class="n free">70 %</td></tr>
+          <tr><td>80 %</td><td class="n">652</td><td class="n">USD 1,43</td><td class="n">~USD 65</td><td class="n free">80 %</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="pie">La revisión de cada 10 minutos (cuidado 2) suma ~1.150 miradas al día en todo el equipo: ~USD 2,50 al día. Ya está dentro de la cuenta del 50 % al 80 %.</p>
+  </div>
+
+  <div class="card">
+    <h2>En resumen</h2>
+    <p><strong>¿Se nota el cambio en lo que Argos encuentra?</strong> No: las 31 cosas malas de hoy se habrían encontrado igual.</p>
+    <p><strong>¿Se nota en la plata?</strong> Sí: entre la mitad y una quinta parte de lo de hoy.</p>
+    <p><strong>¿Cuánto exactamente?</strong> Depende de cuántas fotos salgan iguales. Se mide unos días sin apagar nada y ahí se decide.</p>
+  </div>
+
+  <p class="pie">Números de la base de Maven del 17/11/2026 a las 3:27 p. m. (hora de Colombia). Precio por mirada: factura de Google del 13/11 (USD 3,46 por ~1.600 miradas).</p>
+</main>
