@@ -182,7 +182,7 @@ describe("lo que es DATO no se traduce", () => {
     expect(SKINS.map((s) => s.id)).toContain("orquidea");
     expect(BACKGROUND_TEMPLATES.map((t) => t.id)).toContain("tpl-mountains");
     expect(CATALOGO_DE_EVENTOS.map((m) => m.modulo)).toEqual(
-      ["Messenger", "Correo", "Cowork", "Bandeja", "Closers", "Evaluador", "Creadoras"]);
+      ["Oficina", "Messenger", "Correo", "Cowork", "Bandeja", "Closers", "Evaluador", "Creadoras"]);
   });
 });
 

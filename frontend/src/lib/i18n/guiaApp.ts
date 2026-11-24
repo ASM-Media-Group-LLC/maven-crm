@@ -21,8 +21,8 @@ export const guiaApp = {
   // ── Dónde está mirando ──
   "guiaApp.yaEnApp.titulo": { es: "Ya estás en la app de Maven", en: "You're already in the Maven app" },
   "guiaApp.yaEnApp.desc": {
-    es: "Todo listo: Cowork abre aquí. Usa esta guía para ayudar a un compañero.",
-    en: "You're all set: Cowork opens here. Use this guide to help a teammate.",
+    es: "Puedes volver a Cowork o descargar el instalador para actualizar Maven manualmente. Termina tus llamadas y cierra Maven antes de instalarlo.",
+    en: "You can return to Cowork or download the installer to update Maven manually. Finish your calls and quit Maven before installing it.",
   },
   "guiaApp.celular.titulo": { es: "En el celular no necesitas la app", en: "You don't need the app on your phone" },
   "guiaApp.celular.desc": {

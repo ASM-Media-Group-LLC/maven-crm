@@ -29,7 +29,7 @@ export function usePermisosHorarios() {
   const { isSupervisorOrAbove } = useRoleTier();
   const { isAdmin } = useUserRole();
   const esSupervisor = isAdmin || isSupervisorOrAbove;
-  const puedeGestionar = isAdmin || (explicitPermission("Chatters", "Horarios · Gestionar") ?? isSupervisorOrAbove);
+  const puedeGestionar = explicitPermission("Chatters", "Horarios · Gestionar") ?? (isAdmin || isSupervisorOrAbove);
   return { esSupervisor, puedeGestionar, cargando: isLoading };
 }
 

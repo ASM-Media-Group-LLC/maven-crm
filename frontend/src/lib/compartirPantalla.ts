@@ -15,8 +15,8 @@
 // que era justo el problema que esto venía a resolver.
 //
 // Por eso no alcanza con preguntar si la función existe: hay que preguntar
-// también si el dispositivo se maneja con un dedo. En una pantalla táctil, un
-// fallo al compartir NO es una cancelación: es que no se puede.
+// también si es un navegador móvil. Una computadora Windows con pantalla
+// táctil sí puede compartir, aunque su puntero sea «coarse».
 //
 // Google Meet SÍ comparte pantalla desde el celular, pero desde su APLICACIÓN
 // nativa, que usa una función del sistema operativo (ReplayKit en iOS,
@@ -25,12 +25,10 @@
 
 import { traducir } from "@/lib/i18n";
 
-function esTactil(): boolean {
-  try {
-    return window.matchMedia("(pointer: coarse)").matches;
-  } catch {
-    return false;
-  }
+function esNavegadorMovil(): boolean {
+  const ua = navigator.userAgent || "";
+  return /Android|iPhone|iPad|iPod|Mobile/i.test(ua) ||
+    (/Macintosh/i.test(ua) && navigator.maxTouchPoints > 1);
 }
 
 export function puedeCompartirPantalla(): boolean {
@@ -38,7 +36,7 @@ export function puedeCompartirPantalla(): boolean {
     if (typeof navigator === "undefined") return false;
     if (typeof navigator.mediaDevices?.getDisplayMedia !== "function") return false;
     // La API existe pero es un teléfono: Android la expone y siempre falla.
-    return !esTactil();
+    return !esNavegadorMovil();
   } catch {
     return false;
   }
@@ -51,7 +49,9 @@ export function motivoDeFalloAlCompartir(err: unknown): string | null {
   // traducir() y no un texto fijo: el motivo es la descripción del aviso que ve
   // quien tocó el botón, en su idioma (hooks/useLiveKit → toggleScreenShare).
   if (!puedeCompartirPantalla()) {
-    return traducir("shared.screenShare.phones");
+    return traducir(typeof navigator !== "undefined" && esNavegadorMovil()
+      ? "shared.screenShare.phones"
+      : "shared.call.screenShareUnavailableDesc");
   }
   const nombre = (err as { name?: string } | null)?.name;
   if (nombre === "NotAllowedError" || nombre === "AbortError") return null;  // canceló

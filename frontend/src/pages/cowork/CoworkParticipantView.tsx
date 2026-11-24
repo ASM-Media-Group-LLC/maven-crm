@@ -36,6 +36,7 @@ import { anunciar } from "@/lib/anunciarVoz";
 import { playMessageNotification } from "@/lib/notificationSound";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { marcarDescartada, fueDescartada, olvidarDescartada } from "@/lib/solicitudPrivada";
+import { useJornadaConfig } from "@/hooks/useJornada";
 import { useLanguage } from "@/hooks/useLanguage";
 import { traducir, type TranslationKey } from "@/lib/i18n";
 import { MENSAJE_LLAMADA_PRIVADA, MENSAJE_PEDIR_AYUDA, NOMBRE_PAUSA } from "./textosCowork";
@@ -105,6 +106,9 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
   // Los avisos que salen de efectos y de la config de la llamada usan traducir():
   // meter `t` en esas dependencias reiniciaría la llamada al cambiar el idioma.
   const { t } = useLanguage();
+  const jornadaConfig = useJornadaConfig();
+  const pausaPermitida = (kind: "bano" | "break" | "almuerzo") => !!jornadaConfig.data && (!jornadaConfig.data.configurada
+    || (kind === "bano" ? jornadaConfig.data.registra_bano : kind === "almuerzo" ? jornadaConfig.data.registra_comida : false));
   const [displayName, setDisplayName] = useState("User");
   const [connectedLkRoom, setConnectedLkRoom] = useState<string | null>(null);
   const [manuallyLeft, setManuallyLeft] = useState(false);
@@ -141,11 +145,21 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
     if (!isCompleteRoomCode(code)) return;
     setJoiningByCode(true);
     try {
-      const res = await cowork.joinByCode(code) as { roomName?: string };
+      const res = await cowork.joinByCode(code) as { roomName?: string; sessionId: string; pendingApproval?: boolean };
+      if (res.pendingApproval) {
+        navigate(`/cowork?${new URLSearchParams({ session: res.sessionId, solicitud: "1" })}`);
+        return;
+      }
       setRoomCode("");
       setCodigoAbierto(false);
       setNecesitaCodigo(false);
       if (res?.roomName) toast.success(t("cowork.participant.movedByCode", { room: res.roomName }));
+      if (res.sessionId !== cowork.session?.id) {
+        // El código ya se canjeó en el servidor. Refrescar la sesión anterior
+        // dejaba al participante viendo su Cowork de origen.
+        navigate(`/cowork?${new URLSearchParams({ session: res.sessionId })}`);
+        return;
+      }
       cowork.refetch(true);
     } catch (e: unknown) {
       toast.error((e as Error)?.message || t("cowork.common.codeError"));
@@ -1034,7 +1048,7 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
           {conMomentoPrivado && (
             <BotonMomentoPrivado minutos={minutosPrivado} deshabilitado={!!breakStartedAt || isInOneOnOne || !!meetRoom || !connectedLkRoom} />
           )}
-          <Button
+          {(breakStartedAt || pausaPermitida("bano") || pausaPermitida("break") || pausaPermitida("almuerzo")) && <Button
             variant="ghost"
             size="sm"
             className={`gap-1.5 rounded-full ${breakStartedAt ? "text-warning hover:text-warning/80 hover:bg-warning/10" : "text-muted-foreground hover:text-foreground hover:bg-muted"}`}
@@ -1065,14 +1079,14 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
                     </span>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
-                    <DropdownMenuItem onClick={() => toggleBreak("bano")}>{etiquetaPausa("bano")}</DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => toggleBreak("break")}>{etiquetaPausa("break")}</DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => toggleBreak("almuerzo")}>{etiquetaPausa("almuerzo")}</DropdownMenuItem>
+                    {pausaPermitida("bano") && <DropdownMenuItem onClick={() => toggleBreak("bano")}>{etiquetaPausa("bano")}</DropdownMenuItem>}
+                    {pausaPermitida("break") && <DropdownMenuItem onClick={() => toggleBreak("break")}>{etiquetaPausa("break")}</DropdownMenuItem>}
+                    {pausaPermitida("almuerzo") && <DropdownMenuItem onClick={() => toggleBreak("almuerzo")}>{etiquetaPausa("almuerzo")}</DropdownMenuItem>}
                   </DropdownMenuContent>
                 </DropdownMenu>
               </span>
             )}
-          </Button>
+          </Button>}
           {/* Compartir pantalla ahora es DIRECTO desde los controles de la llamada
               (abajo), sin pedir permiso — el token de sala lo habilita para todos. */}
         </div>
@@ -1143,15 +1157,15 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
                 </DropdownMenuItem>
               ) : (
                 <>
-                  <DropdownMenuItem onClick={() => toggleBreak("bano")}>
+                  {pausaPermitida("bano") && <DropdownMenuItem onClick={() => toggleBreak("bano")}>
                     <Coffee className="h-4 w-4 mr-2" /> {etiquetaPausa("bano")}
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => toggleBreak("break")}>
+                  </DropdownMenuItem>}
+                  {pausaPermitida("break") && <DropdownMenuItem onClick={() => toggleBreak("break")}>
                     <Coffee className="h-4 w-4 mr-2" /> {etiquetaPausa("break")}
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => toggleBreak("almuerzo")}>
+                  </DropdownMenuItem>}
+                  {pausaPermitida("almuerzo") && <DropdownMenuItem onClick={() => toggleBreak("almuerzo")}>
                     <Utensils className="h-4 w-4 mr-2" /> {etiquetaPausa("almuerzo")}
-                  </DropdownMenuItem>
+                  </DropdownMenuItem>}
                 </>
               )}
             </DropdownMenuContent>

@@ -151,9 +151,9 @@ export function usePermisosPersonalizados() {
   const { explicitPermission, isLoading } = usePermissions();
   const { isSupervisorOrAbove } = useRoleTier();
   const { isAdmin } = useUserRole();
-  const puedeAprobar = isAdmin || (explicitPermission("Personalizados", "Aprobar") ?? isSupervisorOrAbove);
-  const puedeGestionar = isAdmin || (explicitPermission("Personalizados", "Gestionar") ?? isSupervisorOrAbove);
-  const puedeCrear = isAdmin || (explicitPermission("Personalizados", "Crear pedido") ?? true);
+  const puedeAprobar = explicitPermission("Personalizados", "Aprobar") ?? (isAdmin || isSupervisorOrAbove);
+  const puedeGestionar = explicitPermission("Personalizados", "Gestionar") ?? (isAdmin || isSupervisorOrAbove);
+  const puedeCrear = explicitPermission("Personalizados", "Crear pedido") ?? true;
   return { puedeAprobar, puedeGestionar, puedeCrear, cargando: isLoading };
 }
 

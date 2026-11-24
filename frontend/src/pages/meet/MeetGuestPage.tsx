@@ -1,3 +1,4 @@
+import { useMiniaturaLlamada } from "@/pages/messenger/videocall/BarraMiniaturaLlamada";
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -34,6 +35,7 @@ export default function MeetGuestPage() {
   // que colgar se sentía como un refresco que no hacía nada (Jhon, 09/09).
   // Y salir TERMINA la admisión: volver a entrar es pedir permiso de nuevo.
   const [sali, setSali] = useState(false);
+  const estadoMiniatura = useMiniaturaLlamada(status === "admitted" && !!call && !sali);
 
   useEffect(() => {
     if (code.length !== 6) {
@@ -108,6 +110,7 @@ export default function MeetGuestPage() {
             que si el invitado se va a otro programa la pierde de vista. */}
         <LlamadaEnVentanaFlotante activa>
           <LiveKitCallView
+            estadoMiniatura={estadoMiniatura}
             autoPip={!docPipSupported()}
             roomName={call.room}
             // Con este nombre lo ven los de adentro: no depende del idioma del invitado.

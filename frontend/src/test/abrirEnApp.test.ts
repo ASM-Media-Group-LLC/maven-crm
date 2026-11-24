@@ -16,13 +16,12 @@ describe("abrir los links de Maven en la app", () => {
     expect(debeOfrecerApp({ ua: WIN, enApp: false, conSesion: true, ruta: "/cowork" })).toBe(true);
   });
 
-  it("no se ofrece en el teléfono, dentro de la app, sin sesión ni a invitados", () => {
+  it("no se ofrece en el teléfono, dentro de la app, en páginas privadas sin sesión", () => {
     expect(debeOfrecerApp({ ua: CEL, enApp: false, conSesion: true, ruta: "/cowork" })).toBe(false);
     expect(debeOfrecerApp({ ua: MAC, enApp: true, conSesion: true, ruta: "/cowork" })).toBe(false);
     expect(debeOfrecerApp({ ua: MAC, enApp: false, conSesion: false, ruta: "/cowork" })).toBe(false);
-    // El link de reunión: al invitado de afuera (sin sesión) nunca; a alguien del
-    // equipo con sesión SÍ se le ofrece la app (Alvaro, 18/11/2026).
-    expect(debeOfrecerApp({ ua: MAC, enApp: false, conSesion: false, ruta: "/entrar/abc123" })).toBe(false);
+    // La sesión de la app no exige otra sesión en Chrome.
+    expect(debeOfrecerApp({ ua: MAC, enApp: false, conSesion: false, ruta: "/entrar/abc123" })).toBe(true);
     expect(debeOfrecerApp({ ua: MAC, enApp: false, conSesion: true, ruta: "/entrar/abc123" })).toBe(true);
     expect(debeOfrecerApp({ ua: MAC, enApp: false, conSesion: true, ruta: "/unirse/xyz" })).toBe(true);
     expect(debeOfrecerApp({ ua: MAC, enApp: false, conSesion: true, ruta: "/" })).toBe(false);

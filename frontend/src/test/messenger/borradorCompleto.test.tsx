@@ -14,6 +14,7 @@ import StarterKit from "@tiptap/starter-kit";
 //   2. Los adjuntos solo vivían en el estado del cajón, que se remonta al
 //      cambiar de chat.
 
+vi.mock("@/hooks/usePermissions", () => ({ usePermissions: () => ({ canFunction: () => true }) }));
 vi.mock("@/hooks/useAuth", () => ({ useAuth: () => ({ user: { id: "u1" } }) }));
 vi.mock("@/integrations/supabase/client", () => ({ supabase: {} }));
 vi.mock("@/hooks/useLanguage", () => ({ useLanguage: () => ({ t: (k: string) => k, lang: "es" }) }));

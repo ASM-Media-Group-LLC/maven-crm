@@ -13,6 +13,8 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import CoworkCreateDialog from "./CoworkCreateDialog";
+import CoworkAccesosDialog from "./CoworkAccesosDialog";
+import CoworkSolicitud from "./CoworkSolicitud";
 import CoworkLobby from "./CoworkLobby";
 import CoworkHostDashboard from "./CoworkHostDashboard";
 import CoworkParticipantView from "./CoworkParticipantView";
@@ -58,6 +60,14 @@ function guardarPortada(uid: string | null | undefined, cambio: Partial<Pick<typ
 }
 
 export default function CoworkPage() {
+  const [params] = useSearchParams();
+  // Al cambiar de Cowork no se pueden reutilizar la membresía, sala ni errores
+  // del anterior mientras se carga el destino. Cambiar ?room= dentro del mismo
+  // Cowork conserva la instancia y su comportamiento habitual.
+  return <CoworkPorSesion key={params.get("session") ?? "portada"} />;
+}
+
+function CoworkPorSesion() {
   const [searchParams, setSearchParams] = useSearchParams();
   const sessionId = searchParams.get("session");
   const navigate = useNavigate();
@@ -69,6 +79,8 @@ export default function CoworkPage() {
   const [showCreate, setShowCreate] = useState(false);
   const [autoJoining, setAutoJoining] = useState(false);
   const [autoJoinFailed, setAutoJoinFailed] = useState(false);
+  const montado = useRef(true);
+  useEffect(() => { montado.current = true; return () => { montado.current = false; }; }, []);
   
   const [userId, setUserId] = useState<string | null>(null);
   // Quién es, para la portada guardada (ver portadaGuardada arriba).
@@ -88,7 +100,7 @@ export default function CoworkPage() {
   // por alcance (todo, o solo las que tienen a alguien de nivel inferior). Antes
   // esto era solo-admin y un rol con "Todos los datos" veía únicamente las suyas.
   const { dataScope, isLoading: alcanceCargando, hayError: alcanceFallo } = usePermissions();
-  const veTodasLasSesiones = isAdmin || dataScope("Cowork") !== "self";
+  const veTodasLasSesiones = dataScope("Cowork") !== "self";
   const [allSessions, setAllSessions] = useState<AdminSessionRow[]>(guardada?.todas ?? []);
   const [enteringId, setEnteringId] = useState<string | null>(null);
 
@@ -156,7 +168,7 @@ export default function CoworkPage() {
     sessionId, veTodasLasSesiones: veTodasLasSesiones || alcanceCargando || alcanceFallo, cargando: cowork.loading || autoJoining,
     sesionNoVisible: cowork.sesionNoVisible, estado: cowork.session?.status ?? null,
     membresiasCargadas: cowork.membresiasCargadas, tieneMembresia: !!cowork.myMembership,
-    conCodigo: !!searchParams.get("code") || !!searchParams.get("role"),
+    conCodigo: !!searchParams.get("code") || !!searchParams.get("role") || !!searchParams.get("room") || searchParams.has("solicitud"),
   });
   useEffect(() => {
     if (noEsSuCowork) setSearchParams({}, { replace: true });
@@ -296,7 +308,7 @@ export default function CoworkPage() {
       setRoomCode("");
       // Sin `room`: el código ya la dejó en su sala (y fija). Un `room` que se
       // quedara en la URL la devolvería ahí si luego el supervisor la mueve.
-      setSearchParams({ session: res.sessionId });
+      setSearchParams(res.pendingApproval ? { session: res.sessionId, solicitud: "1" } : { session: res.sessionId });
     } catch (e: any) {
       toast.error(e.message || t("cowork.common.codeError"));
     } finally {
@@ -340,7 +352,7 @@ export default function CoworkPage() {
 
   // Auto-join from invite URL params
   useEffect(() => {
-    if (!sessionId || cowork.loading || autoJoining || autoJoinFailed) return;
+    if (!sessionId || cowork.loading || autoJoining || autoJoinFailed || searchParams.has("solicitud")) return;
 
     const role = searchParams.get("role");
     const code = searchParams.get("code");
@@ -377,6 +389,7 @@ export default function CoworkPage() {
           // SALA FIJA (Alvaro, 18/11/2026): el enlace que dio el supervisor la
           // mueve aunque ya tenga sala, y la deja fija ahí.
           const res = await cowork.joinSession(sessionId, "participant", undefined, roomId, { porEnlace: true }) as { roomName?: string };
+          if (!montado.current) return;
           if (res?.roomName) toast.success(t("cowork.participant.salaFijaDelEnlace", { room: res.roomName }));
         } else if (roomId) {
           // El link (`?room=`) es la orden del coordinador: es LA sala a la que
@@ -386,17 +399,22 @@ export default function CoworkPage() {
           // COORDINADORES ignorando el link de Chatters. Para mover a propósito
           // está el código de 6 caracteres (joinByCode).
           const ultimaSala = await cowork.getMyLastRoomId(sessionId);
+          if (!montado.current) return;
           const sala = salaParaAutoUnir(roomId, ultimaSala);
-          await cowork.joinSession(sessionId, "participant", undefined, sala, { porEnlace: sala === roomId });
+          const result = await cowork.joinSession(sessionId, "participant", undefined, sala, { porEnlace: sala === roomId });
+          if (!montado.current) return;
+          if (result.pendingApproval) { setSearchParams({ session: sessionId, solicitud: "1" }, { replace: true }); return; }
         }
+        if (!montado.current) return;
         soltarSalaDelEnlace();
         // Silenciosa: sin ruedita ni desmontar la vista (17/11/2026).
         cowork.refetch(true);
       } catch (e) {
+        if (!montado.current) return;
         console.error("Auto-join failed:", e);
         setAutoJoinFailed(true);
       } finally {
-        setAutoJoining(false);
+        if (montado.current) setAutoJoining(false);
       }
     };
     doJoin();
@@ -436,6 +454,7 @@ export default function CoworkPage() {
                     : t("cowork.page.subtitleLink")}
               </p>
             </div>
+            <CoworkAccesosDialog />
             {!permissionLoading && canCreateSessions && (
               <Button
                 onClick={() => setShowCreate(true)}
@@ -761,6 +780,15 @@ export default function CoworkPage() {
     );
   }
 
+  if (searchParams.has("solicitud")) {
+    return <CoworkSolicitud key={sessionId} sessionId={sessionId} onBack={() => setSearchParams({})} onEnter={async roomId => {
+      const result = await cowork.joinSession(sessionId, "participant", undefined, roomId);
+      if (result.pendingApproval) return;
+      await cowork.refetch(true);
+      setSearchParams({ session: sessionId }, { replace: true });
+    }} />;
+  }
+
   if (cowork.loading || autoJoining) {
     return <RuedaVigilada alAtascarse={alAtascarse} />;
   }
@@ -777,8 +805,9 @@ export default function CoworkPage() {
         sessionId={sessionId}
         session={cowork.session}
         onJoin={async (role, hostCode, roomId) => {
-          await cowork.joinSession(sessionId, role, hostCode, roomId);
-          cowork.refetch(true);
+          const result = await cowork.joinSession(sessionId, role, hostCode, roomId);
+          if (result.pendingApproval) setSearchParams({ session: sessionId, solicitud: "1" });
+          else cowork.refetch(true);
         }}
       />
     );

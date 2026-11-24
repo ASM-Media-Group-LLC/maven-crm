@@ -21,6 +21,7 @@ interface Props {
   isLoading: boolean;
   /** Solo los admins pueden destruir antes de que venza el plazo. */
   puedePurgar: boolean;
+  puedeRecuperar?: boolean;
   onRecuperar: (userId: string) => void;
   onPurgar: (userId: string) => void;
   recuperando: boolean;
@@ -38,7 +39,7 @@ export function tonoDelPlazo(dias: number): "secondary" | "outline" | "destructi
 }
 
 export default function PapeleraTabla({
-  cuentas, diasDePapelera, isLoading, puedePurgar,
+  cuentas, diasDePapelera, isLoading, puedePurgar, puedeRecuperar = true,
   onRecuperar, onPurgar, recuperando, purgando, error, onReintentar,
 }: Props) {
   const [aPurgar, setAPurgar] = useState<CuentaEnPapelera | null>(null);
@@ -134,7 +135,7 @@ export default function PapeleraTabla({
                   <Button
                     variant="outline"
                     size="sm"
-                    disabled={recuperando}
+                    disabled={recuperando || !puedeRecuperar}
                     onClick={() => onRecuperar(c.id)}
                   >
                     <RotateCcw className="h-3.5 w-3.5 mr-1" />

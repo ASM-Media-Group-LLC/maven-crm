@@ -12,17 +12,14 @@ const hook = import.meta.glob("../../hooks/useCoworkSession.ts", { query: "?raw"
 const fuente = (m: Record<string, unknown>) => Object.values(m)[0] as string;
 
 describe("mover a una persona a otra sala", () => {
-  it("la edge exige anfitrión, sesión activa, sala de la sesión y miembro participante", () => {
+  it("la edge delega la asignación al procedimiento atómico con la sesión autenticada", () => {
     const e = fuente(edge);
     const bloque = e.slice(e.indexOf('if (action === "asignarSala")'), e.indexOf('if (action === "latido")'));
-    expect(bloque.length).toBeGreaterThan(0);
-    expect(bloque).toMatch(/if \(hostCheck\?\.role !== "host"\) return err\(req, "[^"]+", 403\)/);
-    expect(bloque).toMatch(/\.eq\("status", "active"\)/);
-    expect(bloque).toMatch(/from\("cowork_rooms"\)\s*\.select\("id, name"\)\.eq\("id", roomId\)\.eq\("session_id", sessionId\)/);
-    expect(bloque).toMatch(/if \(miembro && miembro\.role === "host"\)/);
-    // Apaga la vigente ANTES de crear la nueva (índice único de una activa por persona).
-    expect(bloque.indexOf("update({ is_active: false })")).toBeLessThan(bloque.indexOf(".insert({"));
-    expect(bloque).toMatch(/assigned_by: userId/);
+    expect(bloque).toContain('await supabase.rpc("cowork_resolver_acceso"');
+    expect(bloque).not.toContain('admin.rpc(');
+    expect(bloque).toContain('_session: sessionId, _user: target, _room: roomId, _aprobar: true');
+    // Empresa, equipo, sala y efectos se ejecutan contra PostgreSQL en
+    // supabase/tests/cowork_solicitudes_acceso.mjs.
   });
 
   it("el tablero ofrece «Mover a otra sala» con las salas de la sesión", () => {
@@ -36,10 +33,6 @@ describe("mover a una persona a otra sala", () => {
   // SALA FIJA (18/11/2026): mover deja a la persona fija en esa sala, y con
   // quien no está conectado se guarda solo la fija.
   it("mover deja la sala fija, también a quien no está conectado", () => {
-    const e = fuente(edge);
-    const bloque = e.slice(e.indexOf('if (action === "asignarSala")'), e.indexOf('if (action === "latido")'));
-    expect(bloque).toMatch(/soloFija: true/);
-    expect(bloque).toMatch(/guardarSalaFija\(admin, \{ sessionId, userId: target, roomId, por: userId \}\)/);
     const p = fuente(tablero);
     expect(p).toMatch(/r\.soloFija \? "cowork\.host\.fixedRoomOffline" : "cowork\.host\.fixedRoom"/);
     expect(p).toMatch(/t\("cowork\.host\.notConnected"\)/);

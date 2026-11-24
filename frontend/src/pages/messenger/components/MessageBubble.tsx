@@ -19,7 +19,7 @@ import ReactionsDisplay from "./ReactionsDisplay";
 import ReadReceiptIndicator from "./ReadReceiptIndicator";
 import ImageLightbox from "./ImageLightbox";
 import { GaleriaDelChat, clasificarMedia } from "../galeriaDelChat";
-import { renderTextWithMentions } from "./MentionAutocomplete";
+import { renderTextWithMentions, linkifyText } from "./MentionAutocomplete";
 import RichText from "./RichText";
 import { formatTime as formatMsgTime } from "../utils";
 import { useNavigate } from "react-router-dom";
@@ -42,6 +42,7 @@ interface MessageBubbleProps {
   onCopy: () => void;
   onEdit: (content: string) => void;
   onDelete: () => void;
+  puedeBorrar?: boolean;
   onRetry?: () => void;
   replyMessage?: ChatMessage;
   /** Clic en la cita: lleva al mensaje original en la conversación. */
@@ -63,7 +64,7 @@ interface MessageBubbleProps {
 }
 
 const MessageBubble = forwardRef<HTMLDivElement, MessageBubbleProps>(({
-  message, isMe, chatType, profiles, highlight, onReply, onOpenProfile, deletedArchive, onCopy, onEdit, onDelete, onRetry,
+  puedeBorrar = false, message, isMe, chatType, profiles, highlight, onReply, onOpenProfile, deletedArchive, onCopy, onEdit, onDelete, onRetry,
   replyMessage, onIrALaCita, showAvatar, showSender, isLastInGroup,
   reactions, onToggleReaction, readByUsers, deliveredByUsers, totalParticipants,
   threadCount = 0, unreadThreadCount = 0, onOpenThread,
@@ -185,20 +186,6 @@ const MessageBubble = forwardRef<HTMLDivElement, MessageBubbleProps>(({
       </div>
     );
   }
-
-  const linkifyText = (text: string): React.ReactNode[] => {
-    const urlRegex = /(https?:\/\/[^\s]+)/g;
-    const parts = text.split(urlRegex);
-    return parts.map((part, i) =>
-      urlRegex.test(part) ? (
-        <a key={i} href={part} target="_blank" rel="noopener noreferrer" className="underline hover:opacity-80 break-all">
-          {part}
-        </a>
-      ) : (
-        <span key={i}>{part}</span>
-      )
-    );
-  };
 
   const highlightText = (text: string) => {
     if (!highlight) {
@@ -564,7 +551,7 @@ const MessageBubble = forwardRef<HTMLDivElement, MessageBubbleProps>(({
                         <Edit2 className="h-3.5 w-3.5 mr-2" /> {t("common.edit")}
                       </DropdownMenuItem>
                     )}
-                    <DropdownMenuItem className="text-destructive" onClick={onDelete}>
+                    <DropdownMenuItem disabled={!puedeBorrar} className="text-destructive" onClick={onDelete}>
                       <Trash2 className="h-3.5 w-3.5 mr-2" /> {t("common.delete")}
                     </DropdownMenuItem>
                   </>
@@ -683,6 +670,7 @@ const MemoizedMessageBubble = memo(MessageBubble, (prev, next) => {
   return (
     prev.message === next.message &&
     prev.isMe === next.isMe &&
+    prev.puedeBorrar === next.puedeBorrar &&
     prev.highlight === next.highlight &&
     prev.showAvatar === next.showAvatar &&
     prev.showSender === next.showSender &&

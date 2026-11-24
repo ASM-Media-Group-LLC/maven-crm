@@ -115,7 +115,7 @@ const MisTareas = () => {
   // (08/09). Con nombres literales, Operations Sales y Closer + quedaban afuera
   // aunque tuvieran "Todos los datos". El admin entra siempre; la RLS decide qué
   // filas llegan (has_scouter_global_scope / has_scouter_team_scope).
-  const isManagerRole = isAdmin || dataScope("Scouter Assist") !== "self";
+  const isManagerRole = dataScope("Scouter Assist") !== "self";
 
   // Top-up: count assignments not finished yet (pending + in_progress).
   // We only show the button on today's date — no point topping up a past day.

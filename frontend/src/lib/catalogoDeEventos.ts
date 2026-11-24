@@ -75,6 +75,9 @@ function modulo(
 }
 
 export const CATALOGO_DE_EVENTOS: readonly ModuloDeAvisos[] = [
+  modulo("Oficina", "posiciones.saldo.modulo", "Oficina", [
+    evento("costos_saldo_umbral", "posiciones.saldo.aviso", ["in_app", "push", "email"], "posiciones.saldo.descripcion"),
+  ]),
   modulo("Messenger", "int.events.module.messenger", null, [
     evento("chat_message", "int.events.chatMessage", ["in_app", "push"], "int.events.chatMessageDesc"),
     evento("chat_mention", "int.events.chatMention", ["in_app"], "int.events.chatMentionDesc"),

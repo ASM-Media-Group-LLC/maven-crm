@@ -26,6 +26,7 @@ import { avisarPersona } from "@/lib/avisoPersona";
 import { adminInvoke, SessionExpiredError } from "@/lib/adminInvoke";
 import { PageHeader } from "@/components/ui/page-header";
 import { useLanguage } from "@/hooks/useLanguage";
+import { usePermisosUsuarios } from "./usePermisosUsuarios";
 
 // Búsqueda tolerante: sin distinguir mayúsculas ni tildes, porque el roster está
 // lleno de apellidos acentuados (Suárez, Durán, Pinzón) y nadie los tipea con tilde.
@@ -34,6 +35,7 @@ const norm = (s: string) =>
 
 const AdminUsuarios = () => {
   const { t } = useLanguage();
+  const funcionesUsuario = usePermisosUsuarios();
   const [credenciales, setCredenciales] = useState<CredencialesCreadas | null>(null);
   const navigate = useNavigate();
   // Esta pantalla vive en dos lados: embebida en Settings (?sub=usuarios) y con
@@ -98,6 +100,7 @@ const AdminUsuarios = () => {
   }, [users, search, filtroRol]);
 
   const handleEditRole = (user: AdminUser) => {
+    if (funcionesUsuario.posiciones) { navigate(`/ajustes/posiciones?persona=${encodeURIComponent(user.id)}`); return; }
     setSelectedUser(user);
     setModalOpen(true);
   };
@@ -162,6 +165,9 @@ const AdminUsuarios = () => {
   useEffect(() => {
     if (!permisosCargando && activeTab === "roles" && !canManageRoles) setActiveTab("usuarios");
   }, [permisosCargando, activeTab, canManageRoles]);
+  useEffect(() => {
+    if (activeTab === "roles" && canManageRoles && funcionesUsuario.posiciones) navigate("/ajustes/posiciones", { replace: true });
+  }, [activeTab, canManageRoles, funcionesUsuario.posiciones, navigate]);
   const tabs = [
     { key: "usuarios" as const, label: t("admin.usersLabel") },
     ...(canManageRoles ? [{ key: "roles" as const, label: "Roles" }] : []),
@@ -192,7 +198,7 @@ const AdminUsuarios = () => {
                     <Button asChild variant="outline" size="sm">
                       <Link to="/admin/horarios"><Clock className="h-4 w-4 mr-1" />{t("admin.horarios.titulo")}</Link>
                     </Button>
-                    {activeTab === "usuarios" ? (
+                    {activeTab === "usuarios" && funcionesUsuario.agregar ? (
                       <Button variant="outline" size="sm" onClick={() => setAddUserOpen(true)}>
                         <Plus className="h-4 w-4 mr-1" />
                         {t("admin.users.addUser")}
@@ -266,7 +272,8 @@ const AdminUsuarios = () => {
                   cuentas={papelera.cuentas}
                   diasDePapelera={papelera.diasDePapelera}
                   isLoading={papelera.isLoading}
-                  puedePurgar={isAdmin}
+                  puedePurgar={isAdmin && funcionesUsuario.desactivar}
+                  puedeRecuperar={funcionesUsuario.desactivar}
                   onRecuperar={(id) => papelera.recuperar.mutate(id)}
                   onPurgar={(id) => papelera.purgar.mutate(id)}
                   recuperando={papelera.recuperar.isPending}
@@ -295,6 +302,7 @@ const AdminUsuarios = () => {
                       onMigrarCorreo={handleMigrarCorreo}
                       onDelete={handleDelete}
                       onRemoveRole={(user) => {
+                        if (funcionesUsuario.posiciones) { handleEditRole(user); return; }
                         adminAction.mutate(
                           { action: "remove_role", user_id: user.id },
                           { onSuccess: () => avisarPersona({
@@ -313,6 +321,7 @@ const AdminUsuarios = () => {
                       onMigrarCorreo={handleMigrarCorreo}
                       onDelete={handleDelete}
                       onRemoveRole={(user) => {
+                        if (funcionesUsuario.posiciones) { handleEditRole(user); return; }
                         adminAction.mutate(
                           { action: "remove_role", user_id: user.id },
                           { onSuccess: () => avisarPersona({
@@ -333,6 +342,7 @@ const AdminUsuarios = () => {
                   />
 
                   <EditUserModal
+                    puedeAsignarRol={!funcionesUsuario.posiciones && funcionesUsuario.asignar && !!selectedUser?.manageable}
                     open={editOpen}
                     onOpenChange={setEditOpen}
                     user={selectedUser}
@@ -403,6 +413,7 @@ const AdminUsuarios = () => {
               )}
 
               <AddUserModal
+                puedeAsignarRol={!funcionesUsuario.posiciones && funcionesUsuario.asignar}
                 open={addUserOpen}
                 onOpenChange={(o) => {
                   setAddUserOpen(o);

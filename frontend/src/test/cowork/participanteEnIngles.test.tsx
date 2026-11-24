@@ -6,8 +6,8 @@
 // GUARDA en la solicitud y lo lee otra persona, así que viaja en español aunque
 // la pantalla esté en inglés.
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent, act } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { render, screen, fireEvent, act, waitFor } from "@testing-library/react";
+import { MemoryRouter, useLocation } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { LanguageProvider } from "@/hooks/useLanguage";
 import { enEspanol, pareceEspanol, textosDeAvisos } from "./enIngles";
@@ -71,6 +71,8 @@ vi.mock("@/integrations/supabase/client", () => {
 import CoworkParticipantView from "@/pages/cowork/CoworkParticipantView";
 
 const requestHost = vi.fn(async () => ({}));
+const joinByCode = vi.fn();
+const refetch = vi.fn();
 let asignacion: Record<string, unknown> | null = null;
 let pausaAbierta: Record<string, unknown> | null = null;
 let cowork: Record<string, unknown> | null = null;
@@ -86,19 +88,24 @@ function coworkFalso(): Record<string, unknown> {
     getMyLastRoomId: async () => "r1",
     getPausaAbierta: async () => pausaAbierta,
     issueLiveKitToken: async () => ({ token: "t", url: "wss://x" }),
-    requestHost, setBreak: ok, leaveRoom: ok, joinSession: ok, joinByCode: ok, joinOneOnOne: ok,
-    joinMeetGrupal: ok, salirDeMeetGrupal: ok, resolveHostRequest: ok, refetch: () => {},
+    requestHost, setBreak: ok, leaveRoom: ok, joinSession: ok, joinByCode, joinOneOnOne: ok,
+    joinMeetGrupal: ok, salirDeMeetGrupal: ok, resolveHostRequest: ok, refetch,
   };
 }
 
+function RutaActual() {
+  const { pathname, search } = useLocation();
+  return <output data-testid="ruta">{pathname}{search}</output>;
+}
 function montar() {
   cowork = coworkFalso();
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={qc}>
-      <MemoryRouter>
+      <MemoryRouter initialEntries={["/cowork?session=s1"]}>
         <LanguageProvider>
           <CoworkParticipantView cowork={cowork as never} userId="u1" />
+          <RutaActual />
         </LanguageProvider>
       </MemoryRouter>
     </QueryClientProvider>,
@@ -116,6 +123,8 @@ describe("Cowork · la vista del participante en inglés", () => {
     // Un break de 35 minutos contra un tope de 30: pasado.
     pausaAbierta = { startedAt: AHORA - 35 * 60_000, kind: "break", limiteMinutos: 30 };
     requestHost.mockClear();
+    joinByCode.mockReset();
+    refetch.mockClear();
   });
 
   it("la barra de la sala en break pasado, el reloj y el cartel del supervisor", async () => {
@@ -160,5 +169,36 @@ describe("Cowork · la vista del participante en inglés", () => {
     montar();
     await screen.findByText("Cowork is already open in another tab");
     expect(enEspanol(document.body)).toEqual([]);
+  });
+
+  it.each([
+    { result: { sessionId: "s2", roomName: "Room 2" }, ruta: "/cowork?session=s2", refresca: false },
+    { result: { sessionId: "s2", pendingApproval: true }, ruta: "/cowork?session=s2&solicitud=1", refresca: false },
+    { result: { sessionId: "s1", roomName: "Room 2" }, ruta: "/cowork?session=s1", refresca: true },
+  ])("el código lleva al destino devuelto por el servidor: $ruta", async ({result, ruta, refresca}) => {
+    asignacion = null; pausaAbierta = null;
+    joinByCode.mockResolvedValue(result);
+    montar();
+    const campo = await screen.findByPlaceholderText("ABC234");
+    // La autoentrada anterior puede refrescar, pero el canje nuevo no debe
+    // refrescar el Cowork de origen cuando la respuesta es de otro destino.
+    await act(async () => {}); refetch.mockClear();
+    fireEvent.change(campo, { target: { value: "ABC234" } });
+    fireEvent.keyDown(campo, { key: "Enter" });
+    await waitFor(() => expect(joinByCode).toHaveBeenCalledWith("ABC234"));
+    await waitFor(() => expect(screen.getByTestId("ruta")).toHaveTextContent(ruta));
+    if (refresca) expect(refetch).toHaveBeenCalledWith(true);
+    else expect(refetch).not.toHaveBeenCalled();
+  });
+
+  it("un código rechazado conserva la pantalla actual y muestra el error", async () => {
+    asignacion = null; pausaAbierta = null;
+    joinByCode.mockRejectedValue(new Error("Access not approved"));
+    montar();
+    const campo = await screen.findByPlaceholderText("ABC234");
+    fireEvent.change(campo, { target: { value: "ABC234" } });
+    fireEvent.keyDown(campo, { key: "Enter" });
+    await waitFor(() => expect(textosDeAvisos(avisos)).toContain("Access not approved"));
+    expect(screen.getByTestId("ruta")).toHaveTextContent("/cowork?session=s1");
   });
 });

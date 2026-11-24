@@ -9,7 +9,7 @@ import { usePermissions } from "@/hooks/usePermissions";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useMuelleFlotante, fabSize, MARGIN, MUELLE_EXTRA_ID } from "@/hooks/useMuelleFlotante";
 import { useUserRole } from "@/hooks/useUserRole";
-import { VENTANA_ANCHO } from "./medidasDeVentana";
+import { VENTANA_ALTO, VENTANA_ANCHO } from "./medidasDeVentana";
 
 // La ventanita de chat trae el editor completo (tiptap + markdown, ~1 MB sin
 // comprimir). Antes viajaba en el arranque de TODA la app aunque nadie abriera
@@ -34,18 +34,16 @@ const cuantasEntran = (anchoDisponible: number) =>
 interface DockApi {
   /** Abre (o restaura) la ventanita de una conversación. */
   abrirChat: (conversationId: string) => void;
+  abrirDirecto: (userId: string) => void;
 }
 
-const DockContext = createContext<DockApi>({ abrirChat: () => {} });
+const DockContext = createContext<DockApi>({ abrirChat: () => {}, abrirDirecto: () => {} });
 
 /** Para que cualquier pantalla pueda abrir un chat en el muelle. */
 export const useMessengerDock = () => useContext(DockContext);
 
-// SIN BURBUJAS FLOTANTES (Alvaro, 19/11/2026: «no necesito esa mierda flotante…
-// ya tengo la parte de cómo dar los mensajes»). El muelle (nube de Mensajes +
-// Clari) ya no se dibuja y los chats se abren en Messenger. Para volverlo a
-// prender, poner esto en true.
-const MUELLE_VISIBLE = false;
+// Clari y la burbuja de Mensajes tienen visibilidad independiente.
+const CLARI_VISIBLE = false;
 
 export function MessengerDockProvider({ children }: { children: ReactNode }) {
   const location = useLocation();
@@ -54,10 +52,10 @@ export function MessengerDockProvider({ children }: { children: ReactNode }) {
   const { t } = useLanguage();
   const { canAccess } = usePermissions();
   const { isAdmin } = useUserRole();
-  const { conversations } = useChatShared();
+  const { conversations, createDirectChat } = useChatShared();
   const { pos, estiloContenedor, arrastreProps, anclarPanel } = useMuelleFlotante();
 
-  // ids abiertos; el primero es el más a la derecha (pegado al muelle).
+  // El primer chat abierto se dibuja junto al muelle.
   const [abiertas, setAbiertas] = useState<string[]>([]);
   const [minimizadas, setMinimizadas] = useState<string[]>([]);
   const [panelAbierto, setPanelAbierto] = useState(false);
@@ -67,27 +65,38 @@ export function MessengerDockProvider({ children }: { children: ReactNode }) {
 
   const enMessenger = location.pathname.startsWith("/messenger");
   const puedeMessenger = canAccess("Messenger");
-  // En /messenger la parte de Messenger del muelle desaparece: ya estás ahí.
-  // Clari se queda, que no tiene nada que ver.
-  // En el teléfono la nube vive SOLO en Cowork (Jhon, 10/09: "mandar mensajes
-  // sin salir de Cowork"): en las demás pantallas móviles taparía composers y
-  // botones de abajo. En escritorio, en todas como siempre.
-  const enCowork = location.pathname.startsWith("/cowork");
-  const mostrarMessenger = MUELLE_VISIBLE && puedeMessenger && !enMessenger && (!isMobile || enCowork);
+  // En Messenger ya está la conversación completa. En el resto de la app,
+  // abrir un chat encima de la pantalla conserva la página y la sala activas.
+  const mostrarMessenger = puedeMessenger && !enMessenger;
   // En el teléfono, dentro del Messenger, el botón de Clari se montaba sobre la
   // barra del composer (grabar nota de voz quedaba debajo). Ahí no va.
-  const mostrarClari = MUELLE_VISIBLE && isAdmin && !(isMobile && enMessenger);
+  const mostrarClari = CLARI_VISIBLE && isAdmin && !(isMobile && enMessenger);
 
   const abrirChat = useCallback((id: string) => {
-    // En el teléfono las ventanitas no tienen sentido: vamos a la pantalla.
-    // Y YA EN /messenger tampoco: ahí las ventanitas no se dibujan, así que abrir
-    // una era no hacer nada — Jhon tocó a María en la nube desde Messenger y el
-    // chat no se abrió (16/09). La página ya sabe seleccionar por ?c=.
-    // Sin muelle no hay ventanitas flotantes: el chat se abre en Messenger.
-    if (!MUELLE_VISIBLE || isMobile || !puedeMessenger || enMessenger) { navigate(`/messenger?c=${id}`); return; }
+    if (!mostrarMessenger) { navigate(`/messenger?c=${encodeURIComponent(id)}`); return; }
+    setPanelAbierto(false);
+    if (isMobile) { setChatEnHoja(id); return; }
     setMinimizadas((m) => m.filter((x) => x !== id));
-    setAbiertas((a) => (a.includes(id) ? a : [id, ...a].slice(0, MAX_ABIERTAS)));
-  }, [isMobile, puedeMessenger, enMessenger, navigate]);
+    // La opción tocada ocupa el primer lugar aunque ya estuviera abierta y
+    // el ancho solo deje dibujar una ventana.
+    setAbiertas((a) => [id, ...a.filter((x) => x !== id)].slice(0, MAX_ABIERTAS));
+  }, [isMobile, mostrarMessenger, navigate]);
+
+  const abrirDirecto = useCallback((userId: string) => {
+    if (!mostrarMessenger) { navigate(`/messenger?dm=${encodeURIComponent(userId)}`); return; }
+    const id: string | null = createDirectChat(userId, (realId) => {
+      if (!id) return;
+      // Reemplaza el identificador provisional en su lugar. Si el usuario
+      // eligió otro chat o cerró este mientras cargaba, conserva esa decisión.
+      const reemplazar = (ids: string[]) => ids.includes(id)
+        ? [...new Set(ids.map((x) => x === id ? realId : x))]
+        : ids;
+      setAbiertas(reemplazar);
+      setMinimizadas(reemplazar);
+      setChatEnHoja((actual) => actual === id ? realId : actual);
+    });
+    if (id) abrirChat(id);
+  }, [abrirChat, createDirectChat, mostrarMessenger, navigate]);
 
   const cerrar = useCallback((id: string) => {
     setAbiertas((a) => a.filter((x) => x !== id));
@@ -114,8 +123,9 @@ export function MessengerDockProvider({ children }: { children: ReactNode }) {
   // Las ventanas se abren hacia el lado con espacio: si el muelle está parkeado
   // en la mitad derecha crecen hacia la izquierda, y al revés.
   const haciaIzquierda = typeof window !== "undefined" && pos.x > window.innerWidth / 2;
+  const altoPantalla = typeof window === "undefined" ? VENTANA_ALTO : window.innerHeight;
   const estiloVentanas = {
-    bottom: estiloContenedor.bottom,
+    bottom: Math.min(Number(estiloContenedor.bottom), Math.max(MARGIN, altoPantalla - VENTANA_ALTO - MARGIN)),
     ...(haciaIzquierda
       ? { right: (typeof window === "undefined" ? 0 : window.innerWidth) - pos.x + MARGIN }
       : { left: pos.x + fabSize() + MARGIN }),
@@ -132,12 +142,12 @@ export function MessengerDockProvider({ children }: { children: ReactNode }) {
     .slice(0, cuantasEntran(anchoLibre));
 
   return (
-    <DockContext.Provider value={{ abrirChat }}>
+    <DockContext.Provider value={{ abrirChat, abrirDirecto }}>
       {children}
 
-      {mostrarMessenger && ventanas.length > 0 && (
+      {mostrarMessenger && !isMobile && ventanas.length > 0 && (
         <div
-          className="pointer-events-none fixed z-50 flex items-end gap-2"
+          className={cn("pointer-events-none fixed z-50 flex items-end gap-2", haciaIzquierda && "flex-row-reverse")}
           style={estiloVentanas}
         >
           <Suspense fallback={null}>
@@ -170,9 +180,8 @@ export function MessengerDockProvider({ children }: { children: ReactNode }) {
           >
             <ChatsPanel
               alto={isMobile ? 360 : 330}
-              // En el teléfono el chat se abre en una hoja encima, sin salir de la
-              // pantalla; en escritorio, en su ventanita junto al muelle.
-              onAbrirChat={(id) => { setPanelAbierto(false); if (isMobile) setChatEnHoja(id); else abrirChat(id); }}
+              onAbrirChat={abrirChat}
+              onAbrirDirecto={abrirDirecto}
               onNuevo={() => { setPanelAbierto(false); navigate("/messenger?nuevo=1"); }}
               onVerTodo={() => { setPanelAbierto(false); navigate("/messenger"); }}
               onCerrar={() => setPanelAbierto(false)}
@@ -191,6 +200,7 @@ export function MessengerDockProvider({ children }: { children: ReactNode }) {
           <div className="fixed inset-x-0 bottom-0 z-50 h-[85dvh] pb-safe">
             <Suspense fallback={null}>
               <DockChatWindow
+                key={chatEnHoja}
                 conversation={porId[chatEnHoja]}
                 llenar
                 onMinimize={() => { setChatEnHoja(null); setPanelAbierto(true); }}
@@ -208,7 +218,10 @@ export function MessengerDockProvider({ children }: { children: ReactNode }) {
           capture punteros. */}
       {(mostrarClari || mostrarMessenger) && (
       <div
-        className="fixed z-50 flex touch-none cursor-grab flex-col-reverse items-center gap-2 active:cursor-grabbing"
+        className={cn(
+          "fixed flex touch-none cursor-grab flex-col-reverse items-center gap-2 active:cursor-grabbing",
+          isMobile && (panelAbierto || (chatEnHoja && porId[chatEnHoja])) ? "z-30" : "z-50",
+        )}
         style={estiloContenedor}
         {...arrastreProps}
       >

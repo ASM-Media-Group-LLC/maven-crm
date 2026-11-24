@@ -58,8 +58,8 @@ export default function BancoTurno() {
         <MenuFalso estado="en_turno" titulo="5 · Ya pasó su salida" fueraDeHorario />
       </div>
       <div className="mt-8 flex flex-wrap items-start gap-5">
-        <Ventana titulo="6 · Al marcar entrada (primera vez)"><AvisoEntrada primeraVez horario="4:00 PM – 12:00 AM" t={t} /></Ventana>
-        <Ventana titulo="7 · Al marcar entrada (las demás veces)"><AvisoEntrada primeraVez={false} horario="4:00 PM – 12:00 AM" t={t} /></Ventana>
+        <Ventana titulo="6 · Al marcar entrada (primera vez)"><AvisoEntrada primeraVez horario="4:00 PM – 12:00 AM" pausa={{ comida: 30, bano: 10 }} t={t} /></Ventana>
+        <Ventana titulo="7 · Al marcar entrada (las demás veces)"><AvisoEntrada primeraVez={false} horario="4:00 PM – 12:00 AM" pausa={{ comida: 60, bano: 10 }} t={t} /></Ventana>
       </div>
       <div className="mt-8 flex flex-wrap items-start gap-5">
         <Ventana titulo="8 · Marcar salida" ancho="max-w-md"><ConfirmarSalida transcurridoSeg={2 * 3600 + 14 * 60} t={t} /></Ventana>

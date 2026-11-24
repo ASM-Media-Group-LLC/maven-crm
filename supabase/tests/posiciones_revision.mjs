@@ -1,0 +1,36 @@
+import {readFileSync} from 'node:fs';
+import assert from 'node:assert/strict';
+const {PGlite}=await import(process.env.MAVEN_PGLITE_MODULE || '@electric-sql/pglite');
+const db=new PGlite();
+const owner='00000000-0000-4000-8000-000000000001', employee='00000000-0000-4000-8000-000000000002',supervisor='00000000-0000-4000-8000-000000000003',admin='00000000-0000-4000-8000-000000000004',position='00000000-0000-4000-8000-000000000010';
+await db.exec(`create role anon; create role authenticated; create schema auth;
+create function auth.uid() returns uuid language sql stable as $$ select nullif(current_setting('test.uid',true),'')::uuid $$;
+create table auth.users(id uuid primary key);
+insert into auth.users values ('${owner}'),('${employee}'),('${supervisor}'),('${admin}');
+create function public.es_dueno(u uuid) returns boolean language sql stable as $$select u='${owner}'::uuid$$;
+create table posiciones_borrador(id uuid primary key,nombre text,checks jsonb,alcances jsonb,acceso_total boolean,todas_creadoras boolean,modalidad_id uuid,updated_at timestamptz);
+insert into posiciones_borrador values('${position}','Supervisor','{}','{}',false,false,null,'2026-11-22T10:00:00Z');
+create table applied(checks jsonb);
+create function aplicar_test() returns trigger language plpgsql as $$begin if new.checks ? 'failure' then raise exception 'apply failed'; end if; insert into applied values(new.checks);return new;end$$;
+create trigger apply after update on posiciones_borrador for each row execute function aplicar_test();`);
+await db.exec(readFileSync(new URL('../migrations/20261123033654_posiciones_aplicar_y_avisos_saldo.sql',import.meta.url),'utf8'));
+const cfg={checks:{'N:msg.llamar':true},alcances:{Salas:'self'},acceso_total:false,todas_creadoras:false,modalidad_id:null};
+const call=(config=cfg,revision='2026-11-22T10:00:00Z')=>db.query('select posicion_aplicar_revision($1,$2,$3) as p',[position,revision,JSON.stringify(config)]);
+let checks=0;
+for(const who of ['',employee,supervisor,admin]){
+ await db.query("select set_config('test.uid',$1,false)",[who]);await assert.rejects(call(),/Solo el dueño/);checks++;
+}
+assert.equal((await db.query('select count(*) as n from applied')).rows[0].n,0);checks++;
+await db.query("select set_config('test.uid',$1,false)",[owner]);
+await assert.rejects(call({...cfg,checks:{x:'yes'}}),/inválidos/);checks++;
+await assert.rejects(call({...cfg,alcances:{Salas:'anyone'}}),/inválidos/);checks++;
+await assert.rejects(call({...cfg,rol:'admin'}),/inválida/);checks++;
+await assert.rejects(call({...cfg,checks:{failure:true}}),/apply failed/);checks++;
+assert.equal((await db.query('select count(*) as n from posiciones_revisiones')).rows[0].n,0);checks++;
+const saved=(await call()).rows[0].p;
+assert.deepEqual(saved.checks,cfg.checks);checks++;
+assert.equal((await db.query('select count(*) as n from applied')).rows[0].n,1);checks++;
+assert.equal((await db.query('select count(*) as n from posiciones_revisiones')).rows[0].n,1);checks++;
+await assert.rejects(call({...cfg,checks:{}}),/otra sesión/);checks++;
+assert.deepEqual((await db.query('select checks from posiciones_borrador')).rows[0].checks,cfg.checks);checks++;
+await db.close();console.log(`${checks} comprobaciones SQL aprobadas: autorización, validación, aplicación atómica, auditoría y conflicto de versión.`);

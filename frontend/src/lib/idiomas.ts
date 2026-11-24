@@ -40,14 +40,13 @@ export const LOCALE_INTL: Record<Idioma, string> = {
 export const esIdioma = (v: unknown): v is Idioma =>
   typeof v === "string" && (IDIOMAS as readonly string[]).includes(v);
 
-/** El primer idioma del navegador que Maven habla; si ninguno, inglés. */
+/** Idioma principal del dispositivo. Si no está disponible, inglés por defecto;
+ * no cambia a otro idioma secundario sin que la persona lo elija en Maven. */
 export function idiomaDelNavegador(): Idioma {
   try {
-    const lista = navigator.languages?.length ? navigator.languages : [navigator.language];
-    for (const l of lista) {
-      const base = (l ?? "").toLowerCase().split("-")[0];
-      if (esIdioma(base)) return base;
-    }
+    const preferido = navigator.languages?.[0] || navigator.language;
+    const base = (preferido ?? "").toLowerCase().split("-")[0];
+    if (esIdioma(base)) return base;
   } catch {
     // Sin navigator (pruebas, entornos raros): inglés.
   }

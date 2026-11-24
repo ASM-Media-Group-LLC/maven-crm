@@ -4,11 +4,10 @@ import { supabase, SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from "@/integrations
 import { useAuth } from "@/hooks/useAuth";
 import { useLanguage } from "@/hooks/useLanguage";
 import { escritorio } from "@/lib/escritorio";
-import type { TranslationKey } from "@/lib/i18n";
-import { semaforo, tocaAvisar, type Cosa, type MuestraDelEquipo, type Semaforo } from "@/lib/medidorEquipo";
+import { semaforo, tocaAvisar, type MuestraDelEquipo, type Semaforo } from "@/lib/medidorEquipo";
 
 // El medidor de la app (lib/medidorEquipo.ts): una muestra cada 20 s, el aviso
-// a la persona si algo sigue en rojo (máximo uno cada 30 min por cosa) y una
+// informativo si la conexión sigue en rojo (máximo uno cada 30 min) y una
 // fila en equipo_salud cada 5 min para su Expediente de Argos.
 
 const CADA_MS = 20_000;
@@ -55,7 +54,7 @@ export function useMedidorEquipo(): { muestra: MuestraDelEquipo | null; luces: S
   const { t } = useLanguage();
   const [muestra, setMuestra] = useState<MuestraDelEquipo | null>(null);
   const anterior = useRef<Semaforo | null>(null);
-  const avisos = useRef<Partial<Record<Cosa, number>>>({});
+  const ultimoAviso = useRef<number | undefined>(undefined);
   const ultimaGuardada = useRef(0);
   const tRef = useRef(t);
   tRef.current = t;
@@ -69,19 +68,14 @@ export function useMedidorEquipo(): { muestra: MuestraDelEquipo | null; luces: S
       setMuestra(m);
       const luces = semaforo(m);
       const ahora = Date.now();
-      // Un solo aviso con todo lo que siguió en rojo (nada encimado), y nunca
-      // con el detalle del medidor abierto: ahí ya se ve.
-      const toca = (["internet", "memoria", "computador"] as Cosa[])
-        .filter((c) => tocaAvisar(c, luces, anterior.current, avisos.current[c], ahora));
-      if (toca.length > 0 && !detalleAbierto.current) {
-        for (const c of toca) avisos.current[c] = ahora;
-        const titulo = toca.length === 1
-          ? tRef.current(`pwa.medidor.aviso.${toca[0]}.titulo` as TranslationKey)
-          : tRef.current("pwa.medidor.aviso.varios");
-        toast.warning(titulo, {
+      // La carga del procesador y la RAM no interrumpen el trabajo. El detalle
+      // sigue mostrando las mediciones, sin atribuir una causa a la lentitud.
+      if (tocaAvisar("internet", luces, anterior.current, ultimoAviso.current, ahora) && !detalleAbierto.current) {
+        ultimoAviso.current = ahora;
+        toast.info(tRef.current(m.en_linea ? "pwa.medidor.aviso.internet.titulo" : "pwa.medidor.sinConexion"), {
           id: "medidor-equipo",
-          description: toca.map((c) => tRef.current(`pwa.medidor.consejo.${c}.rojo` as TranslationKey)).join(" "),
-          duration: 15_000,
+          description: tRef.current(m.en_linea ? "pwa.medidor.aviso.internet.detalle" : "pwa.medidor.aviso.internet.sinConexion"),
+          duration: 8_000,
         });
       }
       anterior.current = luces;

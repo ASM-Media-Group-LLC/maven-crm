@@ -341,7 +341,8 @@ const ParticipantTile = memo(function ParticipantTile({
         // El fondo del tile lo pone esa clase (antes era un gris plano inline).
         "tile-estudio group relative overflow-hidden flex items-center justify-center h-full transition-all duration-200",
         compact ? "rounded-lg" : "rounded-2xl",
-        participant.isSpeaking && "ring-2 ring-primary ring-offset-2 ring-offset-background",
+        // Quien habla: borde verde y nada se mueve de lugar (vista fija, 19/11/2026).
+        participant.isSpeaking && "ring-2 ring-emerald-400 ring-offset-2 ring-offset-background",
         isPinned && "ring-2 ring-primary",
         className
       )}
@@ -558,7 +559,7 @@ const ParticipantTile = memo(function ParticipantTile({
       {/* Screen sharing badge */}
       {participant.isScreenSharing && (
         <div className="absolute top-3 left-1/2 -translate-x-1/2 z-10">
-          <div className="flex items-center gap-1.5 bg-[hsl(220_3%_14%/0.8)] backdrop-blur-sm text-foreground text-[10px] font-medium rounded-full px-2.5 py-1">
+          <div className="flex items-center gap-1.5 bg-[hsl(220_3%_14%/0.8)] backdrop-blur-sm text-white text-[10px] font-medium rounded-full px-2.5 py-1">
             <Monitor className="h-3 w-3" /> {t("messenger.tile.compartiendoPantalla")}
           </div>
         </div>
@@ -584,7 +585,7 @@ const ParticipantTile = memo(function ParticipantTile({
           abajo-izquierda y la señal en su propia placa abajo-derecha, como un
           rótulo de transmisión — en vez de una barra con degradé. */}
       <div className={cn("absolute bottom-0 left-0 right-0 flex items-end justify-between z-10 pointer-events-none", compact ? "px-1.5 py-1.5" : "px-2.5 py-2.5")}>
-        <div className={cn("flex min-w-0 items-center gap-1.5 rounded-md border border-white/10 bg-[hsl(var(--background)/0.72)] backdrop-blur-sm", compact ? "px-1.5 py-0.5" : "px-2 py-1")}>
+        <div className={cn("flex min-w-0 items-center gap-1.5 rounded-md border border-white/10 bg-[hsl(220_30%_10%/0.85)] backdrop-blur-sm", compact ? "px-1.5 py-0.5" : "px-2 py-1")}>
           <span className={cn("truncate font-medium text-white", compact ? "text-[10px]" : "text-xs")}>
             {participant.isLocal ? t("messenger.preview.tu") : participant.name}
           </span>
@@ -598,7 +599,7 @@ const ParticipantTile = memo(function ParticipantTile({
             cámara + pantalla se dibujan dos tiles suyos y sin esta guarda el
             iconito salía repetido. Va en el de su cámara. */}
         {!participant.esTileDePantalla && (
-          <div className="shrink-0 rounded-md border border-white/10 bg-[hsl(var(--background)/0.72)] px-1.5 py-1 backdrop-blur-sm">
+          <div className="shrink-0 rounded-md border border-white/10 bg-[hsl(220_30%_10%/0.85)] px-1.5 py-1 backdrop-blur-sm">
             <ConnectionIndicator quality={participant.connectionQuality} />
           </div>
         )}

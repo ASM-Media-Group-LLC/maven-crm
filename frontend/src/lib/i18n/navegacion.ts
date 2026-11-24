@@ -40,7 +40,7 @@ export const navegacion = {
   // Sidebar items - Resources
   "nav.designSystem": { es: "Design System", en: "Design System" },
   "nav.docs": { es: "Documentación", en: "Documentation" },
-  "nav.settings": { es: "Settings", en: "Settings" },
+  "nav.settings": { es: "Ajustes", en: "Settings" },
 
   // Topbar
   "topbar.search": { es: "Buscar en la plataforma...", en: "Search the platform..." },

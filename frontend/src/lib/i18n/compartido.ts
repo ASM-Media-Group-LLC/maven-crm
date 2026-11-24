@@ -119,8 +119,8 @@ export const compartido = {
     en: "Screen sharing isn't available here",
   },
   "shared.call.screenShareUnavailableDesc": {
-    es: "Los teléfonos no lo permiten. Hazlo desde la computadora.",
-    en: "Phones don't support it. Do it from a computer.",
+    es: "Esta ventana no permite capturar la pantalla. Prueba en la ventana principal de la llamada o vuelve a abrirla en Maven.",
+    en: "This window can't capture the screen. Try the main call window or reopen the call in Maven.",
   },
   "shared.call.screenShareFailed": { es: "No se pudo compartir la pantalla", en: "Couldn't share your screen" },
   "shared.call.ahorroTitulo": { es: "Tu internet de subida está lento", en: "Your upload speed is low" },

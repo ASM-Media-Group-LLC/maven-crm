@@ -1,3 +1,4 @@
+import { sqlMessengerConPosiciones } from "../functions/_tests/cadena_messenger_posiciones.ts";
 // Mensajes programados del Messenger (migración 20261008170000_chat_programados),
 // probados contra un Postgres de verdad (PGlite) cargado con el esquema de PROD
 // del 28/09 y las migraciones reales del chat que vinieron después (la misma
@@ -251,7 +252,7 @@ const NO_CARGAN_AQUI: Record<string, string> = {
 const DIR_MIG = new URL("../migrations/", import.meta.url);
 const CADENA: { n: string; sql: string }[] = [...Deno.readDirSync(DIR_MIG)].map((e) => e.name)
   .filter((n) => /^\d{14}_\w+\.sql$/.test(n) && n.slice(0, 14) > FIXTURE_HASTA && !NO_CARGAN_AQUI[n]).sort()
-  .map((n) => ({ n, sql: Deno.readTextFileSync(new URL(n, DIR_MIG)) }))
+  .map((n) => ({ n, sql: sqlMessengerConPosiciones(n, Deno.readTextFileSync(new URL(n, DIR_MIG))) }))
   .filter((m) => objetivos(m.sql).length > 0);
 
 check(CADENA.some((m) => m.n === N), "esta migración entra a la cadena del chat");

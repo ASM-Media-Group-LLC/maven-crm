@@ -22,6 +22,7 @@ import { useAdminUsers } from "./useAdminUsers";
 import type { RoleConfig } from "./useRoles";
 import { useLanguage } from "@/hooks/useLanguage";
 import { ConFormato } from "./ConFormato";
+import { usePermisosUsuarios } from "./usePermisosUsuarios";
 
 interface ManageRoleUsersModalProps {
   open: boolean;
@@ -47,12 +48,14 @@ const ManageRoleUsersModal = ({
   isMutating,
 }: ManageRoleUsersModalProps) => {
   const { t } = useLanguage();
+  const { asignar } = usePermisosUsuarios();
   const [assignedSearch, setAssignedSearch] = useState("");
   const [availableSearch, setAvailableSearch] = useState("");
   const [pendingAssign, setPendingAssign] = useState<PendingAssign | null>(null);
   const [pendingRemove, setPendingRemove] = useState<{ userId: string; userName: string } | null>(null);
 
   const { users, isLoading } = useAdminUsers();
+  const puedeGestionar = (id: string) => asignar && users.some(u => u.id === id && u.manageable);
 
   const assignedIds = useMemo(() => new Set(role?.members.map((m) => m.id) ?? []), [role]);
 
@@ -76,7 +79,7 @@ const ManageRoleUsersModal = ({
   }, [users, assignedIds, availableSearch]);
 
   const handleAddClick = (userId: string, userName: string, currentRole: string | null) => {
-    if (!role) return;
+    if (!role || !puedeGestionar(userId)) return;
     // Si el user ya tenía otro rol, confirmamos para evitar sobrescrituras silenciosas.
     if (currentRole && currentRole !== role.name) {
       setPendingAssign({ userId, userName, currentRole });
@@ -86,6 +89,7 @@ const ManageRoleUsersModal = ({
   };
 
   const handleRemoveClick = (userId: string, userName: string) => {
+    if (!puedeGestionar(userId)) return;
     setPendingRemove({ userId, userName });
   };
 
@@ -141,7 +145,7 @@ const ManageRoleUsersModal = ({
                           size="sm"
                           className="text-destructive hover:text-destructive shrink-0"
                           onClick={() => handleRemoveClick(m.id, m.full_name || t("admin.noName"))}
-                          disabled={isMutating}
+                          disabled={isMutating || !puedeGestionar(m.id)}
                         >
                           <UserMinus className="h-4 w-4 mr-1" />
                           {t("admin.manageUsers.remove")}
@@ -200,7 +204,7 @@ const ManageRoleUsersModal = ({
                           size="sm"
                           className="shrink-0"
                           onClick={() => handleAddClick(u.id, u.full_name || t("admin.noName"), u.role)}
-                          disabled={isMutating}
+                          disabled={isMutating || !puedeGestionar(u.id)}
                         >
                           <UserPlus className="h-4 w-4 mr-1" />
                           {t("common.add")}
@@ -244,8 +248,9 @@ const ManageRoleUsersModal = ({
           <AlertDialogFooter>
             <AlertDialogCancel />
             <AlertDialogAction
+              disabled={isMutating || !pendingAssign || !puedeGestionar(pendingAssign.userId)}
               onClick={() => {
-                if (pendingAssign && role) {
+                if (pendingAssign && role && puedeGestionar(pendingAssign.userId)) {
                   onAssign(pendingAssign.userId, role.name);
                 }
                 setPendingAssign(null);
@@ -276,9 +281,10 @@ const ManageRoleUsersModal = ({
           <AlertDialogFooter>
             <AlertDialogCancel />
             <AlertDialogAction
+              disabled={isMutating || !pendingRemove || !puedeGestionar(pendingRemove.userId)}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
               onClick={() => {
-                if (pendingRemove) {
+                if (pendingRemove && puedeGestionar(pendingRemove.userId)) {
                   onRemove(pendingRemove.userId);
                 }
                 setPendingRemove(null);

@@ -3,13 +3,13 @@ import { ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { useLanguage } from "@/hooks/useLanguage";
-import { useEsDueno } from "@/hooks/useEsDueno";
+import { usePermissions } from "@/hooks/usePermissions";
 
-/** Tarjeta en Ajustes que lleva a Posiciones. Solo el dueño la ve. */
+/** Constructor disponible para el dueño y las funciones delegadas. */
 export function TarjetaPosiciones() {
   const { t } = useLanguage();
-  const { esDueno } = useEsDueno();
-  if (esDueno !== true) return null;
+  const { canAccess, canFunction, isLoading } = usePermissions();
+  if (isLoading || !(canAccess("Administración", "Roles") || (canAccess("Administración", "Usuarios") && canFunction("N:usr.asignar")))) return null;
   return (
     <Card>
       <CardContent className="flex items-start gap-3 p-6">

@@ -12,6 +12,7 @@ import { useEsDueno } from "@/hooks/useEsDueno";
 import { useVigilancia } from "@/hooks/useVigilancia";
 import QuienEstaBajando from "@/components/vigilancia/QuienEstaBajando";
 import { useAtajosDeHoy } from "@/components/centro/AtajosDeHoy";
+import { rutaDeCifra } from "@/lib/cifrasDeHoy";
 import type { EstadoVivo } from "@/hooks/useRondinVivo";
 import type { CajaEquipo, PersonaPulso } from "@/lib/pulsoEquipo";
 import type { TranslationKey } from "@/lib/i18n";
@@ -138,22 +139,23 @@ export function CajaDelEquipo({ caja, t, lang, abrir }: { caja: CajaEquipo; t: T
 /** Los números del Pulso como filas de ListaDeNumeros (el inicio en dos
  *  columnas los pone a la derecha, 13/11/2026). Mismos valores que las tarjetas. */
 export function NumerosDelInicio({ coworkConectados, extra = [] }: { coworkConectados?: number | null; extra?: FilaNumero[] }) {
-  const { t, language } = useLanguage();
-  const { puedeVer, pulso, ultimaRonda } = usePulsoEquipo();
-  const ultima = ultimaRonda ? hace(ultimaRonda.toISOString(), language) : null;
+  const { t } = useLanguage();
+  const { puedeVer, pulso } = usePulsoEquipo();
   // Primero los cuatro atajos de hoy (Alvaro, 18/11/2026); después, lo de ahora mismo.
   const atajos = useAtajosDeHoy(puedeVer);
   const filas: FilaNumero[] = [];
   if (puedeVer && pulso && pulso.total > 0) {
     filas.push(
       coworkConectados === undefined
-        ? { icono: Users, tono: "success", etiqueta: t("dashboard.pulso.conectadosAhora"), valor: pulso.conectados, detalle: t("dashboard.pulso.deTotal", { total: pulso.total }) }
-        : { icono: Users, tono: "success", etiqueta: t("dashboard.pulso.enCowork"), valor: coworkConectados == null ? "–" : coworkConectados, detalle: t("dashboard.pulso.conApp", { n: pulso.conectados }) },
+        ? { icono: Users, tono: "success", etiqueta: t("dashboard.pulso.conectadosAhora"), valor: pulso.conectados, detalle: t("dashboard.pulso.deTotal", { total: pulso.total }), href: rutaDeCifra("en-cowork") }
+        : { icono: Users, tono: "success", etiqueta: t("dashboard.pulso.enCowork"), valor: coworkConectados == null ? "–" : coworkConectados, detalle: t("dashboard.pulso.conApp", { n: pulso.conectados }), href: rutaDeCifra("en-cowork") },
       { icono: Gauge, tono: tonoBanda(pulso.notaViva ?? null).tono, etiqueta: t("dashboard.pulso.notaViva"), valor: pulso.notaViva ?? "—",
-        detalle: pulso.conectados === 0 ? t("dashboard.pulso.sinConectados") : t("dashboard.pulso.trabajandoProblema", { trabajando: pulso.trabajando, problema: pulso.conProblema }) },
-      { icono: CheckCircle2, tono: "success", etiqueta: t("dashboard.pulso.trabajando"), valor: pulso.trabajando, detalle: ultima ? t("dashboard.pulso.ultimaRonda", { hace: ultima }) : undefined },
+        detalle: pulso.conectados === 0 ? t("dashboard.pulso.sinConectados") : t("dashboard.pulso.trabajandoProblema", { trabajando: pulso.trabajando, problema: pulso.conProblema }), href: rutaDeCifra("nota-equipo") },
+      // Sin el «última ronda hace N s» (20/11/2026): cambiaba cada segundo, a veces
+      // hacia atrás, y hacía parpadear la lista entera.
+      { icono: CheckCircle2, tono: "success", etiqueta: t("dashboard.pulso.trabajando"), valor: pulso.trabajando, detalle: t("dashboard.pulso.enVivoDetalle"), href: rutaDeCifra("trabajando") },
       { icono: AlertTriangle, tono: pulso.conProblema > 0 ? "danger" : "success", etiqueta: t("dashboard.pulso.conProblema"), valor: pulso.conProblema,
-        detalle: pulso.conProblema === 0 ? t("dashboard.pulso.todoEnOrden") : t("dashboard.pulso.hazClicProblema") },
+        detalle: pulso.conProblema === 0 ? t("dashboard.pulso.todoEnOrden") : t("dashboard.pulso.hazClicProblema"), href: rutaDeCifra("con-problemas") },
     );
   }
   return <ListaDeNumeros titulo={t("dashboard.centro.numeros")} icono={Gauge} filas={[...atajos, ...filas, ...extra]} />;

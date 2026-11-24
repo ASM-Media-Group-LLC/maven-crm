@@ -52,7 +52,7 @@ export const BACKGROUND_TEMPLATES = [
 // los equipos). Para tener una idea: una gaussiana de sigma s se parece a
 // promediar una ventana de ~2,5·s píxeles.
 //
-//   · «blur» (un poco): sigma 50 ≈ ventana de ~125 px a 720p. No se lee nada
+//   · «blur» (leve): sigma 60 ≈ ventana de ~150 px a 720p. No se lee nada
 //     del cuarto (ni ventanas, ni cuadros, ni objetos): quedan solo las manchas
 //     grandes de color — el «difuminar un poco» de Meet.
 //   · «blur-strong» (fuerte): sigma 125 ≈ ventana de ~310 px. Campos de color
@@ -70,10 +70,52 @@ export const BACKGROUND_TEMPLATES = [
 // Costo: el desenfoque corre a 1/4 de resolución con dos pasadas separables y
 // a lo sumo 48 muestras por lado (con sigmas grandes se muestrea de a 2-3
 // texeles; ver pasoDeMuestreo): una fracción de milisegundo en la GPU.
+//
+// 19/11/2026 (Alvaro: «no es tan bueno como Meet, no difumina lo suficiente»):
+// los dos niveles pasan a llamarse «Leve» y «Fuerte», se eligen en el menú de
+// la cámara (al lado del botón de difuminar) y el nivel por defecto es FUERTE
+// (antes el botón rápido ponía «un poco»). Leve ≈ la mitad de Fuerte.
 export const RADIO_DE_BLUR: Record<string, number> = {
-  blur: 50,
+  blur: 60,
   "blur-strong": 125,
 };
+
+// ── El nivel elegido (Leve / Fuerte), por navegador ──────────────────────────
+
+export type NivelDeBlur = "leve" | "fuerte";
+export const NIVEL_DE_BLUR_POR_DEFECTO: NivelDeBlur = "fuerte";
+const CLAVE_NIVEL_BLUR = "call-blur-level";
+
+/** El efecto que corresponde a cada nivel («blur» = leve, «blur-strong» = fuerte). */
+export function efectoDeNivel(nivel: NivelDeBlur): BackgroundEffect {
+  return nivel === "leve" ? "blur" : "blur-strong";
+}
+
+/** El nivel de un efecto de difuminado (null si no es difuminado). */
+export function nivelDeEfecto(effect: BackgroundEffect): NivelDeBlur | null {
+  if (effect === "blur") return "leve";
+  if (effect === "blur-strong") return "fuerte";
+  return null;
+}
+
+/** El último nivel que eligió la persona en este navegador; Fuerte si nunca eligió. */
+export function leerNivelDeBlur(): NivelDeBlur {
+  try {
+    const v = localStorage.getItem(CLAVE_NIVEL_BLUR);
+    return v === "leve" || v === "fuerte" ? v : NIVEL_DE_BLUR_POR_DEFECTO;
+  } catch {
+    return NIVEL_DE_BLUR_POR_DEFECTO;
+  }
+}
+
+export function guardarNivelDeBlur(nivel: NivelDeBlur): void {
+  try { localStorage.setItem(CLAVE_NIVEL_BLUR, nivel); } catch { /* incógnito: sin memoria */ }
+}
+
+/** El efecto con el que se enciende el difuminado: el del nivel guardado. */
+export function blurPorDefecto(): BackgroundEffect {
+  return efectoDeNivel(leerNivelDeBlur());
+}
 
 // ── Cámara con fondo: HD en equipos fuertes ──────────────────────────────────
 //
@@ -97,7 +139,7 @@ export const PERFIL_FONDO_LIVIANO = {
   frameRate: { ideal: 15, max: 15 },
 } as const;
 
-type EquipoParaFondo = { hardwareConcurrency?: number; userAgent?: string } | undefined;
+type EquipoParaFondo = { hardwareConcurrency?: number; userAgent?: string; deviceMemory?: number } | undefined;
 
 function equipoActual(): EquipoParaFondo {
   return typeof navigator === "undefined" ? undefined : navigator;
@@ -126,6 +168,24 @@ export function cadaCuantosCuadrosSegmentar(equipo: EquipoParaFondo = equipoActu
   return equipoAguantaFondoHD(equipo) ? 1 : 2;
 }
 
+/**
+ * ¿Este equipo usa el RECORTE FINO? (19/11/2026, «el pelo oscuro contra la
+ * pared oscura se lo come»). El recorte fino suma al detector liviano el
+ * multiclase de MediaPipe, que ve el PELO como clase aparte (ver MODELOS y
+ * personaFusionada en lib/fondoFino/). Cuesta ~2× por cuadro y baja 16 MB una
+ * vez, así que solo en equipos fuertes: los del fondo en HD y, si el navegador
+ * lo dice, con 8 GB de memoria o más. Los demás siguen con el liviano solo, y
+ * si un equipo fuerte se atrasa, el procesador lo apaga solo (ver
+ * debeBajarAlLiviano en lib/fondoFino/parametros.ts).
+ */
+export const MEMORIA_PARA_RECORTE_FINO_GB = 8;
+
+export function usaRecorteFino(equipo: EquipoParaFondo = equipoActual()): boolean {
+  if (!equipoAguantaFondoHD(equipo)) return false;
+  const memoria = equipo?.deviceMemory;
+  return typeof memoria !== "number" || memoria >= MEMORIA_PARA_RECORTE_FINO_GB;
+}
+
 export function esBlur(effect: BackgroundEffect): boolean {
   return effect === "blur" || effect === "blur-strong";
 }
@@ -146,7 +206,7 @@ export function radioDeBlur(effect: BackgroundEffect): number {
  */
 export function alternarBlur(actual: BackgroundEffect, ultimoNivel: BackgroundEffect): BackgroundEffect {
   if (esBlur(actual)) return "none";
-  return esBlur(ultimoNivel) ? ultimoNivel : "blur";
+  return esBlur(ultimoNivel) ? ultimoNivel : blurPorDefecto();
 }
 
 export function isCustomBackground(effect: BackgroundEffect): boolean {
@@ -217,6 +277,10 @@ export function leerFondoGuardado(): BackgroundEffect {
 }
 
 export function guardarFondo(effect: BackgroundEffect): void {
+  // Elegir un nivel desde cualquier lado (menú, «Fondos y efectos», lobby) lo
+  // deja como el nivel de la próxima vez.
+  const nivel = nivelDeEfecto(effect);
+  if (nivel) guardarNivelDeBlur(nivel);
   try {
     if (!effect || effect === "none") localStorage.removeItem(claveDelFondo());
     else localStorage.setItem(claveDelFondo(), effect);

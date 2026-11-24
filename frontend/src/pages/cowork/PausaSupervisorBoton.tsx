@@ -6,6 +6,7 @@ import {
   ESTADOS_SUPERVISOR,
   leerPausaSupervisor, fijarPausaSupervisor, suscribirPausaSupervisor,
 } from "@/lib/pausaSupervisor";
+import { useJornadaConfig } from "@/hooks/useJornada";
 import { useLanguage } from "@/hooks/useLanguage";
 import { ESTAS_SUPERVISOR, ETIQUETA_SUPERVISOR } from "./textosCowork";
 
@@ -19,6 +20,9 @@ export default function PausaSupervisorBoton() {
   const estado = useSyncExternalStore(suscribirPausaSupervisor, leerPausaSupervisor, leerPausaSupervisor);
   const { t } = useLanguage();
   const activo = estado !== null;
+  const jornada = useJornadaConfig();
+  // La jornada configurada usa el control de pausas registrado del menú lateral.
+  if (!jornada.data || jornada.data.configurada) return null;
   return (
     <Popover>
       <PopoverTrigger asChild>

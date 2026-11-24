@@ -114,6 +114,16 @@ describe("CallControls", () => {
     expect(screen.queryByTitle("Compartir pantalla")).not.toBeInTheDocument();
   });
 
+  it("permite compartir desde la miniatura y conserva las restricciones de la sala", () => {
+    const onToggleScreenShare = vi.fn();
+    const props = { ...defaultProps, onToggleScreenShare, miniaturaDeEscritorio: true };
+    const { rerender } = render(<CallControls {...props} />);
+    fireEvent.click(screen.getByTitle("Compartir pantalla"));
+    expect(onToggleScreenShare).toHaveBeenCalledOnce();
+    rerender(<CallControls {...props} hideScreenShare />);
+    expect(screen.queryByTitle("Compartir pantalla")).not.toBeInTheDocument();
+  });
+
   it("shows screen share button when hideScreenShare is false", () => {
     render(<CallControls {...defaultProps} hideScreenShare={false} />);
     expect(screen.getByTitle("Compartir pantalla")).toBeInTheDocument();

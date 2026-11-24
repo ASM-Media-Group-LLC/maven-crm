@@ -76,7 +76,7 @@ export function useVenPantallasDelHub(activo: boolean): string[] {
   useEffect(() => {
     if (!activo) return;
     let vivo = true;
-    void (async () => {
+    const pedir = async () => {
       try {
         const { data, error } = await sinTipar.rpc("cowork_ven_pantallas_del_hub");
         if (error) throw new Error(error.message);
@@ -84,8 +84,10 @@ export function useVenPantallasDelHub(activo: boolean): string[] {
       } catch (e) {
         console.warn("[cowork] no pude leer quiénes ven las pantallas del Hub", e);
       }
-    })();
-    return () => { vivo = false; };
+    };
+    void pedir();
+    const intervalo = window.setInterval(() => { void pedir(); }, 30_000);
+    return () => { vivo = false; window.clearInterval(intervalo); };
   }, [activo]);
   return ids;
 }

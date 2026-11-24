@@ -16,6 +16,9 @@ export type TramoDeApp = {
   inactivos: number;
 };
 
+export type EstadoMiniaturaLlamada = { miniatura: boolean; anclada: boolean };
+export type AccionMiniaturaLlamada = "estado" | "expandir" | "anclaje";
+
 export type MavenEscritorio = {
   esApp: true;
   plataforma: "mac" | "windows" | "linux";
@@ -25,6 +28,9 @@ export type MavenEscritorio = {
   flotante: (si?: boolean) => Promise<boolean>;
   /** La ventana de una llamada se trae al frente («Volver a la llamada»). Apps desde el 18/11/2026. */
   mostrarEstaVentana?: () => Promise<boolean>;
+  miniaturaLlamada?: (accion: AccionMiniaturaLlamada) => Promise<EstadoMiniaturaLlamada | null>;
+  arrastrarMiniaturaLlamada?: (fase: "inicio" | "mover" | "fin") => void;
+  alCambiarMiniaturaLlamada?: (cb: (estado: EstadoMiniaturaLlamada) => void) => () => void;
   alCambiarFlotante: (cb: (flotando: boolean) => void) => () => void;
   inactividad: () => Promise<number | null>;
   alUsoDeApps: (cb: (lote: TramoDeApp[]) => void) => () => void;

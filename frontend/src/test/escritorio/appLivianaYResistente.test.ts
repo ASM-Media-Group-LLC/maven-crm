@@ -7,6 +7,7 @@ import { proximoIntentoDePantalla } from "@/lib/pantallaSolaEnLaApp";
 // traer las computadoras». Modo liviano en equipos de 8 GB o menos, refresco por
 // memoria en un momento quieto, recuperación sola si se cuelga, y en Cowork la
 // pantalla se comparte sola.
+const captura = Object.values(import.meta.glob("../../../../desktop/src/compartirPantalla.js", { query: "?raw", import: "default", eager: true }))[0] as string;
 const main = Object.values(import.meta.glob("../../../../desktop/src/main.js", { query: "?raw", import: "default", eager: true }))[0] as string;
 const recuperarse = Object.values(import.meta.glob("../../../../desktop/src/recuperarse.js", { query: "?raw", import: "default", eager: true }))[0] as string;
 const preload = Object.values(import.meta.glob("../../../../desktop/src/preload.js", { query: "?raw", import: "default", eager: true }))[0] as string;
@@ -84,8 +85,8 @@ describe("si la app se cuelga o se queda en blanco, se recupera sola", () => {
 describe("en Cowork la pantalla se comparte sola", () => {
   it("la app elige sola la pantalla principal cuando Cowork lo pide (después de revisar el permiso del Mac)", () => {
     expect(preload).toContain('pantallaAutomatica: (si) => ipcRenderer.send("maven:pantalla-auto", Boolean(si))');
-    const manejador = main.slice(main.indexOf("setDisplayMediaRequestHandler"));
-    expect(manejador.indexOf("pantallaPermitida()")).toBeLessThan(manejador.indexOf("if (pantallaAutomatica"));
+    const manejador = captura;
+    expect(manejador.indexOf("pantallaPermitida()")).toBeLessThan(manejador.indexOf("getPrimaryDisplay().id"));
     expect(manejador).toContain("getPrimaryDisplay().id");
   });
   it("la llamada la pide sola solo en la app, solo en Cowork y nunca en pausa", () => {

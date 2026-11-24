@@ -31,11 +31,11 @@ import type {
   VideoTrackTransformer,
   VideoTransformerInitOptions,
 } from "@livekit/track-processors";
-import { RADIO_DE_BLUR, cadaCuantosCuadrosSegmentar } from "@/lib/fondoDeLlamada";
+import { RADIO_DE_BLUR, cadaCuantosCuadrosSegmentar, usaRecorteFino } from "@/lib/fondoDeLlamada";
 import { crearPipelineFondo, type PipelineFondo } from "./pipelineGL";
 import {
   CUADROS_DE_CALENTAMIENTO, FUSION_POR_DEFECTO, REVISAR_RITMO_CADA,
-  promedioMovil, ritmoDelDetector, tocaMulticlase,
+  debeBajarAlLiviano, promedioMovil, ritmoDelDetector, tocaMulticlase,
 } from "./parametros";
 
 // ── El detector ──────────────────────────────────────────────────────────────
@@ -72,8 +72,16 @@ const WASM_MEDIAPIPE = `https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@${V
  *     gris, no menos: lo que falla ahí es el color, no el detector);
  *   · el cuadro en que corre tarda ~20 ms: promedio ~9-10 ms (antes ~5) y se
  *     pierden cuadros (29,2-29,7 por segundo en vez de 30).
- * Por eso queda APAGADO (FUSION_POR_DEFECTO) y lo que sí mejoró el borde es el
+ * Por eso quedó APAGADO (FUSION_POR_DEFECTO) y lo que sí mejoró el borde fue el
  * «borde por color» de pipelineGL.ts (mate), que cuesta menos de 0,5 ms.
+ *
+ * 19/11/2026 (Alvaro: «el pelo oscuro contra el fondo oscuro se lo come»): ahí
+ * el color no sirve (pelo y pared son del mismo color) y el liviano, sin clase
+ * de pelo, duda. Así que el «recorte fino» = liviano + multiclase (que ve el
+ * PELO aparte y solo puede SUMAR persona cerca del contorno) se prende en los
+ * equipos fuertes (usaRecorteFino en lib/fondoDeLlamada.ts). Si el cuadro pasa
+ * de 25 ms sostenido, se apaga solo y queda el liviano (debeBajarAlLiviano).
+ * Los equipos flojos siguen con el liviano solo, cada 2 cuadros.
  */
 export const MODELOS = {
   selfie: {
@@ -189,6 +197,12 @@ export class TransformadorFondoFino implements VideoTrackTransformer<OpcionesFon
   private costoDibujoMs = 0;
   private cuadrosMedidos = 0;
   private ritmo: { cadaCuantos: number; mate: boolean } | null = null;
+  // El costo total por cuadro (detector(es) + dibujo) y cuántas revisiones
+  // seguidas pasó del presupuesto del recorte fino. Si se baja al liviano, no
+  // se vuelve a subir mientras viva este procesador.
+  private costoTotalMs = 0;
+  private revisionesLentas = 0;
+  private bajadoAlLiviano = false;
   private modoAnterior: "borroso" | "imagen" | null = null;
 
   constructor(opciones: OpcionesFondoFino) {
@@ -229,6 +243,8 @@ export class TransformadorFondoFino implements VideoTrackTransformer<OpcionesFon
   private usaFusion(): boolean {
     // Si el principal ya es el multiclase, no tiene sentido sumarlo otra vez.
     if ((this.options.modelo ?? MODELO_POR_DEFECTO) === "multiclase") return false;
+    // El equipo no aguantó el recorte fino: liviano solo hasta cerrar la cámara.
+    if (this.bajadoAlLiviano) return false;
     return this.options.fusion ?? FUSION_POR_DEFECTO;
   }
 
@@ -352,12 +368,15 @@ export class TransformadorFondoFino implements VideoTrackTransformer<OpcionesFon
    * cuadros, decide el ritmo (ver ritmoDelDetector). Los primeros cuadros no
    * cuentan: compilan shaders y calientan la GPU.
    */
-  private medirRitmo(detectorMs: number, dibujoMs: number) {
+  private medirRitmo(detectorMs: number, dibujoMs: number, totalMs: number) {
     this.cuadrosMedidos++;
     if (this.cuadrosMedidos <= CUADROS_DE_CALENTAMIENTO) return;
     if (detectorMs > 0) this.costoDetectorMs = promedioMovil(this.costoDetectorMs, detectorMs);
     this.costoDibujoMs = promedioMovil(this.costoDibujoMs, dibujoMs);
-    if (this.cuadrosMedidos % REVISAR_RITMO_CADA !== 0 || !(this.costoDetectorMs > 0)) return;
+    this.costoTotalMs = promedioMovil(this.costoTotalMs, totalMs);
+    if (this.cuadrosMedidos % REVISAR_RITMO_CADA !== 0) return;
+    this.revisarRecorteFino();
+    if (!(this.costoDetectorMs > 0)) return;
     const nuevo = ritmoDelDetector({
       detectorMs: this.costoDetectorMs,
       dibujoMs: this.costoDibujoMs,
@@ -370,6 +389,21 @@ export class TransformadorFondoFino implements VideoTrackTransformer<OpcionesFon
       );
     }
     this.ritmo = nuevo;
+  }
+
+  /**
+   * Con el recorte fino puesto: si el cuadro promedio pasa del presupuesto
+   * varias revisiones seguidas, se apaga el multiclase y queda el liviano.
+   */
+  private revisarRecorteFino() {
+    if (!this.fino || this.bajadoAlLiviano) { this.revisionesLentas = 0; return; }
+    const r = debeBajarAlLiviano(this.costoTotalMs, this.revisionesLentas);
+    this.revisionesLentas = r.lentas;
+    if (!r.bajar) return;
+    console.info(`[fondo] el equipo no aguanta el recorte fino (${this.costoTotalMs.toFixed(1)} ms por cuadro): queda el liviano`);
+    this.bajadoAlLiviano = true;
+    this.revisionesLentas = 0;
+    this.cerrarFino();
   }
 
   async transform(frame: VideoFrame, controller: TransformStreamDefaultController<VideoFrame>) {
@@ -402,6 +436,7 @@ export class TransformadorFondoFino implements VideoTrackTransformer<OpcionesFon
       // cuadro): se segmenta aunque no toque.
       const toca = this.cuadro % cadaCuantos === 0 || !this.pipeline.tieneMascara();
       let segmento = false;
+      let corrioFino = false;
       if (this.segmentador && toca) {
         const modelo = this.modelo();
         // VIDEO exige marcas de tiempo crecientes.
@@ -420,6 +455,7 @@ export class TransformadorFondoFino implements VideoTrackTransformer<OpcionesFon
         const ts = Math.max(performance.now(), this.ultimoTsFino + 1);
         this.ultimoTsFino = ts;
         try {
+          corrioFino = true;
           this.fino.segmentForVideo(frame, ts, (resultado) => {
             // Máscara 0 = fondo; la pasada la invierte a «persona».
             const mascara = resultado.confidenceMasks?.[0];
@@ -440,7 +476,8 @@ export class TransformadorFondoFino implements VideoTrackTransformer<OpcionesFon
       const nuevo = new VideoFrame(this.canvas, { timestamp: frame.timestamp ?? 0 });
       controller.enqueue(nuevo);
       const filtroMs = performance.now() - t1;
-      this.medirRitmo(segmento ? this.segmentacionMs : 0, filtroMs);
+      const detectoresMs = segmento || corrioFino ? this.segmentacionMs : 0;
+      this.medirRitmo(segmento ? this.segmentacionMs : 0, filtroMs, detectoresMs + filtroMs);
       this.options.onFrameProcessed?.({
         processingTimeMs: this.segmentacionMs + filtroMs,
         segmentationTimeMs: this.segmentacionMs,
@@ -547,7 +584,8 @@ export function ProcesadorDeFondo(
   if (!ProcessorWrapper.isSupported) throw new Error("fondo-fino: el navegador no puede procesar pistas");
   const base: OpcionesFondoFino = {
     modelo: opciones.modelo,
-    fusion: opciones.fusion,
+    // Recorte fino (con el pelo) en los equipos fuertes; liviano en los demás.
+    fusion: opciones.fusion ?? usaRecorteFino(),
     mate: opciones.mate,
     cadaCuantos: opciones.cadaCuantos ?? cadaCuantosCuadrosSegmentar(),
     onFrameProcessed: opciones.onFrameProcessed,

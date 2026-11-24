@@ -1,9 +1,12 @@
+import { useMiniaturaNavegador } from "@/components/LlamadaEnVentanaFlotante";
 import { useState, useEffect, useCallback, useMemo, useRef, type ReactNode } from "react";
 import { useEnTurno } from "@/lib/turnoActivo";
 import { ConnectionState, CriticalTimers, RoomEvent, Track, VideoQuality } from "livekit-client";
 import { useLiveKit } from "@/hooks/useLiveKit";
 import CallTopBar from "./CallTopBar";
 import CallControls from "./CallControls";
+import BarraMiniaturaLlamada from "./BarraMiniaturaLlamada";
+import VideosEnMiniatura from "./VideosEnMiniatura";
 import CallChatSidebar from "./CallChatSidebar";
 import CallParticipantsSidebar from "./CallParticipantsSidebar";
 import AdjustViewDialog, { type ViewSettings } from "./AdjustViewDialog";
@@ -19,14 +22,13 @@ import MonitoreoActivo from "./MonitoreoActivo";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { suscribirOrdenesDePausa } from "@/lib/ordenesDePausa";
 
-import { Loader2, Wifi, WifiOff, Copy, ChevronLeft, ChevronRight, DoorOpen, Check, MonitorUp, LayoutGrid } from "lucide-react";
+import { Loader2, Wifi, WifiOff, Copy, ChevronLeft, ChevronRight, DoorOpen, Check, MonitorUp, LayoutGrid, VideoOff } from "lucide-react";
 import { CLAVES_SALA_TOMADA, olvidarSalaSoltada } from "@/lib/sesionDuplicada";
 import { caidaEnCurso, conexionDeSala, marcarCaida, olvidarCaida } from "@/lib/conexionSala";
 import type { ConexionSala } from "@/lib/coworkTiempoRegla";
 import type { DestinoDeTelemetria } from "@/lib/saludDeLlamada";
 import { cn } from "@/lib/utils";
 import { ajustarConEstaGente, aplicaCalidadPorVoz, calidadDeCamara } from "@/lib/calidadPorVoz";
-import { puedeCompartirPantalla } from "@/lib/compartirPantalla";
 import { toast } from "sonner";
 import { useFaceWatch, faceStateLabel, type FaceWatch } from "@/hooks/useFaceWatch";
 import { useFaceNudge, useScreenShareNudge } from "@/hooks/useFaceNudge";
@@ -35,9 +37,9 @@ import { supabase } from "@/integrations/supabase/client";
 import { useArgosEscaleraClip } from "@/hooks/useArgosEscaleraClip";
 import { latirEnLlamada, salirDeLlamada, LATIDO_LLAMADA_MS, LATIDO_SERVIDOR_MS, latirLlamadaEnServidor, salirLlamadaEnServidor } from "@/lib/llamadaEnMaven";
 import { useRegistrarLlamados } from "@/hooks/useRegistrarLlamados";
-import { esBlur, alternarBlur, leerFondoGuardado, guardarFondo, type BackgroundEffect } from "@/lib/fondoDeLlamada";
+import { esBlur, alternarBlur, blurPorDefecto, efectoDeNivel, leerFondoGuardado, guardarFondo, type BackgroundEffect } from "@/lib/fondoDeLlamada";
 import { precalentarFondo, soportaProcesadorDeFondo } from "@/lib/fondoFino/procesador";
-import { escritorio } from "@/lib/escritorio";
+import { escritorio, type EstadoMiniaturaLlamada } from "@/lib/escritorio";
 import { estaEnPausa } from "@/lib/coworkPausa";
 import { modoLivianoActivo } from "@/lib/appLiviana";
 import { porRedBloqueada } from "@/lib/redBloqueada";
@@ -73,6 +75,7 @@ interface LiveKitCallViewProps {
   /** When true, skip the generic "Llamada finalizada" toast on leave */
   suppressLeaveToast?: boolean;
   compact?: boolean;
+  estadoMiniatura?: EstadoMiniaturaLlamada | null;
   /** Deja que ESTA vista maneje el PiP de video del navegador.
    *
    *  Se apaga donde la llamada ya sale a la ventana flotante del sistema
@@ -197,7 +200,15 @@ function usePunteroGrueso(): boolean {
 /** Gracia antes del aviso grande de «falta tu pantalla» en el Hub. */
 const GRACIA_PANTALLA_HUB_MS = 8_000;
 
-export default function LiveKitCallView({ roomName, displayName, callDisplayName, isAdmin = false, onLeave, initialMicOn = true, initialCamOn = true, initialScreenShareOn = false, initialAudioDeviceId, initialVideoDeviceId, initialAudioOutputDeviceId, initialBackgroundEffect = "none", hideShareLink, hideScreenShare, hideLeaveButton, leaveLabel, leaveIcon, suppressLeaveToast, compact, autoPip = true, autoLeaveOnEmpty, getToken, onMediaStateChange, onFaceStateChange, supervisorEncuadre, onLocalScreenTrack, pantallaSoloParaMi, pantallaVisiblePara, pantallaOpcional = false, camaraOpcional = false, pantallaPrestada = null, sinLatidoDeLlamada, incomingAudioMuted, roomSwitcher, recording, shareLink: shareLinkProp, accionesBarra, guardarChat, encima, hideEndForAll, controlesExtra, sinVideoAjeno = false, telemetria, sinVolverEnError = false, hubDelSupervisor = null, mosaicoDePantallas = false }: LiveKitCallViewProps) {
+/** El cartel de la cámara que no prende, según la causa (lib/falloDeCamara). */
+const TEXTO_FALLO_CAMARA = {
+  ocupada: { titulo: "messenger.callView.camaraFallo.ocupadaTitulo", detalle: "messenger.callView.camaraFallo.ocupadaDetalle" },
+  permiso: { titulo: "messenger.callView.camaraFallo.permisoTitulo", detalle: "messenger.callView.camaraFallo.permisoDetalle" },
+  sin_camara: { titulo: "messenger.callView.camaraFallo.sinCamaraTitulo", detalle: "messenger.callView.camaraFallo.sinCamaraDetalle" },
+  otro: { titulo: "messenger.callView.camaraFallo.otroTitulo", detalle: "messenger.callView.camaraFallo.otroDetalle" },
+} as const;
+
+export default function LiveKitCallView({ roomName, displayName, callDisplayName, isAdmin = false, onLeave, initialMicOn = true, initialCamOn = true, initialScreenShareOn = false, initialAudioDeviceId, initialVideoDeviceId, initialAudioOutputDeviceId, initialBackgroundEffect = "none", hideShareLink, hideScreenShare, hideLeaveButton, leaveLabel, leaveIcon, suppressLeaveToast, compact, estadoMiniatura: miniaturaApp, autoPip = true, autoLeaveOnEmpty, getToken, onMediaStateChange, onFaceStateChange, supervisorEncuadre, onLocalScreenTrack, pantallaSoloParaMi, pantallaVisiblePara, pantallaOpcional = false, camaraOpcional = false, pantallaPrestada = null, sinLatidoDeLlamada, incomingAudioMuted, roomSwitcher, recording, shareLink: shareLinkProp, accionesBarra, guardarChat, encima, hideEndForAll, controlesExtra, sinVideoAjeno = false, telemetria, sinVolverEnError = false, hubDelSupervisor = null, mosaicoDePantallas = false }: LiveKitCallViewProps) {
   // Lista de salas del navegador (solo Cowork supervisor+): estado del popup.
   const [salasAbiertas, setSalasAbiertas] = useState(false);
   // Las flechas < > de cambiar de sala PREGUNTAN antes (Alvaro, 19/11/2026: en la
@@ -212,6 +223,9 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
   // varias veces por segundo (18/11/2026, guarda: test/videocall/llamadaSinTrabas).
   const lk = useLiveKit();
   const { t } = useLanguage();
+  const miniaturaNavegador = useMiniaturaNavegador();
+  const estadoMiniatura = miniaturaNavegador?.miniatura ? { miniatura: true, anclada: true } : miniaturaApp;
+  const enMiniatura = estadoMiniatura?.miniatura === true;
 
   // Silencio local del audio entrante (p.ej. el Hub de Cowork mientras el
   // coordinador está metido en una sala). setVolume(0) por participante remoto:
@@ -324,7 +338,7 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
     ro.observe(el);
     return () => ro.disconnect();
   }, [lk.connectionState]);
-  const effectiveCompact = compact || autoCompact;
+  const effectiveCompact = compact || autoCompact || enMiniatura;
   // ¿Los controles se van a tocar con un dedo?
   //
   // El modo compacto se inventó para la ventana flotante de 340px, donde los
@@ -401,7 +415,8 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
   // El último nivel de difuminado que la persona eligió, para que el botón
   // rápido lo devuelva igual. Antes apagaba "Difuminar más" y lo volvía a
   // prender como normal, sin decir nada.
-  const ultimoBlurRef = useRef<BackgroundEffect>("blur");
+  // Arranca en el nivel guardado (Fuerte si nunca eligió).
+  const ultimoBlurRef = useRef<BackgroundEffect>(blurPorDefecto());
   if (esBlur(bgEffect)) ultimoBlurRef.current = bgEffect;
 
   // El detector del fondo baja ~9,4 MB la primera vez (lib/fondoFino/procesador.ts).
@@ -887,11 +902,19 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
   const apagadaAManoRef = useRef(false);
   apagadaAManoRef.current = pantallaApagadaAMano;
   const pantallaNegraRef = useRef(false);
+  const expandirMiniaturaNavegador = miniaturaNavegador?.miniatura ? miniaturaNavegador.expandir : undefined;
   const alternarPantallaDesdeBoton = useCallback(() => {
     const l = lkRef.current;
+    // En la miniatura web el clic ocurre en otro documento. El selector del
+    // navegador puede exigir un clic en la ventana que inicia la captura.
+    if (expandirMiniaturaNavegador && !l.isScreenSharing) {
+      expandirMiniaturaNavegador();
+      toast.info(t("messenger.callView.compartirEnVentanaPrincipal"));
+      return;
+    }
     if (enHubVigilado) setPantallaApagadaAMano(l.isScreenSharing);
     return l.toggleScreenShare();
-  }, [enHubVigilado]);
+  }, [enHubVigilado, expandirMiniaturaNavegador, t]);
   useEffect(() => {
     if (!pantallaSola) return;
     const tic = () => {
@@ -1081,7 +1104,9 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
     const mode = viewSettings.layout;
     if (mode === "sidebar") return "sidebar";
     if (mode === "tiled") return "grid";
-    return lk.participants.some((p) => p.isScreenSharing) ? "sidebar" : "grid";
+    // Como Meet (19/11/2026): solo la pantalla de OTRO pasa al escenario. La tuya
+    // la cubre la tarjeta «Estás presentando»; no cambia la vista.
+    return lk.participants.some((p) => p.isScreenSharing && !p.isLocal) ? "sidebar" : "grid";
   }, [viewSettings.layout, lk.participants, pinnedSid]);
 
   // PERSONAS, no recuadros. Al compartir pantalla se emiten DOS tiles de la
@@ -1093,7 +1118,9 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
   );
 
   const visibleParticipants = useMemo(() => {
-    let list = lk.participants;
+    // Tu propia pantalla no es un recuadro (19/11/2026): la tarjeta «Estás
+    // presentando a todos» ya la dice, sin el túnel infinito.
+    let list = lk.participants.filter((p) => !(p.isLocal && p.isScreenSharing));
     if (viewSettings.hideNoVideo) list = list.filter((p) => !p.isCameraOff || p.isScreenSharing || p.isLocal);
     if (list.length > viewSettings.maxTiles) list = list.slice(0, viewSettings.maxTiles);
     return list;
@@ -1109,11 +1136,15 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
     // compartiendo», y antes de eso, el túnel de espejos que veía el supervisor.
     const noEsMiPantalla = (p: (typeof visibleParticipants)[number]) => !(p.isLocal && p.isScreenSharing);
     const ss = visibleParticipants.find((p) => p.isScreenSharing && !p.isLocal);
+    // VISTA FIJA, COMO MEET EN MOSAICO (Alvaro, 19/11/2026: «el que habla va
+    // cambiando… visualmente te cansa»): el escenario ya NO sigue al que habla.
+    // Es la pantalla de otro, lo que fijaste con un clic, o el primero que no
+    // eres tú, y ahí se queda. Quien habla solo se marca con un borde verde.
     return ss
-      || visibleParticipants.find((p) => p.identity === lk.activeSpeaker && noEsMiPantalla(p))
+      || visibleParticipants.find((p) => !p.isLocal && noEsMiPantalla(p))
       || visibleParticipants.find(noEsMiPantalla)
       || visibleParticipants[0];
-  }, [visibleParticipants, lk.activeSpeaker, pinnedSid]);
+  }, [visibleParticipants, pinnedSid]);
 
   // Los que NO son el destacado. Se calculaba dos veces inline; con la vista
   // compacta pasaban a ser tres, así que se nombra una vez.
@@ -1141,11 +1172,16 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
     && visibleParticipants.filter((p) => p.isScreenSharing && !p.isLocal).length >= 2;
 
   const room = lk.getRoom();
+  const barraMiniatura = enMiniatura
+    ? <BarraMiniaturaLlamada nombre={callDisplayName || roomName} anclada={estadoMiniatura.anclada} onExpandir={miniaturaNavegador?.miniatura ? miniaturaNavegador.expandir : undefined} />
+    : null;
+  const videosEnMiniatura = enMiniatura && lk.participants.some((p) => !p.isLocal);
 
   // Volviendo de una caída NO se tapa la llamada: se queda el cartel.
   if (lk.connectionState === ConnectionState.Connecting && !yaEstuvoConectada) {
     return (
-      <div className="flex flex-col h-full bg-background text-foreground items-center justify-center gap-4">
+      <div className="relative flex flex-col h-full bg-background text-foreground items-center justify-center gap-4">
+        {barraMiniatura && <div className="absolute inset-x-0 top-0">{barraMiniatura}</div>}
         <Loader2 className="h-10 w-10 animate-spin text-primary" />
         <p className="text-sm text-muted-foreground">{t("messenger.callView.conectando")}</p>
       </div>
@@ -1156,7 +1192,8 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
   // de error, cuyo único botón SACA de la sala. Se sigue intentando.
   if (lk.error && !salaCaida) {
     return (
-      <div className="flex flex-col h-full bg-background text-foreground items-center justify-center gap-4">
+      <div className="relative flex flex-col h-full bg-background text-foreground items-center justify-center gap-4">
+        {barraMiniatura && <div className="absolute inset-x-0 top-0">{barraMiniatura}</div>}
         <p className="text-destructive font-medium">{t("messenger.callView.errorConexion")}</p>
         <p className="text-sm text-muted-foreground max-w-md text-center">{lk.error}</p>
         {/* La conexión inicial se reintenta sola (espera creciente): que se vea,
@@ -1224,7 +1261,9 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
 
   return (
     <div ref={rootRef} className="relative flex flex-col h-full bg-background text-foreground">
-      <CallTopBar roomName={callDisplayName || roomName} participantCount={cantidadDePersonas} onOpenAdjustView={() => setAdjustViewOpen(true)} shareLink={shareLink} hideShareLink={hideShareLink} compact={effectiveCompact} tactil={tactil} extra={selectorDeSalas} acciones={accionesBarra} esLlamada={roomName.startsWith("call-")} />
+      {barraMiniatura ?? (
+        <CallTopBar roomName={callDisplayName || roomName} participantCount={cantidadDePersonas} onOpenAdjustView={() => setAdjustViewOpen(true)} shareLink={shareLink} hideShareLink={hideShareLink} compact={effectiveCompact} tactil={tactil} extra={selectorDeSalas} acciones={accionesBarra} esLlamada={roomName.startsWith("call-")} />
+      )}
       {encima}
 
       {/* Los carteles de conexión van en su propia fila (shrink-0), nunca
@@ -1290,6 +1329,18 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
       {/* «Monitoreo activo · pantallazo hace X». En su propio componente: el
           pantallazo de cada minuto ya no redibuja la llamada entera. */}
       {supervisorEncuadre && conSalaViva && <MonitoreoActivo />}
+      {/* La cámara no prende o se cayó sola y no volvió (19/11/2026): se dice
+          POR QUÉ y se ofrece reintentar. El vigilante sigue probando solo. */}
+      {lk.falloDeCamara && !estaEnPausa() && (
+        <div role="alert" className="shrink-0 flex flex-wrap items-center justify-center gap-x-3 gap-y-1.5 py-2.5 px-3 bg-warning/15 text-foreground text-sm font-medium text-center">
+          <VideoOff className="h-4 w-4 shrink-0 text-warning" aria-hidden />
+          <span>{t(TEXTO_FALLO_CAMARA[lk.falloDeCamara].titulo)}</span>
+          <span className="font-normal opacity-80">{t(TEXTO_FALLO_CAMARA[lk.falloDeCamara].detalle)}</span>
+          <button type="button" onClick={() => void lk.reintentarCamara()} className="rounded-md bg-foreground/10 px-2.5 py-1 hover:bg-foreground/15">
+            {t("messenger.callView.camaraFallo.reintentar")}
+          </button>
+        </div>
+      )}
       {avisoPantallaHub && (
         <div role="alert" className="shrink-0 flex flex-wrap items-center justify-center gap-x-3 gap-y-1.5 py-2.5 px-3 bg-destructive/15 text-foreground text-sm font-medium text-center">
           <MonitorUp className="h-4 w-4 shrink-0 text-destructive" aria-hidden />
@@ -1345,7 +1396,7 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
       )}
 
       <div className="relative flex-1 flex overflow-hidden">
-        <div className="call-ambiente relative flex-1 p-3 overflow-hidden">
+        <div className={cn("call-ambiente relative flex-1 overflow-hidden", enMiniatura ? "p-1.5" : "p-3")}>
           {puedeVolverAlMosaico && (
             <button
               type="button"
@@ -1362,11 +1413,13 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
               roomName={roomName}
               source={recording?.source ?? "cowork"}
               title={recording?.title}
-              canControl={!!recording}
+              canControl={!!recording && !enMiniatura}
               compact={effectiveCompact}
             />
           </div>
-          {pantallasEnMosaico ? (
+          {videosEnMiniatura ? (
+            <VideosEnMiniatura participantes={lk.participants} vozActiva={lk.activeSpeaker} room={room} audioOutputId={audioOutputId} />
+          ) : pantallasEnMosaico ? (
             <div className="flex h-full flex-col gap-2">
               <div className={cn("grid min-h-0 flex-1 gap-2 mx-auto w-full max-w-[1800px] auto-rows-fr", columnasDelMosaico(pantallasEnMosaico.length))}>
                 {pantallasEnMosaico.map((p) => (
@@ -1475,7 +1528,7 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
 
         </div>
 
-        {chatOpen && (
+        {chatOpen && !enMiniatura && (
           <CallChatSidebar
             messages={lk.chatMessages}
             onSend={(texto) => { lk.sendChatMessage(texto); guardarChat?.texto(texto); }}
@@ -1493,7 +1546,7 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
         </div>
       )}
 
-      {participantsOpen && (
+      {participantsOpen && !enMiniatura && (
           <CallParticipantsSidebar
             participants={lk.participants}
             isAdmin={isAdmin}
@@ -1624,10 +1677,9 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
         onVideoInputChange={handleVideoInputChange}
         onOpenVideoSettings={() => setVideoSettingsOpen(true)}
         onOpenMetrics={() => setMetricsOpen(true)}
-        // Los teléfonos no exponen getDisplayMedia: el botón sobraba y hacía
-        // envolver la fila de controles en dos renglones (Jhon, 10/09).
-        hideScreenShare={hideScreenShare || !puedeCompartirPantalla()}
+        hideScreenShare={hideScreenShare}
         hideLeaveButton={hideLeaveButton}
+        miniaturaDeEscritorio={enMiniatura}
         leaveLabel={leaveLabel}
         leaveIcon={leaveIcon}
         compact={effectiveCompact}
@@ -1636,6 +1688,7 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
         onOpenAdjustView={() => setAdjustViewOpen(true)}
         backgroundEffect={bgEffect}
         onToggleBlurBackground={() => handleBgChange(alternarBlur(bgEffect, ultimoBlurRef.current))}
+        onElegirNivelBlur={(nivel) => handleBgChange(efectoDeNivel(nivel))}
         controlesExtra={controlesExtra}
       />
 

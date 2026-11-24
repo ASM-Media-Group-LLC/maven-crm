@@ -9,7 +9,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { puedeCompartirPantalla } from "@/lib/compartirPantalla";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
-import { esBlur, type BackgroundEffect } from "@/lib/fondoDeLlamada";
+import { esBlur, leerNivelDeBlur, nivelDeEfecto, type BackgroundEffect, type NivelDeBlur } from "@/lib/fondoDeLlamada";
 import { useLanguage } from "@/hooks/useLanguage";
 import type { TranslationKey } from "@/lib/i18n";
 import { ncFunciona, type EstadoNC } from "@/lib/estadoNC";
@@ -49,6 +49,7 @@ interface CallControlsProps {
   onOpenAdjustView?: () => void;
   hideScreenShare?: boolean;
   hideLeaveButton?: boolean;
+  miniaturaDeEscritorio?: boolean;
   leaveLabel?: string;
   leaveIcon?: LucideIcon;
   compact?: boolean;
@@ -79,6 +80,9 @@ interface CallControlsProps {
   onToggleCancelacionRuido?: () => void;
   backgroundEffect?: BackgroundEffect;
   onToggleBlurBackground?: () => void;
+  /** Elegir el nivel del difuminado («Leve» / «Fuerte»). Lo enciende con ese
+   *  nivel y lo deja guardado. Sin esto, el menú no muestra los niveles. */
+  onElegirNivelBlur?: (nivel: NivelDeBlur) => void;
   /** Mostrar las flechitas de micrófono y cámara. Por defecto, fuera del modo compacto. */
   flechas?: boolean;
   /** Un control más, a la derecha del chat. Lo usa el Supervisor Hub para la
@@ -364,6 +368,44 @@ function FilaMenu({ icon: Icon, label, onClick, activa }: {
   );
 }
 
+/** Los dos niveles del difuminado, al lado del botón de difuminar (19/11/2026).
+ *  Marca el nivel puesto o, con el difuminado apagado, el que se usará al
+ *  encenderlo (el último elegido; Fuerte si nunca eligió). */
+function NivelesDeBlur({ backgroundEffect, onElegir, className }: {
+  backgroundEffect?: BackgroundEffect; onElegir: (nivel: NivelDeBlur) => void; className?: string;
+}) {
+  const { t } = useLanguage();
+  const encendido = esBlur(backgroundEffect ?? "none");
+  const actual: NivelDeBlur = nivelDeEfecto(backgroundEffect ?? "none") ?? leerNivelDeBlur();
+  const opciones: { nivel: NivelDeBlur; label: string }[] = [
+    { nivel: "leve", label: t("messenger.call.blurLeve") },
+    { nivel: "fuerte", label: t("messenger.call.blurFuerte") },
+  ];
+  return (
+    <div role="group" aria-label={t("messenger.call.nivelDeDifuminado")} className={cn("flex items-center gap-0.5 rounded-full bg-card p-0.5", className)}>
+      {opciones.map(({ nivel, label }) => {
+        const marcado = actual === nivel;
+        return (
+          <button
+            key={nivel}
+            type="button"
+            aria-pressed={encendido && marcado}
+            data-nivel={nivel}
+            onClick={() => onElegir(nivel)}
+            className={cn(
+              "h-7 px-3 rounded-full text-xs transition-colors",
+              marcado && encendido ? "bg-primary/20 text-primary" :
+              marcado ? "bg-muted text-foreground" : "text-muted-foreground hover:bg-muted",
+            )}
+          >
+            {label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 /** Lista PLANA de dispositivos.
  *
  *  No se reusa `DevicePill`: abre su lista con `absolute bottom-full`, y acá
@@ -405,7 +447,7 @@ export default function CallControls({
   onSendReaction, onLeave,
   onAudioInputChange, onAudioOutputChange, onVideoInputChange,
   onOpenVideoSettings, onOpenMetrics, onOpenAdjustView, hideScreenShare, hideLeaveButton, leaveLabel, leaveIcon, compact, tactil, controlesExtra,
-  backgroundEffect, onToggleBlurBackground, flechas,
+  backgroundEffect, onToggleBlurBackground, onElegirNivelBlur, flechas, miniaturaDeEscritorio,
 }: CallControlsProps) {
   const { t } = useLanguage();
   const [audioPopoverOpen, setAudioPopoverOpen] = useState(false);
@@ -444,6 +486,36 @@ export default function CallControls({
   const altoFlecha = compact ? (tactil ? "h-9" : "h-8") : "h-11";
   const anchoBoton = compact ? (tactil ? "w-9" : "w-8") : "w-11";
   const iconSize = compact && !tactil ? "h-3.5 w-3.5" : "h-[18px] w-[18px]";
+
+  const botonDePantalla = !hideScreenShare && (
+    <ControlBtn
+      icon={isScreenSharing ? MonitorOff : Monitor}
+      active={isScreenSharing || undefined}
+      onClick={onToggleScreenShare}
+      // Si la captura no está disponible, el mismo botón explica el motivo.
+      label={t("messenger.call.compartirPantalla")}
+      className={puedeCompartir ? undefined : "opacity-60"}
+      compact={compact || miniaturaDeEscritorio}
+      tactil={tactil}
+    />
+  );
+
+  if (miniaturaDeEscritorio) {
+    const LeaveIcon = leaveIcon ?? PhoneOff;
+    return (
+      <div className="flex shrink-0 items-center justify-center gap-2 bg-background px-2 pb-1.5 pt-1">
+        <ControlBtn icon={isMicOn ? Mic : MicOff} active={isMicOn} onClick={onToggleMic} label={t("messenger.call.microfono")} compact />
+        <ControlBtn icon={isCamOn ? VideoIcon : VideoOff} active={isCamOn} onClick={onToggleCam} label={t("messenger.input.camara")} compact />
+        {botonDePantalla}
+        {!hideLeaveButton && (
+          <button type="button" onClick={onLeave} aria-label={leaveLabel || t("messenger.call.colgar")}
+            className="flex h-8 w-12 items-center justify-center rounded-full bg-destructive text-destructive-foreground hover:bg-destructive/90">
+            <LeaveIcon className="h-4 w-4" aria-hidden />
+          </button>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div className={cn("shrink-0 flex items-center bg-background", compact ? "py-1.5 px-2 justify-center flex-wrap" : "py-3 px-4")}>
@@ -548,6 +620,9 @@ export default function CallControls({
                     <Cloud className="h-3.5 w-3.5" />
                     <span>{t("messenger.call.fondoDifuminado")}</span>
                   </button>
+                  {onElegirNivelBlur && (
+                    <NivelesDeBlur backgroundEffect={backgroundEffect} onElegir={onElegirNivelBlur} />
+                  )}
                   <button
                     onClick={() => { setVideoPopoverOpen(false); onOpenVideoSettings(); }}
                     title={t("messenger.call.fondosYEfectos")}
@@ -574,28 +649,7 @@ export default function CallControls({
           </div>
         )}
 
-        {!hideScreenShare && (
-          <ControlBtn
-            icon={isScreenSharing ? MonitorOff : Monitor}
-            active={!isScreenSharing ? undefined : true}
-            onClick={onToggleScreenShare}
-            // El botón sigue tocándose aunque el teléfono no pueda compartir:
-            // así el toque explica POR QUÉ no se puede. Deshabilitarlo sería
-            // peor — en una pantalla táctil no hay hover, o sea que nadie
-            // llegaría a leer el motivo.
-            //
-            // El NOMBRE no cambia con la detección, a propósito. Atarlo a
-            // `puedeCompartir` hacía que el botón se llamara distinto en
-            // cualquier entorno donde `navigator.mediaDevices` no exista —
-            // empezando por los tests, que fue donde se notó. Un control que
-            // cambia de nombre accesible según una detección es peor que uno
-            // que siempre se llama igual y explica al tocarlo.
-            label={t("messenger.call.compartirPantalla")}
-            className={puedeCompartir ? undefined : "opacity-60"}
-            compact={compact}
-            tactil={tactil}
-          />
-        )}
+        {botonDePantalla}
 
         {/* Reactions — el z-[200] del content NO es decorativo: sin él el menú
             se dibuja detrás del Supervisor Hub (z-120) y de la ventanita de
@@ -681,6 +735,9 @@ export default function CallControls({
                   <FilaMenu icon={Cloud} label={t("messenger.call.difuminarFondo")}
                     activa={esBlur(backgroundEffect)}
                     onClick={cerrarY(onToggleBlurBackground)} />
+                  {onElegirNivelBlur && (
+                    <NivelesDeBlur backgroundEffect={backgroundEffect} onElegir={onElegirNivelBlur} className="ml-10 mb-1 w-fit" />
+                  )}
                   <FilaMenu icon={Sparkles} label={t("messenger.call.fondosYEfectos")} onClick={cerrarY(onOpenVideoSettings)} />
                   {onOpenAdjustView && (
                     <FilaMenu icon={LayoutGrid} label={t("messenger.call.ajustarVista")} onClick={cerrarY(onOpenAdjustView)} />

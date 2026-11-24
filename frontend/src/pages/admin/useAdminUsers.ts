@@ -51,6 +51,9 @@ export const useAdminUsers = () => {
         .rpc("admin_list_user_roles");
 
       if (rolesError) throw rolesError;
+      // Profiles is also the company directory. The administration list must
+      // use the narrower set authorized by the management RPC.
+      const visibleIds = new Set((roles ?? []).map((r: { user_id: string }) => r.user_id));
 
       // Fetch employees that have a profile_id linked
       const { data: employees } = await supabase
@@ -88,7 +91,7 @@ export const useAdminUsers = () => {
         if (e.profile_id) employeeByProfileId.set(e.profile_id, { id: e.id, first_name: e.first_name, last_name: e.last_name });
       });
 
-      return (profiles || []).map((p) => ({
+      return (profiles || []).filter((p) => visibleIds.has(p.id)).map((p) => ({
         id: p.id,
         full_name: p.full_name,
         avatar_url: p.avatar_url,

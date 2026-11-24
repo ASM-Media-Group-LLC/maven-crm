@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useDondeEsta } from "@/hooks/useDondeEsta";
 import { useTurnoPersonas } from "@/hooks/useTurnoPersonas";
-import { armarHoyDelEquipo, type HoyDelEquipo } from "@/lib/llegadas";
+import { armarHoyDelEquipo, llegadasDeHoy, type HoyDelEquipo } from "@/lib/llegadas";
 
 // LOS CUATRO ATAJOS DEL INICIO (Alvaro, 18/11/2026): quién llegó tarde, quién
 // llegó, quién va abajo en puntos y quién no está trabajando. Junta tres
@@ -60,6 +60,22 @@ export function useHoyDelEquipo(habilitado: boolean) {
       return m;
     },
   });
+  // Las marcas de entrada (20/11/2026): manda la marca del turno, no la primera
+  // vez en Cowork del día (eso metía la cola del turno de anoche como «llegó a
+  // las 12:00 a. m.»). Desde 30 min antes del día, por quien marca antes de medianoche.
+  const marcasQ = useQuery({
+    enabled: habilitado,
+    queryKey: ["marcas-de-hoy", hoy],
+    refetchInterval: 60_000,
+    staleTime: 30_000,
+    queryFn: async (): Promise<Array<{ user_id: string; inicio: string }>> => {
+      const desde = new Date(Date.parse(`${hoy}T00:00:00-05:00`) - 30 * 60_000).toISOString();
+      const { data, error } = await (supabase as unknown as { from: (t: string) => { select: (c: string) => { gte: (k: string, v: string) => Promise<{ data: Array<{ user_id: string; inicio: string }> | null; error: { message: string } | null }> } } })
+        .from("turno_marcas").select("user_id, inicio").gte("inicio", desde);
+      if (error) throw new Error(error.message);
+      return data ?? [];
+    },
+  });
   const notasQ = useTurnoPersonas(hoy, 0, 24, habilitado);
   // Horarios confirmados (19/11/2026): sin confirmar, ni tarde ni falta.
   const confQ = useQuery({
@@ -74,20 +90,24 @@ export function useHoyDelEquipo(habilitado: boolean) {
   });
 
   const datos: HoyDelEquipo | null = useMemo(() => {
-    if (!donde.data || !llegadasQ.data || confQ.isLoading) return null;
+    if (!donde.data || !llegadasQ.data || !marcasQ.data || confQ.isLoading) return null;
     const notas = new Map(notasQ.personas.map((p) => [p.userId, p.nota.valor]));
-    return armarHoyDelEquipo(donde.data, llegadasQ.data, notas, confQ.data ?? null);
-  }, [donde.data, llegadasQ.data, notasQ.personas, confQ.data, confQ.isLoading]);
+    const entradaDe = new Map(donde.data.map((f) => [f.user_id, f.entrada]));
+    const llegadas = llegadasDeHoy(hoy, marcasQ.data, llegadasQ.data, (uid) => entradaDe.get(uid) ?? null);
+    return armarHoyDelEquipo(donde.data, llegadas, notas, confQ.data ?? null);
+  }, [donde.data, llegadasQ.data, marcasQ.data, notasQ.personas, confQ.data, confQ.isLoading, hoy]);
 
   const fotos = useFotosDe((donde.data ?? []).map((f) => f.user_id)).data ?? {};
 
   return {
     datos,
     fotos,
-    cargando: donde.isLoading || llegadasQ.isLoading,
+    /** Quiénes tienen el horario confirmado (null = no se pudo leer). */
+    confirmados: confQ.data ?? null,
+    cargando: donde.isLoading || llegadasQ.isLoading || marcasQ.isLoading,
     cargandoNotas: notasQ.cargando,
-    fallo: donde.isError || llegadasQ.isError,
+    fallo: donde.isError || llegadasQ.isError || marcasQ.isError,
     falloNotas: !!notasQ.error,
-    reintentar: () => { void donde.refetch(); void llegadasQ.refetch(); },
+    reintentar: () => { void donde.refetch(); void llegadasQ.refetch(); void marcasQ.refetch(); },
   };
 }

@@ -17,6 +17,7 @@ import { usePanelMensajeria } from "@/hooks/usePanelMensajeria";
 import { supabase } from "@/integrations/supabase/client";
 import { useLanguage } from "@/hooks/useLanguage";
 import { tituloBonito } from "@/lib/tituloBonito";
+import { rutaDeCifra } from "@/lib/cifrasDeHoy";
 
 // CENTRO DE OPERACIONES — el tablero por defecto del admin desde el rediseño
 // Aurora (10/2026, decisión de Alvaro): lo primero son las LLAMADAS y la
@@ -208,17 +209,17 @@ export default function CentroDeOperaciones() {
             coworkConectados={sesionesQ.isLoading || sesionesQ.isError ? null : vivo.conectados}
             extra={[
               { icono: Clock, tono: "success", etiqueta: t("dashboard.centro.coworkHoy"),
-                valor: tiempoCargando ? "…" : horasBonitas(totalHoras), detalle: t("dashboard.centro.personas", { n: equipoHoy.length }) },
+                valor: tiempoCargando ? "…" : horasBonitas(totalHoras), detalle: t("dashboard.centro.personas", { n: equipoHoy.length }), href: rutaDeCifra("cowork-hoy") },
               { icono: MessageCircle, etiqueta: t("dashboard.centro.mensajesHoy"),
                 valor: mensajeria.fallo ? "–" : mensajeria.cargando ? "…" : mensajeria.datos?.mensajesHoy ?? "–",
                 detalle: mensajeria.fallo
                   ? (<span>{t("dashboard.centro.fallo")}<button type="button" className="underline underline-offset-2 hover:text-foreground" onClick={() => mensajeria.reintentar()}>{t("dashboard.centro.reintentar")}</button></span>)
-                  : t("dashboard.centro.chatsActivos", { n: mensajeria.datos?.conversacionesActivas ?? 0 }) },
+                  : t("dashboard.centro.chatsActivos", { n: mensajeria.datos?.conversacionesActivas ?? 0 }), href: rutaDeCifra("mensajes") },
               { icono: Timer, tono: "warning", etiqueta: t("dashboard.centro.respuesta"),
                 valor: mensajeria.fallo ? "–" : mensajeria.cargando ? "…"
                   : mensajeria.datos?.respuestaPromedioS == null ? t("dashboard.centro.sinMedicion")
                   : segundosBonitos(mensajeria.datos.respuestaPromedioS),
-                detalle: t("dashboard.centro.respuestaNota") },
+                detalle: t("dashboard.centro.respuestaNota"), href: rutaDeCifra("respuesta") },
             ]}
           />
 

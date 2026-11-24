@@ -151,7 +151,7 @@ vi.mock("@/hooks/useUserRole", () => ({ useUserRole: () => ({ isAdmin: true, rol
 vi.mock("@/hooks/useAuth", () => ({ useAuth: () => ({ user: { id: "u1" }, session: null, loading: false }) }));
 vi.mock("@/hooks/usePermissions", async () => {
   const real = await vi.importActual<typeof import("@/hooks/usePermissions")>("@/hooks/usePermissions");
-  return { ...real, usePermissions: () => ({ canAccess: () => true, isLoading: false }) };
+  return { ...real, usePermissions: () => ({ canAccess: () => true, canFunction: () => true, isLoading: false }) };
 });
 
 import AdminUsuarios from "@/pages/admin/AdminUsuarios";
@@ -364,9 +364,19 @@ describe("Admin › Roles en inglés", () => {
         fireEvent.click(pestana);
         await within(d).findByText("No name");
         expect(enEspanol(d)).toEqual([]);
-        // Alvaro ya es admin: agregarlo a Chatter pide confirmación.
+        // La cuenta propia no se puede reasignar desde este diálogo.
         const alvaro = within(d).getByText("Alvaro Mejia").closest("li") as HTMLElement;
-        fireEvent.click(within(alvaro).getByRole("button", { name: "Add" }));
+        expect(within(alvaro).getByRole("button", { name: "Add" })).toBeDisabled();
+      },
+    );
+    await revisarDialogo(
+      () => fireEvent.click(within(filaDe("supervisor")).getByTitle("Manage this role's users")),
+      async (d) => {
+        const pestana = within(d).getByRole("tab", { name: "Add" });
+        fireEvent.mouseDown(pestana);
+        fireEvent.click(pestana);
+        const jane = (await within(d).findByText("Jane Doe")).closest("li") as HTMLElement;
+        fireEvent.click(within(jane).getByRole("button", { name: "Add" }));
         const cambiar = await screen.findByRole("alertdialog");
         expect(within(cambiar).getByText(/currently has the/)).toBeTruthy();
         expect(enEspanol(cambiar)).toEqual([]);

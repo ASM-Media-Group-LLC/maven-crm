@@ -19,13 +19,14 @@ interface PermissionRouteProps {
    *  —dueño, admin, RR. HH. o supervisor— SIN pasar por el permiso del módulo
    *  (los supervisores no tienen el de HR). Qué ve cada uno lo filtra la RLS. */
   argos?: boolean;
+  funcion?: string;
   children: React.ReactNode;
 }
 
-const PermissionRoute = ({ module, submodule, soloDueno = false, tambienRh = false, argos = false, children }: PermissionRouteProps) => {
+const PermissionRoute = ({ module, submodule, soloDueno = false, tambienRh = false, argos = false, funcion, children }: PermissionRouteProps) => {
   const location = useLocation();
   const { user, loading: authLoading } = useAuth();
-  const { canAccess, isLoading: permsLoading, hayError, reintentar } = usePermissions();
+  const { canAccess, canFunction, isLoading: permsLoading, hayError, reintentar } = usePermissions();
   const { esDueno, cargando: duenoCargando, error: duenoError } = useEsDueno();
   const { esRh, cargando: rhCargando, error: rhError } = useEsRh();
   const { veArgos, cargando: argosCargando, error: argosError } = useVeArgos();
@@ -75,6 +76,8 @@ const PermissionRoute = ({ module, submodule, soloDueno = false, tambienRh = fal
       </div>
     );
   }
+
+  if (funcion) return canFunction(funcion, esDueno === true) ? <>{children}</> : <Navigate to="/dashboard" replace />;
 
   // Argos: manda ve_argos (no el permiso del módulo).
   if (argos) {

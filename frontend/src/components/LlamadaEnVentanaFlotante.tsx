@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { usePipWindow } from "@/pages/cowork/usePipWindow";
 import { useAutoFlotante } from "@/hooks/useAutoFlotante";
@@ -32,6 +32,9 @@ import { useReanudarMedia } from "@/hooks/useReanudarMedia";
 // `window` nunca se enteraban). Cualquier cosa nueva que use objetos globales
 // para posicionar, medir o escuchar teclas hay que mirarla dos veces.
 
+const MiniaturaNavegador = createContext<{ miniatura: boolean; expandir: () => void } | null>(null);
+export const useMiniaturaNavegador = () => useContext(MiniaturaNavegador);
+
 interface Props {
   /** Hay una llamada en curso: sin esto no hay nada que sacar. */
   activa: boolean;
@@ -63,9 +66,9 @@ export function LlamadaEnVentanaFlotante({ activa, children }: Props) {
   useAutoFlotante({ activa, ventana: pipWindow, abrir: openPip, cerrar: closePip });
 
   return (
-    <>
+    <MiniaturaNavegador.Provider value={{ miniatura: !!pipWindow, expandir: () => { closePip(); window.focus(); } }}>
       <div ref={setAncla} className="h-full w-full" />
       {createPortal(children, caja)}
-    </>
+    </MiniaturaNavegador.Provider>
   );
 }

@@ -418,7 +418,7 @@ export function useCoworkSession(sessionId: string | null) {
   // tenga sala y la deja fija ahí (sala fija, 18/11/2026). Sin la marca, el
   // roomId solo vale si no tiene sala.
   const joinSession = useCallback(async (sid: string, role?: string, hostCode?: string, roomId?: string, opts?: { porEnlace?: boolean }) => {
-    return invokeCowork("joinSession", { sessionId: sid, role, hostCode, roomId, porEnlace: opts?.porEnlace === true });
+    return invokeCowork("joinSession", { sessionId: sid, role, hostCode, roomId, porEnlace: opts?.porEnlace === true, solicitudesAcceso: true });
   }, []);
 
   // Gestión de salas (host): añadir, renombrar / cambiar modo de preview, cerrar.
@@ -439,7 +439,7 @@ export function useCoworkSession(sessionId: string | null) {
     invokeCowork("asignarSala", { sessionId, targetUserId, roomId }) as Promise<{ ok: boolean; sinCambio?: boolean; soloFija?: boolean; roomId: string; roomName: string }>, [sessionId]);
 
   // Canjea un código de sala. Devuelve { sessionId, roomId, ... } para navegar.
-  const joinByCode = useCallback(async (code: string) => invokeCowork("joinByCode", { code }), []);
+  const joinByCode = useCallback(async (code: string) => invokeCowork("joinByCode", { code, solicitudesAcceso: true }), []);
 
   // Última sala en la que estuvo el usuario en una sesión, ACTIVA O NO. Sirve para
   // reanudar: el participante que volvió sin `?room=` (o al que se le desactivó la

@@ -1,0 +1,144 @@
+import {readFileSync} from 'node:fs';
+import assert from 'node:assert/strict';
+const {PGlite}=await import(process.env.MAVEN_PGLITE_MODULE || '@electric-sql/pglite');
+const db=new PGlite();
+const id=n=>`00000000-0000-4000-8000-${String(n).padStart(12,'0')}`;
+const [owner,admin,supervisor,employee,target,peer,foreign]=[1,2,3,4,5,6,7].map(id);
+const tenant=id(100),otherTenant=id(101);
+const sql=path=>readFileSync(new URL(path,import.meta.url),'utf8');
+await db.exec(`
+create role anon; create role authenticated; create role service_role; create schema auth;
+create function auth.uid() returns uuid language sql stable as $$select nullif(current_setting('test.uid',true),'')::uuid$$;
+create table tenant_owners(user_id uuid);
+create table tenant_members(user_id uuid primary key,tenant_id uuid);
+create function current_tenant_id() returns uuid language sql stable as $$select tenant_id from tenant_members where user_id=auth.uid()$$;
+create table profiles(id uuid primary key,nivel text,equipo text,deleted_at timestamptz);
+create table equipos_a_cargo(user_id uuid,equipo text,tenant_id uuid);
+create function equipo_de(u uuid) returns text language sql stable as $$select equipo from profiles where id=u$$;
+create table app_flags(key text primary key,enabled boolean);
+insert into app_flags values('posiciones_mandan',true);
+create table personas_borrador_marcas(user_id uuid primary key,deshabilitada boolean,protegido boolean default false);
+create table posiciones_borrador(id uuid primary key,activa boolean,acceso_total boolean,checks jsonb,alcances jsonb default '{}');
+create table posiciones_borrador_personas(user_id uuid,posicion_id uuid);
+create table posiciones_catalogo(clave text primary key);
+insert into posiciones_catalogo values('Administración|Usuarios');
+create table user_roles(user_id uuid,role text,tenant_id uuid);
+create table roles_config(id uuid,name text,tenant_id uuid,is_active boolean,level int);
+create table role_groups(role_name text,tenant_id uuid,is_admin boolean);
+create table role_permissions(role_id uuid,module text,submodule text,can_access boolean);
+create function es_dueno(u uuid) returns boolean language sql stable as $$select exists(select 1 from tenant_owners where user_id=u)$$;
+create function actor_level(u uuid) returns int language sql stable as $$select coalesce(max(rc.level),0) from user_roles ur join roles_config rc on rc.name=ur.role and rc.tenant_id=ur.tenant_id and rc.is_active where ur.user_id=u$$;
+create function target_level(u uuid) returns int language sql stable as $$select case when actor_level(u)=0 then 999 else actor_level(u) end$$;
+create function is_in_role_group(u uuid,g text) returns boolean language sql stable as $$select case g when 'admin' then actor_level(u)>=100 when 'manager_or_above' then actor_level(u)>=80 when 'supervisor_or_above' then actor_level(u)>=50 else false end$$;
+create function es_admin_o_dueno(u uuid) returns boolean language sql stable as $$select es_dueno(u) or is_in_role_group(u,'admin')$$;
+create function can_manage_users(u uuid) returns boolean language sql stable as $$select coalesce(u is not null and can_use_module_function(u,'Administración','Usuarios','manager_or_above') and actor_level(u)>0,false)$$;
+` .replace('create function can_manage_users', 'set check_function_bodies=off; create function can_manage_users'));
+for(const [n,name,level] of [[10,'admin',100],[11,'supervisor',50],[12,'employee',10],[13,'trainee',5]]) {
+ await db.query('insert into roles_config values($1,$2,$3,true,$4)',[id(n),name,tenant,level]);
+ await db.query('insert into role_groups values($1,$2,$3)',[name,tenant,name==='admin']);
+}
+for(const [u,role,t] of [[owner,'admin',tenant],[admin,'admin',tenant],[supervisor,'supervisor',tenant],[employee,'employee',tenant],[target,'trainee',tenant],[peer,'supervisor',tenant],[foreign,'employee',otherTenant]]) {
+ await db.query('insert into user_roles values($1,$2,$3)',[u,role,t]);
+ await db.query('insert into tenant_members values($1,$2)',[u,t]);
+ await db.query('insert into profiles values($1,$2,$3,null)',[u,role==='supervisor'?'supervisor':'agente',u===peer?'Diseño':'Ventas']);
+}
+await db.query('insert into tenant_owners values($1)',[owner]);
+for(const u of [admin,supervisor,employee]) {
+ await db.query('insert into posiciones_borrador(id,activa,acceso_total,checks) values($1,true,false,$2)',[u,JSON.stringify({'Administración|Usuarios':true})]);
+ await db.query('insert into posiciones_borrador_personas values($1,$1)',[u]);
+}
+await db.exec(sql('../migrations/20261119140000_argos_casos_rrhh.sql').match(/create or replace function public\.tiene_funcion[\s\S]*?\$\$;/)[0]);
+await db.exec(sql('../migrations/20261123042735_posiciones_permisos_efectivos.sql'));
+await db.exec(sql('./fixtures/can_manage_user_before.sql'));
+const check=async(u,action,role=null,to=target)=>(await db.query('select can_manage_user($1,$2,$3,$4) p',[u,to,action,role])).rows[0].p;
+const set=async(u,keys)=>db.query('update posiciones_borrador set checks=$1 where id=$2',[JSON.stringify({'Administración|Usuarios':true,...keys}),u]);
+assert.equal((await check(admin,'reset_password')).allowed,true,'reproduce admin sin casilla que igual puede restablecer');
+await db.exec(sql('../migrations/20261123044233_posiciones_funciones_usuarios.sql'));
+let n=1;
+const operations=[['create_user','N:usr.agregar'],['update_profile','N:usr.editar'],['delete_user','N:usr.desactivar'],['reset_password','N:usr.reset'],['assign_role','N:usr.asignar'],['remove_role','N:usr.asignar']];
+for(const actor of [employee,supervisor,admin]) for(const [action,key] of operations) {
+ const role=action==='create_user'||action==='assign_role'?'trainee':null;
+ await set(actor,{});
+ assert.equal((await check(actor,action,role)).reason,'position_function_denied',`${actor} ${action} bloqueada`);n++;
+ await set(actor,{[key]:true,...(action==='create_user'?{'N:usr.asignar':true}:{})});
+ assert.equal((await check(actor,action,role)).allowed,true,`${actor} ${action} concedida`);n++;
+ await set(actor,{});
+ assert.equal((await check(actor,action,role)).allowed,false,`${actor} ${action} revocada`);n++;
+}
+await set(supervisor,{'N:usr.editar':true});
+assert.equal((await check(supervisor,'update_profile','employee')).reason,'position_function_denied');n++;
+assert.equal((await check(supervisor,'update_profile','trainee')).allowed,true,'mismo rol no requiere reasignar');n++;
+await set(supervisor,{'N:usr.agregar':true});
+assert.equal((await check(supervisor,'create_user',null,null)).allowed,true,'alta básica employee sin permiso de reasignar');n++;
+assert.equal((await check(supervisor,'create_user','supervisor',null)).reason,'position_function_denied');n++;
+await set(supervisor,{'N:usr.reset':true,'N:usr.asignar':true});
+assert.equal((await check(supervisor,'reset_password',null,peer)).reason,'target_level_not_below_caller');n++;
+assert.equal((await check(supervisor,'assign_role','admin')).reason,'role_at_or_above_caller_level');n++;
+assert.equal((await check(owner,'reset_password',null,foreign)).reason,'other_agency');n++;
+assert.equal((await check(admin,'reset_password',null,foreign)).reason,'other_agency');n++;
+await set(admin,{'N:usr.reset':true,'N:usr.desactivar':true});
+assert.equal((await check(admin,'reset_password',null,owner)).reason,'protected_owner');n++;
+assert.equal((await check(admin,'delete_user',null,admin)).reason,'self_target_not_allowed');n++;
+await db.query('insert into personas_borrador_marcas values($1,false,true)',[target]);
+assert.equal((await check(admin,'reset_password')).reason,'protected_user');n++;
+assert.equal((await check(owner,'reset_password')).allowed,true);n++;
+await db.query('delete from personas_borrador_marcas where user_id=$1',[target]);
+// Alcance aplicado en la consulta autenticada y en la escritura privilegiada.
+const scope=async(u,value)=>db.query('update posiciones_borrador set alcances=$1 where id=$2',[JSON.stringify({Usuarios:value}),u]);
+const visible=async(u)=>{
+ await db.query("select set_config('test.uid',$1,false)",[u]);
+ return (await db.query('select * from admin_list_user_roles()')).rows;
+};
+await scope(admin,'self');
+assert.deepEqual((await visible(admin)).map(r=>r.user_id),[admin]);n++;
+assert.equal((await check(admin,'reset_password')).reason,'outside_position_scope');n++;
+await scope(admin,'all');
+assert.equal((await visible(admin)).some(r=>r.user_id===foreign),false);n++;
+assert.equal((await visible(admin)).find(r=>r.user_id===owner).manageable,false);n++;
+await scope(supervisor,'subordinates');
+assert.equal((await check(supervisor,'reset_password')).allowed,true);n++;
+await db.query('update profiles set equipo=$1 where id=$2',['Diseño',target]);
+assert.equal((await check(supervisor,'reset_password')).reason,'outside_position_scope');n++;
+assert.equal((await visible(supervisor)).some(r=>r.user_id===target),false);n++;
+await db.query('insert into equipos_a_cargo values($1,$2,$3)',[supervisor,'Diseño',otherTenant]);
+assert.equal((await check(supervisor,'reset_password')).allowed,false,'un equipo de otra empresa no amplía alcance');n++;
+await db.query('insert into equipos_a_cargo values($1,$2,$3)',[supervisor,'Diseño',tenant]);
+assert.equal((await check(supervisor,'reset_password')).allowed,true);n++;
+await db.query('update profiles set deleted_at=now() where id=$1',[target]);
+assert.equal((await visible(supervisor)).some(r=>r.user_id===target),true,'la papelera conserva el alcance del equipo');n++;
+await db.query('update profiles set deleted_at=null where id=$1',[target]);
+// No mezclar la función de una posición con el alcance amplio de otra.
+await scope(supervisor,'self');
+await db.query('insert into posiciones_borrador(id,activa,acceso_total,checks,alcances) values($1,true,false,$2,$3)',[id(500),JSON.stringify({'Administración|Usuarios':true}),JSON.stringify({Usuarios:'all'})]);
+await db.query('insert into posiciones_borrador_personas values($1,$2)',[supervisor,id(500)]);
+assert.equal((await check(supervisor,'reset_password')).reason,'outside_position_scope');n++;
+await db.query('update posiciones_borrador set checks=checks||$1::jsonb where id=$2',[JSON.stringify({'N:usr.reset':true}),id(500)]);
+assert.equal((await check(supervisor,'reset_password')).allowed,true);n++;
+await db.query('update posiciones_borrador set activa=false where id=$1',[id(500)]);
+assert.equal((await check(supervisor,'reset_password')).allowed,false);n++;
+await scope(supervisor,'all');
+await set(supervisor,{'N:usr.editar':true});
+await db.query('update posiciones_borrador set activa=true,alcances=$1,checks=$2 where id=$3',[JSON.stringify({Usuarios:'self'}),JSON.stringify({'Administración|Usuarios':true,'N:usr.asignar':true}),id(500)]);
+assert.equal((await check(supervisor,'update_profile','employee')).reason,'outside_position_scope','editar con alcance amplio no amplía asignación limitada');n++;
+assert.equal((await check(supervisor,'update_profile')).allowed,true);n++;
+await scope(supervisor,'invalid');
+assert.equal((await check(supervisor,'update_profile')).allowed,false);n++;
+assert.equal((await db.query("select has_function_privilege('authenticated','can_manage_user(uuid,uuid,text,text)','execute') ok")).rows[0].ok,false);n++;
+assert.equal((await db.query("select has_function_privilege('service_role','can_manage_user(uuid,uuid,text,text)','execute') ok")).rows[0].ok,true);n++;
+assert.equal((await db.query("select has_function_privilege('anon','admin_list_user_roles()','execute') ok")).rows[0].ok,false);n++;
+await db.query('insert into personas_borrador_marcas(user_id,deshabilitada) values($1,true)',[admin]);
+assert.equal((await check(admin,'reset_password')).allowed,false);n++;
+assert.equal((await check(null,'reset_password')).reason,'no_caller');n++;
+assert.equal((await check(owner,'accion_inventada')).reason,'unknown_action');n++;
+await db.query('delete from user_roles where user_id=$1',[admin]);
+assert.equal((await check(owner,'delete_user',null,owner)).reason,'self_target_not_allowed');n++;
+// Once positions control a target, legacy assignment cannot overwrite its reviewed roles.
+await db.exec(sql('../migrations/20261123062055_posiciones_constructor_delegado.sql').match(/CREATE OR REPLACE FUNCTION public\.can_manage_user[\s\S]*?\$function\$;/)[0]);
+await set(admin,{'N:usr.asignar':true,'N:usr.editar':true});
+assert.equal((await check(owner,'assign_role','employee',admin)).reason,'use_position_constructor');n++;
+assert.equal((await check(owner,'remove_role',null,admin)).reason,'use_position_constructor');n++;
+assert.equal((await check(owner,'update_profile','employee',admin)).reason,'use_position_constructor');n++;
+await db.query('insert into user_roles values($1,$2,$3)',[admin,'admin',tenant]);
+assert.equal((await check(owner,'update_profile','admin',admin)).allowed,true,'same-role profile editing remains available');n++;
+await db.close();
+console.log(`${n} comprobaciones de Usuarios: casillas por acción en 3 perfiles, revocación, asignación por edición, alta básica, jerarquía, agencia, dueño y usuario deshabilitado.`);

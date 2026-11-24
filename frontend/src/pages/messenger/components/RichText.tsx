@@ -1,6 +1,7 @@
 import React from "react";
 import { RichNode } from "../types";
 import { cn } from "@/lib/utils";
+import EnlaceDeMensaje from "./EnlaceDeMensaje";
 
 /**
  * Dibuja el documento TipTap (chat_messages.content_rich) con React.
@@ -49,9 +50,9 @@ function applyMarks(node: RichNode, children: React.ReactNode, key: React.Key): 
         const href = safeHref(mark.attrs?.href);
         if (href) {
           out = (
-            <a href={href} target="_blank" rel="noopener noreferrer" className="underline hover:opacity-80 break-all">
+            <EnlaceDeMensaje href={href}>
               {out}
-            </a>
+            </EnlaceDeMensaje>
           );
         }
         break;
@@ -76,7 +77,10 @@ function renderNode(
 ): React.ReactNode {
   switch (node.type) {
     case "text":
-      return applyMarks(node, renderText(node.text ?? ""), key);
+      // Una marca de enlace ya envuelve el texto: linkificarlo otra vez crea
+      // dos anchors anidados y el clic puede seguir el destino equivocado.
+      return applyMarks(node, node.marks?.some(m => m.type === "link" && safeHref(m.attrs?.href))
+        ? node.text ?? "" : renderText(node.text ?? ""), key);
     case "hardBreak":
       return <br key={key} />;
     case "paragraph":

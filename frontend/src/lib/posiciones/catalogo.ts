@@ -193,6 +193,11 @@ export const CATALOGO_POSICIONES: SeccionCatalogo[] = [
                 "nueva": true
               },
               {
+                "clave": "N:cowork.miembros",
+                "etiqueta": "posiciones.c.gestionar_accesos_cowork",
+                "nueva": true
+              },
+              {
                 "clave": "N:cowork.verpantallas",
                 "etiqueta": "posiciones.c.ver_pantallas_de_companeros",
                 "nueva": true

@@ -22,7 +22,7 @@ export default function MessagesBell() {
   const navigate = useNavigate();
   const { conversations } = useChatShared();
   const { canAccess } = usePermissions();
-  const { abrirChat } = useMessengerDock();
+  const { abrirChat, abrirDirecto } = useMessengerDock();
   const [open, setOpen] = useState(false);
 
   // CHATS sin leer, no mensajes: un grupo con cuatro mensajes seguidos cuenta 1.
@@ -49,10 +49,8 @@ export default function MessagesBell() {
       {/* Mismo material que el panel del muelle: es literalmente el mismo panel. */}
       <PopoverContent align="end" className="glass-panel w-[calc(100vw-1rem)] max-w-[360px] rounded-2xl p-0">
         <ChatsPanel
-          // Como en Facebook: al tocar una conversación se abre la VENTANITA del
-          // muelle, no te saca de la pantalla en la que estás. (En el teléfono, o
-          // si ya estás en /messenger, el muelle navega en su lugar.)
           onAbrirChat={(id) => { setOpen(false); abrirChat(id); }}
+          onAbrirDirecto={(id) => { setOpen(false); abrirDirecto(id); }}
           onNuevo={() => { setOpen(false); navigate("/messenger?nuevo=1"); }}
           onVerTodo={() => { setOpen(false); navigate("/messenger"); }}
           onCerrar={() => setOpen(false)}

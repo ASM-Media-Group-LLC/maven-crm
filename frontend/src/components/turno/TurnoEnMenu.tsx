@@ -7,8 +7,13 @@ import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { horaUI } from "@/lib/formatoHora";
 import { useAhoraCadaSegundo } from "@/lib/ahoraCompartido";
-import { pedirACowork } from "@/lib/pedidoACowork";
+import { pedirACowork, pedirACoworkAhora } from "@/lib/pedidoACowork";
 import { useAccionesTurno, useMiTurno } from "@/hooks/useMiTurno";
+import { useAuth } from "@/hooks/useAuth";
+import { useJornadaAcciones, useJornadaConfig } from "@/hooks/useJornada";
+import { RegistrosJornada } from "@/components/turno/RegistrosJornada";
+import { Button } from "@/components/ui/button";
+import { useMiPausa } from "@/hooks/usePausas";
 import { AvisoEntrada, CLASE_BOTON_SUAVE, ConfirmarSalida, PreguntaSigues, TarjetaTurno, type EstadoTurno } from "@/components/turno/PiezasTurno";
 
 // LA TARJETA DEL TURNO EN EL MENÚ (Alvaro, 19/11/2026): marcar entrada, pausa
@@ -23,6 +28,12 @@ export function TurnoEnMenu({ compacto = false }: { compacto?: boolean }) {
   const { t } = useLanguage();
   const navigate = useNavigate();
   const q = useMiTurno();
+  const config = useJornadaConfig();
+  const jornada = useJornadaAcciones();
+  const independiente = config.data?.configurada === true;
+  const soloRegistro = independiente && config.data?.requiere_terminos === false;
+  const { user } = useAuth();
+  const miPausa = useMiPausa(user?.id);
   const { entrar, salir, sigo } = useAccionesTurno();
   const tr = q.data;
   // El reloj compartido: 1 s a la vista, 30 s fuera (lib/ahoraCompartido.ts).
@@ -61,6 +72,9 @@ export function TurnoEnMenu({ compacto = false }: { compacto?: boolean }) {
   }, [tr]);
 
   if (!tr || !tr.aplica) return null;
+  if (!config.data) return config.isError
+    ? <Button variant="ghost" size="sm" onClick={() => void config.refetch()}>{t("cowork.jornada.reintentar")}</Button>
+    : null;
 
   const entradaTxt = tr.turno_inicio ? horaUI(tr.turno_inicio) : null;
   const horarioTxt = tr.turno_inicio && tr.turno_fin ? `${horaUI(tr.turno_inicio)} – ${horaUI(tr.turno_fin)}` : null;
@@ -69,11 +83,11 @@ export function TurnoEnMenu({ compacto = false }: { compacto?: boolean }) {
   const faltaSeg = tr.turno_inicio ? (Date.parse(tr.turno_inicio) - ahora) / 1000 : null;
 
   const marcarEntrada = () => {
-    entrar.mutate({ aceptarTerminos: !tr.terminos_ok }, {
+    entrar.mutate({ aceptarTerminos: !soloRegistro && !tr.terminos_ok }, {
       onSuccess: () => {
         setAbrirEntrada(false);
         toast.success(t("cowork.turno.toast.entrada"));
-        navigate("/cowork");
+        if (!independiente) navigate("/cowork");
       },
       onError: (e) => toast.error(t("cowork.turno.toast.noEntrada"), { description: (e as Error).message }),
     });
@@ -85,10 +99,20 @@ export function TurnoEnMenu({ compacto = false }: { compacto?: boolean }) {
     });
   };
   const pausar = (kind: "bano" | "almuerzo") => {
+    if (independiente) {
+      if (!pedirACoworkAhora({ tipo: "pausar", kind })) jornada.pausar.mutate(kind, { onError: (e) => toast.error(e.message) });
+      else window.setTimeout(() => void q.refetch(), 1500);
+      return;
+    }
     if (!pedirACowork({ tipo: "pausar", kind })) navigate("/cowork");
     window.setTimeout(() => void q.refetch(), 2500);
   };
   const volver = () => {
+    if (independiente) {
+      if (!pedirACoworkAhora({ tipo: "volver" })) jornada.retomar.mutate(undefined, { onError: (e) => toast.error(e.message) });
+      else window.setTimeout(() => void q.refetch(), 1500);
+      return;
+    }
     if (!pedirACowork({ tipo: "volver" })) navigate("/cowork");
     window.setTimeout(() => void q.refetch(), 2500);
   };
@@ -109,6 +133,7 @@ export function TurnoEnMenu({ compacto = false }: { compacto?: boolean }) {
     <>
       <div>
         <TarjetaTurno
+          soloRegistro={independiente}
           estado={estado}
           entrada={entradaTxt}
           horario={horarioTxt}
@@ -123,24 +148,29 @@ export function TurnoEnMenu({ compacto = false }: { compacto?: boolean }) {
           onSalida={() => setAbrirSalida(true)}
           botonPausa={
             // «Pausa» abre el menú baño / comida.
-            <DropdownMenu>
+            (config.data.registra_comida || config.data.registra_bano) && <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <button type="button" className={`${CLASE_BOTON_SUAVE} h-10 text-sm`}><Pause className="h-3.5 w-3.5 fill-current" />{t("cowork.turno.pausa")}</button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="start" side="top" className="w-48">
-                <DropdownMenuItem onSelect={() => pausar("bano")} className="gap-2"><Coffee className="h-4 w-4" />{t("cowork.turno.pausaBano")}</DropdownMenuItem>
-                <DropdownMenuItem onSelect={() => pausar("almuerzo")} className="gap-2"><Utensils className="h-4 w-4" />{t("cowork.turno.pausaComida")}</DropdownMenuItem>
+                {config.data.registra_bano && <DropdownMenuItem onSelect={() => pausar("bano")} className="gap-2"><Coffee className="h-4 w-4" />{t("cowork.turno.pausaBano")}</DropdownMenuItem>}
+                {config.data.registra_comida && <DropdownMenuItem onSelect={() => pausar("almuerzo")} className="gap-2"><Utensils className="h-4 w-4" />{t("cowork.turno.pausaComida")}</DropdownMenuItem>}
               </DropdownMenuContent>
             </DropdownMenu>
           }
           t={t}
         />
+        {independiente && <RegistrosJornada />}
       </div>
 
       <Dialog open={abrirEntrada} onOpenChange={setAbrirEntrada}>
         <DialogContent className="max-w-2xl overflow-hidden border-border/60 p-0">
           <DialogTitle className="sr-only">{t("cowork.turno.aviso.titulo")}</DialogTitle>
-          <AvisoEntrada primeraVez={!tr.terminos_ok} horario={horarioTxt} onAceptar={marcarEntrada} onCancelar={() => setAbrirEntrada(false)} t={t} />
+          {soloRegistro ? <div className="space-y-4 p-6">
+            <h2 className="text-lg font-semibold">{t("cowork.jornada.iniciar")}</h2>
+            <p className="text-sm text-muted-foreground">{t("cowork.jornada.aviso")}</p>
+            <div className="flex justify-end gap-2"><Button variant="ghost" onClick={() => setAbrirEntrada(false)}>{t("cowork.jornada.cancelar")}</Button><Button disabled={entrar.isPending} onClick={marcarEntrada}>{t("cowork.turno.marcarEntrada")}</Button></div>
+          </div> : <AvisoEntrada primeraVez={!tr.terminos_ok} horario={horarioTxt} pausa={miPausa.data ?? null} onAceptar={marcarEntrada} onCancelar={() => setAbrirEntrada(false)} t={t} />}
         </DialogContent>
       </Dialog>
 

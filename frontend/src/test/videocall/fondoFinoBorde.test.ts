@@ -37,11 +37,14 @@ describe("borde por color", () => {
   });
 
   it("saca la pared de un hueco del pelo donde la máscara duda, con tope", () => {
-    // Máscara insegura (0,7) con «a» 0,8 y color de pared: baja, pero como
+    // Máscara insegura (0,3) con «a» 0,8 y color de pared: baja, pero como
     // mucho BAJADA_MAX_DEL_COLOR (antes sin límite: titilaba y se comía caras).
-    const a = alfaFinal(0.8, 0.7, PARED, PELO, PARED, 1);
+    // 19/11/2026: solo donde el detector DUDA (< MASCARA_SIN_BAJADA); con 0,7
+    // ya lo ve como persona y el color no baja (el pelo oscuro se comía).
+    const a = alfaFinal(0.8, 0.3, PARED, PELO, PARED, 1);
     expect(a).toBeLessThan(0.8 - 0.3);
     expect(a).toBeGreaterThanOrEqual(0.8 - BAJADA_MAX_DEL_COLOR - 1e-9);
+    expect(alfaFinal(0.8, 0.7, PARED, PELO, PARED, 1)).toBeCloseTo(0.8, 5);
   });
 
   it("donde la máscara está SEGURA de que es persona, el color no borra nada (18/11)", () => {

@@ -159,6 +159,13 @@ Deno.serve(async (req) => {
     if (!yo) throw new HttpError("Sesión inválida", 401);
 
     const accion = String(body.action ?? "");
+    const funcionPosicion = ["subir_iniciar", "subir_confirmar", "restaurar_version"].includes(accion)
+      ? "N:drive.subir" : accion === "borrar_para_siempre" ? "N:drive.borrar" : null;
+    if (funcionPosicion) {
+      const { data: permiso, error: falloPermiso } = await comoLaPersona.rpc("posicion_decision", { _uid: yo, _clave: funcionPosicion });
+      if (falloPermiso || (permiso !== null && typeof permiso !== "boolean")) throw new HttpError("No se pudo verificar el permiso de tu posición", 503);
+      if (permiso === false) throw new HttpError("Tu posición no permite esta acción del Drive", 403);
+    }
     const permisoNas = async (datos: Record<string, unknown>, vence: number) =>
       `${nas}/o?t=${await firmar(secreto, { ...datos, e: ahoraMas(vence) } as never)}`;
 

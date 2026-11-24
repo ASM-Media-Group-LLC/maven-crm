@@ -20,7 +20,7 @@
 
 const {
   app, BrowserWindow, Tray, Menu, nativeImage, shell, ipcMain, session,
-  globalShortcut, desktopCapturer, systemPreferences,
+  globalShortcut, systemPreferences,
 } = require("electron");
 const path = require("node:path");
 const fs = require("node:fs");
@@ -28,11 +28,12 @@ const fs = require("node:fs");
 const { iniciarActualizaciones } = require("./actualizar");
 const { avisarLlamada, cerrarAvisoLlamada } = require("./llamada");
 const { iniciarVigiaDeApps, segundosInactivo } = require("./apps");
-const { pantallaPermitida, primeraVezSinPermiso, guiaPermisoPantalla, pedirPermisoSiToca, pedirAMacOS } = require("./permisoPantalla");
+const { pedirPermisoSiToca } = require("./permisoPantalla");
+const { crearManejadorDePantalla, ponerPantallaAutomatica } = require("./compartirPantalla");
 const { revisarCamaraYMicrofono } = require("./permisoCamaraWindows");
 const { guardarAcceso, leerAcceso, olvidarAcceso, hayAccesoGuardado } = require("./acceso");
 const { vigilarVentana, leerYBorrarCierres } = require("./recuperarse");
-const { esLlamada, prepararVentanaDeLlamada, mostrarVentana } = require("./ventanaDeLlamada");
+const { esLlamada, prepararVentanaDeLlamada, mostrarVentana, controlarMiniatura, arrastrarMiniatura } = require("./ventanaDeLlamada");
 
 const URL_MAVEN = process.env.MAVEN_URL || "https://app.maven-ai.me/login";
 const ORIGENES_MAVEN = new Set(["https://app.maven-ai.me", "https://maven-ai.me", "https://www.maven-ai.me"]);
@@ -112,6 +113,10 @@ function abrirEnlace(enlace) {
     if (app.isReady()) crearVentana();
     return;
   }
+  if (esLlamada(destino.href)) {
+    abrirVentanaDeReunion(destino.href);
+    return;
+  }
   // Si Maven ya está cargado, la ruta se abre ADENTRO (sin recargar): una
   // llamada o un Cowork en curso no se cortan.
   const actual = ventana.webContents.getURL();
@@ -132,6 +137,36 @@ if (process.platform === "win32") {
   const enlace = process.argv.find((a) => typeof a === "string" && a.startsWith(`${PROTOCOLO}://`));
   const d = enlace ? destinoDeEnlace(enlace) : null;
   if (d) enlacePendiente = d.href;
+}
+
+// Un enlace externo no reemplaza el Cowork abierto en la ventana principal.
+// Conserva la sesión de Maven y abre la sala de espera, sin entrar por la persona.
+function abrirVentanaDeReunion(url) {
+  const existente = BrowserWindow.getAllWindows().find((w) =>
+    w !== ventana && !w.isDestroyed() && w.webContents.getURL() === url);
+  if (existente) return mostrarVentana(existente);
+  const hija = new BrowserWindow({
+    width: 1100, height: 760, backgroundColor: "#101827", show: false,
+    webPreferences: {
+      preload: path.join(__dirname, "preload.js"), contextIsolation: true,
+      nodeIntegration: false, sandbox: true, backgroundThrottling: false,
+    },
+  });
+  prepararVentanaDeLlamada(hija);
+  hija.setMenuBarVisibility(false);
+  hija.webContents.setUserAgent(`${hija.webContents.getUserAgent()} MavenEscritorio/${app.getVersion()}`);
+  hija.once("ready-to-show", () => mostrarVentana(hija));
+  hija.webContents.setWindowOpenHandler(({ url: destino }) => {
+    if (/^https?:|^mailto:|^tel:/.test(destino)) shell.openExternal(destino);
+    return { action: "deny" };
+  });
+  hija.webContents.on("will-navigate", (e, destino) => {
+    if (!esDeMaven(destino)) {
+      e.preventDefault();
+      if (/^https?:/.test(destino)) shell.openExternal(destino);
+    }
+  });
+  hija.loadURL(url).catch(() => { if (!hija.isDestroyed()) hija.show(); });
 }
 
 function mostrar() {
@@ -246,8 +281,12 @@ function crearVentana() {
   });
 
   ventana.webContents.setUserAgent(`${ventana.webContents.getUserAgent()} MavenEscritorio/${app.getVersion()}`);
-  ventana.loadURL(enlacePendiente || URL_MAVEN);
+  const pendiente = enlacePendiente;
   enlacePendiente = null;
+  ventana.loadURL(pendiente && !esLlamada(pendiente) ? pendiente : URL_MAVEN);
+  if (pendiente && esLlamada(pendiente)) {
+    ventana.once("ready-to-show", () => abrirVentanaDeReunion(pendiente));
+  }
 
   // Prueba desde el código: MAVEN_CAPTURA=/ruta.png guarda cómo se ve y cierra.
   if (!app.isPackaged && process.env.MAVEN_CAPTURA) {
@@ -262,9 +301,8 @@ function crearVentana() {
 // ── Permisos: cámara, micrófono, avisos, pantalla completa… solo para Maven ──
 // Cowork le avisa a la app que comparta la pantalla completa sin preguntar
 // (Alvaro, 17/11/2026): así se puede volver a compartir sola tras una caída.
-let pantallaAutomatica = false;
 ipcMain.on("maven:pantalla-auto", (e, si) => {
-  if (esDeMaven(e.sender.getURL())) pantallaAutomatica = Boolean(si);
+  if (esDeMaven(e.sender.getURL()) && e.senderFrame === e.sender.mainFrame) ponerPantallaAutomatica(e.sender, Boolean(si));
 });
 
 function configurarPermisos() {
@@ -279,80 +317,7 @@ function configurarPermisos() {
   s.setPermissionCheckHandler((_wc, _permiso, origen) => esDeMaven(origen || ""));
   s.setSpellCheckerLanguages(["es", "en-US"].filter((l) => s.availableSpellCheckerLanguages.includes(l)));
 
-  // Compartir pantalla: Maven pide getDisplayMedia y acá se elige qué compartir.
-  s.setDisplayMediaRequestHandler(async (pedido, responder) => {
-    try {
-      // Mac sin «Grabación de pantalla»: Maven explica cómo arreglarlo en el
-      // mismo clic (antes el primer intento fallaba mudo) y, una vez por
-      // arranque, deja que macOS muestre su propio aviso. Nunca se insiste más
-      // de una vez cada 10 minutos (Cowork vuelve a pedir la pantalla sola).
-      if (!pantallaPermitida()) {
-        if (primeraVezSinPermiso()) {
-          await pedirAMacOS(); // pone a Maven en la lista de Ajustes con su aviso
-          await desktopCapturer.getSources({ types: ["screen"], thumbnailSize: { width: 1, height: 1 } }).catch(() => {});
-        }
-        guiaPermisoPantalla(ventana);
-        return responder({});
-      }
-      // Cowork (la página prendió pantallaAutomatica): la pantalla principal,
-      // sin la ventanita para elegir.
-      if (pantallaAutomatica && esDeMaven(pedido.securityOrigin || pedido.frame?.url || "")) {
-        const pantallas = await desktopCapturer.getSources({ types: ["screen"], thumbnailSize: { width: 1, height: 1 } });
-        const principal = String(require("electron").screen.getPrimaryDisplay().id);
-        const pantalla = pantallas.find((f) => f.display_id === principal) || pantallas[0];
-        if (pantalla) {
-          return responder({ video: pantalla, ...(pedido.audioRequested && !esMac ? { audio: "loopback" } : {}) });
-        }
-      }
-      const fuentes = await desktopCapturer.getSources({
-        types: ["screen", "window"],
-        thumbnailSize: { width: 320, height: 200 },
-        fetchWindowIcons: false,
-      });
-      const elegida = await elegirFuente(fuentes);
-      if (!elegida) return responder({});
-      // En Windows se puede mandar también el sonido del computador.
-      responder({ video: elegida, ...(pedido.audioRequested && !esMac ? { audio: "loopback" } : {}) });
-    } catch {
-      responder({});
-    }
-  });
-}
-
-// Ventanita para elegir pantalla o ventana (como la de Chrome).
-function elegirFuente(fuentes) {
-  return new Promise((resolver) => {
-    const selector = new BrowserWindow({
-      parent: ventana ?? undefined,
-      modal: true,
-      width: 760,
-      height: 560,
-      resizable: false,
-      minimizable: false,
-      maximizable: false,
-      title: "Compartir pantalla",
-      backgroundColor: "#101827",
-      show: false,
-      webPreferences: { preload: path.join(__dirname, "selector-preload.js"), contextIsolation: true, sandbox: true },
-    });
-    let listo = false;
-    const terminar = (id) => {
-      if (listo) return;
-      listo = true;
-      ipcMain.removeHandler("selector:fuentes");
-      ipcMain.removeAllListeners("selector:elegir");
-      resolver(id ? fuentes.find((f) => f.id === id) : null);
-      if (!selector.isDestroyed()) selector.close();
-    };
-    ipcMain.handle("selector:fuentes", () =>
-      fuentes.map((f) => ({ id: f.id, nombre: f.name, pantalla: f.id.startsWith("screen:"), imagen: f.thumbnail.toDataURL() })),
-    );
-    ipcMain.on("selector:elegir", (_e, id) => terminar(id));
-    selector.on("closed", () => terminar(null));
-    selector.once("ready-to-show", () => selector.show());
-    selector.setMenuBarVisibility(false);
-    selector.loadFile(path.join(__dirname, "selector.html"));
-  });
+  s.setDisplayMediaRequestHandler(crearManejadorDePantalla(esDeMaven));
 }
 
 // ── Ventanita flotante ───────────────────────────────────────────────────────
@@ -396,6 +361,16 @@ ipcMain.handle("maven:mostrar-esta-ventana", (e) => {
   const url = e.sender.getURL();
   if (!esDeMaven(url) || !esLlamada(url)) return false;
   return mostrarVentana(BrowserWindow.fromWebContents(e.sender));
+});
+ipcMain.handle("maven:miniatura-llamada", (e, accion) => {
+  const url = e.sender.getURL();
+  if (!esDeMaven(url) || !esLlamada(url) || e.senderFrame !== e.sender.mainFrame) return null;
+  return controlarMiniatura(BrowserWindow.fromWebContents(e.sender), accion);
+});
+ipcMain.on("maven:arrastrar-miniatura", (e, fase) => {
+  const url = e.sender.getURL();
+  if (!esDeMaven(url) || !esLlamada(url) || e.senderFrame !== e.sender.mainFrame) return;
+  arrastrarMiniatura(BrowserWindow.fromWebContents(e.sender), fase);
 });
 ipcMain.handle("maven:flotante", (e, si) => (deLaVentana(e) ? flotante(si === undefined ? undefined : Boolean(si)) : false));
 ipcMain.handle("maven:inactividad", (e) => (deLaVentana(e) ? segundosInactivo() : null));

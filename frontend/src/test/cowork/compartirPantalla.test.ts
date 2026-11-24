@@ -30,6 +30,12 @@ describe("saber si se puede compartir pantalla", () => {
     expect(puedeCompartirPantalla()).toBe(true);
   });
 
+  it("una laptop Windows táctil sí permite compartir", () => {
+    conGetDisplayMedia(true); conPuntero(true);
+    vi.spyOn(navigator, "userAgent", "get").mockReturnValue("Mozilla/5.0 (Windows NT 10.0; Win64; x64)");
+    expect(puedeCompartirPantalla()).toBe(true);
+  });
+
   it("en un iPhone, no: la función ni existe", () => {
     conGetDisplayMedia(false); conPuntero(true);
     expect(puedeCompartirPantalla()).toBe(false);
@@ -40,6 +46,7 @@ describe("saber si se puede compartir pantalla", () => {
   // teléfono se quedaba otra vez sin explicación.
   it("en un Android tampoco, aunque la función exista", () => {
     conGetDisplayMedia(true); conPuntero(true);
+    vi.spyOn(navigator, "userAgent", "get").mockReturnValue("Mozilla/5.0 (Linux; Android 14) Mobile");
     expect(puedeCompartirPantalla()).toBe(false);
   });
 });
@@ -47,10 +54,16 @@ describe("saber si se puede compartir pantalla", () => {
 describe("qué se le dice a la persona", () => {
   it("en un teléfono, el motivo real y qué hacer en su lugar", () => {
     conGetDisplayMedia(false); conPuntero(true);
+    vi.spyOn(navigator, "userAgent", "get").mockReturnValue("Mozilla/5.0 (iPhone) Mobile");
     const m = motivoDeFalloAlCompartir(new Error("lo que sea"));
     expect(m).toContain("teléfonos");
     expect(m).toContain("computadora");
     expect(m).toContain("Hazlo");   // neutro, sin voseo
+  });
+
+  it("si la captura no está disponible en escritorio, explica dónde reintentar", () => {
+    conGetDisplayMedia(false); conPuntero(false);
+    expect(motivoDeFalloAlCompartir(null)).toContain("ventana principal de la llamada");
   });
 
   // Cerrar el diálogo del navegador es una decisión, no un error. Avisarla
@@ -60,6 +73,7 @@ describe("qué se le dice a la persona", () => {
   // volvía a no hacer nada.
   it("en Android, el NotAllowedError NO se toma como una cancelación", () => {
     conGetDisplayMedia(true); conPuntero(true);
+    vi.spyOn(navigator, "userAgent", "get").mockReturnValue("Mozilla/5.0 (Linux; Android 14) Mobile");
     const androide = Object.assign(new Error("Permission denied"), { name: "NotAllowedError" });
     expect(motivoDeFalloAlCompartir(androide)).toContain("teléfonos");
   });

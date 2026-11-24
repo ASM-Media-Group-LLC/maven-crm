@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent, act } from "@testing-library/react";
+import { render, screen, fireEvent, act, within } from "@testing-library/react";
 import { ConnectionState, DisconnectReason, RoomEvent } from "livekit-client";
 
 // Default mock state
@@ -87,7 +87,7 @@ let salaFalsa: SalaFalsa = crearSalaFalsa();
 const defaultLkState = {
   connectionState: ConnectionState.Connected,
   participants: [makeParticipant()],
-  activeSpeaker: null,
+  activeSpeaker: null as string | null,
   isMicOn: true,
   isCamOn: true,
   isScreenSharing: false,
@@ -150,6 +150,7 @@ vi.mock("@/pages/messenger/videocall/ParticipantTile", () => ({
 vi.mock("sonner", () => ({ toast: { info: vi.fn(), success: vi.fn() } }));
 
 import LiveKitCallView from "@/pages/messenger/videocall/LiveKitCallView";
+import { useMiniaturaLlamada } from "@/pages/messenger/videocall/BarraMiniaturaLlamada";
 import { pedirApagarPorPausa, pedirReanudarTrasPausa, olvidarOrdenesDePausa } from "@/lib/ordenesDePausa";
 
 describe("LiveKitCallView", () => {
@@ -245,6 +246,109 @@ describe("LiveKitCallView", () => {
     render(<LiveKitCallView {...defaultProps} />);
     // Local participant should show "Tú" label
     expect(screen.getByText("Tú")).toBeInTheDocument();
+  });
+
+  it("muestra el video remoto y la cámara propia en la miniatura sin reinstalar la llamada", async () => {
+    type Estado = { miniatura: boolean; anclada: boolean };
+    const host = window as Window & { mavenEscritorio?: unknown };
+    let evento: ((estado: Estado) => void) | undefined;
+    const miniaturaLlamada = vi.fn(async () => ({ miniatura: true, anclada: true }));
+    host.mavenEscritorio = {
+      esApp: true, plataforma: "windows", miniaturaLlamada,
+      alCambiarMiniaturaLlamada: (cb: (estado: Estado) => void) => {
+        evento = cb;
+        return () => { evento = undefined; };
+      },
+    };
+    lkState.participants = [
+      makeParticipant(),
+      makeParticipant({ sid: "remote-sid", identity: "user-2", name: "Remote User", isLocal: false }),
+    ];
+    function VistaDePrueba() {
+      const estadoMiniatura = useMiniaturaLlamada(true);
+      return <LiveKitCallView {...defaultProps} estadoMiniatura={estadoMiniatura} />;
+    }
+    try {
+      render(<VistaDePrueba />);
+      const videos = await screen.findByTestId("video-miniatura-llamada");
+      expect(within(videos).getByText("Remote User")).toBeInTheDocument();
+      expect(within(videos).getByText("Tú").parentElement).toHaveClass("absolute");
+      fireEvent.click(screen.getByRole("button", { name: "Desanclar ventana" }));
+      expect(miniaturaLlamada).toHaveBeenCalledWith("anclaje");
+      fireEvent.click(screen.getByRole("button", { name: "Expandir" }));
+      expect(miniaturaLlamada).toHaveBeenCalledWith("expandir");
+      act(() => evento?.({ miniatura: false, anclada: false }));
+      expect(screen.queryByTestId("video-miniatura-llamada")).not.toBeInTheDocument();
+      expect(screen.getByText("Remote User")).toBeInTheDocument();
+      expect(lkState.connect).toHaveBeenCalledTimes(1);
+      expect(lkState.disconnect).not.toHaveBeenCalled();
+    } finally {
+      delete host.mavenEscritorio;
+    }
+  });
+
+  it("durante una presentación muestra su pantalla y su cámara, sin sustituirla por la propia", () => {
+    lkState.participants = [
+      makeParticipant(),
+      makeParticipant({ sid: "camara-remota", identity: "user-2", name: "Presentadora", isLocal: false }),
+      makeParticipant({ sid: "camara-remota-screen", identity: "user-2", name: "Pantalla presentada", isLocal: false, isScreenSharing: true, esTileDePantalla: true }),
+      makeParticipant({ sid: "otra", identity: "user-3", name: "Otra persona", isLocal: false }),
+    ];
+    render(<LiveKitCallView {...defaultProps} estadoMiniatura={{ miniatura: true, anclada: true }} />);
+    const mini = within(screen.getByTestId("video-miniatura-llamada"));
+    expect(within(screen.getByTestId("video-miniatura-principal")).getByText("Pantalla presentada")).toBeInTheDocument();
+    expect(mini.getByText("Presentadora").parentElement).toHaveClass("absolute");
+    expect(mini.queryByText("Tú")).not.toBeInTheDocument();
+    expect(mini.queryByText("Otra persona")).not.toBeInTheDocument();
+  });
+
+  it("sigue una voz sostenida solo en la miniatura grupal y restaura la vista completa", () => {
+    vi.useFakeTimers();
+    try {
+      lkState.participants = [
+        makeParticipant(),
+        makeParticipant({ sid: "remoto-1", identity: "user-2", name: "Ana", isLocal: false }),
+        makeParticipant({ sid: "remoto-2", identity: "user-3", name: "Camilo", isLocal: false }),
+      ];
+      const mini = { miniatura: true, anclada: true };
+      const { rerender } = render(<LiveKitCallView {...defaultProps} estadoMiniatura={mini} />);
+      const principal = () => within(screen.getByTestId("video-miniatura-principal"));
+      const camaraDeCamilo = screen.getByTestId("participant-user-3");
+      expect(principal().getByText("Ana")).toBeInTheDocument();
+
+      lkState.activeSpeaker = "user-3";
+      rerender(<LiveKitCallView {...defaultProps} estadoMiniatura={mini} />);
+      act(() => { vi.advanceTimersByTime(300); });
+      lkState.activeSpeaker = null;
+      rerender(<LiveKitCallView {...defaultProps} estadoMiniatura={mini} />);
+      act(() => { vi.advanceTimersByTime(800); });
+      expect(principal().getByText("Ana")).toBeInTheDocument();
+
+      lkState.activeSpeaker = "user-3";
+      rerender(<LiveKitCallView {...defaultProps} estadoMiniatura={mini} />);
+      act(() => { vi.advanceTimersByTime(750); });
+      expect(principal().getByText("Camilo")).toBeInTheDocument();
+      expect(screen.getByTestId("participant-user-3")).toBe(camaraDeCamilo);
+      lkState.activeSpeaker = "user-1";
+      rerender(<LiveKitCallView {...defaultProps} estadoMiniatura={mini} />);
+      act(() => { vi.advanceTimersByTime(800); });
+      expect(principal().getByText("Camilo")).toBeInTheDocument();
+
+      const completa = { ...mini, miniatura: false };
+      rerender(<LiveKitCallView {...defaultProps} estadoMiniatura={completa} />);
+      const camaraCompleta = screen.getByTestId("participant-user-3");
+      lkState.activeSpeaker = "user-2";
+      rerender(<LiveKitCallView {...defaultProps} estadoMiniatura={completa} />);
+      act(() => { vi.advanceTimersByTime(800); });
+      expect(screen.queryByTestId("video-miniatura-llamada")).not.toBeInTheDocument();
+      expect(screen.getByTestId("participant-user-3")).toBe(camaraCompleta);
+      expect(screen.getByText("Ana")).toBeInTheDocument();
+      expect(screen.getByText("Tú")).toBeInTheDocument();
+      expect(lkState.connect).toHaveBeenCalledTimes(1);
+      expect(lkState.disconnect).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("calls connect on mount with correct args", () => {

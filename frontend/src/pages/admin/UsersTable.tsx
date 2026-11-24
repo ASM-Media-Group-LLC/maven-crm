@@ -12,6 +12,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { useLanguage } from "@/hooks/useLanguage";
 import { DriveFullToggle } from "./DriveFullToggle";
+import { usePermisosUsuarios } from "./usePermisosUsuarios";
 
 const roleBadgeVariant: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
   admin: "destructive",
@@ -33,6 +34,7 @@ interface UsersTableProps {
 const UsersTable = ({ users, onEditRole, onEdit, onResetPassword, onMigrarCorreo, onDelete, onRemoveRole }: UsersTableProps) => {
   const f = useFormato();
   const { t } = useLanguage();
+  const permisos = usePermisosUsuarios();
   const navigate = useNavigate();
   const { toast } = useToast();
   const { user: authUser } = useAuth();
@@ -93,7 +95,7 @@ const UsersTable = ({ users, onEditRole, onEdit, onResetPassword, onMigrarCorreo
                 {user.role ? (
                   <Badge variant={roleBadgeVariant[user.role] ?? "outline"} className="inline-flex items-center gap-1 pr-1">
                     {user.role}
-                    {user.manageable && (
+                    {user.manageable && permisos.asignar && (
                       // Quitar el rol es destructivo y vivía siempre visible dentro
                       // del badge, en una tabla densa: fácil de pegarle sin querer.
                       // Ahora aparece sólo al pasar el mouse por la fila.
@@ -134,7 +136,7 @@ const UsersTable = ({ users, onEditRole, onEdit, onResetPassword, onMigrarCorreo
                   <div className="flex justify-end gap-1">
                     <Tooltip>
                       <TooltipTrigger asChild>
-                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => onEdit(user)} aria-label={t("common.edit")}>
+                        <Button disabled={!permisos.editar || (!user.manageable && user.id !== authUser?.id)} variant="ghost" size="icon" className="h-8 w-8" onClick={() => onEdit(user)} aria-label={t("common.edit")}>
                           <Pencil className="h-4 w-4" />
                         </Button>
                       </TooltipTrigger>
@@ -150,7 +152,7 @@ const UsersTable = ({ users, onEditRole, onEdit, onResetPassword, onMigrarCorreo
                     {(user.manageable || user.id === authUser?.id) && (
                       <Tooltip>
                         <TooltipTrigger asChild>
-                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => onMigrarCorreo(user)} aria-label={t("admin.users.changeEmail")}>
+                          <Button disabled={!permisos.editar} variant="ghost" size="icon" className="h-8 w-8" onClick={() => onMigrarCorreo(user)} aria-label={t("admin.users.changeEmail")}>
                             <AtSign className="h-4 w-4" />
                           </Button>
                         </TooltipTrigger>
@@ -167,7 +169,7 @@ const UsersTable = ({ users, onEditRole, onEdit, onResetPassword, onMigrarCorreo
                       <>
                         <Tooltip>
                           <TooltipTrigger asChild>
-                            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => onEditRole(user)} aria-label={t("admin.users.assignRole")}>
+                            <Button disabled={!permisos.asignar} variant="ghost" size="icon" className="h-8 w-8" onClick={() => onEditRole(user)} aria-label={t("admin.users.assignRole")}>
                               <UserCog className="h-4 w-4" />
                             </Button>
                           </TooltipTrigger>
@@ -175,7 +177,7 @@ const UsersTable = ({ users, onEditRole, onEdit, onResetPassword, onMigrarCorreo
                         </Tooltip>
                         <Tooltip>
                           <TooltipTrigger asChild>
-                            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => onResetPassword(user)} aria-label={t("admin.users.resetPassword")}>
+                            <Button disabled={!permisos.reset} variant="ghost" size="icon" className="h-8 w-8" onClick={() => onResetPassword(user)} aria-label={t("admin.users.resetPassword")}>
                               <KeyRound className="h-4 w-4" />
                             </Button>
                           </TooltipTrigger>
@@ -183,7 +185,7 @@ const UsersTable = ({ users, onEditRole, onEdit, onResetPassword, onMigrarCorreo
                         </Tooltip>
                         <Tooltip>
                           <TooltipTrigger asChild>
-                            <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => onDelete(user)} aria-label={t("common.delete")}>
+                            <Button disabled={!permisos.desactivar} variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => onDelete(user)} aria-label={t("common.delete")}>
                               <Trash2 className="h-4 w-4" />
                             </Button>
                           </TooltipTrigger>

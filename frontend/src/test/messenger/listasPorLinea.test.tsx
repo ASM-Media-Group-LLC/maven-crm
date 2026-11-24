@@ -14,6 +14,7 @@ import StarterKit from "@tiptap/starter-kit";
 // Google Chat/Docs) es que la lista tome solo la línea del cursor o las líneas
 // seleccionadas, y que lo de antes y lo de después quede como texto normal.
 
+vi.mock("@/hooks/usePermissions", () => ({ usePermissions: () => ({ canFunction: () => true }) }));
 vi.mock("@/hooks/useAuth", () => ({ useAuth: () => ({ user: { id: "u1" } }) }));
 vi.mock("@/integrations/supabase/client", () => ({ supabase: {} }));
 vi.mock("@/hooks/useLanguage", (original) =>

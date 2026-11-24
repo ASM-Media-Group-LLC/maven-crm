@@ -1,3 +1,4 @@
+import { sqlMessengerConPosiciones } from "../functions/_tests/cadena_messenger_posiciones.ts";
 // La base de la escritura del Messenger por API (migración
 // 20261001200000_api_messenger_escritura.sql), probada contra un Postgres de verdad
 // (PGlite) cargado con el esquema de PROD: el fixture del 28/09
@@ -270,7 +271,7 @@ const DIR_MIG = new URL("../migrations/", import.meta.url);
 const CADENA: { n: string; sql: string }[] = [];
 const SALTADAS: string[] = [];
 for (const n of [...Deno.readDirSync(DIR_MIG)].map((e) => e.name).filter((x) => /^\d{14}_\w+\.sql$/.test(x) && x.slice(0, 14) > FIXTURE_HASTA).sort()) {
-  const sql = Deno.readTextFileSync(new URL(n, DIR_MIG));
+  const sql = sqlMessengerConPosiciones(n, Deno.readTextFileSync(new URL(n, DIR_MIG)));
   if (NO_CARGAN_AQUI[n]) SALTADAS.push(n);
   else if (n === NOMBRE_B || objetivos(sql).length) CADENA.push({ n, sql }); else SALTADAS.push(n);
 }
@@ -1702,7 +1703,7 @@ function ok(m: string) { TOTAL.ok.push(m); }
 // ════ 20. Mutantes ═══════════════════════════════════════════════════════════
 // Cada uno rompe una pieza de la B; alguna prueba de arriba tiene que notarlo. Aquí
 // se corre una prueba chica por mutante (la misma idea que la de su sección).
-type Mutante = { nombre: string; de: string | RegExp; a: string; nota: (db: PGlite) => Promise<boolean> };
+type Mutante = { nombre: string; de: string | RegExp; a: string; funcionActual?: string; nota: (db: PGlite) => Promise<boolean> };
 const falla_ = async (x: Promise<Res>, codigo: string, campo?: string, valor?: string) => { const r = await x; return !r.ok && r.codigo === codigo && (!campo || r.det[campo] === valor); };
 const MUTANTES: Mutante[] = [
   { nombre: "sin el rechazo de service_role en chat_messages_api",
@@ -1741,7 +1742,7 @@ const MUTANTES: Mutante[] = [
   { nombre: "el cerco solo mira mvf (un token con mvk y sin mvf pasa)",
     de: "  _pred text := $p$(select auth.jwt() ?| array['mvf', 'mvk']) is not true$p$;", a: "  _pred text := $p$(select auth.jwt() ->> 'mvf') is null$p$;",
     nota: async (db) => { await intentar(db, soloMvk(ANA), `insert into notifications(user_id, type, title) values ('${JHON}', 'chat_message', 'falsa')`); return (await uno(db, `select count(*)::int n from notifications where title = 'falsa'`))?.n === 0; } },
-  { nombre: "delete_conversation_cascade solo mira mvf", de: "  IF (auth.jwt() ?| array['mvf', 'mvk']) IS TRUE THEN", a: "  IF (auth.jwt() ->> 'mvf') IS NOT NULL THEN",
+  { nombre: "delete_conversation_cascade solo mira mvf", funcionActual: "public.delete_conversation_cascade(uuid)", de: "  IF (auth.jwt() ?| array['mvf', 'mvk']) IS TRUE THEN", a: "  IF (auth.jwt() ->> 'mvf') IS NOT NULL THEN",
     nota: async (db) => { await intentar(db, soloMvk(ALVARO), `select public.delete_conversation_cascade('${G50}')`); return (await uno(db, `select count(*)::int n from chat_conversations where id = '${G50}'`))?.n === 1; } },
   { nombre: "la retirada solo mira mvf", de: "  if (auth.jwt() ?| array['mvf', 'mvk']) is true then", a: "  if (auth.jwt() ->> 'mvf') is not null then",
     nota: (db) => falla_(rpc(db, soloMvk(ALVARO), "api_retirar_mensajes_de_integracion", { _llave: K_BLU, _desde: null, _limite: 200 }), "MV403") },
@@ -1765,7 +1766,7 @@ const MUTANTES: Mutante[] = [
       insert into chat_participants(conversation_id, user_id, role) values ('c9500000-0000-4000-8000-000000000001', '${NUEVA}', 'member')`), "MV404") },
   { nombre: "el tope de la hora deja pasar uno de más", de: "(case when c.hora_inicio >= _hora then c.hora_msj  else 0 end) + _msj   <= c.lim_msj_hora)", a: "(case when c.hora_inicio >= _hora then c.hora_msj  else 0 end) + _msj   <= c.lim_msj_hora + 1)",
     nota: async (db) => { await db.exec(`update api_escritura_cupos set hora_msj = 1000, hora_inicio = date_trunc('hour', now()) where clave = 'llave:${K_BLU}'`); return falla_(enviar(db, BLU, G, "x"), "MV429", "limite", "key_messages_hour"); } },
-  { nombre: "delete_conversation_cascade sin la guarda de la sesión fabricada", de: "  IF (auth.jwt() ?| array['mvf', 'mvk']) IS TRUE THEN", a: "  IF false THEN",
+  { nombre: "delete_conversation_cascade sin la guarda de la sesión fabricada", funcionActual: "public.delete_conversation_cascade(uuid)", de: "  IF (auth.jwt() ?| array['mvf', 'mvk']) IS TRUE THEN", a: "  IF false THEN",
     nota: async (db) => { await intentar(db, fabricada(ALVARO), `select public.delete_conversation_cascade('${G50}')`); return (await uno(db, `select count(*)::int n from chat_conversations where id = '${G50}'`))?.n === 1; } },
 ];
 {
@@ -1776,6 +1777,15 @@ const MUTANTES: Mutante[] = [
     let nota = false;
     try {
       const db = await nueva(mig);
+      // Una migración posterior puede reemplazar la función: romper también la
+      // definición vigente para comprobar el cerco que realmente se ejecuta.
+      if (mu.funcionActual) {
+        const fila = await uno(db, "select pg_get_functiondef($1::regprocedure) sql", [mu.funcionActual]);
+        const vigente = fila?.sql as string;
+        const rota = vigente.replace(mu.de, mu.a);
+        if (rota === vigente) throw Error(`No se pudo mutar ${mu.funcionActual}`);
+        await db.exec(rota);
+      }
       nota = !(await mu.nota(db));
     } catch (e) { nota = true; console.error(`mutante «${mu.nombre}»: la base no cargó (${msg(e).slice(0, 100)})`); }
     // La misma prueba con la migración de verdad tiene que pasar (si no, no prueba nada).

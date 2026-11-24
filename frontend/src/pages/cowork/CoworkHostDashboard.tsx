@@ -1,3 +1,5 @@
+import CoworkAccesosDialog from "./CoworkAccesosDialog";
+import { usePermissions } from "@/hooks/usePermissions";
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { enHoras } from "@/lib/duracion";
 import { Cronometro, RelojDePersona } from "./RelojVivo";
@@ -69,7 +71,6 @@ import type { useCoworkSession, CoworkRoom } from "@/hooks/useCoworkSession";
 import { useUserRole } from "@/hooks/useUserRole";
 import { useReglaDeAnfitrion, useVenPantallasDelHub } from "@/hooks/useReglaDeAnfitrion";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { useChatShared } from "@/hooks/ChatProvider";
 import { useMessengerDock } from "@/components/messenger/MessengerDock";
 import { MUELLE_EXTRA_ID } from "@/hooks/useMuelleFlotante";
 import { UserAvatar } from "@/components/UserAvatar";
@@ -78,7 +79,7 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "
 import { useLanguage } from "@/hooks/useLanguage";
 import { traducir, type TranslationKey } from "@/lib/i18n";
 import { ETIQUETA_SUPERVISOR, NOMBRE_PAUSA, claveMotivoDetenido, mensajeDeSolicitud } from "./textosCowork";
-import { alternarBlur, esBlur, guardarFondo, leerFondoGuardado, type BackgroundEffect } from "@/lib/fondoDeLlamada";
+import { alternarBlur, blurPorDefecto, esBlur, guardarFondo, leerFondoGuardado, type BackgroundEffect } from "@/lib/fondoDeLlamada";
 import { precalentarFondo, soportaProcesadorDeFondo } from "@/lib/fondoFino/procesador";
 import { crearCamaraDelAnfitrion, type CamaraDelAnfitrion, type ResultadoDelFondo } from "@/lib/camaraDelAnfitrion";
 import { escritorio } from "@/lib/escritorio";
@@ -164,6 +165,10 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
   // memoizados y de la config de la llamada usan traducir(): meter `t` en esas
   // dependencias reconectaría el Hub o la sala al cambiar el idioma.
   const { t } = useLanguage();
+  const { canFunction } = usePermissions();
+  const gestionaAccesos = canFunction("N:cowork.miembros", false);
+  const administraSalas = canFunction("N:cowork.abrir", true);
+  const supervisaPantallas = canFunction("N:cowork.verpantallas", true);
   const { isOnline } = useOnlinePresence();
   const { mediaStates, supervisores, supervisoresDesde, trackEstadoSupervisor } = useCoworkMediaPresence(cowork.session?.id, userId);
   // La pausa del supervisor (break / almuerzo / ausente) se elige con la tacita
@@ -844,7 +849,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
   fondoRef.current = fondo;
   // El último nivel de difuminado elegido, para que el botón lo devuelva igual
   // (mismo criterio que el botón rápido de la llamada).
-  const ultimoBlurRef = useRef<BackgroundEffect>("blur");
+  const ultimoBlurRef = useRef<BackgroundEffect>(blurPorDefecto());
   if (esBlur(fondo)) ultimoBlurRef.current = fondo;
   const [preparandoFondo, setPreparandoFondo] = useState(false);
   const camaraRef = useRef<CamaraDelAnfitrion | null>(null);
@@ -1617,6 +1622,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
   };
 
   const handleAddRoom = async () => {
+    if (!administraSalas) return;
     const name = addName.trim();
     if (!name) return;
     setRoomBusy(true);
@@ -1683,9 +1689,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
   const [avisarSala, setAvisarSala] = useState<string | null>(null);
   // Escribirle a alguien desde la lista de pantallas: se abre (o crea) el DM
   // y sale en la ventanita flotante del Messenger, sin irse del tablero.
-  const { createDirectChat } = useChatShared();
-  const { abrirChat } = useMessengerDock();
-  const escribirA = (uid: string) => { const id = createDirectChat(uid); if (id) abrirChat(id); };
+  const { abrirDirecto: escribirA } = useMessengerDock();
   // MOVER A OTRA SALA (Alvaro, 17/11/2026): antes cada participante elegía su
   // sala y el anfitrión no podía moverlo. La edge valida que quien mueve es
   // anfitrión y que la sala es de esta sesión; a la persona le llega por
@@ -2164,6 +2168,9 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
 
           {/* Unassigned members section removed — participants self-join via URL ?room=X */}
 
+          {/* Accesos nuevos y asignación por alcance de la posición. */}
+          <div className="mx-3 mt-3"><CoworkAccesosDialog sessionId={cowork.session?.id} /></div>
+
           {/* Host Requests */}
           <section className="mx-3 mt-3 space-y-2 rounded-2xl border border-border/60 bg-background/50 p-3">
             <div className="flex items-center gap-2">
@@ -2411,7 +2418,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                             <MessageCircle className="mr-2 h-4 w-4" /> {t("cowork.host.messageOnMessenger")}
                           </DropdownMenuItem>
                           <DropdownMenuSub>
-                            <DropdownMenuSubTrigger disabled={moviendo === f.uid}>
+                            <DropdownMenuSubTrigger disabled={!gestionaAccesos || moviendo === f.uid}>
                               {moviendo === f.uid
                                 ? <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                                 : <ArrowRightLeft className="mr-2 h-4 w-4" />}
@@ -2480,7 +2487,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                       </div>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="sm" disabled={moviendo === p.uid} className="h-7 shrink-0 gap-1 rounded-lg px-2 text-[11px] text-muted-foreground hover:text-foreground">
+                          <Button variant="ghost" size="sm" disabled={!gestionaAccesos || moviendo === p.uid} className="h-7 shrink-0 gap-1 rounded-lg px-2 text-[11px] text-muted-foreground hover:text-foreground">
                             {moviendo === p.uid ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ArrowRightLeft className="h-3.5 w-3.5" />}
                             {t("cowork.host.setFixedRoom")}
                           </Button>
@@ -2658,6 +2665,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                   variant="outline"
                   className="gap-1 rounded-full h-8 shrink-0"
                   title={t("cowork.host.addRoom")}
+                  disabled={!administraSalas}
                   onClick={() => { setAddName(""); setAddOpen(true); }}
                 >
                   <Plus className="h-3.5 w-3.5" /> <span className="hidden sm:inline">{t("cowork.host.addRoom")}</span>
@@ -2753,7 +2761,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                     // isMobile: si el viewport cruza el breakpoint con la hoja
                     // abierta, dos monitores de la misma sala comparten
                     // identidad en LiveKit y uno patea al otro.
-                    enabled={activeRoomId !== room.id && salaEnHoja !== room.id}
+                    enabled={supervisaPantallas && activeRoomId !== room.id && salaEnHoja !== room.id}
                     onSharersChange={manejadores.sharers}
                     onSpeakingChange={manejadores.speaking}
                     onParticipantsChange={manejadores.participants}
@@ -3343,7 +3351,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                       camBaseTrack={camBaseTrack}
                       screenOn={screenFor(room.id)}
                       screenBaseTrack={baseDePantalla}
-                      enabled={true}
+                      enabled={supervisaPantallas}
                     />
                   </div>
                 )}

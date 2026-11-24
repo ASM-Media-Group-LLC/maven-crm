@@ -1,0 +1,36 @@
+import {readFileSync} from 'node:fs';
+import assert from 'node:assert/strict';
+const {PGlite}=await import(process.env.MAVEN_PGLITE_MODULE || '@electric-sql/pglite');
+const db=new PGlite();
+const owner='00000000-0000-4000-8000-000000000001',other='00000000-0000-4000-8000-000000000002';
+await db.exec(`create role anon;create role authenticated;create schema auth;
+create table auth.users(id uuid primary key);insert into auth.users values('${owner}'),('${other}');
+create function auth.uid() returns uuid language sql as $$select null::uuid$$;
+create function es_dueno(u uuid) returns boolean language sql as $$select u='${owner}'::uuid$$;
+create table costos_saldo(id bigint primary key);insert into costos_saldo values(1),(2);
+create table tenant_owners(user_id uuid);insert into tenant_owners values('${owner}');
+create table notification_preferences(user_id uuid,enabled boolean);insert into notification_preferences values('${owner}',false),('${other}',true);
+create function notif_canal_activo(u uuid,t text,c text) returns boolean language sql as $$select coalesce((select enabled from notification_preferences where user_id=u),false)$$;
+create table notification_settings(user_id uuid,notifications_enabled boolean);
+create table notifications(id uuid default gen_random_uuid(),user_id uuid,type text,title text,message text,reference_type text,module_origin text,priority text,status text,visibility_scope text,deep_link_url text);
+create table test_balance(data jsonb);insert into test_balance values('{}');
+create function ia_saldo_calculo() returns jsonb language sql as $$select data from test_balance$$;`);
+await db.exec(readFileSync(new URL('../migrations/20261123034838_argos_avisos_saldo_10_5.sql',import.meta.url),'utf8'));
+let tests=0;
+for(const [state,usd,want] of [['bien',10.01,null],['bien',10,10],['pocos_dias',7,10],['se_acaba_hoy',5,5],['se_acaba_hoy',0,5],['anotar',-37.52,null],['anotar',4,null],['sin_dato',4,null],[null,4,null],['bien',null,null]]){
+ const {rows}=await db.query('select ia_saldo_umbral_correo($1) as n',[JSON.stringify({estado:state,saldo_usd:usd})]);assert.equal(rows[0].n,want);tests++;
+}
+const saldo=async(usd,id=1,state='bien')=>db.query('update test_balance set data=$1',[JSON.stringify({estado:state,saldo_usd:usd,punto:{id,medido_at:'2026-11-22T10:00:00Z'}})]);
+const tick=async()=> (await db.query('select vigilar_saldo_ia_correo() as n')).rows[0].n;
+await saldo(9);assert.equal(await tick(),0);tests++;
+await db.exec(`update notification_preferences set enabled=true where user_id='${owner}'`);
+assert.equal(await tick(),1);tests++;
+assert.equal(await tick(),0);tests++;
+await saldo(4);assert.equal(await tick(),1);tests++;
+assert.equal(await tick(),0);tests++;
+await saldo(4,2);assert.equal(await tick(),1);tests++;
+await saldo(7,2);assert.equal(await tick(),0);tests++;
+const mails=(await db.query('select user_id,message from notifications')).rows;
+assert.equal(mails.length,3);assert.ok(mails.every(m=>m.user_id===owner&&m.message.includes('estimación de Maven')));tests+=2;
+await saldo(-37.52,2,'anotar');assert.equal(await tick(),0);tests++;
+await db.close();console.log(`${tests} comprobaciones de saldo aprobadas: 10/5, dato inválido, opt-in, destinatario y duplicados.`);

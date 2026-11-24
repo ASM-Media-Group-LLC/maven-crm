@@ -30,7 +30,7 @@ vi.mock("@/pages/cowork/CoworkRoomMonitor", () => ({ default: () => null }));
 vi.mock("@/hooks/useUserRole", () => ({ useUserRole: () => ({ isAdmin: esAdmin }) }));
 vi.mock("@/hooks/useRoleTier", () => ({ useRoleTier: () => ({ isSupervisorOrAbove: true, isLoading: false }) }));
 vi.mock("@/hooks/usePermissions", () => ({
-  usePermissions: () => ({ dataScope: () => "all", explicitPermission: () => null, isLoading: false }),
+  usePermissions: () => ({ dataScope: () => "all", canFunction: () => false, explicitPermission: () => null, isLoading: false }),
 }));
 vi.mock("@/integrations/supabase/client", () => {
   const q: Record<string, unknown> = {};

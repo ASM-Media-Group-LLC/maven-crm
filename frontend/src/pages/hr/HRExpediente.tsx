@@ -1,3 +1,6 @@
+import { toast } from "sonner";
+import { exportarExpediente } from "@/lib/posiciones/exportarExpediente";
+import { usePermissions } from "@/hooks/usePermissions";
 import { formatUI } from "@/lib/formatoHora";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { enHoras } from "@/lib/duracion";
@@ -925,8 +928,15 @@ function DesgloseNotaContenido({ dia, atencion, t, compacto }: {
 }
 
 export default function HRExpediente() {
-  const { userId } = useParams<{ userId: string }>();
+  const { canFunction } = usePermissions();
   const { t } = useLanguage();
+  return canFunction("N:argos.expediente", true) ? <ExpedientePermitido /> : <Page><p>{t("posiciones.funcionNoPermitida")}</p></Page>;
+}
+
+function ExpedientePermitido() {
+  const { userId } = useParams<{ userId: string }>();
+  const { t, language } = useLanguage();
+  const [exportando, setExportando] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
   // Volver SIEMPRE a Argos (a la pestaña de donde saliste): si vinimos de un
@@ -940,6 +950,7 @@ export default function HRExpediente() {
   const [verDesglose, setVerDesglose] = useState(false);
   const anio = Number(diaSel.slice(0, 4));
   const mes = Number(diaSel.slice(5, 7));
+  const { canFunction } = usePermissions();
   const { expediente, cargando, error, hoy } = useExpedienteEmpleado(userId ?? null, anio, mes);
 
   const esHoy = diaSel === hoy;
@@ -999,7 +1010,14 @@ export default function HRExpediente() {
         <ArrowLeft className="h-4 w-4" />
         {t("hr.exp.volverArgos")}
       </Button>
-      <PageHeader title={t("hr.exp.title")} subtitle={t("hr.exp.sub")} icon={<Gauge className="h-5 w-5" />} />
+      <PageHeader title={t("hr.exp.title")} subtitle={t("hr.exp.sub")} icon={<Gauge className="h-5 w-5" />}
+        actions={canFunction("N:argos.pdf", false) && <Button variant="outline" size="sm" disabled={!expediente || cargando || !!error || exportando} onClick={async () => {
+          if (!expediente || !canFunction("N:argos.pdf", false)) return;
+          setExportando(true);
+          try { await exportarExpediente(expediente, `${anio}-${String(mes).padStart(2,"0")}`, language); }
+          catch { toast.error(t("posiciones.errorGuardar")); }
+          finally { setExportando(false); }
+        }}>{t("posiciones.c.descargar_reporte")}</Button>} />
 
       {/* Identidad + nota + día + flechas */}
       <section className="vidrio sube mt-4 p-4 lg:p-5">
@@ -1127,7 +1145,7 @@ export default function HRExpediente() {
 
       {/* AHORA MISMO, EN VIVO (Alvaro, 18/11/2026: «dice live: la idea es que esté
           live»): su pantalla y su cámara en video, no en pantallazos. Solo hoy. */}
-      {userId && !cargando && !error && esHoy && <AhoraEnVivo userId={userId} capturas={dia.capturas} />}
+      {userId && canFunction("N:argos.presencia", true) && !cargando && !error && esHoy && <AhoraEnVivo userId={userId} capturas={dia.capturas} />}
 
       {/* TODAS SUS HORAS, justo debajo del en vivo (Alvaro, 13/11 y 18/11/2026:
           «no puedo ver los pantallazos de todo el día», «necesito ver todas las
@@ -1220,7 +1238,7 @@ export default function HRExpediente() {
       </section>
 
       {/* Videos de Argos del día (si los hubo). Se esconde solo si no hay. */}
-      {userId && <ClipsDelDia userId={userId} fecha={dia.fecha} />}
+      {userId && canFunction("N:argos.video", true) && <ClipsDelDia userId={userId} fecha={dia.fecha} />}
 
       {/* Qué le dijo Argos ese día: cronología de nudges (Alvaro, 09/11). */}
       {userId && <AvisosDeArgos userId={userId} fecha={dia.fecha} />}
