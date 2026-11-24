@@ -62,7 +62,7 @@ Prueba aislada con Postgres/PGlite: valores positivos y negativos infinitos, nul
 pasados y finitos; ACL/propietario/seguridad/roles intactos; reaplicación; simulación;
 una nueva deshabilitación usando la función real del constructor; rechazo seguro
 si la definición tiene una forma desconocida. **Aprobada**.
-Estado de despliegue: **preparada para revisión por el responsable de la entrega**.
+Estado de despliegue: **aplicada el 24/11/2026, aproximadamente 06:30 UTC**. Verificación independiente: 72 cuentas, las mismas 16 bloqueadas, cero fechas infinitas; propietario, ACL, SECURITY DEFINER y search_path conservados. La interfaz de administración recuperó 52/52 correos, cuyo origen es `auth.admin.listUsers`.
 
 Fuentes técnicas: [modelo de usuario de Supabase Auth](https://github.com/supabase/auth/blob/master/internal/models/user.go)
 y [serialización de fechas de Go](https://pkg.go.dev/time#Time.MarshalJSON).
@@ -155,12 +155,12 @@ puede empezar antes de la ventana y terminar dentro de ella.
 ## Monitores y simulacro
 
 - `salud-vigilante` está activo cada 2 minutos: **720 ejecuciones y 720 HTTP 200** en 24 h.
-  Su comprobación del cron de aportes todavía usa `drive-aporte-nas-ping`; el nombre
-  activo consultado es `drive-aporte-nas`. Corregir esa discrepancia para medir el proceso real.
+  Al iniciar la auditoría, su comprobación del cron de aportes usaba `drive-aporte-nas-ping`; el nombre
+  activo consultado es `drive-aporte-nas`. Corregido y comprobado en la función publicada el 24/11, 06:53 UTC.
 - `vigia-cortes-de-llamada` está activo cada 5 minutos: **288 ejecuciones**.
 - `vigilar-saldo-ia` está activo cada 10 minutos: **144 ejecuciones**.
 - `equipo-vigilante` está activo cada 3 minutos: **480 ejecuciones de cron** y 479 respuestas
-  HTTP 200 observadas. El fallo de columna descrito arriba muestra su límite actual.
+  HTTP 200 observadas. El fallo de columna descrito arriba mostraba una falsa señal de éxito; la función publicada ya consulta `tarde_min` y comprueba el error.
 - No se encontró un simulacro de usuarios periódico en los cron de producción ni en
   los archivos de CI revisados. El proyecto **maven-simulacro sí existe y está activo**:
   base 1.579 MB, un único cron `hub-estado-supervisores` cada 15 s. Sus registros de 24 h
@@ -202,3 +202,20 @@ Referencias del asesor: [rendimiento de RLS](https://supabase.com/docs/guides/da
    que 12 vídeos, pantallas, detección y consultas bloqueen el hilo de la aplicación.
 5. Certificar resultados observados; presentar hardware y costo solo si el ensayo muestra
    el recurso que se agota. Los números anteriores no autorizan todavía prometer 330 llamadas.
+
+
+## Verificación de la entrega
+
+PR [283](https://github.com/ASM-Media-Group-LLC/maven-crm/pull/283), integrado en main el 24/11/2026 a las 06:52:58 UTC (`ddd71cc186e9f4bd84618a4ebda9a253326ec45a`). Las tres guardas aprobaron: 489 archivos / 4.530 pruebas, tipos sin diagnósticos nuevos (228 heredados tanto en base como en cabeza), compilación, imagen Docker/nginx y bancos de permisos/funciones. Los dos vigilantes desplegados se consultaron por MCP: columna y nombre de cron corregidos. Publicación web comprobada a las 06:57:22 UTC: HTTP 200, entrada `index-Dnh9Z-Du.js`, build `1795503316298`, carga diferida recuperable presente, service worker sin respuestas privadas y limpieza de ambas cachés. En el navegador la sesión siguió abierta, administración mostró 52/52 correos y cero alertas. No sustituye la prueba física de llamadas entre Mac/Windows.
+
+La comparación final de entrada JS/CSS, con la misma compresión Node zlib, pasó de 2.886.567 a 2.484.332 bytes y de 803.847 a 682.452 bytes gzip: ahorro de 121.395 bytes, 15,1 %. No es una medición de velocidad ni reduce el peso de los instaladores ya publicados.
+
+## Actualizaciones de medios y perímetro
+
+La revisión oficial del 24/11 encontró LiveKit 1.13.11 (25/10/2026), frente al 1.8.4 instalado, y Egress 1.15.0 (06/10/2026), frente al 1.9 instalado. Las notas incluyen correcciones de memoria, retransmisión y Chrome. Hay cambios de autenticación TURN y una regresión de Egress corregida en 1.13.9: actualizar exige banco de compatibilidad, grabación, reconexión, Mac/Windows y plan de retorno. No se actualizaron servidores ni se atribuyen las pérdidas del laboratorio a una versión antigua sin una comparación controlada.
+
+Fuentes: [LiveKit 1.13.11](https://github.com/livekit/livekit/releases/tag/v1.13.11), [Egress 1.15.0](https://github.com/livekit/egress/releases/tag/v1.15.0), [corrección 1.13.9](https://github.com/livekit/livekit/releases/tag/v1.13.9).
+
+Lectura del perímetro: Miami tiene UFW activo; en St. Louis UFW está inactivo, lo que requiere verificar su firewall externo antes de concluir protección o exposición. Caddy administra por 127.0.0.1:2019 y no se observó un listener de Redis 6379 en el host de ninguno. No se cambiaron reglas ni se hicieron pruebas intrusivas. Esto no sustituye una auditoría de red completa.
+
+La arquitectura actual separa KASH del edificio Maven Agencias. Los nuevos clientes comparten el edificio con organizaciones/agencias y RLS; no se presupone una base independiente para cada cliente. Los hallazgos de tablas de KASH no demuestran una fuga entre empresas del edificio, cuyo aislamiento debe validarse con pruebas propias antes de contratar más clientes.

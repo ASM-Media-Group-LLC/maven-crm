@@ -8,8 +8,9 @@
 
 ## Stack y deploy
 
-- 2026-11-24: auditoría de infraestructura y carga; reconexión/presencia, carga diferida, consultas de chat y medición al minimizar reparadas; caché privada retirada, bloqueo Auth compatible y vigilantes corregidos.
-- Evidencia y banco aislado en `docs/audits/infraestructura-base-2026-11-24.md` y `scripts/audit/`; completar lectura 5×/10×, publicación y PDF antes de certificar capacidad. Pendientes: aislamiento entre empresas, restauración de respaldos y prueba física Mac/Windows con internet débil.
+- 2026-11-24: PR283 en main; reconexión/presencia, carga diferida, chat/medidor, caché privada, Auth y vigilantes corregidos. Web y funciones publicadas verificadas a las 06:57 UTC; 4.530 pruebas y tres guardas aprobadas.
+- Informe/PDF en `docs/audits/`; simulacros en `docs/auditorias/infraestructura-2026-11-24/`: 33 conexiones favorable, 165/330 no aprueban con SFU de 2 CPU y generador compartido; no certifica Miami (4 CPU) ni Maven completo.
+- Pendientes antes de ampliar: prueba con generador separado y equipos Mac/Windows, actualización compatible LiveKit/Egress/TURN, restauración de respaldos y aislamiento de organizaciones del edificio. KASH permanece en base separada.
 
 | Pieza | Decisión actual |
 |---|---|
