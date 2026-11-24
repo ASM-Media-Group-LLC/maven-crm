@@ -14,7 +14,6 @@ import { almacenDelNavegador, envDeLaApp, guardarDestino, puertaActiva } from "@
 // la empresa, su nombre, correo y contraseña → la empresa nace en el EDIFICIO (activa,
 // con su admin) → Checkout de Stripe (tarjeta obligatoria, 14 días gratis) → /bienvenido.
 // Con la puerta apagada no se puede registrar nadie todavía: se ofrece la demo.
-const SETUP_USD = "3.000";
 
 export default function Empezar() {
   const { t, language } = useLanguage();
@@ -98,7 +97,7 @@ export default function Empezar() {
               <Input id="contrasena" type="password" value={contrasena} onChange={(e) => setContrasena(e.target.value)} autoComplete="new-password"
                 minLength={8} required className="bg-white/10 border-white/10 text-white placeholder:text-white/30" />
             </div>
-            <p className="text-xs text-white/50">{t("cobros.empezar.setup", { usd: SETUP_USD })}</p>
+            <p className="text-xs text-white/50">{t("cobros.empezar.implementacionOpcional")}</p>
             {error && (
               <p role="alert" className="text-sm text-red-300">
                 {t(`cobros.error.${error}` as TranslationKey)}

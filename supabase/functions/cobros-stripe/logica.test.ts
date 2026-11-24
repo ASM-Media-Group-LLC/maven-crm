@@ -173,6 +173,7 @@ Deno.test("planes: Equipo 299/20 personas/USD 20 de Argos; Empresa 599/50/50; pr
 Deno.test("opciones especiales: el dueño todo; Grace sin precio a la medida", () => {
   const dueno = opcionesEspeciales("dueno", { dias_gratis: 30, sin_tarjeta: true, sin_setup: true, precio_a_medida_usd: 450 });
   assertEquals(dueno, { ok: true, opciones: { dias_gratis: 30, sin_tarjeta: true, sin_setup: true, precio_a_medida: 450 } });
+  assertEquals(opcionesEspeciales("dueno", { sin_setup: false }), { ok: true, opciones: { dias_gratis: 0, sin_tarjeta: false, sin_setup: true, precio_a_medida: null } });
   assertEquals(opcionesEspeciales("admin", { precio_a_medida_usd: 100 }), { ok: false, error: "solo_dueno_precio" });
   const grace = opcionesEspeciales("admin", { dias_gratis: 10, sin_setup: true });
   assertEquals(grace, { ok: true, opciones: { dias_gratis: 10, sin_tarjeta: false, sin_setup: true, precio_a_medida: null } });
@@ -192,7 +193,7 @@ Deno.test("aFormulario: corchetes como los pide Stripe y sin los vacíos", () =>
   assertEquals(f.toString(), "a=1&b%5Bc%5D=x&e%5B0%5D%5Bf%5D=2&e%5B1%5D=g");
 });
 
-Deno.test("checkout del registro: tarjeta siempre, 14 días, plan + setup y metadata del cliente", () => {
+Deno.test("checkout del registro: solo el plan, sin implementación automática ni con la opción antigua", () => {
   const f = paramsCheckoutSuscripcion({
     precios: conIds, plan: "empresa", organizacionId: "org-1", customer: "cus_1", appUrl: "https://app.maven-ai.me/",
     diasPrueba: 14, sinSetup: false, precioAMedidaUsd: null, origen: "registro", idioma: "es",
@@ -201,7 +202,7 @@ Deno.test("checkout del registro: tarjeta siempre, 14 días, plan + setup y meta
   assertEquals(f.get("payment_method_collection"), "always");
   assertEquals(f.get("subscription_data[trial_period_days]"), "14");
   assertEquals(f.get("line_items[0][price]"), "price_em");
-  assertEquals(f.get("line_items[1][price]"), "price_se");
+  assertEquals(f.get("line_items[1][price]"), null, "no cobra la implementación aunque un cliente antiguo mande sinSetup=false");
   assertEquals(f.get("subscription_data[metadata][organizacion_id]"), "org-1");
   assertEquals(f.get("metadata[dias_prueba]"), "14");
   assertEquals(f.get("success_url"), "https://app.maven-ai.me/bienvenido?sesion={CHECKOUT_SESSION_ID}");
@@ -214,6 +215,7 @@ Deno.test("checkout del registro: tarjeta siempre, 14 días, plan + setup y meta
   assertEquals(g.get("line_items[1][price]"), null);
   assertEquals(g.get("subscription_data[trial_period_days]"), null);
   assertEquals(g.get("line_items[0][price_data][unit_amount]"), "45000");
+  assertEquals(g.get("line_items[0][price_data][tax_behavior]"), "inclusive");
   assertEquals(g.get("line_items[0][price_data][product]"), "prod_eq");
   assertEquals(g.get("line_items[0][price_data][recurring][interval]"), "month");
   // Sin productos preparados no se arma nada a medias.
@@ -234,7 +236,9 @@ Deno.test("checkout de la recarga y suscripción sin tarjeta", () => {
   assertEquals(s.get("days_until_due"), "7");
   assertEquals(s.get("trial_period_days"), "30");
   assertEquals(s.get("items[0][price]"), "price_eq");
-  assertEquals(s.get("add_invoice_items[0][price]"), "price_se");
+  assertEquals(s.get("add_invoice_items[0][price]"), null, "tampoco agrega la implementación a las facturas sin tarjeta");
+  const aMedida = paramsSuscripcionSinTarjeta({ precios: conIds, plan: "empresa", organizacionId: "org-1", customer: "cus_1", diasPrueba: 0, sinSetup: true, precioAMedidaUsd: 450 });
+  assertEquals(aMedida.get("items[0][price_data][tax_behavior]"), "inclusive");
 });
 
 Deno.test("registro: valida y no deja registrar correos del equipo de Kash", () => {

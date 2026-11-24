@@ -29,9 +29,8 @@ import PedirDemo from "./secciones/PedirDemo";
 // Precios de Alvaro (16/11/2026, segunda vuelta): fijo por empresa y todo
 // incluido, Argos también — Equipo USD 299 hasta 20 personas, Empresa USD 599
 // hasta 50, y Enterprise SIN precio (más de 50 personas: nos contactan), como
-// la tarjeta Enterprise de Lumina — más la instalación a la medida desde
-// USD 3.000 (pago único) en la nota de abajo. Cambiar un precio es cambiar
-// PLANES, nada más.
+// la tarjeta Enterprise de Lumina. Implementación opcional, cotizada y cobrada
+// por separado según alcance (Alvaro, 23/11/2026).
 //
 // TRES REGLAS DE CONTENIDO que no son opinión, son pedido explícito:
 //  1. Ni una cifra de la agencia (montos, cantidad de personas, uso real).
@@ -541,7 +540,8 @@ export default function Portada({ idiomaDeRuta }: { idiomaDeRuta?: Idioma }) {
           </div>
           <p className="pr-precios-nota">
             {t("portada.precios.nota")}{" "}
-            <b>{t("portada.precios.notaInstalacion")}</b>
+            <b>{t("portada.precios.implementacionOpcional")}</b>{" "}
+            <a href="#demo" onClick={abrirDemo} className="underline underline-offset-4">{t("portada.precios.solicitarCotizacion")}</a>
           </p>
         </div>
       </section>

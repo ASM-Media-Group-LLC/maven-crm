@@ -362,7 +362,8 @@ export function opcionesEspeciales(
     opciones: {
       dias_gratis: dias,
       sin_tarjeta: pedido.sin_tarjeta === true,
-      sin_setup: pedido.sin_setup === true,
+      // La implementación se cotiza aparte: ningún alta cobra una tarifa fija.
+      sin_setup: true,
       precio_a_medida: precio === null ? null : Math.round(precio * 100) / 100,
     },
   };
@@ -399,7 +400,7 @@ function lineaDelPlan(precios: Precios, plan: NombrePlan, precioAMedidaUsd: numb
     const producto = precios.stripe.productos?.[plan];
     if (!producto) throw new Error("faltan_productos_stripe");
     return {
-      price_data: { currency: "usd", product: producto, unit_amount: centavos(precioAMedidaUsd), recurring: { interval: "month" } },
+      price_data: { currency: "usd", product: producto, unit_amount: centavos(precioAMedidaUsd), tax_behavior: "inclusive", recurring: { interval: "month" } },
       quantity: 1,
     };
   }
@@ -422,12 +423,8 @@ export function paramsCheckoutSuscripcion(a: {
   idioma?: string;
 }): URLSearchParams {
   const lineas: Record<string, Valor>[] = [lineaDelPlan(a.precios, a.plan, a.precioAMedidaUsd)];
-  if (!a.sinSetup) {
-    const setup = a.precios.stripe.precios?.setup;
-    if (!setup) throw new Error("faltan_productos_stripe");
-    // Pago único: Stripe lo cobra en la primera factura (al poner la tarjeta, aun con prueba).
-    lineas.push({ price: setup, quantity: 1 });
-  }
+  // sinSetup se conserva por compatibilidad con llamadores anteriores. La
+  // implementación opcional nunca se añade al alta ni a un reintento del plan.
   const md = { maven: "1", organizacion_id: a.organizacionId, plan: a.plan, origen: a.origen, dias_prueba: String(a.diasPrueba) };
   const base = a.appUrl.replace(/\/+$/, "");
   return aFormulario({
@@ -487,8 +484,6 @@ export function paramsSuscripcionSinTarjeta(a: {
   const linea = lineaDelPlan(a.precios, a.plan, a.precioAMedidaUsd);
   // En /v1/subscriptions el precio a la medida va en items[][price_data] igual que en Checkout.
   const item = linea.price_data ? { price_data: linea.price_data, quantity: 1 } : { price: linea.price as string, quantity: 1 };
-  const setup = a.sinSetup ? null : a.precios.stripe.precios?.setup;
-  if (!a.sinSetup && !setup) throw new Error("faltan_productos_stripe");
   const md = { maven: "1", organizacion_id: a.organizacionId, plan: a.plan, origen: "dueno", dias_prueba: String(a.diasPrueba) };
   return aFormulario({
     customer: a.customer,
@@ -496,17 +491,23 @@ export function paramsSuscripcionSinTarjeta(a: {
     collection_method: "send_invoice",
     days_until_due: 7,
     trial_period_days: a.diasPrueba > 0 ? a.diasPrueba : undefined,
-    add_invoice_items: setup ? [{ price: setup, quantity: 1 }] : undefined,
     metadata: md,
   });
 }
 
-/** Lo que el dueño prepara una vez en Stripe (cuenta de Lumina, cobros con nombre Maven). */
+// Confirmado por Alvaro el 23/11/2026: SaaS empresarial con aplicación descargable.
+// Código verificado en https://docs.stripe.com/tax/tax-codes.
+export const CODIGO_FISCAL_SAAS_MAVEN = "txcd_10103101";
+
+/** Catálogo de la cuenta propia de Maven; KASH es un cliente del software. */
 export const PRODUCTOS_MAVEN = [
-  { clave: "equipo", nombre: "Maven Equipo", lookup: "maven_equipo_mensual", mensual: true },
-  { clave: "empresa", nombre: "Maven Empresa", lookup: "maven_empresa_mensual", mensual: true },
-  { clave: "setup", nombre: "Maven Setup", lookup: "maven_setup", mensual: false },
-  { clave: "recarga", nombre: "Maven Argos recarga", lookup: "maven_argos_recarga", mensual: false },
+  { clave: "equipo", nombre: "Maven Equipo", lookup: "maven_equipo_mensual", mensual: true, codigoFiscal: CODIGO_FISCAL_SAAS_MAVEN },
+  { clave: "empresa", nombre: "Maven Empresa", lookup: "maven_empresa_mensual", mensual: true, codigoFiscal: CODIGO_FISCAL_SAAS_MAVEN },
+  // Se crea el producto, pero no un precio fijo: cada alcance requiere cotización.
+  // La categoría fiscal del servicio queda pendiente de revisión del contador.
+  { clave: "setup", nombre: "Maven - Implementación opcional", lookup: "maven_setup", mensual: false, codigoFiscal: null },
+  // La categoría de las recargas se confirma por separado.
+  { clave: "recarga", nombre: "Maven Argos recarga", lookup: "maven_argos_recarga", mensual: false, codigoFiscal: null },
 ] as const;
 
 export function montoDeProducto(precios: Precios, clave: (typeof PRODUCTOS_MAVEN)[number]["clave"]): number {
