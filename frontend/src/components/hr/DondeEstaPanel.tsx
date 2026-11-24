@@ -146,8 +146,47 @@ const SITUACIONES: { k: FiltroSituacion; label: TranslationKey; punto: string }[
 ];
 
 export function DondeEstaPanel() {
-  const { t } = useLanguage();
   const q = useDondeEsta();
+  const filas = useMemo(() => q.data ?? [], [q.data]);
+  const fotos = useFotos(filas.map((f) => f.user_id)).data ?? {};
+  // Su pantalla y su cámara de AHORA (últimos 12 min). Si no hay, la tarjeta lo dice.
+  const vivo = useCapturasVivo();
+  const enVivo = useMemo(() => new Map(vivo.personas.map((p) => [p.userId, p])), [vivo.personas]);
+  // …y, si no hay, la última de hoy (Alvaro, 18/11/2026: «pantallazos de todo el mundo»).
+  const sinVivo = useMemo(() => filas.filter((f) => !enVivo.get(f.user_id)?.pantallaUrl).map((f) => f.user_id), [filas, enVivo]);
+  const ultimas = useUltimasDelDia(sinVivo).data ?? {};
+
+  return (
+    <PresenciaArgosVista
+      filas={filas}
+      fotos={fotos}
+      enVivo={enVivo}
+      ultimas={ultimas}
+      cargando={q.isLoading}
+      fallo={q.isError}
+      refrescando={q.isFetching}
+      alRefrescar={() => void q.refetch()}
+    />
+  );
+}
+
+type PresenciaArgosVistaProps = {
+  filas: FilaDondeEsta[];
+  fotos: NonNullable<ReturnType<typeof useFotos>["data"]>;
+  enVivo: ReadonlyMap<string, ReturnType<typeof useCapturasVivo>["personas"][number]>;
+  ultimas: NonNullable<ReturnType<typeof useUltimasDelDia>["data"]>;
+  cargando: boolean;
+  fallo: boolean;
+  refrescando: boolean;
+  alRefrescar: () => void;
+  alAbrirPersona?: (id: string) => void;
+  ahora?: number;
+};
+
+export function PresenciaArgosVista({
+  filas, fotos, enVivo, ultimas, cargando, fallo, refrescando, alRefrescar, alAbrirPersona, ahora = Date.now(),
+}: PresenciaArgosVistaProps) {
+  const { t } = useLanguage();
   // Entra viendo a TODOS (Alvaro, 18/11/2026); los menús solo achican.
   const [filtro, setFiltro] = useState<FiltroSituacion>("todos");
   const [equipo, setEquipo] = useState<string | null>(null);
@@ -157,7 +196,6 @@ export function DondeEstaPanel() {
   const [elegido, setElegido] = useState<string | null>(null);
   const navegar = useNavigate();
   const [abierto, setAbierto] = useState(false);
-  const ahora = Date.now();
 
   const duracion = (desdeIso: string | null): string => {
     if (!desdeIso) return "";
@@ -168,15 +206,6 @@ export function DondeEstaPanel() {
   };
   const minutosATexto = (min: number): string =>
     min < 60 ? t("hr.donde.durMin", { n: min }) : t("hr.donde.durHoras", { h: Math.floor(min / 60), m: String(min % 60).padStart(2, "0") });
-
-  const filas = q.data ?? [];
-  const fotos = useFotos(filas.map((f) => f.user_id)).data ?? {};
-  // Su pantalla y su cámara de AHORA (últimos 12 min). Si no hay, la tarjeta lo dice.
-  const vivo = useCapturasVivo();
-  const enVivo = useMemo(() => new Map(vivo.personas.map((p) => [p.userId, p])), [vivo.personas]);
-  // …y, si no hay, la última de hoy (Alvaro, 18/11/2026: «pantallazos de todo el mundo»).
-  const sinVivo = useMemo(() => filas.filter((f) => !enVivo.get(f.user_id)?.pantallaUrl).map((f) => f.user_id), [filas, enVivo]);
-  const ultimas = useUltimasDelDia(sinVivo).data ?? {};
 
   // Los equipos, con cuánta gente tiene cada uno (el más grande primero).
   const equipos = useMemo(() => {
@@ -240,16 +269,16 @@ export function DondeEstaPanel() {
     ? [...vistas].sort((a, b) => ultimaDe(b.user_id) - ultimaDe(a.user_id))
     : vistas;
 
-  if (q.isLoading) {
+  if (cargando) {
     return <div className="flex items-center justify-center py-16"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>;
   }
-  if (q.isError) {
+  if (fallo) {
     // Un fallo no es «todos están bien»: se dice y se ofrece reintentar.
     return (
       <div role="alert" className="vidrio flex flex-wrap items-center gap-3 p-4 text-sm">
         <AlertTriangle className="h-4 w-4 shrink-0 text-destructive" />
         <span className="min-w-0 flex-1">{t("hr.donde.fallo")}</span>
-        <Button variant="outline" size="sm" onClick={() => void q.refetch()}><RefreshCw className="mr-1.5 h-3.5 w-3.5" />{t("hr.donde.reintentar")}</Button>
+        <Button variant="outline" size="sm" onClick={alRefrescar}><RefreshCw className="mr-1.5 h-3.5 w-3.5" />{t("hr.donde.reintentar")}</Button>
       </div>
     );
   }
@@ -317,7 +346,8 @@ export function DondeEstaPanel() {
                             // Elegir a alguien abre su expediente (Alvaro, 18/11/2026):
                             // en vivo arriba y todas sus horas con sus fotos.
                             setAbierto(false);
-                            navegar(`/hr/expediente/${f.user_id}`, { state: { volverA: "/hr/monitor-ia?t=donde" } });
+                            if (alAbrirPersona) alAbrirPersona(f.user_id);
+                            else navegar(`/hr/expediente/${f.user_id}`, { state: { volverA: "/hr/monitor-ia?t=donde" } });
                           }}
                           className="gap-2.5"
                         >
@@ -338,12 +368,12 @@ export function DondeEstaPanel() {
           </Popover>
           <button
             type="button"
-            onClick={() => void q.refetch()}
+            onClick={alRefrescar}
             className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-foreground/5 hover:text-foreground"
             title={t("hr.donde.reintentar")}
             aria-label={t("hr.donde.reintentar")}
           >
-            <RefreshCw className={`h-4 w-4 ${q.isFetching ? "animate-spin" : ""}`} />
+            <RefreshCw className={`h-4 w-4 ${refrescando ? "animate-spin" : ""}`} />
           </button>
           </div>
         </div>
@@ -395,6 +425,7 @@ export function DondeEstaPanel() {
                   <Link
                     to={`/hr/expediente/${f.user_id}`}
                     state={{ volverA: "/hr/monitor-ia?t=donde" }}
+                    onClick={alAbrirPersona ? (evento) => { evento.preventDefault(); alAbrirPersona(f.user_id); } : undefined}
                     title={[d.nombre, d.estado, d.pantalla].filter(Boolean).join(" · ")}
                     className={`group flex h-full flex-col overflow-hidden rounded-2xl border bg-card/20 transition-colors hover:border-foreground/25 hover:bg-card/40 ${
                       f.pantalla_fuera_de_lugar && d.tono !== "gris" ? "border-destructive/40" : "border-border/40"

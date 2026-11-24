@@ -1,9 +1,20 @@
 // Banco visual local. No se importa desde App.tsx y no usa sesión, base ni capturas reales.
 import { useState, type ReactNode } from "react";
 import { createRoot } from "react-dom/client";
+import { MemoryRouter } from "react-router-dom";
+import { LanguageProvider } from "@/hooks/useLanguage";
+import { cargarIdioma, fijarIdioma, traducir } from "@/lib/i18n";
+import { PresenciaArgosVista } from "@/components/hr/DondeEstaPanel";
+import {
+  CardMuralla,
+  CeldaCuadricula,
+} from "@/components/hr/PantallazosVivoPanel";
+import type { FilaDondeEsta } from "@/hooks/useDondeEsta";
+import type { PersonaVivo } from "@/hooks/useCapturasVivo";
+import type { Semaforo } from "@/hooks/useSemaforos";
+import { capturaDeEjemplo } from "./argos-capturas-ejemplo";
 import {
   Activity,
-  ArrowRight,
   BookOpen,
   CalendarClock,
   CameraOff,
@@ -13,6 +24,8 @@ import {
   FileSpreadsheet,
   LayoutDashboard,
   LayoutGrid,
+  Grid3x3,
+  MonitorPlay,
   List,
   Mail,
   MessageCircle,
@@ -235,7 +248,6 @@ type Filtros = {
 };
 const selectClass =
   "h-9 w-full rounded-md border border-input bg-background px-3 text-sm";
-const subtitulo = "Presencia, evidencias y revisión del equipo";
 const porId = (id: string) => personas.find((persona) => persona.id === id)!;
 const avisosDe = (episodio: Episodio) =>
   episodio.movimientos.filter((movimiento) => movimiento[2]);
@@ -273,41 +285,96 @@ function Grupo({ titulo, children }: { titulo: string; children: ReactNode }) {
   );
 }
 
+const horaCaptura = `${HOY}T15:20:00.000Z`;
+const ahoraEjemplo = Date.parse(horaCaptura);
+const pantallas = new Map([
+  [
+    "laura",
+    capturaDeEjemplo("Cowork / Salas", [
+      "Operaciones",
+      "Reunión de equipo",
+      "Soporte",
+      "Coordinación",
+    ]),
+  ],
+  [
+    "diego",
+    capturaDeEjemplo("Meet / Agenda", [
+      "Revisión semanal",
+      "Compartiendo pantalla",
+      "Propuesta de operaciones",
+      "Próxima reunión",
+    ]),
+  ],
+  [
+    "camila",
+    capturaDeEjemplo("Oficina / Horarios", [
+      "Turnos de hoy",
+      "Cambios pendientes",
+      "Agenda del equipo",
+      "Pausas del turno",
+    ]),
+  ],
+]);
+const capturas = new Map<string, PersonaVivo>();
+for (const persona of personas) {
+  const pantalla = pantallas.get(persona.id);
+  if (!pantalla) continue;
+  capturas.set(persona.id, {
+    userId: persona.id,
+    nombre: persona.nombre,
+    avatarUrl: null,
+    avatarSeed: null,
+    pantallaUrl: pantalla,
+    principalUrl: pantalla,
+    camaraUrl: null,
+    ultima: horaCaptura,
+    tienePantalla: true,
+    fueraDeLugar: null,
+    veredicto: persona.app.replace(" · ", " / ") + " · Vista de ejemplo",
+  });
+}
+
+function presenciaDe(persona: Persona): FilaDondeEsta {
+  const fuera = persona.estado === "Fuera de turno";
+  return {
+    user_id: persona.id,
+    nombre: persona.nombre,
+    puesto: persona.puesto,
+    equipo: persona.equipo,
+    entrada: persona.turno === "AM" ? "08:00" : "13:00",
+    salida: persona.turno === "AM" ? "16:00" : "21:00",
+    en_turno: !fuera,
+    estado: fuera
+      ? "fuera_de_turno"
+      : persona.camara === "No"
+        ? "sin_camara"
+        : persona.estado === "En reunión"
+          ? "meet"
+          : "activo",
+    estado_desde: fuera
+      ? null
+      : new Date(ahoraEjemplo - 8 * 60_000).toISOString(),
+    ultimo_latido: fuera ? null : horaCaptura,
+    pantalla_at: fuera ? null : horaCaptura,
+    pantalla_que: persona.app || null,
+    pantalla_fuera_de_lugar: null,
+    captura_at: fuera ? null : horaCaptura,
+    fuera_hoy_veces: 0,
+    fuera_hoy_min: 0,
+    exento: false,
+  };
+}
+
 function PantallaEjemplo({ persona }: { persona: Persona }) {
-  return (
-    <div className="relative aspect-video overflow-hidden border-b border-border/60 bg-background/80 text-left">
-      <div className="flex h-7 items-center gap-2 border-b border-border/60 px-3 text-[11px] text-muted-foreground">
-        <span className="h-2 w-2 rounded-full bg-success" />
-        {persona.app || "Sin captura"}
-      </div>
-      {persona.app && (
-        <div className="grid h-[calc(100%-28px)] grid-cols-[1fr_2.3fr]">
-          <div className="space-y-2 border-r border-border/60 p-3">
-            {["Equipo", "Conversaciones", "Actividad"].map((texto) => (
-              <div
-                key={texto}
-                className="rounded bg-muted px-2 py-1 text-[10px]"
-              >
-                {texto}
-              </div>
-            ))}
-          </div>
-          <div className="space-y-2 p-3">
-            <div className="h-3 w-3/4 rounded bg-primary/25" />
-            <div className="h-5 w-full rounded bg-muted" />
-            <div className="h-5 w-4/5 rounded bg-muted" />
-            <div className="ml-auto h-5 w-2/3 rounded bg-primary/20" />
-          </div>
-        </div>
-      )}
-      <Badge
-        variant="outline"
-        className="absolute bottom-2 right-2 bg-background/95"
-      >
-        Captura de ejemplo
-      </Badge>
-    </div>
-  );
+  const url = pantallas.get(persona.id);
+  return url ? (
+    <img
+      className="w-full rounded-xl border border-border/60"
+      src={url}
+      alt={`Pantalla de ejemplo de ${persona.nombre}`}
+    />
+  ) : null;
 }
 
 function PreviewArgos() {
@@ -318,7 +385,8 @@ function PreviewArgos() {
     turno: "",
     persona: "",
   });
-  const [vista, setVista] = useState("Pantallas");
+  const [vista, setVista] = useState("Muralla");
+  const [refrescando, setRefrescando] = useState(false);
   const [historial, setHistorial] = useState("Jornada");
   const [estado, setEstado] = useState("Avisos");
   const [revision, setRevision] = useState("Pendientes");
@@ -350,7 +418,7 @@ function PreviewArgos() {
   );
   const delDia = episodios.filter(
     (episodio) =>
-      episodio.fecha === filtros.fecha &&
+      episodio.fecha === (tab === "Resumen" ? HOY : filtros.fecha) &&
       equipoVisible.some(({ id }) => id === episodio.persona),
   );
   const pendientes = delDia.filter(
@@ -508,8 +576,8 @@ function PreviewArgos() {
       <div className="vidrio-panel flex min-w-0 flex-1 flex-col overflow-hidden">
         <Page>
           <PageHeader
-            title="Argos — Monitor de IA"
-            subtitle={subtitulo}
+            title={traducir("hr.monia.title")}
+            subtitle={traducir("hr.monia.subtitle")}
             icon={<Eye />}
             actions={
               <>
@@ -543,6 +611,13 @@ function PreviewArgos() {
                   <Settings className="h-4 w-4" />
                   Ajustes
                 </Button>
+                <Badge
+                  variant="outline"
+                  className="gap-1.5 border-success/50 bg-success/10 px-3 py-1.5 text-success"
+                >
+                  <Eye className="h-3 w-3" />
+                  Monitor activo
+                </Badge>
               </>
             }
           />
@@ -568,7 +643,7 @@ function PreviewArgos() {
             ))}
           </nav>
 
-          {tab !== "Ajustes" && (
+          {tab !== "Ajustes" && tab !== "Resumen" && (
             <div className="my-4 grid grid-cols-2 gap-2 xl:grid-cols-[1fr_1fr_0.65fr_1.3fr]">
               <label className="min-w-0 text-xs font-medium text-muted-foreground">
                 Fecha
@@ -631,122 +706,169 @@ function PreviewArgos() {
             <div className="min-w-0 space-y-4">
               {tab === "Resumen" && (
                 <>
-                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-                    {[
-                      {
-                        label: "Por revisar",
-                        total: pendientes.length,
-                        accion: () => {
-                          cambiar("Revisión");
-                          setRevision("Pendientes");
-                        },
-                      },
-                      {
-                        label: "En Cowork ahora",
-                        total: equipoVisible.filter(
-                          (p) => p.estado === "En Cowork",
-                        ).length,
-                        accion: () => cambiar("En vivo"),
-                      },
-                      {
-                        label: "Problemas técnicos",
-                        total: tecnicos.length,
-                        accion: () => {
-                          cambiar("Estado");
-                          setEstado("Salud de la plataforma");
-                        },
-                      },
-                    ].map(({ label, total, accion }) => (
-                      <button
-                        key={label}
-                        onClick={accion}
-                        className="vidrio rounded-2xl px-4 py-3 text-left hover:bg-primary/10"
-                      >
-                        <span className="flex items-center justify-between text-xs text-muted-foreground">
-                          {label}
-                          <ArrowRight className="h-3.5 w-3.5" />
-                        </span>
-                        <strong className="text-2xl font-semibold tabular-nums">
-                          {total}
-                        </strong>
-                      </button>
-                    ))}
+                  <div
+                    className="mt-4 flex flex-wrap gap-2"
+                    aria-label="Accesos rápidos de Argos"
+                  >
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="rounded-full"
+                      onClick={() => {
+                        cambiar("Revisión");
+                        setRevision("Pendientes");
+                      }}
+                    >
+                      <span className="h-2 w-2 rounded-full bg-warning" />
+                      {pendientes.length} por revisar
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="rounded-full"
+                      onClick={() => {
+                        cambiar("Estado");
+                        setEstado("Salud de la plataforma");
+                      }}
+                    >
+                      <WifiOff className="h-4 w-4 text-muted-foreground" />
+                      {tecnicos.length}{" "}
+                      {tecnicos.length === 1
+                        ? "incidencia técnica"
+                        : "incidencias técnicas"}
+                    </Button>
                   </div>
-                  <Grupo titulo="Incidencias por revisar">
-                    {lista(pendientes)}
-                  </Grupo>
-                  <Grupo titulo="Actividad reciente">
-                    {lista(delDia.filter((item) => !pendientes.includes(item)))}
-                  </Grupo>
+                  <PresenciaArgosVista
+                    filas={equipoVisible.map(presenciaDe)}
+                    ahora={ahoraEjemplo}
+                    fotos={{}}
+                    enVivo={capturas}
+                    ultimas={{}}
+                    cargando={false}
+                    fallo={false}
+                    refrescando={refrescando}
+                    alRefrescar={() => {
+                      setRefrescando(true);
+                      setTimeout(() => setRefrescando(false), 400);
+                    }}
+                    alAbrirPersona={(id) => abrirPersona(porId(id))}
+                  />
+                  <Grupo titulo="Actividad reciente">{lista(delDia)}</Grupo>
                 </>
               )}
 
               {tab === "En vivo" && (
-                <Grupo titulo="Equipo en vivo">
-                  <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-                    <Badge variant="success-soft">Ahora · 10:20</Badge>
-                    <div className="flex gap-1">
-                      {(
-                        [
-                          ["Pantallas", LayoutGrid],
-                          ["Presencia", List],
-                        ] as const
-                      ).map(([nombre, Icono]) => (
-                        <Button
-                          key={nombre}
-                          size="sm"
-                          variant={vista === nombre ? "secondary" : "ghost"}
-                          aria-pressed={vista === nombre}
-                          onClick={() => setVista(nombre)}
-                        >
-                          <Icono className="h-4 w-4" />
-                          {nombre}
-                        </Button>
-                      ))}
-                    </div>
-                  </div>
-                  {equipoVisible.length === 0 && (
-                    <p className="py-3 text-sm text-muted-foreground">
-                      No hay personas con estos filtros.
-                    </p>
-                  )}
-                  <div
-                    className={cn(
-                      "grid gap-2",
-                      vista === "Pantallas" && "sm:grid-cols-2",
-                    )}
-                  >
-                    {equipoVisible.map((persona) => (
-                      <button
-                        key={persona.id}
-                        onClick={() => abrirPersona(persona)}
-                        className="vidrio overflow-hidden rounded-2xl text-left hover:ring-1 hover:ring-primary/50"
-                      >
-                        {vista === "Pantallas" && (
-                          <PantallaEjemplo persona={persona} />
-                        )}
-                        <div className="flex flex-wrap items-center justify-between gap-2 p-3">
-                          <Identidad persona={persona} />
-                          <Badge
-                            variant={
-                              persona.estado === "Fuera de turno"
-                                ? "secondary-soft"
-                                : "success-soft"
-                            }
+                <section className="vidrio sube p-4 lg:p-5">
+                  <div className="v-cont">
+                    <div className="mb-4 flex flex-wrap items-center gap-3">
+                      <span className="relative flex h-9 w-9 shrink-0 items-center justify-center rounded-panel bg-primary/10 text-primary">
+                        <MonitorPlay className="h-[18px] w-[18px]" />
+                        <span className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-success" />
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <h2 className="font-display text-base font-bold tracking-tight">
+                          Pantallazos en vivo
+                        </h2>
+                        <p className="text-xs text-muted-foreground">
+                          Ahora · capturas de ejemplo
+                        </p>
+                      </div>
+                      <div className="inline-flex flex-wrap gap-0.5 rounded-xl border border-border/50 bg-background/40 p-0.5">
+                        {(
+                          [
+                            ["Muralla", LayoutGrid],
+                            ["Cuadrícula", Grid3x3],
+                            ["Lista", List],
+                          ] as const
+                        ).map(([nombre, Icono]) => (
+                          <button
+                            key={nombre}
+                            type="button"
+                            aria-pressed={vista === nombre}
+                            onClick={() => setVista(nombre)}
+                            className={cn(
+                              "flex h-8 items-center gap-1.5 rounded-lg px-2.5 text-xs font-semibold",
+                              vista === nombre
+                                ? "bg-primary text-primary-foreground"
+                                : "text-muted-foreground hover:text-foreground",
+                            )}
                           >
-                            {persona.estado}
-                          </Badge>
-                          {vista === "Presencia" && (
-                            <span className="text-xs text-muted-foreground">
-                              Pantalla: {persona.pantalla} · Cámara:{" "}
-                              {persona.camara}
-                            </span>
-                          )}
-                        </div>
-                      </button>
-                    ))}
+                            <Icono className="h-4 w-4" />
+                            {nombre}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    <div
+                      className={cn(
+                        "grid gap-3",
+                        vista === "Muralla" && "sm:grid-cols-2 lg:grid-cols-3",
+                        vista === "Cuadrícula" &&
+                          "grid-cols-2 sm:grid-cols-3 lg:grid-cols-4",
+                      )}
+                    >
+                      {equipoVisible.map((persona) => {
+                        const captura = capturas.get(persona.id);
+                        const sem: Semaforo =
+                          persona.camara === "No" ? "naranja" : "verde";
+                        const abrir = () => abrirPersona(persona);
+                        if (vista === "Lista")
+                          return (
+                            <button
+                              key={persona.id}
+                              type="button"
+                              onClick={abrir}
+                              className="flex w-full flex-wrap items-center justify-between gap-2 rounded-xl border border-border/50 px-3 py-2 text-left hover:bg-muted/60"
+                            >
+                              <Identidad persona={persona} />
+                              <span className="flex items-center gap-2 text-xs text-muted-foreground">
+                                <span
+                                  className={cn(
+                                    "h-1.5 w-1.5 rounded-full",
+                                    captura
+                                      ? "bg-success"
+                                      : "bg-muted-foreground",
+                                  )}
+                                />
+                                {persona.camara === "No"
+                                  ? "Sin cámara"
+                                  : persona.estado}
+                                <ChevronRight className="h-4 w-4" />
+                              </span>
+                            </button>
+                          );
+                        if (!captura) return null;
+                        return vista === "Muralla" ? (
+                          <CardMuralla
+                            key={persona.id}
+                            p={captura}
+                            t={traducir}
+                            hace={() => "10:20 a. m."}
+                            sem={sem}
+                            onClick={abrir}
+                          />
+                        ) : (
+                          <CeldaCuadricula
+                            key={persona.id}
+                            p={captura}
+                            t={traducir}
+                            sem={sem}
+                            onClick={abrir}
+                          />
+                        );
+                      })}
+                    </div>
+                    {(!equipoVisible.length ||
+                      (vista !== "Lista" &&
+                        !equipoVisible.some((persona) =>
+                          capturas.has(persona.id),
+                        ))) && (
+                      <p className="py-4 text-sm text-muted-foreground">
+                        No hay pantallazos con estos filtros.
+                      </p>
+                    )}
                   </div>
-                </Grupo>
+                </section>
               )}
 
               {tab === "Estado" && (
@@ -988,6 +1110,7 @@ function PreviewArgos() {
                   )}
                   {seccionDetalle === "Expediente" && (
                     <>
+                      <PantallaEjemplo persona={seleccion} />
                       <dl className="grid grid-cols-2 gap-3">
                         <div>
                           <dt className="text-muted-foreground">Turno</dt>
@@ -1020,7 +1143,7 @@ function PreviewArgos() {
                           (item) =>
                             item.persona === seleccion.id &&
                             item.fecha ===
-                              (tab === "En vivo" ? HOY : filtros.fecha),
+                              (tab === "En vivo" || tab === "Resumen" ? HOY : filtros.fecha),
                         ),
                       )}
                     </>
@@ -1083,4 +1206,14 @@ function PreviewArgos() {
   );
 }
 
-createRoot(document.getElementById("root")!).render(<PreviewArgos />);
+const raiz = createRoot(document.getElementById("root")!);
+void cargarIdioma("es").then(() => {
+  fijarIdioma("es");
+  raiz.render(
+    <LanguageProvider>
+      <MemoryRouter>
+        <PreviewArgos />
+      </MemoryRouter>
+    </LanguageProvider>,
+  );
+});
