@@ -195,7 +195,7 @@ class Informe:
         self.text("Mac · Windows · navegador", M + 150, central_y - 37, CW - 300, size=8.2, color=WHITE)
         nodes = [
             (M, central_y - 103, "Web / Dokploy", "Interfaz y actualizaciones\nServidor 147.93.3.97"),
-            (M + 174, central_y - 103, "Supabase", "Accesos, datos y permisos\nProducción en us-east-1"),
+            (M + 174, central_y - 103, "Supabase", "KASH: base separada\nClientes nuevos: base compartida"),
             (M + 348, central_y - 103, "LiveKit / Miami", "Audio, vídeo y pantallas\nSt. Louis como alternativa"),
             (M + 86, central_y - 208, "NAS / archivos", "Almacenamiento de documentos\nRecuperación por validar"),
             (M + 260, central_y - 208, "ONLYOFFICE", "Edición de documentos\nRecorrido completo por probar")]
@@ -208,6 +208,8 @@ class Informe:
             self.text(title, x + 11, top - 10, 139, size=10.5, bold=True)
             self.text(body.replace("\n", "<br/>"), x + 11, top - 30, 139, size=8.3, color=MUTED)
         y = central_y - 309
+        if self.d.get("arquitectura"):
+            y = self.text(escape(self.d["arquitectura"]["resumen"]), M, y, size=9.1) - 15
         s = self.d["servidores"]
         rows = [
             ["Miami / llamadas", f"{n(s['miami']['cpu_24h_promedio_pct'], 2)} % CPU media; {n(s['miami']['cpu_10min_max_pct'], 2)} % máximo de muestras de 10 min.", "0 reinicios; sin falta de memoria."],
@@ -301,10 +303,14 @@ class Informe:
         y = self.page_start(7, "Siguiente nivel", "Lo que falta antes de crecer", "Priorizar evidencia, recuperación y separación entre empresas. Sin estimar costes que todavía no se han medido.")
         for r in self.d["riesgos"]:
             self.text(escape(r["prioridad"]).upper(), M, y, size=8, bold=True, color=AMBER)
-            y = self.text(escape(r["nombre"]), M, y - 15, size=12, bold=True) - 6
+            y = self.text(escape(r["nombre"]), M, y - 13, size=12, bold=True) - 6
             y = self.text(escape(r["detalle"]), M, y, size=9.3) - 5
-            y = self.text("<b>Acción:</b> " + escape(r["siguiente"]), M, y, size=9.3) - 21
-        self.note("<b>Orden recomendado:</b> primero cerrar fallos y verificar la entrega; después aislamiento entre empresas y restauración; luego validar 165 participantes y, con el resultado, avanzar a 330. Comprar recursos solo cuando las pruebas identifiquen el límite.", y, 79)
+            y = self.text("<b>Acción:</b> " + escape(r["siguiente"]), M, y, size=9.3) - 7
+            if r.get("fuentes"):
+                links = [f'<link href="{escape(s["url"], {chr(34): "&quot;"})}" color="#243A55">{escape(s["titulo"])}</link>' for s in r["fuentes"]]
+                y = self.text("Notas oficiales: " + " · ".join(links), M, y, size=7.7) - 3
+            y -= 10
+        self.note("<b>Orden recomendado:</b> primero cerrar fallos y verificar la entrega; después aislamiento entre empresas y restauración; luego validar 165 participantes y, con el resultado, avanzar a 330. Comprar recursos solo cuando las pruebas identifiquen el límite.", y, 70)
 
     def decisions(self):
         y = self.page_start(8, "Decisiones del negocio", "Cuatro elecciones para avanzar", "Puedes marcar una respuesta por pregunta en un lector de PDF compatible. Estas elecciones no realizan compras ni cambian producción.")
@@ -338,7 +344,11 @@ class Informe:
             label = escape(source["titulo"])
             if source.get("url"):
                 label = f'<link href="{escape(source["url"], {chr(34): "&quot;"})}" color="#243A55">{label}</link>'
-            y = self.text(label + ". " + escape(source["referencia"]), M, y - 3, size=7.7, leading=10.4) - 3
+            content = label + ". " + escape(source["referencia"])
+            if source.get("enlaces"):
+                links = [f'<link href="{escape(s["url"], {chr(34): "&quot;"})}" color="#243A55">{escape(s["titulo"])}</link>' for s in source["enlaces"]]
+                content += " " + " · ".join(links)
+            y = self.text(content, M, y - 3, size=7.7, leading=10.4) - 3
         delivery = self.d["delivery"]
         revision = delivery.get("commit") or self.d["base_revision"] + " (base revisada)"
         self.text("Ventana principal: " + escape(self.d["ventana"]) + ". Las muestras de servidores y de calidad indican su propio alcance. Revisión: " + escape(revision) + ". No se incluyen contraseñas, identificadores personales ni contenido de los clientes.", M, y - 5, size=7.5, leading=10.2, color=MUTED)

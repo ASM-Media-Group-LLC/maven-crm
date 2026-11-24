@@ -42,7 +42,7 @@ La pérdida que aparece en la tabla es el rango entre los resúmenes de las sala
 | r4 vídeo 330 | 749 de 900; 30 de 30 informes | 3,986% a 39,296% | 17 | No aprueba conexión ni calidad |
 | r4 audio 330 | 801 de 900; 30 de 30 informes | 10,417% a 30,986% | 17 | No aprueba conexión ni calidad |
 
-En r3 el generador llegó a 1,991 GiB sobre un límite de 2 GiB; tres procesos no entregaron resumen y el contenedor coordinador terminó con código 1. Su proceso principal no figura como `OOMKilled`, por lo que no se afirma que todo el contenedor haya sido terminado por falta de memoria. El límite y los fallos internos hacen que ese escenario no sirva para atribuir un límite de capacidad al SFU.
+En r3 el generador llegó a 1,991 GiB sobre un límite de 2 GiB; tres procesos no entregaron resumen y el contenedor coordinador terminó con código 1. La inspección final marca `OOMKilled: true`; junto con el consumo observado, confirma un evento de falta de memoria en el generador. Ese límite y sus fallos internos impiden atribuir el resultado a la capacidad del SFU de producción.
 
 En r4, el vídeo de 165 mantuvo un gauge de 165 sesiones entre las muestras de 6,5 y 58,8 segundos. El proceso del SFU promedió 1,88 núcleos durante todo ese ensayo, cerca de su límite de dos. En vídeo 330 el SFU alcanzó aproximadamente 3.058 MiB sobre su límite de 3.072 MiB. El generador llegó a unos 4.113 MiB de su límite de 6.144 MiB. Esto señala límites del entorno ensayado; no aísla por sí solo una causa única de pérdida.
 
