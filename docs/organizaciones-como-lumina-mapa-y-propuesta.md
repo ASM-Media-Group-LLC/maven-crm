@@ -52,6 +52,25 @@ Regla madre: **"Yo soy el dueño y señor de todo esto."** Todo es opcional y fl
   - Pasar a demo / marcar como cliente.
   - Ver como.
 - **El orden natural es montaje → prueba → cobro.** Cada paso puede ser 0, y el dueño puede saltar cualquiera.
+- **Grace (Equipo de Maven):**
+  - Puede crear clientes, invitarlos, activarlos, alargar la prueba y mover sillas.
+  - **No** ve ni cambia precios, setup ni cobros. Eso es solo del dueño.
+- **Cobra TECH VISUALS LLC** (la cuenta de Stripe de Maven), en USD.
+- **Cliente pausado:** solo entran sus admins, y ven el aviso con el botón de pagar. Los agentes no entran. No se borra nada.
+- **Avisos al dueño:** por correo y en "Necesita de ti" del panel. Sin WhatsApp por ahora.
+  - Se avisa cuando: empezó la prueba, la prueba se vence, pagó, no pagó, o llegó al tope de sillas.
+- **Primera entrada del admin del cliente:** una lista de arranque que se va tachando sola.
+  - Subir logo.
+  - Crear posiciones.
+  - Crear agencias.
+  - Invitar a su gente.
+  - Descargar la app.
+- **El cliente ve todo en "Mi empresa → Plan":**
+  - su plan y los días de prueba que le quedan;
+  - la próxima factura y su historial de pagos;
+  - el botón de pagar o cambiar tarjeta.
+  - Lo ven y pagan **todos los admins del cliente**. Los dueños de agencia no.
+- **Paga solo el cliente:** una cuenta de cobro por cliente. Sus agencias no pagan a Maven.
 - **Para Codex (cobros):** estos campos son la fuente de verdad del cobro. Stripe (suscripción o checkout de factura) lee de aquí. Nada de precios fijos en el código.
 
 Continúa la especificación del 19/11 (`docs/maven-como-lumina-spec.md`), que sigue vigente. Este documento agrega:
