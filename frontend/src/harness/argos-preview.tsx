@@ -15,6 +15,10 @@ import type { Semaforo } from "@/hooks/useSemaforos";
 import { capturaDeEjemplo } from "./argos-capturas-ejemplo";
 import {
   Activity,
+  Bell,
+  CircleCheck,
+  Clock3,
+  Utensils,
   BookOpen,
   CalendarClock,
   CameraOff,
@@ -50,7 +54,8 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { cn } from "@/lib/utils";
 import "@/index.css";
 
-const HOY = "2026-11-24";
+const HOY = "2026-11-25";
+const AYER = "2026-11-24";
 const personas = [
   {
     id: "laura",
@@ -108,6 +113,8 @@ const personas = [
 type Persona = (typeof personas)[number];
 type Tipo = "Hub" | "Actividad" | "Jornada" | "Conexión";
 type Decision = "Confirmada" | "Justificada" | "Descartada";
+type Pausa = { inicio: string; regreso: string | null; limite: number };
+type TipoAviso = "Cámara" | "Pantalla" | "Actividad" | "Jornada";
 type Episodio = {
   id: string;
   persona: string;
@@ -120,31 +127,116 @@ type Episodio = {
   evidencia: string;
   regla: string;
   revisar?: boolean;
+  tipoAviso?: TipoAviso;
+  recuperado?: string;
+  pausa?: Pausa;
+  accion?: string;
   movimientos: [hora: string, detalle: string, aviso?: boolean][];
 };
+function minutosDePausa(pausa: Pausa): number | null {
+  if (!pausa.regreso) return null;
+  const enMinutos = (hora: string) => {
+    const [h, m] = hora.split(":").map(Number);
+    return h * 60 + m;
+  };
+  const inicio = enMinutos(pausa.inicio);
+  const regreso = enMinutos(pausa.regreso);
+  return (regreso - inicio + 1440) % 1440;
+}
+
+function textoHora(hora: string) {
+  const [h, m] = hora.split(":");
+  return `${Number(h) % 12 || 12}:${m} ${Number(h) < 12 ? "a. m." : "p. m."}`;
+}
+
+const almuerzoLaura: Pausa = { inicio: "12:30", regreso: "13:12", limite: 30 };
+const almuerzoDiego: Pausa = { inicio: "12:10", regreso: null, limite: 45 };
+const almuerzoCamila: Pausa = { inicio: "12:30", regreso: "13:00", limite: 30 };
+
 const episodios: Episodio[] = [
   {
     id: "1",
     persona: "laura",
     fecha: HOY,
-    hora: "10:12",
+    hora: "14:12",
     tipo: "Hub",
+    tipoAviso: "Cámara",
     titulo: "Cámara apagada",
-    duracion: "8 min · sigue abierta",
+    duracion: "8 min · abierto",
     causa: "Causa sin determinar",
     evidencia:
-      "Hub registró el cambio del estado de la cámara a las 10:12. La última señal llegó a las 10:20. No hay un registro que explique por qué se apagó.",
+      "El Hub registró la cámara apagada a las 2:12 p. m. Seguía apagada en el último registro, a las 2:20 p. m.",
     regla:
-      "Supervisores · cámara requerida durante el turno. Revisar después de 5 min en este ejemplo.",
+      "Supervisión requiere cámara durante el turno. En este ejemplo, se revisa si sigue apagada después de 5 min.",
+    accion:
+      "Verificar si la cámara se recuperó y si hubo una causa técnica o una pausa autorizada.",
     revisar: true,
+    movimientos: [
+      ["14:12", "El Hub registró la cámara apagada."],
+      ["14:13", "Argos pidió encender la cámara.", true],
+      ["14:15", "Argos repitió el aviso.", true],
+      ["14:17", "El episodio pasó a revisión."],
+      ["14:18", "Argos volvió a avisar.", true],
+      ["14:20", "Última señal: cámara apagada."],
+    ],
+  },
+  {
+    id: "7",
+    persona: "laura",
+    fecha: HOY,
+    hora: "10:12",
+    tipo: "Hub",
+    tipoAviso: "Cámara",
+    titulo: "Cámara recuperada",
+    duracion: "4 min",
+    causa: "Causa sin determinar",
+    recuperado: "10:16",
+    evidencia:
+      "El Hub registró la cámara apagada y luego encendida. No registró qué causó el apagado.",
+    regla:
+      "Supervisión requiere cámara durante el turno. La cámara volvió antes de superar el umbral de este ejemplo.",
+    accion: "Consultar si el episodio se repite.",
     movimientos: [
       ["10:12", "El Hub registró la cámara apagada."],
       ["10:13", "Argos pidió encender la cámara.", true],
       ["10:15", "Argos repitió el aviso.", true],
-      ["10:17", "Superó la duración de la regla de su puesto."],
-      ["10:18", "Argos volvió a avisar.", true],
-      ["10:20", "Última señal: cámara apagada."],
+      ["10:16", "El Hub registró la cámara encendida."],
     ],
+  },
+  {
+    id: "8",
+    persona: "laura",
+    fecha: HOY,
+    hora: almuerzoLaura.inicio,
+    tipo: "Jornada",
+    titulo: "Almuerzo",
+    duracion: `${minutosDePausa(almuerzoLaura)} min`,
+    causa: "Pausa registrada",
+    pausa: almuerzoLaura,
+    evidencia: "Maven registró inicio y regreso de la pausa de comida.",
+    regla: "La posición permite 30 minutos de almuerzo en este ejemplo.",
+    accion: "Comprobar si los minutos adicionales estaban autorizados.",
+    revisar: true,
+    movimientos: [
+      ["12:30", "Marcó inicio de almuerzo."],
+      ["13:12", "Marcó regreso del almuerzo."],
+    ],
+  },
+  {
+    id: "9",
+    persona: "diego",
+    fecha: HOY,
+    hora: almuerzoDiego.inicio,
+    tipo: "Jornada",
+    titulo: "Almuerzo",
+    duracion: "Regreso sin confirmar",
+    causa: "Registro incompleto",
+    pausa: almuerzoDiego,
+    evidencia:
+      "Maven registró el inicio de la pausa. Falta confirmar el regreso.",
+    regla: "La posición permite 45 minutos de almuerzo en este ejemplo.",
+    accion: "Verificar el regreso antes de calcular el tiempo consumido.",
+    movimientos: [["12:10", "Marcó inicio de almuerzo."]],
   },
   {
     id: "2",
@@ -153,6 +245,7 @@ const episodios: Episodio[] = [
     hora: "10:08",
     tipo: "Conexión",
     titulo: "Pantalla compartida interrumpida",
+    recuperado: "10:08:42",
     duracion: "42 s · recuperada",
     causa: "Corte de conexión registrado",
     evidencia:
@@ -171,6 +264,8 @@ const episodios: Episodio[] = [
     hora: "09:46",
     tipo: "Actividad",
     titulo: "Actividad en una aplicación por verificar",
+    tipoAviso: "Actividad",
+    accion: "Consultar el contexto de esa tarea con RR. HH.",
     duracion: "6 min",
     causa: "Observación de Argos",
     evidencia:
@@ -200,10 +295,11 @@ const episodios: Episodio[] = [
   {
     id: "5",
     persona: "camila",
-    fecha: "2026-11-23",
+    fecha: AYER,
     hora: "12:30",
     tipo: "Jornada",
-    titulo: "Pausa de comida",
+    titulo: "Almuerzo",
+    pausa: almuerzoCamila,
     duracion: "30 min",
     causa: "Pausa autorizada",
     evidencia: "La jornada registra el inicio y el fin de la pausa.",
@@ -216,10 +312,11 @@ const episodios: Episodio[] = [
   {
     id: "6",
     persona: "laura",
-    fecha: "2026-11-23",
+    fecha: AYER,
     hora: "10:02",
     tipo: "Hub",
     titulo: "Cámara apagada y recuperada",
+    recuperado: "10:03",
     duracion: "1 min",
     causa: "Causa sin determinar",
     evidencia: "Se registraron ambos cambios de cámara durante el turno.",
@@ -285,7 +382,7 @@ function Grupo({ titulo, children }: { titulo: string; children: ReactNode }) {
   );
 }
 
-const horaCaptura = `${HOY}T15:20:00.000Z`;
+const horaCaptura = `${HOY}T19:20:00.000Z`;
 const ahoraEjemplo = Date.parse(horaCaptura);
 const pantallas = new Map([
   [
@@ -377,6 +474,245 @@ function PantallaEjemplo({ persona }: { persona: Persona }) {
   ) : null;
 }
 
+function InformeTurno({
+  persona,
+  dia,
+  movimientos,
+  decisiones,
+  abrirEpisodio,
+}: {
+  persona: Persona;
+  dia: string;
+  movimientos: Episodio[];
+  decisiones: Record<string, { resultado: Decision; motivo: string }>;
+  abrirEpisodio: (item: Episodio) => void;
+}) {
+  const almuerzo = movimientos.find((item) => item.pausa);
+  const pausa = almuerzo?.pausa;
+  const minutos = pausa ? minutosDePausa(pausa) : null;
+  const diferencia = pausa && minutos !== null ? minutos - pausa.limite : null;
+  const corregidos = movimientos.filter((item) => item.recuperado);
+  const pendientes = movimientos.filter(
+    (item) => item.revisar && !decisiones[item.id],
+  );
+  const revisados = movimientos.filter((item) => decisiones[item.id]);
+  const grupos = (["Cámara", "Pantalla", "Actividad", "Jornada"] as const)
+    .map((tipo) => {
+      const avisados = movimientos.filter(
+        (item) => item.tipoAviso === tipo && avisosDe(item).length > 0,
+      );
+      return {
+        tipo,
+        avisados,
+        total: avisados.reduce(
+          (total, item) => total + avisosDe(item).length,
+          0,
+        ),
+      };
+    })
+    .filter(({ total }) => total > 0);
+
+  function acceso(item: Episodio, texto: string) {
+    return (
+      <button
+        key={item.id}
+        type="button"
+        onClick={() => abrirEpisodio(item)}
+        className="flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left hover:bg-muted/60"
+      >
+        <span className="min-w-0 flex-1">
+          <span className="block font-medium">{item.titulo}</span>
+          <span className="block text-xs text-muted-foreground">{texto}</span>
+        </span>
+        <ChevronRight
+          className="h-4 w-4 shrink-0 text-muted-foreground"
+          aria-hidden
+        />
+      </button>
+    );
+  }
+
+  return (
+    <section aria-label="Informe del turno" className="space-y-3">
+      <div className="flex flex-wrap items-baseline justify-between gap-1">
+        <h2 className="text-base font-semibold">Informe del turno</h2>
+        <span className="text-xs text-muted-foreground">
+          {dia.slice(8)} nov · turno {persona.turno}
+        </span>
+      </div>
+
+      <div className="space-y-3 rounded-xl border border-border/60 bg-background/30 p-3">
+        <h3 className="flex items-center gap-2 font-semibold">
+          <Clock3 className="h-4 w-4 text-primary" />
+          Jornada y pausas
+        </h3>
+        {dia === HOY && (
+          <p className="text-xs text-muted-foreground">
+            Entrada ·{" "}
+            {persona.entrada === "—"
+              ? "Sin registro"
+              : textoHora(persona.entrada)}
+          </p>
+        )}
+        <div className="flex items-center justify-between gap-2">
+          <span className="flex items-center gap-1.5 font-medium">
+            <Utensils className="h-3.5 w-3.5" />
+            Almuerzo
+          </span>
+          {diferencia !== null && (
+            <Badge variant={diferencia > 0 ? "warning-soft" : "success-soft"}>
+              {diferencia > 0
+                ? `${diferencia} min de más`
+                : "Dentro del límite"}
+            </Badge>
+          )}
+        </div>
+        {pausa && almuerzo ? (
+          <button
+            type="button"
+            onClick={() => abrirEpisodio(almuerzo)}
+            className="block w-full rounded-lg text-left hover:bg-muted/50"
+            aria-label="Ver detalle del almuerzo"
+          >
+            <span className="block text-xs text-muted-foreground">
+              {textoHora(pausa.inicio)} ·{" "}
+              {pausa.regreso
+                ? `Regreso ${textoHora(pausa.regreso)}`
+                : "Regreso sin confirmar"}
+            </span>
+            {minutos !== null ? (
+              <>
+                <span className="mt-1 block font-semibold tabular-nums">
+                  {minutos} min registrados{" "}
+                  <span className="text-xs font-normal text-muted-foreground">
+                    / {pausa.limite} min permitidos
+                  </span>
+                </span>
+                <span
+                  className="mt-2 flex h-1.5 gap-0.5 overflow-hidden rounded-full bg-muted"
+                  aria-hidden
+                >
+                  <span
+                    className="bg-primary"
+                    style={{
+                      width: `${(100 * Math.min(minutos, pausa.limite)) / Math.max(minutos, pausa.limite)}%`,
+                    }}
+                  />
+                  {diferencia !== null && diferencia > 0 && (
+                    <span className="flex-1 bg-warning" />
+                  )}
+                </span>
+              </>
+            ) : (
+              <span className="mt-1 block text-xs text-muted-foreground">
+                Límite: {pausa.limite} min · duración pendiente
+              </span>
+            )}
+          </button>
+        ) : (
+          <p className="text-xs text-muted-foreground">
+            Sin registro de almuerzo para este día.
+          </p>
+        )}
+      </div>
+
+      <details
+        className="rounded-xl border border-border/60 bg-background/30 p-3"
+        open={corregidos.length > 0}
+      >
+        <summary className="cursor-pointer font-semibold">
+          <span className="ml-1 inline-flex items-center gap-2">
+            <CircleCheck className="h-4 w-4 text-success" />
+            Qué se corrigió{" "}
+            <Badge variant="success-soft">{corregidos.length}</Badge>
+          </span>
+        </summary>
+        {corregidos.length ? (
+          <div className="mt-2 divide-y divide-border/50">
+            {corregidos.map((item) =>
+              acceso(
+                item,
+                `${item.duracion} · volvió ${textoHora(item.recuperado!)}`,
+              ),
+            )}
+          </div>
+        ) : (
+          <p className="mt-2 text-xs text-muted-foreground">
+            Sin recuperaciones registradas.
+          </p>
+        )}
+      </details>
+
+      <details
+        className="rounded-xl border border-border/60 bg-background/30 p-3"
+        open={pendientes.length > 0}
+      >
+        <summary className="cursor-pointer font-semibold">
+          <span className="ml-1 inline-flex items-center gap-2">
+            <ClipboardCheck className="h-4 w-4 text-warning" />
+            Qué requiere revisión{" "}
+            <Badge variant="warning-soft">{pendientes.length}</Badge>
+          </span>
+        </summary>
+        {pendientes.length ? (
+          <div className="mt-2 divide-y divide-border/50">
+            {pendientes.map((item) =>
+              acceso(item, `${textoHora(item.hora)} · ${item.duracion}`),
+            )}
+          </div>
+        ) : (
+          <p className="mt-2 text-xs text-muted-foreground">
+            Sin incidencias pendientes.
+          </p>
+        )}
+        {revisados.length > 0 && (
+          <div className="mt-2 border-t border-border/50 pt-2">
+            <p className="text-xs text-muted-foreground">
+              Decisiones de RR. HH.
+            </p>
+            {revisados.map((item) =>
+              acceso(item, decisiones[item.id].resultado),
+            )}
+          </div>
+        )}
+      </details>
+
+      <details className="rounded-xl border border-border/60 bg-background/30 p-3">
+        <summary className="cursor-pointer font-semibold">
+          <span className="ml-1 inline-flex flex-wrap items-center gap-2">
+            <Bell className="h-4 w-4 text-primary" />
+            Avisos de Argos
+            {grupos.map(({ tipo, total }) => (
+              <Badge key={tipo} variant="secondary-soft">
+                {tipo} · {total}
+              </Badge>
+            ))}
+          </span>
+        </summary>
+        {grupos.length ? (
+          grupos.map(({ tipo, avisados }) => (
+            <div key={tipo} className="mt-3">
+              <h3 className="text-xs font-medium text-muted-foreground">
+                {tipo}
+              </h3>
+              {avisados.map((item) =>
+                acceso(
+                  item,
+                  `${textoHora(item.hora)} · ${avisosDe(item).length} avisos · ${item.recuperado ? "Recuperado" : item.duracion}`,
+                ),
+              )}
+            </div>
+          ))
+        ) : (
+          <p className="mt-2 text-xs text-muted-foreground">
+            Sin avisos registrados.
+          </p>
+        )}
+      </details>
+    </section>
+  );
+}
+
 function PreviewArgos() {
   const [tab, setTab] = useState<Pestaña>("Resumen");
   const [filtros, setFiltros] = useState<Filtros>({
@@ -430,9 +766,21 @@ function PreviewArgos() {
     ? episodios.find(({ id }) => id === detalle.episodio)
     : undefined;
 
+  const diaDelDetalle =
+    episodio?.fecha ??
+    (tab === "Resumen" || tab === "En vivo" ? HOY : filtros.fecha);
+  const movimientosPersona = seleccion
+    ? episodios
+        .filter(
+          (item) =>
+            item.persona === seleccion.id && item.fecha === diaDelDetalle,
+        )
+        .sort((a, b) => b.hora.localeCompare(a.hora))
+    : [];
+
   function abrirPersona(persona: Persona) {
     setDetalle({ persona: persona.id });
-    setSeccionDetalle("Expediente");
+    setSeccionDetalle("Informe");
     setMensaje("");
   }
 
@@ -653,8 +1001,8 @@ function PreviewArgos() {
                   value={tab === "En vivo" ? HOY : filtros.fecha}
                   onChange={(e) => fijarFiltro("fecha", e.target.value)}
                 >
-                  <option value={HOY}>Hoy · 24 nov</option>
-                  <option value="2026-11-23">23 nov</option>
+                  <option value={HOY}>Hoy · 25 nov</option>
+                  <option value={AYER}>24 nov</option>
                 </select>
               </label>
               <label className="min-w-0 text-xs font-medium text-muted-foreground">
@@ -843,7 +1191,7 @@ function PreviewArgos() {
                             key={persona.id}
                             p={captura}
                             t={traducir}
-                            hace={() => "10:20 a. m."}
+                            hace={() => "2:20 p. m."}
                             sem={sem}
                             onClick={abrir}
                           />
@@ -1055,18 +1403,34 @@ function PreviewArgos() {
                   <div className="my-3">
                     <h2 className="font-semibold">{episodio.titulo}</h2>
                     <p className="text-xs text-muted-foreground">
-                      {episodio.hora} · {episodio.duracion} · {episodio.causa}
+                      {textoHora(episodio.hora)} · {episodio.duracion} ·{" "}
+                      {episodio.causa}
                     </p>
                   </div>
                 )}
                 {subnav(
                   episodio
-                    ? ["Cronología", "Evidencia", "Regla", "Expediente"]
-                    : ["Expediente"],
+                    ? [
+                        "Cronología",
+                        "Evidencia",
+                        "Regla",
+                        "Informe",
+                        "Expediente completo",
+                      ]
+                    : ["Informe", "Expediente completo"],
                   seccionDetalle,
                   setSeccionDetalle,
                 )}
                 <div className="mt-3 space-y-3 text-sm">
+                  {seccionDetalle === "Informe" && (
+                    <InformeTurno
+                      persona={seleccion}
+                      dia={diaDelDetalle}
+                      movimientos={movimientosPersona}
+                      decisiones={decisiones}
+                      abrirEpisodio={abrirEpisodio}
+                    />
+                  )}
                   {episodio && seccionDetalle === "Cronología" && (
                     <>
                       <ol className="space-y-3 border-l border-border pl-3">
@@ -1075,7 +1439,7 @@ function PreviewArgos() {
                           .map(([hora, texto]) => (
                             <li key={hora}>
                               <span className="text-xs text-muted-foreground tabular-nums">
-                                {hora}
+                                {textoHora(hora)}
                               </span>
                               <p>{texto}</p>
                             </li>
@@ -1089,7 +1453,7 @@ function PreviewArgos() {
                           <ul className="mt-2 space-y-1">
                             {avisosDe(episodio).map(([hora, texto]) => (
                               <li key={hora}>
-                                {hora} · {texto}
+                                {textoHora(hora)} · {texto}
                               </li>
                             ))}
                           </ul>
@@ -1106,9 +1470,24 @@ function PreviewArgos() {
                     </>
                   )}
                   {episodio && seccionDetalle === "Regla" && (
-                    <p>{episodio.regla}</p>
+                    <dl className="grid gap-3">
+                      <div>
+                        <dt className="font-semibold">Regla del puesto</dt>
+                        <dd className="text-muted-foreground">
+                          {episodio.regla}
+                        </dd>
+                      </div>
+                      {episodio.accion && (
+                        <div>
+                          <dt className="font-semibold">Acción sugerida</dt>
+                          <dd className="text-muted-foreground">
+                            {episodio.accion}
+                          </dd>
+                        </div>
+                      )}
+                    </dl>
                   )}
-                  {seccionDetalle === "Expediente" && (
+                  {seccionDetalle === "Expediente completo" && (
                     <>
                       <PantallaEjemplo persona={seleccion} />
                       <dl className="grid grid-cols-2 gap-3">
@@ -1138,17 +1517,10 @@ function PreviewArgos() {
                       <h3 className="font-semibold">
                         Movimientos de la fecha seleccionada
                       </h3>
-                      {lista(
-                        episodios.filter(
-                          (item) =>
-                            item.persona === seleccion.id &&
-                            item.fecha ===
-                              (tab === "En vivo" || tab === "Resumen" ? HOY : filtros.fecha),
-                        ),
-                      )}
+                      {lista(movimientosPersona)}
                     </>
                   )}
-                  {episodio?.revisar && seccionDetalle !== "Expediente" && (
+                  {episodio?.revisar && seccionDetalle === "Cronología" && (
                     <form
                       className="grid gap-2 border-t border-border/60 pt-3"
                       onSubmit={(e) => {

@@ -1,5 +1,7 @@
 # Estado del Proyecto — Maven CRM (v3)
 
+- 25/11/2026 · La vista local de Argos incorpora el informe por persona y turno: almuerzo real y permitido, episodios recuperados, pendientes y avisos por tipo. Pendiente conectar las fuentes de producción y revisar el resultado en Maven.
+
 - 24/11/2026 · Propuesta navegable de Argos en `docs/propuestas/argos-navegacion.html`: resumen, detalle lateral, episodios agrupados, revisión individual e historial del Hub. La vista local actual está en `frontend/argos-preview.html` y reutiliza Presencia, Muralla y Cuadrícula de Argos con datos ficticios, accesos compactos y detalle lateral. Las preguntas 6–9 quedaron resueltas; queda pendiente integrar las vistas y datos de producción.
 
 
