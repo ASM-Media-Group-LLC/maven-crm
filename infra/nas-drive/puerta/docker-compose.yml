@@ -54,9 +54,11 @@ services:
     # mini CAMBIÓ el 28/09 cuando se volvió a iniciar sesión (100.64.206.91 →
     # 100.127.43.97), y con las dos como destino Caddy alternaba al azar: la
     # mitad de los pedidos daban 502. El nombre sigue a la máquina.
+    # 25/11/2026: el mini pasó a llamarse `unlok-server-5` (con tag `tag:mini5`) en
+    # Tailscale; el nombre viejo `unlok-workstation` dejó de existir y la puerta daba 502.
     command: >
       caddy reverse-proxy --from :8080
-      --to unlok-workstation.tail11d450.ts.net:8790
+      --to unlok-server-5.tail11d450.ts.net:8790
     restart: unless-stopped
 
 volumes:
