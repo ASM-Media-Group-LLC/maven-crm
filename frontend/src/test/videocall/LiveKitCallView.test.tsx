@@ -62,6 +62,7 @@ function crearSalaFalsa(remotos: Array<ReturnType<typeof crearParticipanteRemoto
     remoteParticipants: new Map(remotos.map((p) => [p.identity, p])),
     activeSpeakers: [] as Array<{ isLocal: boolean }>,
     isRecording: false,
+    canPlaybackAudio: true,
     startAudio: vi.fn().mockResolvedValue(undefined),
     // `on`/`off` devuelven la sala, como los de la librería, y además guardan
     // los oyentes para poder dispararlos a mano en las pruebas.
@@ -246,6 +247,44 @@ describe("LiveKitCallView", () => {
     render(<LiveKitCallView {...defaultProps} />);
     // Local participant should show "Tú" label
     expect(screen.getByText("Tú")).toBeInTheDocument();
+  });
+
+  it("recupera el audio bloqueado en miniatura y conserva el mismo reproductor al ampliar", async () => {
+    const remoto = crearParticipanteRemoto("externo");
+    const pista = { sid: "mic-externo", source: "microphone", attach: vi.fn(), detach: vi.fn() };
+    remoto.audioTrackPublications.set(pista.sid, { track: pista });
+    salaFalsa = crearSalaFalsa([remoto]);
+    salaFalsa.canPlaybackAudio = false;
+    const reproducir = vi.spyOn(HTMLMediaElement.prototype, "play").mockResolvedValue(undefined);
+    lkState.participants = [
+      makeParticipant(),
+      makeParticipant({ identity: remoto.identity, sid: remoto.sid, isLocal: false, name: "Invitado" }),
+    ];
+
+    try {
+      const { rerender } = render(<LiveKitCallView {...defaultProps} estadoMiniatura={{ miniatura: true, anclada: true }} />);
+      const salida = document.querySelector("audio[data-lk-audio]");
+      expect(salida).toBeTruthy();
+      expect(pista.attach).toHaveBeenCalledExactlyOnceWith(salida);
+      expect(await screen.findByTestId("video-miniatura-llamada")).toBeInTheDocument();
+
+      salaFalsa.startAudio.mockRejectedValueOnce(new DOMException("blocked", "NotAllowedError"));
+      fireEvent.click(screen.getByRole("button", { name: "Activar sonido" }));
+      expect(await screen.findByText(/aún bloquea el sonido/)).toBeInTheDocument();
+
+      salaFalsa.startAudio.mockImplementationOnce(async () => {
+        salaFalsa.canPlaybackAudio = true;
+        salaFalsa.emitir(RoomEvent.AudioPlaybackStatusChanged);
+      });
+      await act(async () => fireEvent.click(screen.getByRole("button", { name: "Activar sonido" })));
+      expect(screen.queryByRole("button", { name: "Activar sonido" })).not.toBeInTheDocument();
+
+      rerender(<LiveKitCallView {...defaultProps} estadoMiniatura={{ miniatura: false, anclada: false }} />);
+      expect(document.querySelector("audio[data-lk-audio]")).toBe(salida);
+      expect(pista.detach).not.toHaveBeenCalled();
+    } finally {
+      reproducir.mockRestore();
+    }
   });
 
   it("muestra el video remoto y la cámara propia en la miniatura sin reinstalar la llamada", async () => {

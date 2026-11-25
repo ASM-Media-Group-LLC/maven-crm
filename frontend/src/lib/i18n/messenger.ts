@@ -530,6 +530,8 @@ export const messenger = {
   "messenger.callView.reintentaSolo": { es: "Se vuelve a intentar solo…", en: "Retrying automatically…" },
   "messenger.callView.cambiarDeSala": { es: "Cambiar de sala: te saca de la actual y entras muteado a la elegida", en: "Switch rooms: takes you out of this one and you join the new one muted" },
   "messenger.callView.salas": { es: "Salas", en: "Rooms" },
+  "messenger.callView.reactivarAudio": { es: "Activar sonido", en: "Enable sound" },
+  "messenger.callView.audioSigueBloqueado": { es: "El navegador aún bloquea el sonido. Vuelve a intentarlo.", en: "Your browser is still blocking sound. Try again." },
   "messenger.callView.reconectando": { es: "Reconectando...", en: "Reconnecting..." },
   "messenger.callView.volvisteDeLaPausa": { es: "Volviste de la pausa. Tu cámara y tu micrófono ya están encendidos; la pantalla hay que retomarla.", en: "You're back from your break. Your camera and microphone are on again; you need to share your screen again." },
   "messenger.callView.volverACompartir": { es: "Volver a compartir pantalla", en: "Share screen again" },

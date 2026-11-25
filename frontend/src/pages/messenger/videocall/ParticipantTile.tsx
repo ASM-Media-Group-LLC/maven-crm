@@ -19,6 +19,8 @@ interface ParticipantTileProps {
   large?: boolean;
   className?: string;
   preferredAudioOutputDeviceId?: string;
+  /** La sala mantiene su propio audio aunque este recuadro cambie o se cierre. */
+  audioDeSala?: boolean;
   onMuteParticipant?: (identity: string) => void;
   onRemoveParticipant?: (identity: string) => void;
   onPinParticipant?: (sid: string) => void;
@@ -47,6 +49,7 @@ function areParticipantPropsEqual(prev: ParticipantTileProps, next: ParticipantT
     prev.large === next.large &&
     prev.className === next.className &&
     prev.preferredAudioOutputDeviceId === next.preferredAudioOutputDeviceId &&
+    prev.audioDeSala === next.audioDeSala &&
     prev.pinnedSid === next.pinnedSid &&
     prevP.sid === nextP.sid &&
     prevP.identity === nextP.identity &&
@@ -96,7 +99,7 @@ function ConnectionIndicator({ quality }: { quality: string }) {
 }
 
 const ParticipantTile = memo(function ParticipantTile({
-  participant, room, large, className, preferredAudioOutputDeviceId,
+  participant, room, large, className, preferredAudioOutputDeviceId, audioDeSala,
   onMuteParticipant, onRemoveParticipant, onPinParticipant, pinnedSid, isAdmin, compact,
 }: ParticipantTileProps) {
   const { t } = useLanguage();
@@ -128,7 +131,7 @@ const ParticipantTile = memo(function ParticipantTile({
 
   // ── Robust audio attachment helper ─────────────────────────────
   const attachAudioTrack = useCallback(() => {
-    if (participant.isLocal || !room) return;
+    if (audioDeSala || participant.isLocal || !room) return;
     // Quien comparte pantalla dibuja DOS recuadros (su pantalla y su persona) y
     // los dos son la misma persona de LiveKit: sin esto, ambos adjuntaban el
     // MISMO micrófono, y con el <audio> de la red de seguridad la voz de esa
@@ -187,7 +190,7 @@ const ParticipantTile = memo(function ParticipantTile({
       attachedAudioTrackRef.current = null;
       attachedAudioElRef.current = null;
     }
-  }, [room, participant.identity, participant.isLocal, participant.esTileDePantalla, preferredAudioOutputDeviceId]);
+  }, [room, participant.identity, participant.isLocal, participant.esTileDePantalla, preferredAudioOutputDeviceId, audioDeSala]);
 
   // ── Video attachment effect ────────────────────────────────────
   useEffect(() => {
@@ -258,6 +261,7 @@ const ParticipantTile = memo(function ParticipantTile({
 
   // ── Audio attachment effect (separate from video) ──────────────
   useEffect(() => {
+    if (audioDeSala || participant.esTileDePantalla) return;
     attachAudioTrack();
 
     // Also set up a retry: sometimes the track arrives slightly after the
@@ -286,7 +290,7 @@ const ParticipantTile = memo(function ParticipantTile({
     return () => {
       if (retryTimer) clearTimeout(retryTimer);
     };
-  }, [attachAudioTrack, participant.isLocal, participant.isMuted]);
+  }, [attachAudioTrack, audioDeSala, participant.esTileDePantalla, participant.isLocal, participant.isMuted]);
 
   // ── Cleanup on unmount ─────────────────────────────────────────
   useEffect(() => {
@@ -438,7 +442,7 @@ const ParticipantTile = memo(function ParticipantTile({
           suelto en dos archivos fue exactamente el bug — el sink marcaba
           `data-lk-room-audio` y los recuperadores buscaban `data-lk-audio`, así
           que no encontraban nada y nadie se enteraba. */}
-      {!participant.isLocal && !participant.esTileDePantalla && (
+      {!audioDeSala && !participant.isLocal && !participant.esTileDePantalla && (
         <audio ref={audioRef} autoPlay playsInline {...{ [MARCA_AUDIO]: "true" }} style={{ display: "none" }} />
       )}
 

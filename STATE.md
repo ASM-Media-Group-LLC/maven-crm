@@ -1,5 +1,7 @@
 # Estado del Proyecto — Maven CRM (v3)
 
+- 25/11/2026 · Llamadas directas y Meet: el audio remoto queda en un reproductor estable por pista y aparece «Activar sonido» si el navegador bloquea la reproducción. Simulación validada; falta comprobar el audio de extremo a extremo con dos equipos.
+
 > Última actualización: 2026-10-14 · Mantenedor: Alvaro (ASM Tech) · Repo: `ASM-Media-Group-LLC/maven-crm`
 >
 > Este archivo se actualiza al cierre de cada slice grande. Sirve como

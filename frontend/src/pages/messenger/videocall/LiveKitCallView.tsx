@@ -15,6 +15,7 @@ import MetricsDialog from "./MetricsDialog";
 import ParticipantTile from "./ParticipantTile";
 import RecordingControl, { leerMiGrabacion, detenerAlSalir } from "./RecordingControl";
 import RoomAudioSink from "./RoomAudioSink";
+import ReactivarAudioLlamada from "./ReactivarAudioLlamada";
 import { useAutoPiP } from "./useAutoPiP";
 import AvisoCaidasSeguidas from "./AvisoCaidasSeguidas";
 import MiPantallaCompartida from "./MiPantallaCompartida";
@@ -129,9 +130,8 @@ interface LiveKitCallViewProps {
   sinLatidoDeLlamada?: boolean;
   // Silenciar TODO el audio entrante de esta llamada SOLO para mí (los demás
   // siguen hablando y escuchándose entre sí; mi micro tampoco se toca). Se hace
-  // con setVolume(0) de LiveKit sobre cada participante remoto: cubre tanto los
-  // <audio> de los tiles como los de la red de seguridad (RoomAudioSink), y la
-  // pista recuerda el volumen para elementos que se adjunten después.
+  // con setVolume(0) de LiveKit sobre cada participante remoto. La pista
+  // recuerda ese volumen para los elementos que adjunte RoomAudioSink.
   incomingAudioMuted?: boolean;
   // Aviso hacia el DUEÑO de la llamada cuando el silencio local se togglea
   // desde otro lado (el header de la ventanita flotante del provider), para
@@ -1265,6 +1265,7 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
         <CallTopBar roomName={callDisplayName || roomName} participantCount={cantidadDePersonas} onOpenAdjustView={() => setAdjustViewOpen(true)} shareLink={shareLink} hideShareLink={hideShareLink} compact={effectiveCompact} tactil={tactil} extra={selectorDeSalas} acciones={accionesBarra} esLlamada={roomName.startsWith("call-")} />
       )}
       {encima}
+      <ReactivarAudioLlamada room={room} />
 
       {/* Los carteles de conexión van en su propia fila (shrink-0), nunca
           encima del video. En la ventanita son UNA línea fina, con el texto
@@ -1418,7 +1419,7 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
             />
           </div>
           {videosEnMiniatura ? (
-            <VideosEnMiniatura participantes={lk.participants} vozActiva={lk.activeSpeaker} room={room} audioOutputId={audioOutputId} />
+            <VideosEnMiniatura participantes={lk.participants} vozActiva={lk.activeSpeaker} room={room} />
           ) : pantallasEnMosaico ? (
             <div className="flex h-full flex-col gap-2">
               <div className={cn("grid min-h-0 flex-1 gap-2 mx-auto w-full max-w-[1800px] auto-rows-fr", columnasDelMosaico(pantallasEnMosaico.length))}>
@@ -1434,7 +1435,7 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
                     onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); handlePinParticipant(p.sid); } }}
                     className="min-h-0 cursor-zoom-in rounded-xl focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
                   >
-                    <ParticipantTile participant={p} room={room} className="h-full" preferredAudioOutputDeviceId={audioOutputId} onMuteParticipant={lk.muteParticipant} onRemoveParticipant={lk.removeParticipant} onPinParticipant={handlePinParticipant} pinnedSid={pinnedSid} isAdmin={isAdmin} />
+                    <ParticipantTile participant={p} room={room} className="h-full" audioDeSala onMuteParticipant={lk.muteParticipant} onRemoveParticipant={lk.removeParticipant} onPinParticipant={handlePinParticipant} pinnedSid={pinnedSid} isAdmin={isAdmin} />
                   </div>
                 ))}
               </div>
@@ -1442,7 +1443,7 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
                 <div className="flex h-24 shrink-0 justify-center gap-2 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
                   {carasDelMosaico.map((p) => (
                     <div key={`${p.identity}-${p.sid}`} className="aspect-video h-full shrink-0 overflow-hidden rounded-lg">
-                      <ParticipantTile compact participant={p} room={room} className="h-full" preferredAudioOutputDeviceId={audioOutputId} onMuteParticipant={lk.muteParticipant} onRemoveParticipant={lk.removeParticipant} onPinParticipant={handlePinParticipant} pinnedSid={pinnedSid} isAdmin={isAdmin} />
+                      <ParticipantTile compact participant={p} room={room} className="h-full" audioDeSala onMuteParticipant={lk.muteParticipant} onRemoveParticipant={lk.removeParticipant} onPinParticipant={handlePinParticipant} pinnedSid={pinnedSid} isAdmin={isAdmin} />
                     </div>
                   ))}
                 </div>
@@ -1453,7 +1454,7 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
             // los cajones se volvian enormes y la cara quedaba perdida en el
             // medio. Centrado y con tope se ve como en Meet.
             <div className={cn("grid gap-3 h-full mx-auto w-full max-w-[1600px]", gridCols)}>
-              {visibleParticipants.map((p) => <ParticipantTile key={`${p.identity}-${p.sid}`} participant={p} room={room} preferredAudioOutputDeviceId={audioOutputId} onMuteParticipant={lk.muteParticipant} onRemoveParticipant={lk.removeParticipant} onPinParticipant={handlePinParticipant} pinnedSid={pinnedSid} isAdmin={isAdmin} />)}
+              {visibleParticipants.map((p) => <ParticipantTile key={`${p.identity}-${p.sid}`} participant={p} room={room} audioDeSala onMuteParticipant={lk.muteParticipant} onRemoveParticipant={lk.removeParticipant} onPinParticipant={handlePinParticipant} pinnedSid={pinnedSid} isAdmin={isAdmin} />)}
             </div>
           ) : (
             // En COMPACTO (ventana flotante) las caras van SUPERPUESTAS sobre la
@@ -1470,7 +1471,7 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
                 // `min-w-0` es lo que le permite al panel grande achicarse. Sin
                 // eso, un flex item se niega a bajar de su contenido y desborda.
                 <div className={effectiveCompact ? (tactil ? "min-h-0 flex-1" : "h-full") : "flex-1 min-w-0"}>
-                  <ParticipantTile compact={effectiveCompact} participant={spotlightParticipant} room={room} large className="h-full" preferredAudioOutputDeviceId={audioOutputId} onMuteParticipant={lk.muteParticipant} onRemoveParticipant={lk.removeParticipant} onPinParticipant={handlePinParticipant} pinnedSid={pinnedSid} isAdmin={isAdmin} />
+                  <ParticipantTile compact={effectiveCompact} participant={spotlightParticipant} room={room} large className="h-full" audioDeSala onMuteParticipant={lk.muteParticipant} onRemoveParticipant={lk.removeParticipant} onPinParticipant={handlePinParticipant} pinnedSid={pinnedSid} isAdmin={isAdmin} />
                 </div>
               )}
               {otrosParticipantes.length > 0 && (
@@ -1481,7 +1482,7 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
                   <div className="flex h-24 shrink-0 gap-1.5 overflow-x-auto pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
                     {otrosParticipantes.map((p) => (
                       <div key={`${p.identity}-${p.sid}`} className="aspect-video h-full shrink-0 overflow-hidden rounded-lg ring-1 ring-white/15">
-                        <ParticipantTile compact={effectiveCompact} participant={p} room={room} className="h-full" preferredAudioOutputDeviceId={audioOutputId} onMuteParticipant={lk.muteParticipant} onRemoveParticipant={lk.removeParticipant} onPinParticipant={handlePinParticipant} pinnedSid={pinnedSid} isAdmin={isAdmin} />
+                        <ParticipantTile compact={effectiveCompact} participant={p} room={room} className="h-full" audioDeSala onMuteParticipant={lk.muteParticipant} onRemoveParticipant={lk.removeParticipant} onPinParticipant={handlePinParticipant} pinnedSid={pinnedSid} isAdmin={isAdmin} />
                       </div>
                     ))}
                   </div>
@@ -1492,14 +1493,14 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
                   <div className="absolute bottom-2 right-2 flex flex-col-reverse gap-1.5 w-[34%] max-w-[150px] pointer-events-none">
                     {otrosParticipantes.slice(0, 2).map((p) => (
                       <div key={`${p.identity}-${p.sid}`} className="aspect-video rounded-lg overflow-hidden ring-1 ring-white/25 shadow-lg pointer-events-auto">
-                        <ParticipantTile compact={effectiveCompact} participant={p} room={room} className="h-full" preferredAudioOutputDeviceId={audioOutputId} onMuteParticipant={lk.muteParticipant} onRemoveParticipant={lk.removeParticipant} onPinParticipant={handlePinParticipant} pinnedSid={pinnedSid} isAdmin={isAdmin} />
+                        <ParticipantTile compact={effectiveCompact} participant={p} room={room} className="h-full" audioDeSala onMuteParticipant={lk.muteParticipant} onRemoveParticipant={lk.removeParticipant} onPinParticipant={handlePinParticipant} pinnedSid={pinnedSid} isAdmin={isAdmin} />
                       </div>
                     ))}
                   </div>
                 ) : (
                   <div className="flex flex-col gap-2 w-48 shrink-0 overflow-y-auto">
                     {otrosParticipantes.map((p) => (
-                      <div key={`${p.identity}-${p.sid}`} className="h-28 shrink-0"><ParticipantTile compact={effectiveCompact} participant={p} room={room} preferredAudioOutputDeviceId={audioOutputId} onMuteParticipant={lk.muteParticipant} onRemoveParticipant={lk.removeParticipant} onPinParticipant={handlePinParticipant} pinnedSid={pinnedSid} isAdmin={isAdmin} /></div>
+                      <div key={`${p.identity}-${p.sid}`} className="h-28 shrink-0"><ParticipantTile compact={effectiveCompact} participant={p} room={room} audioDeSala onMuteParticipant={lk.muteParticipant} onRemoveParticipant={lk.removeParticipant} onPinParticipant={handlePinParticipant} pinnedSid={pinnedSid} isAdmin={isAdmin} /></div>
                     ))}
                   </div>
                 )
@@ -1578,7 +1579,7 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
         )}
       </div>
 
-      {/* Safety-net: ensures every remote mic is audible even if its tile isn't mounted */}
+      {/* El audio de sala es independiente de los recuadros y de la miniatura. */}
       <RoomAudioSink room={room} preferredAudioOutputDeviceId={audioOutputId} />
 
       {/* Navegador de salas (Cowork): flechas estilo Instagram + lista. Al
