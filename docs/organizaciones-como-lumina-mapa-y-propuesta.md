@@ -374,3 +374,7 @@ Alvaro: en Maven no hay revendedores como en Lumina (Jacqueline/Blu era un caso 
 - **Tablero por cliente:** gente activa en 7 días vs sillas; quién nunca entró; en vivo ahora (Cowork); nota de Argos del día y estado de pago (al día / prueba / gracia / pausa).
 - **Más sillas:** las dos vías — el Dueño puede **pedir** (Alvaro aprueba y se ajusta el cobro) o **comprar** con tarjeta y se suman al instante.
 - **Prueba antes de un cliente real:** «Cliente Demo» con corp@asmtech.me como Dueño y Stripe en modo prueba.
+- **Precios que salen listos:** los de la portada (Equipo USD 299 hasta 20, Empresa USD 599 hasta 50, Enterprise a la medida, setup desde USD 3.000); se pueden cambiar por cliente.
+- **Marca propia («Empresa · powered by Maven»):** es un **extra de pago**; apagada por defecto, Alvaro la prende en el cliente que la pague. (Cambia lo del 19/11, donde era para todos.)
+- **Cliente que se va:** se archiva (nadie entra) y se guarda 90 días reactivable; después se borra solo con aprobación de Alvaro.
+- **Tarjeta de Kash en el panel del dueño:** después; primero «Nuevo cliente». Requiere OK explícito porque toca Kash.
