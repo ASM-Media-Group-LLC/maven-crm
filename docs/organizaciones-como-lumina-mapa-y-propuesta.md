@@ -366,3 +366,7 @@ Alvaro: en Maven no hay revendedores como en Lumina (Jacqueline/Blu era un caso 
 - **Invitación:** el cliente nace «En preparación»; el correo al Dueño sale **solo al apretar «Activar»**.
 - **Fin de la prueba sin pago:** siguen trabajando los **días de gracia** que se pongan en ese cliente; después la cuenta **se pausa sola** hasta que paguen (Alvaro puede extender o reactivar a mano).
 - **Quién crea y activa:** Alvaro y Grace. **Precio, setup y cobro: solo Alvaro.**
+- **Cobro por defecto:** link de pago con tarjeta (Stripe, TECH VISUALS LLC); al pagar queda marcado solo. Se puede cambiar por cliente (factura + «Marcar pagado», o suscripción).
+- **Setup:** se cobra **antes de activar**; «Activar» queda bloqueado hasta que el setup esté pagado, o Alvaro lo marque pagado o regalado.
+- **Cuenta en pausa:** el Dueño y sus Admins ven solo «Cuenta en pausa» con botón de pagar; los demás ven «Habla con tu jefe». No se borra nada.
+- **Avisos a Alvaro (correo + panel):** el Dueño entró por primera vez; la prueba vence en 3 días; pago recibido o fallido; cuenta pausada o sillas llenas.
