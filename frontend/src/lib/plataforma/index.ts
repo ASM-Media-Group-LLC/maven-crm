@@ -59,6 +59,7 @@ export function modoPlataforma(): ModoPlataforma {
 /** Los métodos que cambian algo. Con «Ver como» se bloquean todos (solo lectura). */
 export const METODOS_QUE_ESCRIBEN = [
   "crearOrganizacion", "marcarComoDemo", "cambiarMarca", "enviarLinkDeTarjeta", "activarOrganizacion", "recargarArgosManual", "agregarPersona",
+  "guardarFicha", "ponerDueno", "reenviarInvitacionDueno", "pausarOrganizacion", "reactivarOrganizacion", "extenderPrueba",
   "cambiarRol", "quitarPersona", "reenviarInvitacion", "iniciarRecarga", "agregarAdminPlataforma",
   "quitarAdminPlataforma", "reenviarInvitacionAdmin",
 ] as const satisfies readonly (keyof PlataformaDatos)[];

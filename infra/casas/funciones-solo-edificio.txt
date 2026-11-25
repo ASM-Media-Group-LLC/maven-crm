@@ -8,3 +8,6 @@
 cobros-stripe
 directorio
 refrescar-externas
+
+# Nuevo cliente (25/11/2026): la cuenta del Dueño, su invitación y «Crear mi contraseña».
+plataforma

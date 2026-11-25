@@ -8,6 +8,7 @@
 
 ## Stack y deploy
 
+- 2026-11-25: «Nuevo cliente» de verdad (edificio): alta con lo básico, ficha que Maven le pregunta a Alvaro con botones (dinero solo Alvaro), «Activar» con candados (ficha completa, setup pagado/regalado, contrato) e invitación al Dueño con enlace copiable; pausar/reactivar/extender prueba; página `/crear-contrasena`. Migración `20261125120500_nuevo_cliente` + edge `plataforma` (solo edificio). Al fundir: aplicar árbol, publicar `plataforma` en el edificio y Deploy en Dokploy. Pendiente: Resend del edificio, reloj prueba→gracia→pausa, cobro por link de Stripe, aislamiento antes del 2.º cliente.
 - 2026-11-24: PR264 (puerta + panel del dueño) en main. El árbol del edificio no entró: `20261119210000_arbol` y `20261120090000_cobros` repetían el número de migraciones de Kash y el «aplicar» las daba por puestas. Renumeradas a `…210500`/`…090500` + guarda que lo impide. Pendiente: aplicar árbol, llave Kash, invitar a rusin24, variables en Dokploy.
 - 2026-11-24: PR283 en main; reconexión/presencia, carga diferida, chat/medidor, caché privada, Auth y vigilantes corregidos. Web y funciones publicadas verificadas a las 06:57 UTC; 4.530 pruebas y tres guardas aprobadas.
 - Informe/PDF en `docs/audits/`; simulacros en `docs/auditorias/infraestructura-2026-11-24/`: 33 conexiones favorable, 165/330 no aprueban con SFU de 2 CPU y generador compartido; no certifica Miami (4 CPU) ni Maven completo.

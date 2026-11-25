@@ -148,8 +148,8 @@ jobs:
       - name: Guard — cobros, puerta y lectura de Kash
         if: steps.cambios.outputs.correr == 'true'
         run: |
-          deno test --allow-read supabase/functions/cobros-stripe/ supabase/functions/kash-resumen/ supabase/functions/refrescar-externas/
-          deno check supabase/functions/cobros-stripe/index.ts supabase/functions/directorio/index.ts supabase/functions/refrescar-externas/index.ts supabase/functions/kash-resumen/index.ts
+          deno test --allow-read supabase/functions/cobros-stripe/ supabase/functions/kash-resumen/ supabase/functions/refrescar-externas/ supabase/functions/plataforma/
+          deno check supabase/functions/cobros-stripe/index.ts supabase/functions/directorio/index.ts supabase/functions/refrescar-externas/index.ts supabase/functions/kash-resumen/index.ts supabase/functions/plataforma/index.ts
 
       - name: Tipos — mail-fetch
         if: steps.cambios.outputs.correr == 'true'

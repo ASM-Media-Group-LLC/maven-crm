@@ -24,7 +24,10 @@
 //      sin duplicar, el directorio de la puerta y su tope.
 //  10c. Quién soy (20261120120000_quien_soy.sql): dueño / Grace / admin del cliente / nadie,
 //      y la lista «Equipo de Maven» solo para la plataforma.
-//  11. Vuelta atrás de las cuatro y vuelta a cargar.
+//  10d. Nuevo cliente (20261125120500_nuevo_cliente.sql): la organización nace con su
+//      único espacio; la ficha (dinero solo del dueño); «Activar» con candados (ficha
+//      contestada, setup pagado o regalado, contrato); pausar, reactivar, extender prueba.
+//  11. Vuelta atrás de las cinco y vuelta a cargar.
 //
 // Sale con código 1 si algo falla.
 import { PGlite } from "npm:@electric-sql/pglite@0.3";
@@ -40,6 +43,7 @@ const ARBOL = leer("../migraciones/20261119210500_arbol.sql");
 const FUNCIONES = leer("../migraciones/20261119211000_arbol_funciones.sql");
 const COBROS = leer("../migraciones/20261120090500_cobros.sql");
 const QUIEN_SOY = leer("../migraciones/20261120120000_quien_soy.sql");
+const NUEVO = leer("../migraciones/20261125120500_nuevo_cliente.sql");
 const vuelta = (sql: string) => sql.split("\n").filter((l) => l.startsWith("--|")).map((l) => l.replace(/^--\| ?/, "")).join("\n");
 
 /** Saca «create or replace function public.<nombre>(…) … $$;» tal cual de una migración. */
@@ -559,8 +563,73 @@ try {
   check(false, `quien_soy: ${msg(e)}`);
 }
 
+// ════ 10d. Nuevo cliente: ficha, candados de «Activar», pausa ═════════════════
+try {
+  await aplicar(db, "nuevo_cliente", NUEVO);
+  const NC = id(19);
+  await db.exec(`insert into auth.users(id, email) values ('${NC}', 'dueno@nuevo.test')`);
+  await falla(X, `select public.crear_cliente('Intruso')`, /sin_permiso/, "un cualquiera no crea clientes (crear_cliente)");
+  await falla(GRACE, `select public.crear_cliente('X')`, /nombre_invalido/, "el nombre de la empresa no puede ser de una letra");
+  const ORG_N = String(await val(GRACE, `select public.crear_cliente('Agencia Nueva', 'en', true)`));
+  const nt = await q(`select t.sillas, o.estado, o.idioma, o.tipo, o.es_demo from public.tenants t join public.organizaciones o on o.id = t.organizacion_id where o.id = '${ORG_N}'`);
+  check(nt.length === 1 && nt[0].sillas === 0 && nt[0].estado === "preparacion" && nt[0].idioma === "en" && nt[0].tipo === "normal" && nt[0].es_demo === true,
+    `crear_cliente: una organización «normal» en preparación con UN espacio de 0 sillas (${JSON.stringify(nt)})`);
+  await falla(AA, `select public.ficha_de_organizacion('${ORG_N}')`, /sin_permiso/, "el admin de otro cliente no ve la ficha");
+  await falla(AA, `select public.guardar_ficha('${ORG_N}', '{"montaje":"maven"}')`, /sin_permiso/, "el admin de otro cliente no toca la ficha");
+  await falla(AA, `select ficha from public.organizaciones`, /permission denied/, "la ficha no se lee directo por la API");
+  const f0 = (await como(GRACE, `select public.ficha_de_organizacion('${ORG_N}') f`))[0].f;
+  check(["dueno", "plan", "precio", "dias_prueba", "dias_gracia", "forma_cobro", "setup", "silla_extra", "montaje", "contrato"].every((k) => f0.faltan.includes(k)),
+    `la ficha nueva dice todo lo que falta (${f0.faltan.join(",")})`);
+  for (const [k, v] of [["precio_usd", 599], ["dias_prueba", 14], ["dias_gracia", 7], ["forma_cobro", "\"link\""], ["setup_usd", 3000], ["setup_estado", "\"regalado\""], ["silla_extra_usd", 15]] as const) {
+    await falla(GRACE, `select public.guardar_ficha('${ORG_N}', '{"${k}": ${v}}')`, /solo_dueno/, `Grace no pone «${k}» (dinero)`);
+  }
+  await falla(GRACE, `select public.guardar_ficha('${ORG_N}', '{"inventado": 1}')`, /ficha_invalida/, "una clave que no es de la ficha se rechaza");
+  await falla(GRACE, `select public.guardar_ficha('${ORG_N}', '{"personas": 0}')`, /ficha_invalida/, "personas en 0 se rechaza");
+  await anda(GRACE, `select public.guardar_ficha('${ORG_N}', '{"plan_nombre":"empresa","personas":50,"montaje":"maven","pide_contrato":true}')`, "Grace contesta plan, personas, montaje y contrato");
+  check((await q(`select sillas from public.tenants where organizacion_id = '${ORG_N}'`))[0].sillas === 50, "las sillas del espacio siguen al plan (50)");
+  await falla(RUSIN, `select public.guardar_ficha('${ORG_N}', '{"dias_prueba": 400}')`, /ficha_invalida/, "más de 365 días de prueba se rechaza");
+  await falla(RUSIN, `select public.guardar_ficha('${ORG_N}', '{"forma_cobro": "efectivo"}')`, /ficha_invalida/, "una forma de cobro rara se rechaza");
+  await anda(RUSIN, `select public.guardar_ficha('${ORG_N}', '{"precio_usd":599,"dias_prueba":14,"dias_gracia":7,"forma_cobro":"link","setup_usd":3000,"silla_extra_usd":15}')`, "rusin24 contesta lo de dinero");
+  await db.exec(`insert into public.organizacion_admins (organizacion_id, user_id, principal) values ('${ORG_N}', '${NC}', true)`);
+  const f1 = (await como(GRACE, `select public.ficha_de_organizacion('${ORG_N}') f`))[0].f;
+  check(JSON.stringify(f1.faltan) === JSON.stringify(["setup_sin_pagar", "contrato_sin_firmar"]), `solo faltan el setup sin pagar y el contrato (${f1.faltan.join(",")})`);
+  check(f1.ve_dinero === false && !("dias_prueba" in f1.ficha) && !("setup_usd" in f1.ficha) && !("precio_usd" in (f1.plan ?? {})), `Grace ve la ficha SIN dinero (${JSON.stringify(f1.ficha)} ${JSON.stringify(f1.plan)})`);
+  const f1r = (await como(RUSIN, `select public.ficha_de_organizacion('${ORG_N}') f`))[0].f;
+  check(f1r.ve_dinero === true && f1r.ficha.setup_estado === "pendiente" && f1r.plan.precio_usd === 599, `rusin24 ve la ficha completa (setup ${f1r.ficha.setup_estado})`);
+  await falla(GRACE, `select public.activar_organizacion('${ORG_N}')`, /faltan_pendientes: setup_sin_pagar, contrato_sin_firmar/, "no se activa con el setup sin pagar ni el contrato sin firmar");
+  await falla("service_role", `select public.crear_enlace_de_acceso('${NC}', 'invitacion', null, '${ORG_N}')`, /org_en_preparacion/, "en preparación no sale ninguna invitación");
+  await anda(RUSIN, `select public.guardar_ficha('${ORG_N}', '{"setup_estado":"regalado"}')`, "rusin24 regala el setup");
+  await anda(GRACE, `select public.guardar_ficha('${ORG_N}', '{"contrato_firmado":true}')`, "Grace marca el contrato firmado");
+  const act = await anda(GRACE, `select public.activar_organizacion('${ORG_N}') r`, "Grace activa cuando ya no falta nada");
+  check(act[0]?.r?.estado === "activa", `queda activa (${JSON.stringify(act[0]?.r)})`);
+  const cobro = (await q(`select cobro from public.organizaciones where id = '${ORG_N}'`))[0].cobro;
+  const dias = (new Date(cobro.prueba_hasta).getTime() - Date.now()) / 86400000;
+  check(dias > 13.9 && dias < 14.1 && cobro.dias_gracia === 7 && cobro.estado_pago === "en_prueba" && cobro.forma_cobro === "link",
+    `al activar corre la prueba de ESTE cliente: 14 días, gracia 7, en prueba, link (${JSON.stringify(cobro)})`);
+  await falla(GRACE, `select public.activar_organizacion('${ORG_N}')`, /estado_invalido/, "no se activa dos veces");
+  await anda("service_role", `select public.crear_enlace_de_acceso('${NC}', 'invitacion', null, '${ORG_N}')`, "ya activo, sale la invitación del Dueño");
+  await falla(AA, `select public.pausar_organizacion('${ORG_N}')`, /sin_permiso/, "el admin de otro cliente no pausa");
+  await anda(GRACE, `select public.pausar_organizacion('${ORG_N}', 'prueba')`, "Grace pausa");
+  check((await como(NC, `select public.cobros_mi_acceso() a`))[0].a.motivo === "pausada", "en pausa, el Dueño ve «pausada»");
+  await anda(GRACE, `select public.reactivar_organizacion('${ORG_N}')`, "Grace reactiva");
+  check((await como(NC, `select public.cobros_mi_acceso() a`))[0].a.bloqueada === false, "reactivada, el Dueño vuelve a entrar");
+  await falla(GRACE, `select public.extender_prueba('${ORG_N}', 7)`, /solo_dueno/, "Grace no extiende la prueba");
+  await anda(RUSIN, `select public.extender_prueba('${ORG_N}', 7)`, "rusin24 extiende la prueba 7 días");
+  const c2 = (await q(`select cobro from public.organizaciones where id = '${ORG_N}'`))[0].cobro;
+  const dias2 = (new Date(c2.prueba_hasta).getTime() - Date.now()) / 86400000;
+  check(dias2 > 20.9 && dias2 < 21.1, `la prueba pasa a 21 días (${dias2.toFixed(2)})`);
+  await anda(RUSIN, `select public.guardar_ficha('${ORG_N}', '{"personas":10}')`, "bajar el plan a 10 personas");
+  check((await q(`select sillas from public.tenants where organizacion_id = '${ORG_N}'`))[0].sillas === 10, "y el espacio baja a 10 sillas");
+  const hist = await como(GRACE, `select accion, detalle from public.organizacion_bitacora where organizacion_id = '${ORG_N}' order by created_at`);
+  check(hist.every((h) => !/599|3000/.test(JSON.stringify(h.detalle))), `el historial no guarda montos (${hist.map((h) => h.accion).join(",")})`);
+} catch (e) {
+  check(false, `nuevo_cliente: ${msg(e)}`);
+}
+
 // ════ 11. Vuelta atrás y vuelta a cargar ═════════════════════════════════════
 try {
+  await aplicar(db, "vuelta atrás de nuevo_cliente", vuelta(NUEVO));
+  check((await q(`select to_regproc('public.guardar_ficha') is null n`))[0].n === true, "la vuelta atrás de nuevo_cliente borra lo suyo");
   await aplicar(db, "vuelta atrás de quien_soy", vuelta(QUIEN_SOY));
   check((await q(`select to_regproc('public.equipo_de_maven') is null n`))[0].n === true, "la vuelta atrás de quien_soy borra lo suyo");
   await aplicar(db, "vuelta atrás de cobros", vuelta(COBROS));
@@ -579,7 +648,8 @@ try {
   await aplicar(db, "arbol_funciones (otra vez)", FUNCIONES);
   await aplicar(db, "cobros (otra vez)", COBROS);
   await aplicar(db, "quien_soy (otra vez)", QUIEN_SOY);
-  check(true, "después de la vuelta atrás, las cuatro vuelven a cargar");
+  await aplicar(db, "nuevo_cliente (otra vez)", NUEVO);
+  check(true, "después de la vuelta atrás, las cinco vuelven a cargar");
 } catch (e) {
   check(false, msg(e));
 }
