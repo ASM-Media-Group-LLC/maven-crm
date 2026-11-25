@@ -370,3 +370,7 @@ Alvaro: en Maven no hay revendedores como en Lumina (Jacqueline/Blu era un caso 
 - **Setup:** se cobra **antes de activar**; «Activar» queda bloqueado hasta que el setup esté pagado, o Alvaro lo marque pagado o regalado.
 - **Cuenta en pausa:** el Dueño y sus Admins ven solo «Cuenta en pausa» con botón de pagar; los demás ven «Habla con tu jefe». No se borra nada.
 - **Avisos a Alvaro (correo + panel):** el Dueño entró por primera vez; la prueba vence en 3 días; pago recibido o fallido; cuenta pausada o sillas llenas.
+- **Primera entrada del Dueño:** lista de pasos para arrancar (crear Posiciones, invitar Admins, invitar gente, instalar la app) que se palomea sola.
+- **Tablero por cliente:** gente activa en 7 días vs sillas; quién nunca entró; en vivo ahora (Cowork); nota de Argos del día y estado de pago (al día / prueba / gracia / pausa).
+- **Más sillas:** las dos vías — el Dueño puede **pedir** (Alvaro aprueba y se ajusta el cobro) o **comprar** con tarjeta y se suman al instante.
+- **Prueba antes de un cliente real:** «Cliente Demo» con corp@asmtech.me como Dueño y Stripe en modo prueba.
