@@ -360,3 +360,9 @@ Alvaro: en Maven no hay revendedores como en Lumina (Jacqueline/Blu era un caso 
   se conservan las tablas por si un día se prende «tiene subcuentas», sin rehacer nada.
 - Sigue igual: onboarding flexible por organización (días de montaje, prueba, setup, cobro, gracia, pausa), Grace sin precios,
   cobro por TECH VISUALS LLC, Dashboard por organización (quién usa y quién no), Kash como tarjeta solo de mirar.
+
+## Tanda de preguntas «Nuevo cliente» (25/11/2026)
+- **Formulario:** lo básico al crear (empresa, nombre y correo del Dueño, idioma). Plan, sillas, prueba, setup, cobro y logo se llenan después en la ficha del cliente.
+- **Invitación:** el cliente nace «En preparación»; el correo al Dueño sale **solo al apretar «Activar»**.
+- **Fin de la prueba sin pago:** siguen trabajando los **días de gracia** que se pongan en ese cliente; después la cuenta **se pausa sola** hasta que paguen (Alvaro puede extender o reactivar a mano).
+- **Quién crea y activa:** Alvaro y Grace. **Precio, setup y cobro: solo Alvaro.**
