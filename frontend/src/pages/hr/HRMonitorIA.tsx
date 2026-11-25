@@ -19,6 +19,7 @@ import { Page } from "@/components/ui/page";
 import { PageHeader } from "@/components/ui/page-header";
 import { useMonitorConfig } from "@/hooks/useMonitorConfig";
 import { DondeEstaPanel } from "@/components/hr/DondeEstaPanel";
+import { TurnoTabla } from "@/components/hr/TurnoTabla";
 import { useFuncionesCasos } from "@/hooks/useCasosArgos";
 import { veRevision } from "@/lib/casosArgos";
 import { useEsDueno } from "@/hooks/useEsDueno";
@@ -177,18 +178,21 @@ export default function HRMonitorIA() {
   // historial) a los nuevos para no romper links guardados.
   //   · Llamadas (13/11/2026) = a quién se le corta la llamada hoy y por qué.
   //   · Historial del Hub (19/11/2026) = qué quitaron los supervisores, cuándo y por qué.
-  type TabArgos = "donde" | "ahora" | "dia" | "llamadas" | "hub" | "revision" | "ajustes";
+  //   · Turno (25/11/2026) = la tabla del turno: una fila por persona con llegada,
+  //     comida, baño, avisos y conexión. Es la que abre Argos.
+  type TabArgos = "turno" | "donde" | "ahora" | "dia" | "llamadas" | "hub" | "revision" | "ajustes";
   const [searchParams, setSearchParams] = useSearchParams();
   const VIEJO_A_NUEVO: Record<string, TabArgos> = {
-    donde: "donde", ahora: "ahora", dia: "dia", llamadas: "llamadas", hub: "hub", revision: "revision", ajustes: "ajustes",
+    turno: "turno", donde: "donde", ahora: "ahora", dia: "dia", llamadas: "llamadas", hub: "hub", revision: "revision", ajustes: "ajustes",
     equipo: "ahora", envivo: "ahora", panel: "dia", historial: "dia", resumen: "dia", atencion: "ahora",
   };
   const tabURL = searchParams.get("t");
   // Al entrar a Argos se cae en «Dónde está» (Alvaro, 10/11: «necesito saber
   // dónde está el empleado en todo momento»); antes era «El día» (08/11).
-  const solicitada: TabArgos = (tabURL && VIEJO_A_NUEVO[tabURL]) || "donde";
-  const tabPermitida = (k: TabArgos) => k === "ajustes" ? ajustaArgos : k === "dia" ? veExpediente : k === "revision" ? true : vePresencia;
-  const tab: TabArgos = tabPermitida(solicitada) ? solicitada : vePresencia ? "donde" : veExpediente ? "dia" : ajustaArgos ? "ajustes" : "revision";
+  // Desde el 25/11/2026 abre en «Turno» (Alvaro: «echar el chequeo de los empleados»).
+  const solicitada: TabArgos = (tabURL && VIEJO_A_NUEVO[tabURL]) || "turno";
+  const tabPermitida = (k: TabArgos) => k === "ajustes" ? ajustaArgos : k === "dia" ? veExpediente : k === "turno" ? veExpediente || vePresencia : k === "revision" ? true : vePresencia;
+  const tab: TabArgos = tabPermitida(solicitada) ? solicitada : vePresencia || veExpediente ? "turno" : veExpediente ? "dia" : ajustaArgos ? "ajustes" : "revision";
   const setTab = (k: TabArgos) => setSearchParams((prev) => { const n = new URLSearchParams(prev); n.set("t", k); return n; }, { replace: true });
 
   // Revisión de RR. HH. (19/11/2026): la ve quien tenga alguna función de la
@@ -251,6 +255,7 @@ export default function HRMonitorIA() {
       {/* Pestañas de Argos (3) */}
       {(() => {
         const tabs: Array<{ k: TabArgos; label: string }> = [
+          { k: "turno", label: t("hr.monia.tab.turno") },
           { k: "donde", label: t("hr.monia.tab.donde") },
           { k: "dia", label: t("hr.monia.tab.dia") },
           { k: "ahora", label: t("hr.monia.tab.ahora") },
@@ -274,6 +279,13 @@ export default function HRMonitorIA() {
           </div>
         );
       })()}
+
+      {/* TURNO — una fila por persona: llegada, comida, baño, avisos y conexión. */}
+      {tab === "turno" && (
+        <div className="mt-5">
+          <TurnoTabla />
+        </div>
+      )}
 
       {/* DÓNDE ESTÁ — cada empleado ahora: en Cowork o fuera, qué tiene en pantalla. */}
       {tab === "donde" && (
