@@ -378,3 +378,11 @@ Alvaro: en Maven no hay revendedores como en Lumina (Jacqueline/Blu era un caso 
 - **Marca propia («Empresa · powered by Maven»):** es un **extra de pago**; apagada por defecto, Alvaro la prende en el cliente que la pague. (Cambia lo del 19/11, donde era para todos.)
 - **Cliente que se va:** se archiva (nadie entra) y se guarda 90 días reactivable; después se borra solo con aprobación de Alvaro.
 - **Tarjeta de Kash en el panel del dueño:** después; primero «Nuevo cliente». Requiere OK explícito porque toca Kash.
+
+## Quinta tanda (25/11/2026, noche)
+- **Montaje:** se elige **en cada cliente**: «la arma Maven» (Alvaro o Grace dejan Posiciones y lista de gente listas antes de activar; el Dueño después cambia lo que quiera) o «la arma el cliente» (el Dueño lo hace con su lista de pasos).
+- **Ver por dentro:** Alvaro y Grace **sí pueden entrar a la cuenta de un cliente en modo «solo mirar»** (sin cambiar nada); cada entrada queda anotada con fecha y el Dueño del cliente puede ver quién de Maven entró.
+- **Silla extra comprada con tarjeta:** **USD 15 por silla al mes**, cambiable por cliente.
+- **Días de prueba y de gracia: NO hay números fijos.** Se deciden en cada cliente. Al preparar un cliente, **Maven le hace las preguntas a Alvaro con botones, una por una** (días de prueba, días de gracia, setup, forma de cobro…) y **no deja activar hasta que estén todas contestadas**. (Hoy el código trae 14 y 7 como valores globales en `precios_plataforma`; pasan a ser solo una sugerencia de botón.)
+- **Términos y contrato:** el Dueño marca **siempre** «Acepto los términos» la primera vez que entra (se guarda la fecha). Además, en los clientes que Alvaro marque, no se puede activar hasta poner «Contrato firmado». Falta que Alvaro pase el texto de los términos.
+- **Botón de Ayuda del cliente:** ofrece **tres caminos: correo, Telegram y WhatsApp**. Falta que Alvaro pase el correo de soporte, el usuario de Telegram y el número de WhatsApp.
