@@ -36,6 +36,9 @@ interface ContextoPlataforma {
   /** Crear clientes, invitar, cobrar: con datos reales esperan la edge «plataforma» del
    *  edificio (aún no existe). Mientras, los botones van apagados con «Disponible cuando…». */
   escriturasListas: boolean;
+  /** Crear, preparar y activar clientes: con datos reales ya van por la edge «plataforma»
+   *  y las funciones de la ficha (20261125120500_nuevo_cliente.sql). */
+  clientesListos: boolean;
 }
 
 const Contexto = createContext<ContextoPlataforma | null>(null);
@@ -90,6 +93,7 @@ export function PlataformaProvider({ children, datos: datosDados }: { children: 
     vePrecios: calcularVePrecios(yo, mostrandoACliente),
     esPlataforma,
     escriturasListas: esMock,
+    clientesListos: true,
   };
   return <Contexto.Provider value={valor}>{children}</Contexto.Provider>;
 }

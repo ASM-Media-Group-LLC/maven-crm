@@ -108,12 +108,73 @@ export interface PanelDelDueno {
   ve_precios: boolean;
 }
 
+/** El alta pide solo lo básico (tanda 25/11): lo demás va en la ficha. */
 export interface NuevoCliente {
   nombre: string;
-  admin: { nombre: string; correo: string; idioma: "es" | "en" };
-  plan: PlanOrganizacion;
-  marca: MarcaOrganizacion;
+  dueno: { nombre: string; correo: string };
+  idioma: "es" | "en";
   es_demo: boolean;
+}
+
+export type FormaDeCobro = "link" | "factura" | "suscripcion";
+export type EstadoDeSetup = "pendiente" | "pagado" | "regalado";
+
+/** organizaciones.ficha: lo que Maven le pregunta a Alvaro al preparar el cliente.
+ *  Sin las claves de dinero cuando la lee Grace. */
+export interface Ficha {
+  montaje?: "maven" | "cliente";
+  pide_contrato?: boolean;
+  contrato_firmado_at?: string;
+  dias_prueba?: number;
+  dias_gracia?: number;
+  forma_cobro?: FormaDeCobro;
+  setup_usd?: number;
+  setup_estado?: EstadoDeSetup;
+  silla_extra_usd?: number;
+  pausa?: { motivo: string; at: string };
+}
+
+/** Lo que falta para poder activar (ficha_faltantes del edificio). */
+export type Faltante =
+  | "dueno" | "plan" | "precio" | "dias_prueba" | "dias_gracia" | "forma_cobro"
+  | "setup" | "setup_sin_pagar" | "silla_extra" | "montaje" | "contrato" | "contrato_sin_firmar";
+
+export interface FichaDelCliente {
+  organizacion_id: string;
+  nombre: string;
+  estado: EstadoOrganizacion | "bloqueada";
+  idioma: "es" | "en";
+  es_demo: boolean;
+  plan: Partial<PlanOrganizacion> | null;
+  ficha: Ficha;
+  prueba_hasta: string | null;
+  /** false para Grace: la ficha llega sin dinero y esas preguntas las contesta Alvaro. */
+  ve_dinero: boolean;
+  faltan: Faltante[];
+  dueno: { user_id: string; nombre: string; correo: string; entro_at: string | null } | null;
+}
+
+/** Una o varias respuestas de la ficha (guardar_ficha). Las de dinero, solo Alvaro. */
+export interface CambiosDeFicha {
+  plan_nombre?: ClaveDePlan;
+  personas?: number;
+  precio_usd?: number;
+  dias_prueba?: number;
+  dias_gracia?: number;
+  forma_cobro?: FormaDeCobro;
+  setup_usd?: number;
+  setup_estado?: EstadoDeSetup;
+  silla_extra_usd?: number;
+  montaje?: "maven" | "cliente";
+  pide_contrato?: boolean;
+  contrato_firmado?: boolean;
+}
+
+/** Lo que devuelve invitar al Dueño. El enlace se muestra para mandarlo por WhatsApp si el correo no salió. */
+export interface Invitacion {
+  invitado: string | null;
+  enlace: string | null;
+  correo_enviado: boolean;
 }
 
 /** La lista de pendientes del cliente (ClientChecklist de Lumina, con Stripe). */
@@ -231,7 +292,9 @@ export type ClaveDeError =
   | "faltan_pendientes"
   | "cliente_bloqueado"
   | "solo_lectura"
-  | "no_disponible";
+  | "no_disponible"
+  | "estado_invalido"
+  | "nombre_invalido";
 
 export class ErrorDePlataforma extends Error {
   constructor(public clave: ClaveDeError, detalle?: string) {
@@ -246,7 +309,7 @@ export function claveDeError(e: unknown): ClaveDeError | null {
   const msg = e && typeof e === "object" && "message" in e ? String((e as { message: unknown }).message) : String(e ?? "");
   const m = msg.match(/^([a-z_]+)(?::|$)/);
   const claves: ClaveDeError[] = ["sin_permiso", "solo_dueno", "plan_lleno", "ya_existe", "correo_invalido", "org_en_preparacion",
-    "faltan_pendientes", "cliente_bloqueado", "solo_lectura", "no_disponible"];
+    "faltan_pendientes", "cliente_bloqueado", "solo_lectura", "no_disponible", "estado_invalido", "nombre_invalido"];
   if (m && (claves as string[]).includes(m[1])) return m[1] as ClaveDeError;
   // El edificio dice «paquete_lleno» / «agencia_llena»: para el cliente normal es lo mismo.
   if (m && (m[1] === "paquete_lleno" || m[1] === "agencia_llena")) return "plan_lleno";
@@ -264,7 +327,17 @@ export interface PlataformaDatos {
   crearOrganizacion(nuevo: NuevoCliente): Promise<string>;
   marcarComoDemo(org: string, esDemo: boolean): Promise<void>;
   pendientesDe(org: string): Promise<PendientesDelCliente>;
-  activarOrganizacion(org: string): Promise<{ invitado: string }>;
+  /** La ficha del cliente: lo contestado, lo que falta para activar y su Dueño. */
+  fichaDe(org: string): Promise<FichaDelCliente>;
+  guardarFicha(org: string, cambios: CambiosDeFicha): Promise<void>;
+  /** La cuenta del Dueño (si falló al crear, o para cambiarlo antes de activar). */
+  ponerDueno(org: string, nombre: string, correo: string): Promise<void>;
+  /** Activa (con los candados de la ficha) e invita al Dueño. */
+  activarOrganizacion(org: string): Promise<Invitacion>;
+  reenviarInvitacionDueno(org: string): Promise<Invitacion>;
+  pausarOrganizacion(org: string, motivo: string): Promise<void>;
+  reactivarOrganizacion(org: string): Promise<void>;
+  extenderPrueba(org: string, dias: number): Promise<void>;
   recargarArgosManual(org: string, usd: number): Promise<SaldoArgos>;
   cambiarMarca(org: string, marca: MarcaOrganizacion): Promise<void>;
   /** Manda al admin del cliente el link de Stripe para poner su tarjeta. */

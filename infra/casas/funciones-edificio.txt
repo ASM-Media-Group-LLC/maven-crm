@@ -70,3 +70,5 @@ ai-orchestrator
 cobros-stripe
 directorio
 refrescar-externas
+# Nuevo cliente (25/11/2026): cuenta del Dueño, invitación y «Crear mi contraseña».
+plataforma

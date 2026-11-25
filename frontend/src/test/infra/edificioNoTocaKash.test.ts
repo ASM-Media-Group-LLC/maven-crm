@@ -74,7 +74,7 @@ describe("el edificio nunca toca Kash", () => {
   // Kash dejara de saltarlas, al fundir se publicarían en Kash.
   it("las funciones solo del edificio no se publican en Kash", () => {
     const solo = lista(soloEdificio);
-    expect(solo).toEqual(expect.arrayContaining(["cobros-stripe", "directorio", "refrescar-externas"]));
+    expect(solo).toEqual(expect.arrayContaining(["cobros-stripe", "directorio", "refrescar-externas", "plataforma"]));
     const delEdificio = lista(listaFunciones);
     for (const f of solo) {
       expect(delEdificio).toContain(f);
@@ -82,6 +82,8 @@ describe("el edificio nunca toca Kash", () => {
     }
     expect(deployDeKash).toContain("infra/casas/funciones-solo-edificio.txt");
     expect(deployDeKash).toMatch(/skip \$fn \(solo del edificio: no va a Kash\)/);
+    // Un cambio en config.toml que solo toca bloques del edificio no republica Kash entero.
+    expect(deployDeKash).toContain("config.toml cambió solo en funciones del edificio");
     // kash-resumen es la de Kash (solo lectura): no va al edificio.
     expect(delEdificio).not.toContain("kash-resumen");
     expect(solo).not.toContain("kash-resumen");

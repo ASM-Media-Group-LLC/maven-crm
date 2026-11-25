@@ -122,10 +122,30 @@ jobs:
           CHANGED="$(git diff --name-only "$BEFORE" "$AFTER" -- supabase/functions supabase/config.toml || true)"
           echo "Archivos cambiados:"; echo "$CHANGED"
 
-          # Cambios en _shared/ o en config.toml afectan a muchas → TODAS
-          if echo "$CHANGED" | grep -qE '^supabase/functions/_shared/|^supabase/config\.toml$'; then
-            echo "_shared/ o config.toml cambió → TODAS"
+          # Cambios en _shared/ o en config.toml afectan a muchas → TODAS.
+          # Salvo que en config.toml solo hayan cambiado los bloques de funciones SOLO del
+          # edificio (infra/casas/funciones-solo-edificio.txt, con los comentarios que van
+          # justo encima): esos no son de Kash y no hay por qué republicar todo Kash.
+          if echo "$CHANGED" | grep -qE '^supabase/functions/_shared/'; then
+            echo "_shared/ cambió → TODAS"
             echo "deploy_all=true" >> "$GITHUB_OUTPUT"; exit 0
+          fi
+          if echo "$CHANGED" | grep -qE '^supabase/config\.toml$'; then
+            SOLO="$(sed 's/#.*//' infra/casas/funciones-solo-edificio.txt | tr -s ' \t' '\n' | { grep -v '^$' || true; } | tr '\n' ' ')"
+            sin_edificio() {
+              awk -v lista="$SOLO" '
+                BEGIN { n = split(lista, a, " "); for (i = 1; i <= n; i++) s["[functions." a[i] "]"] = 1 }
+                /^[[:space:]]*(#|$)/ { buf = buf $0 "\n"; next }
+                /^\[/ { saltar = ($0 in s); if (!saltar) printf "%s", buf; buf = ""; if (!saltar) print; next }
+                { if (!saltar) { printf "%s", buf; print }; buf = "" }
+                END { if (!saltar) printf "%s", buf }'
+            }
+            if [ -n "${SOLO// /}" ] && cmp -s <(git show "$BEFORE:supabase/config.toml" | sin_edificio) <(git show "$AFTER:supabase/config.toml" | sin_edificio); then
+              echo "config.toml cambió solo en funciones del edificio ($SOLO) → no se republica Kash entero"
+            else
+              echo "config.toml cambió → TODAS"
+              echo "deploy_all=true" >> "$GITHUB_OUTPUT"; exit 0
+            fi
           fi
 
           # Nombre de cada función cambiada = primer segmento tras supabase/functions/
