@@ -343,6 +343,8 @@ const AdminUsuarios = () => {
 
                   <EditUserModal
                     puedeAsignarRol={!funcionesUsuario.posiciones && funcionesUsuario.asignar && !!selectedUser?.manageable}
+                    porPosiciones={funcionesUsuario.posiciones}
+                    onAsignarPosicion={selectedUser ? () => navigate(`/ajustes/posiciones?persona=${encodeURIComponent(selectedUser.id)}`) : undefined}
                     open={editOpen}
                     onOpenChange={setEditOpen}
                     user={selectedUser}
@@ -414,6 +416,8 @@ const AdminUsuarios = () => {
 
               <AddUserModal
                 puedeAsignarRol={!funcionesUsuario.posiciones && funcionesUsuario.asignar}
+                porPosiciones={funcionesUsuario.posiciones}
+                onAsignarPosicion={(id) => navigate(`/ajustes/posiciones?persona=${encodeURIComponent(id)}`)}
                 open={addUserOpen}
                 onOpenChange={(o) => {
                   setAddUserOpen(o);
@@ -463,6 +467,7 @@ const AdminUsuarios = () => {
                           email_error: r?.email_error ?? null,
                           mailbox_ok: r?.mailbox?.ok ?? false,
                           mailbox_error: r?.mailbox?.error ?? null,
+                          user_id: (r as { user_id?: string } | undefined)?.user_id ?? null,
                         });
                       },
                     }
