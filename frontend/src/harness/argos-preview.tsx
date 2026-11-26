@@ -40,6 +40,8 @@ import {
   MessageCircle,
   Monitor,
   PanelTop,
+  PanelLeftClose,
+  PanelLeftOpen,
   Radio,
   Search,
   Settings,
@@ -50,6 +52,10 @@ import {
 } from "lucide-react";
 import Logo from "@/components/Logo";
 import { Page } from "@/components/ui/page";
+import {
+  LINK_CLASS,
+  ACTIVE_CLASS,
+} from "@/components/dashboard/estilosDelMenu";
 import { PageHeader } from "@/components/ui/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -58,6 +64,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { cn } from "@/lib/utils";
 import "@/index.css";
+import "./argos-agenda.css";
 
 const diaAlAbrir = new Date();
 const HOY = diaBogota(diaAlAbrir);
@@ -874,6 +881,7 @@ function InformeTurno({
 
 function PreviewArgos() {
   const [tab, setTab] = useState<Pestaña>("Resumen");
+  const [menuPlegado, setMenuPlegado] = useState(false);
   const [filtros, setFiltros] = useState<Filtros>({
     fecha: HOY,
     equipo: "",
@@ -892,6 +900,7 @@ function PreviewArgos() {
   }>();
   const [seccionDetalle, setSeccionDetalle] = useState("Cronología");
   const panelDetalle = useRef<HTMLElement>(null);
+  const origenDetalle = useRef<HTMLElement | null>(null);
   useEffect(() => {
     if (!detalle) return;
     panelDetalle.current?.focus({ preventScroll: true });
@@ -1007,13 +1016,33 @@ function PreviewArgos() {
         .sort((a, b) => b.hora.localeCompare(a.hora))
     : [];
 
+  function guardarOrigenDetalle() {
+    if (!detalle && document.activeElement instanceof HTMLElement)
+      origenDetalle.current = document.activeElement;
+  }
+
+  function cerrarDetalle() {
+    setDetalle(undefined);
+    requestAnimationFrame(() => {
+      if (origenDetalle.current?.isConnected) origenDetalle.current.focus();
+      else
+        document
+          .querySelector<HTMLButtonElement>(
+            '.argos-nav-principal [aria-current="page"]',
+          )
+          ?.focus();
+    });
+  }
+
   function abrirPersona(persona: Persona) {
+    guardarOrigenDetalle();
     setDetalle({ persona: persona.id });
     setSeccionDetalle("Informe");
     setMensaje("");
   }
 
   function abrirEpisodio(item: Episodio) {
+    guardarOrigenDetalle();
     setDetalle({ persona: item.persona, episodio: item.id });
     setSeccionDetalle("Cronología");
     setResultado(decisiones[item.id]?.resultado ?? "Confirmada");
@@ -1098,8 +1127,9 @@ function PreviewArgos() {
           aria-hidden
         />
         <span className="flex-1">
-          {hecho} · {duracion} · {cantidad}{" "}
-          {cantidad === 1 ? "aviso" : "avisos"}
+          {hecho} · {duracion}
+          {cantidad > 0 &&
+            ` · ${cantidad} ${cantidad === 1 ? "aviso" : "avisos"}`}
         </span>
         <ChevronRight
           className="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted-foreground"
@@ -1195,13 +1225,34 @@ function PreviewArgos() {
   }
 
   return (
-    <div className="fondo-glass flex h-dvh w-full gap-2 overflow-hidden p-2">
+    <div className="argos-propuesta fondo-glass flex h-dvh w-full gap-2 overflow-hidden p-2">
       <aside
-        className="vidrio-panel hidden w-[13.5rem] shrink-0 flex-col px-3 py-4 min-[800px]:flex"
+        className={cn(
+          "vidrio-panel argos-menu-maven hidden shrink-0 flex-col px-3 py-4 min-[800px]:flex",
+          menuPlegado ? "w-16" : "w-[13.5rem]",
+        )}
         aria-label="Menú de Maven"
       >
-        <div className="px-2 pb-5">
-          <Logo size="sm" />
+        <div
+          className={cn(
+            "flex items-center justify-between gap-2 pb-5",
+            menuPlegado ? "flex-col" : "px-2",
+          )}
+        >
+          <Logo size="sm" collapsed={menuPlegado} />
+          <button
+            type="button"
+            className="rounded-md p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
+            aria-label={menuPlegado ? "Ampliar menú" : "Plegar menú"}
+            aria-expanded={!menuPlegado}
+            onClick={() => setMenuPlegado(!menuPlegado)}
+          >
+            {menuPlegado ? (
+              <PanelLeftOpen size={16} />
+            ) : (
+              <PanelLeftClose size={16} />
+            )}
+          </button>
         </div>
         {(
           [
@@ -1217,26 +1268,32 @@ function PreviewArgos() {
           <div
             key={nombre}
             className={cn(
-              "mb-1 flex items-center gap-3 rounded-xl px-3 py-2 text-sm text-muted-foreground",
-              nombre === "Argos" && "bg-primary/20 font-semibold text-primary",
+              LINK_CLASS,
+              "mb-0.5 text-muted-foreground",
+              menuPlegado && "justify-center",
+              nombre === "Argos" && ACTIVE_CLASS,
             )}
             aria-current={nombre === "Argos" ? "page" : undefined}
           >
             <Icono className="h-4 w-4" />
-            {nombre}
+            <span className={menuPlegado ? "sr-only" : undefined}>
+              {nombre}
+            </span>
           </div>
         ))}
         <div className="mt-auto flex items-center gap-2 rounded-xl bg-card/70 p-2">
           <Avatar className="h-8 w-8">
             <AvatarFallback>AM</AvatarFallback>
           </Avatar>
-          <span className="text-sm">Vista del dueño</span>
+          <span className={menuPlegado ? "sr-only" : "text-sm"}>
+            Vista del dueño
+          </span>
         </div>
       </aside>
       <div className="vidrio-panel flex min-w-0 flex-1 flex-col overflow-hidden">
         <Page>
           <PageHeader
-            title="Argos"
+            title="Argos — Monitor IA"
             subtitle="Vista previa con datos de ejemplo"
             icon={<Eye />}
             actions={
@@ -1265,7 +1322,7 @@ function PreviewArgos() {
                   title={
                     diaSeleccionado !== HOY
                       ? "La muestra de marcaciones corresponde a hoy"
-                      : undefined
+                      : "Exportar horas"
                   }
                 >
                   <FileSpreadsheet className="h-4 w-4" />
@@ -1295,7 +1352,7 @@ function PreviewArgos() {
 
           <nav
             aria-label="Secciones de Argos"
-            className="my-4 flex gap-x-3 overflow-x-auto border-b border-border/60 sm:gap-x-6"
+            className="argos-nav-principal mt-4 mb-5 flex gap-1 overflow-x-auto rounded-2xl border border-border/50 bg-background/40 p-1"
           >
             {tabs.map(({ nombre }) => (
               <button
@@ -1304,10 +1361,10 @@ function PreviewArgos() {
                 aria-current={tab === nombre ? "page" : undefined}
                 onClick={() => cambiar(nombre)}
                 className={cn(
-                  "shrink-0 border-b-2 px-0.5 py-2.5 text-sm font-medium focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring",
+                  "shrink-0 rounded-xl px-4 py-2 text-sm font-semibold transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring",
                   tab === nombre
-                    ? "border-primary text-foreground"
-                    : "border-transparent text-muted-foreground hover:text-foreground",
+                    ? "bg-primary text-primary-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground",
                 )}
               >
                 {nombre}
@@ -1375,7 +1432,7 @@ function PreviewArgos() {
                 "min-[950px]:grid-cols-[minmax(0,1fr)_minmax(300px,43%)]",
             )}
           >
-            <div className="min-w-0 space-y-4">
+            <div className="argos-columna-agenda min-w-0 space-y-4">
               {tab === "Resumen" && (
                 <CalendarioArgos
                   fecha={filtros.fecha}
@@ -1421,212 +1478,240 @@ function PreviewArgos() {
               )}
               {tab === "Resumen" && filtros.fecha === HOY && (
                 <>
-                  <RelevoArgos
-                    personas={equipoVisible}
-                    episodios={delDia}
-                    decisiones={decisiones}
-                    abrirPersona={(id) => abrirPersona(porId(id))}
-                    abrirEpisodio={abrirEpisodio}
-                  />
-                  <section className="pt-4" aria-label="Equipo de hoy">
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <div className="flex items-center gap-2">
-                        <h2 className="font-display text-xl font-semibold">
-                          Equipo de hoy
-                        </h2>
-                      </div>
-                      {subnav(
-                        ["Pendientes", "Más avisos", "Conectados"],
-                        supervision,
-                        setSupervision,
-                        { Conectados: conectados.length },
-                      )}
-                    </div>
-                    {supervision === "Pendientes" ? (
-                      <>
-                        <div className="mt-3 grid gap-x-6 gap-y-2 border-y border-border/60 py-2 sm:grid-cols-2">
-                          {porAtender.map(({ persona, casos }) => (
-                            <div key={persona.id} className="py-2">
-                              <button
-                                type="button"
-                                className="mb-1 text-base font-semibold hover:underline"
-                                onClick={() => abrirPersona(persona)}
-                              >
-                                {persona.nombre}
-                              </button>
-                              {casos.map(avisoCorto)}
-                            </div>
-                          ))}
-                          {!porAtender.length && (
-                            <p className="text-sm text-muted-foreground">
-                              Sin pendientes de revisión.
-                            </p>
-                          )}
-                        </div>
-                        <div className="mt-2 flex flex-wrap gap-2">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => {
-                              fijarFiltro("fecha", HOY);
-                              cambiar("Revisión");
-                              setRevision("Pendientes");
-                            }}
-                          >
-                            {pendientes.length} por revisar{" "}
-                            <ChevronRight className="h-3.5 w-3.5" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => {
-                              fijarFiltro("fecha", HOY);
-                              cambiar("Estado");
-                              setEstado("Salud de la plataforma");
-                            }}
-                          >
-                            <WifiOff className="h-3.5 w-3.5" />{" "}
-                            {tecnicos.length}{" "}
-                            {tecnicos.length === 1
-                              ? "incidencia técnica"
-                              : "incidencias técnicas"}
-                          </Button>
-                        </div>
-                      </>
-                    ) : supervision === "Más avisos" ? (
-                      <>
-                        <h3 className="mt-3 mb-2 text-sm font-semibold">
-                          Avisos de Argos
-                        </h3>
-                        <p className="mb-2 text-xs text-muted-foreground">
-                          Avisos automáticos emitidos hoy, agrupados por
-                          episodio.
-                        </p>
-                        <div className="grid gap-2 sm:grid-cols-2">
-                          {conAvisos.map(({ persona, casos, total }) => (
-                            <div
-                              key={persona.id}
-                              className="rounded-xl border border-border/60 bg-background/30 px-3 py-2"
+                  <div className="argos-resumen-dia" data-vista={supervision}>
+                    <RelevoArgos
+                      personas={equipoVisible}
+                      episodios={delDia}
+                      decisiones={decisiones}
+                      abrirPersona={(id) => abrirPersona(porId(id))}
+                      abrirEpisodio={abrirEpisodio}
+                    />
+                    <section
+                      className="argos-equipo"
+                      aria-label="Equipo de hoy"
+                    >
+                      <header className="argos-equipo__cabecera">
+                        <h2 className="font-display">Equipo de hoy</h2>
+                        <Users aria-hidden="true" size={17} />
+                      </header>
+                      <div
+                        className="argos-equipo__pestanas"
+                        role="group"
+                        aria-label="Vistas del equipo"
+                      >
+                        {["Pendientes", "Más avisos", "Conectados"].map(
+                          (nombre) => (
+                            <button
+                              type="button"
+                              key={nombre}
+                              aria-pressed={supervision === nombre}
+                              onClick={() => setSupervision(nombre)}
                             >
-                              <button
-                                type="button"
-                                className="flex w-full flex-wrap items-center justify-between gap-1 text-left text-sm hover:underline"
-                                onClick={() => abrirPersona(persona)}
-                              >
-                                <strong>{persona.nombre}</strong>
-                                <span className="text-xs tabular-nums">
-                                  {total} {total === 1 ? "aviso" : "avisos"} ·{" "}
-                                  {casos.length}{" "}
-                                  {casos.length === 1
-                                    ? "episodio"
-                                    : "episodios"}
-                                </span>
-                              </button>
-                              <details className="mt-1 text-xs">
-                                <summary className="cursor-pointer text-muted-foreground">
-                                  Ver episodios
-                                </summary>
-                                {casos.map(avisoCorto)}
-                              </details>
-                            </div>
-                          ))}
-                          {!conAvisos.length && (
-                            <p className="text-sm text-muted-foreground">
-                              Sin avisos emitidos hoy.
-                            </p>
-                          )}
-                        </div>
-                        <h3 className="mt-4 mb-1 border-t border-border/50 pt-3 text-sm font-semibold">
-                          Llamadas de atención confirmadas
-                        </h3>
-                        <p className="mb-2 text-xs text-muted-foreground">
-                          Solo cuenta una llamada registrada expresamente por un
-                          responsable.
-                        </p>
-                        <div className="grid gap-2 sm:grid-cols-2">
-                          {conLlamadas.map(({ persona, casos }) => (
-                            <div
-                              key={persona.id}
-                              className="rounded-xl border border-border/60 bg-background/30 px-3 py-2"
-                            >
-                              <button
-                                type="button"
-                                className="flex w-full items-center justify-between gap-2 text-left text-sm hover:underline"
-                                onClick={() => abrirPersona(persona)}
-                              >
-                                <strong>{persona.nombre}</strong>
-                                <span className="text-xs tabular-nums">
-                                  {casos.length}{" "}
-                                  {casos.length === 1
-                                    ? "confirmada"
-                                    : "confirmadas"}
-                                </span>
-                              </button>
-                              {casos.map((item) => (
-                                <button
-                                  type="button"
-                                  key={item.id}
-                                  onClick={() => abrirEpisodio(item)}
-                                  className="mt-1 block w-full rounded-md py-1 text-left text-xs hover:bg-muted/60"
-                                  aria-label={`Ver llamada de atención de ${persona.nombre}: ${item.titulo}`}
-                                >
-                                  <span className="flex items-center gap-1.5 font-medium">
-                                    {item.titulo}
-                                    <ChevronRight className="h-3.5 w-3.5" />
-                                  </span>
-                                  <span className="block text-muted-foreground">
-                                    {item.llamadaConfirmada!.por} ·{" "}
-                                    {textoHora(item.llamadaConfirmada!.hora)}
-                                  </span>
-                                  <span className="block">
-                                    {item.llamadaConfirmada!.motivo}
-                                  </span>
-                                </button>
-                              ))}
-                            </div>
-                          ))}
-                          {!conLlamadas.length && (
-                            <p className="text-xs text-muted-foreground">
-                              Sin llamadas de atención confirmadas hoy.
-                            </p>
-                          )}
-                        </div>
-                      </>
-                    ) : (
-                      <div className="mt-2 grid gap-2 sm:grid-cols-2">
-                        {conectados.map((persona) => (
-                          <button
-                            key={persona.id}
-                            type="button"
-                            onClick={() => abrirPersona(persona)}
-                            className="rounded-xl border border-border/60 bg-background/30 px-3 py-2 text-left hover:bg-muted/60"
-                          >
-                            <span className="flex items-center gap-2 text-sm font-semibold">
-                              <span
-                                aria-hidden
-                                className="h-2 w-2 rounded-full bg-success"
-                              />
-                              {persona.nombre}
-                              <ChevronRight className="ml-auto h-3.5 w-3.5 text-muted-foreground" />
-                            </span>
-                            <span className="mt-1 block text-sm">
-                              {persona.ubicacion ?? "Ubicación sin confirmar"}
-                            </span>
-                            <span className="block text-xs text-muted-foreground">
-                              {persona.observacion
-                                ? `${persona.observacion.app} · ${persona.observacion.actividad} · visto a las ${textoHora(persona.observacion.hora)}`
-                                : "Sin actividad observada hoy"}
-                            </span>
-                          </button>
-                        ))}
-                        {!conectados.length && (
-                          <p className="text-sm text-muted-foreground">
-                            Sin conexiones activas en este equipo.
-                          </p>
+                              {nombre}
+                              {nombre === "Conectados" && (
+                                <span>{conectados.length}</span>
+                              )}
+                            </button>
+                          ),
                         )}
                       </div>
-                    )}
-                  </section>
+                      {supervision === "Pendientes" ? (
+                        <>
+                          <div className="argos-equipo__lista">
+                            {porAtender.map(({ persona, casos }) => (
+                              <div
+                                key={persona.id}
+                                className="argos-equipo__persona"
+                              >
+                                <button
+                                  type="button"
+                                  aria-label={persona.nombre}
+                                  className="argos-equipo__nombre"
+                                  onClick={() => abrirPersona(persona)}
+                                >
+                                  <Avatar className="h-7 w-7 shrink-0">
+                                    <AvatarFallback className="bg-primary/15 text-[11px] text-foreground">
+                                      {persona.iniciales}
+                                    </AvatarFallback>
+                                  </Avatar>
+                                  {persona.nombre}
+                                </button>
+                                <div className="argos-equipo__episodios">
+                                  {casos.map(avisoCorto)}
+                                </div>
+                              </div>
+                            ))}
+                            {!porAtender.length && (
+                              <p className="text-sm text-muted-foreground">
+                                Sin pendientes de revisión.
+                              </p>
+                            )}
+                          </div>
+                          <div className="argos-equipo__pie">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => {
+                                fijarFiltro("fecha", HOY);
+                                cambiar("Revisión");
+                                setRevision("Pendientes");
+                              }}
+                            >
+                              {pendientes.length} por revisar{" "}
+                              <ChevronRight className="h-3.5 w-3.5" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => {
+                                fijarFiltro("fecha", HOY);
+                                cambiar("Estado");
+                                setEstado("Salud de la plataforma");
+                              }}
+                            >
+                              <WifiOff className="h-3.5 w-3.5" />{" "}
+                              {tecnicos.length}{" "}
+                              {tecnicos.length === 1
+                                ? "incidencia técnica"
+                                : "incidencias técnicas"}
+                            </Button>
+                          </div>
+                        </>
+                      ) : supervision === "Más avisos" ? (
+                        <>
+                          <h3 className="mt-4 mb-1 text-base font-semibold">
+                            Avisos de Argos
+                          </h3>
+                          <p className="mb-2 text-xs text-muted-foreground">
+                            Avisos automáticos emitidos hoy, agrupados por
+                            episodio.
+                          </p>
+                          <div className="grid gap-2">
+                            {conAvisos.map(({ persona, casos, total }) => (
+                              <div
+                                key={persona.id}
+                                className="rounded-xl border border-border/60 bg-background/30 px-3 py-2"
+                              >
+                                <button
+                                  type="button"
+                                  className="flex w-full flex-wrap items-center justify-between gap-1 text-left text-sm hover:underline"
+                                  onClick={() => abrirPersona(persona)}
+                                >
+                                  <strong>{persona.nombre}</strong>
+                                  <span className="text-xs tabular-nums">
+                                    {total} {total === 1 ? "aviso" : "avisos"} ·{" "}
+                                    {casos.length}{" "}
+                                    {casos.length === 1
+                                      ? "episodio"
+                                      : "episodios"}
+                                  </span>
+                                </button>
+                                <details className="mt-1 text-xs">
+                                  <summary className="cursor-pointer text-muted-foreground">
+                                    Ver episodios
+                                  </summary>
+                                  {casos.map(avisoCorto)}
+                                </details>
+                              </div>
+                            ))}
+                            {!conAvisos.length && (
+                              <p className="text-sm text-muted-foreground">
+                                Sin avisos emitidos hoy.
+                              </p>
+                            )}
+                          </div>
+                          <h3 className="mt-4 mb-1 border-t border-border/50 pt-3 text-sm font-semibold">
+                            Llamadas de atención confirmadas
+                          </h3>
+                          <p className="mb-2 text-xs text-muted-foreground">
+                            Solo cuenta una llamada registrada expresamente por
+                            un responsable.
+                          </p>
+                          <div className="grid gap-2">
+                            {conLlamadas.map(({ persona, casos }) => (
+                              <div
+                                key={persona.id}
+                                className="rounded-xl border border-border/60 bg-background/30 px-3 py-2"
+                              >
+                                <button
+                                  type="button"
+                                  className="flex w-full items-center justify-between gap-2 text-left text-sm hover:underline"
+                                  onClick={() => abrirPersona(persona)}
+                                >
+                                  <strong>{persona.nombre}</strong>
+                                  <span className="text-xs tabular-nums">
+                                    {casos.length}{" "}
+                                    {casos.length === 1
+                                      ? "confirmada"
+                                      : "confirmadas"}
+                                  </span>
+                                </button>
+                                {casos.map((item) => (
+                                  <button
+                                    type="button"
+                                    key={item.id}
+                                    onClick={() => abrirEpisodio(item)}
+                                    className="mt-1 block w-full rounded-md py-1 text-left text-xs hover:bg-muted/60"
+                                    aria-label={`Ver llamada de atención de ${persona.nombre}: ${item.titulo}`}
+                                  >
+                                    <span className="flex items-center gap-1.5 font-medium">
+                                      {item.titulo}
+                                      <ChevronRight className="h-3.5 w-3.5" />
+                                    </span>
+                                    <span className="block text-muted-foreground">
+                                      {item.llamadaConfirmada!.por} ·{" "}
+                                      {textoHora(item.llamadaConfirmada!.hora)}
+                                    </span>
+                                    <span className="block">
+                                      {item.llamadaConfirmada!.motivo}
+                                    </span>
+                                  </button>
+                                ))}
+                              </div>
+                            ))}
+                            {!conLlamadas.length && (
+                              <p className="text-xs text-muted-foreground">
+                                Sin llamadas de atención confirmadas hoy.
+                              </p>
+                            )}
+                          </div>
+                        </>
+                      ) : (
+                        <div className="mt-2 grid gap-2">
+                          {conectados.map((persona) => (
+                            <button
+                              key={persona.id}
+                              type="button"
+                              onClick={() => abrirPersona(persona)}
+                              className="rounded-xl border border-border/60 bg-background/30 px-3 py-2 text-left hover:bg-muted/60"
+                            >
+                              <span className="flex items-center gap-2 text-sm font-semibold">
+                                <span
+                                  aria-hidden
+                                  className="h-2 w-2 rounded-full bg-success"
+                                />
+                                {persona.nombre}
+                                <ChevronRight className="ml-auto h-3.5 w-3.5 text-muted-foreground" />
+                              </span>
+                              <span className="mt-1 block text-sm">
+                                {persona.ubicacion ?? "Ubicación sin confirmar"}
+                              </span>
+                              <span className="block text-xs text-muted-foreground">
+                                {persona.observacion
+                                  ? `${persona.observacion.app} · ${persona.observacion.actividad} · visto a las ${textoHora(persona.observacion.hora)}`
+                                  : "Sin actividad observada hoy"}
+                              </span>
+                            </button>
+                          ))}
+                          {!conectados.length && (
+                            <p className="text-sm text-muted-foreground">
+                              Sin conexiones activas en este equipo.
+                            </p>
+                          )}
+                        </div>
+                      )}
+                    </section>
+                  </div>
                   <PresenciaArgosVista
                     filas={equipoVisible.map(presenciaDe)}
                     ahora={ahoraEjemplo}
@@ -1939,7 +2024,7 @@ function PreviewArgos() {
                   <Button
                     size="icon"
                     variant="ghost"
-                    onClick={() => setDetalle(undefined)}
+                    onClick={cerrarDetalle}
                     aria-label="Cerrar detalle"
                   >
                     <X className="h-4 w-4" />

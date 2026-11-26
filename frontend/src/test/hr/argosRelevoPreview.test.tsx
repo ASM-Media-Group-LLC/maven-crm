@@ -58,6 +58,7 @@ describe("Relevo de supervisión de Argos", () => {
     preparar();
     const pm = screen.getByRole("button", { name: /ver turno PM/i });
     expect(pm).toHaveTextContent("1 de 2");
+    expect(pm).toHaveAccessibleDescription(/Falta la marca de Manuel Ejemplo/);
     fireEvent.click(pm);
     const luz = screen.getByRole("button", { name: /Luz Ejemplo/ });
     const manuel = screen.getByRole("button", { name: /Manuel Ejemplo/ });
@@ -89,6 +90,12 @@ describe("Relevo de supervisión de Argos", () => {
       screen.getByRole("button", { name: /18:00 Nuria Ejemplo/ }),
     );
     expect(abrirPersona).toHaveBeenCalledWith("nora");
+    fireEvent.click(
+      screen.getByRole("button", { name: "Cerrar detalle del turno" }),
+    );
+    expect(
+      screen.getByRole("button", { name: /ver próximas entradas/i }),
+    ).toHaveFocus();
   });
 
   it("muestra los episodios AM y abre el pendiente con su responsable", () => {

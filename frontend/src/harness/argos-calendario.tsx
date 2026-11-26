@@ -10,7 +10,6 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { fechaDeDia } from "@/lib/casosArgos";
-import { cn } from "@/lib/utils";
 
 type CalendarioArgosProps = {
   fecha: string;
@@ -23,8 +22,6 @@ const opciones = { locale: es };
 const iso = (dia: Date) => format(dia, "yyyy-MM-dd");
 const nombreCompleto = (dia: Date) =>
   format(dia, "EEEE, d 'de' MMMM 'de' yyyy", opciones);
-const flecha =
-  "h-10 w-9 shrink-0 rounded-lg p-0 text-muted-foreground hover:text-foreground";
 
 export function CalendarioArgos({
   fecha,
@@ -56,28 +53,29 @@ export function CalendarioArgos({
   }
 
   return (
-    <section aria-label="Fecha de la jornada" className="pt-2">
-      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
-        <div aria-live="polite" aria-atomic="true">
-          <h2 className="font-display text-[2rem] font-semibold leading-tight tracking-tight text-foreground first-letter:uppercase sm:text-4xl">
+    <section aria-label="Fecha de la jornada" className="argos-fecha">
+      <div className="argos-fecha__cabecera">
+        <div
+          aria-live="polite"
+          aria-atomic="true"
+          className="argos-fecha__titulo"
+        >
+          <h2 className="font-display">
             {esHoy ? "Hoy" : format(seleccion, "EEEE d", opciones)}
           </h2>
-          <time
-            dateTime={fecha}
-            className="mt-1 block text-base leading-snug text-muted-foreground first-letter:uppercase"
-          >
+          <time dateTime={fecha}>
             {esHoy
               ? nombreCompleto(seleccion)
               : format(seleccion, "MMMM 'de' yyyy", opciones)}
           </time>
         </div>
-        <div className="flex items-center gap-1.5">
+        <div className="argos-fecha__acciones">
           {!esHoy && (
             <Button
               type="button"
               variant="ghost"
               size="sm"
-              className="text-sm"
+              className="argos-fecha__volver"
               onClick={() => alCambiar(hoy)}
             >
               Volver a hoy
@@ -88,11 +86,11 @@ export function CalendarioArgos({
               <Button
                 type="button"
                 variant="outline"
-                className="h-10 gap-2 rounded-lg px-3 text-sm font-medium"
+                className="argos-fecha__abrir"
                 aria-label="Abrir calendario"
               >
                 <CalendarDays className="h-4 w-4" aria-hidden="true" />
-                Calendario
+                <span>Calendario</span>
               </Button>
             </PopoverTrigger>
             <PopoverContent
@@ -138,21 +136,18 @@ export function CalendarioArgos({
         </div>
       </div>
 
-      <nav
-        aria-label="Semana de la jornada"
-        className="mt-4 flex items-center gap-1 border-y border-border/60 py-1 sm:gap-2"
-      >
+      <nav aria-label="Semana de la jornada" className="argos-fecha__semana">
         <Button
           type="button"
           variant="ghost"
           size="icon"
           aria-label="Semana anterior"
-          className={flecha}
+          className="argos-fecha__flecha"
           onClick={() => alCambiar(iso(addDays(seleccion, -7)))}
         >
           <ChevronLeft className="h-4 w-4" aria-hidden="true" />
         </Button>
-        <div className="grid min-w-0 flex-1 grid-cols-7 gap-0.5 sm:gap-1">
+        <div className="argos-fecha__dias">
           {semana.map((dia) => {
             const clave = iso(dia);
             const activo = fecha === clave;
@@ -165,34 +160,17 @@ export function CalendarioArgos({
                 aria-current={clave === hoy ? "date" : undefined}
                 aria-pressed={activo}
                 onClick={() => alCambiar(clave)}
-                className={cn(
-                  "relative flex min-h-[3.75rem] min-w-0 flex-col items-center justify-center gap-0.5 rounded-md px-0.5 pb-1 text-foreground outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring",
-                  activo ? "bg-primary/10 text-primary" : "hover:bg-muted/60",
-                )}
+                className="argos-fecha__dia"
               >
-                <span
-                  className={cn(
-                    "text-[13px] font-medium leading-none first-letter:uppercase sm:text-sm",
-                    !activo && "text-muted-foreground",
-                  )}
-                >
-                  {format(dia, "EEEEEE", opciones)}
+                <span className="argos-fecha__nombre">
+                  {format(dia, "EEE", opciones)}
                 </span>
-                <span className="text-lg font-semibold leading-tight tabular-nums">
+                <span className="argos-fecha__numero">
                   {dia.getDate()}
+                  {pendiente && (
+                    <span aria-hidden="true" className="argos-fecha__punto" />
+                  )}
                 </span>
-                {activo && (
-                  <span
-                    aria-hidden="true"
-                    className="absolute inset-x-[18%] bottom-0 h-0.5 rounded-full bg-primary"
-                  />
-                )}
-                {pendiente && (
-                  <span
-                    aria-hidden="true"
-                    className="absolute bottom-1.5 h-1 w-1 rounded-full bg-warning"
-                  />
-                )}
               </button>
             );
           })}
@@ -202,14 +180,14 @@ export function CalendarioArgos({
           variant="ghost"
           size="icon"
           aria-label="Semana siguiente"
-          className={flecha}
+          className="argos-fecha__flecha"
           onClick={() => alCambiar(iso(addDays(seleccion, 7)))}
         >
           <ChevronRight className="h-4 w-4" aria-hidden="true" />
         </Button>
       </nav>
       {semana.some((dia) => tienePendientes(iso(dia))) && (
-        <p className="mt-2 flex items-center gap-2 text-[13px] text-muted-foreground">
+        <p className="argos-fecha__leyenda">
           <span
             aria-hidden="true"
             className="h-1.5 w-1.5 rounded-full bg-warning"

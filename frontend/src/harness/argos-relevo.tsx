@@ -1,6 +1,5 @@
-import { useState } from "react";
+import { useRef, useState, type MouseEvent } from "react";
 import { Check, ChevronRight, X } from "lucide-react";
-import { cn } from "@/lib/utils";
 
 export const corteEjemplo = "16:20";
 type Horario = {
@@ -88,6 +87,7 @@ export function RelevoArgos<E extends Episodio>({
 }) {
   const [seccion, setSeccion] = useState<Seccion | null>(null);
   const [resto, setResto] = useState(false);
+  const botonDeDetalle = useRef<HTMLButtonElement | null>(null);
   const turnos = personas
     .filter((p) => horariosEjemplo[p.id])
     .map((persona) => ({ persona, horario: horariosEjemplo[persona.id] }))
@@ -131,53 +131,22 @@ export function RelevoArgos<E extends Episodio>({
   const pendientesAM =
     aRevisar.length === 1 ? "1 pendiente" : `${aRevisar.length} pendientes`;
   const proxima = proximas[0];
-  const agenda = [
-    {
-      id: "AM",
-      accion: "Ver cierre AM",
-      hora: "08:00",
-      hasta: "16:00",
-      titulo: "Cierre del turno AM",
-      detalle: am.length
-        ? `${entradasAM} de ${am.length} entradas registradas · ${pendientesAM} para el relevo`
-        : "Sin entradas programadas",
-    },
-    {
-      id: "PM",
-      accion: "Ver turno PM",
-      hora: "16:00",
-      hasta: "00:00",
-      titulo: "Turno PM en curso",
-      detalle: pm.length
-        ? [
-            `${entradasPM} de ${pm.length} entradas registradas`,
-            sinMarca.length === 1
-              ? `Falta la marca de ${sinMarca[0].persona.nombre}`
-              : sinMarca.length
-                ? `${sinMarca.length} sin entrada registrada`
-                : "Todas marcadas",
-          ].join(" · ")
-        : "Nadie debía entrar todavía",
-    },
-    {
-      id: "Próximas entradas",
-      accion: "Ver próximas entradas",
-      hora: proxima?.horario.inicio ?? "—",
-      hasta: proxima
-        ? `en ${minutos(proxima.horario.inicio) - minutoCorte} min`
-        : "",
-      titulo: "Próxima entrada",
-      detalle: proxima
-        ? [
-            proxima.persona.nombre,
-            proximas.length > 1 &&
-              `y ${proximas.length - 1} más en la próxima hora`,
-          ]
-            .filter(Boolean)
-            .join(" ")
-        : "Sin entradas previstas en los próximos 60 minutos",
-    },
-  ] as const;
+  const longitudDelDia = minutos("24:00") - minutos("08:00");
+  const posicionDelCorte = (minutoCorte - minutos("08:00")) / longitudDelDia;
+
+  function controlDeDetalle(vista: Seccion, etiqueta: string) {
+    return {
+      type: "button" as const,
+      "aria-label": etiqueta,
+      "aria-expanded": seccion === vista,
+      "aria-controls": seccion === vista ? "detalle-agenda-turno" : undefined,
+      onClick: (evento: MouseEvent<HTMLButtonElement>) => {
+        botonDeDetalle.current = evento.currentTarget;
+        setSeccion(seccion === vista ? null : vista);
+        setResto(false);
+      },
+    };
+  }
 
   function mostrarEpisodio(item: E) {
     return (
@@ -207,177 +176,197 @@ export function RelevoArgos<E extends Episodio>({
   }
 
   return (
-    <section aria-labelledby="titulo-agenda-turnos" className="mt-5">
-      <header className="mb-1 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-        <h2
-          id="titulo-agenda-turnos"
-          className="font-display text-xl font-semibold leading-tight tracking-tight"
+    <section aria-labelledby="titulo-agenda-turnos" className="argos-turno">
+      <div className="argos-turno__contenido">
+        <header className="argos-turno__cabecera">
+          <h2 id="titulo-agenda-turnos">Turno PM</h2>
+          <span className="argos-turno__estado">En curso</span>
+        </header>
+        <button
+          {...controlDeDetalle("PM", "Ver turno PM")}
+          aria-describedby="cobertura-pm faltan-marcas-pm"
+          className="argos-turno__cobertura"
         >
-          Turnos y entradas
-        </h2>
-        <p className="text-sm tabular-nums text-muted-foreground">
-          Al corte de las {corteEjemplo} · Bogotá
-        </p>
-      </header>
-      <ol className="mt-2 divide-y divide-border/55 border-y border-border/55">
-        {agenda.map(({ id, accion, hora, hasta, titulo, detalle }, indice) => (
-          <li key={id}>
-            <button
-              id={`abrir-relevo-${indice}`}
-              type="button"
-              aria-label={accion}
-              aria-describedby={`datos-relevo-${indice}`}
-              aria-expanded={seccion === id}
-              aria-controls={
-                seccion === id ? "detalle-agenda-turno" : undefined
-              }
-              onClick={() => {
-                setSeccion(seccion === id ? null : id);
-                setResto(false);
-              }}
-              className={cn(
-                "group grid w-full grid-cols-[3.75rem_minmax(0,1fr)_1rem] items-center gap-x-3 rounded-md px-1 py-2.5 text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring hover:bg-muted/45 sm:grid-cols-[4.75rem_minmax(0,1fr)_1rem] sm:gap-x-4 sm:px-2",
-                seccion === id && "bg-muted/40",
-              )}
-            >
-              <span
-                aria-hidden="true"
-                className="flex flex-col leading-tight tabular-nums"
-              >
-                <span
-                  className={cn(
-                    "text-[17px] font-semibold tracking-tight",
-                    id === "PM" && "text-primary",
-                  )}
-                >
-                  {hora}
+          <span id="cobertura-pm" className="argos-turno__numeros">
+            {pm.length > 0 ? (
+              <>
+                <span className="argos-turno__cifra">
+                  {entradasPM} <span>de</span> {pm.length}
                 </span>
-                {hasta && (
-                  <span className="mt-0.5 text-xs text-muted-foreground">
-                    {id === "Próximas entradas" ? hasta : `– ${hasta}`}
-                  </span>
-                )}
-              </span>
-              <span id={`datos-relevo-${indice}`} className="min-w-0">
-                <span className="sr-only">
-                  {hora} {hasta} ·{" "}
-                </span>
-                <span className="flex items-center gap-2 text-base font-semibold leading-snug">
-                  {titulo}
-                  {id === "PM" && (
-                    <span
-                      aria-hidden="true"
-                      className="h-1.5 w-1.5 rounded-full bg-success"
-                    />
-                  )}
-                </span>
-                <span className="mt-0.5 block text-sm leading-snug text-muted-foreground">
-                  {detalle}
-                </span>
-              </span>
-              <ChevronRight
-                aria-hidden="true"
-                className={cn(
-                  "h-4 w-4 text-muted-foreground transition-transform",
-                  seccion === id && "rotate-90 text-foreground",
-                )}
-              />
-            </button>
-            {seccion === id && (
-              <div
-                id="detalle-agenda-turno"
-                className="mb-2 space-y-3 rounded-lg border border-border/60 bg-muted/25 px-3 py-3 sm:ml-[5.75rem] sm:px-4"
-              >
-                <div className="flex flex-wrap items-center gap-2">
-                  <h3 className="mr-auto text-sm font-semibold">
-                    {seccion === "AM"
-                      ? "Entradas del AM"
-                      : seccion === "PM"
-                        ? `Entradas previstas hasta las ${corteEjemplo}`
-                        : resto
-                          ? "Entradas del resto del día"
-                          : "Entradas en los próximos 60 minutos"}
-                  </h3>
-                  {seccion === "Próximas entradas" && (
-                    <button
-                      type="button"
-                      className="rounded-md border px-2.5 py-1.5 text-sm font-medium hover:bg-muted"
-                      onClick={() => setResto(!resto)}
-                    >
-                      {resto ? "Próximos 60 min" : "Resto del día"}
-                    </button>
-                  )}
-                  <button
-                    aria-label="Cerrar detalle del turno"
-                    type="button"
-                    className="rounded-md p-2 hover:bg-muted"
-                    onClick={() => {
-                      setSeccion(null);
-                      document
-                        .getElementById(`abrir-relevo-${indice}`)
-                        ?.focus();
-                    }}
-                  >
-                    <X className="h-4 w-4" />
-                  </button>
-                </div>
-                <div className="divide-y divide-border/50">
-                  {mostrar.map(({ persona, horario }) => (
-                    <button
-                      key={persona.id}
-                      type="button"
-                      className="grid w-full grid-cols-[auto_1fr_1rem] items-center gap-x-3 gap-y-1 rounded-md py-2 text-left text-sm hover:bg-muted/60"
-                      onClick={() => abrirPersona(persona.id)}
-                    >
-                      <span className="rounded-md bg-muted px-2 py-1 font-medium tabular-nums">
-                        {horario.inicio}
-                      </span>
-                      <span className="min-w-28 flex-1 font-medium">
-                        {persona.nombre}
-                      </span>
-                      <span className="col-start-2 row-start-2 text-sm leading-snug">
-                        <EstadoEntrada horario={horario} />
-                      </span>
-                      <ChevronRight
-                        aria-hidden="true"
-                        className="col-start-3 row-start-1 h-3.5 w-3.5 text-muted-foreground"
-                      />
-                    </button>
-                  ))}
-                </div>
-                {!mostrar.length && (
-                  <p className="text-sm text-muted-foreground">
-                    Sin entradas previstas en este intervalo.
-                  </p>
-                )}
-                {seccion === "AM" && (
-                  <div className="grid gap-3 border-t border-border/40 pt-3 lg:grid-cols-2">
-                    <div>
-                      <h4 className="mb-1 flex items-center gap-2 text-sm font-semibold">
-                        <Check className="h-3.5 w-3.5 text-success" />
-                        Del AM ya resuelto o revisado a las {
-                          corteEjemplo
-                        } · {solucionados.length}
-                      </h4>
-                      {solucionados.map(mostrarEpisodio)}
-                    </div>
-                    <div>
-                      <h4 className="mb-1 flex items-center gap-2 text-sm font-semibold">
-                        <span
-                          aria-hidden="true"
-                          className="h-1.5 w-1.5 rounded-full bg-warning"
-                        />
-                        Del AM que sigue pendiente · {aRevisar.length}
-                      </h4>
-                      {aRevisar.map(mostrarEpisodio)}
-                    </div>
-                  </div>
-                )}
-              </div>
+                <span>entradas registradas</span>
+              </>
+            ) : (
+              <span>Nadie debía entrar todavía</span>
             )}
-          </li>
-        ))}
-      </ol>
+          </span>
+          <span id="faltan-marcas-pm" className="argos-turno__avisar">
+            {sinMarca.length === 1 ? (
+              <>
+                Falta la marca de <strong>{sinMarca[0].persona.nombre}</strong>
+              </>
+            ) : sinMarca.length > 1 ? (
+              <>
+                <strong>{sinMarca.length} personas</strong> sin entrada
+                registrada
+              </>
+            ) : pm.length > 0 ? (
+              "Todas las entradas al día"
+            ) : (
+              "Ver entradas"
+            )}
+            <ChevronRight aria-hidden="true" size={16} />
+          </span>
+        </button>
+        <div
+          role="img"
+          aria-label={`Horario de Bogotá. Turno AM de 08:00 a 16:00, PM de 16:00 a medianoche. Corte a las ${corteEjemplo}.`}
+          className="argos-turno__tiempo"
+        >
+          <div aria-hidden="true" className="argos-turno__riel">
+            <span
+              className="argos-turno__avance"
+              style={{ width: `${posicionDelCorte * 100}%` }}
+            />
+            <span className="argos-turno__relevo" />
+            <span
+              className="argos-turno__corte"
+              style={{ left: `${posicionDelCorte * 100}%` }}
+            >
+              <span>{corteEjemplo} · Bogotá</span>
+            </span>
+          </div>
+          <div aria-hidden="true" className="argos-turno__horas">
+            <span>08:00</span>
+            <span>16:00</span>
+            <span>00:00</span>
+          </div>
+        </div>
+      </div>
+      <div className="argos-turno__accesos">
+        <button
+          {...controlDeDetalle("AM", "Ver cierre AM")}
+          aria-describedby="info-cierre-am"
+        >
+          <span className="argos-turno__etiqueta">
+            Cierre AM <ChevronRight aria-hidden="true" size={14} />
+          </span>
+          <span id="info-cierre-am">
+            {am.length > 0
+              ? `${entradasAM} de ${am.length} entradas · ${pendientesAM}`
+              : "Sin entradas programadas"}
+          </span>
+        </button>
+        <button
+          {...controlDeDetalle("Próximas entradas", "Ver próximas entradas")}
+          aria-describedby="info-entrada"
+        >
+          <span className="argos-turno__etiqueta">
+            Próxima entrada <ChevronRight aria-hidden="true" size={14} />
+          </span>
+          <span id="info-entrada">
+            {proxima ? (
+              <>
+                <strong>{proxima.horario.inicio}</strong> ·{" "}
+                {proxima.persona.nombre}
+                {proximas.length > 1
+                  ? ` (+${proximas.length - 1} en la próxima hora)`
+                  : ""}
+              </>
+            ) : (
+              "Sin entradas en los próximos 60 minutos"
+            )}
+          </span>
+        </button>
+      </div>
+      {seccion && (
+        <div
+          id="detalle-agenda-turno"
+          className="argos-turno__detalle space-y-3"
+        >
+          <div className="flex flex-wrap items-center gap-2">
+            <h3 className="mr-auto text-sm font-semibold">
+              {seccion === "AM"
+                ? "Entradas del AM"
+                : seccion === "PM"
+                  ? `Entradas previstas hasta las ${corteEjemplo}`
+                  : resto
+                    ? "Entradas del resto del día"
+                    : "Entradas en los próximos 60 minutos"}
+            </h3>
+            {seccion === "Próximas entradas" && (
+              <button
+                type="button"
+                className="rounded-md border px-2.5 py-1.5 text-sm font-medium hover:bg-muted"
+                onClick={() => setResto(!resto)}
+              >
+                {resto ? "Próximos 60 min" : "Resto del día"}
+              </button>
+            )}
+            <button
+              aria-label="Cerrar detalle del turno"
+              type="button"
+              className="rounded-md p-2 hover:bg-muted"
+              onClick={() => {
+                setSeccion(null);
+                botonDeDetalle.current?.focus();
+              }}
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+          <div className="divide-y divide-border/50">
+            {mostrar.map(({ persona, horario }) => (
+              <button
+                key={persona.id}
+                type="button"
+                className="grid w-full grid-cols-[auto_1fr_1rem] items-center gap-x-3 gap-y-1 rounded-md py-2 text-left text-sm hover:bg-muted/60"
+                onClick={() => abrirPersona(persona.id)}
+              >
+                <span className="rounded-md bg-muted px-2 py-1 font-medium tabular-nums">
+                  {horario.inicio}
+                </span>
+                <span className="min-w-28 flex-1 font-medium">
+                  {persona.nombre}
+                </span>
+                <span className="col-start-2 row-start-2 text-sm leading-snug">
+                  <EstadoEntrada horario={horario} />
+                </span>
+                <ChevronRight
+                  aria-hidden="true"
+                  className="col-start-3 row-start-1 h-3.5 w-3.5 text-muted-foreground"
+                />
+              </button>
+            ))}
+          </div>
+          {!mostrar.length && (
+            <p className="text-sm text-muted-foreground">
+              Sin entradas previstas en este intervalo.
+            </p>
+          )}
+          {seccion === "AM" && (
+            <div className="grid gap-3 border-t border-border/40 pt-3 lg:grid-cols-2">
+              <div>
+                <h4 className="mb-1 flex items-center gap-2 text-sm font-semibold">
+                  <Check className="h-3.5 w-3.5 text-success" />
+                  Del AM ya resuelto o revisado a las {corteEjemplo} ·{" "}
+                  {solucionados.length}
+                </h4>
+                {solucionados.map(mostrarEpisodio)}
+              </div>
+              <div>
+                <h4 className="mb-1 flex items-center gap-2 text-sm font-semibold">
+                  <span
+                    aria-hidden="true"
+                    className="h-1.5 w-1.5 rounded-full bg-warning"
+                  />
+                  Del AM que sigue pendiente · {aRevisar.length}
+                </h4>
+                {aRevisar.map(mostrarEpisodio)}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
     </section>
   );
 }
