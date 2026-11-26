@@ -138,6 +138,18 @@ export function useTurnoTabla(dia: string, esHoy: boolean, habilitado = true) {
         const fila = armarFila(dia, entrada, ahora);
         if (apareceEnElDia(fila)) filas.push(fila);
       }
+      // Quien «no vino» y tampoco entró a Cowork en los 14 días anteriores va aparte
+      // (Alvaro, 26/11/2026): son cuentas sin uso o días libres mal puestos.
+      const desde14 = iso(Date.parse(`${sumarDias(dia, -14)}T00:00:00-05:00`));
+      const hasta1 = iso(Date.parse(`${sumarDias(dia, 1)}T00:00:00-05:00`));
+      const ausentes = filas.filter((f) => f.noVino);
+      const activos = await Promise.all(ausentes.map(async (f) => {
+        const r = await db.from("cowork_tiempo_segmentos").select("id").eq("user_id", f.userId)
+          .gte("started_at", desde14).lt("started_at", hasta1).limit(1);
+        // Si la consulta falla no se sabe: se deja como «no vino» (no se esconde a nadie).
+        return r.error ? true : (r.data ?? []).length > 0;
+      }));
+      ausentes.forEach((f, i) => { if (!activos[i]) f.inactivo = true; });
       return { dia, filas, calculadoAt: ahora };
     },
   });

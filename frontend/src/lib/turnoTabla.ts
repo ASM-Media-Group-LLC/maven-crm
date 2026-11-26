@@ -150,6 +150,9 @@ export interface FilaTurno {
   cortesMin: number;
   nivelConexion: Nivel;
 
+  /** No vino y no ha entrado a Cowork en los 14 días anteriores (cuenta sin uso o
+   *  días libres mal puestos): va aparte, plegado (Alvaro, 26/11/2026). Lo marca el hook. */
+  inactivo?: boolean;
   /** El peor de todos. */
   nivel: NivelFila;
   /** Por qué (claves de motivo, de la más grave a la menos). */
@@ -177,8 +180,8 @@ export const peor = (...n: Nivel[]): Nivel => n.reduce((a, b) => (PESO[b] > PESO
 export function armarFila(dia: string, p: EntradaPersona, ahora: number): FilaTurno {
   const h = p.horario;
   const turno = ventanaTurno(dia, h);
-  const { desde, hasta } = ventanaDatos(dia, h);
-  const dentro = (t: number) => t >= desde && t < hasta;
+  const { desde: v0, hasta: v1 } = ventanaDatos(dia, h);
+  const dentro = (x: number) => x >= v0 && x < v1;
   const segs = p.segmentos.filter((s) => dentro(s.inicio) && s.fin > s.inicio).sort((a, b) => a.inicio - b.inicio);
   const pausas = p.pausas.filter((x) => dentro(x.inicio)).sort((a, b) => a.inicio - b.inicio);
   const avisos = p.avisos.filter((a) => dentro(a.at)).sort((a, b) => a.at - b.at);
@@ -334,10 +337,11 @@ export function apareceEnElDia(f: FilaTurno): boolean {
   return f.turnoInicio != null || f.llegada != null;
 }
 
-export type Seccion = "mirar" | "ojo" | "bien" | "luego";
+export type Seccion = "mirar" | "ojo" | "bien" | "luego" | "inactivos";
 
 export function seccionDe(f: FilaTurno): Seccion {
   if (f.empiezaLuego) return "luego";
+  if (f.inactivo) return "inactivos";
   return f.nivel === "rojo" ? "mirar" : f.nivel === "ambar" ? "ojo" : "bien";
 }
 

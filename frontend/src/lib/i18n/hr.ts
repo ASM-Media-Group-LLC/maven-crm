@@ -2154,6 +2154,7 @@ export const hr = {
   "hr.turno.sec.mirar": { es: "Mirar primero", en: "Look first" },
   "hr.turno.sec.ojo": { es: "Ojo", en: "Keep an eye" },
   "hr.turno.sec.bien": { es: "Todo en orden", en: "On track" },
+  "hr.turno.sec.inactivos": { es: "Sin actividad reciente (no entran a Cowork hace 14 días)", en: "No recent activity (no Cowork in 14 days)" },
   "hr.turno.sec.luego": { es: "Entran más tarde", en: "Starts later" },
   "hr.turno.min": { es: "{n} min", en: "{n} min" },
   "hr.turno.horas": { es: "{h} h {m}", en: "{h} h {m}" },

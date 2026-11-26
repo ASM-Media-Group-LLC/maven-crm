@@ -179,6 +179,7 @@ const TITULO_SECCION: Record<Seccion, TranslationKey> = {
   ojo: "hr.turno.sec.ojo",
   bien: "hr.turno.sec.bien",
   luego: "hr.turno.sec.luego",
+  inactivos: "hr.turno.sec.inactivos",
 };
 
 export function TurnoTabla() {
@@ -205,9 +206,9 @@ export function TurnoTabla() {
   const delTurno = useMemo(() => filas.filter((f) => !turno || `${f.entrada}–${f.salida}` === turno), [filas, turno]);
   const pasa = (f: FilaTurno, k: Filtro) =>
     k === "todos" ? true
-      : k === "mirar" ? f.nivel !== "ok" && !f.empiezaLuego
+      : k === "mirar" ? f.nivel !== "ok" && !f.empiezaLuego && !f.inactivo
         : k === "tarde" ? f.tardeMin != null
-          : k === "noEsta" ? f.noVino || f.noLlegaMin != null
+          : k === "noEsta" ? (f.noVino && !f.inactivo) || f.noLlegaMin != null
             : f.nivelComida !== "ok" || f.nivelBano !== "ok";
   const conteo = useMemo(() => {
     const c: Record<Filtro, number> = { todos: 0, mirar: 0, tarde: 0, noEsta: 0, pausas: 0 };
@@ -221,11 +222,11 @@ export function TurnoTabla() {
     [delTurno, filtro, texto],
   );
   const secciones = useMemo(() => {
-    const m: Record<Seccion, FilaTurno[]> = { mirar: [], ojo: [], bien: [], luego: [] };
+    const m: Record<Seccion, FilaTurno[]> = { mirar: [], ojo: [], bien: [], luego: [], inactivos: [] };
     for (const f of vistas) m[seccionDe(f)].push(f);
     return m;
   }, [vistas]);
-  const paraMirar = useMemo(() => ordenarPorAtencion(delTurno.filter((f) => f.nivel !== "ok" && !f.empiezaLuego)), [delTurno]);
+  const paraMirar = useMemo(() => ordenarPorAtencion(delTurno.filter((f) => f.nivel !== "ok" && !f.empiezaLuego && !f.inactivo)), [delTurno]);
   const ahoraComiendo = delTurno.filter((f) => f.comidaAhora != null).length;
   const ahoraBano = delTurno.filter((f) => f.banoAhora != null).length;
   const ahoraAviso = delTurno.filter((f) => f.avisoAbierto).length;
@@ -380,8 +381,8 @@ export function TurnoTabla() {
               <p className="flex items-center gap-2 text-sm font-semibold">
                 <Punto nivel={paraMirar.some((f) => f.nivel === "rojo") ? "rojo" : paraMirar.length ? "ambar" : "ok"} />
                 {paraMirar.length
-                  ? t(paraMirar.length === 1 ? "hr.turno.parte.uno" : "hr.turno.parte.varios", { n: paraMirar.length, total: delTurno.filter((f) => !f.empiezaLuego).length })
-                  : t("hr.turno.parte.limpio", { total: delTurno.filter((f) => !f.empiezaLuego).length })}
+                  ? t(paraMirar.length === 1 ? "hr.turno.parte.uno" : "hr.turno.parte.varios", { n: paraMirar.length, total: delTurno.filter((f) => !f.empiezaLuego && !f.inactivo).length })
+                  : t("hr.turno.parte.limpio", { total: delTurno.filter((f) => !f.empiezaLuego && !f.inactivo).length })}
               </p>
               {esHoy && (ahoraComiendo + ahoraBano + ahoraAviso > 0) && (
                 <p className="mt-1 text-xs text-muted-foreground">
@@ -489,6 +490,16 @@ export function TurnoTabla() {
                   </summary>
                   <div className="mt-2 flex flex-col gap-1.5 md:gap-0 md:divide-y md:divide-border/30">
                     {secciones.luego.map((f) => <Fila key={f.userId} f={f} />)}
+                  </div>
+                </details>
+              )}
+              {secciones.inactivos.length > 0 && (
+                <details className="mt-2 rounded-2xl border border-dashed border-border/40 bg-card/10 p-3">
+                  <summary className="cursor-pointer text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                    {t(TITULO_SECCION.inactivos)} · {secciones.inactivos.length}
+                  </summary>
+                  <div className="mt-2 flex flex-col gap-1.5 md:gap-0 md:divide-y md:divide-border/30">
+                    {secciones.inactivos.map((f) => <Fila key={f.userId} f={f} />)}
                   </div>
                 </details>
               )}
