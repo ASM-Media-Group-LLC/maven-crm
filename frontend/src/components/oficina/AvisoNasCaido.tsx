@@ -62,8 +62,8 @@ export function AvisoNasCaido() {
           <button
             type="button"
             onClick={cerrar}
-            title={t("drive.nas.cerrar")}
-            aria-label={t("drive.nas.cerrar")}
+            title={t("drive.nas.cerrarCuadro")}
+            aria-label={t("drive.nas.cerrarCuadro")}
             data-cerrar-aviso-nas
             className="-mr-1 -mt-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-muted-foreground hover:bg-white/10 hover:text-foreground"
           >

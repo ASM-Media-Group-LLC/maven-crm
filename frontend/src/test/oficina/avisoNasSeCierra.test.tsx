@@ -13,14 +13,14 @@ describe("aviso de NAS caído", () => {
   it("la X cierra el cuadro y la franja se queda", () => {
     render(<AvisoNasCaido />);
     expect(screen.getByRole("alertdialog")).toBeTruthy();
-    fireEvent.click(screen.getByLabelText("drive.nas.cerrar"));
+    fireEvent.click(screen.getByLabelText("drive.nas.cerrarCuadro"));
     expect(screen.queryByRole("alertdialog")).toBeNull();
     expect(screen.getByRole("status")).toBeTruthy();
   });
 
   it("no vuelve en la misma caída, pero sí en una caída nueva", () => {
     const { unmount } = render(<AvisoNasCaido />);
-    fireEvent.click(screen.getByLabelText("drive.nas.cerrar"));
+    fireEvent.click(screen.getByLabelText("drive.nas.cerrarCuadro"));
     unmount();
     const r = render(<AvisoNasCaido />);
     expect(screen.queryByRole("alertdialog")).toBeNull();
