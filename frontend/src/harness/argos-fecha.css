@@ -1,0 +1,213 @@
+.argos-fecha {
+  container-type: inline-size;
+  --fecha-seleccion: color-mix(in srgb, hsl(var(--primary)) 18%, white);
+  --fecha-tinta: color-mix(in srgb, hsl(var(--primary)) 34%, #071523);
+}
+
+.argos-fecha__cabecera,
+.argos-fecha__acciones,
+.argos-fecha__semana,
+.argos-fecha__leyenda {
+  display: flex;
+  align-items: center;
+}
+
+.argos-fecha__cabecera {
+  justify-content: space-between;
+  gap: 0.6rem;
+}
+
+.argos-fecha__titulo {
+  min-width: 0;
+}
+
+.argos-fecha__titulo h2 {
+  color: hsl(var(--foreground));
+  font-size: 2.5rem;
+  font-weight: 650;
+  line-height: 1.06;
+  letter-spacing: -0.045em;
+}
+
+.argos-fecha__titulo h2::first-letter,
+.argos-fecha__titulo time::first-letter,
+.argos-fecha__nombre::first-letter {
+  text-transform: uppercase;
+}
+
+.argos-fecha__titulo time {
+  display: block;
+  margin-top: 0.35rem;
+  color: hsl(var(--muted-foreground));
+  font-size: 0.95rem;
+  line-height: 1.35;
+}
+
+.argos-fecha__acciones {
+  flex-shrink: 0;
+  gap: 0.25rem;
+}
+
+.argos-fecha .argos-fecha__abrir,
+.argos-fecha .argos-fecha__volver {
+  height: 2.25rem;
+  border-radius: 0.5rem;
+  padding-inline: 0.65rem;
+  font-size: 0.875rem;
+}
+
+.argos-fecha .argos-fecha__abrir {
+  gap: 0.45rem;
+  background: transparent;
+}
+
+.argos-fecha__semana {
+  margin-top: 0.9rem;
+  padding: 0.25rem;
+  gap: 0.1rem;
+  border-radius: 0.65rem;
+  border: 1px solid hsl(var(--border) / 0.72);
+  background: hsl(var(--foreground) / 0.025);
+}
+
+.argos-fecha .argos-fecha__flecha {
+  width: 1.75rem;
+  height: 2.4rem;
+  flex-shrink: 0;
+  border-radius: 0.4rem;
+  padding: 0;
+  color: hsl(var(--muted-foreground));
+}
+
+.argos-fecha__dias {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  flex: 1;
+  min-width: 0;
+  gap: 0.1rem;
+}
+
+.argos-fecha__dia {
+  position: relative;
+  display: flex;
+  min-width: 0;
+  min-height: 2.85rem;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.1rem;
+  border-radius: 0.4rem;
+  color: hsl(var(--foreground));
+}
+
+.argos-fecha__dia:hover {
+  background: hsl(var(--foreground) / 0.06);
+}
+
+.argos-fecha__dia:focus-visible {
+  outline: 2px solid hsl(var(--ring));
+  outline-offset: -2px;
+}
+
+.argos-fecha__nombre {
+  color: hsl(var(--muted-foreground));
+  font-size: 0.75rem;
+  font-weight: 500;
+  line-height: 1.1;
+}
+
+.argos-fecha__numero {
+  position: relative;
+  font-family: Manrope, ui-sans-serif, system-ui, sans-serif;
+  font-variant-numeric: tabular-nums;
+  font-size: 1.125rem;
+  font-weight: 650;
+  line-height: 1.12;
+  letter-spacing: -0.035em;
+}
+
+.argos-fecha__dia[aria-pressed="true"] {
+  background: var(--fecha-seleccion);
+  color: var(--fecha-tinta);
+}
+
+.argos-fecha__dia[aria-pressed="true"] .argos-fecha__nombre {
+  color: var(--fecha-tinta);
+}
+
+.argos-fecha__punto {
+  position: absolute;
+  left: calc(100% + 3px);
+  top: 0.05em;
+  width: 0.3rem;
+  height: 0.3rem;
+  border-radius: 50%;
+  background: hsl(var(--warning));
+}
+
+.argos-fecha__dia[aria-pressed="true"] .argos-fecha__punto {
+  background: color-mix(in srgb, hsl(var(--warning)) 50%, #352203);
+}
+
+.argos-fecha__leyenda {
+  margin-top: 0.4rem;
+  gap: 0.4rem;
+  color: hsl(var(--muted-foreground));
+  font-size: 0.8rem;
+  line-height: 1.25;
+}
+
+@container (max-width: 26rem) {
+  .argos-fecha .argos-fecha__abrir {
+    width: 2.25rem;
+    padding-inline: 0;
+  }
+
+  .argos-fecha__abrir span {
+    display: none;
+  }
+
+  .argos-fecha__cabecera {
+    align-items: flex-start;
+  }
+
+  .argos-fecha .argos-fecha__flecha {
+    width: 1.4rem;
+  }
+}
+
+@container (min-width: 38rem) {
+  .argos-fecha__titulo {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0.1rem 1rem;
+  }
+
+  .argos-fecha__titulo h2 {
+    font-size: 2.75rem;
+  }
+
+  .argos-fecha__titulo time {
+    margin-top: 0;
+    font-size: 1rem;
+  }
+
+  .argos-fecha__semana {
+    margin-top: 0.8rem;
+  }
+
+  .argos-fecha__dia {
+    flex-direction: row;
+    gap: 0.35rem;
+    min-height: 2.35rem;
+  }
+
+  .argos-fecha__nombre {
+    font-size: 0.8125rem;
+  }
+
+  .argos-fecha__numero {
+    font-size: 1.25rem;
+  }
+}

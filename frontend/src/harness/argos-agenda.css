@@ -1,0 +1,152 @@
+@import "./argos-fecha.css";
+@import "./argos-turno.css";
+
+/* La agenda se adapta a la columna real, también cuando el expediente está abierto. */
+.argos-columna-agenda {
+  container: agenda / inline-size;
+}
+
+.argos-resumen-dia {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+}
+
+.argos-equipo {
+  min-width: 0;
+  padding: 16px 18px 10px;
+  border: 1px solid hsl(var(--border) / 0.75);
+  border-radius: 14px;
+  color: hsl(var(--foreground));
+  background: hsl(var(--card) / 0.75);
+}
+
+.argos-equipo__cabecera,
+.argos-equipo__nombre,
+.argos-equipo__pie {
+  display: flex;
+  align-items: center;
+}
+.argos-equipo__cabecera {
+  justify-content: space-between;
+  gap: 12px;
+}
+.argos-equipo__cabecera h2 {
+  font-size: 19px;
+  font-weight: 650;
+  letter-spacing: -0.025em;
+  line-height: 1.4;
+}
+.argos-equipo__cabecera > svg {
+  color: hsl(var(--muted-foreground));
+}
+.argos-equipo__pestanas {
+  display: flex;
+  gap: 2px;
+  margin-top: 10px;
+  border-bottom: 1px solid hsl(var(--border) / 0.8);
+}
+.argos-equipo__pestanas button {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 6px;
+  margin-bottom: -1px;
+  color: hsl(var(--muted-foreground));
+  font-size: 13px;
+  font-weight: 520;
+  white-space: nowrap;
+  border-bottom: 2px solid transparent;
+}
+.argos-equipo__pestanas button[aria-pressed="true"] {
+  border-color: hsl(var(--primary));
+  color: hsl(var(--foreground));
+}
+.argos-equipo__pestanas button:hover,
+.argos-equipo__nombre:hover {
+  color: hsl(var(--primary));
+}
+.argos-equipo__pestanas span {
+  font-variant-numeric: tabular-nums;
+}
+.argos-equipo__pestanas button:focus-visible,
+.argos-equipo__nombre:focus-visible {
+  outline: 2px solid hsl(var(--ring));
+  outline-offset: 2px;
+}
+.argos-equipo__persona {
+  padding: 8px 0;
+  border-bottom: 1px solid hsl(var(--border) / 0.5);
+}
+.argos-equipo__nombre {
+  gap: 9px;
+  width: fit-content;
+  font-weight: 600;
+  font-size: 15px;
+}
+.argos-equipo__episodios {
+  padding-left: 0;
+}
+.argos-equipo__episodios button {
+  gap: 4px;
+  padding: 4px 0;
+  color: hsl(var(--foreground) / 0.85);
+  font-size: 14px;
+  line-height: 1.45;
+}
+.argos-equipo__episodios button > svg:first-child {
+  display: none;
+}
+.argos-equipo__pie {
+  flex-wrap: wrap;
+  gap: 0 6px;
+  margin-top: 4px;
+}
+.argos-equipo__pie button {
+  height: auto;
+  padding: 6px 2px;
+  color: hsl(var(--muted-foreground));
+  font-size: 12px;
+}
+@container agenda (min-width: 40.5rem) {
+  .argos-resumen-dia {
+    grid-template-columns: minmax(0, 1.3fr) minmax(280px, 0.95fr);
+    gap: clamp(14px, 1.5vw, 24px);
+  }
+  .argos-resumen-dia[data-vista="Pendientes"] > .argos-turno {
+    align-self: stretch;
+    display: flex;
+    flex-direction: column;
+  }
+  .argos-resumen-dia[data-vista="Pendientes"] .argos-turno__contenido {
+    flex-grow: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+  }
+}
+@media (max-width: 480px) {
+  .argos-nav-principal button {
+    padding-inline: 9px;
+  }
+  .argos-equipo {
+    padding-inline: 14px;
+  }
+}
+
+.dark .argos-nav-principal button[aria-current="page"] {
+  background-color: color-mix(in srgb, hsl(var(--primary)) 77%, #082755);
+  color: white;
+}
+
+@media (max-width: 480px) {
+  .argos-propuesta .argos-nav-principal {
+    gap: 1px;
+  }
+  .argos-propuesta .argos-nav-principal button {
+    padding-inline: 6px;
+    flex: 1 0 auto;
+    font-size: 13px;
+  }
+}

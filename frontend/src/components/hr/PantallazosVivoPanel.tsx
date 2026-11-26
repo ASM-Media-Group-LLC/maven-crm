@@ -223,7 +223,7 @@ function SelloEstado({ p, t, sem, chico }: { p: PersonaVivo; t: Tr; sem: Semafor
 // estado arriba a la izquierda (rojo sólido si algo anda mal) y la cámara abajo
 // a la derecha; debajo, la persona y la hora, el estado en una línea y lo que vio
 // Argos (la app en una pastilla y la frase). Lo malo: filo rojo y estado en rojo.
-function CardMuralla({ p, t, hace, sem, onClick }: { p: PersonaVivo; t: Tr; hace: (iso: string) => string; sem: Semaforo; onClick: () => void }) {
+export function CardMuralla({ p, t, hace, sem, onClick }: { p: PersonaVivo; t: Tr; hace: (iso: string) => string; sem: Semaforo; onClick: () => void }) {
   const nombre = p.nombre || t("hr.noName");
   const malo = sem === "rojo" || p.fueraDeLugar === true;
   const { app, que } = separar(p.veredicto);
@@ -272,7 +272,7 @@ function CardMuralla({ p, t, hace, sem, onClick }: { p: PersonaVivo; t: Tr; hace
 }
 
 // ── Vista CUADRÍCULA: celda compacta (con punto de semáforo y análisis en hover) ──
-function CeldaCuadricula({ p, t, sem, onClick }: { p: PersonaVivo; t: Tr; sem: Semaforo; onClick: () => void }) {
+export function CeldaCuadricula({ p, t, sem, onClick }: { p: PersonaVivo; t: Tr; sem: Semaforo; onClick: () => void }) {
   const nombre = p.nombre || t("hr.noName");
   return (
     <button

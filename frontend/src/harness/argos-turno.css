@@ -1,0 +1,208 @@
+/* Resumen operativo dentro de la propuesta de Argos. */
+.argos-turno {
+  --turno-superficie: hsl(var(--card));
+  --turno-titulo: hsl(var(--foreground));
+  --turno-acento: color-mix(in srgb, hsl(var(--primary)) 84%, black);
+  --turno-borde: hsl(var(--border));
+  --turno-suave: hsl(var(--muted-foreground));
+  min-width: 0;
+  overflow: hidden;
+  align-self: start;
+  color: hsl(var(--foreground));
+  background: var(--turno-superficie);
+  border: 1px solid var(--turno-borde);
+  border-radius: 14px;
+}
+.dark .argos-turno {
+  --turno-superficie: color-mix(in srgb, hsl(var(--card)) 96%, hsl(var(--primary)));
+  --turno-titulo: hsl(var(--foreground));
+  --turno-acento: color-mix(in srgb, hsl(var(--primary)) 58%, white);
+  --turno-borde: hsl(var(--border));
+  --turno-suave: color-mix(in srgb, hsl(var(--muted-foreground)) 78%, hsl(var(--foreground)));
+}
+.argos-turno__contenido,
+.argos-turno__detalle {
+  padding: clamp(16px, 3%, 24px);
+}
+.argos-turno__cabecera {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.argos-turno__cabecera h2 {
+  color: var(--turno-titulo);
+  margin: 0;
+  font-size: 25px;
+  font-weight: 650;
+  letter-spacing: -0.035em;
+  line-height: 1.15;
+}
+.argos-turno__estado {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--turno-acento);
+  font-size: 14px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+.argos-turno__estado::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+}
+.argos-turno button {
+  text-align: left;
+}
+.argos-turno button:focus-visible {
+  outline: 2px solid var(--turno-acento);
+  outline-offset: -2px;
+  border-radius: 4px;
+}
+.argos-turno__cobertura {
+  display: flex;
+  flex-wrap: wrap;
+  width: 100%;
+  align-items: center;
+  gap: 10px 24px;
+  margin-top: 14px;
+  font-size: 14px;
+  line-height: 1.35;
+}
+.argos-turno__numeros {
+  display: flex;
+  flex-direction: column;
+  color: var(--turno-suave);
+}
+.argos-turno__cifra {
+  color: var(--turno-titulo);
+  font-size: 32px;
+  font-weight: 600;
+  line-height: 1.15;
+  letter-spacing: -0.045em;
+  font-variant-numeric: tabular-nums;
+}
+.argos-turno__cifra > span {
+  color: var(--turno-suave);
+  font-size: 18px;
+  font-weight: 450;
+  letter-spacing: 0;
+}
+.argos-turno__avisar {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0 0.3em;
+  color: var(--turno-suave);
+}
+.argos-turno__avisar strong {
+  color: hsl(var(--foreground));
+  font-weight: 550;
+}
+.argos-turno__avisar svg {
+  color: var(--turno-acento);
+}
+.argos-turno__cobertura:hover .argos-turno__avisar,
+.argos-turno__accesos button:hover .argos-turno__etiqueta {
+  color: var(--turno-acento);
+}
+.argos-turno__tiempo {
+  margin-top: 17px;
+  padding-top: 24px;
+  font-variant-numeric: tabular-nums;
+}
+.argos-turno__riel {
+  position: relative;
+  height: 3px;
+  background: var(--turno-borde);
+  border-radius: 4px;
+}
+.argos-turno__avance {
+  display: block;
+  height: 100%;
+  background: var(--turno-acento);
+  border-radius: inherit;
+  opacity: 0.7;
+}
+.argos-turno__relevo {
+  position: absolute;
+  left: 50%;
+  top: -2px;
+  height: 7px;
+  width: 1px;
+  background: var(--turno-suave);
+}
+.argos-turno__corte {
+  position: absolute;
+  top: 50%;
+  width: 9px;
+  height: 9px;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  background: var(--turno-acento);
+  box-shadow: 0 0 0 2px var(--turno-superficie);
+}
+.argos-turno__corte > span {
+  position: absolute;
+  bottom: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  color: var(--turno-acento);
+  font-size: 13px;
+  font-weight: 550;
+  line-height: 1.25;
+  white-space: nowrap;
+}
+.argos-turno__horas {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  margin-top: 7px;
+  color: var(--turno-suave);
+  font-size: 13px;
+}
+.argos-turno__horas span:nth-child(2) {
+  text-align: center;
+}
+.argos-turno__horas span:last-child {
+  text-align: right;
+}
+.argos-turno__accesos {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  border-top: 1px solid var(--turno-borde);
+}
+.argos-turno__accesos button {
+  display: flex;
+  flex-direction: column;
+  align-items: start;
+  gap: 4px;
+  min-width: 0;
+  padding: 13px clamp(12px, 3%, 20px);
+  font-size: 14px;
+  line-height: 1.4;
+  color: var(--turno-suave);
+}
+.argos-turno__accesos button + button {
+  border-left: 1px solid var(--turno-borde);
+}
+.argos-turno__etiqueta {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: hsl(var(--foreground));
+  font-weight: 550;
+}
+.argos-turno__etiqueta svg {
+  color: var(--turno-suave);
+}
+.argos-turno__accesos strong {
+  color: inherit;
+  font-weight: 550;
+  font-variant-numeric: tabular-nums;
+}
+.argos-turno__detalle {
+  border-top: 1px solid var(--turno-borde);
+}

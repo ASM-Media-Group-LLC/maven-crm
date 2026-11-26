@@ -1,0 +1,615 @@
+<style>
+  #argos-propuesta {
+    --ap-bg: light-dark(#f4f6fa, #101928);
+    --ap-panel: light-dark(#fff, #1b283b);
+    --ap-text: light-dark(#182237, #e3eaf6);
+    --ap-dim: light-dark(#58687d, #a7b5c9);
+    --ap-line: light-dark(#dce3ed, #344258);
+    --ap-blue: light-dark(#1767cf, #70b0ff);
+    color: var(--ap-text);
+    background: var(--ap-bg);
+    font:
+      14px/1.5 Inter,
+      system-ui,
+      sans-serif;
+    border-radius: 20px;
+    padding: 24px;
+    box-sizing: border-box;
+  }
+  #argos-propuesta * {
+    box-sizing: border-box;
+  }
+  #argos-propuesta h2,
+  #argos-propuesta h3,
+  #argos-propuesta p {
+    margin: 0;
+  }
+  #argos-propuesta h2 {
+    font-size: 24px;
+    font-weight: 600;
+  }
+  #argos-propuesta h3 {
+    font-size: 17px;
+    font-weight: 600;
+  }
+  #argos-propuesta button,
+  #argos-propuesta input,
+  #argos-propuesta select,
+  #argos-propuesta textarea {
+    font: inherit;
+    color: inherit;
+  }
+  #argos-propuesta button {
+    background: var(--ap-panel);
+    border: 1px solid var(--ap-line);
+    border-radius: 10px;
+    padding: 8px 12px;
+  }
+  #argos-propuesta button[aria-pressed="true"],
+  #argos-propuesta .ap-primary {
+    background: var(--ap-blue);
+    color: light-dark(#fff, #101928);
+    border-color: transparent;
+  }
+  #argos-propuesta button:focus-visible,
+  #argos-propuesta input:focus-visible,
+  #argos-propuesta textarea:focus-visible {
+    outline: 2px solid var(--ap-blue);
+    outline-offset: 3px;
+  }
+  #argos-propuesta .ap-muted {
+    color: var(--ap-dim);
+  }
+  #argos-propuesta .ap-small {
+    font-size: 12px;
+  }
+  #argos-propuesta .ap-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+  #argos-propuesta .ap-spread {
+    justify-content: space-between;
+  }
+  #argos-propuesta .ap-nav {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    margin: 20px 0 16px;
+  }
+  #argos-propuesta .ap-filters {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-bottom: 20px;
+  }
+  #argos-propuesta label {
+    display: grid;
+    gap: 4px;
+  }
+  #argos-propuesta input,
+  #argos-propuesta select,
+  #argos-propuesta textarea {
+    background: var(--ap-panel);
+    border: 1px solid var(--ap-line);
+    border-radius: 9px;
+    padding: 8px;
+    max-width: 100%;
+    min-width: 0;
+  }
+  #argos-propuesta .ap-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 20px;
+  }
+  #argos-propuesta .ap-layout.ap-open {
+    grid-template-columns: minmax(0, 1fr) minmax(280px, 38%);
+  }
+  #argos-propuesta .ap-box {
+    background: var(--ap-panel);
+    border: 1px solid var(--ap-line);
+    border-radius: 16px;
+    padding: 16px;
+  }
+  #argos-propuesta .ap-summary {
+    display: flex;
+    gap: 24px;
+    flex-wrap: wrap;
+    padding: 12px 0 20px;
+  }
+  #argos-propuesta .ap-summary strong {
+    display: block;
+    font-size: 24px;
+    font-weight: 500;
+  }
+  #argos-propuesta .ap-list {
+    display: grid;
+    gap: 10px;
+    margin-top: 14px;
+  }
+  #argos-propuesta .ap-event {
+    display: grid;
+    grid-template-columns: 40px minmax(0, 1fr) auto;
+    gap: 12px;
+    align-items: center;
+    text-align: left;
+    width: 100%;
+    padding: 14px;
+  }
+  #argos-propuesta .ap-avatar {
+    display: grid;
+    place-items: center;
+    width: 38px;
+    height: 38px;
+    background: var(--ap-bg);
+    border-radius: 50%;
+    color: var(--ap-blue);
+  }
+  #argos-propuesta .ap-event strong {
+    font-weight: 500;
+    display: block;
+  }
+  #argos-propuesta .ap-tag {
+    font-size: 12px;
+    border-radius: 6px;
+    padding: 3px 7px;
+    background: var(--ap-bg);
+    display: inline-block;
+  }
+  #argos-propuesta .ap-divider {
+    border: 0;
+    border-top: 1px solid var(--ap-line);
+    margin: 16px 0;
+  }
+  #argos-propuesta .ap-timeline {
+    padding-left: 18px;
+    display: grid;
+    gap: 16px;
+  }
+  #argos-propuesta .ap-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+    gap: 12px;
+    margin-top: 16px;
+  }
+  #argos-propuesta .ap-grid button {
+    text-align: left;
+    padding: 16px;
+  }
+  #argos-propuesta .ap-screen {
+    background: var(--ap-bg);
+    min-height: 90px;
+    padding: 12px;
+    margin-bottom: 12px;
+    display: grid;
+    align-content: center;
+    gap: 8px;
+    border-radius: 8px;
+  }
+  #argos-propuesta .ap-screen div {
+    height: 5px;
+    background: var(--ap-line);
+    width: 80%;
+  }
+  #argos-propuesta .ap-screen div:nth-child(2) {
+    width: 50%;
+  }
+  #argos-propuesta .ap-details {
+    align-self: start;
+    min-width: 0;
+  }
+  #argos-propuesta .ap-detail-content {
+    margin-top: 16px;
+  }
+  #argos-propuesta .ap-notice {
+    margin: 14px 0;
+    color: var(--ap-dim);
+  }
+  #argos-propuesta .ap-review {
+    display: grid;
+    gap: 12px;
+    margin-top: 16px;
+  }
+  #argos-propuesta textarea {
+    width: 100%;
+    min-height: 80px;
+  }
+  #argos-propuesta [hidden] {
+    display: none !important;
+  }
+  #argos-propuesta .ap-health {
+    display: grid;
+    gap: 12px;
+    margin-top: 16px;
+  }
+  #argos-propuesta .ap-foot {
+    margin-top: 18px;
+    color: var(--ap-dim);
+    font-size: 12px;
+  }
+  #argos-propuesta .ap-title {
+    padding-right: 70px;
+  }
+  #argos-propuesta .ap-tabs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 14px;
+  }
+  @media (max-width: 760px) {
+    #argos-propuesta {
+      padding: 16px;
+    }
+    #argos-propuesta .ap-layout.ap-open {
+      grid-template-columns: 1fr;
+    }
+    #argos-propuesta .ap-details {
+      order: -1;
+    }
+    #argos-propuesta .ap-event {
+      grid-template-columns: 32px minmax(0, 1fr);
+    }
+    #argos-propuesta .ap-event > span:last-child {
+      grid-column: 2;
+    }
+    #argos-propuesta .ap-filters label {
+      flex: 1 1 130px;
+    }
+  }
+</style>
+<div id="argos-propuesta">
+  <header class="ap-row ap-spread">
+    <div class="ap-title">
+      <div class="ap-small ap-muted">Maven / Argos</div>
+      <h2>Tu equipo, a la vista</h2>
+      <p class="ap-muted">
+        Propuesta interactiva · personas y situaciones de ejemplo
+      </p>
+    </div>
+    <button type="button" data-section="Ajustes">Ajustes</button>
+  </header>
+  <nav class="ap-nav" aria-label="Secciones de Argos"></nav>
+  <div class="ap-filters">
+    <label
+      >Fecha<select id="ap-date">
+        <option value="24">Hoy · 24 noviembre</option>
+        <option value="23">23 noviembre</option>
+      </select></label
+    >
+    <label
+      >Equipo<select id="ap-team">
+        <option>Todos</option>
+        <option>Operaciones</option>
+        <option>RR. HH.</option>
+      </select></label
+    >
+    <label
+      >Persona<input
+        id="ap-person"
+        type="search"
+        placeholder="Buscar por nombre"
+    /></label>
+  </div>
+  <div class="ap-layout">
+    <main id="ap-main"></main>
+    <aside
+      id="ap-detail"
+      class="ap-box ap-details"
+      aria-label="Detalle de la incidencia"
+      hidden
+    ></aside>
+  </div>
+  <p id="ap-feedback" class="ap-notice" role="status" aria-live="polite"></p>
+  <footer class="ap-foot">
+    Demostración local · las decisiones de esta vista se aplican solo a los
+    ejemplos.
+  </footer>
+</div>
+<script>
+  (() => {
+    const root = document.getElementById("argos-propuesta");
+    const main = root.querySelector("#ap-main");
+    const detail = root.querySelector("#ap-detail");
+    const sections = ["Resumen", "En vivo", "Estado", "Historial", "Revisión"];
+    const people = [
+      {
+        name: "Laura Méndez",
+        initials: "LM",
+        team: "Operaciones",
+        role: "Supervisión",
+        live: "Cámara pendiente",
+        app: "Maven · Cowork",
+      },
+      {
+        name: "Diego Torres",
+        initials: "DT",
+        team: "Operaciones",
+        role: "Consultoría",
+        live: "En reunión",
+        app: "Maven · Meet",
+      },
+      {
+        name: "Camila Ríos",
+        initials: "CR",
+        team: "RR. HH.",
+        role: "Recursos humanos",
+        live: "Conectada",
+        app: "Maven · Horarios",
+      },
+    ];
+    const events = [
+      {
+        id: 1,
+        person: 0,
+        date: "24",
+        time: "10:12",
+        title: "Cámara apagada durante 8 min",
+        duration: "8 min",
+        source: "Historial del Hub",
+        state: "Pendiente",
+        alerts: 3,
+        technical: false,
+        rule: "Cámara requerida durante el turno. Revisar episodios de más de 5 minutos.",
+        evidence:
+          "Eventos de cámara disponibles. La causa del apagado no quedó registrada.",
+        timeline: [
+          ["10:12", "Se registró la cámara apagada. Causa sin determinar."],
+          ["10:14", "Argos mostró el primer recordatorio."],
+          ["10:17", "El episodio superó la duración configurada."],
+          ["10:20", "Última comprobación. Cámara aún apagada."],
+        ],
+      },
+      {
+        id: 2,
+        person: 1,
+        date: "24",
+        time: "10:08",
+        title: "Pantalla interrumpida y recuperada",
+        duration: "42 s",
+        source: "Conexión",
+        state: "Resuelto",
+        alerts: 0,
+        technical: true,
+        rule: "Interrupción técnica. Consultar recuperación antes de solicitar revisión laboral.",
+        evidence:
+          "Se registró pérdida de conexión y recuperación. Sin captura del intervalo desconectado.",
+        timeline: [
+          ["10:08:00", "La conexión se interrumpió."],
+          ["10:08:42", "La conexión y la pantalla se recuperaron."],
+        ],
+      },
+      {
+        id: 3,
+        person: 2,
+        date: "24",
+        time: "09:46",
+        title: "Actividad por revisar en una aplicación",
+        duration: "6 min",
+        source: "Análisis de pantalla",
+        state: "Pendiente",
+        alerts: 1,
+        technical: false,
+        rule: "Evaluar la actividad respecto a las herramientas y tareas autorizadas para RR. HH.",
+        evidence:
+          "En producción se abrirían las capturas disponibles y la explicación de Argos. Este ejemplo no contiene imágenes de empleados.",
+        timeline: [
+          ["09:46", "Argos señaló actividad que requiere contexto."],
+          ["09:49", "Se solicitó volver a la actividad asignada."],
+          [
+            "09:52",
+            "Finalizó el intervalo señalado. Pendiente de revisión humana.",
+          ],
+        ],
+      },
+      {
+        id: 4,
+        person: 0,
+        date: "24",
+        time: "09:02",
+        title: "Inicio de pantalla compartida",
+        duration: "Movimiento",
+        source: "Historial del Hub",
+        state: "Registrado",
+        alerts: 0,
+        technical: false,
+        rule: "Movimiento de inicio de sesión de supervisión.",
+        evidence: "Evento de inicio de pantalla registrado por la aplicación.",
+        timeline: [["09:02", "Se inició la pantalla compartida."]],
+      },
+      {
+        id: 5,
+        person: 2,
+        date: "23",
+        time: "12:30",
+        title: "Pausa de comida",
+        duration: "30 min",
+        source: "Jornada",
+        state: "Justificada",
+        alerts: 0,
+        technical: false,
+        rule: "Pausa permitida por la política asignada a su posición.",
+        evidence: "Entrada y salida de la pausa registradas.",
+        timeline: [
+          ["12:30", "Comenzó la pausa."],
+          ["13:00", "Volvió de la pausa."],
+        ],
+      },
+    ];
+    const state = {
+      section: "Resumen",
+      date: "24",
+      team: "Todos",
+      person: "",
+      selected: null,
+      detailTab: "Cronología",
+      history: "Todo",
+      grid: true,
+      decisions: {},
+    };
+    const esc = (text) =>
+      String(text).replace(
+        /[&<>"']/g,
+        (c) =>
+          ({
+            "&": "&amp;",
+            "<": "&lt;",
+            ">": "&gt;",
+            '"': "&quot;",
+            "'": "&#39;",
+          })[c],
+      );
+    const currentState = (event) =>
+      state.decisions[event.id]?.verdict || event.state;
+    function matches(person) {
+      return (
+        (state.team === "Todos" || person.team === state.team) &&
+        person.name.toLowerCase().includes(state.person.toLowerCase())
+      );
+    }
+    function filtered() {
+      return events.filter(
+        (event) => event.date === state.date && matches(people[event.person]),
+      );
+    }
+    function eventButton(event) {
+      const person = people[event.person];
+      return `<button type="button" class="ap-event" data-event="${event.id}"><span class="ap-avatar">${person.initials}</span><span><strong>${person.name}</strong><span>${event.title}</span><span class="ap-small ap-muted" style="display:block">${event.time} · ${event.source} · ${event.alerts} ${event.alerts === 1 ? "aviso" : "avisos"}</span></span><span class="ap-tag">${currentState(event)}</span></button>`;
+    }
+    function list(items) {
+      return items.length
+        ? `<div class="ap-list">${items.map(eventButton).join("")}</div>`
+        : '<p class="ap-notice">Sin resultados para estos filtros.</p>';
+    }
+    function render() {
+      root.querySelector(".ap-nav").innerHTML = sections
+        .map(
+          (section) =>
+            `<button type="button" data-section="${section}" aria-pressed="${state.section === section}">${section}</button>`,
+        )
+        .join("");
+      const items = filtered();
+      const pending = items.filter(
+        (event) => currentState(event) === "Pendiente",
+      );
+      root.querySelector("#ap-date").disabled = state.section === "En vivo";
+      root.querySelector("#ap-date").value =
+        state.section === "En vivo" ? "24" : state.date;
+      if (state.section === "Resumen")
+        main.innerHTML = `<h3>Lo que necesita atención</h3><div class="ap-summary"><div><strong>${pending.length}</strong>Por revisar</div><div><strong>${items.filter((event) => event.technical).length}</strong>Episodios técnicos</div><div><strong>${people.filter(matches).length}</strong>Personas en esta vista</div></div>${list(pending)}<hr class="ap-divider"><h3>Actividad reciente</h3>${list(items.filter((event) => currentState(event) !== "Pendiente"))}`;
+      if (state.section === "En vivo")
+        main.innerHTML = `<div class="ap-row ap-spread"><div><h3>Equipo en vivo</h3><p class="ap-small ap-muted">Ahora · 10:20 · actualización ilustrativa</p></div><button type="button" data-view>Ver como ${state.grid ? "lista" : "cuadrícula"}</button></div><div class="${state.grid ? "ap-grid" : "ap-list"}">${people
+          .filter(matches)
+          .map(
+            (person) =>
+              `<button type="button" data-person="${people.indexOf(person)}">${state.grid ? `<div class="ap-screen"><span class="ap-small">${person.app}</span><div></div><div></div><span class="ap-small ap-muted">Vista de pantalla ilustrativa</span></div>` : ""}<strong>${person.name}</strong><p>${person.live}</p><p class="ap-small ap-muted">Última señal · 10:20</p></button>`,
+          )
+          .join("")}</div>`;
+      if (state.section === "Estado")
+        main.innerHTML = `<h3>Estado del monitoreo y la conexión</h3><p class="ap-muted">Señales disponibles, interrupciones y recuperación.</p><div class="ap-health"><div class="ap-box"><strong>Última revisión de Argos · 10:20</strong><p class="ap-muted">Cobertura ilustrativa de 3 personas. Abrir una persona muestra qué se observó.</p></div><div class="ap-box"><strong>Salud de la plataforma</strong><p class="ap-muted">Conexión, llamadas, cámara y pantalla.</p>${list(items.filter((event) => event.technical))}</div></div>`;
+      if (state.section === "Historial")
+        main.innerHTML = `<h3>Historial del equipo</h3><div class="ap-tabs">${["Todo", "Hub", "Jornada"].map((filter) => `<button type="button" data-history="${filter}" aria-pressed="${state.history === filter}">${filter === "Hub" ? "Historial del Hub" : filter}</button>`).join("")}</div>${list(items.filter((event) => state.history === "Todo" || (state.history === "Hub" ? event.source === "Historial del Hub" : event.source === "Jornada")))}`;
+      if (state.section === "Revisión")
+        main.innerHTML = `<h3>Revisión por incidencia</h3><p class="ap-muted">${pending.length} pendientes · ${Object.keys(state.decisions).filter((id) => items.some((event) => event.id === Number(id))).length} decisiones en esta vista</p>${list(items.filter((event) => event.state === "Pendiente"))}<hr class="ap-divider"><h3>Resumen diario</h3>${people
+          .filter(matches)
+          .map((person) => {
+            const own = items.filter(
+              (event) =>
+                people[event.person] === person && event.state === "Pendiente",
+            );
+            return `<p class="ap-notice">${person.name} · ${own.filter((event) => currentState(event) === "Pendiente").length} pendientes · ${own.filter((event) => currentState(event) !== "Pendiente").length} revisadas</p>`;
+          })
+          .join("")}`;
+      if (state.section === "Ajustes")
+        main.innerHTML = `<h3>Reglas de la empresa</h3><div class="ap-list"><div class="ap-box"><strong>Por posición</strong><p>Cámara, pantalla, pausas y herramientas autorizadas.</p></div><div class="ap-box"><strong>Cuándo solicitar revisión</strong><p>Duración, repetición y excepciones por posición.</p></div><div class="ap-box"><strong>Permisos de Argos</strong><p>Ver equipo, consultar evidencias, revisar incidencias y modificar reglas.</p></div></div><p class="ap-notice">El ejemplo de supervisión solicita revisar cámara apagada después de 5 minutos. El umbral definitivo queda por definir.</p>`;
+      renderDetail();
+    }
+    function renderDetail() {
+      const event = events.find((item) => item.id === state.selected);
+      detail.hidden = !event;
+      root.querySelector(".ap-layout").classList.toggle("ap-open", !!event);
+      if (!event) return;
+      const person = people[event.person];
+      const decision = state.decisions[event.id];
+      detail.innerHTML = `<div class="ap-row ap-spread"><span class="ap-tag">${currentState(event)}</span><button type="button" data-close aria-label="Cerrar detalle">Cerrar</button></div><h3 style="margin-top:12px">${person.name}</h3><p class="ap-small ap-muted">${person.team} · ${person.role} · ${event.date} noviembre</p><p style="margin-top:12px">${event.title}</p><div class="ap-tabs">${["Cronología", "Evidencia", "Reglas", "Expediente"].map((tab) => `<button type="button" data-detail="${tab}" aria-pressed="${state.detailTab === tab}">${tab}</button>`).join("")}</div><div class="ap-detail-content"></div>`;
+      const content = detail.querySelector(".ap-detail-content");
+      if (state.detailTab === "Cronología")
+        content.innerHTML = `<ol class="ap-timeline">${event.timeline.map(([time, text]) => `<li><span class="ap-small ap-muted">${time}</span><p>${text}</p></li>`).join("")}</ol><details><summary>${event.alerts} avisos de este episodio</summary><p class="ap-notice">${event.alerts ? `${event.alerts} recordatorios agrupados en el mismo episodio.` : "Este episodio no generó recordatorios."}</p></details>`;
+      if (state.detailTab === "Evidencia")
+        content.innerHTML = `<h3>Qué se observó</h3><p class="ap-notice">${event.evidence}</p><p>Origen · ${event.source}</p><p>Duración · ${event.duration}</p>`;
+      if (state.detailTab === "Reglas")
+        content.innerHTML = `<h3>Regla aplicada</h3><p class="ap-notice">${event.rule}</p><p class="ap-small ap-muted">Regla ilustrativa de la posición ${person.role}.</p>`;
+      if (state.detailTab === "Expediente")
+        content.innerHTML = `<h3>Jornada de ${person.name.split(" ")[0]}</h3><p class="ap-notice">${person.role} · ${person.team}</p><h3>Incidencias y movimientos</h3>${list(events.filter((item) => item.person === event.person && item.date === event.date))}<hr class="ap-divider"><p>Horario y pausas · según posición</p><p>Historial, evidencias y decisiones · disponibles por episodio</p>`;
+      if (event.state === "Pendiente")
+        content.insertAdjacentHTML(
+          "beforeend",
+          `<hr class="ap-divider"><section class="ap-review"><h3>Revisar esta incidencia</h3><label>Decisión<select name="verdict"><option>Confirmada</option><option>Justificada</option><option>Descartada</option></select></label><label>Motivo<textarea name="note" required placeholder="Explica lo que verificaste">${esc(decision?.note || "")}</textarea></label><button type="button" data-save class="ap-primary">Guardar decisión de ejemplo</button></section>${decision ? `<p class="ap-notice">${decision.verdict} · ${esc(decision.note)}</p>` : ""}`,
+        );
+      if (decision && detail.querySelector("select"))
+        detail.querySelector("select").value = decision.verdict;
+    }
+    root.addEventListener("click", (event) => {
+      const button = event.target.closest("button");
+      if (!button || button.type === "submit") return;
+      if (button.hasAttribute("data-save")) {
+        const note = detail.querySelector("textarea").value.trim();
+        if (!note) {
+          root.querySelector("#ap-feedback").textContent =
+            "Escribe el motivo de la decisión.";
+          return;
+        }
+        state.decisions[state.selected] = {
+          verdict: detail.querySelector("select").value,
+          note,
+        };
+        render();
+        root.querySelector("#ap-feedback").textContent =
+          "Decisión guardada en el ejemplo. El resumen diario se actualizó.";
+        return;
+      }
+      if (button.dataset.section) {
+        state.section = button.dataset.section;
+        state.selected = null;
+      }
+      if (button.dataset.event) {
+        state.selected = Number(button.dataset.event);
+        state.detailTab = "Cronología";
+      }
+      if (button.dataset.person) {
+        const person = Number(button.dataset.person);
+        state.selected = events.find(
+          (item) => item.person === person && item.date === "24",
+        )?.id;
+        state.detailTab = "Expediente";
+      }
+      if (button.hasAttribute("data-close")) state.selected = null;
+      if (button.dataset.detail) state.detailTab = button.dataset.detail;
+      if (button.dataset.history) state.history = button.dataset.history;
+      if (button.hasAttribute("data-view")) state.grid = !state.grid;
+      render();
+    });
+    root.querySelector("#ap-date").addEventListener("change", (event) => {
+      state.date = event.target.value;
+      state.selected = null;
+      render();
+    });
+    root.querySelector("#ap-team").addEventListener("change", (event) => {
+      state.team = event.target.value;
+      state.selected = null;
+      render();
+    });
+    root.querySelector("#ap-person").addEventListener("input", (event) => {
+      state.person = event.target.value;
+      state.selected = null;
+      render();
+    });
+    root.addEventListener("keydown", (event) => {
+      if (event.key === "Escape") {
+        state.selected = null;
+        renderDetail();
+      }
+    });
+    render();
+  })();
+</script>
