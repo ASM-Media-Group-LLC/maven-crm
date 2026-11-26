@@ -154,3 +154,8 @@ Ambos sets ya tienen migrations subidas (`20260504100000`, `20260504110000`) per
 ## 2026-11-24 · Compartir en llamadas directas
 - «Compartir pantalla» queda disponible en la barra grande y en la miniatura de llamadas. Cuando la captura no se puede iniciar, Maven muestra el motivo.
 - El selector instalado indica qué falta, conserva la opción elegida y permite reintentar la confirmación si falla. Pendiente validar la captura entre dos equipos con los nuevos instaladores.
+
+## 2026-11-24 · Propuesta de estabilidad y crecimiento
+- Revisión de solo lectura y PDF de 15 páginas para 230/1.000/3.000/10.000 personas, costos reproducibles y programa diario/mensual; sin compras, cargas nuevas ni activaciones.
+- Promolog falla en cobertura y Argos llega a su tope; el árbol de organizaciones aún falta en el edificio y hay una colisión de migración. Evidencia en docs/audits/escalado-2026-11-24.
+- Pendiente: reparar/probar llamadas y supervisión, certificar 230, validar recuperación <1 h e incorporar empresas con aislamiento; presupuesto sujeto a prueba y aprobación.
