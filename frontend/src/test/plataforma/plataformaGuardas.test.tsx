@@ -112,10 +112,15 @@ describe("4. Grace no ve precios ni cobros", () => {
     const pagos = await m.planYPagos("org-nova");
     expect(pagos.ve_precios).toBe(false);
     expect(pagos.cobro).toBeNull();
-    await expect(m.crearOrganizacion({
-      nombre: "Otra", admin: { nombre: "Ana", correo: "ana@otra.co", idioma: "es" },
-      plan: { nombre: "equipo", personas: 20, precio_usd: 1 }, marca: {}, es_demo: true,
-    })).rejects.toMatchObject({ clave: "solo_dueno" });
+    // Grace crea clientes (lo básico), pero no pone nada de dinero en la ficha.
+    const nueva = await m.crearOrganizacion({ nombre: "Otra", dueno: { nombre: "Ana", correo: "ana@otra.co" }, idioma: "es", es_demo: true });
+    await expect(m.guardarFicha(nueva, { precio_usd: 1 })).rejects.toMatchObject({ clave: "solo_dueno" });
+    await expect(m.guardarFicha(nueva, { dias_prueba: 14 })).rejects.toMatchObject({ clave: "solo_dueno" });
+    await expect(m.extenderPrueba("org-nova", 7)).rejects.toMatchObject({ clave: "solo_dueno" });
+    const ficha = await m.fichaDe("org-nova");
+    expect(ficha.ve_dinero).toBe(false);
+    expect(ficha.ficha.dias_prueba).toBeUndefined();
+    expect(ficha.plan?.precio_usd).toBeUndefined();
     await expect(m.iniciarRecarga("org-nova")).rejects.toMatchObject({ clave: "solo_dueno" });
     await expect(m.agregarAdminPlataforma("X", "x@y.co")).rejects.toMatchObject({ clave: "solo_dueno" });
   });
@@ -173,7 +178,7 @@ describe("5. Ver como es solo lectura", () => {
     expect((await ro.personas("org-nova")).length).toBe(18);
   });
   it("la lista de métodos que escriben está completa", () => {
-    const lectura = new Set(["quienSoy", "organizacionesDelDueno", "pendientesDe", "resumenDeMiEmpresa", "personas", "historial",
+    const lectura = new Set(["quienSoy", "organizacionesDelDueno", "pendientesDe", "fichaDe", "resumenDeMiEmpresa", "personas", "historial",
       "planYPagos", "equipoMaven", "todasLasPersonas"]);
     const m = crearPlataformaMock({ latencia: 0 }) as unknown as PlataformaDatos & { reiniciar: unknown };
     const escriben = Object.keys(m).filter((k) => k !== "reiniciar" && !lectura.has(k)).sort();
@@ -194,5 +199,29 @@ describe("el plan lleno bloquea", () => {
     const r = await m.activarOrganizacion("org-demo");
     expect(r.invitado).toBe("corp@asmtech.me");
     expect((await m.pendientesDe("org-demo")).estado).toBe("activa");
+  });
+  it("un cliente nuevo no se activa hasta contestar la ficha y pagar o regalar el setup", async () => {
+    const m = crearPlataformaMock({ identidad: () => "dueno", latencia: 0 });
+    const id = await m.crearOrganizacion({ nombre: "Agencia Uno", dueno: { nombre: "Dueña Uno", correo: "duena@uno.co" }, idioma: "es", es_demo: false });
+    const f0 = await m.fichaDe(id);
+    expect(f0.estado).toBe("preparacion");
+    expect(f0.faltan).toEqual(expect.arrayContaining(["plan", "precio", "dias_prueba", "dias_gracia", "forma_cobro", "setup", "silla_extra", "montaje", "contrato"]));
+    await expect(m.activarOrganizacion(id)).rejects.toMatchObject({ clave: "faltan_pendientes" });
+    await m.guardarFicha(id, { plan_nombre: "equipo", personas: 20, precio_usd: 299, dias_prueba: 14, dias_gracia: 7, forma_cobro: "link",
+      setup_usd: 3000, silla_extra_usd: 15, montaje: "cliente", pide_contrato: false });
+    expect((await m.fichaDe(id)).faltan).toEqual(["setup_sin_pagar"]);
+    await expect(m.activarOrganizacion(id)).rejects.toMatchObject({ clave: "faltan_pendientes" });
+    await m.guardarFicha(id, { setup_estado: "regalado" });
+    expect((await m.fichaDe(id)).faltan).toEqual([]);
+    const r = await m.activarOrganizacion(id);
+    expect(r.invitado).toBe("duena@uno.co");
+    expect(r.enlace).toMatch(/\/crear-contrasena#t=/);
+    const f1 = await m.fichaDe(id);
+    expect(f1.estado).toBe("activa");
+    expect(f1.prueba_hasta).not.toBeNull();
+    await m.pausarOrganizacion(id, "no pagó");
+    expect((await m.fichaDe(id)).estado).toBe("pausada");
+    await m.reactivarOrganizacion(id);
+    expect((await m.fichaDe(id)).estado).toBe("activa");
   });
 });

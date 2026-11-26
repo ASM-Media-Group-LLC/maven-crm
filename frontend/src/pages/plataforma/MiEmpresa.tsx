@@ -84,7 +84,7 @@ export default function MiEmpresa() {
         </Link>
       )}
       {p.esPlataforma && !p.verComo && (
-        <PendientesDelCliente org={org} marca={{ ...r.organizacion.marca, nombreCliente: r.organizacion.nombre }} />
+        <PendientesDelCliente org={org} />
       )}
 
       <CabeceraDeMarca r={r} />

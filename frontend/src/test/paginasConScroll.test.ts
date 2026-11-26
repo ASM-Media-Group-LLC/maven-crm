@@ -46,6 +46,8 @@ const FUERA_DEL_SHELL = new Set([
   "DiagnosticoPantalla",
   // Portal de creadoras: entrar y elegir contraseña, públicas como Login y ResetPassword.
   "PortalEntrar", "PortalContrasena",
+  // «Crear mi contraseña» del Dueño de un cliente nuevo (25/11): pública, como ResetPassword.
+  "CrearContrasena",
   // Subir contenido por link público (/aportar/:token): fuera del shell, la ventana scrollea sola.
   "PaginaAportar",
   // Registro solo desde la portada (/empezar) y la vuelta de Stripe (/bienvenido):

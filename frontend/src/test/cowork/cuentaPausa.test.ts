@@ -141,3 +141,22 @@ describe("presupuesto diario de baño", () => {
     expect(fraseDiaAgotado().toLowerCase()).toMatch(/baño|puesto/);
   });
 });
+
+// 26/11/2026 (video de Alvaro): una persona con 7:49 de baño usados entraba otra vez
+// y la pantalla decía −5:43 y «Excediste tu tiempo de baño del día». El baño son 10
+// minutos EN TOTAL (vaya las veces que vaya): el servidor ya manda lo que QUEDA
+// (pausa_restante_min) y la pantalla volvía a restar lo usado.
+describe("baño: 10 minutos en total, sin restar dos veces", () => {
+  it("con el tope que manda el servidor (lo que queda), lo usado no se vuelve a restar", () => {
+    // Usó 7:49; el servidor dice «quedan 2 min». Esta pausa lleva 4 s.
+    const c = cuentaPausa(4, 2, 0);
+    expect(c.excedida).toBe(false);
+    expect(c.texto).toBe("1:56");
+  });
+
+  it("la pantalla de la persona no suma lo ya gastado a la cuenta", async () => {
+    const fuente = (import.meta.glob("../../pages/cowork/CoworkParticipantView.tsx", { query: "?raw", import: "default", eager: true }) as Record<string, string>);
+    const codigo = Object.values(fuente)[0];
+    expect(codigo).toMatch(/const consumidoDe = \(_kind: "bano" \| "break" \| "almuerzo" \| null\) => 0;/);
+  });
+});

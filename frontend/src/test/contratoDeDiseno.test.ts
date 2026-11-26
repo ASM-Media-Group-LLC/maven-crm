@@ -47,7 +47,9 @@ const FUERA_DEL_SHELL = new Set([
   // Portal de creadoras: entrar y elegir contraseña son públicas (como Login y
   // ResetPassword), y PortalLayout es su marco (monta un <Outlet>). Sus páginas
   // (PortalInicio, PortalFicha, PortalAjustes) sí cumplen el contrato.
-  "PortalEntrar", "PortalContrasena", "PortalLayout",
+  "PortalEntrar", "PortalContrasena",
+  // «Crear mi contraseña» del Dueño de un cliente nuevo (25/11): pública, como ResetPassword.
+  "CrearContrasena", "PortalLayout",
   // La casa de la plataforma (/plataforma, /mi-empresa) es su MARCO: vive fuera del
   // AppShell de Kash y monta un <Outlet>. Sus páginas (PanelDueno, MiEmpresa,
   // MiPlanYPagos, EquipoMaven) sí cumplen el contrato.

@@ -1125,9 +1125,12 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
       camaraOpcional: vigilarAnfitrion && !camaraObligatoria,
       // Su pantalla del Hub es la única: el tablero la reenvía a las salas que elija.
       onLocalScreenTrack: fijarPantallaDelHub,
-      // …y en el Hub la ven solo los admins (Alvaro, 18/11/2026: «solo en el
-      // Hub»). Los supervisores no se la ven entre ellos: era otro espejo.
-      pantallaSoloParaMi: vigilarAnfitrion,
+      // …y en el Hub la ven TODOS: los supervisores se ven las pantallas entre
+      // sí (Alvaro, 26/11/2026, video de Breiner y Vanessa: «Vanessa no puede ver
+      // lo que yo comparto»). Antes (18/11) solo la veían los admins y a los demás
+      // se les asomaba un recuadro negro que se quitaba solo. Uno sigue sin verse
+      // a sí mismo (el túnel infinito): para eso está el aviso de MiPantallaCompartida.
+      pantallaSoloParaMi: false,
       pantallaVisiblePara: venPantallasDelHub,
       // Su señal al dueño (fuera, sin cámara, sin pantalla o en negro, con la
       // causa) y la pantalla que, si la quita a mano, no vuelve sola.
