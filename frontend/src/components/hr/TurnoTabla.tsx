@@ -116,7 +116,7 @@ function celdaLlegada(t: Tr, f: FilaTurno): { arriba: string; abajo: string; niv
 }
 
 function celdaComida(t: Tr, f: FilaTurno): { arriba: string; abajo: string; nivel: Nivel | "ahora"; tenue: boolean } {
-  const tope = t("hr.turno.deTope", { n: f.comidaMin, tope: f.comidaTope });
+  const tope = t("hr.turno.deTope", { a: duracion(t, f.comidaMin), b: duracion(t, f.comidaTope) });
   if (f.comidaAhora != null) {
     return { arriba: t("hr.turno.fueraDesde", { h: hora(f.comidaAhora) }), abajo: tope, nivel: f.nivelComida === "ok" ? "ahora" : f.nivelComida, tenue: false };
   }
@@ -133,11 +133,11 @@ function celdaComida(t: Tr, f: FilaTurno): { arriba: string; abajo: string; nive
 
 function celdaBano(t: Tr, f: FilaTurno): { arriba: string; abajo: string; nivel: Nivel | "ahora"; tenue: boolean } {
   if (f.empiezaLuego) return { arriba: "", abajo: "", nivel: "ok", tenue: true };
-  if (f.banoAhora != null) return { arriba: t("hr.turno.enBano"), abajo: t("hr.turno.deTope", { n: f.banoMin, tope: f.banoTope }), nivel: f.nivelBano === "ok" ? "ahora" : f.nivelBano, tenue: false };
+  if (f.banoAhora != null) return { arriba: t("hr.turno.enBano"), abajo: t("hr.turno.deTope", { a: duracion(t, f.banoMin), b: duracion(t, f.banoTope) }), nivel: f.nivelBano === "ok" ? "ahora" : f.nivelBano, tenue: false };
   if (!f.banos) return { arriba: "0", abajo: "", nivel: "ok", tenue: true };
   return {
     arriba: t(f.banos === 1 ? "hr.turno.idas1" : "hr.turno.idas", { n: f.banos }),
-    abajo: t("hr.turno.deTope", { n: f.banoMin, tope: f.banoTope }),
+    abajo: t("hr.turno.deTope", { a: duracion(t, f.banoMin), b: duracion(t, f.banoTope) }),
     nivel: f.nivelBano,
     tenue: false,
   };

@@ -225,7 +225,8 @@ export function armarFila(dia: string, p: EntradaPersona, ahora: number): FilaTu
   if (antesMin != null) nivelLlegada = peor(nivelLlegada, antesMin >= UMBRALES.antesRojoMin ? "rojo" : "ambar");
 
   // COMIDA: almuerzo + break juntos (el dueño: «son lo mismo»). Las de 0 min no cuentan.
-  const comidas = pausas.filter((x) => (x.kind === "almuerzo" || x.kind === "break") && (x.fin == null || x.fin > x.inicio));
+  // Las de menos de un minuto (marcó y desmarcó) no cuentan.
+  const comidas = pausas.filter((x) => (x.kind === "almuerzo" || x.kind === "break") && (x.fin == null || x.fin - x.inicio >= 60_000));
   const comidaMs = comidas.reduce((s, x) => s + ((x.fin ?? (terminado ? x.inicio : ahora)) - x.inicio), 0);
   const comidaMin = min(comidaMs);
   const abiertaComida = comidas.find((x) => x.fin == null && !terminado) ?? null;

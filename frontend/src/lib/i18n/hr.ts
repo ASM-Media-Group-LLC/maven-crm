@@ -2170,7 +2170,7 @@ export const hr = {
   "hr.turno.cerroSistema": { es: "cerró el sistema", en: "closed by system" },
   "hr.turno.olvidoCerrar": { es: "olvidó marcar salida", en: "forgot to clock out" },
   "hr.turno.soloMarca": { es: "solo marca, sin Cowork", en: "clock-in only, no Cowork" },
-  "hr.turno.deTope": { es: "{n} de {tope} min", en: "{n} of {tope} min" },
+  "hr.turno.deTope": { es: "{a} de {b}", en: "{a} of {b}" },
   "hr.turno.fueraDesde": { es: "Fuera desde {h}", en: "Out since {h}" },
   "hr.turno.sinPlanComida": { es: "Sin pausa de comida", en: "No lunch plan" },
   "hr.turno.aunNo": { es: "Aún no sale", en: "Not yet" },
