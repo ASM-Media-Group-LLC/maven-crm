@@ -1875,6 +1875,13 @@ html.en-escritorio .barra-arrastrable,
 html.en-escritorio .entrar-barra { -webkit-app-region: drag; }
 html.en-escritorio .barra-arrastrable :is(button, a, input, select, textarea, [role="button"], [role="combobox"], [role="menu"], [tabindex]),
 html.en-escritorio .entrar-barra :is(button, a) { -webkit-app-region: no-drag; }
+/* Lo que FLOTA encima de la barra de arriba (la ventanita del Hub / de la llamada)
+   no es barra: sin esto, en la app la ventanita que cae sobre la barra era «zona
+   para mover la ventana». Sus botones (silenciar, minimizar, tamaño, colgar) no
+   respondían, arrastrarla movía TODA la app y el doble clic la agrandaba
+   (26/11/2026, video de Daniel Ospina). */
+html.en-escritorio .sin-arrastre,
+html.en-escritorio .sin-arrastre * { -webkit-app-region: no-drag; }
 /* Mac: el riel baja para dejarle lugar al semáforo, y ese hueco también arrastra. */
 html.escritorio-mac [data-sidebar="sidebar"] { margin-top: 30px; height: calc(100% - 30px); }
 html.escritorio-mac div[data-variant] > div.fixed { -webkit-app-region: drag; }

@@ -8,6 +8,7 @@
 
 ## Stack y deploy
 
+- 2026-11-26: app de escritorio: la ventanita flotante del Hub caía sobre la barra que mueve la ventana; sus botones no respondían y arrastrarla movía toda la app (video de Daniel Ospina). Clase `sin-arrastre` (no-drag) en PersistentCallProvider. Y «Ver en ventanita» en el recuadro de cada chatter (al pasar el mouse; su pantalla, sin sonido, una ventanita encima de todo).
 - 2026-11-26: Posiciones con jerarquía (decisiones de Alvaro): nadie cambia la posición que ocupa; solo el Dueño da «Admin»; nadie asigna una posición de mando que él tiene (HR solo asigna las de abajo). Triggers en `20261126203000_posiciones_candados_jerarquia.sql` (PENDIENTE aplicar en Kash con OK). En Usuarios, el menú gris de rol pasa a «Asignar posición».
 - 2026-11-26: el cuadro «NAS caído» ya se cierra con la X (cada persona el suyo, no vuelve en esa misma caída); la franja roja de arriba se queda mientras siga caído.
 - 2026-11-26: Hub de supervisores: ahora se ven las pantallas ENTRE supervisores (antes solo admins; a los demás les salía un recuadro negro que se quitaba solo). La pastilla propia dice «Estás compartiendo tu pantalla». Ojo ancho de banda si comparten muchos a la vez.
