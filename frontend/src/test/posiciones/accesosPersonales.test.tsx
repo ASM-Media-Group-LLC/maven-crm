@@ -16,6 +16,8 @@ const close=vi.fn();
 function content(props={}){return <EditorAccesosPersona persona={persona} posiciones={positions} asignadas={['support']} onCerrar={close} {...props}/>}
 function paint(props={}){const client=new QueryClient({defaultOptions:{queries:{retry:false}}});return render(<QueryClientProvider client={client}>{content(props)}</QueryClientProvider>)}
 const edit=()=>{fireEvent.click(screen.getByRole('checkbox',{name:'Operaciones'}));fireEvent.change(screen.getByRole('textbox'),{target:{value:'llamar'}});fireEvent.click(screen.getByRole('checkbox',{name:'posiciones.personas.editor.bloquearFuncion posiciones.c.llamar'}));};
+// Solo cuentan las ESCRITURAS: al abrir, el editor lee cámara/pantalla (exigencias_de_varios).
+const aplicaciones=()=>rpc.mock.calls.filter(c=>c[0]==='persona_aplicar_accesos');
 beforeEach(()=>{cleanup();rpc.mockReset().mockResolvedValue({error:null});close.mockReset()});
 describe('Asignación revisada y restricciones individuales',()=>{
  it('combina sin que el bloqueo pueda recuperarse desde otra posición o acceso total',()=>{
@@ -24,18 +26,18 @@ describe('Asignación revisada y restricciones individuales',()=>{
   expect(accesosCombinados(positions,['inactive'],[])['Oficina|Documentos']).toBe(false);
  });
  it('las casillas y Revisar no escriben; Aplicar envía una petición versionada',async()=>{
-  paint();edit();expect(rpc).not.toHaveBeenCalled();
-  fireEvent.click(screen.getByRole('button',{name:'posiciones.revision.revisar'}));expect(rpc).not.toHaveBeenCalled();
+  paint();edit();expect(aplicaciones()).toHaveLength(0);
+  fireEvent.click(screen.getByRole('button',{name:'posiciones.revision.revisar'}));expect(aplicaciones()).toHaveLength(0);
   fireEvent.click(screen.getByRole('button',{name:'posiciones.revision.aplicar'}));
   await waitFor(()=>expect(close).toHaveBeenCalledTimes(1));
-  expect(rpc).toHaveBeenCalledTimes(1);expect(rpc).toHaveBeenCalledWith('persona_aplicar_accesos',{
+  expect(aplicaciones()).toHaveLength(1);expect(rpc).toHaveBeenCalledWith('persona_aplicar_accesos',{
    _user_id:'person1',_revision:0,_posiciones:['support','ops'],_denegadas:['N:msg.llamar'],
    _versiones:Object.fromEntries(positions.map(p=>[p.id,p.updated_at])),
   });
  });
  it('cancelar no guarda ni modifica la configuración recibida',()=>{
   paint();edit();fireEvent.click(screen.getByRole('button',{name:'posiciones.dialogo.cancelar'}));
-  expect(rpc).not.toHaveBeenCalled();expect(close).toHaveBeenCalledTimes(1);expect(positions[0].checks['N:msg.llamar']).toBe(true);
+  expect(aplicaciones()).toHaveLength(0);expect(close).toHaveBeenCalledTimes(1);expect(positions[0].checks['N:msg.llamar']).toBe(true);
  });
  it('no permite asignar una posición desactivada',()=>{paint();expect(screen.getByRole('checkbox',{name:/Inactiva/})).toBeDisabled()});
  it('una falla conserva la propuesta y muestra el motivo',async()=>{
@@ -47,7 +49,7 @@ describe('Asignación revisada y restricciones individuales',()=>{
  it('rechaza un cambio de versión de la persona sin reescribir el borrador',()=>{
   const client=new QueryClient();const view=render(<QueryClientProvider client={client}>{content()}</QueryClientProvider>);edit();
   view.rerender(<QueryClientProvider client={client}>{content({revision:{user_id:persona.id,revision:1,denegadas:[]}})}</QueryClientProvider>);
-  expect(screen.getByRole('alert')).toHaveTextContent('posiciones.personas.editor.conflicto');expect(screen.getByRole('button',{name:'posiciones.revision.revisar'})).toBeDisabled();expect(rpc).not.toHaveBeenCalled();
+  expect(screen.getByRole('alert')).toHaveTextContent('posiciones.personas.editor.conflicto');expect(screen.getByRole('button',{name:'posiciones.revision.revisar'})).toBeDisabled();expect(aplicaciones()).toHaveLength(0);
  });
 });
 
