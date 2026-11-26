@@ -61,14 +61,15 @@ export default function MiPantallaCompartida({ track, compacto = false, onDejar,
         title={t("messenger.callView.miPantalla.mostrar")}
         aria-label={t("messenger.callView.miPantalla.mostrar")}
         className={cn(
-          "vidrio absolute bottom-2 left-2 z-20 flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-medium text-foreground hover:bg-white/10",
+          "vidrio absolute bottom-2 left-2 z-20 flex items-center gap-2 rounded-full px-3 py-1.5 text-xs font-semibold text-foreground ring-1 ring-success/50 hover:bg-white/10",
           negra && "ring-1 ring-destructive/70",
         )}
       >
         {negra
           ? <AlertTriangle className="h-3.5 w-3.5 text-destructive" aria-hidden />
-          : <span className="h-1.5 w-1.5 rounded-full bg-success" aria-hidden />}
-        {t("messenger.callView.miPantalla.compartiendo")}
+          : <span className="h-2 w-2 animate-pulse rounded-full bg-success" aria-hidden />}
+        {/* 26/11/2026 (Breiner): «Compartiendo» solo no se entendía; ahora lo dice completo. */}
+        {t("messenger.callView.miPantalla.titulo")}
         <ChevronUp className="h-3 w-3 opacity-70" aria-hidden />
       </button>
     );
