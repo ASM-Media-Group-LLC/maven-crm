@@ -18,3 +18,15 @@ describe("la ventanita flotante no es barra para arrastrar", () => {
     expect(proveedor).toContain("sin-arrastre fixed top-2 left-2 z-[200]");
   });
 });
+
+// 26/11/2026 (Daniel Ospina): «Ver en ventanita» en el recuadro de cada chatter.
+const monitor = Object.values(import.meta.glob("../../pages/cowork/CoworkRoomMonitor.tsx", { query: "?raw", import: "default", eager: true }) as Record<string, string>)[0];
+describe("ver la pantalla de un chatter en ventanita", () => {
+  it("al pasar el mouse sale el botón, saca la pantalla sin sonido y se cierra si deja de compartir", () => {
+    expect(monitor).toContain('t("cowork.monitor.verEnVentanita")');
+    expect(monitor).toMatch(/group-hover:opacity-100/);
+    expect(monitor).toContain("requestPictureInPicture()");
+    expect(monitor).toContain("v.muted = true;");
+    expect(monitor).toContain("document.exitPictureInPicture()");
+  });
+});
