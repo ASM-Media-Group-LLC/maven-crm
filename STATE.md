@@ -151,3 +151,7 @@ Ambos sets ya tienen migrations subidas (`20260504100000`, `20260504110000`) per
 ## 2026-11-24 · Compartir en llamadas directas
 - «Compartir pantalla» queda disponible en la barra grande y en la miniatura de llamadas. Cuando la captura no se puede iniciar, Maven muestra el motivo.
 - El selector instalado indica qué falta, conserva la opción elegida y permite reintentar la confirmación si falla. Pendiente validar la captura entre dos equipos con los nuevos instaladores.
+
+## 2026-11-26 · Argos: tabla del turno
+- Argos abre en la pestaña «Turno» (Shift): una fila por persona con llegada/salida, comida (almuerzo + break), baño, avisos de Argos y conexión; semáforo normal, tira de la semana y calendario. Lee tablas existentes, sin migraciones (`lib/turnoTabla.ts`, `hooks/useTurnoTabla.ts`, `components/hr/TurnoTabla.tsx`).
+- Pendiente: perfil del empleado con calendario del mes; corregir horarios de 7 días (los días libres salen como «no vino»).
