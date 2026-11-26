@@ -138,6 +138,9 @@ export function EditorAccesosPersona({ persona, posiciones, asignadas, revision,
           </section>
         </>}
       </div>
+      {/* El error TAMBIÉN junto a «Aplicar» (Grace, 26/11/2026): arriba quedaba
+          fuera de la vista con la lista larga y parecía que el botón no hacía nada. */}
+      {error && <p role="alert" data-error-aplicar className="rounded-control border border-destructive/50 bg-destructive/10 px-3 py-2 text-sm text-destructive">{error}</p>}
       <DialogFooter>
         <Button variant="outline" disabled={guardar.isPending} onClick={() => revisando ? setRevisando(false) : onCerrar()}>{t(revisando ? "posiciones.revision.seguir" : "posiciones.dialogo.cancelar")}</Button>
         <Button disabled={!pendiente || conflicto || guardar.isPending} onClick={() => { setError(""); if (revisando) guardar.mutate(); else setRevisando(true); }}>
