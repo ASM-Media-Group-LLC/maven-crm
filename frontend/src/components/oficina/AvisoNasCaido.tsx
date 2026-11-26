@@ -59,7 +59,7 @@ export function AvisoNasCaido() {
             <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{t("drive.nas.caidoCuerpo", { n: pendientes })}</p>
             {desde && <p className="mt-2 text-[11px] text-muted-foreground/80">{t("drive.nas.desde", { t: hora(desde) })}</p>}
           </div>
-          <button type="button" onClick={cerrar} aria-label={t("drive.nas.cerrar")} title={t("drive.nas.cerrar")} className="-mr-1 -mt-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-muted-foreground hover:bg-foreground/10 hover:text-foreground">
+          <button type="button" onClick={cerrar} aria-label={t("drive.nas.cerrarCuadro")} title={t("drive.nas.cerrarCuadro")} className="-mr-1 -mt-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-muted-foreground hover:bg-foreground/10 hover:text-foreground">
             <X className="h-4 w-4" />
           </button>
         </div>
