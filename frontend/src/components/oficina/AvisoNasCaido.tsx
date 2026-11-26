@@ -1,4 +1,5 @@
-import { CloudOff } from "lucide-react";
+import { useState } from "react";
+import { CloudOff, X } from "lucide-react";
 import { useLanguage } from "@/hooks/useLanguage";
 import { useNasSalud } from "@/hooks/useNasSalud";
 
@@ -6,6 +7,16 @@ import { useNasSalud } from "@/hooks/useNasSalud";
 // No se puede cerrar (quitamos la X). Lo ven dueño + admins + todos los que
 // tienen Drive full (la RLS de drive_nas_salud lo fuerza vía drive_tiene_full).
 // Se quita SOLO cuando el NAS vuelve (caido = false).
+//
+// 25/11/2026 (Alvaro: «esto no se puede cerrar»): el cuadro de abajo a la derecha
+// tapaba la pantalla. Ahora tiene X; la franja de arriba sigue fija mientras el NAS
+// esté caído. Cerrarlo vale para esta caída (se recuerda por su «desde»): si el
+// NAS vuelve a caerse, el cuadro aparece de nuevo.
+const CLAVE_CERRADO = "maven:nas-aviso-cerrado";
+
+function leerCerrado(): string | null {
+  try { return localStorage.getItem(CLAVE_CERRADO); } catch { return null; }
+}
 
 function hora(desde: string | null): string {
   if (!desde) return "";
@@ -19,6 +30,12 @@ function hora(desde: string | null): string {
 export function AvisoNasCaido() {
   const { t } = useLanguage();
   const { caido, desde, pendientes } = useNasSalud();
+  const [cerrado, setCerrado] = useState<string | null>(leerCerrado);
+  const estaCaida = desde ?? "sin-fecha";
+  const cerrar = () => {
+    setCerrado(estaCaida);
+    try { localStorage.setItem(CLAVE_CERRADO, estaCaida); } catch { /* sin almacenamiento: se cierra solo en esta pestaña */ }
+  };
 
   if (!caido) return null;
 
@@ -30,8 +47,8 @@ export function AvisoNasCaido() {
         <span className="min-w-0">{t("drive.nas.caidoFranja", { n: pendientes })}</span>
       </div>
 
-      {/* Pop-up fijo abajo a la derecha — SIN botón de cerrar. Se va solo cuando
-          el NAS vuelve a estar arriba (desde la base). */}
+      {/* Pop-up abajo a la derecha, con X (25/11/2026). */}
+      {cerrado !== estaCaida && (
       <div role="alertdialog" aria-live="assertive" className="vidrio vidrio-glow fixed bottom-4 right-4 z-[60] w-[min(92vw,22rem)] rounded-2xl border border-destructive/50 p-4 shadow-xl">
         <div className="flex items-start gap-3">
           <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-destructive/15 text-destructive">
@@ -41,10 +58,13 @@ export function AvisoNasCaido() {
             <p className="text-sm font-semibold text-foreground">{t("drive.nas.caidoTitulo")}</p>
             <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{t("drive.nas.caidoCuerpo", { n: pendientes })}</p>
             {desde && <p className="mt-2 text-[11px] text-muted-foreground/80">{t("drive.nas.desde", { t: hora(desde) })}</p>}
-            <p className="mt-2 text-[11px] font-semibold text-destructive">{t("drive.nas.permanente")}</p>
           </div>
+          <button type="button" onClick={cerrar} aria-label={t("drive.nas.cerrar")} title={t("drive.nas.cerrar")} className="-mr-1 -mt-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-muted-foreground hover:bg-foreground/10 hover:text-foreground">
+            <X className="h-4 w-4" />
+          </button>
         </div>
       </div>
+      )}
     </>
   );
 }
