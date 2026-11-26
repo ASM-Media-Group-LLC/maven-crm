@@ -406,9 +406,16 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
   useEffect(() => { void recargarConsumido(); }, [recargarConsumido]);
   useEffect(() => { if (!breakStartedAt) void recargarConsumido(); }, [breakStartedAt, recargarConsumido]);
 
-  /** Lo ya gastado hoy solo cuenta para el baño (presupuesto diario); el break y
-   *  el almuerzo son por pausa, así que arrancan en cero. */
-  const consumidoDe = (kind: "bano" | "break" | "almuerzo" | null) => (kind === "bano" ? banoConsumido : 0);
+  /** Cuánto de lo ya gastado se suma a ESTA pausa en la cuenta regresiva: nada.
+   *
+   *  El tope que manda el servidor al abrir la pausa (startBreak / pausaAbierta,
+   *  `pausa_restante_min`, 19/11/2026) ya es LO QUE QUEDA del cupo del turno: el
+   *  baño son 10 minutos en total, vaya 1 o 4 veces, y el servidor ya descontó lo
+   *  usado. Volver a sumar lo gastado hoy lo restaba DOS veces (26/11/2026: con
+   *  7:49 usados el servidor decía «quedan 2 min» y la pantalla mostraba −5:43 y
+   *  «Excediste tu tiempo de baño del día» apenas la persona entraba al baño).
+   *  El tablero del supervisor sí suma lo gastado: allá el tope es el total (10). */
+  const consumidoDe = (_kind: "bano" | "break" | "almuerzo" | null) => 0;
 
   // Avisar EN VOZ cuando se acaba la pausa.
   //
