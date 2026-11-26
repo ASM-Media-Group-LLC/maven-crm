@@ -7,20 +7,8 @@ interface Props {
   preferredAudioOutputDeviceId?: string;
 }
 
-/**
- * Safety-net audio renderer at the room level.
- *
- * Subscribes to ALL remote microphone tracks and attaches each to a hidden
- * <audio> element, regardless of whether a ParticipantTile for that participant
- * is currently mounted (it may be filtered out by hideNoVideo or maxTiles).
- *
- * ParticipantTile also attaches audio to its own element; the browser will play
- * both attached MediaStreams simultaneously, but the underlying media stream is
- * the same so it is heard once per output device. To avoid double audio, we
- * keep this sink muted=false and rely on the browser sharing the same source.
- * In practice attaching the same RemoteAudioTrack twice does not duplicate audio
- * because LiveKit's attach() returns the same underlying element source.
- */
+/** Reproduce cada pista de audio remota en un elemento estable de la sala,
+ * aunque la persona no tenga recuadro o la llamada se mueva a otra ventana. */
 export default function RoomAudioSink({ room, preferredAudioOutputDeviceId }: Props) {
   const attachedRef = useRef<Map<string, { track: RemoteTrack; el: HTMLAudioElement }>>(new Map());
 
@@ -71,8 +59,11 @@ export default function RoomAudioSink({ room, preferredAudioOutputDeviceId }: Pr
       if (preferredAudioOutputDeviceId && typeof mediaEl.setSinkId === "function") {
         mediaEl.setSinkId(preferredAudioOutputDeviceId).catch(() => {});
       }
+      attachedRef.current.set(key, { track, el });
       const tryPlay = (attempt = 0) => {
+        if (attachedRef.current.get(key)?.el !== el) return;
         el.play().catch(() => {
+          if (attachedRef.current.get(key)?.el !== el) return;
           if (attempt < 5) { setTimeout(() => tryPlay(attempt + 1), 300 * Math.pow(2, attempt)); return; }
           // Antes acá se RENDÍA en silencio. Los reintentos rápidos cubren una
           // carrera de milisegundos, pero no la política de autoplay: esa solo
@@ -82,7 +73,6 @@ export default function RoomAudioSink({ room, preferredAudioOutputDeviceId }: Pr
         });
       };
       tryPlay();
-      attachedRef.current.set(key, { track, el });
     };
 
     const detach = (track: RemoteTrack, participant: RemoteParticipant) => {

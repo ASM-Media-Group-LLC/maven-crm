@@ -7,11 +7,10 @@ import ParticipantTile from "./ParticipantTile";
 
 const ESPERA_VOZ_MS = 750;
 
-export default function VideosEnMiniatura({ participantes, vozActiva, room, audioOutputId }: {
+export default function VideosEnMiniatura({ participantes, vozActiva, room }: {
   participantes: LKParticipant[];
   vozActiva: string | null;
   room: Room | null;
-  audioOutputId?: string;
 }) {
   const { t } = useLanguage();
   const camaras = participantes.filter((p) => !p.isScreenSharing);
@@ -64,7 +63,7 @@ export default function VideosEnMiniatura({ participantes, vozActiva, room, audi
             participant={persona}
             room={room}
             className="h-full"
-            preferredAudioOutputDeviceId={audioOutputId}
+            audioDeSala
           />
         </div>
       ))}

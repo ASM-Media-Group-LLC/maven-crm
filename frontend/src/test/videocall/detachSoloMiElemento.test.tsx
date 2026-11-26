@@ -69,6 +69,16 @@ describe("un recuadro que se desmonta", () => {
     HTMLMediaElement.prototype.pause = vi.fn();
   });
 
+  it("deja el micrófono a la salida de sala cuando hay una", () => {
+    const { sala, micro } = salaConPistas("user-1");
+    const adjuntar = vi.spyOn(micro, "attach");
+    const { container } = render(
+      <ParticipantTile participant={participante()} room={sala as unknown as import("livekit-client").Room} audioDeSala />
+    );
+    expect(container.querySelector("audio")).toBeNull();
+    expect(adjuntar).not.toHaveBeenCalled();
+  });
+
   it("desconecta SOLO su propio <audio>, nunca la pista entera", () => {
     const { sala } = salaConPistas("user-1");
     const { unmount } = render(

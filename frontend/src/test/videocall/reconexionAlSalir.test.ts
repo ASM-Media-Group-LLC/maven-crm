@@ -180,3 +180,55 @@ describe("recuperación de llamadas sin conexiones huérfanas", () => {
     expect(result.current.getRoom()).toBe(nueva);
   });
 });
+
+describe("prioridad de voz", () => {
+  it.each(["call-prueba", "meet_prueba"])("reduce el video en %s tras dos lecturas malas y restablece los topes con red estable", async (nombre) => {
+    const sala = salaFalsa(nombre);
+    colarSala(sala);
+    let limite = "none";
+    const crearPista = (maxBitrate: number, maxFramerate: number) => {
+      let encodings: RTCRtpEncodingParameters[] = [{ maxBitrate, maxFramerate, scaleResolutionDownBy: 1 }];
+      const sender = {
+        getParameters: () => ({ encodings: structuredClone(encodings) }),
+        setParameters: vi.fn(async (params: { encodings: RTCRtpEncodingParameters[] }) => { encodings = params.encodings; }),
+      };
+      const track = {
+        sender,
+        mediaStreamTrack: { getSettings: () => ({ width: 1920, height: 1080 }) },
+        getRTCStatsReport: async () => new Map([["out", { type: "outbound-rtp", qualityLimitationReason: limite }]]),
+      };
+      return { track, sender };
+    };
+    const camara = crearPista(3_000_000, 30);
+    const pantalla = crearPista(1_500_000, 15);
+    sala.localParticipant.getTrackPublication.mockImplementation((fuente) => {
+      if (fuente === "camera") return { track: camara.track };
+      if (fuente === "screen_share") return { track: pantalla.track };
+      return undefined;
+    });
+    const telemetria = { corte: vi.fn(), salud: vi.fn() };
+    const { result } = renderHook(() => useLiveKit());
+    await act(async () => {
+      await result.current.connect(sala.name, "Prueba", false, { ...OPCIONES, tokenProvider: async () => TOKEN, telemetria });
+    });
+
+    await avanzar(5_000);
+    expect(camara.sender.setParameters).not.toHaveBeenCalled();
+    expect(pantalla.sender.setParameters).not.toHaveBeenCalled();
+
+    limite = "bandwidth";
+    await avanzar(5_000);
+    expect(camara.sender.setParameters).not.toHaveBeenCalled();
+    await avanzar(5_000);
+    expect(camara.sender.getParameters().encodings[0]).toMatchObject({ maxBitrate: 350_000, scaleResolutionDownBy: 3 });
+    expect(pantalla.sender.getParameters().encodings[0]).toMatchObject({ maxBitrate: 700_000, maxFramerate: 5 });
+    expect(sala.localParticipant.setMicrophoneEnabled).toHaveBeenCalledExactlyOnceWith(false);
+
+    limite = "none";
+    await avanzar(60_000);
+    expect(camara.sender.getParameters().encodings[0].maxBitrate).toBe(350_000);
+    await avanzar(5_000);
+    expect(camara.sender.getParameters().encodings[0]).toMatchObject({ maxBitrate: 3_000_000, scaleResolutionDownBy: 1 });
+    expect(pantalla.sender.getParameters().encodings[0]).toMatchObject({ maxBitrate: 1_500_000, maxFramerate: 15 });
+  });
+});

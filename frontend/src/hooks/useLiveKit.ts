@@ -1,4 +1,4 @@
-import { afirmarRelojesDeLiveKit } from "@/lib/relojesFirmes";
+import { afirmarRelojesDeLiveKit, repetirConRelojFirme } from "@/lib/relojesFirmes";
 import { useState, useCallback, useRef, useEffect } from "react";
 import {
   Room,
@@ -59,6 +59,7 @@ import {
 } from "@/lib/saludDeLlamada";
 import { armarAudio, leerAudioRecibido, leerMicrofono, type AudioDeLaMuestra, type ContadoresDeAudio } from "@/lib/audioDeLlamada";
 import { AHORRO_INICIAL, PANTALLA_AHORRO, ahorroPorPrueba, siguienteAhorro, type EstadoAhorro } from "@/lib/modoAhorro";
+import { MEDIR_PRIORIDAD_VOZ_MS, PRIORIDAD_VOZ_INICIAL, siguientePrioridadVoz } from "@/lib/prioridadDeVoz";
 import {
   CAMARA_INICIAL, PUBLICACION_DE_CAMARA, camaraEnHD, copiarTopes, elegirPerfilDeCamara, escribirTopes, siguientePerfilDeCamara, topesDeCowork, topesLivianos,
   type EstadoCamara, type PerfilDeCamara, type SenalesDeSubida, type TopeDeCodificacion,
@@ -626,6 +627,7 @@ export function useLiveKit() {
   // El modo ahorro de la llamada vigente (lo lee también toggleScreenShare para
   // elegir el perfil de la pantalla).
   const ahorroRef = useRef<EstadoAhorro>(AHORRO_INICIAL);
+  const prioridadVozRef = useRef(PRIORIDAD_VOZ_INICIAL);
   // La última prueba de velocidad real (lib/pruebaDeRed.ts) y cuándo toca la
   // próxima. Viven por pestaña, no por conexión: una re-entrada tras una caída o
   // un cambio de sala dentro de la media hora no vuelve a medir.
@@ -686,20 +688,26 @@ export function useLiveKit() {
     // Modo ahorro (lib/modoAhorro.ts): con la subida lenta, cámara en calidad
     // media y pantalla a 5 cuadros por segundo, solo para esta persona.
     ahorroRef.current = AHORRO_INICIAL;
+    prioridadVozRef.current = PRIORIDAD_VOZ_INICIAL;
     let ahorroAvisado = false;
     // La prueba de velocidad real, solo en las salas de Cowork.
     const conPrueba = salaConPrueba(room.name);
-    const originales = new Map<RTCRtpSender, Array<{ maxFramerate?: number; maxBitrate?: number }>>();
+    const originales = new WeakMap<RTCRtpSender, Array<{ maxFramerate?: number; maxBitrate?: number }>>();
     // La CÁMARA ya no se toca aquí: la maneja su perfil (lib/perfilDeCamara.ts),
     // que cuenta el modo ahorro como una de sus señales. Antes el ahorro apagaba
     // la capa de 720p con setPublishingQuality, pero dynacast la volvía a prender
     // en cuanto alguien la pedía, y la de 360p que quedaba no tenía tope.
-    const aplicarAhorro = async (activo: boolean) => {
+    let aplicandoAhorro = false;
+    const aplicarAhorro = async () => {
+      if (!sigueVigente() || aplicandoAhorro) return;
+      aplicandoAhorro = true;
       try {
+        const activo = ahorroRef.current.activo || prioridadVozRef.current.activa;
         const sender = room.localParticipant.getTrackPublication(Track.Source.ScreenShare)?.track?.sender;
         if (!sender) return;
         const params = sender.getParameters();
         if (!params.encodings?.length) return;
+        const topesActuales = params.encodings.map(copiarTopes);
         if (activo) {
           if (!originales.has(sender)) {
             originales.set(sender, params.encodings.map((e) => ({ maxFramerate: e.maxFramerate, maxBitrate: e.maxBitrate })));
@@ -715,30 +723,36 @@ export function useLiveKit() {
             if (antes[i]?.maxFramerate === undefined) delete e.maxFramerate; else e.maxFramerate = antes[i].maxFramerate;
             if (antes[i]?.maxBitrate === undefined) delete e.maxBitrate; else e.maxBitrate = antes[i].maxBitrate;
           });
-          originales.delete(sender);
         }
-        await sender.setParameters(params);
+        if (params.encodings.some((e, i) =>
+          e.maxFramerate !== topesActuales[i].maxFramerate || e.maxBitrate !== topesActuales[i].maxBitrate,
+        )) await sender.setParameters(params);
+        if (!activo) originales.delete(sender);
       } catch { /* ajustar la calidad jamás rompe la llamada */ }
+      finally { aplicandoAhorro = false; }
     };
     // La cámara según el internet de subida (lib/perfilDeCamara.ts). Se aplica EN
     // VIVO sobre el emisor (sender.setParameters), sin volver a publicar: en
     // liviano se topan las capas (arriba 360p@15 y 350 kbps); al volver al normal
     // se dejan exactamente como estaban. Si no hay nada distinto, no se llama.
     perfilCamaraRef.current = CAMARA_INICIAL;
-    const originalesCam = new Map<RTCRtpSender, TopeDeCodificacion[]>();
+    const originalesCam = new WeakMap<RTCRtpSender, TopeDeCodificacion[]>();
+    // El HD es el perfil inicial; la subida limitada de forma sostenida o
+    // un transporte restringido aplican el tope liviano durante la llamada.
+    const camaraLiviana = () => prioridadVozRef.current.activa
+      || (perfilCamaraRef.current.perfil === "liviano" && !camaraEnHD(room.name))
+      || porRedBloqueada();
+    let aplicandoCamara = false;
     const aplicarCamara = async () => {
+      if (!sigueVigente() || aplicandoCamara) return;
+      aplicandoCamara = true;
       try {
-        if (roomRef.current !== room) return;
         const pista = room.localParticipant.getTrackPublication(Track.Source.Camera)?.track;
         const sender = pista?.sender;
         if (!pista || !sender) return;
         const params = sender.getParameters();
         if (!params.encodings?.length) return;
-        // En Meet y en las llamadas de Maven la cámara va en HD y NO se recorta a
-        // 360p por la subida (Alvaro, 17/11/2026: «calidad alta en Meet»).
-        // Salvo por TCP (lib/redBloqueada.ts): ahí el HD congela el video 71 a
-        // 110 veces en 5 minutos, así que se topa también en Meet y en el chat.
-        const liviano = (perfilCamaraRef.current.perfil === "liviano" && !camaraEnHD(room.name)) || porRedBloqueada();
+        const liviano = camaraLiviana();
         // En Cowork también el normal va topado: todo en vivo, a 10 fps
         // (perfilDeCamara.ts, CAMARA_COWORK). Fuera de Cowork, el normal es el de siempre.
         if (liviano || conPrueba) {
@@ -758,11 +772,15 @@ export function useLiveKit() {
         } else {
           const antes = originalesCam.get(sender);
           if (!antes) return;
-          originalesCam.delete(sender);
-          if (!escribirTopes(params.encodings, antes)) return;
+          if (!escribirTopes(params.encodings, antes)) {
+            originalesCam.delete(sender);
+            return;
+          }
         }
         await sender.setParameters(params);
+        if (!liviano && !conPrueba) originalesCam.delete(sender);
       } catch { /* ajustar la calidad jamás rompe la llamada */ }
+      finally { aplicandoCamara = false; }
     };
     aplicarCamaraRef.current = aplicarCamara;
     const leer = async (fuente: Track.Source): Promise<LecturaDePista | null> => {
@@ -856,8 +874,7 @@ export function useLiveKit() {
         ahorroRef.current = ahorroPorPrueba(siguienteAhorro(ahorroRef.current, muestra), pruebaVigente?.subida_mbps ?? null);
         const ahorro = ahorroRef.current;
         // Prendido se vuelve a aplicar cada minuto: LiveKit puede reponer capas.
-        if (ahorro.activo) void aplicarAhorro(true);
-        else if (estabaEnAhorro) void aplicarAhorro(false);
+        if (ahorro.activo || estabaEnAhorro) void aplicarAhorro();
         if (ahorro.activo && !estabaEnAhorro && !ahorroAvisado) {
           ahorroAvisado = true;
           toast(traducir("shared.call.ahorroTitulo"), { description: traducir("shared.call.ahorroDesc"), duration: 10_000 });
@@ -875,7 +892,8 @@ export function useLiveKit() {
         // Cada 10 minutos: qué tan lejos queda cada servidor de llamadas (lib/pingRegiones.ts).
         const regiones = (vueltaRegiones++ % MEDIR_REGIONES_CADA === 0) ? await medirRegiones() : null;
         if (!sigueVigente()) return;
-        const filaDeSalud = { sala: room.name, datos: { ...muestra, ...memoria, ahorro: ahorro.activo, nc, nc_info: { ...(ncInfo ?? {}), ruido_usuario: ncUsuarioRef.current ? "si" as const : "no" as const }, perfil_cam: perfilCam, transporte: transporteDeLaLlamada(), ...(prueba ? { prueba } : {}), ...(trabasDelMinuto.length ? { trabas: trabasDelMinuto } : {}), ...(audio ? { audio } : {}), ...(regiones ? { regiones } : {}), ...(falloCamaraParaSaludRef.current ? { cam_fallo: falloCamaraParaSaludRef.current } : {}) } };
+        const perfilCamEfectivo = camaraLiviana() ? "liviano" : "normal";
+        const filaDeSalud = { sala: room.name, datos: { ...muestra, ...memoria, ahorro: ahorro.activo || prioridadVozRef.current.activa, nc, nc_info: { ...(ncInfo ?? {}), ruido_usuario: ncUsuarioRef.current ? "si" as const : "no" as const }, perfil_cam: perfilCamEfectivo, transporte: transporteDeLaLlamada(), ...(prueba ? { prueba } : {}), ...(trabasDelMinuto.length ? { trabas: trabasDelMinuto } : {}), ...(audio ? { audio } : {}), ...(regiones ? { regiones } : {}), ...(falloCamaraParaSaludRef.current ? { cam_fallo: falloCamaraParaSaludRef.current } : {}) } };
         falloCamaraParaSaludRef.current = null;
         if (telemetriaRef.current) telemetriaRef.current.salud(filaDeSalud);
         else void (supabase.from as unknown as InsertaSalud)("llamada_salud")
@@ -884,6 +902,34 @@ export function useLiveKit() {
       } catch { /* medir jamás rompe la llamada */ }
       finally { muestreando = false; }
     };
+    // En Meet y llamadas directas, adaptar el video en segundos sin aumentar
+    // las muestras que se guardan en el servidor ni iniciar una prueba de red.
+    let midiendoVoz = false;
+    const adaptarPorVoz = async () => {
+      if (!sigueVigente() || midiendoVoz) return;
+      midiendoVoz = true;
+      try {
+        const fuentes = [Track.Source.Camera, Track.Source.ScreenShare].filter((fuente) => {
+          const publicacion = room.localParticipant.getTrackPublication(fuente);
+          return publicacion?.track && !publicacion.isMuted;
+        });
+        const resultados = await Promise.all(fuentes.map(leer));
+        if (!sigueVigente()) return;
+        const antes = prioridadVozRef.current;
+        const lecturas = resultados.filter((pista): pista is LecturaDePista => pista !== null);
+        prioridadVozRef.current = siguientePrioridadVoz(antes, lecturas, Date.now());
+        const camara = room.localParticipant.getTrackPublication(Track.Source.Camera)?.track?.sender;
+        const pantalla = room.localParticipant.getTrackPublication(Track.Source.ScreenShare)?.track?.sender;
+        const activa = prioridadVozRef.current.activa;
+        await Promise.all([
+          activa || (camara && originalesCam.has(camara)) ? aplicarCamara() : undefined,
+          activa || (pantalla && originales.has(pantalla)) ? aplicarAhorro() : undefined,
+        ]);
+      } catch { /* la llamada continúa si faltan estadísticas */ }
+      finally { midiendoVoz = false; }
+    };
+    const vigiaVoz = conPrueba ? null
+      : repetirConRelojFirme(() => { void adaptarPorVoz(); }, MEDIR_PRIORIDAD_VOZ_MS);
     const primera = window.setTimeout(() => { void tomar(); }, 15_000);
     const cada = window.setInterval(() => { void tomar(); }, MUESTRA_CADA_MS);
     // «Tu internet está débil» (lib/internetDebil.ts). Cada 2 s se mira si la
@@ -942,6 +988,8 @@ export function useLiveKit() {
       document.removeEventListener("visibilitychange", alOcultar);
       window.clearTimeout(primera);
       window.clearInterval(cada);
+      vigiaVoz?.();
+      prioridadVozRef.current = PRIORIDAD_VOZ_INICIAL;
       window.clearTimeout(primeraMirada);
       window.clearInterval(vigiaTransporte);
       anotarTransporte(null);
@@ -2016,7 +2064,7 @@ export function useLiveKit() {
             perfilCamaraRef.current = { perfil: "liviano", buenas: 0 };
           }
           // En Cowork, también el normal: todo en vivo a 10 fps (perfilDeCamara.ts).
-          if (perfilCamaraRef.current.perfil === "liviano" || salaConPrueba(room.name)) void aplicarCamaraRef.current?.();
+          if (prioridadVozRef.current.activa || perfilCamaraRef.current.perfil === "liviano" || salaConPrueba(room.name)) void aplicarCamaraRef.current?.();
         }
         debouncedRefresh();
         // NOTE: Background is handled by scheduleBackgroundApply on connect
@@ -3006,7 +3054,7 @@ export function useLiveKit() {
       const pruebaVigente = ultimaPruebaRef.current;
       const perfil = elegirPerfilDePantalla({
         prueba: pruebaVigente ? { subida_mbps: pruebaVigente.resultado.subida_mbps, edadMs: Date.now() - pruebaVigente.at } : null,
-        ahorroActivo: ahorroRef.current.activo,
+        ahorroActivo: ahorroRef.current.activo || prioridadVozRef.current.activa,
         limiteCam: ultimaMuestraRef.current?.limite_cam ?? null,
         limitePant: ultimaMuestraRef.current?.limite_pant ?? null,
       });
