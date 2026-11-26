@@ -1,5 +1,7 @@
 # Estado del Proyecto — Maven CRM (v3)
 
+- 25/11/2026 · La propuesta de Argos abre en Hoy con agenda, semana navegable, calendario y cierres con pendientes por fecha. Las decisiones de ejemplo actualizan los indicadores. Pendiente validación visual del dueño e integración con datos reales.
+
 - 25/11/2026 · La propuesta de Argos muestra relevo AM/PM, entradas previstas y marcadas, próximos ingresos, conexión, observaciones y avisos por persona. Se puede abrir cada episodio. Usa datos de ejemplo; queda pendiente conectar horarios, marcas, señales y revisiones reales.
 
 - 25/11/2026 · La vista local de Argos incorpora el informe por persona y turno: almuerzo real y permitido, episodios recuperados, pendientes y avisos por tipo. Pendiente conectar las fuentes de producción y revisar el resultado en Maven.

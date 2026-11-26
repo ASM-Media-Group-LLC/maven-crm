@@ -4,10 +4,16 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta http-equiv="Content-Security-Policy" content="connect-src 'self'" />
-    <title>Maven · Supervisión del día en Argos</title>
+    <style>
+      @media (min-width: 768px) and (max-width: 1279px) {
+        .argos-accion-cabecera[aria-label] { width: 36px; height: 36px; padding: 0; }
+        .argos-accion-cabecera .argos-texto-accion { display: none; }
+      }
+    </style>
+    <title>Argos · Agenda del equipo</title>
   </head>
   <body>
     <div id="root"></div>
-    <script type="module" src="/src/harness/argos-preview.tsx?v=supervision-del-equipo"></script>
+    <script type="module" src="/src/harness/argos-preview.tsx?v=agenda-turnos"></script>
   </body>
 </html>

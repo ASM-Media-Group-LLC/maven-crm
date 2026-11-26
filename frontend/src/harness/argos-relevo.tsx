@@ -1,14 +1,5 @@
 import { useState } from "react";
-import {
-  CalendarClock,
-  Check,
-  ChevronRight,
-  Clock3,
-  Moon,
-  Radio,
-  Sunrise,
-  X,
-} from "lucide-react";
+import { Check, ChevronRight, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export const corteEjemplo = "16:20";
@@ -136,49 +127,55 @@ export function RelevoArgos<E extends Episodio>({
     seccion === "AM" ? am : seccion === "PM" ? pm : resto ? futuras : proximas;
   const nombre = (id: string) =>
     personas.find((p) => p.id === id)?.nombre ?? "Sin identificar";
-  const bloques = [
+  const sinMarca = pm.filter(({ horario }) => !horario.marca);
+  const pendientesAM =
+    aRevisar.length === 1 ? "1 pendiente" : `${aRevisar.length} pendientes`;
+  const proxima = proximas[0];
+  const agenda = [
     {
       id: "AM",
-      titulo: "Cierre AM",
-      cobertura: am.length ? entradasAM / am.length : 0,
-      icono: Sunrise,
-      color: "text-amber-500",
       accion: "Ver cierre AM",
-      cifra: `${entradasAM} de ${am.length}`,
-      unidad: "entradas registradas",
-      pie: `${aRevisar.length} ${aRevisar.length === 1 ? "pendiente del AM" : "pendientes del AM"}`,
+      hora: "08:00",
+      hasta: "16:00",
+      titulo: "Cierre del turno AM",
+      detalle: am.length
+        ? `${entradasAM} de ${am.length} entradas registradas · ${pendientesAM} para el relevo`
+        : "Sin entradas programadas",
     },
     {
       id: "PM",
-      titulo: "PM en curso",
-      cobertura: pm.length ? entradasPM / pm.length : 0,
-      icono: Radio,
-      color: "text-success",
       accion: "Ver turno PM",
-      cifra: `${entradasPM} de ${pm.length}`,
-      unidad: "entradas previstas al corte",
-      pie:
-        pm.length > entradasPM
-          ? `${pm.length - entradasPM} sin entrada registrada`
-          : pm.length
-            ? "Todas las entradas al día"
-            : "Nadie debía entrar todavía",
+      hora: "16:00",
+      hasta: "00:00",
+      titulo: "Turno PM en curso",
+      detalle: pm.length
+        ? [
+            `${entradasPM} de ${pm.length} entradas registradas`,
+            sinMarca.length === 1
+              ? `Falta la marca de ${sinMarca[0].persona.nombre}`
+              : sinMarca.length
+                ? `${sinMarca.length} sin entrada registrada`
+                : "Todas marcadas",
+          ].join(" · ")
+        : "Nadie debía entrar todavía",
     },
     {
       id: "Próximas entradas",
-      titulo: "Próximas entradas",
-      cobertura: null,
-      icono: CalendarClock,
-      color: "text-primary",
       accion: "Ver próximas entradas",
-      cifra: proximas[0]?.horario.inicio ?? "—",
-      unidad: proximas[0]?.persona.nombre ?? "Sin entradas en la próxima hora",
-      pie:
-        proximas.length > 1
-          ? `${proximas.length} entradas en los próximos 60 min`
-          : proximas.length
-            ? `En ${minutos(proximas[0].horario.inicio) - minutoCorte} min`
-            : "Próximos 60 minutos",
+      hora: proxima?.horario.inicio ?? "—",
+      hasta: proxima
+        ? `en ${minutos(proxima.horario.inicio) - minutoCorte} min`
+        : "",
+      titulo: "Próxima entrada",
+      detalle: proxima
+        ? [
+            proxima.persona.nombre,
+            proximas.length > 1 &&
+              `y ${proximas.length - 1} más en la próxima hora`,
+          ]
+            .filter(Boolean)
+            .join(" ")
+        : "Sin entradas previstas en los próximos 60 minutos",
     },
   ] as const;
 
@@ -194,13 +191,13 @@ export function RelevoArgos<E extends Episodio>({
           <span className="block text-sm font-medium">
             {item.titulo} · {nombre(item.persona)}
           </span>
-          <span className="text-xs text-muted-foreground">
+          <span className="text-sm text-muted-foreground">
             Desde {item.hora} ·{" "}
             {decisiones[item.id]?.resultado ??
               (item.recuperado
                 ? `Recuperado a las ${item.recuperado}`
                 : item.responsable
-                  ? `Seguimiento: ${item.responsable}`
+                  ? `Seguimiento de ${item.responsable}`
                   : "Sin responsable asignado")}
           </span>
         </span>
@@ -210,162 +207,177 @@ export function RelevoArgos<E extends Episodio>({
   }
 
   return (
-    <section
-      aria-label="Cómo va el día"
-      className="vidrio mt-4 overflow-hidden rounded-2xl"
-    >
-      <header className="flex flex-wrap items-center justify-between gap-2 px-4 pb-3 pt-4 sm:px-5">
-        <h2 className="font-display text-base font-bold">Cómo va el día</h2>
-        <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
-          <Clock3 className="h-3.5 w-3.5" />
-          25 nov · {corteEjemplo} · Bogotá
-        </span>
+    <section aria-labelledby="titulo-agenda-turnos" className="mt-5">
+      <header className="mb-1 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+        <h2
+          id="titulo-agenda-turnos"
+          className="font-display text-xl font-semibold leading-tight tracking-tight"
+        >
+          Turnos y entradas
+        </h2>
+        <p className="text-sm tabular-nums text-muted-foreground">
+          Al corte de las {corteEjemplo} · Bogotá
+        </p>
       </header>
-      <div className="grid gap-px overflow-hidden border-t border-border/50 bg-border/50 sm:grid-cols-3">
-        {bloques.map(
-          ({
-            id,
-            titulo,
-            icono: Icono,
-            color,
-            accion,
-            cifra,
-            unidad,
-            pie,
-            cobertura,
-          }) => (
+      <ol className="mt-2 divide-y divide-border/55 border-y border-border/55">
+        {agenda.map(({ id, accion, hora, hasta, titulo, detalle }, indice) => (
+          <li key={id}>
             <button
-              key={id}
+              id={`abrir-relevo-${indice}`}
               type="button"
               aria-label={accion}
-              aria-describedby={`cifra-relevo-${id.split(" ")[0]} pie-relevo-${id.split(" ")[0]}`}
+              aria-describedby={`datos-relevo-${indice}`}
               aria-expanded={seccion === id}
+              aria-controls={
+                seccion === id ? "detalle-agenda-turno" : undefined
+              }
               onClick={() => {
                 setSeccion(seccion === id ? null : id);
                 setResto(false);
               }}
               className={cn(
-                "flex flex-col items-stretch bg-card px-4 py-3.5 text-left transition-colors hover:bg-secondary sm:px-5",
-                seccion === id && "bg-secondary",
+                "group grid w-full grid-cols-[3.75rem_minmax(0,1fr)_1rem] items-center gap-x-3 rounded-md px-1 py-2.5 text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring hover:bg-muted/45 sm:grid-cols-[4.75rem_minmax(0,1fr)_1rem] sm:gap-x-4 sm:px-2",
+                seccion === id && "bg-muted/40",
               )}
             >
-              <span className="flex items-center gap-2 text-sm font-medium">
-                <Icono className={cn("h-4 w-4", color)} />
-                {titulo}
-                <ChevronRight
-                  className={cn(
-                    "ml-auto h-4 w-4 text-muted-foreground",
-                    seccion === id && "rotate-90",
-                  )}
-                />
-              </span>
               <span
-                id={`cifra-relevo-${id.split(" ")[0]}`}
-                className="mt-1.5 flex flex-wrap items-baseline gap-x-2"
+                aria-hidden="true"
+                className="flex flex-col leading-tight tabular-nums"
               >
-                <strong className="text-2xl font-semibold tracking-tight tabular-nums">
-                  {cifra}
-                </strong>
-                <span className="text-xs text-foreground/80">{unidad}</span>
-              </span>
-              <span
-                id={`pie-relevo-${id.split(" ")[0]}`}
-                className="mt-1 text-xs text-muted-foreground"
-              >
-                {pie}
-              </span>
-              {cobertura !== null && (
                 <span
-                  aria-hidden="true"
-                  className="mt-2 block h-1 w-full overflow-hidden rounded-full bg-muted"
+                  className={cn(
+                    "text-[17px] font-semibold tracking-tight",
+                    id === "PM" && "text-primary",
+                  )}
                 >
-                  <span
-                    className={cn(
-                      "block h-full rounded-full",
-                      id === "AM" ? "bg-amber-500/75" : "bg-success/80",
-                    )}
-                    style={{ width: `${cobertura * 100}%` }}
-                  />
+                  {hora}
                 </span>
-              )}
+                {hasta && (
+                  <span className="mt-0.5 text-xs text-muted-foreground">
+                    {id === "Próximas entradas" ? hasta : `– ${hasta}`}
+                  </span>
+                )}
+              </span>
+              <span id={`datos-relevo-${indice}`} className="min-w-0">
+                <span className="sr-only">
+                  {hora} {hasta} ·{" "}
+                </span>
+                <span className="flex items-center gap-2 text-base font-semibold leading-snug">
+                  {titulo}
+                  {id === "PM" && (
+                    <span
+                      aria-hidden="true"
+                      className="h-1.5 w-1.5 rounded-full bg-success"
+                    />
+                  )}
+                </span>
+                <span className="mt-0.5 block text-sm leading-snug text-muted-foreground">
+                  {detalle}
+                </span>
+              </span>
+              <ChevronRight
+                aria-hidden="true"
+                className={cn(
+                  "h-4 w-4 text-muted-foreground transition-transform",
+                  seccion === id && "rotate-90 text-foreground",
+                )}
+              />
             </button>
-          ),
-        )}
-      </div>
-      {seccion && (
-        <div className="space-y-3 border-t border-border/60 px-4 py-3 sm:px-5">
-          <div className="flex flex-wrap items-center gap-2">
-            <h3 className="mr-auto text-sm font-semibold">
-              {seccion === "AM"
-                ? "Entradas del AM"
-                : seccion === "PM"
-                  ? `Entradas previstas hasta las ${corteEjemplo}`
-                  : resto
-                    ? "Entradas del resto del día"
-                    : "Entradas en los próximos 60 minutos"}
-            </h3>
-            {seccion === "Próximas entradas" && (
-              <button
-                className="rounded-full border px-3 py-1 text-xs font-medium"
-                onClick={() => setResto(!resto)}
+            {seccion === id && (
+              <div
+                id="detalle-agenda-turno"
+                className="mb-2 space-y-3 rounded-lg border border-border/60 bg-muted/25 px-3 py-3 sm:ml-[5.75rem] sm:px-4"
               >
-                {resto ? "Próximos 60 min" : "Resto del día"}
-              </button>
+                <div className="flex flex-wrap items-center gap-2">
+                  <h3 className="mr-auto text-sm font-semibold">
+                    {seccion === "AM"
+                      ? "Entradas del AM"
+                      : seccion === "PM"
+                        ? `Entradas previstas hasta las ${corteEjemplo}`
+                        : resto
+                          ? "Entradas del resto del día"
+                          : "Entradas en los próximos 60 minutos"}
+                  </h3>
+                  {seccion === "Próximas entradas" && (
+                    <button
+                      type="button"
+                      className="rounded-md border px-2.5 py-1.5 text-sm font-medium hover:bg-muted"
+                      onClick={() => setResto(!resto)}
+                    >
+                      {resto ? "Próximos 60 min" : "Resto del día"}
+                    </button>
+                  )}
+                  <button
+                    aria-label="Cerrar detalle del turno"
+                    type="button"
+                    className="rounded-md p-2 hover:bg-muted"
+                    onClick={() => {
+                      setSeccion(null);
+                      document
+                        .getElementById(`abrir-relevo-${indice}`)
+                        ?.focus();
+                    }}
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+                <div className="divide-y divide-border/50">
+                  {mostrar.map(({ persona, horario }) => (
+                    <button
+                      key={persona.id}
+                      type="button"
+                      className="grid w-full grid-cols-[auto_1fr_1rem] items-center gap-x-3 gap-y-1 rounded-md py-2 text-left text-sm hover:bg-muted/60"
+                      onClick={() => abrirPersona(persona.id)}
+                    >
+                      <span className="rounded-md bg-muted px-2 py-1 font-medium tabular-nums">
+                        {horario.inicio}
+                      </span>
+                      <span className="min-w-28 flex-1 font-medium">
+                        {persona.nombre}
+                      </span>
+                      <span className="col-start-2 row-start-2 text-sm leading-snug">
+                        <EstadoEntrada horario={horario} />
+                      </span>
+                      <ChevronRight
+                        aria-hidden="true"
+                        className="col-start-3 row-start-1 h-3.5 w-3.5 text-muted-foreground"
+                      />
+                    </button>
+                  ))}
+                </div>
+                {!mostrar.length && (
+                  <p className="text-sm text-muted-foreground">
+                    Sin entradas previstas en este intervalo.
+                  </p>
+                )}
+                {seccion === "AM" && (
+                  <div className="grid gap-3 border-t border-border/40 pt-3 lg:grid-cols-2">
+                    <div>
+                      <h4 className="mb-1 flex items-center gap-2 text-sm font-semibold">
+                        <Check className="h-3.5 w-3.5 text-success" />
+                        Del AM ya resuelto o revisado a las {
+                          corteEjemplo
+                        } · {solucionados.length}
+                      </h4>
+                      {solucionados.map(mostrarEpisodio)}
+                    </div>
+                    <div>
+                      <h4 className="mb-1 flex items-center gap-2 text-sm font-semibold">
+                        <span
+                          aria-hidden="true"
+                          className="h-1.5 w-1.5 rounded-full bg-warning"
+                        />
+                        Del AM que sigue pendiente · {aRevisar.length}
+                      </h4>
+                      {aRevisar.map(mostrarEpisodio)}
+                    </div>
+                  </div>
+                )}
+              </div>
             )}
-            <button
-              aria-label="Cerrar detalle del turno"
-              className="rounded-md p-1 hover:bg-muted"
-              onClick={() => setSeccion(null)}
-            >
-              <X className="h-4 w-4" />
-            </button>
-          </div>
-          <div className="divide-y divide-border/40">
-            {mostrar.map(({ persona, horario }) => (
-              <button
-                key={persona.id}
-                className="flex w-full flex-wrap items-center gap-x-3 gap-y-1 rounded-lg py-2 text-left text-sm hover:bg-muted/60"
-                onClick={() => abrirPersona(persona.id)}
-              >
-                <span className="rounded-md bg-muted px-2 py-1 font-medium tabular-nums">
-                  {horario.inicio}
-                </span>
-                <span className="min-w-28 flex-1 font-medium">
-                  {persona.nombre}
-                </span>
-                <span className="text-xs">
-                  <EstadoEntrada horario={horario} />
-                </span>
-                <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
-              </button>
-            ))}
-          </div>
-          {!mostrar.length && (
-            <p className="text-xs text-muted-foreground">
-              Sin entradas previstas en este intervalo.
-            </p>
-          )}
-          {seccion === "AM" && (
-            <div className="grid gap-3 border-t border-border/40 pt-3 lg:grid-cols-2">
-              <div>
-                <h4 className="mb-1 flex items-center gap-1 text-xs font-semibold">
-                  <Check className="h-3.5 w-3.5 text-success" />
-                  Del AM ya resuelto o revisado a las {corteEjemplo} ·{" "}
-                  {solucionados.length}
-                </h4>
-                {solucionados.map(mostrarEpisodio)}
-              </div>
-              <div>
-                <h4 className="mb-1 flex items-center gap-1 text-xs font-semibold">
-                  <Moon className="h-3.5 w-3.5 text-warning" />
-                  Del AM que sigue pendiente · {aRevisar.length}
-                </h4>
-                {aRevisar.map(mostrarEpisodio)}
-              </div>
-            </div>
-          )}
-        </div>
-      )}
+          </li>
+        ))}
+      </ol>
     </section>
   );
 }

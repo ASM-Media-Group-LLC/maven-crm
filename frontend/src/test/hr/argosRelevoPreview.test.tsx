@@ -113,7 +113,7 @@ describe("Relevo de supervisión de Argos", () => {
   it("recalcula las cifras al filtrar por persona, aunque todavía no deba entrar", () => {
     preparar(personas.filter((p) => p.id === "nora"));
     const pm = screen.getByRole("button", { name: /ver turno PM/i });
-    expect(pm).toHaveTextContent("0 de 0");
+    expect(pm).toHaveTextContent("Nadie debía entrar todavía");
     fireEvent.click(pm);
     expect(
       screen.getByText(/Sin entradas previstas en este intervalo/i),

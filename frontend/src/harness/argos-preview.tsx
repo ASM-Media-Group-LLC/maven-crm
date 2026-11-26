@@ -3,7 +3,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { createRoot } from "react-dom/client";
 import { MemoryRouter } from "react-router-dom";
 import { LanguageProvider } from "@/hooks/useLanguage";
-import { cargarIdioma, fijarIdioma, traducir } from "@/lib/i18n";
+import { cargarIdioma, fijarIdioma } from "@/lib/i18n";
 import { PresenciaArgosVista } from "@/components/hr/DondeEstaPanel";
 import {
   CardMuralla,
@@ -13,6 +13,10 @@ import type { FilaDondeEsta } from "@/hooks/useDondeEsta";
 import type { PersonaVivo } from "@/hooks/useCapturasVivo";
 import type { Semaforo } from "@/hooks/useSemaforos";
 import { corteEjemplo, horariosEjemplo, RelevoArgos } from "./argos-relevo";
+import { CalendarioArgos } from "./argos-calendario";
+import { CierreDiaArgos } from "./argos-cierre-dia";
+import { diaBogota } from "@/lib/historialHub";
+import { fechaDeDia } from "@/lib/casosArgos";
 import { capturaDeEjemplo } from "./argos-capturas-ejemplo";
 import {
   Activity,
@@ -55,8 +59,14 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { cn } from "@/lib/utils";
 import "@/index.css";
 
-const HOY = "2026-11-25";
-const AYER = "2026-11-24";
+const diaAlAbrir = new Date();
+const HOY = diaBogota(diaAlAbrir);
+const AYER = diaBogota(diaAlAbrir, 1);
+const fechaCorta = (dia: string) =>
+  fechaDeDia(dia).toLocaleDateString("es-CO", {
+    day: "numeric",
+    month: "short",
+  });
 const personas = [
   {
     id: "laura",
@@ -394,6 +404,26 @@ const episodios: Episodio[] = [
     movimientos: [["09:02", "Se inició la pantalla compartida."]],
   },
   {
+    id: "relevo-ayer",
+    persona: "diego",
+    fecha: AYER,
+    hora: "15:40",
+    titulo: "Nota de relevo por confirmar",
+    tipo: "Jornada",
+    duracion: "Al cierre del turno",
+    causa: "Pendiente de revisión",
+    evidencia:
+      "A las 16:00 seguía pendiente la confirmación de la nota de relevo en el registro de ejemplo.",
+    regla: "El turno de Operaciones entrega su nota antes del relevo.",
+    accion:
+      "Comprobar con la persona responsable si la nota quedó en otro canal.",
+    revisar: true,
+    movimientos: [
+      ["15:40", "Se abrió la revisión de la nota de relevo."],
+      ["16:00", "El turno cerró con la confirmación pendiente."],
+    ],
+  },
+  {
     id: "5",
     persona: "camila",
     fecha: AYER,
@@ -666,7 +696,7 @@ function InformeTurno({
       <div className="flex flex-wrap items-baseline justify-between gap-1">
         <h2 className="text-base font-semibold">Informe del turno</h2>
         <span className="text-xs text-muted-foreground">
-          {dia.slice(8)} nov · turno {persona.turno}
+          {fechaCorta(dia)} · turno {persona.turno}
         </span>
       </div>
 
@@ -892,9 +922,20 @@ function PreviewArgos() {
           .toLowerCase()
           .includes(filtros.persona.trim().toLowerCase())),
   );
+  const diaSeleccionado = tab === "En vivo" ? HOY : filtros.fecha;
+  const pendientesPorDia: Record<string, number> = {};
+  for (const item of episodios) {
+    if (
+      item.revisar &&
+      !decisiones[item.id] &&
+      equipoVisible.some((p) => p.id === item.persona)
+    ) {
+      pendientesPorDia[item.fecha] = (pendientesPorDia[item.fecha] ?? 0) + 1;
+    }
+  }
   const delDia = episodios.filter(
     (episodio) =>
-      episodio.fecha === (tab === "Resumen" ? HOY : filtros.fecha) &&
+      episodio.fecha === diaSeleccionado &&
       equipoVisible.some(({ id }) => id === episodio.persona),
   );
   const pendientes = delDia.filter(
@@ -956,9 +997,7 @@ function PreviewArgos() {
     ? episodios.find(({ id }) => id === detalle.episodio)
     : undefined;
 
-  const diaDelDetalle =
-    episodio?.fecha ??
-    (tab === "Resumen" || tab === "En vivo" ? HOY : filtros.fecha);
+  const diaDelDetalle = episodio?.fecha ?? diaSeleccionado;
   const movimientosPersona = seleccion
     ? episodios
         .filter(
@@ -1052,7 +1091,7 @@ function PreviewArgos() {
         type="button"
         aria-label={`Ver episodio de ${porId(item.persona).nombre}: ${hecho}, ${duracion}, ${cantidad} ${cantidad === 1 ? "aviso" : "avisos"}`}
         onClick={() => abrirEpisodio(item)}
-        className="flex w-full items-start gap-1.5 rounded-md py-1 text-left text-xs leading-snug hover:bg-muted/60 focus-visible:ring-2 focus-visible:ring-ring"
+        className="flex w-full items-start gap-1.5 rounded-md py-1.5 text-left text-sm leading-snug hover:bg-muted/60 focus-visible:ring-2 focus-visible:ring-ring"
       >
         <Icono
           className="mt-0.5 h-3.5 w-3.5 shrink-0 text-warning"
@@ -1197,40 +1236,51 @@ function PreviewArgos() {
       <div className="vidrio-panel flex min-w-0 flex-1 flex-col overflow-hidden">
         <Page>
           <PageHeader
-            title={traducir("hr.monia.title")}
-            subtitle={traducir("hr.monia.subtitle")}
+            title="Argos"
+            subtitle="Vista previa con datos de ejemplo"
             icon={<Eye />}
             actions={
               <>
                 <Button
+                  title="Horarios"
+                  aria-label="Horarios"
                   variant="outline"
                   size="sm"
-                  className="rounded-full"
+                  className="argos-accion-cabecera rounded-full"
                   onClick={() => {
                     cambiar("Historial");
                     setHistorial("Jornada");
                   }}
                 >
                   <CalendarClock className="h-4 w-4" />
-                  Horarios
+                  <span className="argos-texto-accion">Horarios</span>
                 </Button>
                 <Button
+                  aria-label="Exportar horas"
                   variant="outline"
                   size="sm"
-                  className="rounded-full"
+                  className="argos-accion-cabecera rounded-full"
                   onClick={exportarHoras}
+                  disabled={diaSeleccionado !== HOY}
+                  title={
+                    diaSeleccionado !== HOY
+                      ? "La muestra de marcaciones corresponde a hoy"
+                      : undefined
+                  }
                 >
                   <FileSpreadsheet className="h-4 w-4" />
-                  Exportar horas
+                  <span className="argos-texto-accion">Exportar horas</span>
                 </Button>
                 <Button
+                  title="Ajustes"
+                  aria-label="Ajustes"
                   variant={tab === "Ajustes" ? "secondary" : "outline"}
                   size="sm"
-                  className="rounded-full"
+                  className="argos-accion-cabecera rounded-full"
                   onClick={() => cambiar("Ajustes")}
                 >
                   <Settings className="h-4 w-4" />
-                  Ajustes
+                  <span className="argos-texto-accion">Ajustes</span>
                 </Button>
                 <Badge
                   variant="outline"
@@ -1242,25 +1292,26 @@ function PreviewArgos() {
               </>
             }
           />
-          <p className="mt-3 text-xs text-muted-foreground">
-            Vista previa local · datos de ejemplo
-          </p>
 
           <nav
             aria-label="Secciones de Argos"
-            className="mt-4 flex flex-wrap gap-1 rounded-2xl border border-border/50 bg-background/40 p-1"
+            className="my-4 flex gap-x-3 overflow-x-auto border-b border-border/60 sm:gap-x-6"
           >
-            {tabs.map(({ nombre, icono: Icono }) => (
-              <Button
+            {tabs.map(({ nombre }) => (
+              <button
                 key={nombre}
-                variant={tab === nombre ? "default" : "ghost"}
+                type="button"
                 aria-current={tab === nombre ? "page" : undefined}
                 onClick={() => cambiar(nombre)}
-                className="rounded-xl"
+                className={cn(
+                  "shrink-0 border-b-2 px-0.5 py-2.5 text-sm font-medium focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring",
+                  tab === nombre
+                    ? "border-primary text-foreground"
+                    : "border-transparent text-muted-foreground hover:text-foreground",
+                )}
               >
-                <Icono className="h-4 w-4" />
                 {nombre}
-              </Button>
+              </button>
             ))}
           </nav>
 
@@ -1268,15 +1319,15 @@ function PreviewArgos() {
             <div className="my-4 grid grid-cols-2 gap-2 xl:grid-cols-[1fr_1fr_0.65fr_1.3fr]">
               <label className="min-w-0 text-xs font-medium text-muted-foreground">
                 Fecha
-                <select
+                <input
+                  type="date"
                   className={selectClass}
                   disabled={tab === "En vivo"}
-                  value={tab === "En vivo" ? HOY : filtros.fecha}
-                  onChange={(e) => fijarFiltro("fecha", e.target.value)}
-                >
-                  <option value={HOY}>Hoy · 25 nov</option>
-                  <option value={AYER}>24 nov</option>
-                </select>
+                  value={diaSeleccionado}
+                  onChange={(e) => {
+                    if (e.target.value) fijarFiltro("fecha", e.target.value);
+                  }}
+                />
               </label>
               <label className="min-w-0 text-xs font-medium text-muted-foreground">
                 Equipo
@@ -1326,6 +1377,49 @@ function PreviewArgos() {
           >
             <div className="min-w-0 space-y-4">
               {tab === "Resumen" && (
+                <CalendarioArgos
+                  fecha={filtros.fecha}
+                  hoy={HOY}
+                  pendientes={pendientesPorDia}
+                  alCambiar={(dia) => fijarFiltro("fecha", dia)}
+                />
+              )}
+              {tab === "Resumen" &&
+                (filtros.equipo || filtros.persona || filtros.turno) && (
+                  <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border/60 pb-2 text-sm">
+                    <span>
+                      {[filtros.equipo, filtros.turno, filtros.persona]
+                        .filter(Boolean)
+                        .join(" · ")}
+                    </span>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        setFiltros({
+                          ...filtros,
+                          equipo: "",
+                          turno: "",
+                          persona: "",
+                        });
+                        setDetalle(undefined);
+                      }}
+                    >
+                      Quitar filtros
+                    </Button>
+                  </div>
+                )}
+              {tab === "Resumen" && filtros.fecha !== HOY && (
+                <CierreDiaArgos
+                  fecha={filtros.fecha}
+                  hoy={HOY}
+                  episodios={delDia}
+                  decisiones={decisiones}
+                  nombre={(id) => porId(id).nombre}
+                  abrirEpisodio={abrirEpisodio}
+                />
+              )}
+              {tab === "Resumen" && filtros.fecha === HOY && (
                 <>
                   <RelevoArgos
                     personas={equipoVisible}
@@ -1334,18 +1428,11 @@ function PreviewArgos() {
                     abrirPersona={(id) => abrirPersona(porId(id))}
                     abrirEpisodio={abrirEpisodio}
                   />
-                  <section
-                    className="vidrio rounded-2xl p-4"
-                    aria-label="Atención del equipo"
-                  >
+                  <section className="pt-4" aria-label="Equipo de hoy">
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <div className="flex items-center gap-2">
-                        <ClipboardCheck
-                          className="h-4 w-4 text-warning"
-                          aria-hidden
-                        />
-                        <h2 className="font-display text-base font-bold">
-                          Atención del equipo
+                        <h2 className="font-display text-xl font-semibold">
+                          Equipo de hoy
                         </h2>
                       </div>
                       {subnav(
@@ -1357,15 +1444,12 @@ function PreviewArgos() {
                     </div>
                     {supervision === "Pendientes" ? (
                       <>
-                        <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                        <div className="mt-3 grid gap-x-6 gap-y-2 border-y border-border/60 py-2 sm:grid-cols-2">
                           {porAtender.map(({ persona, casos }) => (
-                            <div
-                              key={persona.id}
-                              className="rounded-xl border border-border/60 bg-background/30 px-3 py-2"
-                            >
+                            <div key={persona.id} className="py-2">
                               <button
                                 type="button"
-                                className="mb-1 font-semibold text-sm hover:underline"
+                                className="mb-1 text-base font-semibold hover:underline"
                                 onClick={() => abrirPersona(persona)}
                               >
                                 {persona.nombre}
@@ -1975,31 +2059,35 @@ function PreviewArgos() {
                   )}
                   {seccionDetalle === "Expediente completo" && (
                     <>
-                      <PantallaEjemplo persona={seleccion} />
-                      <dl className="grid grid-cols-2 gap-3">
-                        <div>
-                          <dt className="text-muted-foreground">Turno</dt>
-                          <dd>{seleccion.turno}</dd>
-                        </div>
-                        <div>
-                          <dt className="text-muted-foreground">
-                            Entrada de hoy
-                          </dt>
-                          <dd>{seleccion.entrada}</dd>
-                        </div>
-                        <div>
-                          <dt className="text-muted-foreground">
-                            Pantalla ahora
-                          </dt>
-                          <dd>{seleccion.pantalla}</dd>
-                        </div>
-                        <div>
-                          <dt className="text-muted-foreground">
-                            Cámara ahora
-                          </dt>
-                          <dd>{seleccion.camara}</dd>
-                        </div>
-                      </dl>
+                      {diaDelDetalle === HOY && (
+                        <>
+                          <PantallaEjemplo persona={seleccion} />
+                          <dl className="grid grid-cols-2 gap-3">
+                            <div>
+                              <dt className="text-muted-foreground">Turno</dt>
+                              <dd>{seleccion.turno}</dd>
+                            </div>
+                            <div>
+                              <dt className="text-muted-foreground">
+                                Entrada de hoy
+                              </dt>
+                              <dd>{seleccion.entrada}</dd>
+                            </div>
+                            <div>
+                              <dt className="text-muted-foreground">
+                                Pantalla ahora
+                              </dt>
+                              <dd>{seleccion.pantalla}</dd>
+                            </div>
+                            <div>
+                              <dt className="text-muted-foreground">
+                                Cámara ahora
+                              </dt>
+                              <dd>{seleccion.camara}</dd>
+                            </div>
+                          </dl>
+                        </>
+                      )}
                       <h3 className="font-semibold">
                         Movimientos de la fecha seleccionada
                       </h3>
