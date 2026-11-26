@@ -112,7 +112,8 @@ describe("5. tu propia pantalla compartida, como en Meet", () => {
     expect(s).not.toMatch(/<video/);
     expect(s).toContain('t("messenger.callView.miPantalla.presentando")');
     expect(s).toContain('t("messenger.callView.miPantalla.dejar")');
-    expect(s).toContain('t("messenger.callView.miPantalla.compartiendo")');
+    // 26/11/2026: la pastilla dice «Estás compartiendo tu pantalla» completo.
+    expect(s).toContain('t("messenger.callView.miPantalla.titulo")');
     expect(s).toContain('t("messenger.callView.miPantalla.negra")');
     expect(s).toContain("vigilarPantallaNegra(track, setNegraPropia)");
     expect(s).toMatch(/localStorage\.setItem\(CLAVE_OCULTA/);

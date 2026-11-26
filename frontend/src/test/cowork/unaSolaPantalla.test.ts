@@ -61,8 +61,12 @@ describe("el supervisor no se escapa de Argos", () => {
   it("se leyó la llamada", () => {
     expect(llamada.length).toBeGreaterThan(1000);
   });
-  it("en el Hub nadie ve su pantalla: solo la sala donde habla", () => {
-    expect(tablero).toMatch(/pantallaSoloParaMi: vigilarAnfitrion/);
+  // 26/11/2026 (Alvaro, video de Breiner y Vanessa): en el Hub los supervisores
+  // SÍ se ven las pantallas entre ellos. El mecanismo de «solo para mí» sigue en
+  // la llamada por si otro lugar lo necesita, pero el Hub ya no lo prende.
+  it("en el Hub los supervisores se ven las pantallas entre sí", () => {
+    expect(tablero).toMatch(/pantallaSoloParaMi: false,/);
+    expect(tablero).not.toMatch(/pantallaSoloParaMi: vigilarAnfitrion/);
     expect(llamada).toMatch(/setTrackSubscriptionPermissions\(false,/);
   });
   it("entrar a una sala no calla a Argos", () => {
