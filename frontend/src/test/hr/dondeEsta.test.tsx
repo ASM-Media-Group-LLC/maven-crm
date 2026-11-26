@@ -52,6 +52,8 @@ describe("la lógica", () => {
     expect(tonoDe("fuera_de_cowork")).toBe("rojo");
     expect(tonoDe("sin_pantalla")).toBe("naranja");
     expect(pasaFiltro({ estado: "pausa" }, "enCowork")).toBe(true);
+    expect(pasaFiltro({ estado: "sin_camara", presenciaEnSala: true }, "enCowork")).toBe(true);
+    expect(pasaFiltro({ estado: "meet", presenciaEnSala: false }, "enCowork")).toBe(false);
     // Otra llamada de Maven no es «fuera de Cowork» (Alvaro, 11/11).
     expect(tonoDe("en_llamada")).toBe("neutro");
     expect(pasaFiltro({ estado: "en_llamada" }, "enCowork")).toBe(true);

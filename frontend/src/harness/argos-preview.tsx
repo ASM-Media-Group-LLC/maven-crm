@@ -1,5 +1,5 @@
 // Banco visual local. No se importa desde App.tsx y no usa sesión, base ni capturas reales.
-import { useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { createRoot } from "react-dom/client";
 import { MemoryRouter } from "react-router-dom";
 import { LanguageProvider } from "@/hooks/useLanguage";
@@ -12,6 +12,7 @@ import {
 import type { FilaDondeEsta } from "@/hooks/useDondeEsta";
 import type { PersonaVivo } from "@/hooks/useCapturasVivo";
 import type { Semaforo } from "@/hooks/useSemaforos";
+import { corteEjemplo, horariosEjemplo, RelevoArgos } from "./argos-relevo";
 import { capturaDeEjemplo } from "./argos-capturas-ejemplo";
 import {
   Activity,
@@ -65,10 +66,15 @@ const personas = [
     puesto: "Supervisor",
     turno: "AM",
     estado: "En Cowork",
-    entrada: "8:01",
+    ubicacion: "Cowork · Sala Operaciones",
     pantalla: "Sí",
     camara: "No",
-    app: "Maven · Cowork",
+    conexion: "Conectada",
+    observacion: {
+      app: "Cowork",
+      actividad: "Tablero de salas abierto",
+      hora: "16:20",
+    },
   },
   {
     id: "diego",
@@ -77,11 +83,15 @@ const personas = [
     equipo: "Operaciones",
     puesto: "Consultor",
     turno: "AM",
-    estado: "En reunión",
-    entrada: "8:00",
-    pantalla: "Sí",
-    camara: "Sí",
-    app: "Maven · Meet",
+    estado: "Fuera de turno",
+    pantalla: "—",
+    camara: "—",
+    conexion: "Terminó su sesión",
+    observacion: {
+      app: "Meet",
+      actividad: "Agenda de la reunión en pantalla",
+      hora: "15:48",
+    },
   },
   {
     id: "camila",
@@ -90,11 +100,15 @@ const personas = [
     equipo: "RR. HH.",
     puesto: "Recursos humanos",
     turno: "AM",
-    estado: "En Cowork",
-    entrada: "8:09",
-    pantalla: "Sí",
-    camara: "Sí",
-    app: "Maven · Horarios",
+    estado: "Fuera de turno",
+    pantalla: "—",
+    camara: "—",
+    conexion: "Terminó su sesión",
+    observacion: {
+      app: "Horarios",
+      actividad: "Turnos del equipo en pantalla",
+      hora: "15:54",
+    },
   },
   {
     id: "mateo",
@@ -103,13 +117,60 @@ const personas = [
     equipo: "Operaciones",
     puesto: "Supervisor",
     turno: "PM",
-    estado: "Fuera de turno",
-    entrada: "—",
+    estado: "Sin entrada registrada",
     pantalla: "—",
     camara: "—",
-    app: "",
+    conexion: "Sin señal de conexión",
+    observacion: null,
   },
-];
+  {
+    id: "lucia",
+    nombre: "Lucía Paz",
+    iniciales: "LP",
+    equipo: "Operaciones",
+    puesto: "Asistente",
+    turno: "PM",
+    estado: "En reunión",
+    ubicacion: "Meet · Revisión de entregas",
+    pantalla: "Sí",
+    camara: "Sí",
+    conexion: "Conectada",
+    observacion: {
+      app: "Documentos",
+      actividad: "Lista de entregas abierta",
+      hora: "16:18",
+    },
+  },
+  {
+    id: "ines",
+    nombre: "Inés Vega",
+    iniciales: "IV",
+    equipo: "Operaciones",
+    puesto: "Asistente",
+    turno: "PM",
+    estado: "Fuera de turno",
+    pantalla: "—",
+    camara: "—",
+    conexion: "Sin señal de conexión",
+    observacion: null,
+  },
+  {
+    id: "nora",
+    nombre: "Nora León",
+    iniciales: "NL",
+    equipo: "Operaciones",
+    puesto: "Consultor",
+    turno: "PM",
+    estado: "Fuera de turno",
+    pantalla: "—",
+    camara: "—",
+    conexion: "Sin señal de conexión",
+    observacion: null,
+  },
+].map((persona) => ({
+  ...persona,
+  entrada: horariosEjemplo[persona.id].marca ?? "—",
+}));
 type Persona = (typeof personas)[number];
 type Tipo = "Hub" | "Actividad" | "Jornada" | "Conexión";
 type Decision = "Confirmada" | "Justificada" | "Descartada";
@@ -127,6 +188,9 @@ type Episodio = {
   evidencia: string;
   regla: string;
   revisar?: boolean;
+  responsable?: string;
+  llamadaConfirmada?: { por: string; hora: string; motivo: string };
+  captura?: { hora: string; url: string };
   tipoAviso?: TipoAviso;
   recuperado?: string;
   pausa?: Pausa;
@@ -158,26 +222,26 @@ const episodios: Episodio[] = [
     id: "1",
     persona: "laura",
     fecha: HOY,
-    hora: "14:12",
+    hora: "16:12",
     tipo: "Hub",
     tipoAviso: "Cámara",
     titulo: "Cámara apagada",
     duracion: "8 min · abierto",
     causa: "Causa sin determinar",
     evidencia:
-      "El Hub registró la cámara apagada a las 2:12 p. m. Seguía apagada en el último registro, a las 2:20 p. m.",
+      "El Hub registró la cámara apagada a las 4:12 p. m. Seguía apagada en el último registro, a las 4:20 p. m.",
     regla:
       "Supervisión requiere cámara durante el turno. En este ejemplo, se revisa si sigue apagada después de 5 min.",
     accion:
       "Verificar si la cámara se recuperó y si hubo una causa técnica o una pausa autorizada.",
     revisar: true,
     movimientos: [
-      ["14:12", "El Hub registró la cámara apagada."],
-      ["14:13", "Argos pidió encender la cámara.", true],
-      ["14:15", "Argos repitió el aviso.", true],
-      ["14:17", "El episodio pasó a revisión."],
-      ["14:18", "Argos volvió a avisar.", true],
-      ["14:20", "Última señal: cámara apagada."],
+      ["16:12", "El Hub registró la cámara apagada."],
+      ["16:13", "Argos pidió encender la cámara.", true],
+      ["16:15", "Argos repitió el aviso.", true],
+      ["16:17", "El episodio pasó a revisión."],
+      ["16:18", "Argos volvió a avisar.", true],
+      ["16:20", "Última señal: cámara apagada."],
     ],
   },
   {
@@ -205,6 +269,7 @@ const episodios: Episodio[] = [
   },
   {
     id: "8",
+    responsable: "Sofía Ruiz",
     persona: "laura",
     fecha: HOY,
     hora: almuerzoLaura.inicio,
@@ -264,6 +329,15 @@ const episodios: Episodio[] = [
     hora: "09:46",
     tipo: "Actividad",
     titulo: "Actividad en una aplicación por verificar",
+    captura: {
+      hora: "09:46",
+      url: capturaDeEjemplo("Navegador / Consulta externa", [
+        "Página de referencia",
+        "Material de consulta",
+        "Recursos relacionados",
+        "Índice del sitio",
+      ]),
+    },
     tipoAviso: "Actividad",
     accion: "Consultar el contexto de esa tarea con RR. HH.",
     duracion: "6 min",
@@ -277,6 +351,33 @@ const episodios: Episodio[] = [
       ["09:46", "Primera observación de Argos."],
       ["09:49", "Argos pidió revisar la actividad abierta.", true],
       ["09:52", "Terminó el intervalo observado."],
+    ],
+  },
+  {
+    id: "10",
+    persona: "diego",
+    fecha: HOY,
+    hora: "11:00",
+    tipo: "Jornada",
+    titulo: "Relevo sin registrar",
+    duracion: "15 min",
+    causa: "Revisión de supervisión",
+    evidencia:
+      "La supervisora verificó con Diego que faltaba la nota prevista a las 11:00. El registro se completó a las 11:15.",
+    regla:
+      "La posición de este ejemplo debe dejar la nota del relevo al terminar la reunión.",
+    llamadaConfirmada: {
+      por: "Sofía Ruiz",
+      hora: "11:20",
+      motivo: "Faltó registrar la nota de relevo al cierre de la reunión.",
+    },
+    movimientos: [
+      ["11:00", "Hora prevista para registrar el relevo."],
+      ["11:15", "Se completó la nota de relevo."],
+      [
+        "11:20",
+        "Sofía Ruiz confirmó una llamada de atención y dejó su motivo.",
+      ],
     ],
   },
   {
@@ -382,7 +483,8 @@ function Grupo({ titulo, children }: { titulo: string; children: ReactNode }) {
   );
 }
 
-const horaCaptura = `${HOY}T19:20:00.000Z`;
+const isoEnBogota = (hora: string) => `${HOY}T${hora}:00-05:00`;
+const horaCaptura = isoEnBogota(corteEjemplo);
 const ahoraEjemplo = Date.parse(horaCaptura);
 const pantallas = new Map([
   [
@@ -412,11 +514,30 @@ const pantallas = new Map([
       "Pausas del turno",
     ]),
   ],
+  [
+    "lucia",
+    capturaDeEjemplo("Oficina / Documentos", [
+      "Lista de entregas",
+      "Pendiente de revisión",
+      "Entrega del viernes",
+      "Material recibido",
+    ]),
+  ],
 ]);
 const capturas = new Map<string, PersonaVivo>();
+const ultimas: Record<
+  string,
+  { pantallaUrl: string; camaraUrl: null; ultima: string }
+> = {};
 for (const persona of personas) {
   const pantalla = pantallas.get(persona.id);
-  if (!pantalla) continue;
+  const obs = persona.observacion;
+  if (!pantalla || !obs) continue;
+  const ultima = isoEnBogota(obs.hora);
+  if (persona.estado === "Fuera de turno") {
+    ultimas[persona.id] = { pantallaUrl: pantalla, camaraUrl: null, ultima };
+    continue;
+  }
   capturas.set(persona.id, {
     userId: persona.id,
     nombre: persona.nombre,
@@ -425,38 +546,46 @@ for (const persona of personas) {
     pantallaUrl: pantalla,
     principalUrl: pantalla,
     camaraUrl: null,
-    ultima: horaCaptura,
+    ultima,
     tienePantalla: true,
     fueraDeLugar: null,
-    veredicto: persona.app.replace(" · ", " / ") + " · Vista de ejemplo",
+    veredicto: `${obs.app} · ${obs.actividad}`,
   });
 }
 
-function presenciaDe(persona: Persona): FilaDondeEsta {
+function presenciaDe(
+  persona: Persona,
+): FilaDondeEsta & { presenciaEnSala: boolean } {
   const fuera = persona.estado === "Fuera de turno";
+  const sinMarca = persona.estado === "Sin entrada registrada";
+  const obs = persona.observacion;
+  const horario = horariosEjemplo[persona.id];
+  const inicioEstado = persona.camara === "No" ? "16:12" : horario.marca;
   return {
     user_id: persona.id,
+    presenciaEnSala:
+      persona.conexion === "Conectada" && persona.estado === "En Cowork",
     nombre: persona.nombre,
     puesto: persona.puesto,
     equipo: persona.equipo,
-    entrada: persona.turno === "AM" ? "08:00" : "13:00",
-    salida: persona.turno === "AM" ? "16:00" : "21:00",
+    entrada: horario.inicio,
+    salida: horario.fin,
     en_turno: !fuera,
     estado: fuera
       ? "fuera_de_turno"
-      : persona.camara === "No"
-        ? "sin_camara"
-        : persona.estado === "En reunión"
-          ? "meet"
-          : "activo",
-    estado_desde: fuera
-      ? null
-      : new Date(ahoraEjemplo - 8 * 60_000).toISOString(),
-    ultimo_latido: fuera ? null : horaCaptura,
-    pantalla_at: fuera ? null : horaCaptura,
-    pantalla_que: persona.app || null,
+      : sinMarca
+        ? "no_ha_entrado"
+        : persona.camara === "No"
+          ? "sin_camara"
+          : persona.estado === "En reunión"
+            ? "meet"
+            : "activo",
+    estado_desde: fuera || !inicioEstado ? null : isoEnBogota(inicioEstado),
+    ultimo_latido: persona.conexion === "Conectada" ? horaCaptura : null,
+    pantalla_at: obs ? isoEnBogota(obs.hora) : null,
+    pantalla_que: obs ? `${obs.app} · ${obs.actividad}` : null,
     pantalla_fuera_de_lugar: null,
-    captura_at: fuera ? null : horaCaptura,
+    captura_at: obs ? isoEnBogota(obs.hora) : null,
     fuera_hoy_veces: 0,
     fuera_hoy_min: 0,
     exento: false,
@@ -725,12 +854,23 @@ function PreviewArgos() {
   const [refrescando, setRefrescando] = useState(false);
   const [historial, setHistorial] = useState("Jornada");
   const [estado, setEstado] = useState("Avisos");
+  const [supervision, setSupervision] = useState("Pendientes");
   const [revision, setRevision] = useState("Pendientes");
   const [detalle, setDetalle] = useState<{
     persona: string;
     episodio?: string;
   }>();
   const [seccionDetalle, setSeccionDetalle] = useState("Cronología");
+  const panelDetalle = useRef<HTMLElement>(null);
+  useEffect(() => {
+    if (!detalle) return;
+    panelDetalle.current?.focus({ preventScroll: true });
+    if (panelDetalle.current) {
+      const caja = panelDetalle.current.getBoundingClientRect();
+      if (caja.top < 0 || caja.top >= window.innerHeight)
+        panelDetalle.current.scrollIntoView({ block: "start" });
+    }
+  }, [detalle]);
   const [decisiones, setDecisiones] = useState<
     Record<string, { resultado: Decision; motivo: string }>
   >({});
@@ -761,6 +901,56 @@ function PreviewArgos() {
     (episodio) => episodio.revisar && !decisiones[episodio.id],
   );
   const tecnicos = delDia.filter(({ tipo }) => tipo === "Conexión");
+  const conectados = equipoVisible.filter(
+    (persona) => persona.conexion === "Conectada",
+  );
+  const porAtender = equipoVisible
+    .map((persona) => ({
+      persona,
+      casos: pendientes.filter((item) => item.persona === persona.id),
+    }))
+    .filter(({ casos }) => casos.length);
+  const conAvisos = equipoVisible
+    .map((persona) => {
+      const casos = delDia.filter(
+        (item) => item.persona === persona.id && avisosDe(item).length,
+      );
+      return {
+        persona,
+        casos,
+        total: casos.reduce((total, item) => total + avisosDe(item).length, 0),
+      };
+    })
+    .filter(({ total }) => total > 0)
+    .sort(
+      (a, b) =>
+        b.total - a.total ||
+        a.persona.nombre.localeCompare(b.persona.nombre, "es"),
+    );
+
+  const conLlamadas = equipoVisible
+    .map((persona) => ({
+      persona,
+      casos: delDia.filter(
+        (item) => item.persona === persona.id && item.llamadaConfirmada,
+      ),
+    }))
+    .filter(({ casos }) => casos.length > 0)
+    .sort(
+      (a, b) =>
+        b.casos.length - a.casos.length ||
+        a.persona.nombre.localeCompare(b.persona.nombre, "es"),
+    );
+
+  function horaDeActividad(item: Episodio) {
+    return decisiones[item.id]
+      ? corteEjemplo
+      : (item.movimientos[item.movimientos.length - 1]?.[0] ?? item.hora);
+  }
+  const recientes = delDia
+    .filter((item) => !item.revisar || decisiones[item.id])
+    .sort((a, b) => horaDeActividad(b).localeCompare(horaDeActividad(a)));
+
   const seleccion = detalle && porId(detalle.persona);
   const episodio = detalle?.episodio
     ? episodios.find(({ id }) => id === detalle.episodio)
@@ -792,7 +982,7 @@ function PreviewArgos() {
     setMensaje("");
   }
 
-  function filaEpisodio(item: Episodio) {
+  function filaEpisodio(item: Episodio, reciente = false) {
     const Icono = iconoDe[item.tipo];
     const avisos = avisosDe(item).length;
     return (
@@ -809,7 +999,8 @@ function PreviewArgos() {
         <span className="min-w-0 flex-1">
           <span className="block text-sm font-semibold">{item.titulo}</span>
           <span className="text-xs text-muted-foreground">
-            {porId(item.persona).nombre} · {item.hora} · {item.duracion}
+            {porId(item.persona).nombre} ·{" "}
+            {reciente ? horaDeActividad(item) : item.hora} · {item.duracion}
             {avisos > 0
               ? ` · ${avisos} ${avisos === 1 ? "aviso" : "avisos"}`
               : ""}
@@ -830,9 +1021,11 @@ function PreviewArgos() {
     );
   }
 
-  function lista(items: Episodio[]) {
+  function lista(items: Episodio[], reciente = false) {
     return items.length ? (
-      <div className="divide-y divide-border/50">{items.map(filaEpisodio)}</div>
+      <div className="divide-y divide-border/50">
+        {items.map((item) => filaEpisodio(item, reciente))}
+      </div>
     ) : (
       <p className="py-4 text-sm text-muted-foreground">
         Sin movimientos con estos filtros.
@@ -840,10 +1033,87 @@ function PreviewArgos() {
     );
   }
 
+  function avisoCorto(item: Episodio) {
+    const cantidad = avisosDe(item).length;
+    const hecho = item.pausa
+      ? "Almuerzo sobre el límite"
+      : item.tipo === "Actividad"
+        ? "Aplicación por revisar"
+        : item.titulo;
+    const minutos = item.pausa && minutosDePausa(item.pausa);
+    const duracion =
+      minutos != null && item.pausa
+        ? `+${minutos - item.pausa.limite} min`
+        : item.duracion.replace(" · abierto", "");
+    const Icono = iconoDe[item.tipo];
+    return (
+      <button
+        key={item.id}
+        type="button"
+        aria-label={`Ver episodio de ${porId(item.persona).nombre}: ${hecho}, ${duracion}, ${cantidad} ${cantidad === 1 ? "aviso" : "avisos"}`}
+        onClick={() => abrirEpisodio(item)}
+        className="flex w-full items-start gap-1.5 rounded-md py-1 text-left text-xs leading-snug hover:bg-muted/60 focus-visible:ring-2 focus-visible:ring-ring"
+      >
+        <Icono
+          className="mt-0.5 h-3.5 w-3.5 shrink-0 text-warning"
+          aria-hidden
+        />
+        <span className="flex-1">
+          {hecho} · {duracion} · {cantidad}{" "}
+          {cantidad === 1 ? "aviso" : "avisos"}
+        </span>
+        <ChevronRight
+          className="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted-foreground"
+          aria-hidden
+        />
+      </button>
+    );
+  }
+
+  function detalleDeTarjeta(id: string) {
+    const persona = porId(id);
+    const obs = persona.observacion;
+    const casos = pendientes.filter((item) => item.persona === id);
+    return (
+      <div className="space-y-1 border-t border-border/40 px-3 py-2.5 text-xs">
+        {obs ? (
+          <>
+            <p className="leading-snug">
+              <strong>{obs.app}</strong> · {obs.actividad}
+            </p>
+            <p className="text-muted-foreground">
+              Última observación · {textoHora(obs.hora)}
+            </p>
+          </>
+        ) : (
+          <p className="text-muted-foreground">Sin actividad observada hoy</p>
+        )}
+        <p className="flex items-center gap-1.5 text-muted-foreground">
+          <span
+            className={cn(
+              "h-1.5 w-1.5 rounded-full",
+              persona.conexion === "Conectada"
+                ? "bg-success"
+                : "bg-muted-foreground/60",
+            )}
+            aria-hidden
+          />
+          Conexión · {persona.conexion}
+        </p>
+        {casos.length > 0 && (
+          <div className="mt-1 border-t border-border/40 pt-1">
+            {casos.map(avisoCorto)}
+          </div>
+        )}
+      </div>
+    );
+  }
+
   function subnav(
     opciones: string[],
     vigente: string,
     elegir: (opcion: string) => void,
+    conteos: Record<string, number> = {},
   ) {
     return (
       <div className="flex flex-wrap gap-2">
@@ -856,6 +1126,9 @@ function PreviewArgos() {
             onClick={() => elegir(opcion)}
           >
             {opcion}
+            {conteos[opcion] !== undefined && (
+              <span className="text-xs tabular-nums">{conteos[opcion]}</span>
+            )}
           </Button>
         ))}
       </div>
@@ -1054,44 +1327,229 @@ function PreviewArgos() {
             <div className="min-w-0 space-y-4">
               {tab === "Resumen" && (
                 <>
-                  <div
-                    className="mt-4 flex flex-wrap gap-2"
-                    aria-label="Accesos rápidos de Argos"
+                  <RelevoArgos
+                    personas={equipoVisible}
+                    episodios={delDia}
+                    decisiones={decisiones}
+                    abrirPersona={(id) => abrirPersona(porId(id))}
+                    abrirEpisodio={abrirEpisodio}
+                  />
+                  <section
+                    className="vidrio rounded-2xl p-4"
+                    aria-label="Atención del equipo"
                   >
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="rounded-full"
-                      onClick={() => {
-                        cambiar("Revisión");
-                        setRevision("Pendientes");
-                      }}
-                    >
-                      <span className="h-2 w-2 rounded-full bg-warning" />
-                      {pendientes.length} por revisar
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="rounded-full"
-                      onClick={() => {
-                        cambiar("Estado");
-                        setEstado("Salud de la plataforma");
-                      }}
-                    >
-                      <WifiOff className="h-4 w-4 text-muted-foreground" />
-                      {tecnicos.length}{" "}
-                      {tecnicos.length === 1
-                        ? "incidencia técnica"
-                        : "incidencias técnicas"}
-                    </Button>
-                  </div>
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div className="flex items-center gap-2">
+                        <ClipboardCheck
+                          className="h-4 w-4 text-warning"
+                          aria-hidden
+                        />
+                        <h2 className="font-display text-base font-bold">
+                          Atención del equipo
+                        </h2>
+                      </div>
+                      {subnav(
+                        ["Pendientes", "Más avisos", "Conectados"],
+                        supervision,
+                        setSupervision,
+                        { Conectados: conectados.length },
+                      )}
+                    </div>
+                    {supervision === "Pendientes" ? (
+                      <>
+                        <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                          {porAtender.map(({ persona, casos }) => (
+                            <div
+                              key={persona.id}
+                              className="rounded-xl border border-border/60 bg-background/30 px-3 py-2"
+                            >
+                              <button
+                                type="button"
+                                className="mb-1 font-semibold text-sm hover:underline"
+                                onClick={() => abrirPersona(persona)}
+                              >
+                                {persona.nombre}
+                              </button>
+                              {casos.map(avisoCorto)}
+                            </div>
+                          ))}
+                          {!porAtender.length && (
+                            <p className="text-sm text-muted-foreground">
+                              Sin pendientes de revisión.
+                            </p>
+                          )}
+                        </div>
+                        <div className="mt-2 flex flex-wrap gap-2">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => {
+                              fijarFiltro("fecha", HOY);
+                              cambiar("Revisión");
+                              setRevision("Pendientes");
+                            }}
+                          >
+                            {pendientes.length} por revisar{" "}
+                            <ChevronRight className="h-3.5 w-3.5" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => {
+                              fijarFiltro("fecha", HOY);
+                              cambiar("Estado");
+                              setEstado("Salud de la plataforma");
+                            }}
+                          >
+                            <WifiOff className="h-3.5 w-3.5" />{" "}
+                            {tecnicos.length}{" "}
+                            {tecnicos.length === 1
+                              ? "incidencia técnica"
+                              : "incidencias técnicas"}
+                          </Button>
+                        </div>
+                      </>
+                    ) : supervision === "Más avisos" ? (
+                      <>
+                        <h3 className="mt-3 mb-2 text-sm font-semibold">
+                          Avisos de Argos
+                        </h3>
+                        <p className="mb-2 text-xs text-muted-foreground">
+                          Avisos automáticos emitidos hoy, agrupados por
+                          episodio.
+                        </p>
+                        <div className="grid gap-2 sm:grid-cols-2">
+                          {conAvisos.map(({ persona, casos, total }) => (
+                            <div
+                              key={persona.id}
+                              className="rounded-xl border border-border/60 bg-background/30 px-3 py-2"
+                            >
+                              <button
+                                type="button"
+                                className="flex w-full flex-wrap items-center justify-between gap-1 text-left text-sm hover:underline"
+                                onClick={() => abrirPersona(persona)}
+                              >
+                                <strong>{persona.nombre}</strong>
+                                <span className="text-xs tabular-nums">
+                                  {total} {total === 1 ? "aviso" : "avisos"} ·{" "}
+                                  {casos.length}{" "}
+                                  {casos.length === 1
+                                    ? "episodio"
+                                    : "episodios"}
+                                </span>
+                              </button>
+                              <details className="mt-1 text-xs">
+                                <summary className="cursor-pointer text-muted-foreground">
+                                  Ver episodios
+                                </summary>
+                                {casos.map(avisoCorto)}
+                              </details>
+                            </div>
+                          ))}
+                          {!conAvisos.length && (
+                            <p className="text-sm text-muted-foreground">
+                              Sin avisos emitidos hoy.
+                            </p>
+                          )}
+                        </div>
+                        <h3 className="mt-4 mb-1 border-t border-border/50 pt-3 text-sm font-semibold">
+                          Llamadas de atención confirmadas
+                        </h3>
+                        <p className="mb-2 text-xs text-muted-foreground">
+                          Solo cuenta una llamada registrada expresamente por un
+                          responsable.
+                        </p>
+                        <div className="grid gap-2 sm:grid-cols-2">
+                          {conLlamadas.map(({ persona, casos }) => (
+                            <div
+                              key={persona.id}
+                              className="rounded-xl border border-border/60 bg-background/30 px-3 py-2"
+                            >
+                              <button
+                                type="button"
+                                className="flex w-full items-center justify-between gap-2 text-left text-sm hover:underline"
+                                onClick={() => abrirPersona(persona)}
+                              >
+                                <strong>{persona.nombre}</strong>
+                                <span className="text-xs tabular-nums">
+                                  {casos.length}{" "}
+                                  {casos.length === 1
+                                    ? "confirmada"
+                                    : "confirmadas"}
+                                </span>
+                              </button>
+                              {casos.map((item) => (
+                                <button
+                                  type="button"
+                                  key={item.id}
+                                  onClick={() => abrirEpisodio(item)}
+                                  className="mt-1 block w-full rounded-md py-1 text-left text-xs hover:bg-muted/60"
+                                  aria-label={`Ver llamada de atención de ${persona.nombre}: ${item.titulo}`}
+                                >
+                                  <span className="flex items-center gap-1.5 font-medium">
+                                    {item.titulo}
+                                    <ChevronRight className="h-3.5 w-3.5" />
+                                  </span>
+                                  <span className="block text-muted-foreground">
+                                    {item.llamadaConfirmada!.por} ·{" "}
+                                    {textoHora(item.llamadaConfirmada!.hora)}
+                                  </span>
+                                  <span className="block">
+                                    {item.llamadaConfirmada!.motivo}
+                                  </span>
+                                </button>
+                              ))}
+                            </div>
+                          ))}
+                          {!conLlamadas.length && (
+                            <p className="text-xs text-muted-foreground">
+                              Sin llamadas de atención confirmadas hoy.
+                            </p>
+                          )}
+                        </div>
+                      </>
+                    ) : (
+                      <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                        {conectados.map((persona) => (
+                          <button
+                            key={persona.id}
+                            type="button"
+                            onClick={() => abrirPersona(persona)}
+                            className="rounded-xl border border-border/60 bg-background/30 px-3 py-2 text-left hover:bg-muted/60"
+                          >
+                            <span className="flex items-center gap-2 text-sm font-semibold">
+                              <span
+                                aria-hidden
+                                className="h-2 w-2 rounded-full bg-success"
+                              />
+                              {persona.nombre}
+                              <ChevronRight className="ml-auto h-3.5 w-3.5 text-muted-foreground" />
+                            </span>
+                            <span className="mt-1 block text-sm">
+                              {persona.ubicacion ?? "Ubicación sin confirmar"}
+                            </span>
+                            <span className="block text-xs text-muted-foreground">
+                              {persona.observacion
+                                ? `${persona.observacion.app} · ${persona.observacion.actividad} · visto a las ${textoHora(persona.observacion.hora)}`
+                                : "Sin actividad observada hoy"}
+                            </span>
+                          </button>
+                        ))}
+                        {!conectados.length && (
+                          <p className="text-sm text-muted-foreground">
+                            Sin conexiones activas en este equipo.
+                          </p>
+                        )}
+                      </div>
+                    )}
+                  </section>
                   <PresenciaArgosVista
                     filas={equipoVisible.map(presenciaDe)}
                     ahora={ahoraEjemplo}
                     fotos={{}}
                     enVivo={capturas}
-                    ultimas={{}}
+                    ultimas={ultimas}
+                    accionesPersona={detalleDeTarjeta}
                     cargando={false}
                     fallo={false}
                     refrescando={refrescando}
@@ -1101,7 +1559,9 @@ function PreviewArgos() {
                     }}
                     alAbrirPersona={(id) => abrirPersona(porId(id))}
                   />
-                  <Grupo titulo="Actividad reciente">{lista(delDia)}</Grupo>
+                  <Grupo titulo="Actividad reciente">
+                    {lista(recientes, true)}
+                  </Grupo>
                 </>
               )}
 
@@ -1191,7 +1651,7 @@ function PreviewArgos() {
                             key={persona.id}
                             p={captura}
                             t={traducir}
-                            hace={() => "2:20 p. m."}
+                            hace={() => textoHora(persona.observacion!.hora)}
                             sem={sem}
                             onClick={abrir}
                           />
@@ -1385,6 +1845,8 @@ function PreviewArgos() {
 
             {seleccion && (
               <aside
+                ref={panelDetalle}
+                tabIndex={-1}
                 aria-label="Detalle de Argos"
                 className="vidrio order-first min-w-0 rounded-2xl p-4 min-[950px]:order-none"
               >
@@ -1406,6 +1868,20 @@ function PreviewArgos() {
                       {textoHora(episodio.hora)} · {episodio.duracion} ·{" "}
                       {episodio.causa}
                     </p>
+                    {episodio.llamadaConfirmada && (
+                      <div className="mt-2 rounded-lg border border-border/60 p-2.5 text-xs">
+                        <p className="font-semibold">
+                          Llamada de atención confirmada
+                        </p>
+                        <p>
+                          {episodio.llamadaConfirmada.por} ·{" "}
+                          {textoHora(episodio.llamadaConfirmada.hora)}
+                        </p>
+                        <p className="text-muted-foreground">
+                          {episodio.llamadaConfirmada.motivo}
+                        </p>
+                      </div>
+                    )}
                   </div>
                 )}
                 {subnav(
@@ -1464,8 +1940,18 @@ function PreviewArgos() {
                   {episodio && seccionDetalle === "Evidencia" && (
                     <>
                       <p>{episodio.evidencia}</p>
-                      {episodio.tipo === "Actividad" && (
-                        <PantallaEjemplo persona={seleccion} />
+                      {episodio.captura && (
+                        <figure>
+                          <img
+                            className="w-full rounded-xl border border-border/60"
+                            src={episodio.captura.url}
+                            alt={`Captura de ejemplo del episodio a las ${textoHora(episodio.captura.hora)}`}
+                          />
+                          <figcaption className="mt-1 text-xs text-muted-foreground">
+                            Captura del episodio ·{" "}
+                            {textoHora(episodio.captura.hora)}
+                          </figcaption>
+                        </figure>
                       )}
                     </>
                   )}

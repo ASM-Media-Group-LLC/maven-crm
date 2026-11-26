@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { AlertTriangle, Check, ChevronDown, Loader2, MapPin, RefreshCw, Search, X } from "lucide-react";
@@ -68,11 +68,11 @@ const FILTROS: { k: Filtro; label: TranslationKey; punto: string }[] = [
 
 /** ¿Esta persona entra en el filtro? «En turno» es todos menos fuera de turno
  *  (Alvaro, 13/11: «solo quien debería trabajar ahora»). */
-export function pasaFiltro(f: Pick<FilaDondeEsta, "estado">, filtro: Filtro | "todos"): boolean {
+export function pasaFiltro(f: Pick<FilaDondeEsta, "estado"> & { presenciaEnSala?: boolean }, filtro: Filtro | "todos"): boolean {
   const tono = tonoDe(f.estado);
   if (filtro === "todos") return true;
   if (filtro === "enTurno") return tono !== "gris";
-  if (filtro === "enCowork") return tono === "verde" || tono === "neutro";
+  if (filtro === "enCowork") return f.presenciaEnSala ?? (tono === "verde" || tono === "neutro");
   return tono === filtro;
 }
 
@@ -180,11 +180,12 @@ type PresenciaArgosVistaProps = {
   refrescando: boolean;
   alRefrescar: () => void;
   alAbrirPersona?: (id: string) => void;
+  accionesPersona?: (id: string) => ReactNode;
   ahora?: number;
 };
 
 export function PresenciaArgosVista({
-  filas, fotos, enVivo, ultimas, cargando, fallo, refrescando, alRefrescar, alAbrirPersona, ahora = Date.now(),
+  filas, fotos, enVivo, ultimas, cargando, fallo, refrescando, alRefrescar, alAbrirPersona, accionesPersona, ahora = Date.now(),
 }: PresenciaArgosVistaProps) {
   const { t } = useLanguage();
   // Entra viendo a TODOS (Alvaro, 18/11/2026); los menús solo achican.
@@ -421,13 +422,13 @@ export function PresenciaArgosVista({
               const camaraUrl = enVivoAhora ? v!.camaraUrl : u?.camaraUrl ?? null;
               const cuando = enVivoAhora ? v!.ultima : u?.ultima ?? null;
               return (
-                <li key={f.user_id}>
+                <li key={f.user_id} className={accionesPersona ? "flex min-w-0 flex-col overflow-hidden rounded-2xl border border-border/40 bg-card/20" : undefined}>
                   <Link
                     to={`/hr/expediente/${f.user_id}`}
                     state={{ volverA: "/hr/monitor-ia?t=donde" }}
                     onClick={alAbrirPersona ? (evento) => { evento.preventDefault(); alAbrirPersona(f.user_id); } : undefined}
                     title={[d.nombre, d.estado, d.pantalla].filter(Boolean).join(" · ")}
-                    className={`group flex h-full flex-col overflow-hidden rounded-2xl border bg-card/20 transition-colors hover:border-foreground/25 hover:bg-card/40 ${
+                    className={`group flex flex-col overflow-hidden transition-colors hover:border-foreground/25 hover:bg-card/40 ${accionesPersona ? "flex-1" : "h-full rounded-2xl border bg-card/20"} ${
                       f.pantalla_fuera_de_lugar && d.tono !== "gris" ? "border-destructive/40" : "border-border/40"
                     }`}
                   >
@@ -453,8 +454,9 @@ export function PresenciaArgosVista({
                       )}
                     </div>
                     <Quien f={f} d={d} />
-                    <Detalles f={f} d={d} />
+                    <Detalles f={f} d={accionesPersona ? { ...d, pantalla: "" } : d} />
                   </Link>
+                  {accionesPersona?.(f.user_id)}
                 </li>
               );
             })}
