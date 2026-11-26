@@ -13,11 +13,28 @@ import type { FilaDondeEsta } from "@/hooks/useDondeEsta";
 import type { PersonaVivo } from "@/hooks/useCapturasVivo";
 import type { Semaforo } from "@/hooks/useSemaforos";
 import { corteEjemplo, horariosEjemplo, RelevoArgos } from "./argos-relevo";
+import { AgendaVisual } from "./argos-diseno-agenda";
+import { EquipoVisual } from "./argos-diseno-equipo";
+import { BuscadorPersonaArgos } from "./argos-buscar-persona";
+import type { PersonaVistaArgos, TurnoVistaArgos } from "./argos-diseno-tipos";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { CalendarioArgos } from "./argos-calendario";
 import { CierreDiaArgos } from "./argos-cierre-dia";
 import { diaBogota } from "@/lib/historialHub";
 import { fechaDeDia } from "@/lib/casosArgos";
-import { capturaDeEjemplo } from "./argos-capturas-ejemplo";
+import { pantallasDeMuestra as pantallas } from "./capturas-argos";
 import {
   Activity,
   Bell,
@@ -32,6 +49,7 @@ import {
   Eye,
   FileSpreadsheet,
   LayoutDashboard,
+  MoreHorizontal,
   LayoutGrid,
   Grid3x3,
   MonitorPlay,
@@ -65,6 +83,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { cn } from "@/lib/utils";
 import "@/index.css";
 import "./argos-agenda.css";
+import "./argos-supervision.css";
 
 const diaAlAbrir = new Date();
 const HOY = diaBogota(diaAlAbrir);
@@ -154,7 +173,7 @@ const personas = [
     conexion: "Conectada",
     observacion: {
       app: "Documentos",
-      actividad: "Lista de entregas abierta",
+      actividad: "Lista de entregas visible",
       hora: "16:18",
     },
   },
@@ -236,6 +255,7 @@ const almuerzoCamila: Pausa = { inicio: "12:30", regreso: "13:00", limite: 30 };
 
 const episodios: Episodio[] = [
   {
+    captura: { hora: "16:20", url: pantallas.get("laura")! },
     id: "1",
     persona: "laura",
     fecha: HOY,
@@ -346,15 +366,6 @@ const episodios: Episodio[] = [
     hora: "09:46",
     tipo: "Actividad",
     titulo: "Actividad en una aplicación por verificar",
-    captura: {
-      hora: "09:46",
-      url: capturaDeEjemplo("Navegador / Consulta externa", [
-        "Página de referencia",
-        "Material de consulta",
-        "Recursos relacionados",
-        "Índice del sitio",
-      ]),
-    },
     tipoAviso: "Actividad",
     accion: "Consultar el contexto de esa tarea con RR. HH.",
     duracion: "6 min",
@@ -523,44 +534,6 @@ function Grupo({ titulo, children }: { titulo: string; children: ReactNode }) {
 const isoEnBogota = (hora: string) => `${HOY}T${hora}:00-05:00`;
 const horaCaptura = isoEnBogota(corteEjemplo);
 const ahoraEjemplo = Date.parse(horaCaptura);
-const pantallas = new Map([
-  [
-    "laura",
-    capturaDeEjemplo("Cowork / Salas", [
-      "Operaciones",
-      "Reunión de equipo",
-      "Soporte",
-      "Coordinación",
-    ]),
-  ],
-  [
-    "diego",
-    capturaDeEjemplo("Meet / Agenda", [
-      "Revisión semanal",
-      "Compartiendo pantalla",
-      "Propuesta de operaciones",
-      "Próxima reunión",
-    ]),
-  ],
-  [
-    "camila",
-    capturaDeEjemplo("Oficina / Horarios", [
-      "Turnos de hoy",
-      "Cambios pendientes",
-      "Agenda del equipo",
-      "Pausas del turno",
-    ]),
-  ],
-  [
-    "lucia",
-    capturaDeEjemplo("Oficina / Documentos", [
-      "Lista de entregas",
-      "Pendiente de revisión",
-      "Entrega del viernes",
-      "Material recibido",
-    ]),
-  ],
-]);
 const capturas = new Map<string, PersonaVivo>();
 const ultimas: Record<
   string,
@@ -879,7 +852,31 @@ function InformeTurno({
   );
 }
 
+type VistaResumen = "equipo" | "agenda" | "comparar";
 function PreviewArgos() {
+  const [diseno, setDiseno] = useState<VistaResumen>(() => {
+    const vista = new URLSearchParams(location.search).get("diseno");
+    return vista === "agenda" || vista === "comparar" ? vista : "equipo";
+  });
+  const [turnoAbierto, setTurnoAbierto] = useState<TurnoVistaArgos | null>(
+    null,
+  );
+  const detalleTurnos = useRef<HTMLDetailsElement>(null);
+  const [pantallaAbierta, setPantallaAbierta] = useState<Persona | null>(null);
+  function abrirTurno(turno: TurnoVistaArgos) {
+    setTurnoAbierto(turno);
+    if (detalleTurnos.current) {
+      detalleTurnos.current.open = true;
+      requestAnimationFrame(() => {
+        const panel = detalleTurnos.current?.querySelector<HTMLElement>(
+          "#detalle-agenda-turno",
+        );
+        panel?.focus({ preventScroll: true });
+        panel?.scrollIntoView({ block: "nearest" });
+      });
+    }
+  }
+
   const [tab, setTab] = useState<Pestaña>("Resumen");
   const [menuPlegado, setMenuPlegado] = useState(false);
   const [filtros, setFiltros] = useState<Filtros>({
@@ -950,6 +947,30 @@ function PreviewArgos() {
   const pendientes = delDia.filter(
     (episodio) => episodio.revisar && !decisiones[episodio.id],
   );
+  const ultimoPendiente = pendientes.reduce<Episodio | undefined>(
+    (ultimo, item) => (!ultimo || item.hora > ultimo.hora ? item : ultimo),
+    undefined,
+  );
+  const historico = diaSeleccionado !== HOY;
+  const directorio: PersonaVistaArgos[] = personas.map((persona) => ({
+    ...persona,
+    ...horariosEjemplo[persona.id],
+    observacion: historico ? null : persona.observacion,
+    ubicacion: historico ? null : (persona.ubicacion ?? null),
+    conectada: !historico && persona.conexion === "Conectada",
+    imagen: historico ? null : (pantallas.get(persona.id) ?? null),
+    pendientes: pendientes.filter((item) => item.persona === persona.id).length,
+  }));
+  const vistaPersonas = {
+    personas: directorio.filter((persona) =>
+      equipoVisible.some(({ id }) => id === persona.id),
+    ),
+    corte: corteEjemplo,
+    buscando: Boolean(filtros.persona),
+    abrirPersona: (id: string) => abrirPersona(porId(id)),
+    abrirPantalla: (id: string) => setPantallaAbierta(porId(id)),
+    abrirTurno,
+  };
   const tecnicos = delDia.filter(({ tipo }) => tipo === "Conexión");
   const conectados = equipoVisible.filter(
     (persona) => persona.conexion === "Conectada",
@@ -1292,63 +1313,49 @@ function PreviewArgos() {
       </aside>
       <div className="vidrio-panel flex min-w-0 flex-1 flex-col overflow-hidden">
         <Page>
-          <PageHeader
-            title="Argos — Monitor IA"
-            subtitle="Vista previa con datos de ejemplo"
-            icon={<Eye />}
-            actions={
-              <>
+          <header className="argos-cabecera-supervision">
+            <PageHeader
+              title="Argos"
+              subtitle="Supervisión del equipo · Datos de ejemplo"
+              icon={<Eye />}
+            />
+            <BuscadorPersonaArgos
+              key={diaSeleccionado}
+              personas={directorio}
+              abrirPersona={vistaPersonas.abrirPersona}
+              historico={historico}
+            />
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
                 <Button
-                  title="Horarios"
-                  aria-label="Horarios"
+                  size="icon"
                   variant="outline"
-                  size="sm"
-                  className="argos-accion-cabecera rounded-full"
-                  onClick={() => {
+                  aria-label="Opciones de Argos"
+                >
+                  <MoreHorizontal className="size-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem
+                  onSelect={() => {
                     cambiar("Historial");
                     setHistorial("Jornada");
                   }}
                 >
-                  <CalendarClock className="h-4 w-4" />
-                  <span className="argos-texto-accion">Horarios</span>
-                </Button>
-                <Button
-                  aria-label="Exportar horas"
-                  variant="outline"
-                  size="sm"
-                  className="argos-accion-cabecera rounded-full"
-                  onClick={exportarHoras}
-                  disabled={diaSeleccionado !== HOY}
-                  title={
-                    diaSeleccionado !== HOY
-                      ? "La muestra de marcaciones corresponde a hoy"
-                      : "Exportar horas"
-                  }
-                >
-                  <FileSpreadsheet className="h-4 w-4" />
-                  <span className="argos-texto-accion">Exportar horas</span>
-                </Button>
-                <Button
-                  title="Ajustes"
-                  aria-label="Ajustes"
-                  variant={tab === "Ajustes" ? "secondary" : "outline"}
-                  size="sm"
-                  className="argos-accion-cabecera rounded-full"
-                  onClick={() => cambiar("Ajustes")}
-                >
-                  <Settings className="h-4 w-4" />
-                  <span className="argos-texto-accion">Ajustes</span>
-                </Button>
-                <Badge
-                  variant="outline"
-                  className="gap-1.5 border-success/50 bg-success/10 px-3 py-1.5 text-success"
-                >
-                  <Eye className="h-3 w-3" />
-                  Monitor activo
-                </Badge>
-              </>
-            }
-          />
+                  <CalendarClock className="mr-2 size-4" />
+                  Horarios
+                </DropdownMenuItem>
+                <DropdownMenuItem disabled={historico} onSelect={exportarHoras}>
+                  <FileSpreadsheet className="mr-2 size-4" />
+                  Exportar horas
+                </DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => cambiar("Ajustes")}>
+                  <Settings className="mr-2 size-4" />
+                  Ajustes
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </header>
 
           <nav
             aria-label="Secciones de Argos"
@@ -1373,56 +1380,62 @@ function PreviewArgos() {
           </nav>
 
           {tab !== "Ajustes" && tab !== "Resumen" && (
-            <div className="my-4 grid grid-cols-2 gap-2 xl:grid-cols-[1fr_1fr_0.65fr_1.3fr]">
-              <label className="min-w-0 text-xs font-medium text-muted-foreground">
-                Fecha
-                <input
-                  type="date"
-                  className={selectClass}
-                  disabled={tab === "En vivo"}
-                  value={diaSeleccionado}
-                  onChange={(e) => {
-                    if (e.target.value) fijarFiltro("fecha", e.target.value);
-                  }}
-                />
-              </label>
-              <label className="min-w-0 text-xs font-medium text-muted-foreground">
-                Equipo
-                <select
-                  className={selectClass}
-                  value={filtros.equipo}
-                  onChange={(e) => fijarFiltro("equipo", e.target.value)}
-                >
-                  <option value="">Todos</option>
-                  <option>Operaciones</option>
-                  <option>RR. HH.</option>
-                </select>
-              </label>
-              <label className="min-w-0 text-xs font-medium text-muted-foreground">
-                Turno
-                <select
-                  className={selectClass}
-                  value={filtros.turno}
-                  onChange={(e) => fijarFiltro("turno", e.target.value)}
-                >
-                  <option value="">Todos</option>
-                  <option>AM</option>
-                  <option>PM</option>
-                </select>
-              </label>
-              <label className="min-w-0 text-xs font-medium text-muted-foreground">
-                Persona
-                <span className="relative block">
-                  <Search className="absolute left-2.5 top-2.5 h-4 w-4" />
-                  <Input
-                    className="h-9 pl-9"
-                    placeholder="Buscar nombre"
-                    value={filtros.persona}
-                    onChange={(e) => fijarFiltro("persona", e.target.value)}
+            <details className="argos-desglose mb-4">
+              <summary>
+                Filtros de la sección
+                <ChevronRight size={15} />
+              </summary>
+              <div className="my-3 grid grid-cols-2 gap-2 xl:grid-cols-[1fr_1fr_0.65fr_1.3fr]">
+                <label className="min-w-0 text-xs font-medium text-muted-foreground">
+                  Fecha
+                  <input
+                    type="date"
+                    className={selectClass}
+                    disabled={tab === "En vivo"}
+                    value={diaSeleccionado}
+                    onChange={(e) => {
+                      if (e.target.value) fijarFiltro("fecha", e.target.value);
+                    }}
                   />
-                </span>
-              </label>
-            </div>
+                </label>
+                <label className="min-w-0 text-xs font-medium text-muted-foreground">
+                  Equipo
+                  <select
+                    className={selectClass}
+                    value={filtros.equipo}
+                    onChange={(e) => fijarFiltro("equipo", e.target.value)}
+                  >
+                    <option value="">Todos</option>
+                    <option>Operaciones</option>
+                    <option>RR. HH.</option>
+                  </select>
+                </label>
+                <label className="min-w-0 text-xs font-medium text-muted-foreground">
+                  Turno
+                  <select
+                    className={selectClass}
+                    value={filtros.turno}
+                    onChange={(e) => fijarFiltro("turno", e.target.value)}
+                  >
+                    <option value="">Todos</option>
+                    <option>AM</option>
+                    <option>PM</option>
+                  </select>
+                </label>
+                <label className="min-w-0 text-xs font-medium text-muted-foreground">
+                  Persona
+                  <span className="relative block">
+                    <Search className="absolute left-2.5 top-2.5 h-4 w-4" />
+                    <Input
+                      className="h-9 pl-9"
+                      placeholder="Buscar nombre"
+                      value={filtros.persona}
+                      onChange={(e) => fijarFiltro("persona", e.target.value)}
+                    />
+                  </span>
+                </label>
+              </div>
+            </details>
           )}
 
           <div
@@ -1478,20 +1491,104 @@ function PreviewArgos() {
               )}
               {tab === "Resumen" && filtros.fecha === HOY && (
                 <>
-                  <div className="argos-resumen-dia" data-vista={supervision}>
+                  <div
+                    className="argos-cambio-vista"
+                    role="group"
+                    aria-label="Vista de la jornada"
+                  >
+                    <button
+                      type="button"
+                      aria-pressed={diseno === "equipo"}
+                      onClick={() => setDiseno("equipo")}
+                    >
+                      <Users size={15} />
+                      Equipo
+                    </button>
+                    <button
+                      type="button"
+                      aria-pressed={diseno === "agenda"}
+                      onClick={() => setDiseno("agenda")}
+                    >
+                      <CalendarClock size={15} />
+                      Turnos
+                    </button>
+                    <span className="argos-corte-jornada">
+                      Turno PM · {corteEjemplo} Bogotá
+                    </span>
+                  </div>
+                  {ultimoPendiente && (
+                    <section
+                      className="argos-ultimo-pendiente"
+                      aria-label="Pendientes de revisión"
+                    >
+                      <button
+                        type="button"
+                        onClick={() => abrirEpisodio(ultimoPendiente)}
+                      >
+                        <span className="argos-epigrafe-pendiente">
+                          <span className="argos-indicador-pendiente" />
+                          Último pendiente
+                        </span>
+                        <span>
+                          <strong>
+                            {porId(ultimoPendiente.persona).nombre}
+                          </strong>{" "}
+                          · {ultimoPendiente.titulo} ·{" "}
+                          {ultimoPendiente.duracion.split(" · ")[0]}
+                          {avisosDe(ultimoPendiente).length > 0 &&
+                            ` · ${avisosDe(ultimoPendiente).length} avisos`}
+                        </span>
+                      </button>
+                      <button
+                        type="button"
+                        aria-label={`Ver pendientes de revisión (${pendientes.length})`}
+                        onClick={() => {
+                          cambiar("Revisión");
+                          setRevision("Pendientes");
+                        }}
+                      >
+                        Ver{" "}
+                        {pendientes.length === 1
+                          ? "pendiente"
+                          : `los ${pendientes.length}`}
+                        <ChevronRight size={14} />
+                      </button>
+                    </section>
+                  )}
+                  <div
+                    className={
+                      diseno === "comparar" ? "argos-comparacion" : undefined
+                    }
+                  >
+                    {diseno !== "agenda" && <EquipoVisual {...vistaPersonas} />}
+                    {diseno !== "equipo" && <AgendaVisual {...vistaPersonas} />}
+                  </div>
+                  <details ref={detalleTurnos} className="argos-desglose">
+                    <summary>
+                      Relevo de turnos
+                      <ChevronRight size={15} />
+                    </summary>
                     <RelevoArgos
+                      seccionElegida={turnoAbierto}
+                      alElegirSeccion={setTurnoAbierto}
                       personas={equipoVisible}
                       episodios={delDia}
                       decisiones={decisiones}
                       abrirPersona={(id) => abrirPersona(porId(id))}
                       abrirEpisodio={abrirEpisodio}
                     />
+                  </details>
+                  <details className="argos-desglose">
+                    <summary>
+                      Avisos y llamadas de atención
+                      <ChevronRight size={15} />
+                    </summary>
                     <section
                       className="argos-equipo"
                       aria-label="Equipo de hoy"
                     >
                       <header className="argos-equipo__cabecera">
-                        <h2 className="font-display">Equipo de hoy</h2>
+                        <h2 className="font-display">Seguimiento del equipo</h2>
                         <Users aria-hidden="true" size={17} />
                       </header>
                       <div
@@ -1711,26 +1808,14 @@ function PreviewArgos() {
                         </div>
                       )}
                     </section>
-                  </div>
-                  <PresenciaArgosVista
-                    filas={equipoVisible.map(presenciaDe)}
-                    ahora={ahoraEjemplo}
-                    fotos={{}}
-                    enVivo={capturas}
-                    ultimas={ultimas}
-                    accionesPersona={detalleDeTarjeta}
-                    cargando={false}
-                    fallo={false}
-                    refrescando={refrescando}
-                    alRefrescar={() => {
-                      setRefrescando(true);
-                      setTimeout(() => setRefrescando(false), 400);
-                    }}
-                    alAbrirPersona={(id) => abrirPersona(porId(id))}
-                  />
-                  <Grupo titulo="Actividad reciente">
+                  </details>
+                  <details className="argos-desglose">
+                    <summary>
+                      Actividad reciente
+                      <ChevronRight size={15} />
+                    </summary>
                     {lista(recientes, true)}
-                  </Grupo>
+                  </details>
                 </>
               )}
 
@@ -1756,6 +1841,7 @@ function PreviewArgos() {
                             ["Muralla", LayoutGrid],
                             ["Cuadrícula", Grid3x3],
                             ["Lista", List],
+                            ["Presencia", Users],
                           ] as const
                         ).map(([nombre, Icono]) => (
                           <button
@@ -1776,73 +1862,97 @@ function PreviewArgos() {
                         ))}
                       </div>
                     </div>
-                    <div
-                      className={cn(
-                        "grid gap-3",
-                        vista === "Muralla" && "sm:grid-cols-2 lg:grid-cols-3",
-                        vista === "Cuadrícula" &&
-                          "grid-cols-2 sm:grid-cols-3 lg:grid-cols-4",
-                      )}
-                    >
-                      {equipoVisible.map((persona) => {
-                        const captura = capturas.get(persona.id);
-                        const sem: Semaforo =
-                          persona.camara === "No" ? "naranja" : "verde";
-                        const abrir = () => abrirPersona(persona);
-                        if (vista === "Lista")
-                          return (
-                            <button
-                              key={persona.id}
-                              type="button"
-                              onClick={abrir}
-                              className="flex w-full flex-wrap items-center justify-between gap-2 rounded-xl border border-border/50 px-3 py-2 text-left hover:bg-muted/60"
-                            >
-                              <Identidad persona={persona} />
-                              <span className="flex items-center gap-2 text-xs text-muted-foreground">
-                                <span
-                                  className={cn(
-                                    "h-1.5 w-1.5 rounded-full",
-                                    captura
-                                      ? "bg-success"
-                                      : "bg-muted-foreground",
-                                  )}
-                                />
-                                {persona.camara === "No"
-                                  ? "Sin cámara"
-                                  : persona.estado}
-                                <ChevronRight className="h-4 w-4" />
-                              </span>
-                            </button>
-                          );
-                        if (!captura) return null;
-                        return vista === "Muralla" ? (
-                          <CardMuralla
-                            key={persona.id}
-                            p={captura}
-                            t={traducir}
-                            hace={() => textoHora(persona.observacion!.hora)}
-                            sem={sem}
-                            onClick={abrir}
-                          />
-                        ) : (
-                          <CeldaCuadricula
-                            key={persona.id}
-                            p={captura}
-                            t={traducir}
-                            sem={sem}
-                            onClick={abrir}
-                          />
-                        );
-                      })}
-                    </div>
-                    {(!equipoVisible.length ||
-                      (vista !== "Lista" &&
-                        !equipoVisible.some((persona) =>
-                          capturas.has(persona.id),
-                        ))) && (
-                      <p className="py-4 text-sm text-muted-foreground">
-                        No hay pantallazos con estos filtros.
-                      </p>
+                    {vista === "Presencia" ? (
+                      <PresenciaArgosVista
+                        filas={equipoVisible.map(presenciaDe)}
+                        ahora={ahoraEjemplo}
+                        fotos={{}}
+                        enVivo={capturas}
+                        ultimas={ultimas}
+                        accionesPersona={detalleDeTarjeta}
+                        cargando={false}
+                        fallo={false}
+                        refrescando={refrescando}
+                        alRefrescar={() => {
+                          setRefrescando(true);
+                          setTimeout(() => setRefrescando(false), 400);
+                        }}
+                        alAbrirPersona={(id) => abrirPersona(porId(id))}
+                      />
+                    ) : (
+                      <>
+                        <div
+                          className={cn(
+                            "grid gap-3",
+                            vista === "Muralla" &&
+                              "sm:grid-cols-2 lg:grid-cols-3",
+                            vista === "Cuadrícula" &&
+                              "grid-cols-2 sm:grid-cols-3 lg:grid-cols-4",
+                          )}
+                        >
+                          {equipoVisible.map((persona) => {
+                            const captura = capturas.get(persona.id);
+                            const sem: Semaforo =
+                              persona.camara === "No" ? "naranja" : "verde";
+                            const abrir = () => abrirPersona(persona);
+                            if (vista === "Lista")
+                              return (
+                                <button
+                                  key={persona.id}
+                                  type="button"
+                                  onClick={abrir}
+                                  className="flex w-full flex-wrap items-center justify-between gap-2 rounded-xl border border-border/50 px-3 py-2 text-left hover:bg-muted/60"
+                                >
+                                  <Identidad persona={persona} />
+                                  <span className="flex items-center gap-2 text-xs text-muted-foreground">
+                                    <span
+                                      className={cn(
+                                        "h-1.5 w-1.5 rounded-full",
+                                        captura
+                                          ? "bg-success"
+                                          : "bg-muted-foreground",
+                                      )}
+                                    />
+                                    {persona.camara === "No"
+                                      ? "Sin cámara"
+                                      : persona.estado}
+                                    <ChevronRight className="h-4 w-4" />
+                                  </span>
+                                </button>
+                              );
+                            if (!captura) return null;
+                            return vista === "Muralla" ? (
+                              <CardMuralla
+                                key={persona.id}
+                                p={captura}
+                                t={traducir}
+                                hace={() =>
+                                  textoHora(persona.observacion!.hora)
+                                }
+                                sem={sem}
+                                onClick={abrir}
+                              />
+                            ) : (
+                              <CeldaCuadricula
+                                key={persona.id}
+                                p={captura}
+                                t={traducir}
+                                sem={sem}
+                                onClick={abrir}
+                              />
+                            );
+                          })}
+                        </div>
+                        {(!equipoVisible.length ||
+                          (vista !== "Lista" &&
+                            !equipoVisible.some((persona) =>
+                              capturas.has(persona.id),
+                            ))) && (
+                          <p className="py-4 text-sm text-muted-foreground">
+                            No hay pantallazos con estos filtros.
+                          </p>
+                        )}
+                      </>
                     )}
                   </div>
                 </section>
@@ -2030,6 +2140,33 @@ function PreviewArgos() {
                     <X className="h-4 w-4" />
                   </Button>
                 </div>
+                {!episodio && diaDelDetalle === HOY && (
+                  <div className="argos-ficha-senal">
+                    {seleccion.observacion ? (
+                      <>
+                        <span>
+                          {seleccion.ubicacion ?? "Última actividad registrada"}
+                        </span>
+                        <strong>
+                          {seleccion.observacion.app} ·{" "}
+                          {seleccion.observacion.actividad}
+                        </strong>
+                        <span>Última señal · {seleccion.observacion.hora}</span>
+                        {pantallas.has(seleccion.id) && (
+                          <button
+                            type="button"
+                            onClick={() => setPantallaAbierta(seleccion)}
+                          >
+                            <Monitor size={15} />
+                            Ver pantalla
+                          </button>
+                        )}
+                      </>
+                    ) : (
+                      <span>Sin actividad observada hoy</span>
+                    )}
+                  </div>
+                )}
                 {episodio && (
                   <div className="my-3">
                     <h2 className="font-semibold">{episodio.titulo}</h2>
@@ -2109,6 +2246,11 @@ function PreviewArgos() {
                   {episodio && seccionDetalle === "Evidencia" && (
                     <>
                       <p>{episodio.evidencia}</p>
+                      {!episodio.captura && (
+                        <p className="text-xs text-muted-foreground">
+                          Sin captura adjunta a este episodio.
+                        </p>
+                      )}
                       {episodio.captura && (
                         <figure>
                           <img
@@ -2146,7 +2288,6 @@ function PreviewArgos() {
                     <>
                       {diaDelDetalle === HOY && (
                         <>
-                          <PantallaEjemplo persona={seleccion} />
                           <dl className="grid grid-cols-2 gap-3">
                             <div>
                               <dt className="text-muted-foreground">Turno</dt>
@@ -2233,6 +2374,25 @@ function PreviewArgos() {
           </div>
         </Page>
       </div>
+      <Dialog
+        open={Boolean(pantallaAbierta)}
+        onOpenChange={(abierto) => {
+          if (!abierto) setPantallaAbierta(null);
+        }}
+      >
+        {pantallaAbierta && (
+          <DialogContent className="argos-visor-pantalla">
+            <DialogHeader>
+              <DialogTitle>Pantalla de {pantallaAbierta.nombre}</DialogTitle>
+              <DialogDescription>
+                {pantallaAbierta.observacion?.app} ·{" "}
+                {pantallaAbierta.observacion?.hora} · Captura de ejemplo
+              </DialogDescription>
+            </DialogHeader>
+            <PantallaEjemplo persona={pantallaAbierta} />
+          </DialogContent>
+        )}
+      </Dialog>
     </div>
   );
 }

@@ -1,0 +1,179 @@
+.argos-cabecera-supervision {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(13rem, 25rem) auto;
+  align-items: center;
+  gap: 12px;
+}
+.argos-cambio-vista,
+.argos-cambio-vista button,
+.argos-desglose > summary,
+.argos-ficha-senal button {
+  display: flex;
+  align-items: center;
+}
+.argos-cambio-vista {
+  gap: 0.25rem;
+  border-bottom: 1px solid hsl(var(--border) / 0.7);
+}
+.argos-cambio-vista button {
+  gap: 0.45rem;
+  padding: 0.55rem 0.75rem;
+  border-bottom: 2px solid transparent;
+  color: hsl(var(--muted-foreground));
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+.argos-cambio-vista button[aria-pressed="true"] {
+  border-bottom-color: hsl(var(--primary));
+  color: hsl(var(--foreground));
+}
+.argos-corte-jornada {
+  margin-left: auto;
+  color: hsl(var(--muted-foreground));
+  font-size: 0.8rem;
+}
+.argos-ultimo-pendiente {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  border-inline-start: 2px solid hsl(var(--warning) / 0.75);
+  padding: 0.2rem 0.65rem;
+}
+.argos-ultimo-pendiente button:first-child {
+  display: grid;
+  gap: 0.14rem;
+  text-align: left;
+  font-size: 0.875rem;
+}
+.argos-epigrafe-pendiente {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-weight: 600;
+  font-size: 0.75rem;
+  color: hsl(var(--muted-foreground));
+}
+.argos-ultimo-pendiente button:last-child {
+  display: inline-flex;
+  align-items: center;
+  white-space: nowrap;
+  gap: 0.25rem;
+  font-size: 0.8125rem;
+  color: hsl(var(--foreground));
+}
+.argos-ultimo-pendiente button:hover {
+  text-decoration: underline;
+}
+.argos-indicador-pendiente {
+  width: 0.4rem;
+  height: 0.4rem;
+  border-radius: 50%;
+  background: hsl(var(--warning));
+}
+.argos-desglose {
+  border-block-start: 1px solid hsl(var(--border) / 0.65);
+}
+.argos-desglose > summary {
+  cursor: pointer;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding-block: 0.7rem;
+  color: hsl(var(--muted-foreground));
+  list-style: none;
+  font-weight: 600;
+  font-size: 0.875rem;
+}
+.argos-desglose > summary::-webkit-details-marker {
+  display: none;
+}
+.argos-desglose[open] > summary {
+  color: hsl(var(--foreground));
+}
+.argos-desglose[open] > summary svg {
+  transform: rotate(90deg);
+}
+.argos-propuesta .argos-desglose + .argos-desglose {
+  margin-top: 0;
+}
+.argos-cambio-vista button:hover,
+.argos-desglose > summary:hover {
+  color: hsl(var(--primary));
+}
+.argos-ficha-senal {
+  display: grid;
+  gap: 0.35rem;
+  margin-block: 1rem;
+  padding: 0.25rem 0 0.8rem;
+  border-bottom: 1px solid hsl(var(--border));
+}
+.argos-ficha-senal > span {
+  font-size: 0.8rem;
+  color: hsl(var(--muted-foreground));
+}
+.argos-ficha-senal > strong {
+  font-size: 0.95rem;
+}
+.argos-ficha-senal button {
+  gap: 0.35rem;
+  width: fit-content;
+  padding-block: 0.3rem;
+  color: hsl(var(--primary));
+  font-weight: 600;
+  font-size: 0.875rem;
+}
+.argos-visor-pantalla {
+  width: min(92vw, 62rem);
+  max-width: none;
+}
+.argos-visor-pantalla img {
+  max-height: 70dvh;
+  object-fit: contain;
+}
+.argos-comparacion {
+  display: grid;
+  align-items: start;
+  gap: 1rem;
+}
+@container agenda (min-width: 60rem) {
+  .argos-comparacion {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 640px) {
+  .argos-cabecera-supervision {
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 10px;
+  }
+  .argos-cabecera-supervision .argos-buscar {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+  .argos-cabecera-supervision > button {
+    grid-column: 2;
+    grid-row: 1;
+  }
+  .argos-cambio-vista button {
+    padding-inline: 0.45rem;
+  }
+}
+@media (max-width: 640px) {
+  .argos-propuesta .argos-fecha__titulo h2 {
+    font-size: 1.85rem;
+  }
+  .argos-propuesta .argos-nav-principal {
+    margin-block: 0.7rem 0.8rem;
+  }
+  .argos-fecha__semana {
+    margin-top: 0.55rem;
+  }
+  .argos-fecha__titulo time {
+    font-size: 0.85rem;
+  }
+  .argos-propuesta .argos-columna-agenda > :not([hidden]) ~ :not([hidden]) {
+    margin-top: 0.65rem;
+  }
+  .argos-ultimo-pendiente button:first-child {
+    font-size: 0.82rem;
+  }
+}

@@ -1,5 +1,7 @@
 # Estado del Proyecto — Maven CRM (v3)
 
+- 26/11/2026 · Preview local de Argos: buscador de personas en cabecera, actividad y hora por persona, pantalla a demanda y vista de turnos. Datos ficticios; pendiente aprobación e integración con la operación real.
+
 - 26/11/2026 · Vista previa de Argos: calendario semanal, turno en curso y equipo en una composición adaptada al ancho, con controles del monitor de Maven. El PR sigue en revisión con datos de ejemplo.
 
 - 25/11/2026 · La propuesta de Argos abre en Hoy con agenda, semana navegable, calendario y cierres con pendientes por fecha. Las decisiones de ejemplo actualizan los indicadores. Pendiente validación visual del dueño e integración con datos reales.

@@ -78,14 +78,21 @@ export function RelevoArgos<E extends Episodio>({
   decisiones,
   abrirPersona,
   abrirEpisodio,
+  seccionElegida,
+  alElegirSeccion,
 }: {
   personas: Persona[];
   episodios: E[];
   decisiones: Record<string, { resultado: string }>;
   abrirPersona: (id: string) => void;
   abrirEpisodio: (episodio: E) => void;
+  seccionElegida?: Seccion | null;
+  alElegirSeccion?: (seccion: Seccion | null) => void;
 }) {
-  const [seccion, setSeccion] = useState<Seccion | null>(null);
+  const [seccionInterna, setSeccionInterna] = useState<Seccion | null>(null);
+  const seccion =
+    seccionElegida === undefined ? seccionInterna : seccionElegida;
+  const setSeccion = alElegirSeccion ?? setSeccionInterna;
   const [resto, setResto] = useState(false);
   const botonDeDetalle = useRef<HTMLButtonElement | null>(null);
   const turnos = personas
@@ -281,6 +288,7 @@ export function RelevoArgos<E extends Episodio>({
       {seccion && (
         <div
           id="detalle-agenda-turno"
+          tabIndex={-1}
           className="argos-turno__detalle space-y-3"
         >
           <div className="flex flex-wrap items-center gap-2">

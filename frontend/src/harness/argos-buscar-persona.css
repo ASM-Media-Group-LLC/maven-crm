@@ -1,0 +1,116 @@
+.argos-buscar {
+  position: relative;
+  z-index: 21;
+  width: 100%;
+  min-width: 0;
+}
+
+.argos-buscar input {
+  height: 2.75rem;
+  padding-inline: 2.7rem;
+  border-radius: 0.7rem;
+  background: hsl(var(--card));
+  color: hsl(var(--foreground));
+  font-size: 0.94rem;
+}
+
+.argos-buscar__lupa,
+.argos-buscar__borrar {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  color: hsl(var(--muted-foreground));
+}
+
+.argos-buscar__lupa {
+  left: 0.9rem;
+  width: 1.06rem;
+  height: 1.06rem;
+  pointer-events: none;
+}
+
+.argos-buscar__borrar {
+  right: 0.25rem;
+  display: grid;
+  width: 2.25rem;
+  height: 2.25rem;
+  place-items: center;
+  border-radius: 0.5rem;
+}
+
+.argos-buscar__borrar:hover,
+.argos-buscar__borrar:focus-visible {
+  background: hsl(var(--muted));
+  color: hsl(var(--foreground));
+}
+
+.argos-buscar__menu {
+  position: absolute;
+  inset-inline: 0;
+  top: calc(100% + 0.35rem);
+  overflow: hidden;
+  border: 1px solid hsl(var(--border));
+  border-radius: 0.75rem;
+  background: hsl(var(--popover));
+  color: hsl(var(--popover-foreground));
+  box-shadow: 0 12px 30px rgb(0 0 0 / 0.2);
+}
+
+.argos-buscar__menu ul {
+  max-height: min(20rem, 45vh);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.argos-buscar__menu li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.65rem;
+  padding: 0.6rem 0.9rem;
+  cursor: pointer;
+}
+
+.argos-buscar__menu li + li {
+  border-top: 1px solid hsl(var(--border) / 0.6);
+}
+
+.argos-buscar__menu li[aria-selected="true"],
+.argos-buscar__menu li:hover {
+  background: hsl(var(--accent));
+}
+
+.argos-buscar__menu li > svg {
+  flex-shrink: 0;
+  color: hsl(var(--muted-foreground));
+}
+
+.argos-buscar__persona {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.12rem 0.6rem;
+  min-width: 0;
+}
+
+.argos-buscar__nombre {
+  font-size: 0.94rem;
+  font-weight: 650;
+}
+
+.argos-buscar__puesto,
+.argos-buscar__actividad,
+.argos-buscar__menu p {
+  font-size: 0.82rem;
+  color: hsl(var(--muted-foreground));
+}
+
+.argos-buscar__actividad {
+  width: 100%;
+  line-height: 1.45;
+}
+
+.argos-buscar__menu p {
+  padding: 0.85rem 0.9rem;
+  overflow-wrap: anywhere;
+}
