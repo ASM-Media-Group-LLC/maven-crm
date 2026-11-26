@@ -73,7 +73,7 @@ describe("por TCP el video va chico (guardas del código)", () => {
   });
 
   it("aplicarCamara topa con porRedBloqueada aunque la sala sea HD", () => {
-    expect(livekit).toMatch(/const liviano = \(perfilCamaraRef\.current\.perfil === "liviano" && !camaraEnHD\(room\.name\)\) \|\| porRedBloqueada\(\);/);
+    expect(livekit).toMatch(/const camaraLiviana[^;]+\|\| porRedBloqueada\(\);/);
   });
 
   it("el transporte se mira al conectar y seguido, y al cambiar se reaplica la cámara", () => {

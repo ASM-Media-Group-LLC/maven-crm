@@ -258,9 +258,9 @@ export function escribirTopes(encodings: TopeDeCodificacion[], topes: TopeDeCodi
 
 // ── MEET Y LLAMADAS DE MAVEN: HD (Alvaro, 17/11/2026) ─────────────────────────
 //
-// Fuera de Cowork (meet_… y las llamadas del chat) la cámara va a 1080p y el
-// perfil liviano NO la recorta a 360p: ahí la cara es lo importante y Alvaro
-// eligió calidad sobre estabilidad. Cowork queda como estaba.
+// Fuera de Cowork (meet_… y las llamadas del chat) la cámara parte en 1080p.
+// useLiveKit baja temporalmente ese perfil si la subida limita el video de
+// forma sostenida o si la llamada usa un transporte restringido.
 export function camaraEnHD(sala: string | null | undefined): boolean {
   return !!sala && !sala.startsWith("cowork_");
 }

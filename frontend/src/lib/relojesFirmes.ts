@@ -73,6 +73,18 @@ export function crearRelojesFirmes(): RelojesFirmes | null {
 }
 
 let puestos = false;
+let relojesFirmes: RelojesFirmes | null = null;
+
+/** Usa el mismo reloj de LiveKit para trabajo de la llamada en segundo plano. */
+export function repetirConRelojFirme(fn: () => void, ms: number): () => void {
+  const relojes = relojesFirmes;
+  if (relojes) {
+    const id = relojes.setInterval(fn, ms);
+    return () => relojes.clearInterval(id);
+  }
+  const id = window.setInterval(fn, ms);
+  return () => window.clearInterval(id);
+}
 
 /** Pone los relojes firmes en LiveKit (una vez por pestaña). Llamar antes de `new Room`. */
 export function afirmarRelojesDeLiveKit(): void {
@@ -80,6 +92,7 @@ export function afirmarRelojesDeLiveKit(): void {
   puestos = true;
   const r = crearRelojesFirmes();
   if (!r) return;
+  relojesFirmes = r;
   // Los ids de un reloj y otro no se mezclan: LiveKit siempre limpia con el
   // mismo CriticalTimers con que programó.
   const ct = CriticalTimers as unknown as RelojesFirmes;

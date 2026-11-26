@@ -12,9 +12,8 @@ describe("cámara en HD fuera de Cowork (Alvaro, 17/11/2026)", () => {
     expect(camaraEnHD(null)).toBe(false);
   });
 
-  it("la sala se crea con sus opciones y el liviano no recorta la cámara en HD", () => {
+  it("el perfil inicial de Meet y llamadas directas sigue siendo HD", () => {
     expect(livekit).toContain("new Room(opcionesDeSala(roomName))");
     expect(livekit).toContain("VideoPresets.h1080.resolution");
-    expect(livekit).toMatch(/perfil === "liviano" && !camaraEnHD\(room\.name\)/);
   });
 });
