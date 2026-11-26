@@ -57,6 +57,8 @@ const Concepto = lazy(() => import("./pages/portada/Concepto"));
 const Credentials = import.meta.env.DEV ? lazy(() => import("./pages/Credentials")) : null;
 const ForgotPassword = lazy(() => import("./pages/ForgotPassword"));
 const ResetPassword = lazy(() => import("./pages/ResetPassword"));
+// «Crear mi contraseña»: la invitación del Dueño de un cliente nuevo (solo edificio).
+const CrearContrasena = lazy(() => import("./pages/plataforma/CrearContrasena"));
 const ChatterPublicView = lazy(() => import("./pages/ChatterPublicView"));
 const PaginaAportar = lazy(() => import("./pages/aportar/PaginaAportar"));
 const VideoCallPage = lazy(() => import("./pages/VideoCallPage"));
@@ -357,6 +359,7 @@ const App = () => (
               
               <Route path="/forgot-password" element={<ForgotPassword />} />
               <Route path="/reset-password" element={<ResetPassword />} />
+              <Route path="/crear-contrasena" element={<CrearContrasena />} />
               {/* Chatter public view — no auth, accessible via /chatter/<sessionId> */}
               <Route path="/chatter/:sessionId" element={<ChatterPublicView />} />
               {/* Subida pública por link: la gente sube contenido al Drive SIN cuenta.

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { destinoPorEnlaceDeAcceso, elegirConexion, inicioTrasEntrar } from "@/lib/puerta";
+import { destinoPorEnlaceDeAcceso, destinoPorRuta, elegirConexion, inicioTrasEntrar, tokenDelEnlace } from "@/lib/puerta";
 import { SUPABASE_URL, SUPABASE_URL_KASH, DESTINO_SUPABASE, urlDeFuncion } from "@/lib/conexionSupabase";
 
 // PUERTA PRENDIDA SIN ROMPER KASH (19/11/2026).
@@ -81,5 +81,20 @@ describe("4. a dónde va el login", () => {
     expect(inicioTrasEntrar("kash")).toBe("/dashboard");
     expect(inicioTrasEntrar("edificio")).toBe("/plataforma");
     expect(fuentes["/frontend/src/pages/Login.tsx"]).toMatch(/: inicioTrasEntrar\(destinoDeEstaPestana\(\)\);/);
+  });
+});
+
+describe("«Crear mi contraseña» (invitación del Dueño, 25/11)", () => {
+  const PRENDIDA2 = { VITE_PUERTA_EDIFICIO: "1", VITE_EDIFICIO_URL: "https://ezeigddgkaemxpshghmu.supabase.co", VITE_EDIFICIO_ANON_KEY: "x" };
+  it("esa ruta arranca contra el edificio solo con la puerta prendida", () => {
+    expect(destinoPorRuta("/crear-contrasena", PRENDIDA2)).toBe("edificio");
+    expect(destinoPorRuta("/crear-contrasena/", PRENDIDA2)).toBe("edificio");
+    expect(destinoPorRuta("/crear-contrasena", {})).toBeNull();
+    expect(destinoPorRuta("/login", PRENDIDA2)).toBeNull();
+  });
+  it("el token sale del #hash y solo si tiene la forma correcta", () => {
+    expect(tokenDelEnlace("#t=" + "A".repeat(64))).toBe("a".repeat(64));
+    expect(tokenDelEnlace("#t=abc")).toBeNull();
+    expect(tokenDelEnlace("")).toBeNull();
   });
 });

@@ -1,4 +1,4 @@
-import { ErrorDePlataforma, type AdminDePlataforma, type ClienteDelDueno, type EventoDelHistorial, type PanelDelDueno, type Persona, type PlataformaDatos, type PlanYPagos, type ResumenDeMiEmpresa, type RolDePersona, type Yo } from "./tipos";
+import { ErrorDePlataforma, type AdminDePlataforma, type ClienteDelDueno, type EventoDelHistorial, type FichaDelCliente, type Invitacion, type PanelDelDueno, type Persona, type PlataformaDatos, type PlanYPagos, type ResumenDeMiEmpresa, type RolDePersona, type Yo } from "./tipos";
 
 // LA PLATAFORMA CONTRA EL EDIFICIO (maven-agencias, ezeigddgkaemxpshghmu).
 //
@@ -34,12 +34,16 @@ async function rpc<T>(c: ClienteDelEdificio, fn: string, args?: Record<string, u
 }
 
 async function edge<T>(c: ClienteDelEdificio, accion: string, body: Record<string, unknown>): Promise<T> {
-  // TODO(vagón 5): edge «plataforma» del edificio (crea cuentas, manda correos con Resend
-  // desde noreply@envios.maven-ai.me, Stripe). Hasta que exista, no se finge nada.
-  const { data, error } = await c.functions.invoke<{ ok: boolean; data?: T; error?: string }>("plataforma", { body: { accion, ...body } });
-  // Sin la edge (todavía no existe) o con un fallo de red: «no disponible», nunca un éxito falso.
+  // La edge «plataforma» del edificio (supabase/functions/plataforma): la cuenta del Dueño,
+  // su invitación y «Crear mi contraseña». Las acciones que todavía no tiene (agregar
+  // personas, Stripe…) contestan «accion_desconocida» → «no disponible», nunca un éxito falso.
+  const { data, error } = await c.functions.invoke<{ ok: boolean; data?: T; error?: string; detalle?: string }>("plataforma", { body: { accion, ...body } });
   if (error) throw new ErrorDePlataforma("no_disponible", accion);
-  if (!data?.ok) throw new Error(data?.error || "no_disponible");
+  if (!data?.ok) {
+    if (!data?.error || data.error === "accion_desconocida") throw new ErrorDePlataforma("no_disponible", accion);
+    // «faltan_pendientes: setup_sin_pagar, …»: la pantalla lee la clave y el detalle.
+    throw new Error(data.detalle && !data.detalle.startsWith(data.error) ? `${data.error}: ${data.detalle}` : data.detalle || data.error);
+  }
   return data.data as T;
 }
 
@@ -100,13 +104,36 @@ export function crearPlataformaSupabase(c: ClienteDelEdificio): PlataformaDatos 
     },
 
     async crearOrganizacion(n) {
-      const id = await rpc<string>(c, "crear_organizacion", {
-        _nombre: n.nombre, _tipo: "normal", _plan: n.plan, _marca: n.marca, _es_demo: n.es_demo,
+      // La edge crea la organización (con la sesión de quien llama: los candados son de la
+      // base) y la cuenta del Dueño, sin correo: el cliente nace en preparación. Si la cuenta
+      // del Dueño falla, el cliente queda creado y la ficha ofrece ponerlo otra vez.
+      const r = await edge<{ organizacion_id: string }>(c, "crear_cliente", {
+        nombre: n.nombre, idioma: n.idioma, es_demo: n.es_demo, dueno_nombre: n.dueno.nombre, dueno_correo: n.dueno.correo,
       });
-      // La cuenta del admin y su silla las arma la edge (no manda correo: el cliente nace en preparación).
-      await edge(c, "crear_admin_cliente", { organizacion_id: id, ...n.admin });
-      return id;
+      return r.organizacion_id;
     },
+
+    async fichaDe(org) {
+      // infra/edificio/migraciones/20261125120500_nuevo_cliente.sql
+      const [f, lideres] = await Promise.all([
+        rpc<Omit<FichaDelCliente, "dueno">>(c, "ficha_de_organizacion", { _org: org }),
+        rpc<{ user_id: string; nombre: string; correo: string; correo_madre: boolean; ultimo_ingreso: string | null }[]>(c, "lideres_de_organizacion", { _org: org }),
+      ]);
+      const d = lideres.find((l) => l.correo_madre) ?? null;
+      return {
+        ...f,
+        ficha: f.ficha ?? {},
+        faltan: f.faltan ?? [],
+        dueno: d ? { user_id: d.user_id, nombre: d.nombre, correo: d.correo, entro_at: d.ultimo_ingreso } : null,
+      };
+    },
+
+    async guardarFicha(org, cambios) { await rpc(c, "guardar_ficha", { _org: org, _cambios: cambios }); },
+    async ponerDueno(org, nombre, correo) { await edge(c, "poner_dueno", { organizacion_id: org, dueno_nombre: nombre, dueno_correo: correo }); },
+    async reenviarInvitacionDueno(org) { return edge<Invitacion>(c, "reenviar_invitacion", { organizacion_id: org }); },
+    async pausarOrganizacion(org, motivo) { await rpc(c, "pausar_organizacion", { _org: org, _motivo: motivo }); },
+    async reactivarOrganizacion(org) { await rpc(c, "reactivar_organizacion", { _org: org }); },
+    async extenderPrueba(org, dias) { await rpc(c, "extender_prueba", { _org: org, _dias: dias }); },
 
     async marcarComoDemo(org, esDemo) {
       // TODO(vagón 4): `marcar_demo(_org, _es_demo)` en el edificio (es_demo solo lo cambia la plataforma).
@@ -134,9 +161,8 @@ export function crearPlataformaSupabase(c: ClienteDelEdificio): PlataformaDatos 
     },
 
     async activarOrganizacion(org) {
-      await rpc(c, "activar_organizacion", { _org: org });
-      // Al activar, la edge manda la invitación del admin («Crear mi contraseña», 7 días).
-      return edge<{ invitado: string }>(c, "invitar_admin_cliente", { organizacion_id: org });
+      // Activar (candados de la base) + invitar al Dueño en un solo paso de la edge.
+      return edge<Invitacion>(c, "activar_e_invitar", { organizacion_id: org });
     },
 
     async recargarArgosManual(org, usd) {

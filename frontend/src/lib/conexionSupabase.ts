@@ -9,7 +9,7 @@
 // Va aparte de client.ts a propósito: muchas pruebas reemplazan client.ts entero, y este
 // módulo no crea ningún cliente (no cuesta nada importarlo).
 
-import { almacenDelNavegador, destinoPorEnlaceDeAcceso, elegirConexion, envDeLaApp, fijarDestinoDeEstaPestana, guardarDestino } from "@/lib/puerta";
+import { almacenDelNavegador, destinoPorEnlaceDeAcceso, destinoPorRuta, elegirConexion, envDeLaApp, fijarDestinoDeEstaPestana, guardarDestino } from "@/lib/puerta";
 
 const PROD_URL = "https://lsagslbkliprespbyhts.supabase.co";
 // Modern publishable key (sb_publishable_*). Replaced the legacy anon JWT
@@ -33,7 +33,7 @@ export const SUPABASE_KEY_KASH = isPlaceholder(rawKey) ? PROD_PUBLISHABLE_KEY : 
 // contra Kash. Con la puerta apagada no hace nada.
 if (typeof window !== "undefined") {
   const env = envDeLaApp();
-  if (destinoPorEnlaceDeAcceso(window.location.hash, env) === "edificio") {
+  if (destinoPorEnlaceDeAcceso(window.location.hash, env) === "edificio" || destinoPorRuta(window.location.pathname, env) === "edificio") {
     guardarDestino(almacenDelNavegador(), "edificio");
   }
 }

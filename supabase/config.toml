@@ -450,6 +450,13 @@ verify_jwt = false
 [functions.refrescar-externas]
 verify_jwt = false
 
+# La función «plataforma» del edificio (25/11/2026): crea la cuenta del Dueño de un
+# cliente nuevo, le manda la invitación y deja poner la contraseña («Crear mi
+# contraseña»). verify_jwt=false: el canje del enlace lo hace quien todavía no tiene
+# contraseña; lo demás revisa la sesión adentro (solo Maven).
+[functions.plataforma]
+verify_jwt = false
+
 # ESTA SÍ ES DE KASH, y es SOLO LECTURA (Alvaro, 19/11/2026, tanda 5): cuenta y
 # resume (personas, en vivo, nota de Argos, gasto, alertas) sin datos personales.
 # verify_jwt=false: la llama el edificio con la llave dedicada X-Kash-Resumen-Token.

@@ -145,6 +145,21 @@ export function destinoPorEnlaceDeAcceso(hash: string | null | undefined, env: E
   }
 }
 
+/** «Crear mi contraseña» (la invitación del Dueño de un cliente nuevo) vive SOLO en el
+ *  edificio: esa ruta arranca contra el edificio aunque el navegador nunca haya pasado por
+ *  el login. Con la puerta apagada: null (Kash, como siempre). */
+export const RUTA_CREAR_CONTRASENA = "/crear-contrasena";
+export function destinoPorRuta(pathname: string | null | undefined, env: EnvPuerta): Destino | null {
+  if (!configDelEdificio(env) || !pathname) return null;
+  return pathname.replace(/\/+$/, "") === RUTA_CREAR_CONTRASENA ? "edificio" : null;
+}
+
+/** El token del enlace («#t=…», 64 hex) o null. */
+export function tokenDelEnlace(hash: string | null | undefined): string | null {
+  const t = new URLSearchParams((hash ?? "").replace(/^#/, "")).get("t")?.trim().toLowerCase() ?? "";
+  return /^[0-9a-f]{64}$/.test(t) ? t : null;
+}
+
 /** A dónde va el login cuando no hay returnTo: Kash al tablero de siempre; el edificio a
  *  la casa de la plataforma (/plataforma reparte: clientes, /mi-empresa o /dashboard). */
 export function inicioTrasEntrar(destino: Destino): string {

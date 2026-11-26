@@ -1,4 +1,5 @@
 import { PLANES, RECARGA_RECIBES_USD, correoValido, planVisible } from "./planes";
+import { CLAVES_DE_DINERO, aplicarCambiosDeFicha, faltantesDe } from "./ficha";
 import {
   ErrorDePlataforma,
   type AdminDePlataforma,
@@ -6,6 +7,9 @@ import {
   type EstadoDeCobro,
   type EventoDelHistorial,
   type Factura,
+  type Ficha,
+  type FichaDelCliente,
+  type Invitacion,
   type NuevaPersona,
   type NuevoCliente,
   type OrganizacionBase,
@@ -60,7 +64,16 @@ interface OrgMock {
   historial: EventoDelHistorial[];
   /** Personas a la espera de su invitación hasta que se active. */
   invitacion_pendiente: string | null;
+  /** La ficha que Maven contesta al preparar el cliente (tanda 25/11). */
+  ficha: Ficha;
+  idioma: "es" | "en";
+  prueba_hasta: string | null;
 }
+
+const FICHA_COMPLETA: Ficha = {
+  montaje: "maven", pide_contrato: false, dias_prueba: 14, dias_gracia: 7, forma_cobro: "link",
+  setup_usd: 3000, setup_estado: "pagado", silla_extra_usd: 15,
+};
 
 const NOMBRES_NOVA = [
   "Laura Gómez", "Daniel Ortiz", "Camila Reyes", "Mateo Herrera", "Sofía Castro", "Andrés Molina",
@@ -138,6 +151,7 @@ function semilla(): { orgs: Map<string, OrgMock>; externas: OrganizacionExterna[
       { id: "h5", at: hace(DIA * 2), actor_nombre: "Laura Gómez", actor_tipo: "cliente", accion: "rol_cambiado", detalle: { nombre: "Camila Reyes", rol: "supervisor" } },
     ],
     invitacion_pendiente: null,
+    ficha: { ...FICHA_COMPLETA }, idioma: "es", prueba_hasta: null,
   };
 
   const atlas: OrgMock = {
@@ -166,12 +180,13 @@ function semilla(): { orgs: Map<string, OrgMock>; externas: OrganizacionExterna[
       { id: "a4", at: hace(DIA * 2), actor_nombre: null, actor_tipo: "sistema", accion: "cobro_fallido", detalle: { usd: 299 } },
     ],
     invitacion_pendiente: null,
+    ficha: { ...FICHA_COMPLETA }, idioma: "es", prueba_hasta: null,
   };
 
   const demo: OrgMock = {
     base: {
       id: "org-demo", nombre: "Cliente Demo", slug: "cliente-demo", tipo: "normal", estado: "preparacion", es_demo: true,
-      plan: { ...PLANES.equipo, dias_gratis: 30, sin_tarjeta: true, sin_setup: true },
+      plan: { ...PLANES.equipo },
       marca: { nombre: "Cliente Demo", logo_url: null, color: "#6b7280" },
     },
     admins: [{ user_id: "demo-1", principal: true }],
@@ -189,6 +204,9 @@ function semilla(): { orgs: Map<string, OrgMock>; externas: OrganizacionExterna[
       { id: "d1", at: hace(DIA), actor_nombre: "Alvaro Mejía", actor_tipo: "plataforma", accion: "cliente_creado", detalle: {} },
     ],
     invitacion_pendiente: "corp@asmtech.me",
+    // La demo ya tiene la ficha contestada (sin setup): lista para «Activar».
+    ficha: { montaje: "maven", pide_contrato: false, dias_prueba: 30, dias_gracia: 7, forma_cobro: "link", setup_usd: 0, silla_extra_usd: 15 },
+    idioma: "es", prueba_hasta: null,
   };
 
   for (const o of [nova, atlas, demo]) orgs.set(o.base.id, o);
@@ -284,11 +302,10 @@ export function crearPlataformaMock(opciones: { identidad?: () => TipoDeYo; late
     async crearOrganizacion(nuevo: NuevoCliente) {
       await espera(lat * 2);
       if (!esPlataforma()) throw new ErrorDePlataforma("sin_permiso");
-      // Como crear_organizacion: Grace solo pone el nombre del plan y las personas.
-      const { nombre: _n, personas: _p, ...conPrecio } = nuevo.plan;
-      if (!esDueno() && Object.keys(conPrecio).length > 0) throw new ErrorDePlataforma("solo_dueno");
-      if (!correoValido(nuevo.admin.correo)) throw new ErrorDePlataforma("correo_invalido");
+      // Como crear_cliente: lo básico; el plan y lo de dinero van en la ficha.
+      if (!correoValido(nuevo.dueno.correo)) throw new ErrorDePlataforma("correo_invalido");
       const nombre = nuevo.nombre.trim();
+      if (nombre.length < 2 || nuevo.dueno.nombre.trim().length < 2) throw new ErrorDePlataforma("nombre_invalido");
       if ([...estado.orgs.values()].some((o) => o.base.nombre.toLowerCase() === nombre.toLowerCase())) {
         throw new ErrorDePlataforma("ya_existe");
       }
@@ -297,23 +314,114 @@ export function crearPlataformaMock(opciones: { identidad?: () => TipoDeYo; late
       const o: OrgMock = {
         base: {
           id, nombre, slug: nombre.toLowerCase().replace(/[^a-z0-9]+/g, "-"), tipo: "normal", estado: "preparacion",
-          es_demo: nuevo.es_demo, plan: copia(nuevo.plan), marca: copia(nuevo.marca),
+          es_demo: nuevo.es_demo, plan: null, marca: { nombre },
         },
         admins: [{ user_id: adminId, principal: true }],
         personas: [{
-          user_id: adminId, nombre: nuevo.admin.nombre.trim(), correo: nuevo.admin.correo.trim().toLowerCase(), rol: "admin",
+          user_id: adminId, nombre: nuevo.dueno.nombre.trim(), correo: nuevo.dueno.correo.trim().toLowerCase(), rol: "admin",
           estado: "invitada", en_vivo: false, ultima_actividad: null, nota_argos: null, desde: new Date().toISOString(),
         }],
         argos: { saldo_usd: 0, pausado: true },
         cobro: {
           estado: "sin_cobro", proximo_cobro_at: null, proximo_monto_usd: null, tarjeta: null,
-          dias_prueba_restantes: nuevo.plan.dias_gratis ?? null, dias_gracia_restantes: null, facturas: [],
+          dias_prueba_restantes: null, dias_gracia_restantes: null, facturas: [],
         },
-        activada_at: null, admin_entro_at: null, historial: [], invitacion_pendiente: nuevo.admin.correo.trim().toLowerCase(),
+        activada_at: null, admin_entro_at: null, historial: [], invitacion_pendiente: nuevo.dueno.correo.trim().toLowerCase(),
+        ficha: {}, idioma: nuevo.idioma, prueba_hasta: null,
       };
       estado.orgs.set(id, o);
       anotar(o, "cliente_creado", { nombre });
       return id;
+    },
+
+    async fichaDe(id) {
+      await espera(lat);
+      if (!esPlataforma()) throw new ErrorDePlataforma("sin_permiso");
+      const o = org(id);
+      const principal = o.admins.find((a) => a.principal);
+      const d = principal ? o.personas.find((x) => x.user_id === principal.user_id) : null;
+      const faltan = faltantesDe({ tieneDueno: !!d, plan: o.base.plan, ficha: o.ficha });
+      const ficha: Ficha = copia(o.ficha);
+      if (!esDueno()) for (const k of CLAVES_DE_DINERO) delete ficha[k];
+      const r: FichaDelCliente = {
+        organizacion_id: id, nombre: o.base.nombre, estado: o.base.estado, idioma: o.idioma, es_demo: o.base.es_demo,
+        plan: planVisible(copia(o.base.plan), esDueno()), ficha, prueba_hasta: esDueno() ? o.prueba_hasta : null,
+        ve_dinero: esDueno(), faltan,
+        dueno: d ? { user_id: d.user_id, nombre: d.nombre, correo: d.correo, entro_at: o.admin_entro_at } : null,
+      };
+      return r;
+    },
+
+    async guardarFicha(id, cambios) {
+      await espera(lat);
+      if (!esPlataforma()) throw new ErrorDePlataforma("sin_permiso");
+      const dinero = Object.keys(cambios).some((k) => k === "precio_usd" || (CLAVES_DE_DINERO as readonly string[]).includes(k));
+      if (dinero && !esDueno()) throw new ErrorDePlataforma("solo_dueno");
+      const o = org(id);
+      const r = aplicarCambiosDeFicha(o.base.plan, o.ficha, cambios);
+      o.base.plan = r.plan as OrganizacionBase["plan"];
+      o.ficha = r.ficha;
+      anotar(o, "ficha_cambiada", { claves: Object.keys(cambios) });
+    },
+
+    async ponerDueno(id, nombre, correo) {
+      await espera(lat);
+      if (!esPlataforma()) throw new ErrorDePlataforma("sin_permiso");
+      if (!correoValido(correo)) throw new ErrorDePlataforma("correo_invalido");
+      const o = org(id);
+      if (o.base.estado !== "preparacion") throw new ErrorDePlataforma("estado_invalido");
+      const uid = nuevoId("u");
+      o.personas = o.personas.filter((p) => !o.admins.some((a) => a.principal && a.user_id === p.user_id));
+      o.admins = [{ user_id: uid, principal: true }];
+      o.personas.unshift({
+        user_id: uid, nombre: nombre.trim(), correo: correo.trim().toLowerCase(), rol: "admin", estado: "invitada",
+        en_vivo: false, ultima_actividad: null, nota_argos: null, desde: new Date().toISOString(),
+      });
+      o.invitacion_pendiente = correo.trim().toLowerCase();
+      anotar(o, "admin_agregado", { correo });
+    },
+
+    async reenviarInvitacionDueno(id) {
+      await espera(lat);
+      if (!esPlataforma()) throw new ErrorDePlataforma("sin_permiso");
+      const o = org(id);
+      if (o.base.estado === "preparacion") throw new ErrorDePlataforma("org_en_preparacion");
+      const principal = o.admins.find((a) => a.principal);
+      const correo = o.personas.find((x) => x.user_id === principal?.user_id)?.correo ?? null;
+      anotar(o, "invitacion_mandada", { correo });
+      const r: Invitacion = { invitado: correo, enlace: `${typeof location !== "undefined" ? location.origin : "https://app.maven-ai.me"}/crear-contrasena#t=${"0".repeat(64)}`, correo_enviado: false };
+      return r;
+    },
+
+    async pausarOrganizacion(id, motivo) {
+      await espera(lat);
+      if (!esPlataforma()) throw new ErrorDePlataforma("sin_permiso");
+      const o = org(id);
+      if (o.base.estado !== "activa") throw new ErrorDePlataforma("estado_invalido");
+      o.base.estado = "pausada";
+      o.ficha = { ...o.ficha, pausa: { motivo, at: new Date().toISOString() } };
+      anotar(o, "cliente_pausado", { motivo });
+    },
+
+    async reactivarOrganizacion(id) {
+      await espera(lat);
+      if (!esPlataforma()) throw new ErrorDePlataforma("sin_permiso");
+      const o = org(id);
+      if (o.base.estado !== "pausada") throw new ErrorDePlataforma("estado_invalido");
+      o.base.estado = "activa";
+      const { pausa: _p, ...resto } = o.ficha;
+      o.ficha = resto;
+      anotar(o, "cliente_reactivado");
+    },
+
+    async extenderPrueba(id, dias) {
+      await espera(lat);
+      if (!esDueno()) throw new ErrorDePlataforma("solo_dueno");
+      const o = org(id);
+      const desde = Math.max(Date.now(), o.prueba_hasta ? new Date(o.prueba_hasta).getTime() : 0);
+      o.prueba_hasta = new Date(desde + dias * DIA).toISOString();
+      o.cobro.estado = "prueba";
+      anotar(o, "prueba_extendida", { dias });
     },
 
     async marcarComoDemo(id, esDemo) {
@@ -347,7 +455,8 @@ export function crearPlataformaMock(opciones: { identidad?: () => TipoDeYo; late
       await espera(lat * 2);
       if (!esPlataforma()) throw new ErrorDePlataforma("sin_permiso");
       const o = org(id);
-      const faltan = [!o.admins.length && "lider", !(o.base.plan?.personas ?? 0) && "paquete"].filter(Boolean);
+      if (o.base.estado !== "preparacion") throw new ErrorDePlataforma("estado_invalido");
+      const faltan = faltantesDe({ tieneDueno: o.admins.some((a) => a.principal), plan: o.base.plan, ficha: o.ficha });
       if (faltan.length) throw new ErrorDePlataforma("faltan_pendientes", faltan.join(", "));
       o.base.estado = "activa";
       o.activada_at = new Date().toISOString();
@@ -356,12 +465,14 @@ export function crearPlataformaMock(opciones: { identidad?: () => TipoDeYo; late
         const credito = o.base.plan.nombre === "empresa" ? PLANES.empresa.argos_usd_mes : PLANES.equipo.argos_usd_mes;
         o.argos = { saldo_usd: credito, pausado: false };
       }
-      if (o.cobro.dias_prueba_restantes) o.cobro.estado = "prueba";
-      const invitado = o.invitacion_pendiente ?? "";
+      const dias = o.ficha.dias_prueba ?? 0;
+      if (dias > 0) { o.prueba_hasta = new Date(Date.now() + dias * DIA).toISOString(); o.cobro.estado = "prueba"; o.cobro.dias_prueba_restantes = dias; }
+      const invitado = o.invitacion_pendiente ?? null;
       o.invitacion_pendiente = null;
       anotar(o, "cliente_activado");
       if (invitado) anotar(o, "invitacion_mandada", { correo: invitado });
-      return { invitado };
+      const r: Invitacion = { invitado, enlace: `${typeof location !== "undefined" ? location.origin : "https://app.maven-ai.me"}/crear-contrasena#t=${"0".repeat(64)}`, correo_enviado: true };
+      return r;
     },
 
     async recargarArgosManual(id, usd) {

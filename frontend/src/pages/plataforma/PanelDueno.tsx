@@ -57,14 +57,14 @@ export default function PanelDueno() {
             <Presentation className="mr-1.5 h-4 w-4" />{p.mostrandoACliente ? t("plataforma.mostrar.dejar") : t("plataforma.mostrar.boton")}
           </Button>
           {!p.mostrandoACliente && !p.verComo && (
-            <Button onClick={() => setNuevoAbierto(true)} disabled={!p.escriturasListas} title={p.escriturasListas ? undefined : t("plataforma.disponibleCuando")}>
+            <Button onClick={() => setNuevoAbierto(true)} disabled={!p.clientesListos} title={p.clientesListos ? undefined : t("plataforma.disponibleCuando")}>
               <Plus className="mr-1.5 h-4 w-4" />{t("plataforma.dueno.nuevo")}
             </Button>
           )}
         </>}
       />
 
-      {!p.escriturasListas && !p.mostrandoACliente && (
+      {!p.clientesListos && !p.mostrandoACliente && (
         <p className="vidrio px-4 py-2.5 text-xs text-muted-foreground" data-disponible-cuando>{t("plataforma.disponibleCuando")}</p>
       )}
 
