@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { RolPorPosicion } from "./RolPorPosicion";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -16,10 +17,13 @@ interface EditUserModalProps {
   user: AdminUser | null;
   onConfirm: (data: { first_name: string; last_name: string; role?: string; ai_daily_quota_override: number | null }) => void;
   puedeAsignarRol: boolean;
+  /** El rol lo da la Posición: en vez del menú gris, «Asignar posición». */
+  porPosiciones?: boolean;
+  onAsignarPosicion?: () => void;
   isLoading: boolean;
 }
 
-const EditUserModal = ({ open, onOpenChange, user, onConfirm, isLoading, puedeAsignarRol }: EditUserModalProps) => {
+const EditUserModal = ({ open, onOpenChange, user, onConfirm, isLoading, puedeAsignarRol, porPosiciones = false, onAsignarPosicion }: EditUserModalProps) => {
   const { t } = useLanguage();
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
@@ -97,6 +101,7 @@ const EditUserModal = ({ open, onOpenChange, user, onConfirm, isLoading, puedeAs
 
           <div className="space-y-2">
             <Label htmlFor="edit-role">{t("common.role")}</Label>
+            {porPosiciones ? <RolPorPosicion onAsignar={onAsignarPosicion} /> : (
             <Select value={role} onValueChange={setRole} disabled={!puedeAsignarRol}>
               <SelectTrigger id="edit-role">
                 <SelectValue placeholder={t("admin.selectRole")} />
@@ -109,6 +114,7 @@ const EditUserModal = ({ open, onOpenChange, user, onConfirm, isLoading, puedeAs
                 ))}
               </SelectContent>
             </Select>
+            )}
           </div>
 
           <div className="space-y-2">

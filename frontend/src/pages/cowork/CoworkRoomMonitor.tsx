@@ -6,7 +6,7 @@ import { cn } from "@/lib/utils";
 import { Room, RoomEvent, Track } from "livekit-client";
 import { copiaSirve } from "@/lib/microDelSupervisor";
 import { nombreCorto } from "@/lib/pausaCowork";
-import { VideoOff, Loader2, Monitor, Video, Copy } from "lucide-react";
+import { VideoOff, Loader2, Monitor, Video, Copy, PictureInPicture2 } from "lucide-react";
 import { esOtraPestana } from "@/lib/sesionDuplicada";
 import { toast } from "sonner";
 import { useLanguage } from "@/hooks/useLanguage";
@@ -74,8 +74,9 @@ interface PartVideo {
 }
 
 // Adjunta un track de video remoto a un <video>.
-function VideoTile({ track }: { track: any }) {
+function VideoTile({ track, videoRef }: { track: any; videoRef?: React.MutableRefObject<HTMLVideoElement | null> }) {
   const ref = useRef<HTMLVideoElement>(null);
+  useEffect(() => { if (videoRef) videoRef.current = ref.current; });
   useEffect(() => {
     const el = ref.current;
     if (el && track) { try { track.attach(el); } catch { /* noop */ } }
@@ -92,14 +93,51 @@ function VideoTile({ track }: { track: any }) {
 // cámara; si comparte pantalla, el botón deja alternar. Si NO comparte, el botón va
 // deshabilitado. Solo se ADJUNTA (y por ende streamea) el track que se está viendo — el otro
 // queda pausado por adaptiveStream, así ver la pantalla no cuesta ancho de banda hasta pedirlo.
-function MonitorTile({ pv, viewingScreen, onSwap, showName = true, showSwap = true }: { pv: PartVideo; viewingScreen: boolean; onSwap: () => void; showName?: boolean; showSwap?: boolean }) {
+function MonitorTile({ pv, viewingScreen: viendoPantalla, onSwap, showName = true, showSwap = true }: { pv: PartVideo; viewingScreen: boolean; onSwap: () => void; showName?: boolean; showSwap?: boolean }) {
   const { t } = useLanguage();
   const canSwap = !!pv.screen;
+  // VER EN VENTANITA (Alvaro, 26/11/2026, video de Daniel Ospina): en Chrome, al
+  // pararse sobre el video salía el botón propio de Chrome para sacarlo a una
+  // ventanita encima de todo; en la app de escritorio no existe. Aquí: al pasar
+  // el mouse, «Ver en ventanita» saca la PANTALLA del chatter (sin sonido) a una
+  // sola ventanita flotante que queda encima de cualquier programa; abrir otra
+  // reemplaza la anterior. Mientras está afuera, el recuadro muestra la pantalla
+  // (es el mismo <video>: así LiveKit la sigue mandando).
+  const [enVentanita, setEnVentanita] = useState(false);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const viewingScreen = viendoPantalla || (enVentanita && !!pv.screen);
   const activeTrack = viewingScreen && pv.screen ? pv.screen : pv.camera;
+  const puedeVentanita = !!pv.screen && typeof document !== "undefined" && "pictureInPictureEnabled" in document && document.pictureInPictureEnabled;
+  useEffect(() => {
+    const v = videoRef.current;
+    if (!v) return;
+    const salio = () => setEnVentanita(false);
+    v.addEventListener("leavepictureinpicture", salio);
+    return () => v.removeEventListener("leavepictureinpicture", salio);
+  });
+  // Si deja de compartir, la ventanita se cierra sola.
+  useEffect(() => {
+    if (!pv.screen && enVentanita && document.pictureInPictureElement) void document.exitPictureInPicture().catch(() => {});
+  }, [pv.screen, enVentanita]);
+  const abrirVentanita = async () => {
+    setEnVentanita(true);
+    // Un tic para que el recuadro cambie a la pantalla y el <video> la tenga puesta.
+    await new Promise((r) => setTimeout(r, 150));
+    const v = videoRef.current;
+    if (!v) return;
+    try {
+      v.muted = true;
+      if (v.paused) await v.play().catch(() => {});
+      await v.requestPictureInPicture();
+    } catch {
+      setEnVentanita(false);
+      toast.error(t("cowork.monitor.ventanitaFallo"));
+    }
+  };
   return (
-    <div className="relative overflow-hidden rounded-lg bg-black min-h-0">
+    <div className="group relative overflow-hidden rounded-lg bg-black min-h-0">
       {activeTrack ? (
-        <VideoTile track={activeTrack} />
+        <VideoTile track={activeTrack} videoRef={videoRef} />
       ) : (
         <div className="flex flex-col items-center justify-center h-full gap-1 text-muted-foreground/50">
           <VideoOff className="h-4 w-4" />
@@ -126,6 +164,19 @@ function MonitorTile({ pv, viewingScreen, onSwap, showName = true, showSwap = tr
       >
         {viewingScreen ? <Video className="h-3.5 w-3.5 tactil:h-4 tactil:w-4" /> : <Monitor className="h-3.5 w-3.5 tactil:h-4 tactil:w-4" />}
       </button>}
+      {puedeVentanita && !enVentanita && (
+        <button
+          type="button"
+          onClick={() => { void abrirVentanita(); }}
+          title={t("cowork.monitor.verEnVentanita")}
+          aria-label={t("cowork.monitor.verEnVentanita")}
+          data-ver-en-ventanita
+          className="absolute right-2 top-2 z-10 flex items-center gap-1 rounded-md bg-black/60 px-2 py-1 text-[11px] font-medium text-white/90 opacity-0 backdrop-blur-sm transition-opacity hover:bg-black/80 focus-visible:opacity-100 group-hover:opacity-100"
+        >
+          <PictureInPicture2 className="h-3.5 w-3.5" aria-hidden />
+          {t("cowork.monitor.verEnVentanita")}
+        </button>
+      )}
       {showName && (pv.name || viewingScreen) && (
         // Nombre corto y letra apagada (diseño v5, Álvaro 26/10): la chapita
         // informa sin tapar el video ni gritar en blanco puro.

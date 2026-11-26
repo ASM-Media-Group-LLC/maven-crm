@@ -410,6 +410,8 @@ export const cowork = {
   "cowork.monitor.notSharing": { es: "No está compartiendo pantalla", en: "Not sharing their screen" },
   "cowork.monitor.viewCamera": { es: "Ver cámara", en: "View camera" },
   "cowork.monitor.viewScreen": { es: "Ver pantalla compartida", en: "View shared screen" },
+  "cowork.monitor.verEnVentanita": { es: "Ver en ventanita", en: "Pop out" },
+  "cowork.monitor.ventanitaFallo": { es: "No se pudo abrir la ventanita. Prueba otra vez.", en: "Couldn't open the pop-out window. Try again." },
   "cowork.monitor.screenSuffix": { es: "pantalla", en: "screen" },
   "cowork.monitor.screenShort": { es: "Pantalla", en: "Screen" },
   "cowork.monitor.previewUnavailable": { es: "Preview no disponible", en: "Preview unavailable" },

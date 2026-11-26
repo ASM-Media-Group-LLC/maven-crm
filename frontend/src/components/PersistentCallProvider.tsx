@@ -387,7 +387,7 @@ export function PersistentCallProvider({ children }: { children: React.ReactNode
       {config && enFlotante && (
         <div
           ref={setFloatEl}
-          className="fixed z-[150] rounded-2xl border border-border bg-card shadow-2xl overflow-hidden flex flex-col"
+          className="sin-arrastre fixed z-[150] rounded-2xl border border-border bg-card shadow-2xl overflow-hidden flex flex-col"
           style={{ left: pos.x, top: pos.y, width: anchoFlotante, height: altoFlotante }}
         >
           <div
@@ -515,7 +515,7 @@ export function PersistentCallProvider({ children }: { children: React.ReactNode
             setConfig((c) => (c ? { ...c, incomingAudioMuted: next } : c));
             config.onIncomingAudioMutedChange?.(next);
           }}
-          className={`fixed top-2 left-2 z-[200] h-8 w-8 rounded-full flex items-center justify-center bg-black/55 backdrop-blur-sm transition-colors ${config.incomingAudioMuted ? "text-warning hover:text-warning/80" : "text-white/80 hover:text-white"}`}
+          className={`sin-arrastre fixed top-2 left-2 z-[200] h-8 w-8 rounded-full flex items-center justify-center bg-black/55 backdrop-blur-sm transition-colors ${config.incomingAudioMuted ? "text-warning hover:text-warning/80" : "text-white/80 hover:text-white"}`}
         >
           {config.incomingAudioMuted ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
         </button>,
