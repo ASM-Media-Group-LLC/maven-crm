@@ -8,6 +8,7 @@
 
 ## Stack y deploy
 
+- 2026-11-26: Posiciones con jerarquía (decisiones de Alvaro): nadie cambia la posición que ocupa; solo el Dueño da «Admin»; nadie asigna una posición de mando que él tiene (HR solo asigna las de abajo). Triggers en `20261126203000_posiciones_candados_jerarquia.sql` (PENDIENTE aplicar en Kash con OK). En Usuarios, el menú gris de rol pasa a «Asignar posición».
 - 2026-11-26: el cuadro «NAS caído» ya se cierra con la X (cada persona el suyo, no vuelve en esa misma caída); la franja roja de arriba se queda mientras siga caído.
 - 2026-11-26: Hub de supervisores: ahora se ven las pantallas ENTRE supervisores (antes solo admins; a los demás les salía un recuadro negro que se quitaba solo). La pastilla propia dice «Estás compartiendo tu pantalla». Ojo ancho de banda si comparten muchos a la vez.
 - 2026-11-26: baño = 10 min EN TOTAL por turno. La pantalla de la persona restaba dos veces lo ya usado (el servidor ya manda lo que queda): Breiner con 7:49 usados veía −5:43 y «Excediste» al entrar. Corregido en CoworkParticipantView (el tablero del supervisor ya estaba bien).
