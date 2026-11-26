@@ -94,7 +94,6 @@ export function EditorAccesosPersona({ persona, posiciones, asignadas, revision,
           <span className="text-xs text-muted-foreground">{t("posiciones.encendido.ayuda")}</span>
         </div>}
         {conflicto && <p role="alert" className="rounded-control border border-warning p-3 text-sm">{t("posiciones.personas.editor.conflicto")}</p>}
-        {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
         {revisando ? <>
           <div className="grid gap-3 rounded-control border border-border p-4 text-sm sm:grid-cols-2">
             <div><p className="font-medium">{t("posiciones.personas.editor.antes")}</p><p>{nombres(base.asignadas)}</p></div>
