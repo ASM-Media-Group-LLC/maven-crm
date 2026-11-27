@@ -442,7 +442,7 @@ export function TurnoTabla() {
           type="button"
           onClick={() => setAbiertoId(abierta ? null : f.userId)}
           aria-expanded={abierta}
-          className="group grid w-full grid-cols-[1fr_auto] items-center gap-x-4 gap-y-2 rounded-2xl px-3 py-3.5 text-left transition hover:bg-foreground/[0.04] md:grid-cols-[minmax(11rem,15rem)_1fr_12rem_1rem]"
+          className="group grid w-full grid-cols-[1fr_auto] items-center gap-x-4 gap-y-2 rounded-2xl px-3 py-3.5 text-left transition hover:bg-foreground/[0.04] md:grid-cols-[minmax(11rem,15rem)_1fr_auto_1rem]"
         >
           <div className="flex min-w-0 items-center gap-2.5">
             <span className="relative shrink-0">
@@ -457,32 +457,25 @@ export function TurnoTabla() {
             </div>
           </div>
           <div className="col-span-2 row-start-2 md:col-span-1 md:row-start-auto">{f.llegada != null && <Franja f={f} t={t} ahora={q.data?.calculadoAt ?? Date.now()} />}</div>
-          <div className="text-right md:row-start-auto">
-            {f.llegada != null ? (
-              <>
-                {(filtro === "mejores" || filtro === "peores") && parte(f) != null ? (
-                  <>
-                    <p className="font-display text-lg font-bold tabular-nums leading-none">{Math.round(parte(f)! * 100)} %</p>
-                    <p className="mt-1 text-[11px] tabular-nums text-muted-foreground">
-                      {t("hr.turno.deSuTurno", { a: duracion(t, minutosTrabajados(f)), b: minutosTurno(f) != null ? duracion(t, minutosTurno(f)!) : "—" })}
-                    </p>
-                  </>
-                ) : f.enCurso && marcha(f) ? (
-                  <AvanceTexto {...marcha(f)!} t={t} />
-                ) : (
-                  <>
-                    <p className="text-sm tabular-nums text-foreground/90">
-                      {t("hr.turno.deHoras", { a: duracion(t, minutosTrabajados(f)), b: minutosTurno(f) != null ? duracion(t, minutosTurno(f)!) : "—" })}
-                    </p>
-                    <p className="text-[11px] tabular-nums text-muted-foreground">{t("hr.turno.llego", { h: ll.arriba })}</p>
-                  </>
-                )}
-              </>
-            ) : f.noVino && f.entrada ? (
-              <p className="text-[12px] text-muted-foreground">{t("hr.turno.debiaEntrar", { h: a12(f.entrada) ?? "" })}</p>
-            ) : (
-              <p className="text-sm text-muted-foreground">{ll.arriba || "—"}</p>
-            )}
+          {/* UNA PASTILLA CLARA (Alvaro, 27/11/2026): lo importante y nada más; las horas
+              exactas van adentro. */}
+          <div className="flex justify-end md:row-start-auto">
+            {(() => {
+              const m = f.enCurso && f.llegada != null ? marcha(f) : null;
+              const pct = parte(f);
+              const [punto, texto] = (filtro === "mejores" || filtro === "peores") && pct != null
+                ? [COLOR_FRANJA.trabajo, t("hr.turno.pill.pct", { n: Math.round(pct * 100) })]
+                : m ? [colorAvance(m.falta), m.falta > 5 ? t("hr.turno.atras", { d: duracion(t, m.falta) }) : t("hr.turno.alDia")]
+                : f.llegada != null ? [null, t("hr.turno.pill.trabajo", { a: duracion(t, minutosTrabajados(f)), b: minutosTurno(f) != null ? duracion(t, minutosTurno(f)!) : "—" })]
+                : f.noVino && f.entrada ? [null, t("hr.turno.debiaEntrar", { h: a12(f.entrada) ?? "" })]
+                : [null, ll.arriba || "—"];
+              return (
+                <span className="inline-flex items-center gap-2 whitespace-nowrap rounded-full border border-border/50 bg-foreground/[0.04] px-3 py-1.5 text-xs font-medium tabular-nums text-foreground/85">
+                  {punto && <span className={`h-2 w-2 rounded-full ${punto}`} aria-hidden />}
+                  {texto}
+                </span>
+              );
+            })()}
           </div>
           <ChevronDown className={`hidden h-4 w-4 text-muted-foreground transition md:block ${abierta ? "rotate-180" : ""}`} />
         </button>
@@ -499,41 +492,27 @@ export function TurnoTabla() {
           </div>
         )}
         {abierta && f.llegada != null && (
+          // LISTA SIMPLE (Alvaro, 27/11/2026): sin cajas, un renglón por dato.
           <div className="flex flex-col gap-4 px-3 pb-5 md:pl-14">
-            {/* Lo principal arriba y en grande (27/11/2026): el % de su turno, una barra
-                y tres datos cortos. Sin frases largas. */}
-            {minutosTurno(f) != null && (
-              <div className="flex flex-col gap-3 rounded-2xl border border-border/40 bg-card/30 p-4 sm:flex-row sm:items-center sm:gap-6">
-                {/* Hoy: UNA barra, la del avance (lleva contra lo que debería llevar); en
-                    un día cerrado, la del turno completo (Alvaro, 27/11/2026). */}
-                {(() => {
-                  const m = f.enCurso ? marcha(f) : null;
-                  const pct = m ? (m.deberia > 0 ? Math.min(1, m.lleva / m.deberia) : 1) : Math.min(1, parte(f) ?? 0);
-                  return (
-                    <>
-                      <div className="flex items-baseline gap-2 sm:w-44 sm:shrink-0">
-                        <span className="font-display text-[2.5rem] font-bold tabular-nums leading-none tracking-tight">{Math.round(pct * 100)}%</span>
-                        <span className="text-sm leading-tight text-muted-foreground">{t(m ? "hr.turno.pctDeLoQueVa" : "hr.turno.pctDeSuTurno")}</span>
-                      </div>
-                      <div className="flex min-w-0 flex-1 flex-col gap-2.5">
-                        <div className={PISTA}>
-                          <div className={`h-full rounded-full ${m ? colorAvance(m.falta) : COLOR_FRANJA.trabajo}`} style={{ width: `${pct * 100}%` }} />
-                        </div>
-                  <div className="flex flex-wrap gap-1.5 text-xs">
-                    <span className="rounded-full bg-foreground/[0.06] px-2.5 py-1 tabular-nums">{m ? t("hr.turno.llevaDe", { a: duracion(t, m.lleva), b: duracion(t, m.deberia) }) : t("hr.turno.chip.trabajo", { a: duracion(t, minutosTrabajados(f)), b: duracion(t, minutosTurno(f)!) })}</span>
-                    <span className="rounded-full bg-foreground/[0.06] px-2.5 py-1 tabular-nums">{t("hr.turno.chip.camara", { c: duracion(t, f.activoMin) })}</span>
-                    <span className="rounded-full bg-foreground/[0.06] px-2.5 py-1 tabular-nums">{t("hr.turno.chip.gracia", { g: duracion(t, Math.min(f.sinCamPantMin, f.graciaMin ?? 10)) })}</span>
-                    {m && (
-                      <span className="flex items-center gap-1.5 rounded-full bg-foreground/[0.06] px-2.5 py-1 font-medium tabular-nums"><span className={`h-1.5 w-1.5 rounded-full ${colorAvance(m.falta)}`} aria-hidden />{m.falta > 5 ? t("hr.turno.atras", { d: duracion(t, m.falta) }) : t("hr.turno.alDia")}</span>
-                    )}
+            <div className="divide-y divide-border/40 rounded-2xl border border-border/40 bg-card/30">
+              {(() => {
+                const m = f.enCurso ? marcha(f) : null;
+                const pct = m ? (m.deberia > 0 ? Math.min(1, m.lleva / m.deberia) : 1) : Math.min(1, parte(f) ?? 0);
+                return (
+                  <div className="flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3.5">
+                    <span className="w-40 shrink-0 text-sm text-muted-foreground">{t(m ? "hr.turno.lista.avanceHoy" : "hr.turno.lista.turno")}</span>
+                    <div className={`${PISTA} min-w-[8rem] flex-1`}>
+                      <div className={`h-full rounded-full ${m ? colorAvance(m.falta) : COLOR_FRANJA.trabajo}`} style={{ width: `${pct * 100}%` }} />
+                    </div>
+                    <span className="text-sm font-semibold tabular-nums">{Math.round(pct * 100)} %</span>
+                    <span className="text-sm tabular-nums text-muted-foreground">
+                      {m
+                        ? `${t("hr.turno.llevaDe", { a: duracion(t, m.lleva), b: duracion(t, m.deberia) })} · ${m.falta > 5 ? t("hr.turno.atras", { d: duracion(t, m.falta) }) : t("hr.turno.alDia")}`
+                        : t("hr.turno.chip.trabajo", { a: duracion(t, minutosTrabajados(f)), b: minutosTurno(f) != null ? duracion(t, minutosTurno(f)!) : "—" })}
+                    </span>
                   </div>
-                </div>
-                    </>
-                  );
-                })()}
-              </div>
-            )}
-            <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-5">
+                );
+              })()}
               {([
                 [Clock, t("hr.turno.col.llegada"), ll],
                 [UtensilsCrossed, t("hr.turno.col.comida"), celdaComida(t, f)],
@@ -541,11 +520,14 @@ export function TurnoTabla() {
                 [Bell, t("hr.turno.col.avisos"), celdaAvisos(t, f)],
                 [Wifi, t("hr.turno.col.conexion"), celdaConexion(t, f)],
               ] as Array<[typeof Clock, string, ReturnType<typeof celdaLlegada>]>).map(([Icono, etq, x]) => (
-                <div key={etq} className="flex h-full min-w-0 flex-col rounded-2xl border border-border/40 bg-card/20 p-3.5">
-                  <p className="mb-2 flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
-                    <Icono className="h-3.5 w-3.5" />{etq}
-                  </p>
-                  <Celda arriba={x.arriba || "—"} abajo={x.abajo} nivel={x.nivel} tenue={x.tenue} completo />
+                <div key={etq} className="flex flex-wrap items-center gap-x-4 gap-y-1 px-4 py-3">
+                  <span className="flex w-40 shrink-0 items-center gap-2 text-sm text-muted-foreground"><Icono className="h-4 w-4" />{etq}</span>
+                  <span className={`text-sm font-medium tabular-nums ${x.tenue ? "text-muted-foreground" : "text-foreground"}`}>{x.arriba || "—"}</span>
+                  {x.abajo && (
+                    <span className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                      <Punto nivel={x.nivel} />{x.abajo}
+                    </span>
+                  )}
                 </div>
               ))}
             </div>
