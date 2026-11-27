@@ -192,7 +192,7 @@ function celdaConexion(t: Tr, f: FilaTurno): { arriba: string; abajo: string; ni
 // Los colores son los de Maven: trabajo en gris claro, comida y baño en el color
 // principal, sin cámara o pantalla en ámbar y los cortes de internet en rojo.
 const COLOR_FRANJA: Record<TipoFranja, string> = {
-  trabajo: "bg-foreground/30",
+  trabajo: "bg-success/70",
   comida: "bg-[hsl(var(--chart-1))]",
   bano: "bg-[hsl(var(--chart-5))]",
   pausa: "bg-muted-foreground/25",
@@ -205,7 +205,7 @@ const ORDEN_LEYENDA: Array<[TipoFranja, TranslationKey]> = [
   ["sin_camara", "hr.turno.franja.sinCamara"], ["corte", "hr.turno.franja.corte"],
 ];
 
-function Franja({ f, t }: { f: FilaTurno; t: Tr }) {
+function Franja({ f, t, ahora }: { f: FilaTurno; t: Tr; ahora: number }) {
   const tramos = f.franja;
   if (!tramos.length && f.turnoInicio == null) return null;
   const desde = Math.min(f.turnoInicio ?? Infinity, ...tramos.map((x) => x.inicio));
@@ -227,6 +227,13 @@ function Franja({ f, t }: { f: FilaTurno; t: Tr }) {
         {f.marcasAviso.map((at, i) => (
           <div key={`a${i}`} className="absolute inset-y-0 w-0.5 bg-destructive" style={{ left: pos(at) }} />
         ))}
+        {/* Lo que falta del turno, más tenue, y la marca de «ahora» (27/11/2026). */}
+        {f.enCurso && ahora < hasta && (
+          <>
+            <div className="absolute inset-y-0 right-0 bg-background/40" style={{ left: pos(ahora) }} />
+            <div className="absolute -inset-y-0.5 w-0.5 rounded-full bg-foreground" style={{ left: pos(ahora) }} />
+          </>
+        )}
       </div>
       <div className="mt-0.5 flex justify-between text-[10px] tabular-nums text-muted-foreground/70">
         <span>{hora(desde)}</span>
@@ -297,6 +304,16 @@ export function TurnoTabla() {
             : f.ignorados > 0;
   /** Qué parte de su turno trabajó (0–1), o null si no hay turno. */
   const parte = (f: FilaTurno) => { const m = minutosTurno(f); return m ? minutosTrabajados(f) / m : null; };
+  /** Cómo va hoy (Alvaro, 27/11/2026: «debería llevar 2 y solo lleva 1 h 46»): lo que
+   *  ya pasó del turno sin contar su comida y baño permitidos, lo que lleva de verdad,
+   *  cuánto va atrás y cuántos problemas tuvo (avisos de Argos y cortes de internet). */
+  const marcha = (f: FilaTurno) => {
+    if (f.turnoInicio == null || !q.data) return null;
+    const pasados = Math.max(0, Math.round((Math.min(q.data.calculadoAt, f.turnoFin ?? q.data.calculadoAt) - f.turnoInicio) / 60_000));
+    const deberia = Math.max(0, pasados - Math.min(f.comidaMin, f.comidaTope) - Math.min(f.banoMin, f.banoTope));
+    const lleva = minutosTrabajados(f);
+    return { deberia, lleva, falta: Math.max(0, deberia - lleva), problemas: f.avisos + f.cortes };
+  };
   const texto = buscar.trim().toLocaleLowerCase();
   const vistas = useMemo(
     () => {
@@ -363,7 +380,7 @@ export function TurnoTabla() {
           type="button"
           onClick={() => setAbiertoId(abierta ? null : f.userId)}
           aria-expanded={abierta}
-          className="group grid w-full grid-cols-[1fr_auto] items-center gap-x-4 gap-y-2 rounded-2xl px-3 py-3.5 text-left transition hover:bg-foreground/[0.04] md:grid-cols-[minmax(11rem,15rem)_1fr_9rem_1rem]"
+          className="group grid w-full grid-cols-[1fr_auto] items-center gap-x-4 gap-y-2 rounded-2xl px-3 py-3.5 text-left transition hover:bg-foreground/[0.04] md:grid-cols-[minmax(11rem,15rem)_1fr_10.5rem_1rem]"
         >
           <div className="flex min-w-0 items-center gap-2.5">
             <span className="relative shrink-0">
@@ -377,7 +394,7 @@ export function TurnoTabla() {
               <p className="truncate text-[11px] text-muted-foreground">{motivo ?? horario}</p>
             </div>
           </div>
-          <div className="col-span-2 row-start-2 md:col-span-1 md:row-start-auto">{f.llegada != null && <Franja f={f} t={t} />}</div>
+          <div className="col-span-2 row-start-2 md:col-span-1 md:row-start-auto">{f.llegada != null && <Franja f={f} t={t} ahora={q.data?.calculadoAt ?? Date.now()} />}</div>
           <div className="text-right md:row-start-auto">
             {f.llegada != null ? (
               <>
@@ -386,6 +403,18 @@ export function TurnoTabla() {
                     <p className="font-display text-lg font-bold tabular-nums leading-none">{Math.round(parte(f)! * 100)} %</p>
                     <p className="mt-1 text-[11px] tabular-nums text-muted-foreground">
                       {t("hr.turno.deSuTurno", { a: duracion(t, minutosTrabajados(f)), b: minutosTurno(f) != null ? duracion(t, minutosTurno(f)!) : "—" })}
+                    </p>
+                  </>
+                ) : f.enCurso && marcha(f) ? (
+                  <>
+                    <p className="text-sm tabular-nums text-foreground/90">
+                      {t("hr.turno.lleva", { a: duracion(t, marcha(f)!.lleva), b: duracion(t, marcha(f)!.deberia) })}
+                    </p>
+                    <p className={`text-[11px] tabular-nums ${marcha(f)!.falta > 15 ? "text-warning" : "text-muted-foreground"}`}>
+                      {[
+                        marcha(f)!.falta > 5 ? t("hr.turno.atras", { d: duracion(t, marcha(f)!.falta) }) : t("hr.turno.alDia"),
+                        marcha(f)!.problemas > 0 ? t(marcha(f)!.problemas === 1 ? "hr.turno.problema1" : "hr.turno.problemas", { n: marcha(f)!.problemas }) : null,
+                      ].filter(Boolean).join(" · ")}
                     </p>
                   </>
                 ) : (
@@ -471,9 +500,12 @@ export function TurnoTabla() {
   return (
     <section className="vidrio sube p-4 lg:p-5">
       <div className="v-cont flex flex-col gap-4">
+        {/* LA CABECERA, UNA SOLA PIEZA (Alvaro, 27/11/2026): título y fechas, los
+            números del día y las vistas, dentro del mismo marco. */}
+        <div className="overflow-hidden rounded-3xl border border-border/50 bg-card/25">
         {/* ENCABEZADO (Alvaro, 27/11/2026: «que quede bien estético»): el título a la
             izquierda y las fechas en un solo bloque a la derecha (semana + calendario). */}
-        <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+        <div className="flex flex-col gap-3 p-4 xl:flex-row xl:items-center xl:justify-between">
           <div className="flex min-w-0 items-center gap-3">
             <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-border/70 bg-foreground/[0.04] text-foreground/75">
               <ClipboardList className="h-[18px] w-[18px]" />
@@ -545,20 +577,10 @@ export function TurnoTabla() {
           </div>
         </div>
 
-        {q.isLoading ? (
-          <div className="flex items-center justify-center py-16"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
-        ) : q.isError ? (
-          <div role="alert" className="flex flex-wrap items-center gap-3 rounded-2xl border border-destructive/30 bg-destructive/5 p-4 text-sm">
-            <AlertTriangle className="h-4 w-4 shrink-0 text-destructive" />
-            <span className="min-w-0 flex-1">{t("hr.turno.fallo")}</span>
-            <Button variant="outline" size="sm" onClick={() => void q.refetch()}><RefreshCw className="mr-1.5 h-3.5 w-3.5" />{t("hr.donde.reintentar")}</Button>
-          </div>
-        ) : !filas.length ? (
-          <p className="rounded-2xl border border-dashed border-border/50 p-6 text-center text-sm text-muted-foreground">{t("hr.turno.vacio")}</p>
-        ) : (
-          <>
+          {!q.isLoading && !q.isError && filas.length > 0 && (
+            <>
             {/* LOS NÚMEROS DEL DÍA: cada tarjeta filtra la tabla. */}
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
+            <div className="grid grid-cols-2 border-t border-border/40 sm:grid-cols-5 sm:divide-x sm:divide-border/40">
               {([
                 ["trabajaron", `${numeros.vinieron}/${numeros.tocaban}`, "hr.turno.num.vinieron", null],
                 ["tarde", String(numeros.tarde), "hr.turno.num.tarde", numeros.tarde ? "ambar" : null],
@@ -573,7 +595,7 @@ export function TurnoTabla() {
                   disabled={!k}
                   onClick={() => k && setFiltro(filtro === k ? "todos" : k)}
                   aria-pressed={k ? filtro === k : undefined}
-                  className={`flex min-h-[5.5rem] flex-col justify-between rounded-2xl border p-3.5 text-left transition disabled:cursor-default ${k && filtro === k ? "border-primary/60 bg-primary/10" : "border-border/50 bg-card/30 hover:enabled:bg-foreground/[0.04]"}`}
+                  className={`flex min-h-[5.5rem] flex-col justify-between px-4 py-3.5 text-left transition disabled:cursor-default ${k && filtro === k ? "bg-primary/10" : "hover:enabled:bg-foreground/[0.04]"}`}
                 >
                   <p className="flex items-center gap-1.5 font-display text-2xl font-bold tabular-nums leading-none">
                     {valor}{nivel && <Punto nivel={nivel} />}
@@ -589,7 +611,7 @@ export function TurnoTabla() {
 
             {/* VISTAS, TURNO Y BUSCADOR: todo del mismo alto (h-10) y sin barra de
                 scroll; en ventanas angostas las vistas se reparten parejas. */}
-            <div className="grid gap-2 2xl:grid-cols-[minmax(0,1fr)_11rem_14rem] 2xl:items-center">
+            <div className="grid gap-2 border-t border-border/40 p-3 2xl:grid-cols-[minmax(0,1fr)_11rem_14rem] 2xl:items-center">
               <div className="grid grid-cols-3 gap-1 rounded-2xl border border-border/50 bg-background/40 p-1 sm:flex">
                 {VISTAS.filter(([k]) => k !== "activos" || esHoy).map(([k, etq]) => (
                   <button
@@ -634,6 +656,22 @@ export function TurnoTabla() {
               </div>
             </div>
 
+            </>
+          )}
+        </div>
+
+        {q.isLoading ? (
+          <div className="flex items-center justify-center py-16"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
+        ) : q.isError ? (
+          <div role="alert" className="flex flex-wrap items-center gap-3 rounded-2xl border border-destructive/30 bg-destructive/5 p-4 text-sm">
+            <AlertTriangle className="h-4 w-4 shrink-0 text-destructive" />
+            <span className="min-w-0 flex-1">{t("hr.turno.fallo")}</span>
+            <Button variant="outline" size="sm" onClick={() => void q.refetch()}><RefreshCw className="mr-1.5 h-3.5 w-3.5" />{t("hr.donde.reintentar")}</Button>
+          </div>
+        ) : !filas.length ? (
+          <p className="rounded-2xl border border-dashed border-border/50 p-6 text-center text-sm text-muted-foreground">{t("hr.turno.vacio")}</p>
+        ) : (
+          <>
             {/* LA TABLA */}
             <div className="flex flex-col gap-1">
               <div className="flex flex-wrap items-center gap-x-3 gap-y-1 px-1 text-[10px] text-muted-foreground md:px-3">
