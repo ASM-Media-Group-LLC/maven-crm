@@ -493,11 +493,12 @@ export function TurnoTabla() {
   // cambia el filtro, se respeta.
   const [turnoElegido, setTurnoElegido] = useState(false);
   useEffect(() => {
-    if (turnoElegido || !esHoy || turno != null) return;
+    // Espera a saber la lista de la empresa (si no, elegiría «pm» y luego no casa con sus turnos).
+    if (turnoElegido || !esHoy || turno != null || turnosEmp.isLoading) return;
     const ahora = new Date().toLocaleTimeString("en-GB", { timeZone: "America/Bogota", hour: "2-digit", minute: "2-digit", hour12: false });
     const actual = catalogo.length ? catalogo.find((x) => horaEnTurno(ahora, x))?.id : jornadaDe(ahora);
     if (actual) { setTurno(actual); setTurnoElegido(true); }
-  }, [catalogo, esHoy, turno, turnoElegido]);
+  }, [catalogo, esHoy, turno, turnoElegido, turnosEmp.isLoading]);
   /** Los grupos por turno, en el orden de la empresa (y «sin turno» al final). */
   const gruposTurno = useMemo(() => {
     const orden: Array<[string | null, string, string | null]> = [
