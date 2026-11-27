@@ -974,6 +974,7 @@ function ExpedientePermitido() {
   const c = dia.nota.banda ? TONO[dia.nota.banda] : null;
   // Diseño pulido (solo dueño con su link): casillas neutras, números en blanco.
   const pulido = useDisenoPulido();
+  const conVivo = !!userId && canFunction("N:argos.presencia", true) && !cargando && !error && esHoy;
 
   // % DE ATENCIÓN DEL DÍA (estilo Hubstaff): de los pantallazos que la IA ya
   // juzgó este día, qué porción estaba en lo suyo. Sin juzgados → "—" (no 0).
@@ -1087,7 +1088,9 @@ function ExpedientePermitido() {
           // CABECERA CLARA (Alvaro, 27/11/2026: «más estética, que se entienda»): la
           // nota grande a la izquierda y seis casillas parejas, cada una con una
           // línea que dice qué significa su número.
-          <div className="mt-4 grid gap-3 lg:grid-cols-[13rem_1fr]">
+          <div className={`mt-4 grid gap-4 ${conVivo ? "lg:grid-cols-[minmax(0,1.5fr)_minmax(17rem,1fr)]" : ""}`}>
+          {conVivo && userId && <AhoraEnVivo userId={userId} capturas={dia.capturas} junto />}
+          <div className={`grid gap-3 ${conVivo ? "content-start" : "lg:grid-cols-[13rem_1fr]"}`}>
             <div className="flex flex-col justify-center rounded-2xl border border-border/60 bg-card/30 p-4">
               <p className="text-xs font-medium text-muted-foreground">{t("hr.exp.nota")}</p>
               <p className="mt-1 flex items-baseline gap-1.5">
@@ -1101,7 +1104,7 @@ function ExpedientePermitido() {
                 </p>
               )}
             </div>
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+            <div className={`grid grid-cols-2 gap-3 ${conVivo ? "" : "sm:grid-cols-3"}`}>
             {(() => {
               const debia = expediente?.horario.entrada?.slice(0, 5) ?? null;
               const entro = dia.entroAt ? new Date(dia.entroAt).toLocaleTimeString("es-CO", { timeZone: "America/Bogota", hour: "2-digit", minute: "2-digit", hour12: false }) : null;
@@ -1130,6 +1133,7 @@ function ExpedientePermitido() {
               ));
             })()}
             </div>
+          </div>
           </div>
           ) : (
           <div className="mt-4 grid grid-cols-3 gap-2 sm:grid-cols-5">
@@ -1161,7 +1165,7 @@ function ExpedientePermitido() {
 
       {/* AHORA MISMO, EN VIVO (Alvaro, 18/11/2026: «dice live: la idea es que esté
           live»): su pantalla y su cámara en video, no en pantallazos. Solo hoy. */}
-      {userId && canFunction("N:argos.presencia", true) && !cargando && !error && esHoy && <AhoraEnVivo userId={userId} capturas={dia.capturas} />}
+      {/* El en vivo va ahora DENTRO de la cabecera, junto a los números (27/11/2026). */}
 
       {/* LAS PESTAÑAS (27/11/2026): Resumen · Fotos por hora · Lo que hizo · Apps y equipo. */}
       <div className="mt-5 grid grid-cols-2 gap-1 rounded-2xl border border-border/50 bg-background/40 p-1 sm:grid-cols-3 lg:flex">
