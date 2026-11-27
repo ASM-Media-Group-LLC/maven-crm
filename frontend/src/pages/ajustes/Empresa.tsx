@@ -6,6 +6,7 @@ import { useLanguage } from "@/hooks/useLanguage";
 import { usePuedoConfigurarEmpresa } from "@/hooks/usePausas";
 import { ModalidadesPausa } from "@/components/horarios/ModalidadesPausa";
 import { CamaraPantallaPorPuesto } from "@/components/ajustes/CamaraPantallaPorPuesto";
+import { DriveEspacioPorPuesto } from "@/components/ajustes/DriveEspacioPorPuesto";
 
 // AJUSTES → EMPRESA (Alvaro, 19/11/2026): lo que es de toda la empresa y no de
 // un puesto vive aquí, para que cualquier empresa que use Maven se configure
@@ -26,7 +27,11 @@ export default function Empresa() {
         {puede.isLoading ? (
           <div className="flex justify-center p-10"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
         ) : puede.data ? (
-          <ModalidadesPausa />
+          <>
+            <ModalidadesPausa />
+            {/* El espacio del Drive de cada puesto (27/11/2026). */}
+            <DriveEspacioPorPuesto />
+          </>
         ) : (
           <div className="vidrio flex flex-col gap-2 p-6 text-sm text-muted-foreground">
             <p>{t("settings.empresa.sinPermiso")}</p>
