@@ -122,6 +122,8 @@ export interface FilaTurno {
   enCurso: boolean;
   /** ¿Aún no empieza (hoy)? */
   empiezaLuego: boolean;
+  /** ¿Está trabajando en este momento (con cámara y pantalla en Cowork)? */
+  activoAhora: boolean;
 
   llegada: number | null;
   /** ¿La llegada salió de la marca de entrada (y no hubo trabajo en Cowork)? */
@@ -290,6 +292,9 @@ export function armarFila(dia: string, p: EntradaPersona, ahora: number): FilaTu
     if (s.estado === "sin_camara" || s.estado === "sin_pantalla" || s.estado === "fuera_de_camara") sinCamPantMs += dur;
   }
   const activoMin = min(activoMs), conectadoMin = min(conectadoMs), cortesMin = min(cortesMs);
+  // Activo ahora: su último rato en Cowork es de trabajo y se vio hace menos de 3 min.
+  const ultimo = segs[segs.length - 1];
+  const activoAhora = !terminado && !!ultimo && (ultimo.estado === "activo" || ultimo.estado === "meet") && ahora - ultimo.fin < 3 * 60_000;
   const pct = conectadoMs > 0 ? activoMs / conectadoMs : 1;
   let nivelConexion: Nivel = "ok";
   // Con menos de una hora conectado no se juzga el porcentaje (recién empieza).
@@ -333,6 +338,7 @@ export function armarFila(dia: string, p: EntradaPersona, ahora: number): FilaTu
     turnoFin: turno?.fin ?? null,
     enCurso,
     empiezaLuego,
+    activoAhora,
     llegada,
     sinMarca,
     tardeMin,

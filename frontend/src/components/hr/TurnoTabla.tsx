@@ -4,7 +4,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import {
-  AlertTriangle, CalendarDays, ChevronDown, ChevronLeft, ChevronRight, ClipboardList, Loader2, RefreshCw, Search, X,
+  AlertTriangle, Bell, CalendarDays, ChevronDown, ChevronLeft, ChevronRight, ClipboardList, Clock, DoorOpen, Loader2, RefreshCw, Search,
+  UtensilsCrossed, Wifi, X,
 } from "lucide-react";
 import { useLanguage } from "@/hooks/useLanguage";
 import type { TranslationKey } from "@/lib/i18n";
@@ -34,9 +35,9 @@ import {
 type Tr = (k: TranslationKey, vars?: Record<string, string | number>) => string;
 // La vista de un toque (Alvaro, 27/11/2026: «filtrar los que estuvieron, los que no,
 // los que estuvieron mejor, los que estuvieron peor»).
-type Filtro = "todos" | "trabajaron" | "noVinieron" | "mejores" | "peores" | "tarde" | "ignoro";
+type Filtro = "todos" | "activos" | "trabajaron" | "noVinieron" | "mejores" | "peores" | "tarde" | "ignoro";
 const VISTAS: Array<[Filtro, TranslationKey]> = [
-  ["todos", "hr.turno.v.todos"], ["trabajaron", "hr.turno.v.trabajaron"], ["noVinieron", "hr.turno.v.noVinieron"],
+  ["todos", "hr.turno.v.todos"], ["activos", "hr.turno.v.activos"], ["trabajaron", "hr.turno.v.trabajaron"], ["noVinieron", "hr.turno.v.noVinieron"],
   ["mejores", "hr.turno.v.mejores"], ["peores", "hr.turno.v.peores"],
 ];
 
@@ -289,6 +290,7 @@ export function TurnoTabla() {
   const delTurno = useMemo(() => filas.filter((f) => !turno || `${f.entrada}–${f.salida}` === turno), [filas, turno]);
   const pasa = (f: FilaTurno, k: Filtro) =>
     k === "todos" ? true
+      : k === "activos" ? f.activoAhora
       : k === "trabajaron" || k === "mejores" || k === "peores" ? f.llegada != null
         : k === "noVinieron" ? (f.noVino && !f.inactivo && !f.diaLibre) || f.noLlegaMin != null
           : k === "tarde" ? f.tardeMin != null
@@ -383,7 +385,7 @@ export function TurnoTabla() {
                   <>
                     <p className="font-display text-lg font-bold tabular-nums leading-none">{Math.round(parte(f)! * 100)} %</p>
                     <p className="mt-1 text-[11px] tabular-nums text-muted-foreground">
-                      {t("hr.turno.deHoras", { a: duracion(t, minutosTrabajados(f)), b: minutosTurno(f) != null ? duracion(t, minutosTurno(f)!) : "—" })}
+                      {t("hr.turno.deSuTurno", { a: duracion(t, minutosTrabajados(f)), b: minutosTurno(f) != null ? duracion(t, minutosTurno(f)!) : "—" })}
                     </p>
                   </>
                 ) : (
@@ -416,21 +418,39 @@ export function TurnoTabla() {
           </div>
         )}
         {abierta && f.llegada != null && (
-          <div className="flex flex-col gap-4 px-3 pb-4 md:pl-14">
-            <p className="text-[11px] text-muted-foreground">{horario}</p>
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
-              {[
-                [t("hr.turno.col.llegada"), ll], [t("hr.turno.col.comida"), celdaComida(t, f)], [t("hr.turno.col.bano"), celdaBano(t, f)],
-                [t("hr.turno.col.avisos"), celdaAvisos(t, f)], [t("hr.turno.col.conexion"), celdaConexion(t, f)],
-              ].map(([etq, c]) => {
-                const x = c as ReturnType<typeof celdaLlegada>;
-                return (
-                  <div key={etq as string} className="min-w-0 rounded-xl border border-border/40 p-2.5">
-                    <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground/70">{etq as string}</p>
-                    <Celda arriba={x.arriba || "—"} abajo={x.abajo} nivel={x.nivel} tenue={x.tenue} />
-                  </div>
-                );
-              })}
+          <div className="flex flex-col gap-4 px-3 pb-5 md:pl-14">
+            {/* Cómo sale su porcentaje, en una frase (Alvaro, 27/11/2026: «¿el 94 % de qué?»). */}
+            {minutosTurno(f) != null && (
+              <div className="rounded-2xl border border-border/40 bg-card/30 p-4">
+                <p className="flex items-baseline gap-2">
+                  <span className="font-display text-2xl font-bold tabular-nums">{Math.round((parte(f) ?? 0) * 100)} %</span>
+                  <span className="text-sm text-muted-foreground">{t("hr.turno.pctDeSuTurno")}</span>
+                </p>
+                <p className="mt-1.5 text-sm leading-relaxed text-foreground/85">
+                  {t("hr.turno.pctExplica", {
+                    a: duracion(t, minutosTrabajados(f)),
+                    b: duracion(t, minutosTurno(f)!),
+                    c: duracion(t, f.activoMin),
+                    g: duracion(t, Math.min(f.sinCamPantMin, f.graciaMin ?? 10)),
+                  })}
+                </p>
+              </div>
+            )}
+            <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-5">
+              {([
+                [Clock, t("hr.turno.col.llegada"), ll],
+                [UtensilsCrossed, t("hr.turno.col.comida"), celdaComida(t, f)],
+                [DoorOpen, t("hr.turno.col.bano"), celdaBano(t, f)],
+                [Bell, t("hr.turno.col.avisos"), celdaAvisos(t, f)],
+                [Wifi, t("hr.turno.col.conexion"), celdaConexion(t, f)],
+              ] as Array<[typeof Clock, string, ReturnType<typeof celdaLlegada>]>).map(([Icono, etq, x]) => (
+                <div key={etq} className="min-w-0 rounded-2xl border border-border/40 bg-card/20 p-3">
+                  <p className="mb-2 flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                    <Icono className="h-3.5 w-3.5" />{etq}
+                  </p>
+                  <Celda arriba={x.arriba || "—"} abajo={x.abajo} nivel={x.nivel} tenue={x.tenue} />
+                </div>
+              ))}
             </div>
             <div className="flex flex-wrap items-center gap-2">
               <Button size="sm" variant="outline" className="rounded-full" onClick={() => abrir(f)}>
@@ -560,7 +580,7 @@ export function TurnoTabla() {
             {/* Filtros, turno y buscador */}
             <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
               <div className="flex gap-1 overflow-x-auto rounded-full border border-border/50 bg-background/40 p-1">
-                {VISTAS.map(([k, etq]) => (
+                {VISTAS.filter(([k]) => k !== "activos" || esHoy).map(([k, etq]) => (
                   <button
                     key={k}
                     type="button"
@@ -614,7 +634,7 @@ export function TurnoTabla() {
               {!vistas.length && (
                 <p className="rounded-2xl border border-dashed border-border/50 p-5 text-center text-sm text-muted-foreground">{t("hr.turno.nadieAsi")}</p>
               )}
-              {(filtro === "mejores" || filtro === "peores" || filtro === "noVinieron") ? (
+              {(filtro === "mejores" || filtro === "peores" || filtro === "noVinieron" || filtro === "activos") ? (
                 <div className="mt-2 flex flex-col gap-1 md:divide-y md:divide-border/30">
                   {vistas.map((f) => <Fila key={f.userId} f={f} />)}
                 </div>
