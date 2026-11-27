@@ -163,3 +163,4 @@ Ambos sets ya tienen migrations subidas (`20260504100000`, `20260504110000`) per
 - 27/11/2026 (Claude): PR #303 «Llamadas limpias» (nada encima del video, ventanita en la esquina, tarjeta de llamada entrante, «solo navegador» por Posición). Pendiente: aplicar en Kash la migración 20261127050000_posiciones_solo_navegador.sql (con OK de Alvaro).
 
 - 27/11/2026 (Claude): hora de comida por plan de pausa (recomendada u obligatoria con margen) + ajuste por persona en Team schedules + recordatorio. Migración 20261127070000_hora_de_comida.sql pendiente de aplicar en Kash con OK de Alvaro.
+- 27/11/2026 (Claude): «Debe estar en Cowork» pasa a ser interruptor de cada Posición (migración 20261127060000_posiciones_debe_cowork.sql). Arranca igual que hoy; Finanzas queda sin Cowork. Pendiente: aplicarla en Kash con OK de Alvaro.
