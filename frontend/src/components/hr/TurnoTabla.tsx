@@ -322,7 +322,7 @@ export function TurnoTabla() {
   const [filtro, setFiltro] = useState<Filtro>(esHoy ? "activos" : "trabajaron");
   // «Activos ahora» solo existe hoy: en otro día se cae a «Trabajaron», y al volver a hoy, a «Activos ahora».
   useEffect(() => {
-    setFiltro((f) => (!esHoy && f === "activos" ? "trabajaron" : esHoy && f === "trabajaron" ? "activos" : f));
+    setFiltro((f) => (!esHoy && f === "activos" ? "trabajaron" : f));
   }, [esHoy]);
   const [turno, setTurno] = useState<string | null>(null);
   const [buscar, setBuscar] = useState("");
@@ -653,11 +653,12 @@ export function TurnoTabla() {
                 scroll; en ventanas angostas las vistas se reparten parejas. */}
             <div className="grid gap-2 border-t border-border/40 p-3 2xl:grid-cols-[minmax(0,1fr)_11rem_14rem] 2xl:items-center">
               <div className="grid grid-cols-3 gap-1 rounded-2xl border border-border/50 bg-background/40 p-1 sm:flex">
-                {VISTAS.filter(([k]) => k !== "activos" || esHoy).map(([k, etq]) => (
+                {VISTAS.map(([k, etq]) => (
                   <button
                     key={k}
                     type="button"
-                    onClick={() => setFiltro(k)}
+                    // «Activos ahora» siempre visible (Alvaro, 27/11/2026); mirando otro día, lleva a hoy.
+                    onClick={() => { if (k === "activos" && !esHoy) irA(hoy); setFiltro(k); }}
                     aria-pressed={filtro === k}
                     className={`h-8 min-w-0 truncate rounded-xl px-3 text-xs font-medium transition sm:flex-1 ${filtro === k ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:bg-foreground/[0.05] hover:text-foreground"}`}
                   >
