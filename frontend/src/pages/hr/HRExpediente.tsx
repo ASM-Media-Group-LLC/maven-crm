@@ -30,6 +30,8 @@ import { GraciaDelDia } from "@/components/hr/GraciaDelDia";
 import { AppsDelDia } from "@/components/hr/AppsDelDia";
 import { EquipoDelDia } from "@/components/hr/EquipoDelDia";
 import { AhoraEnVivo } from "@/components/hr/AhoraEnVivo";
+import { LoQuePaso } from "@/components/hr/TurnoTabla";
+import { useTurnoTabla } from "@/hooks/useTurnoTabla";
 import { CronologiaDelDia } from "@/components/hr/CronologiaDelDia";
 import { useDisenoPulido } from "@/hooks/useDisenoPulido";
 import { Mail } from "lucide-react";
@@ -975,6 +977,11 @@ function ExpedientePermitido() {
   // Diseño pulido (solo dueño con su link): casillas neutras, números en blanco.
   const pulido = useDisenoPulido();
   const conVivo = !!userId && canFunction("N:argos.presencia", true) && !cargando && !error && esHoy;
+  // LO QUE PASÓ EN SU TURNO (Alvaro, 27/11/2026: «no hace correlación»): la misma
+  // raya y la misma lista que en Shift, para que lo de aquí cuadre con lo de allá.
+  // Usa la misma consulta que Shift (si vienes de ahí, ya está cargada).
+  const turno = useTurnoTabla(diaSel, esHoy, !!userId);
+  const filaTurno = turno.data?.filas.find((f) => f.userId === userId && f.llegada != null) ?? null;
 
   // % DE ATENCIÓN DEL DÍA (estilo Hubstaff): de los pantallazos que la IA ya
   // juzgó este día, qué porción estaba en lo suyo. Sin juzgados → "—" (no 0).
@@ -1159,6 +1166,11 @@ function ExpedientePermitido() {
               <div className="text-[10px] text-muted-foreground">{t("hr.exp.pausas")}</div>
             </div>
           </div>
+          )}
+          {filaTurno && (
+            <div className="mt-4 rounded-2xl border border-border/60 bg-card/30">
+              <LoQuePaso f={filaTurno} t={t} ahora={turno.data?.calculadoAt ?? Date.now()} />
+            </div>
           )}
         </div>
       </section>
