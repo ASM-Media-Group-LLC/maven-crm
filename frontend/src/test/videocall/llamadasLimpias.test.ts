@@ -97,3 +97,11 @@ describe("la app solo se exige a quien debe estar en Cowork (27/11/2026)", () =>
     expect(a).not.toContain('t("pwa.app.siempre")');
   });
 });
+
+describe("«Debe estar en Cowork» sale de la Posición (27/11/2026)", () => {
+  it("la regla de la app pregunta a la base por la posición, no a una lista en el código", () => {
+    const c = leer("components/CoworkSoloApp.tsx");
+    expect(c).toContain('.rpc("mi_debe_cowork")');
+    expect(c).not.toContain('.rpc("mi_cowork_estado")');
+  });
+});

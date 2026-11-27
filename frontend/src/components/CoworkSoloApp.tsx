@@ -73,8 +73,9 @@ function useSoloApp(lugar: LugarSoloApp): { estado: EstadoSoloApp; desde: Date |
   return { estado: estadoSoloApp({ ua, tactil, enApp, desde, ahora: new Date(), probador, soloNavegador: libre }), desde, listo: (leido && navegadorListo && coworkListo) || !hayQueMirar };
 }
 
-/** ¿Esta persona tiene que estar en Cowork? `null` = no se sabe (falló la
- *  consulta): entonces manda la regla de siempre. Una consulta por pestaña. */
+/** ¿Esta persona tiene que estar en Cowork? Lo dice su Posición («Debe estar
+ *  en Cowork», 27/11/2026). `null` = no se sabe (falló la consulta): entonces
+ *  manda la regla de siempre. Una consulta por pestaña. */
 let debeCoworkCache: boolean | null | undefined;
 function useDebeEstarEnCowork(activo: boolean): { debeCowork: boolean | null; listo: boolean } {
   const [v, setV] = useState<boolean | null | undefined>(debeCoworkCache);
@@ -84,9 +85,9 @@ function useDebeEstarEnCowork(activo: boolean): { debeCowork: boolean | null; li
     void (async () => {
       let r: boolean | null = null;
       try {
-        const { data, error } = await (supabase as unknown as { rpc: (f: string) => Promise<{ data: unknown; error: unknown }> }).rpc("mi_cowork_estado");
-        const fila = !error && Array.isArray(data) ? (data[0] as { debe?: unknown } | undefined) : undefined;
-        r = fila ? fila.debe === true : null;
+        const { data, error } = await (supabase as unknown as { rpc: (f: string) => Promise<{ data: unknown; error: unknown }> }).rpc("mi_debe_cowork");
+        // Sale de la Posición («Debe estar en Cowork»), sin mirar el turno.
+        r = !error && typeof data === "boolean" ? data : null;
       } catch { r = null; }
       if (r !== null) debeCoworkCache = r;
       if (vivo) setV(r);
