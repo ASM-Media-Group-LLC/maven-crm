@@ -309,6 +309,12 @@ All colors MUST be HSL. Light mode in :root, dark mode in .dark.
      tarjetas, menú y bordes neutros, sin tinte azul. Las demás pieles siguen
      con el azul marino oficial. .dark[data-skin] (0,2,0) va después de .dark. */
   .dark[data-skin="gris"] {
+    --primary: 220 8% 72%;
+    --primary-foreground: 220 10% 10%;
+    --ring: 220 8% 62%;
+    --sidebar-primary: 220 8% 72%;
+    --sidebar-primary-foreground: 220 10% 10%;
+    --sidebar-ring: 220 8% 62%;
     --background: 220 6% 13%;
     --card: 220 6% 16%;
     --popover: 220 6% 16%;
@@ -320,7 +326,17 @@ All colors MUST be HSL. Light mode in :root, dark mode in .dark.
     --sidebar-accent: 220 5% 20%;
     --sidebar-border: 220 5% 21%;
   }
+  /* NEGRO y GRIS en OSCURO: el color de marca era casi negro sobre fondo negro y
+     todo lo «primario» desaparecía (pestañas, «Fix it», chips de posición;
+     Alvaro, 27/11/2026: «no se ve ni mierda»). En oscuro el primario pasa a un
+     gris claro con texto oscuro encima: blanco y negro, como pide el skin. */
   .dark[data-skin="negro"] {
+    --primary: 220 8% 88%;
+    --primary-foreground: 220 10% 8%;
+    --ring: 220 8% 70%;
+    --sidebar-primary: 220 8% 88%;
+    --sidebar-primary-foreground: 220 10% 8%;
+    --sidebar-ring: 220 8% 70%;
     --background: 0 0% 3%;
     --card: 220 4% 7%;
     --popover: 220 4% 7%;

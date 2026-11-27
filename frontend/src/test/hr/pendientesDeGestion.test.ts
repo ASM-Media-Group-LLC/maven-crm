@@ -16,10 +16,10 @@ describe("qué se muestra", () => {
   it("primero lo pendiente y después las sugerencias", () => {
     expect(itemsVisibles(items, leerOcultos(new Date("2026-11-27T15:00:00Z"))).map((i) => i.clave)).toEqual(["horarios", "comida_sin_hora"]);
   });
-  it("la X lo cierra hasta mañana", () => {
+  it("la X lo esconde 5 minutos y vuelve a salir", () => {
     ocultarHoy(new Date("2026-11-27T15:00:00Z"));
-    expect(itemsVisibles(items, leerOcultos(new Date("2026-11-27T20:00:00Z")))).toEqual([]);
-    expect(itemsVisibles(items, leerOcultos(new Date("2026-11-28T15:00:00Z")))).toHaveLength(2);
+    expect(itemsVisibles(items, leerOcultos(new Date("2026-11-27T15:04:00Z")))).toEqual([]);
+    expect(itemsVisibles(items, leerOcultos(new Date("2026-11-27T15:05:01Z")))).toHaveLength(2);
   });
   it("«Ahora no» esconde la sugerencia una semana; lo pendiente sigue", () => {
     ocultarSugerencia("comida_sin_hora", new Date("2026-11-27T15:00:00Z"));

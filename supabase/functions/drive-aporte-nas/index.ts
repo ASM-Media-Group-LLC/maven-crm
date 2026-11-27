@@ -261,6 +261,13 @@ async function enviarAviso(pendientes: number, desdeISO: string): Promise<boolea
 // Si el NAS responde, el contador vuelve a 0.
 const FALLOS_MINIMOS = 3;
 const PENDIENTES_MINIMOS = 5;
+// 27/11/2026 (Alvaro: «falsa alarma y alarma a la gente»): a las 22:21 el NAS
+// tardó unos segundos y 6 corridas SEGUIDAS (en el mismo minuto) contaron como
+// 3 fallos: el aviso se prendió en segundos y al minuto ya estaba bien. Ahora,
+// además de los fallos, el NAS tiene que llevar CAÍDO al menos 10 minutos desde
+// el primer fallo. `desde` guarda ese primer fallo (el aviso solo lo muestra
+// cuando `caido` es true).
+const CAIDO_MINIMO_MS = 10 * 60_000;
 
 async function registrarSalud(admin: Admin, arriba: boolean, pendientes: number): Promise<void> {
   const ahora = new Date().toISOString();
@@ -278,20 +285,22 @@ async function registrarSalud(admin: Admin, arriba: boolean, pendientes: number)
 
   const fallosPrev = Number((prev?.fallos_consecutivos as number | null) ?? 0);
   const fallos = fallosPrev + 1;
-  const marcarCaido = fallos >= FALLOS_MINIMOS && pendientes > PENDIENTES_MINIMOS;
+  // Primer fallo de esta racha (si el anterior estaba bien, empieza ahora).
+  const desde = (fallosPrev > 0 ? (prev?.desde as string | null) : null) ?? ahora;
+  const lleva = Date.now() - new Date(desde).getTime();
+  const marcarCaido = fallos >= FALLOS_MINIMOS && lleva >= CAIDO_MINIMO_MS && pendientes > PENDIENTES_MINIMOS;
 
   if (!marcarCaido) {
     // Falló esta vez pero todavía no cumple el umbral: ni header ni correo.
-    // Guardamos el contador y caido=false (lo que el frontend respeta).
+    // Guardamos el contador, el primer fallo y caido=false (lo que el frontend respeta).
     await admin.from("drive_nas_salud").upsert({
-      id: 1, caido: false, desde: null, pendientes,
+      id: 1, caido: false, desde, pendientes,
       fallos_consecutivos: fallos, actualizado: ahora,
     }).then(() => {}, () => {});
     return;
   }
 
   // Umbral alcanzado: se declara caído y, con freno horario, se manda el correo.
-  const desde = (prev?.desde as string | null) ?? ahora;
   let ultimoAviso = (prev?.ultimo_aviso as string | null) ?? null;
   const vencido = !ultimoAviso || (Date.now() - new Date(ultimoAviso).getTime()) > AVISO_CADA_MIN * 60_000;
   if (vencido && await enviarAviso(pendientes, desde)) ultimoAviso = ahora;
