@@ -122,24 +122,20 @@ function Avance({ lleva, deberia, falta, problemas, t }: { lleva: number; deberi
   // a la misma tonalidad»): verde de «Trabajando», ámbar de «Sin cámara o
   // pantalla» y rojo de «Sin internet», tomados de COLOR_FRANJA.
   const color = falta > 60 ? COLOR_FRANJA.corte : atras ? COLOR_FRANJA.sin_camara : COLOR_FRANJA.trabajo;
+  // Misma forma que la franja del centro (Alvaro, 27/11/2026: «a la misma altura»):
+  // la barra arriba, a la par de la franja, y debajo una sola línea con los datos.
   return (
-    <div className="flex w-full flex-col items-end gap-1.5">
-      <p className="text-sm tabular-nums text-foreground/90">
-        {duracion(t, lleva)} <span className="text-muted-foreground">/ {duracion(t, deberia)}</span>
-      </p>
-      <div className={`${PISTA} w-full max-w-[9rem]`}>
+    <div className="w-full">
+      <div className={PISTA}>
         <div className={`h-full rounded-full ${color}`} style={{ width: `${pct}%` }} />
       </div>
-      <div className="flex items-center gap-1">
-        <span className="flex items-center gap-1.5 rounded-full bg-foreground/[0.05] px-2 py-0.5 text-[10px] font-medium tabular-nums text-foreground/80">
+      <div className="mt-0.5 flex flex-wrap items-center justify-between gap-x-2 text-[10px] tabular-nums">
+        <span className="whitespace-nowrap text-foreground/80">{t("hr.turno.llevaDe", { a: duracion(t, lleva), b: duracion(t, deberia) })}</span>
+        <span className="flex items-center gap-1.5 whitespace-nowrap text-muted-foreground">
           <span className={`h-1.5 w-1.5 rounded-full ${color}`} aria-hidden />
           {atras ? t("hr.turno.atras", { d: duracion(t, falta) }) : t("hr.turno.alDia")}
+          {problemas > 0 && <span className="text-muted-foreground/70">· {t(problemas === 1 ? "hr.turno.problema1" : "hr.turno.problemas", { n: problemas })}</span>}
         </span>
-        {problemas > 0 && (
-          <span className="rounded-full bg-foreground/[0.07] px-2 py-0.5 text-[10px] font-medium tabular-nums text-muted-foreground">
-            {t(problemas === 1 ? "hr.turno.problema1" : "hr.turno.problemas", { n: problemas })}
-          </span>
-        )}
       </div>
     </div>
   );
@@ -422,7 +418,7 @@ export function TurnoTabla() {
           type="button"
           onClick={() => setAbiertoId(abierta ? null : f.userId)}
           aria-expanded={abierta}
-          className="group grid w-full grid-cols-[1fr_auto] items-center gap-x-4 gap-y-2 rounded-2xl px-3 py-3.5 text-left transition hover:bg-foreground/[0.04] md:grid-cols-[minmax(11rem,15rem)_1fr_10.5rem_1rem]"
+          className="group grid w-full grid-cols-[1fr_auto] items-center gap-x-4 gap-y-2 rounded-2xl px-3 py-3.5 text-left transition hover:bg-foreground/[0.04] md:grid-cols-[minmax(11rem,15rem)_1fr_15rem_1rem]"
         >
           <div className="flex min-w-0 items-center gap-2.5">
             <span className="relative shrink-0">
