@@ -164,3 +164,5 @@ Ambos sets ya tienen migrations subidas (`20260504100000`, `20260504110000`) per
 
 - 27/11/2026 (Claude): hora de comida por plan de pausa (recomendada u obligatoria con margen) + ajuste por persona en Team schedules + recordatorio. Migración 20261127070000_hora_de_comida.sql pendiente de aplicar en Kash con OK de Alvaro.
 - 27/11/2026 (Claude): «Debe estar en Cowork» pasa a ser interruptor de cada Posición (migración 20261127060000_posiciones_debe_cowork.sql). Arranca igual que hoy; Finanzas queda sin Cowork. Pendiente: aplicarla en Kash con OK de Alvaro.
+
+- 27/11/2026 (Claude): cuadrito «Pendientes del equipo» abajo a la derecha (horarios sin confirmar, personas sin Posición, hora de comida, turnos). Cada cosa la ve quien la puede arreglar según su Posición. Migración 20261127200000_pendientes_de_gestion.sql.
