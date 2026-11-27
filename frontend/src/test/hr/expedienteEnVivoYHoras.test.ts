@@ -25,13 +25,15 @@ describe("arriba, en vivo", () => {
   });
   it("va primero en el expediente, solo hoy, y la cronología ya no repite el pantallazo", () => {
     const s = fuente("HRExpediente.tsx");
-    const vivo = s.indexOf("<AhoraEnVivo userId={userId} capturas={dia.capturas} />");
+    // 27/11/2026: el en vivo va dentro de la cabecera, junto a los números.
+    const vivo = s.indexOf("<AhoraEnVivo userId={userId} capturas={dia.capturas} junto />");
     const horas = s.indexOf('id="expediente-todo-el-dia"');
     const cron = s.indexOf("<CronologiaDelDia");
     expect(vivo).toBeGreaterThan(0);
     expect(horas).toBeGreaterThan(vivo);
     expect(cron).toBeGreaterThan(horas);
-    expect(s).toContain("esHoy && <AhoraEnVivo");
+    expect(s).toContain("!cargando && !error && esHoy;");
+    expect(s).toContain("{conVivo && userId && <AhoraEnVivo");
     expect(fuente("CronologiaDelDia.tsx")).toContain("const mostrarAhora = false;");
   });
 });
