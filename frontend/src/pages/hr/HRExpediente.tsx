@@ -950,7 +950,7 @@ function ExpedientePermitido() {
   const [verDesglose, setVerDesglose] = useState(false);
   // PESTAÑAS (Alvaro, 27/11/2026: «más seccionado, como pestañitas, no un scroll
   // infinito»): arriba queda fijo el resumen del día; debajo, una sección a la vez.
-  type Pestana = "resumen" | "fotos" | "hizo" | "pago" | "avisos" | "apps";
+  type Pestana = "resumen" | "dia" | "pago" | "avisos" | "apps";
   const [pestana, setPestana] = useState<Pestana>("resumen");
   const anio = Number(diaSel.slice(0, 4));
   const mes = Number(diaSel.slice(5, 7));
@@ -1152,9 +1152,9 @@ function ExpedientePermitido() {
       {userId && canFunction("N:argos.presencia", true) && !cargando && !error && esHoy && <AhoraEnVivo userId={userId} capturas={dia.capturas} />}
 
       {/* LAS PESTAÑAS (27/11/2026): Resumen · Fotos por hora · Lo que hizo · Apps y equipo. */}
-      <div className="mt-5 grid grid-cols-3 gap-1 rounded-2xl border border-border/50 bg-background/40 p-1 lg:flex">
+      <div className="mt-5 grid grid-cols-2 gap-1 rounded-2xl border border-border/50 bg-background/40 p-1 sm:grid-cols-3 lg:flex">
         {([
-          ["resumen", "hr.exp.tab.resumen"], ["fotos", "hr.exp.tab.fotos"], ["hizo", "hr.exp.tab.hizo"],
+          ["resumen", "hr.exp.tab.resumen"], ["dia", "hr.exp.tab.dia"],
           ["pago", "hr.exp.tab.pago"], ["avisos", "hr.exp.tab.avisos"], ["apps", "hr.exp.tab.apps"],
         ] as const).map(([k, etq]) => (
           <button
@@ -1162,7 +1162,7 @@ function ExpedientePermitido() {
             type="button"
             onClick={() => setPestana(k)}
             aria-pressed={pestana === k}
-            className={`min-w-0 flex-1 shrink-0 whitespace-nowrap rounded-xl px-3 py-2 text-[13px] font-semibold transition ${pestana === k ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
+            className={`min-w-0 flex-1 shrink-0 whitespace-nowrap rounded-xl px-3 py-2 text-sm font-semibold transition ${pestana === k ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
           >
             {t(etq)}
           </button>
@@ -1218,7 +1218,10 @@ function ExpedientePermitido() {
         </>
       )}
 
-      {pestana === "fotos" && (
+
+      {/* SU DÍA, HORA POR HORA (Alvaro, 27/11/2026: «fotos por hora» y «lo que hizo» se
+          pisaban): sus horas con fotos y, debajo, la línea del día y los días anteriores. */}
+      {pestana === "dia" && (
         <>
       {/* TODAS SUS HORAS, justo debajo del en vivo (Alvaro, 13/11 y 18/11/2026:
           «no puedo ver los pantallazos de todo el día», «necesito ver todas las
@@ -1260,11 +1263,6 @@ function ExpedientePermitido() {
         </div>
       </section>
 
-        </>
-      )}
-
-      {pestana === "hizo" && (
-        <>
       {/* QUÉ HIZO, EN ORDEN (Alvaro, 18/11/2026, propuesta 3 «Cronología»): el
           día como un chat, lo más nuevo arriba, lo malo con su prueba y los días
           anteriores debajo. No quita nada: lo de siempre sigue abajo. */}
@@ -1277,7 +1275,7 @@ function ExpedientePermitido() {
           esHoy={esHoy}
           onElegirDia={(f) => { setDiaSel(f); setVerCalendario(false); window.scrollTo({ top: 0, behavior: "smooth" }); }}
           onVerMasDias={() => { setVerCalendario(true); window.scrollTo({ top: 0, behavior: "smooth" }); }}
-          onVerFotos={() => setPestana("fotos")}
+          onVerFotos={() => document.getElementById("expediente-todo-el-dia")?.scrollIntoView({ behavior: "smooth", block: "start" })}
         />
       )}
 

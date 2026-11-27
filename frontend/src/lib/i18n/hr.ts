@@ -2195,6 +2195,7 @@ export const hr = {
   "hr.exp.tab.resumen": { es: "Resumen", en: "Summary" },
   "hr.exp.tab.fotos": { es: "Fotos por hora", en: "Photos by hour" },
   "hr.exp.tab.hizo": { es: "Lo que hizo", en: "What they did" },
+  "hr.exp.tab.dia": { es: "Su día, hora por hora", en: "Their day, hour by hour" },
   "hr.exp.tab.pago": { es: "Pago y gracia", en: "Pay and grace" },
   "hr.exp.tab.avisos": { es: "Avisos", en: "Warnings" },
   "hr.exp.tab.apps": { es: "Apps y equipo", en: "Apps and device" },

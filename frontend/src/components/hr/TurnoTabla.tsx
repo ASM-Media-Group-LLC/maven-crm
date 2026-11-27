@@ -100,24 +100,39 @@ function Celda({ arriba, abajo, nivel = "ok", tenue = false, completo = false }:
   );
 }
 
+/** UNA SOLA BARRA para todo Shift (Alvaro, 27/11/2026: «todas estas líneas tienen
+ *  que tener la misma estética»): mismo alto, bordes, pista y colores. */
+const PISTA = "relative h-2 overflow-hidden rounded-full bg-foreground/[0.06]";
+const COLOR_FRANJA: Record<TipoFranja, string> = {
+  trabajo: "bg-success/70",
+  comida: "bg-[hsl(var(--chart-1))]",
+  bano: "bg-[hsl(var(--chart-5))]",
+  pausa: "bg-muted-foreground/25",
+  sin_camara: "bg-warning/70",
+  sin_pantalla: "bg-warning/70",
+  corte: "bg-destructive/70",
+};
+
 /** El avance de hoy como indicador (27/11/2026): barrita de lo que lleva sobre lo
  *  que debería llevar y una pastilla de «X atrás» o «al día», más los problemas. */
 function Avance({ lleva, deberia, falta, problemas, t }: { lleva: number; deberia: number; falta: number; problemas: number; t: Tr }) {
   const pct = deberia > 0 ? Math.min(100, (lleva / deberia) * 100) : 100;
   const atras = falta > 5;
-  // Tonos apagados (Alvaro, 27/11/2026: «muy prendidos»): fondo casi invisible y
-  // el color solo en el texto, atenuado.
-  const tono = falta > 60 ? "bg-destructive/[0.07] text-destructive/75" : atras ? "bg-warning/[0.07] text-warning/75" : "bg-foreground/[0.05] text-muted-foreground";
+  // Los MISMOS tonos de la franja de la izquierda (Alvaro, 27/11/2026: «tiene que ir
+  // a la misma tonalidad»): verde de «Trabajando», ámbar de «Sin cámara o
+  // pantalla» y rojo de «Sin internet», tomados de COLOR_FRANJA.
+  const color = falta > 60 ? COLOR_FRANJA.corte : atras ? COLOR_FRANJA.sin_camara : COLOR_FRANJA.trabajo;
   return (
     <div className="flex w-full flex-col items-end gap-1.5">
       <p className="text-sm tabular-nums text-foreground/90">
         {duracion(t, lleva)} <span className="text-muted-foreground">/ {duracion(t, deberia)}</span>
       </p>
-      <div className="h-0.5 w-full max-w-[9rem] overflow-hidden rounded-full bg-foreground/[0.08]">
-        <div className={`h-full rounded-full ${atras ? (falta > 60 ? "bg-destructive/45" : "bg-warning/45") : "bg-foreground/35"}`} style={{ width: `${pct}%` }} />
+      <div className={`${PISTA} w-full max-w-[9rem]`}>
+        <div className={`h-full rounded-full ${color}`} style={{ width: `${pct}%` }} />
       </div>
       <div className="flex items-center gap-1">
-        <span className={`rounded-full px-2 py-0.5 text-[10px] font-medium tabular-nums ${tono}`}>
+        <span className="flex items-center gap-1.5 rounded-full bg-foreground/[0.05] px-2 py-0.5 text-[10px] font-medium tabular-nums text-foreground/80">
+          <span className={`h-1.5 w-1.5 rounded-full ${color}`} aria-hidden />
           {atras ? t("hr.turno.atras", { d: duracion(t, falta) }) : t("hr.turno.alDia")}
         </span>
         {problemas > 0 && (
@@ -223,15 +238,6 @@ function celdaConexion(t: Tr, f: FilaTurno): { arriba: string; abajo: string; ni
 // ── La franja del día (27/11/2026) ───────────────────────────────────────────
 // Los colores son los de Maven: trabajo en gris claro, comida y baño en el color
 // principal, sin cámara o pantalla en ámbar y los cortes de internet en rojo.
-const COLOR_FRANJA: Record<TipoFranja, string> = {
-  trabajo: "bg-success/70",
-  comida: "bg-[hsl(var(--chart-1))]",
-  bano: "bg-[hsl(var(--chart-5))]",
-  pausa: "bg-muted-foreground/25",
-  sin_camara: "bg-warning/70",
-  sin_pantalla: "bg-warning/70",
-  corte: "bg-destructive/70",
-};
 const ORDEN_LEYENDA: Array<[TipoFranja, TranslationKey]> = [
   ["trabajo", "hr.turno.franja.trabajo"], ["comida", "hr.turno.franja.comida"], ["bano", "hr.turno.franja.bano"],
   ["sin_camara", "hr.turno.franja.sinCamara"], ["corte", "hr.turno.franja.corte"],
@@ -249,12 +255,12 @@ function Franja({ f, t, ahora }: { f: FilaTurno; t: Tr; ahora: number }) {
   const capas = [...tramos.filter((x) => x.tipo !== "comida" && x.tipo !== "bano"), ...tramos.filter((x) => x.tipo === "comida" || x.tipo === "bano")];
   return (
     <div aria-hidden>
-      <div className="relative h-2.5 overflow-hidden rounded-full bg-foreground/[0.05]">
+      <div className={PISTA}>
         {f.turnoInicio != null && f.turnoFin != null && (
           <div className="absolute inset-y-0 rounded-full border border-border/60" style={{ left: pos(f.turnoInicio), width: ancho(f.turnoInicio, f.turnoFin) }} />
         )}
         {capas.map((x, i) => (
-          <div key={i} className={`absolute inset-y-0.5 ${COLOR_FRANJA[x.tipo]}`} style={{ left: pos(x.inicio), width: ancho(x.inicio, x.fin) }} />
+          <div key={i} className={`absolute inset-y-0 ${COLOR_FRANJA[x.tipo]}`} style={{ left: pos(x.inicio), width: ancho(x.inicio, x.fin) }} />
         ))}
         {f.marcasAviso.map((at, i) => (
           <div key={`a${i}`} className="absolute inset-y-0 w-0.5 bg-destructive" style={{ left: pos(at) }} />
@@ -483,15 +489,15 @@ export function TurnoTabla() {
                   <span className="text-sm leading-tight text-muted-foreground">{t("hr.turno.pctDeSuTurno")}</span>
                 </div>
                 <div className="flex min-w-0 flex-1 flex-col gap-2.5">
-                  <div className="h-2 overflow-hidden rounded-full bg-foreground/10">
-                    <div className="h-full rounded-full bg-success" style={{ width: `${Math.min(100, (parte(f) ?? 0) * 100)}%` }} />
+                  <div className={PISTA}>
+                    <div className={`h-full rounded-full ${COLOR_FRANJA.trabajo}`} style={{ width: `${Math.min(100, (parte(f) ?? 0) * 100)}%` }} />
                   </div>
                   <div className="flex flex-wrap gap-1.5 text-xs">
                     <span className="rounded-full bg-foreground/[0.06] px-2.5 py-1 tabular-nums">{t("hr.turno.chip.trabajo", { a: duracion(t, minutosTrabajados(f)), b: duracion(t, minutosTurno(f)!) })}</span>
                     <span className="rounded-full bg-foreground/[0.06] px-2.5 py-1 tabular-nums">{t("hr.turno.chip.camara", { c: duracion(t, f.activoMin) })}</span>
                     <span className="rounded-full bg-foreground/[0.06] px-2.5 py-1 tabular-nums">{t("hr.turno.chip.gracia", { g: duracion(t, Math.min(f.sinCamPantMin, f.graciaMin ?? 10)) })}</span>
                     {f.enCurso && marcha(f) && marcha(f)!.falta > 5 && (
-                      <span className="rounded-full bg-warning/[0.07] px-2.5 py-1 font-medium tabular-nums text-warning/75">{t("hr.turno.atras", { d: duracion(t, marcha(f)!.falta) })}</span>
+                      <span className="flex items-center gap-1.5 rounded-full bg-foreground/[0.06] px-2.5 py-1 font-medium tabular-nums"><span className={`h-1.5 w-1.5 rounded-full ${COLOR_FRANJA.sin_camara}`} aria-hidden />{t("hr.turno.atras", { d: duracion(t, marcha(f)!.falta) })}</span>
                     )}
                   </div>
                 </div>
