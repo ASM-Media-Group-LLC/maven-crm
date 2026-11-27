@@ -7,6 +7,8 @@
 > queda claro dónde estamos, qué se decidió, y qué falta.
 
 ## Stack y deploy
+- 27/11/2026 (Claude, PR 295): Shift → al abrir a una persona, «Lo que pasó en su turno»: la raya grande y una línea por cada pedazo de color (comida, baño, sin cámara, sin internet, avisos) con hora y duración; mouse encima ilumina el pedazo. Arreglado «1 warnings».
+
 
 - 2026-11-26: app de escritorio: la ventanita flotante del Hub caía sobre la barra que mueve la ventana; sus botones no respondían y arrastrarla movía toda la app (video de Daniel Ospina). Clase `sin-arrastre` (no-drag) en PersistentCallProvider. Y «Ver en ventanita» en el recuadro de cada chatter (al pasar el mouse; su pantalla, sin sonido, una ventanita encima de todo).
 - 2026-11-26: Posiciones con jerarquía (decisiones de Alvaro): nadie cambia la posición que ocupa; solo el Dueño da «Admin»; nadie asigna una posición de mando que él tiene (HR solo asigna las de abajo). Triggers en `20261126203000_posiciones_candados_jerarquia.sql` (PENDIENTE aplicar en Kash con OK). En Usuarios, el menú gris de rol pasa a «Asignar posición».

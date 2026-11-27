@@ -299,9 +299,113 @@ function Franja({ f, t, ahora }: { f: FilaTurno; t: Tr; ahora: number }) {
       </div>
       <div className="mt-0.5 flex justify-between text-[10px] tabular-nums text-muted-foreground/70">
         <span>{hora(desde)}</span>
-        <span>{f.marcasAviso.length ? t("hr.turno.franja.avisos", { n: f.marcasAviso.length }) : ""}</span>
+        <span>{f.marcasAviso.length ? t(f.marcasAviso.length === 1 ? "hr.turno.franja.aviso1" : "hr.turno.franja.avisos", { n: f.marcasAviso.length }) : ""}</span>
         <span>{hora(hasta)}</span>
       </div>
+    </div>
+  );
+}
+
+// ── LO QUE PASÓ, PEDAZO POR PEDAZO (Alvaro, 27/11/2026) ─────────────────────
+// «Miro la raya… mi expectativa sería saber la parte azul qué pasó, la parte roja
+// qué pasó». Al abrir a la persona: la misma raya y, debajo, una línea por cada
+// pedazo de color, con su hora y cuánto duró. Pasar el mouse por una línea
+// ilumina su pedazo en la raya, y al revés.
+type TipoEvento = Exclude<TipoFranja, "trabajo" | "sin_pantalla"> | "aviso";
+interface Evento { tipo: TipoEvento; inicio: number; fin: number }
+
+const COLOR_EVENTO: Record<TipoEvento, string> = {
+  comida: COLOR_FRANJA.comida, bano: COLOR_FRANJA.bano, pausa: "bg-muted-foreground/40",
+  sin_camara: COLOR_FRANJA.sin_camara, corte: COLOR_FRANJA.corte, aviso: "bg-destructive",
+};
+const ETIQUETA_EVENTO: Record<TipoEvento, TranslationKey> = {
+  comida: "hr.turno.franja.comida", bano: "hr.turno.franja.bano", pausa: "hr.turno.franja.pausa",
+  sin_camara: "hr.turno.franja.sinCamara", corte: "hr.turno.franja.corte", aviso: "hr.turno.franja.aviso",
+};
+
+/** Los pedazos que no son trabajo, juntando los seguidos del mismo tipo (menos de
+ *  1 min entre uno y otro). Sin cámara/pantalla y pausas de menos de 1 min no
+ *  salen (la gracia los cubre); comida, baño y cortes salen siempre. */
+export function eventosDelDia(f: FilaTurno): Evento[] {
+  const piezas = f.franja
+    .filter((x) => x.tipo !== "trabajo")
+    .map((x) => ({ tipo: (x.tipo === "sin_pantalla" ? "sin_camara" : x.tipo) as TipoEvento, inicio: x.inicio, fin: x.fin }))
+    .sort((a, b) => a.inicio - b.inicio);
+  const juntos: Evento[] = [];
+  for (const x of piezas) {
+    const prev = [...juntos].reverse().find((y) => y.tipo === x.tipo);
+    if (prev && x.inicio - prev.fin < 60_000) { prev.fin = Math.max(prev.fin, x.fin); continue; }
+    juntos.push({ ...x });
+  }
+  // Cowork marca la «pausa» y además la comida o el baño: si la pausa cae sobre
+  // una comida o un baño, es la misma cosa y no se repite.
+  const salidas = juntos.filter((x) => x.tipo === "comida" || x.tipo === "bano");
+  const repetida = (x: Evento) => x.tipo === "pausa" && salidas.some((y) => Math.min(x.fin, y.fin) - Math.max(x.inicio, y.inicio) >= (x.fin - x.inicio) / 2);
+  const largos = juntos.filter((x) => !repetida(x) && (x.tipo === "comida" || x.tipo === "bano" || x.tipo === "corte" || x.fin - x.inicio >= 60_000));
+  const avisos = f.marcasAviso.map((at): Evento => ({ tipo: "aviso", inicio: at, fin: at }));
+  return [...largos, ...avisos].sort((a, b) => a.inicio - b.inicio);
+}
+
+export function LoQuePaso({ f, t, ahora }: { f: FilaTurno; t: Tr; ahora: number }) {
+  const [foco, setFoco] = useState<number | null>(null);
+  const eventos = useMemo(() => eventosDelDia(f), [f]);
+  const tramos = f.franja;
+  const desde = Math.min(f.turnoInicio ?? Infinity, ...tramos.map((x) => x.inicio));
+  const hasta = Math.max(f.turnoFin ?? -Infinity, ...tramos.map((x) => x.fin));
+  if (!Number.isFinite(desde) || !Number.isFinite(hasta) || hasta <= desde) return null;
+  const pos = (msx: number) => `${((msx - desde) / (hasta - desde)) * 100}%`;
+  const ancho = (a: number, b: number) => `${Math.max(0.6, ((b - a) / (hasta - desde)) * 100)}%`;
+  const apagado = (i: number) => (foco != null && foco !== i ? "opacity-25" : "");
+  const trabajo = tramos.filter((x) => x.tipo === "trabajo");
+  return (
+    <div className="px-4 py-4">
+      <p className="mb-3 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">{t("hr.turno.paso.titulo")}</p>
+      {/* La raya, más alta, con cada pedazo numerado por su línea de abajo. */}
+      <div className="relative h-3 overflow-hidden rounded-full bg-foreground/[0.06]" onMouseLeave={() => setFoco(null)}>
+        {trabajo.map((x, i) => (
+          <div key={`t${i}`} className={`absolute inset-y-0 ${COLOR_FRANJA.trabajo} transition-opacity ${foco != null ? "opacity-25" : ""}`}
+            style={{ left: pos(x.inicio), width: ancho(x.inicio, x.fin) }} />
+        ))}
+        {eventos.map((x, i) => (
+          <div key={i} onMouseEnter={() => setFoco(i)}
+            title={`${t(ETIQUETA_EVENTO[x.tipo])} · ${x.tipo === "aviso" ? hora(x.inicio) : `${horaCorta(x.inicio)} – ${hora(x.fin)}`}`}
+            className={`absolute inset-y-0 cursor-help transition-opacity ${COLOR_EVENTO[x.tipo]} ${x.tipo === "aviso" ? "w-1 rounded-full" : ""} ${apagado(i)} ${foco === i ? "ring-2 ring-foreground/70" : ""}`}
+            style={{ left: pos(x.inicio), ...(x.tipo === "aviso" ? {} : { width: ancho(x.inicio, x.fin) }) }} />
+        ))}
+        {f.enCurso && ahora < hasta && (
+          <>
+            <div className="absolute inset-y-0 right-0 bg-background/40" style={{ left: pos(ahora) }} />
+            <div className="absolute inset-y-0 w-0.5 rounded-full bg-foreground" style={{ left: pos(ahora) }} />
+          </>
+        )}
+      </div>
+      <div className="mt-1 flex justify-between text-[10px] tabular-nums text-muted-foreground/70">
+        <span>{hora(desde)}</span><span>{hora(hasta)}</span>
+      </div>
+
+      {eventos.length === 0 ? (
+        <p className="mt-3 flex items-center gap-2 text-sm text-muted-foreground">
+          <span className={`h-2.5 w-2.5 rounded-sm ${COLOR_FRANJA.trabajo}`} aria-hidden />{t("hr.turno.paso.nada")}
+        </p>
+      ) : (
+        <ul className="mt-3 flex flex-col" onMouseLeave={() => setFoco(null)}>
+          {eventos.map((x, i) => {
+            const min = Math.max(1, Math.round((x.fin - x.inicio) / 60_000));
+            const abierto = f.enCurso && x.tipo !== "aviso" && ahora - x.fin < 90_000;
+            return (
+              <li key={i} onMouseEnter={() => setFoco(i)}
+                className={`grid grid-cols-[0.75rem_7.5rem_1fr_auto] items-center gap-3 rounded-lg px-2 py-1.5 text-sm transition-colors ${foco === i ? "bg-foreground/[0.06]" : ""}`}>
+                <span className={`h-2.5 w-2.5 rounded-sm ${COLOR_EVENTO[x.tipo]}`} aria-hidden />
+                <span className="tabular-nums text-muted-foreground">{x.tipo === "aviso" ? hora(x.inicio) : `${horaCorta(x.inicio)} – ${hora(x.fin)}`}</span>
+                <span className="font-medium">{t(ETIQUETA_EVENTO[x.tipo])}</span>
+                <span className="tabular-nums text-muted-foreground">
+                  {x.tipo === "aviso" ? "" : abierto ? t("hr.turno.paso.enCurso", { d: duracion(t, min) }) : duracion(t, min)}
+                </span>
+              </li>
+            );
+          })}
+        </ul>
+      )}
     </div>
   );
 }
@@ -534,6 +638,7 @@ export function TurnoTabla() {
                   </div>
                 );
               })()}
+              <LoQuePaso f={f} t={t} ahora={q.data?.calculadoAt ?? Date.now()} />
               {([
                 [Clock, t("hr.turno.col.llegada"), ll],
                 [UtensilsCrossed, t("hr.turno.col.comida"), celdaComida(t, f)],
