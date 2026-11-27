@@ -73,6 +73,11 @@ Deno.test("cupo: entra justo; un byte más, no — y el mensaje dice cuánto", (
   assert(/No te alcanza el espacio: usas 49 GB de 50 GB/.test(msg), msg);
 });
 
+Deno.test("cupo sin tope (null): nunca bloquea; manda solo el disco del NAS", () => {
+  const G = 1024 ** 3;
+  chequearCupo(5000 * G, null, 500 * G);
+});
+
 Deno.test("lugar en el NAS: 5% libre después de guardar, y el doble si va por partes", () => {
   const disco = [{ ok: true, libre: 100, total: 1000 }];
   assert(hayLugarEnElNas(disco, 50, false), "50 entra dejando 50 (5%)");

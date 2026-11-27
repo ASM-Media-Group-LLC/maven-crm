@@ -23,6 +23,18 @@ export function BarraDeUso() {
   const uso = useUsoDrive();
   if (!uso.data) return null;
   const { usado, cupo } = uso.data;
+  // SIN TOPE (27/11/2026): por su puesto o por persona. Solo se dice cuánto usa.
+  if (cupo === null) {
+    return (
+      <div className="flex w-full flex-col gap-2 rounded-panel border border-border/60 bg-card/60 px-4 py-3 sm:w-80" data-testid="barra-uso-drive">
+        <span className="flex items-center gap-1.5 text-xs font-medium text-foreground">
+          <HardDrive className="h-3.5 w-3.5 text-muted-foreground" />
+          {t("drive.uso.titulo")}
+        </span>
+        <p className="text-xs text-muted-foreground">{t("drive.uso.sinTope", { usado: tamano(usado) })}</p>
+      </div>
+    );
+  }
   const pct = cupo > 0 ? Math.min(100, (usado / cupo) * 100) : 100;
   const casiLleno = pct >= 90;
   return (
@@ -136,8 +148,11 @@ export function CuposDialog({ onCerrar }: { onCerrar: () => void }) {
 function FilaDeCupo({ u }: { u: UsoDePersona }) {
   const { t } = useLanguage();
   const guardar = useGuardarCupo();
-  const [gb, setGb] = useState(String(Math.round((u.cupo / GB) * 10) / 10));
-  const pct = u.cupo > 0 ? Math.min(100, (u.usado / u.cupo) * 100) : 100;
+  const sinTope = u.cupo === null;
+  const [gb, setGb] = useState(u.cupo === null ? "" : String(Math.round((u.cupo / GB) * 10) / 10));
+  const pct = u.cupo === null ? 0 : u.cupo > 0 ? Math.min(100, (u.usado / u.cupo) * 100) : 100;
+  // De dónde sale: suyo, de su puesto o el general (27/11/2026).
+  const delPuesto = !u.cupo_propio && u.cupo !== CUPO_POR_DEFECTO;
   const alFallar = (e: unknown) => toast.error((e as Error).message);
   const aplicar = () => {
     const n = Number(gb.replace(",", "."));
@@ -162,21 +177,33 @@ function FilaDeCupo({ u }: { u: UsoDePersona }) {
             inputMode="decimal"
             value={gb}
             onChange={(e) => setGb(e.target.value)}
-            onBlur={() => { if (Number(gb.replace(",", ".")) * GB !== u.cupo) aplicar(); }}
+            onBlur={() => { if (gb.trim() && Number(gb.replace(",", ".")) * GB !== u.cupo) aplicar(); }}
+            placeholder={sinTope ? t("drive.cupos.sinTopeCorto") : undefined}
             className="h-8 w-20 tabular-nums"
           />
+          {!(sinTope && u.cupo_propio) && (
+            <Button
+              type="button" variant="outline" size="sm" className="h-8 px-2 text-xs"
+              onClick={() => guardar.mutate({ userId: u.user_id, bytes: null, sinTope: true }, {
+                onSuccess: () => { setGb(""); toast.success(t("drive.cupos.guardado")); },
+                onError: alFallar,
+              })}
+            >
+              {t("drive.cupos.sinTope")}
+            </Button>
+          )}
           {u.cupo_propio ? (
             <Button
               type="button" variant="ghost" size="sm" className="h-8 px-2 text-xs"
               onClick={() => guardar.mutate({ userId: u.user_id, bytes: null }, {
-                onSuccess: () => { setGb(String(CUPO_POR_DEFECTO / GB)); toast.success(t("drive.cupos.guardado")); },
+                onSuccess: () => { setGb(""); toast.success(t("drive.cupos.guardado")); },
                 onError: alFallar,
               })}
             >
               {t("drive.cupos.volver")}
             </Button>
           ) : (
-            <span className="text-xs text-muted-foreground">{t("drive.cupos.general")}</span>
+            <span className="text-xs text-muted-foreground">{t(delPuesto ? "drive.cupos.delPuesto" : "drive.cupos.general")}</span>
           )}
         </form>
       </td>
