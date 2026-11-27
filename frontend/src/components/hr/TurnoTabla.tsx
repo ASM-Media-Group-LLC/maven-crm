@@ -493,7 +493,8 @@ export function TurnoTabla() {
                 ["tarde", String(numeros.tarde), "hr.turno.num.tarde", numeros.tarde ? "ambar" : null],
                 ["noEsta", String(numeros.noVino), "hr.turno.num.noVino", numeros.noVino ? "rojo" : null],
                 ["ignoro", String(numeros.ignoraron), "hr.turno.num.ignoraron", numeros.ignoraron ? "rojo" : null],
-                [null, t("hr.turno.deHoras", { a: duracion(t, numeros.horas), b: duracion(t, numeros.horasTurno) }), "hr.turno.num.horas", null],
+                // Números humanos (Alvaro, 27/11/2026: «no me hables por 216 h 01»): el % en grande y horas redondas abajo.
+                [null, numeros.horasTurno ? `${Math.round((numeros.horas / numeros.horasTurno) * 100)} %` : "—", "hr.turno.num.horas", null],
               ] as Array<[Filtro | null, string, TranslationKey, Nivel | null]>).map(([k, valor, etq, nivel]) => (
                 <button
                   key={etq}
@@ -506,7 +507,11 @@ export function TurnoTabla() {
                   <p className="flex items-center gap-1.5 font-display text-2xl font-bold tabular-nums leading-none">
                     {valor}{nivel && <Punto nivel={nivel} />}
                   </p>
-                  <p className="mt-1 text-[11px] text-muted-foreground">{t(etq)}</p>
+                  <p className="mt-1 text-[11px] text-muted-foreground">
+                    {etq === "hr.turno.num.horas"
+                      ? t("hr.turno.num.horasDe", { a: Math.round(numeros.horas / 60), b: Math.round(numeros.horasTurno / 60) })
+                      : t(etq)}
+                  </p>
                 </button>
               ))}
             </div>

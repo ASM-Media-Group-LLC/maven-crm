@@ -2170,6 +2170,7 @@ export const hr = {
   "hr.turno.normal.tardeVez": { es: "{n}.ª vez tarde esta semana", en: "late {n} times this week" },
   "hr.turno.deHoras": { es: "{a} de {b}", en: "{a} of {b}" },
   "hr.turno.llego": { es: "llegó {h}", en: "in {h}" },
+  "hr.turno.num.horasDe": { es: "trabajaron {a} de {b} horas", en: "worked {a} of {b} hours" },
   "hr.turno.verDia": { es: "Ver su día completo", en: "See their full day" },
   "hr.turno.normal.menos": { es: "trabajó {d} menos que de costumbre", en: "worked {d} less than usual" },
   "hr.turno.sec.libres": { es: "Día libre o con permiso", en: "Day off or on leave" },
