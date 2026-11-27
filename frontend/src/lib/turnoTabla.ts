@@ -384,12 +384,14 @@ export function apareceEnElDia(f: FilaTurno): boolean {
   return f.turnoInicio != null || f.llegada != null;
 }
 
-export type Seccion = "mirar" | "ojo" | "bien" | "luego" | "inactivos" | "libres";
+export type Seccion = "mirar" | "ojo" | "bien" | "luego" | "inactivos" | "libres" | "noVinieron";
 
 export function seccionDe(f: FilaTurno): Seccion {
   if (f.empiezaLuego) return "luego";
   if (f.inactivo) return "inactivos";
   if (f.diaLibre) return "libres";
+  // Los que no vinieron van juntos y plegados al final (Alvaro, 27/11/2026).
+  if (f.noVino) return "noVinieron";
   return f.nivel === "rojo" ? "mirar" : f.nivel === "ambar" ? "ojo" : "bien";
 }
 

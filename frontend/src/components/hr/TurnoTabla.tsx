@@ -32,7 +32,13 @@ import {
 // señal). Lo que va bien no lleva puntito.
 
 type Tr = (k: TranslationKey, vars?: Record<string, string | number>) => string;
-type Filtro = "todos" | "mirar" | "tarde" | "noEsta" | "pausas" | "ignoro";
+// La vista de un toque (Alvaro, 27/11/2026: «filtrar los que estuvieron, los que no,
+// los que estuvieron mejor, los que estuvieron peor»).
+type Filtro = "todos" | "trabajaron" | "noVinieron" | "mejores" | "peores" | "tarde" | "ignoro";
+const VISTAS: Array<[Filtro, TranslationKey]> = [
+  ["todos", "hr.turno.v.todos"], ["trabajaron", "hr.turno.v.trabajaron"], ["noVinieron", "hr.turno.v.noVinieron"],
+  ["mejores", "hr.turno.v.mejores"], ["peores", "hr.turno.v.peores"],
+];
 
 const PUNTO: Record<Nivel | "ahora", string> = {
   ok: "",
@@ -49,6 +55,7 @@ const minutosTurno = (f: FilaTurno) => (f.turnoInicio != null && f.turnoFin != n
 
 function duracion(t: Tr, minutos: number): string {
   if (minutos < 60) return t("hr.turno.min", { n: minutos });
+  if (minutos % 60 === 0) return t("hr.turno.horasRedondas", { h: minutos / 60 });
   return t("hr.turno.horas", { h: Math.floor(minutos / 60), m: String(minutos % 60).padStart(2, "0") });
 }
 
@@ -235,6 +242,7 @@ const TITULO_SECCION: Record<Seccion, TranslationKey> = {
   bien: "hr.turno.sec.bien",
   luego: "hr.turno.sec.luego",
   inactivos: "hr.turno.sec.inactivos",
+  noVinieron: "hr.turno.sec.noVinieron",
   libres: "hr.turno.sec.libres",
 };
 
@@ -281,19 +289,27 @@ export function TurnoTabla() {
   const delTurno = useMemo(() => filas.filter((f) => !turno || `${f.entrada}–${f.salida}` === turno), [filas, turno]);
   const pasa = (f: FilaTurno, k: Filtro) =>
     k === "todos" ? true
-      : k === "mirar" ? f.nivel !== "ok" && !f.empiezaLuego && !f.inactivo
-        : k === "tarde" ? f.tardeMin != null
-          : k === "noEsta" ? (f.noVino && !f.inactivo) || f.noLlegaMin != null
-            : k === "ignoro" ? f.ignorados > 0
-              : f.nivelComida !== "ok" || f.nivelBano !== "ok";
+      : k === "trabajaron" || k === "mejores" || k === "peores" ? f.llegada != null
+        : k === "noVinieron" ? (f.noVino && !f.inactivo && !f.diaLibre) || f.noLlegaMin != null
+          : k === "tarde" ? f.tardeMin != null
+            : f.ignorados > 0;
+  /** Qué parte de su turno trabajó (0–1), o null si no hay turno. */
+  const parte = (f: FilaTurno) => { const m = minutosTurno(f); return m ? minutosTrabajados(f) / m : null; };
   const texto = buscar.trim().toLocaleLowerCase();
   const vistas = useMemo(
-    () => ordenarPorAtencion(delTurno.filter((f) => pasa(f, filtro) && (!texto || f.nombre.toLocaleLowerCase().includes(texto)))),
+    () => {
+      const xs = delTurno.filter((f) => pasa(f, filtro) && (!texto || f.nombre.toLocaleLowerCase().includes(texto)));
+      if (filtro === "mejores" || filtro === "peores") {
+        const signo = filtro === "mejores" ? -1 : 1;
+        return [...xs].sort((a, b) => signo * ((parte(a) ?? 0) - (parte(b) ?? 0)));
+      }
+      return ordenarPorAtencion(xs);
+    },
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [delTurno, filtro, texto],
   );
   const secciones = useMemo(() => {
-    const m: Record<Seccion, FilaTurno[]> = { mirar: [], ojo: [], bien: [], luego: [], inactivos: [], libres: [] };
+    const m: Record<Seccion, FilaTurno[]> = { mirar: [], ojo: [], bien: [], luego: [], inactivos: [], libres: [], noVinieron: [] };
     for (const f of vistas) m[seccionDe(f)].push(f);
     return m;
   }, [vistas]);
@@ -345,7 +361,7 @@ export function TurnoTabla() {
           type="button"
           onClick={() => setAbiertoId(abierta ? null : f.userId)}
           aria-expanded={abierta}
-          className="group grid w-full grid-cols-[1fr_auto] items-center gap-x-3 gap-y-1.5 rounded-2xl px-3 py-2.5 text-left transition hover:bg-foreground/[0.04] md:grid-cols-[minmax(11rem,15rem)_1fr_8.5rem_1rem]"
+          className="group grid w-full grid-cols-[1fr_auto] items-center gap-x-4 gap-y-2 rounded-2xl px-3 py-3.5 text-left transition hover:bg-foreground/[0.04] md:grid-cols-[minmax(11rem,15rem)_1fr_9rem_1rem]"
         >
           <div className="flex min-w-0 items-center gap-2.5">
             <span className="relative shrink-0">
@@ -359,23 +375,48 @@ export function TurnoTabla() {
               <p className="truncate text-[11px] text-muted-foreground">{motivo ?? horario}</p>
             </div>
           </div>
-          <div className="col-span-2 row-start-2 md:col-span-1 md:row-start-auto"><Franja f={f} t={t} /></div>
+          <div className="col-span-2 row-start-2 md:col-span-1 md:row-start-auto">{f.llegada != null && <Franja f={f} t={t} />}</div>
           <div className="text-right md:row-start-auto">
             {f.llegada != null ? (
               <>
-                <p className="text-sm tabular-nums text-foreground/90">
-                  {t("hr.turno.deHoras", { a: duracion(t, minutosTrabajados(f)), b: minutosTurno(f) != null ? duracion(t, minutosTurno(f)!) : "—" })}
-                </p>
-                <p className="text-[11px] tabular-nums text-muted-foreground">{t("hr.turno.llego", { h: ll.arriba })}</p>
+                {(filtro === "mejores" || filtro === "peores") && parte(f) != null ? (
+                  <>
+                    <p className="font-display text-lg font-bold tabular-nums leading-none">{Math.round(parte(f)! * 100)} %</p>
+                    <p className="mt-1 text-[11px] tabular-nums text-muted-foreground">
+                      {t("hr.turno.deHoras", { a: duracion(t, minutosTrabajados(f)), b: minutosTurno(f) != null ? duracion(t, minutosTurno(f)!) : "—" })}
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <p className="text-sm tabular-nums text-foreground/90">
+                      {t("hr.turno.deHoras", { a: duracion(t, minutosTrabajados(f)), b: minutosTurno(f) != null ? duracion(t, minutosTurno(f)!) : "—" })}
+                    </p>
+                    <p className="text-[11px] tabular-nums text-muted-foreground">{t("hr.turno.llego", { h: ll.arriba })}</p>
+                  </>
+                )}
               </>
+            ) : f.noVino && f.entrada ? (
+              <p className="text-[12px] text-muted-foreground">{t("hr.turno.debiaEntrar", { h: a12(f.entrada) ?? "" })}</p>
             ) : (
               <p className="text-sm text-muted-foreground">{ll.arriba || "—"}</p>
             )}
           </div>
           <ChevronDown className={`hidden h-4 w-4 text-muted-foreground transition md:block ${abierta ? "rotate-180" : ""}`} />
         </button>
-        {abierta && (
-          <div className="flex flex-col gap-3 px-3 pb-3 md:pl-14">
+        {abierta && f.llegada == null && (
+          <div className="flex flex-wrap items-center gap-3 px-3 pb-4 md:pl-14">
+            <p className="text-sm text-muted-foreground">
+              {f.diaLibre ? t("hr.turno.libre.marcado") : t("hr.turno.noVinoDetalle", { h: horario })}
+            </p>
+            {puedeLibre && (
+              <Button size="sm" variant="outline" className="rounded-full" disabled={guardandoLibre === f.userId} onClick={() => void cambiarLibre(f, !f.diaLibre)}>
+                {t(f.diaLibre ? "hr.turno.libre.quitar" : "hr.turno.libre.marcar")}
+              </Button>
+            )}
+          </div>
+        )}
+        {abierta && f.llegada != null && (
+          <div className="flex flex-col gap-4 px-3 pb-4 md:pl-14">
             <p className="text-[11px] text-muted-foreground">{horario}</p>
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
               {[
@@ -489,9 +530,9 @@ export function TurnoTabla() {
             {/* LOS NÚMEROS DEL DÍA: cada tarjeta filtra la tabla. */}
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
               {([
-                ["todos", `${numeros.vinieron}/${numeros.tocaban}`, "hr.turno.num.vinieron", null],
+                ["trabajaron", `${numeros.vinieron}/${numeros.tocaban}`, "hr.turno.num.vinieron", null],
                 ["tarde", String(numeros.tarde), "hr.turno.num.tarde", numeros.tarde ? "ambar" : null],
-                ["noEsta", String(numeros.noVino), "hr.turno.num.noVino", numeros.noVino ? "rojo" : null],
+                ["noVinieron", String(numeros.noVino), "hr.turno.num.noVino", numeros.noVino ? "rojo" : null],
                 ["ignoro", String(numeros.ignoraron), "hr.turno.num.ignoraron", numeros.ignoraron ? "rojo" : null],
                 // Números humanos (Alvaro, 27/11/2026: «no me hables por 216 h 01»): el % en grande y horas redondas abajo.
                 [null, numeros.horasTurno ? `${Math.round((numeros.horas / numeros.horasTurno) * 100)} %` : "—", "hr.turno.num.horas", null],
@@ -500,7 +541,7 @@ export function TurnoTabla() {
                   key={etq}
                   type="button"
                   disabled={!k}
-                  onClick={() => k && setFiltro(k)}
+                  onClick={() => k && setFiltro(filtro === k ? "todos" : k)}
                   aria-pressed={k ? filtro === k : undefined}
                   className={`rounded-2xl border p-3 text-left transition disabled:cursor-default ${k && filtro === k ? "border-primary/60 bg-primary/10" : "border-border/50 bg-card/30 hover:enabled:bg-foreground/[0.04]"}`}
                 >
@@ -517,7 +558,20 @@ export function TurnoTabla() {
             </div>
 
             {/* Filtros, turno y buscador */}
-            <div className="flex flex-col gap-2 lg:flex-row lg:items-center">
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
+              <div className="flex gap-1 overflow-x-auto rounded-full border border-border/50 bg-background/40 p-1">
+                {VISTAS.map(([k, etq]) => (
+                  <button
+                    key={k}
+                    type="button"
+                    onClick={() => setFiltro(k)}
+                    aria-pressed={filtro === k}
+                    className={`shrink-0 rounded-full px-3.5 py-1.5 text-xs font-medium transition ${filtro === k ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
+                  >
+                    {t(etq)}
+                  </button>
+                ))}
+              </div>
               <div className="flex items-center gap-1.5 lg:ml-auto">
                 <select
                   value={turno ?? ""}
@@ -560,6 +614,11 @@ export function TurnoTabla() {
               {!vistas.length && (
                 <p className="rounded-2xl border border-dashed border-border/50 p-5 text-center text-sm text-muted-foreground">{t("hr.turno.nadieAsi")}</p>
               )}
+              {(filtro === "mejores" || filtro === "peores" || filtro === "noVinieron") ? (
+                <div className="mt-2 flex flex-col gap-1 md:divide-y md:divide-border/30">
+                  {vistas.map((f) => <Fila key={f.userId} f={f} />)}
+                </div>
+              ) : (<>
               {(["mirar", "ojo", "bien"] as Seccion[]).map((s) => secciones[s].length > 0 && (
                 <div key={s} className="flex flex-col gap-1.5 md:gap-0">
                   <p className="mt-2 flex items-center gap-1.5 px-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground md:px-3">
@@ -571,6 +630,16 @@ export function TurnoTabla() {
                   </div>
                 </div>
               ))}
+              {secciones.noVinieron.length > 0 && (
+                <details className="mt-2 rounded-2xl border border-dashed border-border/40 bg-card/10 p-3">
+                  <summary className="cursor-pointer text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                    {t(TITULO_SECCION.noVinieron)} · {secciones.noVinieron.length}
+                  </summary>
+                  <div className="mt-2 flex flex-col gap-1.5 md:gap-0 md:divide-y md:divide-border/30">
+                    {secciones.noVinieron.map((f) => <Fila key={f.userId} f={f} />)}
+                  </div>
+                </details>
+              )}
               {secciones.luego.length > 0 && (
                 <details className="mt-2 rounded-2xl border border-dashed border-border/40 bg-card/10 p-3">
                   <summary className="cursor-pointer text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
@@ -601,6 +670,7 @@ export function TurnoTabla() {
                   </div>
                 </details>
               )}
+              </>)}
             </div>
 
             <p className="text-[11px] text-muted-foreground">
