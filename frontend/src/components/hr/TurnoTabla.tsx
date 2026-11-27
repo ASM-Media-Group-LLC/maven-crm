@@ -44,6 +44,9 @@ const PUNTO: Record<Nivel | "ahora", string> = {
 const hora = (msx: number | null | undefined) => (msx == null ? "—" : horaBogota(new Date(msx).toISOString()));
 const horaCorta = (msx: number) => hora(msx).replace(/\s?(AM|PM)$/i, "");
 
+/** Minutos que le tocaba trabajar ese día (largo del turno). */
+const minutosTurno = (f: FilaTurno) => (f.turnoInicio != null && f.turnoFin != null ? Math.round((f.turnoFin - f.turnoInicio) / 60_000) : null);
+
 function duracion(t: Tr, minutos: number): string {
   if (minutos < 60) return t("hr.turno.min", { n: minutos });
   return t("hr.turno.horas", { h: Math.floor(minutos / 60), m: String(minutos % 60).padStart(2, "0") });
@@ -303,6 +306,7 @@ export function TurnoTabla() {
     noVino: delTurno.filter((f) => f.noVino && !f.inactivo && !f.diaLibre).length,
     ignoraron: delTurno.filter((f) => f.ignorados > 0).length,
     horas: delTurno.reduce((s, f) => s + f.conectadoMin, 0),
+    horasTurno: tocaban.reduce((s, f) => s + (minutosTurno(f) ?? 0), 0),
   };
   /** Frases contra lo normal de la persona. */
   const contraLoNormal = (f: FilaTurno): string[] => {
@@ -339,7 +343,7 @@ export function TurnoTabla() {
           type="button"
           onClick={() => setAbiertoId(abierta ? null : f.userId)}
           aria-expanded={abierta}
-          className="group grid w-full grid-cols-[1fr_auto] items-center gap-x-3 gap-y-1.5 rounded-2xl px-3 py-2.5 text-left transition hover:bg-foreground/[0.04] md:grid-cols-[minmax(11rem,15rem)_1fr_6.5rem_1rem]"
+          className="group grid w-full grid-cols-[1fr_auto] items-center gap-x-3 gap-y-1.5 rounded-2xl px-3 py-2.5 text-left transition hover:bg-foreground/[0.04] md:grid-cols-[minmax(11rem,15rem)_1fr_8.5rem_1rem]"
         >
           <div className="flex min-w-0 items-center gap-2.5">
             <span className="relative shrink-0">
@@ -354,7 +358,18 @@ export function TurnoTabla() {
             </div>
           </div>
           <div className="col-span-2 row-start-2 md:col-span-1 md:row-start-auto"><Franja f={f} t={t} /></div>
-          <p className="text-right text-sm tabular-nums text-foreground/90 md:row-start-auto">{ll.arriba || "—"}</p>
+          <div className="text-right md:row-start-auto">
+            {f.llegada != null ? (
+              <>
+                <p className="text-sm tabular-nums text-foreground/90">
+                  {t("hr.turno.deHoras", { a: duracion(t, f.conectadoMin), b: minutosTurno(f) != null ? duracion(t, minutosTurno(f)!) : "—" })}
+                </p>
+                <p className="text-[11px] tabular-nums text-muted-foreground">{t("hr.turno.llego", { h: ll.arriba })}</p>
+              </>
+            ) : (
+              <p className="text-sm text-muted-foreground">{ll.arriba || "—"}</p>
+            )}
+          </div>
           <ChevronDown className={`hidden h-4 w-4 text-muted-foreground transition md:block ${abierta ? "rotate-180" : ""}`} />
         </button>
         {abierta && (
@@ -476,7 +491,7 @@ export function TurnoTabla() {
                 ["tarde", String(numeros.tarde), "hr.turno.num.tarde", numeros.tarde ? "ambar" : null],
                 ["noEsta", String(numeros.noVino), "hr.turno.num.noVino", numeros.noVino ? "rojo" : null],
                 ["ignoro", String(numeros.ignoraron), "hr.turno.num.ignoraron", numeros.ignoraron ? "rojo" : null],
-                [null, duracion(t, numeros.horas), "hr.turno.num.horas", null],
+                [null, t("hr.turno.deHoras", { a: duracion(t, numeros.horas), b: duracion(t, numeros.horasTurno) }), "hr.turno.num.horas", null],
               ] as Array<[Filtro | null, string, TranslationKey, Nivel | null]>).map(([k, valor, etq, nivel]) => (
                 <button
                   key={etq}
