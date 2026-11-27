@@ -32,6 +32,7 @@ begin
     from public.profiles p
     join public.tenant_members m on m.user_id = p.id and m.tenant_id = emp
    where p.deleted_at is null
+     and public.debe_estar_en_cowork(p.id)
      and public.puede_editar_horario(p.id)
      and not exists (select 1 from public.horario_confirmado h where h.user_id = p.id);
   if n > 0 then

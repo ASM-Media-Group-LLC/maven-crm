@@ -178,3 +178,5 @@ Ambos sets ya tienen migrations subidas (`20260504100000`, `20260504110000`) per
 - Pendiente: aplicar la migración 20261127050220 en producción (pide permiso del dueño).
 
 - 27/11/2026 (Claude): cuadrito «Pendientes del equipo» abajo a la derecha (horarios sin confirmar, personas sin Posición, hora de comida, turnos). Cada cosa la ve quien la puede arreglar según su Posición. Migración 20261127200000_pendientes_de_gestion.sql.
+
+- 27/11/2026 (Claude): limpieza de Posiciones (cuentas de prueba a la papelera, posiciones vacías borradas, Juan Pachas sin Administración→Usuarios); horarios solo se piden a quien debe estar en Cowork; skin negro/gris en oscuro con primario claro.
