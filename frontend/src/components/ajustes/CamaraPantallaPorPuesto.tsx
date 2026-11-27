@@ -1,5 +1,5 @@
 import { type ReactNode, useState } from "react";
-import { Eye, Loader2, Lock, Monitor, RefreshCw, Video } from "lucide-react";
+import { Eye, Globe, Loader2, Lock, Monitor, RefreshCw, Video } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
@@ -8,7 +8,7 @@ import { haceCuanto } from "@/lib/conexionEquipo/resumen";
 import { cn } from "@/lib/utils";
 import {
   type CambioExigencias, type MotivoBloqueo, type PuestoExigencias,
-  cambiosDe, useExigenciasPorPuesto, useGuardarExigencias,
+  cambiosDe, useExigenciasPorPuesto, useGuardarExigencias, useGuardarSoloNavegador, usePosicionesSoloNavegador,
 } from "@/hooks/useExigencias";
 
 // CÁMARA Y PANTALLA POR PUESTO (Alvaro, 19/11/2026). Cada puesto pide cámara y
@@ -45,6 +45,30 @@ function Interruptor({ puesto, cosa, onPedir }: { puesto: PuestoExigencias; cosa
         checked={valor}
         disabled={!puesto.puede_cambiar}
         onCheckedChange={(v) => onPedir({ puesto, cosa, valor: v })}
+        aria-label={t("settings.exig.aria", { cosa: etiqueta, puesto: puesto.nombre })}
+      />
+    </label>
+  );
+}
+
+/** «Solo navegador» (Alvaro, 26/11/2026): esa gente no necesita la app de
+ *  Maven. No avisa a nadie ni manda correo: se guarda al tocarlo. */
+function InterruptorNavegador({ puesto, valor }: { puesto: PuestoExigencias; valor: boolean | undefined }) {
+  const { t } = useLanguage();
+  const { toast } = useToast();
+  const guardar = useGuardarSoloNavegador();
+  const etiqueta = t("settings.exig.soloNavegador");
+  if (valor === undefined) return null;
+  return (
+    <label className={cn("flex items-center gap-2 text-xs", puesto.puede_cambiar ? "text-foreground" : "text-muted-foreground")} title={t("settings.exig.soloNavegadorAyuda")}>
+      <Globe className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+      <span className="whitespace-nowrap">{etiqueta}</span>
+      <Switch
+        checked={valor}
+        disabled={!puesto.puede_cambiar || guardar.isPending}
+        onCheckedChange={(v) => guardar.mutate({ posicion: puesto.id, valor: v }, {
+          onError: (e) => toast({ title: t("settings.exig.soloNavegadorError"), description: (e as Error).message, variant: "destructive" }),
+        })}
         aria-label={t("settings.exig.aria", { cosa: etiqueta, puesto: puesto.nombre })}
       />
     </label>
@@ -109,6 +133,7 @@ function LineaCambio({ c }: { c: CambioExigencias }) {
 export function CamaraPantallaPorPuesto() {
   const { t } = useLanguage();
   const q = useExigenciasPorPuesto();
+  const navegador = usePosicionesSoloNavegador();
   const [pendiente, setPendiente] = useState<Pendiente | null>(null);
 
   let cuerpo: ReactNode;
@@ -146,6 +171,7 @@ export function CamaraPantallaPorPuesto() {
                 <div className="flex shrink-0 flex-wrap items-center gap-4">
                   <Interruptor puesto={p} cosa="camara" onPedir={setPendiente} />
                   <Interruptor puesto={p} cosa="pantalla" onPedir={setPendiente} />
+                  <InterruptorNavegador puesto={p} valor={navegador.data?.[p.id]} />
                 </div>
               </div>
               {pendiente?.puesto.id === p.id && <Confirmar p={pendiente} onCancelar={() => setPendiente(null)} />}

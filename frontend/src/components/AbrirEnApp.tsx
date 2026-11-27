@@ -6,6 +6,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useLanguage } from "@/hooks/useLanguage";
 import { escritorio } from "@/lib/escritorio";
 import { debeOfrecerApp, enlaceDeApp, guardarPreferencia, leerPreferencia } from "@/lib/abrirEnApp";
+import { useSoloNavegador } from "@/hooks/useExigencias";
 
 // LOS LINKS DE MAVEN ABREN EN LA APP DE COMPUTADOR (Alvaro, 17/11/2026). Ver
 // lib/abrirEnApp.ts. Dos mitades:
@@ -21,6 +22,8 @@ export function AbrirEnApp() {
   const { t } = useLanguage();
   const [modo, setModo] = useState<"oculto" | "ofrecer" | "abriendo">("oculto");
   const decidido = useRef<string | null>(null);
+  // Su Posición le deja trabajar solo en el navegador: nunca se le ofrece la app.
+  const soloNavegador = useSoloNavegador(!!user && !escritorio());
 
   // Dentro de la app: un link maven:// abre su ruta sin recargar (no corta llamadas).
   useEffect(() => {
@@ -35,7 +38,7 @@ export function AbrirEnApp() {
     if (decidido.current === ruta) return;
     const ua = navigator.userAgent || "";
     const tactil = /Macintosh/i.test(ua) && (navigator.maxTouchPoints ?? 0) > 1; // iPad se hace pasar por Mac
-    if (tactil || !debeOfrecerApp({ ua, enApp: !!escritorio(), conSesion: !!user, ruta: pathname })) {
+    if (soloNavegador || tactil || !debeOfrecerApp({ ua, enApp: !!escritorio(), conSesion: !!user, ruta: pathname })) {
       setModo("oculto");
       return;
     }
@@ -48,7 +51,7 @@ export function AbrirEnApp() {
       return;
     }
     setModo("ofrecer");
-  }, [user, pathname, search, hash]);
+  }, [user, pathname, search, hash, soloNavegador]);
 
   useEffect(() => {
     if (modo !== "abriendo") return;

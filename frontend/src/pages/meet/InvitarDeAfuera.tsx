@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { UserPlus, Copy, Mail, MessageCircle, Ban, Loader2 } from "lucide-react";
+import { Copy, Mail, MessageCircle, Ban, Loader2, Link2 } from "lucide-react";
 import { toast } from "sonner";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { getPublicBaseUrl } from "@/lib/getPublicUrl";
@@ -73,7 +73,9 @@ export default function InvitarDeAfuera({ livekitRoom }: { livekitRoom: string }
           title={t("meet.invite.button")}
           className="flex h-8 items-center gap-1.5 rounded-full border border-border bg-card/40 px-3 text-xs text-foreground transition-colors hover:bg-card"
         >
-          <UserPlus className="h-3.5 w-3.5" />
+          {/* Un enlace, no un «+persona»: al lado está «Agregar» (gente de Maven)
+              con el mismo ícono y se veían dos botones iguales (Alvaro, 26/11/2026). */}
+          <Link2 className="h-3.5 w-3.5" />
           <span className="hidden md:inline">{t("meet.invite.button")}</span>
         </button>
       </PopoverTrigger>

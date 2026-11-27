@@ -11,6 +11,7 @@ import { enlaceDeApp } from "@/lib/abrirEnApp";
 import { COLUMNA_DESDE, esNavegadorDeComputador, estadoSoloApp, type EstadoSoloApp, type LugarSoloApp } from "@/lib/coworkSoloApp";
 import { RUTA_DESCARGAR_CON_GUIA } from "@/lib/guiaApp";
 import { RUTA_GUIA_APP } from "@/lib/guiaApp";
+import { useSoloNavegadorConEstado } from "@/hooks/useExigencias";
 
 // Ver lib/coworkSoloApp.ts. Aviso (antes de la fecha) o pantalla de «Cowork se
 // abre en la app» (desde la fecha). Si la fecha no se puede leer, no se bloquea.
@@ -60,7 +61,8 @@ function useSoloApp(lugar: LugarSoloApp): { estado: EstadoSoloApp; desde: Date |
     return () => { vivo = false; };
   }, [lugar]);
   const probador = !!user?.id && probadores.includes(user.id);
-  return { estado: estadoSoloApp({ ua, tactil, enApp, desde, ahora: new Date(), probador }), desde, listo: leido || !hayQueMirar };
+  const { soloNavegador, listo: navegadorListo } = useSoloNavegadorConEstado(!!user?.id && hayQueMirar);
+  return { estado: estadoSoloApp({ ua, tactil, enApp, desde, ahora: new Date(), probador, soloNavegador }), desde, listo: (leido && navegadorListo) || !hayQueMirar };
 }
 
 function enlaces() {

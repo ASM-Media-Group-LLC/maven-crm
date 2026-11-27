@@ -163,14 +163,15 @@ describe("llamada entrante en el navegador", () => {
 
   it("ofrece contestar en la app y descargarla", () => {
     render(<IncomingCallModal call={llamada} onAccept={() => {}} onDecline={() => {}} enLaApp />);
-    expect(screen.getByText("messenger.incoming.contestarEnApp")).toBeTruthy();
+    // 26/11/2026: la llamada entrante es una tarjeta con botones redondos; el texto va en la etiqueta.
+    expect(screen.getByLabelText("messenger.incoming.contestarEnApp")).toBeTruthy();
     expect(screen.getByText("messenger.incoming.descargarApp").closest("a")).toBeTruthy();
-    expect(screen.queryByText("messenger.incoming.aceptar")).toBeNull();
+    expect(screen.queryByLabelText("messenger.incoming.aceptar")).toBeNull();
   });
 
   it("en la app sigue siendo «Aceptar» de siempre", () => {
     render(<IncomingCallModal call={llamada} onAccept={() => {}} onDecline={() => {}} />);
-    expect(screen.getByText("messenger.incoming.aceptar")).toBeTruthy();
+    expect(screen.getByLabelText("messenger.incoming.aceptar")).toBeTruthy();
     expect(screen.queryByText("messenger.incoming.descargarApp")).toBeNull();
   });
 
