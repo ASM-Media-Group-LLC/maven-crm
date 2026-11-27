@@ -8,6 +8,7 @@
 
 ## Stack y deploy
 - 27/11/2026 (Claude, PR 295): Shift → al abrir a una persona, «Lo que pasó en su turno»: la raya grande y una línea por cada pedazo de color (comida, baño, sin cámara, sin internet, avisos) con hora y duración; mouse encima ilumina el pedazo. Arreglado «1 warnings».
+- 27/11/2026 (Claude, PR 295): la ficha de la persona muestra la misma lista «Lo que pasó en su turno»; pestañas de una palabra (Resumen · Por hora · Pago · Avisos · Apps). Se trajo PR 302 (gracia única) a esta rama: ya no sale «Sin cámara 0 de 0» lleno de amarillo.
 
 
 - 2026-11-26: app de escritorio: la ventanita flotante del Hub caía sobre la barra que mueve la ventana; sus botones no respondían y arrastrarla movía toda la app (video de Daniel Ospina). Clase `sin-arrastre` (no-drag) en PersistentCallProvider. Y «Ver en ventanita» en el recuadro de cada chatter (al pasar el mouse; su pantalla, sin sonido, una ventanita encima de todo).

@@ -929,6 +929,8 @@ function DesgloseNotaContenido({ dia, atencion, t, compacto }: {
   );
 }
 
+const PUNTO_BANDA: Record<string, string> = { bien: "bg-success", ojo: "bg-warning", mal: "bg-destructive" };
+
 export default function HRExpediente() {
   const { canFunction } = usePermissions();
   const { t } = useLanguage();
@@ -1325,8 +1327,6 @@ function ExpedientePermitido() {
 
 /** El día que pide el link (`?dia=AAAA-MM-DD`), si es válido y no es futuro; si no, hoy. */
 /** Puntito de la nota en el diseño pulido (el mismo del titular de Argos). */
-const PUNTO_BANDA: Record<string, string> = { bien: "bg-success", ojo: "bg-warning", mal: "bg-destructive" };
-
 function diaDelLink(search: string, hoy: string): string {
   const pedido = new URLSearchParams(search).get("dia");
   if (pedido && /^\d{4}-\d{2}-\d{2}$/.test(pedido) && pedido <= hoy) return pedido;
