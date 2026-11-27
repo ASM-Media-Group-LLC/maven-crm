@@ -488,6 +488,27 @@ export function TurnoTabla() {
     return f.entrada ? catalogo.find((x) => horaEnTurno(f.entrada!, x))?.id ?? null : null;
   }, [catalogo, turnosGente.data]);
   const delTurno = useMemo(() => filas.filter((f) => !turno || turnoDe(f) === turno), [filas, turno, turnoDe]);
+  // ARRANCA EN EL TURNO QUE CORRE AHORA (Alvaro, 27/11/2026: «que te desplegara el
+  // PM by default o en la hora que estés»). Solo hoy y una sola vez: si la persona
+  // cambia el filtro, se respeta.
+  const [turnoElegido, setTurnoElegido] = useState(false);
+  useEffect(() => {
+    if (turnoElegido || !esHoy || turno != null) return;
+    const ahora = new Date().toLocaleTimeString("en-GB", { timeZone: "America/Bogota", hour: "2-digit", minute: "2-digit", hour12: false });
+    const actual = catalogo.length ? catalogo.find((x) => horaEnTurno(ahora, x))?.id : jornadaDe(ahora);
+    if (actual) { setTurno(actual); setTurnoElegido(true); }
+  }, [catalogo, esHoy, turno, turnoElegido]);
+  /** Los grupos por turno, en el orden de la empresa (y «sin turno» al final). */
+  const gruposTurno = useMemo(() => {
+    const orden: Array<[string | null, string, string | null]> = [
+      ...opcionesTurno.map(([id, nombre]): [string, string, string | null] => {
+        const x = catalogo.find((c) => c.id === id);
+        return [id, nombre, x ? `${a12(x.entrada)} – ${a12(x.salida)}` : null];
+      }),
+      [null, t("hr.turno.grupo.sinTurno"), null],
+    ];
+    return orden;
+  }, [opcionesTurno, catalogo, t]);
   const pasa = (f: FilaTurno, k: Filtro) =>
     k === "todos" ? true
       : k === "activos" ? f.activoAhora
@@ -856,7 +877,7 @@ export function TurnoTabla() {
               {/* LA JORNADA (Alvaro, 27/11/2026): un botoncito, no la lista de horarios. */}
               <div className="flex shrink-0 gap-1 rounded-2xl border border-border/50 bg-background/40 p-1" role="group" aria-label={t("hr.turno.turno")}>
                 {([[null, t("hr.turno.jornada.todas")], ...opcionesTurno] as Array<[string | null, string]>).map(([j, etq]) => (
-                  <button key={j ?? "todas"} type="button" onClick={() => setTurno(j)} aria-pressed={turno === j}
+                  <button key={j ?? "todas"} type="button" onClick={() => { setTurnoElegido(true); setTurno(j); }} aria-pressed={turno === j}
                     className={`h-8 flex-1 whitespace-nowrap rounded-xl px-3 text-xs font-medium transition lg:flex-none ${turno === j ? "bg-foreground/[0.1] text-foreground" : "text-muted-foreground hover:bg-foreground/[0.05] hover:text-foreground"}`}>
                     {etq}
                   </button>
@@ -891,7 +912,32 @@ export function TurnoTabla() {
               {!vistas.length && (
                 <p className="rounded-2xl border border-dashed border-border/50 p-5 text-center text-sm text-muted-foreground">{t("hr.turno.nadieAsi")}</p>
               )}
-              {(filtro === "mejores" || filtro === "peores" || filtro === "noVinieron" || filtro === "activos") ? (
+              {/* POR GRUPOS DE TURNO (Alvaro, 27/11/2026: «que luego te lo pusiera por
+                  grupos»): con «Todos», un bloque por turno con su resumen arriba. */}
+              {turno == null && vistas.length > 0 ? (
+                gruposTurno.map(([id, nombre, horas]) => {
+                  const gente = vistas.filter((f) => turnoDe(f) === id);
+                  if (!gente.length) return null;
+                  const activosG = gente.filter((f) => f.activoAhora).length;
+                  const atrasG = gente.filter((f) => { const m = f.enCurso ? marcha(f) : null; return !!m && m.falta > 5; }).length;
+                  return (
+                    <div key={id ?? "sin"} className="mt-3 flex flex-col gap-1.5 md:gap-0">
+                      <div className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5 rounded-xl bg-foreground/[0.035] px-3 py-2">
+                        <span className="text-sm font-semibold text-foreground">{nombre}</span>
+                        {horas && <span className="text-xs tabular-nums text-muted-foreground">{horas}</span>}
+                        <span className="text-xs text-muted-foreground">
+                          {t("hr.turno.grupo.personas", { n: gente.length })}
+                          {esHoy && activosG > 0 && <> · <span className="inline-block h-1.5 w-1.5 -translate-y-px rounded-full bg-success" aria-hidden /> {t("hr.turno.grupo.activos", { n: activosG })}</>}
+                          {atrasG > 0 && <> · {t("hr.turno.grupo.atras", { n: atrasG })}</>}
+                        </span>
+                      </div>
+                      <div className="flex flex-col gap-1.5 md:divide-y md:divide-border/30 md:gap-0">
+                        {gente.map(fila)}
+                      </div>
+                    </div>
+                  );
+                })
+              ) : (filtro === "mejores" || filtro === "peores" || filtro === "noVinieron" || filtro === "activos") ? (
                 <div className="mt-2 flex flex-col gap-1 md:divide-y md:divide-border/30">
                   {vistas.map(fila)}
                 </div>
