@@ -69,7 +69,7 @@ function useSoloApp(lugar: LugarSoloApp): { estado: EstadoSoloApp; desde: Date |
   // VISTA PREVIA LOCAL (Alvaro, 27/11/2026: «no puedo ver cómo está el Cowork»):
   // en el servidor de desarrollo (npm run dev) Cowork y las llamadas no se mandan
   // a la app, para poder revisarlos. En producción import.meta.env.DEV es false.
-  if (import.meta.env.DEV) return { estado: "nada", desde, listo: true };
+  if (import.meta.env.DEV && import.meta.env.MODE !== "test") return { estado: "nada", desde, listo: true };
   return { estado: estadoSoloApp({ ua, tactil, enApp, desde, ahora: new Date(), probador, soloNavegador: libre }), desde, listo: (leido && navegadorListo && coworkListo) || !hayQueMirar };
 }
 
