@@ -6,7 +6,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useLanguage } from "@/hooks/useLanguage";
 import type { TranslationKey } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
-import { itemsVisibles, type ItemPendiente, leerOcultos, ocultarHoy, ocultarSugerencia } from "@/lib/pendientesDeGestion";
+import { VUELVE_MS, itemsVisibles, type ItemPendiente, leerOcultos, ocultarHoy, ocultarSugerencia } from "@/lib/pendientesDeGestion";
 
 // PENDIENTES Y SUGERENCIAS (Alvaro, 27/11/2026): un cuadrito abajo a la derecha
 // para quien cuadra a los empleados: lo que falta (horarios sin confirmar,
@@ -38,13 +38,16 @@ export function PendientesDeGestion() {
   useEffect(() => {
     if (!user) return;
     let vivo = true;
-    void (async () => {
+    const leerTodo = async () => {
       try {
         const { data, error } = await (supabase as unknown as RpcDb).rpc("pendientes_de_gestion");
         if (vivo && !error && Array.isArray(data)) setItems(data as ItemPendiente[]);
       } catch { /* sin dato no se muestra nada: nunca un pendiente inventado */ }
-    })();
-    return () => { vivo = false; };
+    };
+    void leerTodo();
+    // Cada 5 minutos: se pone al día y, si se cerró con la X, vuelve a salir.
+    const id = window.setInterval(() => { void leerTodo(); setOcultos(leerOcultos(new Date())); }, VUELVE_MS);
+    return () => { vivo = false; window.clearInterval(id); };
   }, [user]);
 
   const visibles = itemsVisibles(items, ocultos);
