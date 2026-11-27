@@ -12,6 +12,7 @@ const fuentes = import.meta.glob(
     "../../pages/meet/InvitarDeAfuera.tsx",
     "../../components/PersistentCallProvider.tsx",
     "../../components/AbrirEnApp.tsx",
+    "../../components/CoworkSoloApp.tsx",
   ],
   { query: "?raw", import: "default", eager: true },
 ) as Record<string, string>;
@@ -84,5 +85,15 @@ describe("solo navegador por Posición", () => {
     expect(estadoSoloApp({ ...base, soloNavegador: true })).toBe("nada");
     expect(estadoSoloApp({ ...base, probador: true, soloNavegador: true })).toBe("nada");
     expect(leer("components/AbrirEnApp.tsx")).toContain("if (soloNavegador || tactil");
+  });
+});
+
+describe("la app solo se exige a quien debe estar en Cowork (27/11/2026)", () => {
+  it("quien no tiene Cowork obligatorio queda libre, y el aviso de la app es un botoncito", () => {
+    const c = leer("components/CoworkSoloApp.tsx");
+    expect(c).toContain("const libre = soloNavegador || debeCowork === false;");
+    const a = leer("components/AbrirEnApp.tsx");
+    expect(a).toContain("data-abrir-en-app");
+    expect(a).not.toContain('t("pwa.app.siempre")');
   });
 });
