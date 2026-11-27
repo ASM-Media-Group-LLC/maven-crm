@@ -56,9 +56,17 @@ services:
     # mitad de los pedidos daban 502. El nombre sigue a la máquina.
     # 25/11/2026: el mini pasó a llamarse `unlok-server-5` (con tag `tag:mini5`) en
     # Tailscale; el nombre viejo `unlok-workstation` dejó de existir y la puerta daba 502.
+    # 26/11/2026 (noche): con `unlok-server-5` seguía en 502 (i/o timeout). Causa:
+    # en la mini corren DOS Tailscale a la vez: el de servidor (unlok-server-5,
+    # 100.64.206.91, utun0) y la app de escritorio con sesión de corp@
+    # (unlok-workstation, 100.127.43.97, utun5). El pedido de la puerta entraba
+    # por utun0, pero la mini contestaba por utun5 (su ruta hacia 100.95.94.18)
+    # y la respuesta se perdía. Por eso ahora apunta a 100.127.43.97, la entrada
+    # por la que la mini sí contesta. Arreglo de fondo pendiente: dejar UN solo
+    # Tailscale en la mini y volver a apuntar al nombre.
     command: >
       caddy reverse-proxy --from :8080
-      --to unlok-server-5.tail11d450.ts.net:8790
+      --to 100.127.43.97:8790
     restart: unless-stopped
 
 volumes:
