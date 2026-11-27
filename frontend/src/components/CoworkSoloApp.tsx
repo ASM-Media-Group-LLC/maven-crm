@@ -62,7 +62,34 @@ function useSoloApp(lugar: LugarSoloApp): { estado: EstadoSoloApp; desde: Date |
   }, [lugar]);
   const probador = !!user?.id && probadores.includes(user.id);
   const { soloNavegador, listo: navegadorListo } = useSoloNavegadorConEstado(!!user?.id && hayQueMirar);
-  return { estado: estadoSoloApp({ ua, tactil, enApp, desde, ahora: new Date(), probador, soloNavegador }), desde, listo: (leido && navegadorListo) || !hayQueMirar };
+  // 27/11/2026 (Alvaro): la app se exige SOLO a quien tiene que estar en Cowork
+  // (debe_estar_en_cowork). A los demás —admins, dueño, Finanzas…— nunca.
+  const { debeCowork, listo: coworkListo } = useDebeEstarEnCowork(!!user?.id && hayQueMirar);
+  const libre = soloNavegador || debeCowork === false;
+  return { estado: estadoSoloApp({ ua, tactil, enApp, desde, ahora: new Date(), probador, soloNavegador: libre }), desde, listo: (leido && navegadorListo && coworkListo) || !hayQueMirar };
+}
+
+/** ¿Esta persona tiene que estar en Cowork? `null` = no se sabe (falló la
+ *  consulta): entonces manda la regla de siempre. Una consulta por pestaña. */
+let debeCoworkCache: boolean | null | undefined;
+function useDebeEstarEnCowork(activo: boolean): { debeCowork: boolean | null; listo: boolean } {
+  const [v, setV] = useState<boolean | null | undefined>(debeCoworkCache);
+  useEffect(() => {
+    if (!activo || debeCoworkCache !== undefined) return;
+    let vivo = true;
+    void (async () => {
+      let r: boolean | null = null;
+      try {
+        const { data, error } = await (supabase as unknown as { rpc: (f: string) => Promise<{ data: unknown; error: unknown }> }).rpc("mi_cowork_estado");
+        const fila = !error && Array.isArray(data) ? (data[0] as { debe?: unknown } | undefined) : undefined;
+        r = fila ? fila.debe === true : null;
+      } catch { r = null; }
+      if (r !== null) debeCoworkCache = r;
+      if (vivo) setV(r);
+    })();
+    return () => { vivo = false; };
+  }, [activo]);
+  return { debeCowork: v ?? null, listo: !activo || v !== undefined };
 }
 
 function enlaces() {
