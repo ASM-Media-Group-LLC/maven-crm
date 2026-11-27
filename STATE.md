@@ -174,4 +174,4 @@ Ambos sets ya tienen migrations subidas (`20260504100000`, `20260504110000`) per
 - Pendiente: aplicar la migración 20261127050220 en producción (pide permiso del dueño).
 ## 2026-11-27 · Turnos de la empresa, del puesto y de la persona
 - Cada empresa define sus turnos (AM 08–16, PM 16–00, Madrugada 00–08 sembrados) en Ajustes → Empresa; cada puesto trae uno por defecto y cada persona puede tener el suyo (Horarios del equipo). El horario base usa: horas propias → turno (persona → puesto) → turno del rol → rol. Argos → Turno filtra con esos turnos.
-- Migración 20261127200000_turnos_de_la_empresa.sql. Pendiente: aplicarla en producción (pide permiso del dueño) y que RR. HH. elija el turno de cada puesto/persona.
+- Migración 20261127190845_turnos_de_la_empresa.sql. Aplicada el 27/11 con OK del dueño, más 20261127191003_turnos_conflictos.sql (aviso de quien tiene varios puestos con turnos distintos; gana su turno propio, si no el del primer puesto). Pendiente: que RR. HH. elija el turno de cada puesto/persona.

@@ -155,6 +155,18 @@ function FilaHorario({ f, t, pausa, turnos, suTurno }: { f: FilaEquipoHorario; t
           </div>
         )}
 
+        {/* SUS HORAS NO SON LAS DEL TURNO (27/11/2026): manda la semana; se avisa. */}
+        {(() => {
+          const tu = turnoSel ? turnos.find((x) => x.id === turnoSel) : suTurno && turnos.find((x) => x.id === suTurno.turno_id);
+          if (!tu || !misma || (misma.entrada === tu.entrada && misma.salida === tu.salida)) return null;
+          return (
+            <span className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+              <span className="h-1.5 w-1.5 rounded-full bg-warning" aria-hidden />
+              {t("hr.turnosEmp.horasDistintas", { t: tu.nombre, a: a12(tu.entrada) ?? tu.entrada, b: a12(tu.salida) ?? tu.salida })}
+            </span>
+          );
+        })()}
+
         <PausaDeLaFila pausa={pausa} t={t} />
 
         <div className="flex flex-wrap items-center gap-2">

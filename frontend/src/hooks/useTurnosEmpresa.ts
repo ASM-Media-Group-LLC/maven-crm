@@ -13,7 +13,9 @@ const db = supabase as unknown as RpcDb;
 
 export interface TurnoEmpresa { id: string; nombre: string; entrada: string; salida: string; activa: boolean; puestos: number; personas: number }
 export interface PuestoTurno { id: string; nombre: string; turno_id: string | null; puede: boolean; personas: number }
-export interface TurnosEmpresa { puede_editar: boolean; turnos: TurnoEmpresa[]; puestos: PuestoTurno[] }
+/** Alguien con varios puestos de turnos distintos y sin turno propio (se usa el del primer puesto). */
+export interface ConflictoTurno { user_id: string; nombre: string; usa: string; puestos: Array<{ puesto: string; turno: string }> }
+export interface TurnosEmpresa { puede_editar: boolean; turnos: TurnoEmpresa[]; puestos: PuestoTurno[]; conflictos?: ConflictoTurno[] }
 export interface TurnoDePersona { user_id: string; turno_id: string; nombre: string; entrada: string; salida: string; origen: "persona" | "puesto" }
 
 export const CLAVE_TURNOS = ["turnos-empresa"] as const;

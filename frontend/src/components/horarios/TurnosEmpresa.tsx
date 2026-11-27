@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { Clock, Loader2, Plus, RefreshCw } from "lucide-react";
+import { Link } from "react-router-dom";
+import { AlertTriangle, Clock, Loader2, Plus, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { useLanguage } from "@/hooks/useLanguage";
@@ -121,6 +122,25 @@ export function TurnosEmpresa() {
             {q.data.turnos.map((x) => <FilaTurno key={`${x.id}-${x.nombre}-${x.entrada}-${x.salida}`} x={x} editable={q.data!.puede_editar} />)}
             {q.data.puede_editar && <FilaTurno x={null} editable />}
           </ul>
+          {/* LOS CONFLICTOS (27/11/2026): varios puestos con turnos distintos. Se usa
+              el del primer puesto; RR. HH. le pone el suyo en Horarios del equipo. */}
+          {(q.data.conflictos ?? []).length > 0 && (
+            <div className="border-t border-border/50 bg-warning/[0.06] px-4 py-3">
+              <p className="flex items-center gap-2 text-sm font-medium text-foreground">
+                <AlertTriangle className="h-4 w-4 shrink-0 text-warning" />{t("hr.turnosEmp.conflictos")}
+              </p>
+              <ul className="mt-2 flex flex-col gap-1.5">
+                {(q.data.conflictos ?? []).map((c) => (
+                  <li key={c.user_id} className="text-xs text-muted-foreground">
+                    <span className="font-medium text-foreground">{c.nombre}</span>
+                    {" · "}{c.puestos.map((x) => `${x.puesto}: ${x.turno}`).join(" · ")}
+                    {" → "}{t("hr.turnosEmp.seUsa", { t: c.usa })}
+                  </li>
+                ))}
+              </ul>
+              <Link to="/hr/horarios-equipo" className="mt-2 inline-block text-xs font-medium text-primary hover:underline">{t("hr.turnosEmp.arreglar")}</Link>
+            </div>
+          )}
           {q.data.puestos.length > 0 && (
             <>
               <p className="border-t border-border/50 px-4 pb-1 pt-3 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">{t("hr.turnosEmp.porPuesto")}</p>
