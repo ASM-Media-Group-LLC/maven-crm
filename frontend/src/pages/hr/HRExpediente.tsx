@@ -948,6 +948,10 @@ function ExpedientePermitido() {
   const [diaSel, setDiaSel] = useState<string>(() => diaDelLink(location.search, hoyStr));
   const [verCalendario, setVerCalendario] = useState(false);
   const [verDesglose, setVerDesglose] = useState(false);
+  // PESTAÑAS (Alvaro, 27/11/2026: «más seccionado, como pestañitas, no un scroll
+  // infinito»): arriba queda fijo el resumen del día; debajo, una sección a la vez.
+  type Pestana = "resumen" | "fotos" | "hizo" | "apps";
+  const [pestana, setPestana] = useState<Pestana>("resumen");
   const anio = Number(diaSel.slice(0, 4));
   const mes = Number(diaSel.slice(5, 7));
   const { canFunction } = usePermissions();
@@ -1084,7 +1088,7 @@ function ExpedientePermitido() {
           {/* Stats del día. Pulido: casillas neutras (filo fino, radio 10), la cifra
               en blanco y la etiqueta arriba en gris; lo flojo, solo un puntito. */}
           {pulido ? (
-          <div className="mt-4 grid grid-cols-3 gap-2 lg:grid-cols-7">
+          <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4 xl:grid-cols-7">
             {[
               { k: "hr.exp.nota" as const, v: dia.nota.valor != null ? String(dia.nota.valor) : "—", punto: null },
               // A qué hora entró y a qué hora debía (Alvaro, 18/11/2026).
@@ -1106,10 +1110,10 @@ function ExpedientePermitido() {
               { k: "hr.exp.faltas" as const, v: String(dia.faltas.length), punto: null },
               { k: "hr.exp.pausas" as const, v: enHoras(dia.minutosPausaDeMas), punto: null },
             ].map((x) => (
-              <div key={x.k} title={"title" in x ? x.title : undefined} className="rounded-[10px] border border-border/60 bg-card/30 px-3 py-2.5">
-                <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
-                  {x.punto && <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${x.punto}`} aria-hidden />}
-                  <span className="truncate">{"p" in x && x.p ? t(x.k, x.p) : t(x.k)}</span>
+              <div key={x.k} title={"title" in x ? x.title : undefined} className="flex h-full flex-col justify-between gap-1.5 rounded-xl border border-border/60 bg-card/30 px-3 py-2.5">
+                <div className="flex items-start gap-1.5 text-[11px] font-medium leading-tight text-muted-foreground">
+                  {x.punto && <span className={`mt-1 h-1.5 w-1.5 shrink-0 rounded-full ${x.punto}`} aria-hidden />}
+                  <span>{"p" in x && x.p ? t(x.k, x.p) : t(x.k)}</span>
                 </div>
                 <div className="mt-1 font-display text-xl font-semibold tabular-nums leading-tight text-foreground">{x.v}</div>
               </div>
@@ -1147,6 +1151,66 @@ function ExpedientePermitido() {
           live»): su pantalla y su cámara en video, no en pantallazos. Solo hoy. */}
       {userId && canFunction("N:argos.presencia", true) && !cargando && !error && esHoy && <AhoraEnVivo userId={userId} capturas={dia.capturas} />}
 
+      {/* LAS PESTAÑAS (27/11/2026): Resumen · Fotos por hora · Lo que hizo · Apps y equipo. */}
+      <div className="mt-5 flex gap-1 overflow-x-auto rounded-2xl border border-border/50 bg-background/40 p-1">
+        {([
+          ["resumen", "hr.exp.tab.resumen"], ["fotos", "hr.exp.tab.fotos"], ["hizo", "hr.exp.tab.hizo"], ["apps", "hr.exp.tab.apps"],
+        ] as const).map(([k, etq]) => (
+          <button
+            key={k}
+            type="button"
+            onClick={() => setPestana(k)}
+            aria-pressed={pestana === k}
+            className={`min-w-0 flex-1 shrink-0 rounded-xl px-4 py-2 text-sm font-semibold transition ${pestana === k ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
+          >
+            {t(etq)}
+          </button>
+        ))}
+      </div>
+
+      {pestana === "resumen" && (
+        <>
+      {/* Argos como MANAGER del día: lo PRIMERO, juzga el día con criterio
+          (Alvaro, 09/11). Reemplaza las barras abiertas de pantalla/cámara. */}
+      <TarjetaArgos nombre={nombre} dia={dia} horario={expediente?.horario ?? { entrada: null, salida: null }} />
+
+      {/* Minutos de gracia del turno (Alvaro, 16/11): cuánto se pagó, cuánto se
+          descontó, y RR. HH. puede devolver minutos. */}
+      {userId && <GraciaDelDia userId={userId} fecha={dia.fecha} />}
+
+      {/* Asistencia + el desglose técnico, ya COLAPSADO: el perfil abre limpio y
+          el detalle (pantalla/cámara/atención) se abre solo si se quiere. */}
+      <section className="vidrio sube mt-4 p-4 lg:p-5">
+        <div className="v-cont">
+          {expediente && <AsistenciaDia horario={expediente.horario} dia={dia} userId={userId} nombre={nombre} t={t} />}
+
+          <button
+            type="button"
+            onClick={() => setVerDesglose((v) => !v)}
+            className="mt-3 flex w-full items-center justify-between rounded-2xl border border-border/40 bg-card/20 px-3.5 py-2.5 text-xs font-semibold text-muted-foreground transition hover:bg-card/40"
+          >
+            <span className="flex items-center gap-2"><Gauge className="h-3.5 w-3.5 text-primary" />{verDesglose ? t("hr.exp.ocultarDesglose") : t("hr.exp.verDesglose")}</span>
+            <ChevronDown className={`h-4 w-4 transition-transform ${verDesglose ? "rotate-180" : ""}`} />
+          </button>
+          {verDesglose && (
+            <div className="mt-2 rounded-2xl border border-border/40 bg-card/20 p-3.5">
+              <DesgloseNotaContenido dia={dia} atencion={atencion} t={t} compacto />
+            </div>
+          )}
+        </div>
+      </section>
+
+      {/* Videos de Argos del día (si los hubo). Se esconde solo si no hay. */}
+      {userId && canFunction("N:argos.video", true) && <ClipsDelDia userId={userId} fecha={dia.fecha} />}
+
+      {/* Qué le dijo Argos ese día: cronología de nudges (Alvaro, 09/11). */}
+      {userId && <AvisosDeArgos userId={userId} fecha={dia.fecha} />}
+
+        </>
+      )}
+
+      {pestana === "fotos" && (
+        <>
       {/* TODAS SUS HORAS, justo debajo del en vivo (Alvaro, 13/11 y 18/11/2026:
           «no puedo ver los pantallazos de todo el día», «necesito ver todas las
           horas», «todas las fotos de la hora»): una fila por hora con todas sus fotos. */}
@@ -1187,6 +1251,11 @@ function ExpedientePermitido() {
         </div>
       </section>
 
+        </>
+      )}
+
+      {pestana === "hizo" && (
+        <>
       {/* QUÉ HIZO, EN ORDEN (Alvaro, 18/11/2026, propuesta 3 «Cronología»): el
           día como un chat, lo más nuevo arriba, lo malo con su prueba y los días
           anteriores debajo. No quita nada: lo de siempre sigue abajo. */}
@@ -1199,49 +1268,21 @@ function ExpedientePermitido() {
           esHoy={esHoy}
           onElegirDia={(f) => { setDiaSel(f); setVerCalendario(false); window.scrollTo({ top: 0, behavior: "smooth" }); }}
           onVerMasDias={() => { setVerCalendario(true); window.scrollTo({ top: 0, behavior: "smooth" }); }}
-          onVerFotos={() => document.getElementById("expediente-todo-el-dia")?.scrollIntoView({ behavior: "smooth", block: "start" })}
+          onVerFotos={() => setPestana("fotos")}
         />
       )}
 
-      {/* Argos como MANAGER del día: lo PRIMERO, juzga el día con criterio
-          (Alvaro, 09/11). Reemplaza las barras abiertas de pantalla/cámara. */}
-      <TarjetaArgos nombre={nombre} dia={dia} horario={expediente?.horario ?? { entrada: null, salida: null }} />
+        </>
+      )}
 
-      {/* Minutos de gracia del turno (Alvaro, 16/11): cuánto se pagó, cuánto se
-          descontó, y RR. HH. puede devolver minutos. */}
-      {userId && <GraciaDelDia userId={userId} fecha={dia.fecha} />}
-
+      {pestana === "apps" && (
+        <>
       {/* Apps y páginas de la app de computador (Alvaro, 17/11/2026). */}
       {userId && <AppsDelDia userId={userId} fecha={dia.fecha} />}
       {userId && <EquipoDelDia userId={userId} fecha={dia.fecha} />}
 
-      {/* Asistencia + el desglose técnico, ya COLAPSADO: el perfil abre limpio y
-          el detalle (pantalla/cámara/atención) se abre solo si se quiere. */}
-      <section className="vidrio sube mt-4 p-4 lg:p-5">
-        <div className="v-cont">
-          {expediente && <AsistenciaDia horario={expediente.horario} dia={dia} userId={userId} nombre={nombre} t={t} />}
-
-          <button
-            type="button"
-            onClick={() => setVerDesglose((v) => !v)}
-            className="mt-3 flex w-full items-center justify-between rounded-2xl border border-border/40 bg-card/20 px-3.5 py-2.5 text-xs font-semibold text-muted-foreground transition hover:bg-card/40"
-          >
-            <span className="flex items-center gap-2"><Gauge className="h-3.5 w-3.5 text-primary" />{verDesglose ? t("hr.exp.ocultarDesglose") : t("hr.exp.verDesglose")}</span>
-            <ChevronDown className={`h-4 w-4 transition-transform ${verDesglose ? "rotate-180" : ""}`} />
-          </button>
-          {verDesglose && (
-            <div className="mt-2 rounded-2xl border border-border/40 bg-card/20 p-3.5">
-              <DesgloseNotaContenido dia={dia} atencion={atencion} t={t} compacto />
-            </div>
-          )}
-        </div>
-      </section>
-
-      {/* Videos de Argos del día (si los hubo). Se esconde solo si no hay. */}
-      {userId && canFunction("N:argos.video", true) && <ClipsDelDia userId={userId} fecha={dia.fecha} />}
-
-      {/* Qué le dijo Argos ese día: cronología de nudges (Alvaro, 09/11). */}
-      {userId && <AvisosDeArgos userId={userId} fecha={dia.fecha} />}
+        </>
+      )}
 
     </Page>
   );
