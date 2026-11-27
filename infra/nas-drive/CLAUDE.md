@@ -12,7 +12,7 @@ Esta guía es para un Claude que opera **en** el mini5 (`unlok-server-5`, usuari
 | Herramientas de la salida de Google | rclone con los remotos `gdrive` (lectura), `gborrar` (borrado) y `nas`; carpetas `~/importar`, `~/vaciar`, `~/permisos` | los scripts dejan `.log` al lado |
 | Copia del repo | `~/Projects/maven-crm`, se actualiza por empuje desde el Mac de Jhon (`actualizar-repo-equipo`) | `git log -1` ahí. No tiene acceso a GitHub: desde el mini no se abren PRs |
 
-El camino de un archivo: el frontend pide a la edge `drive` de Supabase, que firma un permiso; el navegador va a la **puerta** (`infra/nas-drive/puerta`, Caddy + Tailscale en el Dokploy de 147.93.3.97; cómo montarla o mudarla, en el `README.md`), y la puerta entra al mini por Tailscale con el nombre MagicDNS `unlok-workstation`, nunca por IP (cambia al volver a entrar). En disco los archivos son `/Volumes/NASx/maven-drive/<agencia>/<id>`, sin nombre ni carpeta: eso vive en `drive_items` en la base.
+El camino de un archivo: el frontend pide a la edge `drive` de Supabase, que firma un permiso; el navegador va a la **puerta** (`infra/nas-drive/puerta`, Caddy + Tailscale en el Dokploy de 147.93.3.97; cómo montarla o mudarla, en el `README.md`), y la puerta entra al mini por Tailscale con el nombre MagicDNS `unlok-server-5` (antes `unlok-workstation`; cambió el 25/11/2026 y la puerta dio 502 hasta corregirlo), nunca por IP (cambia al volver a entrar). En disco los archivos son `/Volumes/NASx/maven-drive/<agencia>/<id>`, sin nombre ni carpeta: eso vive en `drive_items` en la base.
 
 ## Actualizar el servidor
 
