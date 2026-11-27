@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import {
-  AlertTriangle, CalendarDays, ChevronLeft, ChevronRight, ClipboardList, Loader2, RefreshCw, Search, X,
+  AlertTriangle, CalendarDays, ChevronDown, ChevronLeft, ChevronRight, ClipboardList, Loader2, RefreshCw, Search, X,
 } from "lucide-react";
 import { useLanguage } from "@/hooks/useLanguage";
 import type { TranslationKey } from "@/lib/i18n";
@@ -205,7 +205,7 @@ function Franja({ f, t }: { f: FilaTurno; t: Tr }) {
   // Primero el trabajo y los estados; encima, las pausas (comida y baño).
   const capas = [...tramos.filter((x) => x.tipo !== "comida" && x.tipo !== "bano"), ...tramos.filter((x) => x.tipo === "comida" || x.tipo === "bano")];
   return (
-    <div className="mt-1 md:col-span-full md:pl-11" aria-hidden>
+    <div aria-hidden>
       <div className="relative h-2.5 overflow-hidden rounded-full bg-foreground/[0.05]">
         {f.turnoInicio != null && f.turnoFin != null && (
           <div className="absolute inset-y-0 rounded-full border border-border/60" style={{ left: pos(f.turnoInicio), width: ancho(f.turnoInicio, f.turnoFin) }} />
@@ -219,7 +219,7 @@ function Franja({ f, t }: { f: FilaTurno; t: Tr }) {
       </div>
       <div className="mt-0.5 flex justify-between text-[10px] tabular-nums text-muted-foreground/70">
         <span>{hora(desde)}</span>
-        <span>{t("hr.turno.franja.avisos", { n: f.marcasAviso.length })}</span>
+        <span>{f.marcasAviso.length ? t("hr.turno.franja.avisos", { n: f.marcasAviso.length }) : ""}</span>
         <span>{hora(hasta)}</span>
       </div>
     </div>
@@ -268,6 +268,7 @@ export function TurnoTabla() {
   const [turno, setTurno] = useState<string | null>(null);
   const [buscar, setBuscar] = useState("");
   const [calAbierto, setCalAbierto] = useState(false);
+  const [abiertoId, setAbiertoId] = useState<string | null>(null);
 
   const locale = language === "es" ? "es-CO" : language;
   const fmtDia = (d: string, o: Intl.DateTimeFormatOptions) => new Date(`${d}T12:00:00-05:00`).toLocaleDateString(locale, { timeZone: "America/Bogota", ...o });
@@ -282,11 +283,6 @@ export function TurnoTabla() {
           : k === "noEsta" ? (f.noVino && !f.inactivo) || f.noLlegaMin != null
             : k === "ignoro" ? f.ignorados > 0
               : f.nivelComida !== "ok" || f.nivelBano !== "ok";
-  const conteo = useMemo(() => {
-    const c: Record<Filtro, number> = { todos: 0, mirar: 0, tarde: 0, noEsta: 0, pausas: 0, ignoro: 0 };
-    for (const f of delTurno) for (const k of Object.keys(c) as Filtro[]) if (pasa(f, k)) c[k]++;
-    return c;
-  }, [delTurno]);
   const texto = buscar.trim().toLocaleLowerCase();
   const vistas = useMemo(
     () => ordenarPorAtencion(delTurno.filter((f) => pasa(f, filtro) && (!texto || f.nombre.toLocaleLowerCase().includes(texto)))),
@@ -298,10 +294,6 @@ export function TurnoTabla() {
     for (const f of vistas) m[seccionDe(f)].push(f);
     return m;
   }, [vistas]);
-  const paraMirar = useMemo(() => ordenarPorAtencion(delTurno.filter((f) => f.nivel !== "ok" && !f.empiezaLuego && !f.inactivo)), [delTurno]);
-  const ahoraComiendo = delTurno.filter((f) => f.comidaAhora != null).length;
-  const ahoraBano = delTurno.filter((f) => f.banoAhora != null).length;
-  const ahoraAviso = delTurno.filter((f) => f.avisoAbierto).length;
   // LOS NÚMEROS DEL DÍA (Alvaro, 27/11/2026: «solo números»).
   const tocaban = delTurno.filter((f) => f.turnoInicio != null && !f.empiezaLuego && !f.inactivo && !f.diaLibre);
   const numeros = {
@@ -329,80 +321,71 @@ export function TurnoTabla() {
 
   const semana = semanaDe(dia);
 
-  const ficha = (k: Filtro, etiqueta: string, nivel: Nivel | null) => (
-    <button
-      key={k}
-      type="button"
-      onClick={() => setFiltro(k)}
-      aria-pressed={filtro === k}
-      className={`flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition ${filtro === k ? "border-primary/60 bg-primary/15 text-foreground" : "border-border/60 text-muted-foreground hover:text-foreground"}`}
-    >
-      {nivel && <Punto nivel={nivel} />}
-      {etiqueta}
-      <span className="tabular-nums text-muted-foreground">{conteo[k]}</span>
-    </button>
-  );
 
+  // FILA SENCILLA (Alvaro, 27/11/2026: «muy tupida… más minimalista; voy tocando y
+  // me voy enterando»): a la vista solo la persona, una frase, su llegada y la
+  // franja del día. Al tocarla se abre el detalle de las cinco cosas.
   const Fila = ({ f }: { f: FilaTurno }) => {
-    const ll = celdaLlegada(t, f), co = celdaComida(t, f), ba = celdaBano(t, f), av = celdaAvisos(t, f), cx = celdaConexion(t, f);
+    const abierta = abiertoId === f.userId;
     const foto = q.fotos[f.userId];
     const frases = [...(f.motivos[0] ? [frase(t, f.motivos[0])] : []), ...contraLoNormal(f)];
     const motivo = f.diaLibre ? t("hr.turno.libre.marcado") : frases.length ? frases.join(" · ") : null;
-    const mas = f.diaLibre ? 0 : f.motivos.length - 1;
     const horario = f.entrada && f.salida ? `${a12(f.entrada)} – ${a12(f.salida)}` : t("hr.turno.sinHorario");
     const puedeLibre = q.data?.diaLibreListo && (f.noVino || f.diaLibre) && !f.inactivo;
+    const ll = celdaLlegada(t, f);
     return (
-      <div className="flex flex-col">
-      <button
-        type="button"
-        onClick={() => abrir(f)}
-        className="group grid w-full grid-cols-1 gap-2 rounded-2xl border border-border/40 bg-card/20 px-3 py-2.5 text-left transition hover:border-border hover:bg-foreground/[0.04] md:grid-cols-[minmax(12rem,1.6fr)_1fr_1.1fr_0.8fr_0.9fr_1fr_1rem] md:items-center md:gap-3 md:rounded-xl md:border-transparent md:bg-transparent md:py-2"
-      >
-        <div className="flex min-w-0 items-center gap-2.5">
-          <span className="relative shrink-0">
-            <UserAvatar name={f.nombre} src={foto?.foto} seed={foto?.seed} size="sm" />
-            {f.nivel !== "ok" && !f.empiezaLuego && (
-              <span className={`absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-2 border-background ${PUNTO[f.nivel]}`} aria-label={t(f.nivel === "rojo" ? "hr.turno.sec.mirar" : "hr.turno.sec.ojo")} role="img" />
-            )}
-          </span>
-          <div className="min-w-0">
-            <p className="truncate text-sm font-semibold">{f.nombre}</p>
-            <p className="truncate text-[11px] text-muted-foreground">
-              {motivo ? <>{motivo}{mas > 0 ? ` · +${mas}` : ""}</> : horario}
-            </p>
-            {motivo && <p className="truncate text-[11px] text-muted-foreground/70">{horario}</p>}
+      <div className={`flex flex-col rounded-2xl transition ${abierta ? "bg-foreground/[0.04]" : ""}`}>
+        <button
+          type="button"
+          onClick={() => setAbiertoId(abierta ? null : f.userId)}
+          aria-expanded={abierta}
+          className="group grid w-full grid-cols-[1fr_auto] items-center gap-x-3 gap-y-1.5 rounded-2xl px-3 py-2.5 text-left transition hover:bg-foreground/[0.04] md:grid-cols-[minmax(11rem,15rem)_1fr_6.5rem_1rem]"
+        >
+          <div className="flex min-w-0 items-center gap-2.5">
+            <span className="relative shrink-0">
+              <UserAvatar name={f.nombre} src={foto?.foto} seed={foto?.seed} size="sm" />
+              {f.nivel !== "ok" && !f.empiezaLuego && (
+                <span className={`absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-2 border-background ${PUNTO[f.nivel]}`} aria-label={t(f.nivel === "rojo" ? "hr.turno.sec.mirar" : "hr.turno.sec.ojo")} role="img" />
+              )}
+            </span>
+            <div className="min-w-0">
+              <p className="truncate text-sm font-semibold">{f.nombre}</p>
+              <p className="truncate text-[11px] text-muted-foreground">{motivo ?? horario}</p>
+            </div>
           </div>
-        </div>
-        {/* En angosto, las cinco cosas en dos columnas con su etiqueta. */}
-        <div className="grid grid-cols-2 gap-x-3 gap-y-2 pl-11 md:contents">
-          {[
-            [t("hr.turno.col.llegada"), ll], [t("hr.turno.col.comida"), co], [t("hr.turno.col.bano"), ba],
-            [t("hr.turno.col.avisos"), av], [t("hr.turno.col.conexion"), cx],
-          ].map(([etq, c]) => {
-            const x = c as ReturnType<typeof celdaLlegada>;
-            return (
-              <div key={etq as string} className="min-w-0">
-                <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground/70 md:hidden">{etq as string}</p>
-                <Celda arriba={x.arriba || " "} abajo={x.abajo} nivel={x.nivel} tenue={x.tenue} />
-              </div>
-            );
-          })}
-        </div>
-        <ChevronRight className="hidden h-4 w-4 text-muted-foreground transition group-hover:translate-x-0.5 group-hover:text-foreground md:block" />
-        <Franja f={f} t={t} />
-      </button>
-      {puedeLibre && (
-        <div className="flex justify-end px-3 pb-1">
-          <button
-            type="button"
-            disabled={guardandoLibre === f.userId}
-            onClick={() => void cambiarLibre(f, !f.diaLibre)}
-            className="rounded-full border border-border/60 px-2.5 py-0.5 text-[11px] text-muted-foreground transition hover:text-foreground disabled:opacity-50"
-          >
-            {guardandoLibre === f.userId ? "…" : t(f.diaLibre ? "hr.turno.libre.quitar" : "hr.turno.libre.marcar")}
-          </button>
-        </div>
-      )}
+          <div className="col-span-2 row-start-2 md:col-span-1 md:row-start-auto"><Franja f={f} t={t} /></div>
+          <p className="text-right text-sm tabular-nums text-foreground/90 md:row-start-auto">{ll.arriba || "—"}</p>
+          <ChevronDown className={`hidden h-4 w-4 text-muted-foreground transition md:block ${abierta ? "rotate-180" : ""}`} />
+        </button>
+        {abierta && (
+          <div className="flex flex-col gap-3 px-3 pb-3 md:pl-14">
+            <p className="text-[11px] text-muted-foreground">{horario}</p>
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
+              {[
+                [t("hr.turno.col.llegada"), ll], [t("hr.turno.col.comida"), celdaComida(t, f)], [t("hr.turno.col.bano"), celdaBano(t, f)],
+                [t("hr.turno.col.avisos"), celdaAvisos(t, f)], [t("hr.turno.col.conexion"), celdaConexion(t, f)],
+              ].map(([etq, c]) => {
+                const x = c as ReturnType<typeof celdaLlegada>;
+                return (
+                  <div key={etq as string} className="min-w-0 rounded-xl border border-border/40 p-2.5">
+                    <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground/70">{etq as string}</p>
+                    <Celda arriba={x.arriba || "—"} abajo={x.abajo} nivel={x.nivel} tenue={x.tenue} />
+                  </div>
+                );
+              })}
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <Button size="sm" variant="outline" className="rounded-full" onClick={() => abrir(f)}>
+                {t("hr.turno.verDia")}<ChevronRight className="ml-1 h-3.5 w-3.5" />
+              </Button>
+              {puedeLibre && (
+                <Button size="sm" variant="ghost" className="rounded-full" disabled={guardandoLibre === f.userId} onClick={() => void cambiarLibre(f, !f.diaLibre)}>
+                  {t(f.diaLibre ? "hr.turno.libre.quitar" : "hr.turno.libre.marcar")}
+                </Button>
+              )}
+            </div>
+          </div>
+        )}
       </div>
     );
   };
@@ -511,57 +494,8 @@ export function TurnoTabla() {
               ))}
             </div>
 
-            {/* EL PARTE DE ARGOS: a quién mirar y por qué. */}
-            <div className="rounded-2xl border border-border/50 bg-card/30 p-4">
-              <p className="flex items-center gap-2 text-sm font-semibold">
-                <Punto nivel={paraMirar.some((f) => f.nivel === "rojo") ? "rojo" : paraMirar.length ? "ambar" : "ok"} />
-                {paraMirar.length
-                  ? t(paraMirar.length === 1 ? "hr.turno.parte.uno" : "hr.turno.parte.varios", { n: paraMirar.length, total: delTurno.filter((f) => !f.empiezaLuego && !f.inactivo).length })
-                  : t("hr.turno.parte.limpio", { total: delTurno.filter((f) => !f.empiezaLuego && !f.inactivo).length })}
-              </p>
-              {esHoy && (ahoraComiendo + ahoraBano + ahoraAviso > 0) && (
-                <p className="mt-1 text-xs text-muted-foreground">
-                  {[
-                    ahoraComiendo ? t("hr.turno.ahora.comiendo", { n: ahoraComiendo }) : null,
-                    ahoraBano ? t("hr.turno.ahora.bano", { n: ahoraBano }) : null,
-                    ahoraAviso ? t("hr.turno.ahora.aviso", { n: ahoraAviso }) : null,
-                  ].filter(Boolean).join(" · ")}
-                </p>
-              )}
-              {paraMirar.length > 0 && (
-                <ul className="mt-3 flex flex-col gap-1">
-                  {paraMirar.slice(0, 4).map((f) => (
-                    <li key={f.userId}>
-                      <button type="button" onClick={() => abrir(f)} className="flex w-full items-center gap-2.5 rounded-lg px-1.5 py-1 text-left transition hover:bg-foreground/[0.05]">
-                        <UserAvatar name={f.nombre} src={q.fotos[f.userId]?.foto} seed={q.fotos[f.userId]?.seed} size="xs" />
-                        <span className="shrink-0 text-sm font-medium">{f.nombre}</span>
-                        <span className="flex min-w-0 items-center gap-1.5 truncate text-xs text-muted-foreground">
-                          <Punto nivel={f.nivel} />
-                          <span className="truncate">{f.motivos.slice(0, 2).map((m) => frase(t, m)).join(" · ")}</span>
-                        </span>
-                      </button>
-                    </li>
-                  ))}
-                  {paraMirar.length > 4 && (
-                    <li>
-                      <button type="button" onClick={() => setFiltro("mirar")} className="px-1.5 text-xs font-medium text-primary hover:underline">
-                        {t("hr.turno.parte.verTodos", { n: paraMirar.length })}
-                      </button>
-                    </li>
-                  )}
-                </ul>
-              )}
-            </div>
-
             {/* Filtros, turno y buscador */}
             <div className="flex flex-col gap-2 lg:flex-row lg:items-center">
-              <div className="flex gap-1.5 overflow-x-auto pb-0.5">
-                {ficha("todos", t("hr.turno.f.todos"), null)}
-                {ficha("mirar", t("hr.turno.f.mirar"), "rojo")}
-                {ficha("tarde", t("hr.turno.f.tarde"), "ambar")}
-                {ficha("noEsta", t("hr.turno.f.noEsta"), "rojo")}
-                {ficha("pausas", t("hr.turno.f.pausas"), "ambar")}
-              </div>
               <div className="flex items-center gap-1.5 lg:ml-auto">
                 <select
                   value={turno ?? ""}
@@ -595,15 +529,6 @@ export function TurnoTabla() {
 
             {/* LA TABLA */}
             <div className="flex flex-col gap-1">
-              <div className="hidden grid-cols-[minmax(12rem,1.6fr)_1fr_1.1fr_0.8fr_0.9fr_1fr_1rem] gap-3 px-3 pb-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground/80 md:grid">
-                <span>{t("hr.turno.col.persona")}</span>
-                <span>{t("hr.turno.col.llegada")}</span>
-                <span>{t("hr.turno.col.comida")}</span>
-                <span>{t("hr.turno.col.bano")}</span>
-                <span>{t("hr.turno.col.avisos")}</span>
-                <span>{t("hr.turno.col.conexion")}</span>
-                <span />
-              </div>
               <div className="flex flex-wrap items-center gap-x-3 gap-y-1 px-1 text-[10px] text-muted-foreground md:px-3">
                 {ORDEN_LEYENDA.map(([k, etq]) => (
                   <span key={k} className="flex items-center gap-1"><span className={`inline-block h-2 w-3 rounded-sm ${COLOR_FRANJA[k]}`} />{t(etq)}</span>
