@@ -17,7 +17,7 @@ describe("vista fija, como Meet en mosaico", () => {
   });
   it("tu propia pantalla no cambia la vista ni ocupa un recuadro", () => {
     const s = fuente(vista);
-    expect(s).toContain('lk.participants.some((p) => p.isScreenSharing && !p.isLocal) ? "sidebar" : "grid"');
+    expect(s).toContain('if (lk.participants.some((p) => p.isScreenSharing && !p.isLocal)) return "sidebar";');
     expect(s).toContain("lk.participants.filter((p) => !(p.isLocal && p.isScreenSharing))");
   });
   it("quien habla: borde verde, sin moverse", () => {

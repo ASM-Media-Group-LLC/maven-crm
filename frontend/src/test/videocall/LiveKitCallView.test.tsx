@@ -229,10 +229,11 @@ describe("LiveKitCallView", () => {
     expect(screen.queryByText("Esperando a que otros participantes se unan...")).not.toBeInTheDocument();
   });
 
-  it("shows reconnecting banner", () => {
+  it("shows the reconnecting signal dot in the top bar (no banner over the video)", () => {
     lkState = { ...defaultLkState, isReconnecting: true };
-    render(<LiveKitCallView {...defaultProps} />);
-    expect(screen.getByText("Reconectando...")).toBeInTheDocument();
+    const { container } = render(<LiveKitCallView {...defaultProps} />);
+    expect(container.querySelector("[data-senal-debil]")).not.toBeNull();
+    expect(screen.queryByText("Reconectando...")).not.toBeInTheDocument();
   });
 
   it("does NOT show reconnecting banner when connected normally", () => {

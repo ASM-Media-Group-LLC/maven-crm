@@ -89,6 +89,14 @@ export function CallOutlet({ className }: { className?: string }) {
 const POS_KEY = "maven.call.float.pos";
 const SIZE_KEY = "maven.call.float.size";
 
+/** Dónde va la ventanita sin mover: abajo a la derecha, con 16 px de aire. */
+function esquinaAbajoDerecha(t: { w: number; h: number }, ancho: number, alto: number): { x: number; y: number } {
+  return { x: Math.max(8, ancho - t.w - 16), y: Math.max(8, alto - t.h - 16) };
+}
+function leerPosGuardada(): boolean {
+  try { return !!window.localStorage.getItem(POS_KEY); } catch { return false; }
+}
+
 // Tamaños de la ventanita (tres fijos + mínimo + acotar): lib/ventanitaFlotante.ts.
 const TAMANO_INICIAL = TAMANOS_FLOTANTE[1];
 
@@ -136,8 +144,12 @@ export function PersistentCallProvider({ children }: { children: React.ReactNode
       const raw = window.localStorage.getItem(POS_KEY);
       if (raw) return JSON.parse(raw);
     } catch { /* sin posición guardada */ }
-    return { x: window.innerWidth - 360, y: window.innerHeight - 280 };
+    return esquinaAbajoDerecha(TAMANO_INICIAL, window.innerWidth, window.innerHeight);
   });
+  // Mientras nadie la mueva, vive en la esquina de abajo a la derecha y se
+  // queda AHÍ aunque cambie la pantalla (Alvaro, 26/11/2026: «se descuadra»).
+  // Al arrastrarla, recuerda dónde la dejaste.
+  const anclada = useRef(!leerPosGuardada());
 
   // En una pantalla angosta la ventanita de 340px no entra; se achica al ancho
   // disponible en vez de salirse. Va en ESTADO, no leído en el render: lo único
@@ -179,6 +191,10 @@ export function PersistentCallProvider({ children }: { children: React.ReactNode
       const t = acotarTamano(tamanoRef.current, window.innerWidth, window.innerHeight);
       const ancho = minimizada ? Math.min(220, window.innerWidth - 16) : t.w;
       const alto = minimizada ? 44 : t.h;
+      if (anclada.current) {
+        const e = esquinaAbajoDerecha({ w: ancho, h: alto }, window.innerWidth, window.innerHeight);
+        return e.x === p.x && e.y === p.y ? p : e;
+      }
       const x = Math.min(Math.max(8, p.x), Math.max(8, window.innerWidth - ancho - 8));
       const y = Math.min(Math.max(8, p.y), Math.max(8, window.innerHeight - alto - 8));
       return x === p.x && y === p.y ? p : { x, y };
@@ -236,6 +252,7 @@ export function PersistentCallProvider({ children }: { children: React.ReactNode
       window.removeEventListener("pointermove", mover);
       window.removeEventListener("pointerup", soltar);
       window.removeEventListener("pointercancel", soltar);
+      anclada.current = false;
       setPos((p) => {
         try { window.localStorage.setItem(POS_KEY, JSON.stringify(p)); } catch { /* noop */ }
         return p;
@@ -259,8 +276,8 @@ export function PersistentCallProvider({ children }: { children: React.ReactNode
       // Que no se salga por la derecha ni por abajo desde donde está.
       const t = acotarTamano(
         { w: inicio.w + (ev.clientX - inicio.x), h: inicio.h + (ev.clientY - inicio.y) },
-        window.innerWidth - Math.max(0, pos.x - 8),
-        window.innerHeight - Math.max(0, pos.y - 8),
+        anclada.current ? window.innerWidth : window.innerWidth - Math.max(0, pos.x - 8),
+        anclada.current ? window.innerHeight : window.innerHeight - Math.max(0, pos.y - 8),
       );
       ultimo = t;
       setTamano(t);

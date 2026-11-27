@@ -324,7 +324,8 @@ describe("5. «Tu internet está débil»: solo un aviso", () => {
     // 18/11/2026: el codificador limitado por red ya no prende el aviso.
     expect(vigia).not.toContain("limitadoPorRed");
     expect(DEBIL_SOSTENIDO_MS).toBeGreaterThanOrEqual(20_000);
-    expect(leer("videocall/LiveKitCallView.tsx")).toContain('t("messenger.callView.internetDebil")');
+    // 26/11/2026: el aviso es un puntito en la barra; el texto entero va en el title.
+    expect(leer("videocall/LiveKitCallView.tsx")).toContain('"messenger.callView.internetDebil"');
   });
 });
 

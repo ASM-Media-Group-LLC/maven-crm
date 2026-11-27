@@ -22,7 +22,7 @@ import MonitoreoActivo from "./MonitoreoActivo";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { suscribirOrdenesDePausa } from "@/lib/ordenesDePausa";
 
-import { Loader2, Wifi, WifiOff, Copy, ChevronLeft, ChevronRight, DoorOpen, Check, MonitorUp, LayoutGrid, VideoOff } from "lucide-react";
+import { Loader2, WifiOff, Copy, ChevronLeft, ChevronRight, DoorOpen, Check, MonitorUp, LayoutGrid, VideoOff } from "lucide-react";
 import { CLAVES_SALA_TOMADA, olvidarSalaSoltada } from "@/lib/sesionDuplicada";
 import { caidaEnCurso, conexionDeSala, marcarCaida, olvidarCaida } from "@/lib/conexionSala";
 import type { ConexionSala } from "@/lib/coworkTiempoRegla";
@@ -207,6 +207,9 @@ const TEXTO_FALLO_CAMARA = {
   sin_camara: { titulo: "messenger.callView.camaraFallo.sinCamaraTitulo", detalle: "messenger.callView.camaraFallo.sinCamaraDetalle" },
   otro: { titulo: "messenger.callView.camaraFallo.otroTitulo", detalle: "messenger.callView.camaraFallo.otroDetalle" },
 } as const;
+
+/** Caritas que caben en la tira de la ventanita; el resto va en «y N más». */
+const CARITAS_EN_TIRA = 3;
 
 export default function LiveKitCallView({ roomName, displayName, callDisplayName, isAdmin = false, onLeave, initialMicOn = true, initialCamOn = true, initialScreenShareOn = false, initialAudioDeviceId, initialVideoDeviceId, initialAudioOutputDeviceId, initialBackgroundEffect = "none", hideShareLink, hideScreenShare, hideLeaveButton, leaveLabel, leaveIcon, suppressLeaveToast, compact, estadoMiniatura: miniaturaApp, autoPip = true, autoLeaveOnEmpty, getToken, onMediaStateChange, onFaceStateChange, supervisorEncuadre, onLocalScreenTrack, pantallaSoloParaMi, pantallaVisiblePara, pantallaOpcional = false, camaraOpcional = false, pantallaPrestada = null, sinLatidoDeLlamada, incomingAudioMuted, roomSwitcher, recording, shareLink: shareLinkProp, accionesBarra, guardarChat, encima, hideEndForAll, controlesExtra, sinVideoAjeno = false, telemetria, sinVolverEnError = false, hubDelSupervisor = null, mosaicoDePantallas = false }: LiveKitCallViewProps) {
   // Lista de salas del navegador (solo Cowork supervisor+): estado del popup.
@@ -1106,8 +1109,12 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
     if (mode === "tiled") return "grid";
     // Como Meet (19/11/2026): solo la pantalla de OTRO pasa al escenario. La tuya
     // la cubre la tarjeta «Estás presentando»; no cambia la vista.
-    return lk.participants.some((p) => p.isScreenSharing && !p.isLocal) ? "sidebar" : "grid";
-  }, [viewSettings.layout, lk.participants, pinnedSid]);
+    if (lk.participants.some((p) => p.isScreenSharing && !p.isLocal)) return "sidebar";
+    // Ventanita con mucha gente (Alvaro, 26/11/2026): en vez de 7 cuadritos
+    // ilegibles, en grande quien habla y abajo una tira «y N más».
+    if (effectiveCompact && lk.participants.length >= 5) return "sidebar";
+    return "grid";
+  }, [viewSettings.layout, lk.participants, pinnedSid, effectiveCompact]);
 
   // PERSONAS, no recuadros. Al compartir pantalla se emiten DOS tiles de la
   // misma persona (uno para la pantalla, otro para su camara), asi que
@@ -1229,8 +1236,26 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
   const salaActualIdx = salasNavegables && roomSwitcher
     ? Math.max(0, salasNavegables.findIndex((r) => r.id === roomSwitcher.currentId))
     : 0;
+  // Las flechas para pasar de sala van en la barra, a los lados del selector:
+  // antes flotaban sobre el video y tapaban la pantalla compartida y los
+  // nombres (Alvaro, 26/11/2026).
+  const salaAnterior = salasNavegables ? salasNavegables[(salaActualIdx - 1 + salasNavegables.length) % salasNavegables.length] : null;
+  const salaSiguiente = salasNavegables ? salasNavegables[(salaActualIdx + 1) % salasNavegables.length] : null;
+  const flechaDeSala = (sala: { id: string; name: string } | null, lado: "anterior" | "siguiente") => sala ? (
+    <button
+      type="button"
+      data-flecha-sala={lado}
+      title={t("messenger.callView.irA", { name: sala.name })}
+      aria-label={t(lado === "anterior" ? "messenger.callView.salaAnterior" : "messenger.callView.salaSiguiente")}
+      onClick={() => setSalaPorConfirmar(sala)}
+      className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+    >
+      {lado === "anterior" ? <ChevronLeft className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+    </button>
+  ) : null;
   const selectorDeSalas = salasNavegables && roomSwitcher ? (
-    <div className="relative flex min-w-0 items-center">
+    <div className="relative flex min-w-0 items-center gap-0.5">
+      {flechaDeSala(salaAnterior, "anterior")}
       <button
         type="button"
         onClick={() => setSalasAbiertas((v) => !v)}
@@ -1256,13 +1281,44 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
           ))}
         </div>
       )}
+      {flechaDeSala(salaSiguiente, "siguiente")}
     </div>
+  ) : null;
+
+  // Lo que pasa ahora, en la barra de arriba y nunca sobre el video.
+  const senalDebil = (lk.isReconnecting || lk.internetDebil) && !salaCaida;
+  const estadoDeLaBarra = (
+    <>
+      {senalDebil && (
+        <span
+          role="status"
+          data-senal-debil
+          title={t(lk.internetDebil ? "messenger.callView.internetDebil" : "messenger.callView.senal.reconectando")}
+          aria-label={t(lk.internetDebil ? "messenger.callView.internetDebilCorto" : "messenger.callView.reconectando")}
+          className="flex h-6 w-6 items-center justify-center rounded-full bg-warning/15 text-warning"
+        >
+          <WifiOff className="h-3.5 w-3.5 animate-pulse motion-reduce:animate-none" aria-hidden />
+        </span>
+      )}
+      <RecordingControl room={room} roomName={roomName} source={recording?.source ?? "cowork"} title={recording?.title} canControl={false} compact />
+      {localScreenShare && localScreenTrack && (
+        <MiPantallaCompartida
+          track={localScreenTrack}
+          compacto={effectiveCompact}
+          onDejar={() => { void alternarPantallaDesdeBoton(); }}
+          negra={enHubVigilado ? pantallaNegra : undefined}
+        />
+      )}
+    </>
+  );
+  const botonGrabar = recording && !enMiniatura ? (
+    <RecordingControl room={room} roomName={roomName} source={recording.source ?? "cowork"} title={recording.title} canControl variante="barra" compact={effectiveCompact} />
   ) : null;
 
   return (
     <div ref={rootRef} className="relative flex flex-col h-full bg-background text-foreground">
       {barraMiniatura ?? (
-        <CallTopBar roomName={callDisplayName || roomName} participantCount={cantidadDePersonas} onOpenAdjustView={() => setAdjustViewOpen(true)} shareLink={shareLink} hideShareLink={hideShareLink} compact={effectiveCompact} tactil={tactil} extra={selectorDeSalas} acciones={accionesBarra} esLlamada={roomName.startsWith("call-")} />
+        <CallTopBar roomName={callDisplayName || roomName} participantCount={cantidadDePersonas} onOpenAdjustView={() => setAdjustViewOpen(true)} shareLink={shareLink} hideShareLink={hideShareLink} compact={effectiveCompact} tactil={tactil} extra={selectorDeSalas} acciones={accionesBarra} esLlamada={roomName.startsWith("call-")} estado={estadoDeLaBarra} />
       )}
       {encima}
 
@@ -1270,26 +1326,9 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
           encima del video. En la ventanita son UNA línea fina, con el texto
           entero en el title: antes el de internet débil envolvía en tres líneas
           y tapaba la pantalla y las cámaras (Alvaro, 19/11/2026). */}
-      {lk.isReconnecting && !lk.internetDebil && (
-        <div className={cn("shrink-0 flex items-center justify-center gap-2 bg-warning/15 text-warning font-medium", effectiveCompact ? "py-0.5 text-[11px]" : "py-1.5 text-xs")}>
-          <WifiOff className={cn("animate-pulse", effectiveCompact ? "h-3 w-3" : "h-3.5 w-3.5")} /> {t("messenger.callView.reconectando")}
-        </div>
-      )}
-      {/* «Tu internet está débil» SOLO cuando la llamada se cayó de verdad:
-          reconectando o en LOST más de 20 s (lib/internetDebil.ts). Un bajón
-          de calidad (POOR) no muestra nada. Solo avisa: no apaga nada. */}
-      {lk.internetDebil && !salaCaida && (
-        effectiveCompact ? (
-          <div role="status" title={t("messenger.callView.internetDebil")} className="shrink-0 flex items-center justify-center gap-1.5 py-0.5 px-2 bg-warning/10 text-warning text-[11px] font-medium whitespace-nowrap overflow-hidden">
-            <WifiOff className="h-3 w-3 shrink-0 animate-pulse" aria-hidden="true" />
-            <span className="truncate">{t("messenger.callView.internetDebilCorto")}</span>
-          </div>
-        ) : (
-          <div role="status" className="shrink-0 flex items-center justify-center gap-2 py-1 px-3 bg-warning/10 text-warning text-xs font-medium text-center">
-            <Wifi className="h-3.5 w-3.5 shrink-0" aria-hidden="true" /> {t("messenger.callView.internetDebil")}
-          </div>
-        )
-      )}
+      {/* Reconectando / internet débil: ya NO son franjas. Van como un puntito
+          de señal en la barra de arriba (`estadoDeLaBarra`), con el texto entero
+          al pasar el mouse (Alvaro, 26/11/2026: «el aviso tapa la llamada»). */}
       {/* «Tu internet se está cortando seguido» (lib/caidasSeguidas.ts): con 3
           caídas propias en 30 min, una vez por hora. Solo avisa. */}
       <AvisoCaidasSeguidas />
@@ -1407,16 +1446,6 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
               {t("cowork.hubPantalla.verTodas")}
             </button>
           )}
-          <div className="absolute left-5 top-5 z-20">
-            <RecordingControl
-              room={room}
-              roomName={roomName}
-              source={recording?.source ?? "cowork"}
-              title={recording?.title}
-              canControl={!!recording && !enMiniatura}
-              compact={effectiveCompact}
-            />
-          </div>
           {videosEnMiniatura ? (
             <VideosEnMiniatura participantes={lk.participants} vozActiva={lk.activeSpeaker} room={room} audioOutputId={audioOutputId} />
           ) : pantallasEnMosaico ? (
@@ -1465,11 +1494,11 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
             // cedía (le faltaba `min-w-0`), la barra terminaba empujada fuera
             // del `overflow-hidden` del padre. La cámara estaba en el DOM pero
             // fuera de lo visible: Alexandra solo veía el cuadro de su pantalla.
-            <div className={cn("h-full", effectiveCompact ? (tactil ? "flex flex-col gap-1.5" : "relative") : "flex gap-2")}>
+            <div className={cn("h-full", effectiveCompact ? "flex flex-col gap-1.5" : "flex gap-2")}>
               {spotlightParticipant && (
                 // `min-w-0` es lo que le permite al panel grande achicarse. Sin
                 // eso, un flex item se niega a bajar de su contenido y desborda.
-                <div className={effectiveCompact ? (tactil ? "min-h-0 flex-1" : "h-full") : "flex-1 min-w-0"}>
+                <div className={effectiveCompact ? "min-h-0 flex-1" : "flex-1 min-w-0"}>
                   <ParticipantTile compact={effectiveCompact} participant={spotlightParticipant} room={room} large className="h-full" preferredAudioOutputDeviceId={audioOutputId} onMuteParticipant={lk.muteParticipant} onRemoveParticipant={lk.removeParticipant} onPinParticipant={handlePinParticipant} pinnedSid={pinnedSid} isAdmin={isAdmin} />
                 </div>
               )}
@@ -1486,15 +1515,25 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
                     ))}
                   </div>
                 ) : effectiveCompact ? (
-                  // Esquina inferior derecha, encima de la pantalla. Se muestran
-                  // como mucho DOS: en una ventana de este tamaño, una tira de
-                  // nueve caritas no se ve, estorba.
-                  <div className="absolute bottom-2 right-2 flex flex-col-reverse gap-1.5 w-[34%] max-w-[150px] pointer-events-none">
-                    {otrosParticipantes.slice(0, 2).map((p) => (
-                      <div key={`${p.identity}-${p.sid}`} className="aspect-video rounded-lg overflow-hidden ring-1 ring-white/25 shadow-lg pointer-events-auto">
+                  // Ventanita (Alvaro, 26/11/2026): en grande quien comparte o
+                  // habla y DEBAJO una tira de caritas, sin nada encima del video.
+                  // Las que no caben se cuentan en «y N más» (abre la lista).
+                  <div data-tira-caritas className="flex h-16 shrink-0 items-stretch gap-1.5">
+                    {otrosParticipantes.slice(0, CARITAS_EN_TIRA).map((p) => (
+                      <div key={`${p.identity}-${p.sid}`} className="aspect-video h-full shrink-0 overflow-hidden rounded-lg ring-1 ring-white/15">
                         <ParticipantTile compact={effectiveCompact} participant={p} room={room} className="h-full" preferredAudioOutputDeviceId={audioOutputId} onMuteParticipant={lk.muteParticipant} onRemoveParticipant={lk.removeParticipant} onPinParticipant={handlePinParticipant} pinnedSid={pinnedSid} isAdmin={isAdmin} />
                       </div>
                     ))}
+                    {otrosParticipantes.length > CARITAS_EN_TIRA && (
+                      <button
+                        type="button"
+                        data-y-n-mas
+                        onClick={() => { setParticipantsOpen(true); setChatOpen(false); }}
+                        className="flex h-full shrink-0 items-center rounded-lg bg-card/70 px-3 text-xs font-medium text-foreground ring-1 ring-white/15 hover:bg-muted"
+                      >
+                        {t("messenger.callView.yNMas", { n: otrosParticipantes.length - CARITAS_EN_TIRA })}
+                      </button>
+                    )}
                   </div>
                 ) : (
                   <div className="flex flex-col gap-2 w-48 shrink-0 overflow-y-auto">
@@ -1513,17 +1552,6 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
             </div>
           )}
 
-          {/* Tu propia pantalla, como en Meet (Alvaro, 19/11/2026): un cuadrito
-              chico con «Dejar de compartir», que se esconde en una pastilla.
-              Sale de la publicación ScreenShare del participante local. */}
-          {localScreenShare && localScreenTrack && (
-            <MiPantallaCompartida
-              track={localScreenTrack}
-              compacto={effectiveCompact}
-              onDejar={() => { void alternarPantallaDesdeBoton(); }}
-              negra={enHubVigilado ? pantallaNegra : undefined}
-            />
-          )}
 
 
         </div>
@@ -1581,38 +1609,6 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
       {/* Safety-net: ensures every remote mic is audible even if its tile isn't mounted */}
       <RoomAudioSink room={room} preferredAudioOutputDeviceId={audioOutputId} />
 
-      {/* Navegador de salas (Cowork): flechas estilo Instagram + lista. Al
-          moverse, el dueño cuelga la sala anterior y te mete MUTEADO a la
-          nueva (initialMicOn=false del flujo de entrar a sala): no quedas como
-          presencia fantasma ni hablando donde ya no estás mirando. */}
-      {roomSwitcher && roomSwitcher.rooms.length > 1 && (() => {
-        const n = roomSwitcher.rooms.length;
-        const idx = Math.max(0, roomSwitcher.rooms.findIndex((r) => r.id === roomSwitcher.currentId));
-        const anterior = roomSwitcher.rooms[(idx - 1 + n) % n];
-        const siguiente = roomSwitcher.rooms[(idx + 1) % n];
-        return (
-          <>
-            <button
-              type="button"
-              title={t("messenger.callView.irA", { name: anterior.name })}
-              aria-label={t("messenger.callView.irA", { name: anterior.name })}
-              onClick={() => setSalaPorConfirmar(anterior)}
-              className="absolute left-1.5 top-1/2 -translate-y-1/2 z-30 h-9 w-9 rounded-full flex items-center justify-center bg-black/45 text-white/85 backdrop-blur-sm hover:bg-black/65 hover:text-white transition-colors"
-            >
-              <ChevronLeft className="h-5 w-5" />
-            </button>
-            <button
-              type="button"
-              title={t("messenger.callView.irA", { name: siguiente.name })}
-              aria-label={t("messenger.callView.irA", { name: siguiente.name })}
-              onClick={() => setSalaPorConfirmar(siguiente)}
-              className="absolute right-1.5 top-1/2 -translate-y-1/2 z-30 h-9 w-9 rounded-full flex items-center justify-center bg-black/45 text-white/85 backdrop-blur-sm hover:bg-black/65 hover:text-white transition-colors"
-            >
-              <ChevronRight className="h-5 w-5" />
-            </button>
-          </>
-        );
-      })()}
       {/* Confirmar antes de cambiar de sala con las flechas. Va por encima de la
           ventanita flotante (z-[150]) y, si la llamada está en la ventana del
           sistema, se dibuja en ESE documento. */}
@@ -1689,7 +1685,7 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
         backgroundEffect={bgEffect}
         onToggleBlurBackground={() => handleBgChange(alternarBlur(bgEffect, ultimoBlurRef.current))}
         onElegirNivelBlur={(nivel) => handleBgChange(efectoDeNivel(nivel))}
-        controlesExtra={controlesExtra}
+        controlesExtra={botonGrabar || controlesExtra ? <>{botonGrabar}{controlesExtra}</> : undefined}
       />
 
       <AdjustViewDialog open={adjustViewOpen} onClose={() => setAdjustViewOpen(false)} settings={viewSettings} onSettingsChange={handleViewSettingsChange} />

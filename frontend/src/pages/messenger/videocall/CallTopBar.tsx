@@ -25,10 +25,13 @@ interface CallTopBarProps {
    *  «está todo abultado arriba»): sin «EN VIVO» y con «Ajustar vista» solo
    *  como ícono. */
   esLlamada?: boolean;
+  /** Lo que pasa AHORA en la llamada, a la derecha y sin tapar el video
+   *  (Alvaro, 26/11/2026): la señal débil, «REC» y «Presentando». */
+  estado?: ReactNode;
 }
 
 export default function CallTopBar({
-  roomName, participantCount, isEncrypted, onOpenAdjustView, shareLink, hideShareLink, compact, tactil, extra, acciones, esLlamada,
+  roomName, participantCount, isEncrypted, onOpenAdjustView, shareLink, hideShareLink, compact, tactil, extra, acciones, esLlamada, estado,
 }: CallTopBarProps) {
   const { t } = useLanguage();
   const [elapsed, setElapsed] = useState(0);
@@ -83,6 +86,7 @@ export default function CallTopBar({
       </div>
 
       <div className="flex shrink-0 items-center gap-1">
+        {estado}
         <span className={cn("text-muted-foreground mr-1 whitespace-nowrap", compact ? "text-[10px]" : "text-xs mr-2")}>
           {participantCount === 1 ? t("messenger.topbar.unParticipante") : t("messenger.metrics.nParticipantes", { n: participantCount })}
         </span>
