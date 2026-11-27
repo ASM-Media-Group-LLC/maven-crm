@@ -1031,16 +1031,11 @@ function ExpedientePermitido() {
             <div className="min-w-0 flex-1">
               <h2 className="break-words font-display text-base font-bold leading-tight tracking-tight">{nombre}</h2>
               {/* En el diseño pulido la nota ya va grande abajo: no se repite junto al nombre. */}
-              {dia.nota.banda && !pulido && (false ? (
-                <span className="mt-1 inline-flex items-center gap-1.5 text-xs text-muted-foreground">
-                  <span className={`h-1.5 w-1.5 rounded-full ${PUNTO_BANDA[dia.nota.banda] ?? "bg-muted-foreground"}`} aria-hidden />
-                  <span className="tabular-nums"><span className="font-semibold text-foreground">{dia.nota.valor}</span> / 100</span>
-                </span>
-              ) : (
+              {dia.nota.banda && !pulido && (
                 <span className={`mt-0.5 inline-flex items-center rounded-control px-1.5 py-0.5 text-[11px] font-semibold ${c?.chip}`}>
                   {dia.nota.valor} / 100
                 </span>
-              ))}
+              )}
             </div>
             {/* Navegación de día */}
             <div className="flex items-center gap-1.5">
