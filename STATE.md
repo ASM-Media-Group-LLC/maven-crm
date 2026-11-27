@@ -159,3 +159,5 @@ Ambos sets ya tienen migrations subidas (`20260504100000`, `20260504110000`) per
 - El selector instalado indica qué falta, conserva la opción elegida y permite reintentar la confirmación si falla. Pendiente validar la captura entre dos equipos con los nuevos instaladores.
 
 - 26/11/2026 noche (Claude): Drive NAS arreglado. La mini tiene 2 Tailscale (servidor y app de escritorio) y contestaba por el equivocado; la puerta (Dokploy + infra/nas-drive/puerta) apunta a unlok-workstation.tail11d450.ts.net:8790. Pendiente: dejar un solo Tailscale en la mini.
+
+- 27/11/2026 (Claude): PR #303 «Llamadas limpias» (nada encima del video, ventanita en la esquina, tarjeta de llamada entrante, «solo navegador» por Posición). Pendiente: aplicar en Kash la migración 20261127050000_posiciones_solo_navegador.sql (con OK de Alvaro).
