@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -37,7 +37,8 @@ type Tr = (k: TranslationKey, vars?: Record<string, string | number>) => string;
 // los que estuvieron mejor, los que estuvieron peor»).
 type Filtro = "todos" | "activos" | "trabajaron" | "noVinieron" | "mejores" | "peores" | "tarde" | "ignoro";
 const VISTAS: Array<[Filtro, TranslationKey]> = [
-  ["todos", "hr.turno.v.todos"], ["activos", "hr.turno.v.activos"], ["trabajaron", "hr.turno.v.trabajaron"], ["noVinieron", "hr.turno.v.noVinieron"],
+  // Orden y vista de entrada (Alvaro, 27/11/2026): 1 Activos ahora, 2 Trabajaron, 3 Todos.
+  ["activos", "hr.turno.v.activos"], ["trabajaron", "hr.turno.v.trabajaron"], ["todos", "hr.turno.v.todos"], ["noVinieron", "hr.turno.v.noVinieron"],
   ["mejores", "hr.turno.v.mejores"], ["peores", "hr.turno.v.peores"],
 ];
 
@@ -318,7 +319,11 @@ export function TurnoTabla() {
     }
     void qc.invalidateQueries({ queryKey: ["argos-turno-tabla", dia] });
   };
-  const [filtro, setFiltro] = useState<Filtro>("todos");
+  const [filtro, setFiltro] = useState<Filtro>(esHoy ? "activos" : "trabajaron");
+  // «Activos ahora» solo existe hoy: en otro día se cae a «Trabajaron», y al volver a hoy, a «Activos ahora».
+  useEffect(() => {
+    setFiltro((f) => (!esHoy && f === "activos" ? "trabajaron" : esHoy && f === "trabajaron" ? "activos" : f));
+  }, [esHoy]);
   const [turno, setTurno] = useState<string | null>(null);
   const [buscar, setBuscar] = useState("");
   const [calAbierto, setCalAbierto] = useState(false);
