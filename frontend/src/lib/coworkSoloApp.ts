@@ -19,8 +19,10 @@ export function esNavegadorDeComputador(p: { ua: string; tactil: boolean; enApp:
  *  17/11/2026 (Alvaro): la fecha pasó al viernes 20/11 y antes hay una prueba
  *  con 3 personas (monitor_config.cowork_solo_app_probadores): a ellas ya se
  *  les pide la app, con o sin fecha. */
-export function estadoSoloApp(p: { ua: string; tactil: boolean; enApp: boolean; desde: Date | null; ahora: Date; probador?: boolean }): EstadoSoloApp {
+export function estadoSoloApp(p: { ua: string; tactil: boolean; enApp: boolean; desde: Date | null; ahora: Date; probador?: boolean; soloNavegador?: boolean }): EstadoSoloApp {
   if (!esNavegadorDeComputador(p)) return "nada";
+  // Su Posición le deja trabajar solo en el navegador (Finanzas, 26/11/2026).
+  if (p.soloNavegador) return "nada";
   if (p.probador) return "bloqueo";
   if (!p.desde || Number.isNaN(p.desde.getTime())) return "nada";
   return p.ahora >= p.desde ? "bloqueo" : "aviso";

@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -96,4 +97,74 @@ export function cambiosDe(c: Pick<CambioExigencias, "camara_antes" | "camara_des
   if (c.pantalla_antes && !c.pantalla_despues) quita.push("pantalla");
   if (!c.pantalla_antes && c.pantalla_despues) pide.push("pantalla");
   return { quita, pide };
+}
+
+// SOLO NAVEGADOR POR POSICIÓN (Alvaro, 26/11/2026). Finanzas trabaja en el
+// navegador: no se le ofrece la app ni se le exige para Cowork o las llamadas.
+
+/** ¿Mi posición me deja trabajar solo en el navegador? Si la base no contesta,
+ *  NO (se queda como antes: se ofrece la app). Sin react-query a propósito: lo
+ *  usan el aviso de la app y el bloqueo de llamadas, que viven también fuera
+ *  del QueryClientProvider. Una sola consulta por pestaña (5 min). */
+export function useSoloNavegador(activo = true): boolean {
+  return useSoloNavegadorConEstado(activo).soloNavegador;
+}
+
+let cacheNavegador: { valor: boolean; t: number } | null = null;
+let enVueloNavegador: Promise<boolean> | null = null;
+function leerSoloNavegador(): Promise<boolean> {
+  if (cacheNavegador && Date.now() - cacheNavegador.t < 5 * 60_000) return Promise.resolve(cacheNavegador.valor);
+  if (enVueloNavegador) return enVueloNavegador;
+  enVueloNavegador = (async () => {
+    try {
+      const { data, error } = await db.rpc("mi_solo_navegador");
+      const valor = !error && data === true;
+      if (!error) cacheNavegador = { valor, t: Date.now() };
+      return valor;
+    } catch { return false; } finally { enVueloNavegador = null; }
+  })();
+  return enVueloNavegador;
+}
+/** Para las pruebas. */
+export function olvidarSoloNavegador() { cacheNavegador = null; enVueloNavegador = null; }
+
+/** Igual, diciendo además si ya se sabe (para no bloquear y desbloquear). */
+export function useSoloNavegadorConEstado(activo = true): { soloNavegador: boolean; listo: boolean } {
+  const [estado, setEstado] = useState<{ soloNavegador: boolean; listo: boolean }>(() =>
+    cacheNavegador ? { soloNavegador: cacheNavegador.valor, listo: true } : { soloNavegador: false, listo: false });
+  useEffect(() => {
+    if (!activo) return;
+    let vivo = true;
+    void leerSoloNavegador().then((v) => { if (vivo) setEstado({ soloNavegador: v, listo: true }); });
+    return () => { vivo = false; };
+  }, [activo]);
+  return activo ? estado : { soloNavegador: false, listo: true };
+}
+
+export function usePosicionesSoloNavegador() {
+  return useQuery<Record<string, boolean>>({
+    queryKey: ["posiciones-solo-navegador"],
+    staleTime: 30_000,
+    queryFn: async () => {
+      const { data, error } = await db.rpc("posiciones_solo_navegador");
+      if (error) throw new Error(error.message);
+      const mapa: Record<string, boolean> = {};
+      for (const f of (Array.isArray(data) ? data : []) as Array<{ id: string; solo_navegador: boolean }>) mapa[f.id] = f.solo_navegador === true;
+      return mapa;
+    },
+  });
+}
+
+export function useGuardarSoloNavegador() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (v: { posicion: string; valor: boolean }) => {
+      const { error } = await db.rpc("posicion_solo_navegador_guardar", { _posicion: v.posicion, _valor: v.valor });
+      if (error) throw new Error(error.message);
+    },
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["posiciones-solo-navegador"] });
+      olvidarSoloNavegador();
+    },
+  });
 }

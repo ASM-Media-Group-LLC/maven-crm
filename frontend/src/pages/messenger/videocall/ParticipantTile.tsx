@@ -560,7 +560,7 @@ const ParticipantTile = memo(function ParticipantTile({
       {participant.isScreenSharing && (
         <div className="absolute top-3 left-1/2 -translate-x-1/2 z-10">
           <div className="flex items-center gap-1.5 bg-[hsl(220_3%_14%/0.8)] backdrop-blur-sm text-white text-[10px] font-medium rounded-full px-2.5 py-1">
-            <Monitor className="h-3 w-3" /> {t("messenger.tile.compartiendoPantalla")}
+            <Monitor className="h-3 w-3" aria-label={compact ? t("messenger.tile.compartiendoPantalla") : undefined} /> {!compact && t("messenger.tile.compartiendoPantalla")}
           </div>
         </div>
       )}
@@ -581,28 +581,28 @@ const ParticipantTile = memo(function ParticipantTile({
         </div>
       )}
 
-      {/* Rótulo lower-third (Estudio Acero): el nombre en una placa sólida
-          abajo-izquierda y la señal en su propia placa abajo-derecha, como un
-          rótulo de transmisión — en vez de una barra con degradé. */}
-      <div className={cn("absolute bottom-0 left-0 right-0 flex items-end justify-between z-10 pointer-events-none", compact ? "px-1.5 py-1.5" : "px-2.5 py-2.5")}>
-        <div className={cn("flex min-w-0 items-center gap-1.5 rounded-md border border-white/10 bg-[hsl(220_30%_10%/0.85)] backdrop-blur-sm", compact ? "px-1.5 py-0.5" : "px-2 py-1")}>
-          <span className={cn("truncate font-medium text-white", compact ? "text-[10px]" : "text-xs")}>
+      {/* Rótulo (Alvaro, 26/11/2026: «los nombres tapan las caras»): una sombra
+          suave abajo y, encima, el nombre CHICO a la izquierda con el micrófono
+          apagado y la señal al lado. Nada de placas grandes: la cara queda libre. */}
+      <div
+        data-rotulo
+        className={cn(
+          "pointer-events-none absolute inset-x-0 bottom-0 z-10 flex items-end bg-gradient-to-t from-black/60 via-black/25 to-transparent",
+          compact ? "h-7 px-1.5 pb-1" : "h-10 px-2.5 pb-1.5",
+        )}
+      >
+        <div className="flex min-w-0 max-w-full items-center gap-1">
+          <span className={cn("truncate font-medium text-white drop-shadow", compact ? "text-[10px]" : "text-[11px]")}>
             {participant.isLocal ? t("messenger.preview.tu") : participant.name}
           </span>
           {participant.isMuted && (
-            <div className={cn("rounded-full bg-destructive flex items-center justify-center shrink-0", compact ? "h-4 w-4" : "h-5 w-5")}>
-              <MicOff className={compact ? "h-2.5 w-2.5 text-white" : "h-3 w-3 text-white"} />
-            </div>
+            <MicOff aria-label={t("messenger.tile.silenciado")} className={cn("shrink-0 text-red-400 drop-shadow", compact ? "h-2.5 w-2.5" : "h-3 w-3")} />
           )}
+          {/* La calidad de conexión es de la PERSONA, no de cada recuadro: con
+              cámara + pantalla se dibujan dos tiles suyos y sin esta guarda el
+              iconito salía repetido. Va en el de su cámara. */}
+          {!participant.esTileDePantalla && <ConnectionIndicator quality={participant.connectionQuality} />}
         </div>
-        {/* La calidad de conexión es de la PERSONA, no de cada recuadro: con
-            cámara + pantalla se dibujan dos tiles suyos y sin esta guarda el
-            iconito salía repetido. Va en el de su cámara. */}
-        {!participant.esTileDePantalla && (
-          <div className="shrink-0 rounded-md border border-white/10 bg-[hsl(220_30%_10%/0.85)] px-1.5 py-1 backdrop-blur-sm">
-            <ConnectionIndicator quality={participant.connectionQuality} />
-          </div>
-        )}
       </div>
     </div>
   );

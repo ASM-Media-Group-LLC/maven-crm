@@ -45,13 +45,15 @@ describe("1. internet débil: solo con la llamada caída de verdad", () => {
     expect(DEBIL_SOSTENIDO_MS).toBeGreaterThanOrEqual(20_000);
   });
 
-  it("en la ventanita el aviso es una línea fina, en su fila y no encima del video", () => {
+  it("el aviso es un puntito de señal en la barra de arriba, nunca encima del video (26/11/2026)", () => {
     const s = leer("videocall/LiveKitCallView.tsx");
-    expect(s).toContain('t("messenger.callView.internetDebilCorto")');
-    const corto = s.slice(s.indexOf("{lk.internetDebil && !salaCaida && ("), s.indexOf('t("messenger.callView.internetDebilCorto")'));
-    expect(corto).toContain("shrink-0");
-    expect(corto).toContain("whitespace-nowrap");
-    expect(corto).not.toMatch(/\babsolute\b/);
+    const estado = s.slice(s.indexOf("const estadoDeLaBarra = ("), s.indexOf("const botonGrabar"));
+    expect(estado).toContain("data-senal-debil");
+    expect(estado).toContain('t(lk.internetDebil ? "messenger.callView.internetDebil"');
+    expect(estado).not.toMatch(/\babsolute\b/);
+    // Ya no hay franja de aviso en su propia fila.
+    expect(s).not.toContain("{lk.internetDebil && !salaCaida && (");
+    expect(s).toContain("estado={estadoDeLaBarra}");
   });
 });
 
@@ -86,10 +88,12 @@ describe("2. la ventanita flotante se agranda y vuelve a Cowork", () => {
 describe("3. las flechas < > de cambiar de sala preguntan antes", () => {
   it("las flechas solo abren la confirmación; el cambio va en «Cambiar de sala»", () => {
     const s = leer("videocall/LiveKitCallView.tsx");
-    expect(s).toContain("onClick={() => setSalaPorConfirmar(anterior)}");
-    expect(s).toContain("onClick={() => setSalaPorConfirmar(siguiente)}");
-    expect(s).not.toContain("onClick={() => roomSwitcher.onSwitch(anterior.id)}");
-    expect(s).not.toContain("onClick={() => roomSwitcher.onSwitch(siguiente.id)}");
+    // 26/11/2026: las flechas van en la barra, a los lados del selector.
+    expect(s).toContain("onClick={() => setSalaPorConfirmar(sala)}");
+    expect(s).toContain('flechaDeSala(salaAnterior, "anterior")');
+    expect(s).toContain('flechaDeSala(salaSiguiente, "siguiente")');
+    expect(s).not.toMatch(/absolute left-1\.5 top-1\/2/);
+    expect(s).not.toContain("roomSwitcher.onSwitch(anterior.id)");
     const dialogo = s.slice(s.indexOf("<AlertDialog open={!!salaPorConfirmar}"), s.indexOf("</AlertDialog>"));
     expect(dialogo).toContain('t("messenger.callView.confirmarSala.cambiar")');
     expect(dialogo).toContain("<AlertDialogCancel />");
@@ -106,16 +110,17 @@ describe("5. tu propia pantalla compartida, como en Meet", () => {
     expect(s).toContain("onToggleScreenShare={salaCaida ? primeroReconectar : alternarPantallaDesdeBoton}");
   });
 
-  it("la tarjeta: «Estás presentando a todos» SIN video (sin túnel), «Dejar de compartir», se esconde y avisa del negro", () => {
+  it("la pastilla de arriba: «Presentando» SIN video (sin túnel), «Dejar de compartir» y avisa del negro (26/11/2026)", () => {
     const s = leer("videocall/MiPantallaCompartida.tsx");
-    // Alvaro, 19/11/2026: como Meet pero sin la vista real (el túnel del 18/11).
     expect(s).not.toMatch(/<video/);
-    expect(s).toContain('t("messenger.callView.miPantalla.presentando")');
+    expect(s).toContain('t("messenger.callView.miPantalla.presentandoCorto")');
     expect(s).toContain('t("messenger.callView.miPantalla.dejar")');
-    // 26/11/2026: la pastilla dice «Estás compartiendo tu pantalla» completo.
-    expect(s).toContain('t("messenger.callView.miPantalla.titulo")');
-    expect(s).toContain('t("messenger.callView.miPantalla.negra")');
+    expect(s).toContain('t("messenger.callView.miPantalla.negraCorto")');
     expect(s).toContain("vigilarPantallaNegra(track, setNegraPropia)");
-    expect(s).toMatch(/localStorage\.setItem\(CLAVE_OCULTA/);
+    // Ya no flota sobre los videos.
+    expect(s).not.toMatch(/absolute bottom-2 left-2/);
+    const v = leer("videocall/LiveKitCallView.tsx");
+    const estado = v.slice(v.indexOf("const estadoDeLaBarra = ("), v.indexOf("const botonGrabar"));
+    expect(estado).toContain("<MiPantallaCompartida");
   });
 });

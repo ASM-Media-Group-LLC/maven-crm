@@ -41,21 +41,30 @@ export default function IncomingCallModal({ call, onAccept, onDecline, enLaApp =
   // En el teléfono además vibra mientras suena (el timbre lo pone CallProvider).
   useEffect(() => vibrarMientrasSuena(), []);
 
+  // Tarjeta arriba a la derecha (Alvaro, 26/11/2026): avisa con foto, nombre y
+  // timbre SIN tapar lo que estás haciendo. Antes era un velo oscuro en toda la
+  // pantalla. En el teléfono va arriba, a lo ancho.
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-      <div className="vidrio vidrio-glow sube rounded-[20px] border border-border/60 p-8 flex flex-col items-center gap-6 w-80">
+    <div
+      role="alertdialog"
+      aria-live="assertive"
+      aria-label={call.caller_name ?? t("messenger.incoming.desconocido")}
+      data-llamada-entrante
+      className="vidrio vidrio-glow sube fixed inset-x-2 top-2 z-[200] rounded-2xl border border-border/60 p-3 shadow-2xl sm:inset-x-auto sm:right-4 sm:top-4 sm:w-[340px]"
+    >
+      <div className="flex items-center gap-3">
         {/* Quién llama: su foto, con las ondas del timbre y el tipo de llamada. */}
-        <div className="relative">
+        <div className="relative shrink-0">
           <span className="absolute inset-0 rounded-full bg-primary/25 animate-ping motion-reduce:animate-none" />
-          <span className="absolute -inset-3 rounded-full border border-primary/20" />
-          <UserAvatar name={call.caller_name ?? "?"} src={perfil?.foto} seed={perfil?.seed} size="xl" className="relative h-24 w-24 text-2xl" />
-          <span className="absolute -bottom-1 -right-1 flex h-8 w-8 items-center justify-center rounded-full border-2 border-background bg-primary text-primary-foreground">
-            <CallIcon className="h-4 w-4" />
+          <UserAvatar name={call.caller_name ?? "?"} src={perfil?.foto} seed={perfil?.seed} size="lg" className="relative h-12 w-12 text-base" />
+          <span className="absolute -bottom-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full border-2 border-background bg-primary text-primary-foreground">
+            <CallIcon className="h-2.5 w-2.5" />
           </span>
         </div>
 
-        <div className="text-center space-y-1">
-          <p className="text-xs text-muted-foreground">
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-sm font-semibold text-foreground">{call.caller_name ?? t("messenger.incoming.desconocido")}</p>
+          <p className="truncate text-xs text-muted-foreground">
             {t(
               isOngoing
                 ? (isGroup
@@ -66,50 +75,44 @@ export default function IncomingCallModal({ call, onAccept, onDecline, enLaApp =
                     : (isAudio ? "messenger.incoming.entranteAudio" : "messenger.incoming.entranteVideo")),
             )}
           </p>
-          <p className="text-xl font-semibold text-foreground">{call.caller_name ?? t("messenger.incoming.desconocido")}</p>
           {/* En grupo: en qué chat es la llamada. */}
           {isGroup && call.titulo && call.titulo !== call.caller_name && (
-            <p className="text-xs text-muted-foreground truncate max-w-[16rem]">{call.titulo}</p>
+            <p className="truncate text-[11px] text-muted-foreground/80">{call.titulo}</p>
           )}
         </div>
 
-        <div className="flex gap-6">
-          {/* Decline */}
+        <div className="flex shrink-0 gap-2">
           <button
             onClick={onDecline}
-            className="flex flex-col items-center gap-1 group"
+            title={t("messenger.incoming.rechazar")}
+            aria-label={t("messenger.incoming.rechazar")}
+            className="flex h-10 w-10 items-center justify-center rounded-full bg-destructive shadow-lg transition-transform hover:scale-105"
           >
-            <div className="h-14 w-14 rounded-full bg-destructive flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform">
-              <PhoneOff className="h-6 w-6 text-destructive-foreground" />
-            </div>
-            <span className="text-xs text-muted-foreground">{t("messenger.incoming.rechazar")}</span>
+            <PhoneOff className="h-4 w-4 text-destructive-foreground" />
           </button>
-
-          {/* Accept */}
           <button
             onClick={onAccept}
-            className="flex flex-col items-center gap-1 group"
+            title={enLaApp
+              ? t(isOngoing ? "messenger.incoming.unirseEnApp" : "messenger.incoming.contestarEnApp")
+              : t(isOngoing ? "messenger.incoming.unirse" : "messenger.incoming.aceptar")}
+            aria-label={enLaApp
+              ? t(isOngoing ? "messenger.incoming.unirseEnApp" : "messenger.incoming.contestarEnApp")
+              : t(isOngoing ? "messenger.incoming.unirse" : "messenger.incoming.aceptar")}
+            className="flex h-10 w-10 items-center justify-center rounded-full bg-success shadow-lg transition-transform hover:scale-105"
           >
-            <div className="h-14 w-14 rounded-full bg-success flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform">
-              <Phone className="h-6 w-6 text-success-foreground" />
-            </div>
-            <span className="text-xs text-muted-foreground">
-              {enLaApp
-                ? t(isOngoing ? "messenger.incoming.unirseEnApp" : "messenger.incoming.contestarEnApp")
-                : t(isOngoing ? "messenger.incoming.unirse" : "messenger.incoming.aceptar")}
-            </span>
+            <Phone className="h-4 w-4 text-success-foreground" />
           </button>
         </div>
-
-        {enLaApp && (
-          <div className="space-y-1 text-center">
-            <p className="text-xs text-muted-foreground">{t("messenger.incoming.soloEnApp")}</p>
-            <a href={RUTA_DESCARGAR_CON_GUIA} target="_blank" rel="noopener noreferrer" className="text-xs font-medium text-primary underline-offset-2 hover:underline">
-              {t("messenger.incoming.descargarApp")}
-            </a>
-          </div>
-        )}
       </div>
+
+      {enLaApp && (
+        <div className="mt-2 flex items-center justify-between gap-2 border-t border-border/50 pt-2">
+          <p className="text-[11px] text-muted-foreground">{t("messenger.incoming.soloEnApp")}</p>
+          <a href={RUTA_DESCARGAR_CON_GUIA} target="_blank" rel="noopener noreferrer" className="shrink-0 text-[11px] font-medium text-primary underline-offset-2 hover:underline">
+            {t("messenger.incoming.descargarApp")}
+          </a>
+        </div>
+      )}
     </div>
   );
 }

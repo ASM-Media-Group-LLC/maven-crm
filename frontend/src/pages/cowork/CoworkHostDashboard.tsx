@@ -3217,6 +3217,9 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                 // Nunca más alto que la pantalla. Aplica también al alto que la
                 // persona haya elegido arrastrando la esquina.
                 maxHeight: "calc(100dvh - 2rem)",
+                // Ni más ancho: un tamaño guardado en un monitor grande se salía
+                // por la derecha en la laptop (26/11/2026).
+                maxWidth: "calc(100vw - 2rem)",
               }}
           >
             {/* Esquina para ESTIRAR el Hub (Alvaro: más grande, más cómodo). */}
