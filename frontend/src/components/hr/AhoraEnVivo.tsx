@@ -19,7 +19,8 @@ const EN_VIVO = new Set(["conectando", "en_vivo", "reconectando"]);
 const hhmm = (iso: string) =>
   a12(new Date(iso).toLocaleTimeString("en-GB", { timeZone: "America/Bogota", hour: "2-digit", minute: "2-digit", hour12: false }));
 
-export function AhoraEnVivo({ userId, capturas }: { userId: string; capturas: CapturaDia[] }) {
+/** `junto` (27/11/2026): va dentro de la cabecera de la ficha, sin marco propio. */
+export function AhoraEnVivo({ userId, capturas, junto = false }: { userId: string; capturas: CapturaDia[]; junto?: boolean }) {
   const { t } = useLanguage();
   const [escuchar, setEscuchar] = useState(false);
   const obs = useObservadorEnVivo(userId, true, escuchar);
@@ -50,8 +51,8 @@ export function AhoraEnVivo({ userId, capturas }: { userId: string; capturas: Ca
     : t("hr.exp.vivo.noDisponible");
 
   return (
-    <section className="vidrio sube mt-4 p-4 lg:p-5">
-      <div className="v-cont flex flex-col gap-3">
+    <section className={junto ? "flex min-w-0 flex-col gap-3" : "vidrio sube mt-4 p-4 lg:p-5"}>
+      <div className={junto ? "flex flex-col gap-3" : "v-cont flex flex-col gap-3"}>
         <div className="flex flex-wrap items-center gap-2">
           <h2 className="text-sm font-semibold">{t("hr.exp.cron.ahora")}</h2>
           {/* «En vivo» ya lo dice el video (18/11/2026: «se repite»). */}
@@ -67,7 +68,7 @@ export function AhoraEnVivo({ userId, capturas }: { userId: string; capturas: Ca
         {vivo ? (
           // Grande (Alvaro, 18/11/2026: «el live está muy chiquito»): a todo el ancho,
           // hasta casi el alto de la ventana.
-          <div className="mx-auto w-full max-w-[calc((100vh-9rem)*16/9)] overflow-hidden rounded-xl">
+          <div className={`mx-auto w-full overflow-hidden rounded-xl ${junto ? "" : "max-w-[calc((100vh-9rem)*16/9)]"}`}>
             <EscenarioEnVivo
               estado={obs.estado}
               pantalla={obs.pantalla}
@@ -81,7 +82,7 @@ export function AhoraEnVivo({ userId, capturas }: { userId: string; capturas: Ca
             />
           </div>
         ) : ultimo.pantalla || ultimo.camara ? (
-          <div className="grid gap-2 sm:grid-cols-2">
+          <div className={`grid gap-2 ${junto ? "" : "sm:grid-cols-2"}`}>
             {([["pantalla", ultimo.pantalla], ["camara", ultimo.camara]] as const).map(([tipo, c]) => (
               <div key={tipo} className="relative aspect-[16/10] overflow-hidden rounded-xl border border-border/50 bg-muted/40">
                 {c ? (

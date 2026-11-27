@@ -1,6 +1,8 @@
 // Minutos de gracia de Argos (Alvaro, 16/11/2026).
 //
-// Cada turno trae 15 min sin pantalla y 15 min sin cámara de gracia. Lo que pasa
+// Desde el 27/11/2026: cada turno trae UN bolsillo de gracia para estar sin cámara
+// o sin pantalla (10 min por defecto; lo pone la empresa y cada Posición). Antes
+// eran 15 sin pantalla y 15 sin cámara por separado. Lo que pasa
 // de ahí no se paga: «el contador sigue… le dice cuántos minutos se conectó y
 // cuántos le va a pagar». La cuenta la hace la base (argos_gracia_calculo, en
 // supabase/migrations/20261116192437_argos_minutos_de_gracia.sql); aquí solo se
@@ -64,6 +66,8 @@ export interface ResumenGracia {
   descuento: number;
   pantalla: UsoGracia;
   camara: UsoGracia;
+  /** El bolsillo único: sin cámara + sin pantalla contra la gracia total. */
+  combinada: UsoGracia;
   ensayo: boolean;
   /** Minutos que devolvió RR. HH. en este turno (pantalla + cámara). */
   devueltos: number;
@@ -77,6 +81,10 @@ export function resumenGracia(g: GraciaTurno): ResumenGracia {
     descuento: minDeSeg(g.descuento_seg),
     pantalla: usoGracia(g.sin_pantalla_seg, g.gracia_pantalla_min),
     camara: usoGracia(g.sin_camara_seg, g.gracia_camara_min),
+    combinada: usoGracia(
+      (Number(g.sin_pantalla_seg) || 0) + (Number(g.sin_camara_seg) || 0),
+      (Number(g.gracia_pantalla_min) || 0) + (Number(g.gracia_camara_min) || 0),
+    ),
     ensayo: g.ensayo === true,
     devueltos: Math.max(0, Number(g.extra_pantalla_min) || 0) + Math.max(0, Number(g.extra_camara_min) || 0),
   };
@@ -95,8 +103,8 @@ export function formatoMinutos(min: number): string {
 export type TonoGracia = "bien" | "poca" | "descuento";
 
 export function tonoGracia(r: ResumenGracia): TonoGracia {
-  if (r.descuento > 0 || r.pantalla.exceso > 0 || r.camara.exceso > 0) return "descuento";
-  if (Math.min(r.pantalla.queda, r.camara.queda) <= 5) return "poca";
+  if (r.descuento > 0 || r.combinada.exceso > 0) return "descuento";
+  if (r.combinada.queda <= 5) return "poca";
   return "bien";
 }
 

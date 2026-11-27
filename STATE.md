@@ -7,6 +7,12 @@
 > queda claro dónde estamos, qué se decidió, y qué falta.
 
 ## Stack y deploy
+- 27/11/2026 (Claude, PR 295): Shift → al abrir a una persona, «Lo que pasó en su turno»: la raya grande y una línea por cada pedazo de color (comida, baño, sin cámara, sin internet, avisos) con hora y duración; mouse encima ilumina el pedazo. Arreglado «1 warnings».
+- 27/11/2026 (Claude, PR 295): la ficha de la persona muestra la misma lista «Lo que pasó en su turno»; pestañas de una palabra (Resumen · Por hora · Pago · Avisos · Apps). Se trajo PR 302 (gracia única) a esta rama: ya no sale «Sin cámara 0 de 0» lleno de amarillo.
+- 27/11/2026 (Claude, PR 295): «Activos ahora» = en su turno en este momento, también en comida, baño o pausa (antes solo quien estaba trabajando con cámara y pantalla).
+- 27/11/2026 (Claude, PR 295): Shift → cada vista con su número (Activos ahora 15…); «No vinieron» = la tarjeta y la vista cuentan igual; buscador arriba a la derecha; el filtro de horarios es ahora Todos · AM (8–16) · PM (16–24) · Madrugada (resto), por hora de entrada. Pendiente: que cada empresa/Posición defina sus jornadas.
+- 27/11/2026 (Claude, PR 295): Shift marca en amarillo (sin descontar) a quien come fuera de su hora obligatoria (PR 307). Migración 20261127191943_argos_comida_fuera_de_hora.sql aplicada con OK del dueño.
+
 
 - 2026-11-26: app de escritorio: la ventanita flotante del Hub caía sobre la barra que mueve la ventana; sus botones no respondían y arrastrarla movía toda la app (video de Daniel Ospina). Clase `sin-arrastre` (no-drag) en PersistentCallProvider. Y «Ver en ventanita» en el recuadro de cada chatter (al pasar el mouse; su pantalla, sin sonido, una ventanita encima de todo).
 - 2026-11-26: Posiciones con jerarquía (decisiones de Alvaro): nadie cambia la posición que ocupa; solo el Dueño da «Admin»; nadie asigna una posición de mando que él tiene (HR solo asigna las de abajo). Triggers en `20261126203000_posiciones_candados_jerarquia.sql` (PENDIENTE aplicar en Kash con OK). En Usuarios, el menú gris de rol pasa a «Asignar posición».
@@ -164,5 +170,11 @@ Ambos sets ya tienen migrations subidas (`20260504100000`, `20260504110000`) per
 
 - 27/11/2026 (Claude): hora de comida por plan de pausa (recomendada u obligatoria con margen) + ajuste por persona en Team schedules + recordatorio. Migración 20261127070000_hora_de_comida.sql pendiente de aplicar en Kash con OK de Alvaro.
 - 27/11/2026 (Claude): «Debe estar en Cowork» pasa a ser interruptor de cada Posición (migración 20261127060000_posiciones_debe_cowork.sql). Arranca igual que hoy; Finanzas queda sin Cowork. Pendiente: aplicarla en Kash con OK de Alvaro.
+## 2026-11-26 · Argos: tabla del turno
+- Argos abre en la pestaña «Turno» (Shift): una fila por persona con llegada/salida, comida (almuerzo + break), baño, avisos de Argos y conexión; semáforo normal, tira de la semana y calendario. Lee tablas existentes, sin migraciones (`lib/turnoTabla.ts`, `hooks/useTurnoTabla.ts`, `components/hr/TurnoTabla.tsx`).
+- Pendiente: perfil del empleado con calendario del mes; corregir horarios de 7 días (los días libres salen como «no vino»).
+## 2026-11-27 · Gracia de cámara y pantalla por empresa y posición
+- Un solo bolsillo por turno (sin cámara + sin pantalla juntos), 10 min por defecto; la empresa lo pone en Ajustes → Cámara y pantalla por puesto y cada puesto puede tener otro. Misma regla para el pago (argos_gracia_calculo) y las horas.
+- Pendiente: aplicar la migración 20261127050220 en producción (pide permiso del dueño).
 
 - 27/11/2026 (Claude): cuadrito «Pendientes del equipo» abajo a la derecha (horarios sin confirmar, personas sin Posición, hora de comida, turnos). Cada cosa la ve quien la puede arreglar según su Posición. Migración 20261127200000_pendientes_de_gestion.sql.

@@ -28,8 +28,8 @@ export function PildoraGracia({ gracia, compacto = false, className, abierta }: 
   const texto = r.descuento > 0
     ? t(compacto ? "cowork.gracia.descuentoCorto" : "cowork.gracia.descuento", { d: formatoMinutos(r.descuento) })
     : compacto
-    ? t("cowork.gracia.quedanCorto", { p: r.pantalla.queda, c: r.camara.queda })
-    : t("cowork.gracia.quedan", { p: r.pantalla.queda, c: r.camara.queda });
+    ? t("cowork.gracia.quedanUnicaCorto", { n: r.combinada.queda })
+    : t("cowork.gracia.quedanUnica", { n: r.combinada.queda });
 
   return (
     <Popover defaultOpen={abierta}>
@@ -53,22 +53,21 @@ export function PildoraGracia({ gracia, compacto = false, className, abierta }: 
       <PopoverContent align="start" className="w-[min(22rem,calc(100vw-2rem))] p-4">
         <DetalleGracia
           r={r}
-          gp={(gracia.gracia_pantalla_min ?? 0) - (gracia.extra_pantalla_min ?? 0)}
-          gc={(gracia.gracia_camara_min ?? 0) - (gracia.extra_camara_min ?? 0)}
+          g={(gracia.gracia_pantalla_min ?? 0) + (gracia.gracia_camara_min ?? 0) - (gracia.extra_pantalla_min ?? 0) - (gracia.extra_camara_min ?? 0)}
         />
       </PopoverContent>
     </Popover>
   );
 }
 
-function DetalleGracia({ r, gp, gc }: { r: ResumenGracia; gp: number; gc: number }) {
+function DetalleGracia({ r, g }: { r: ResumenGracia; g: number }) {
   const { t } = useLanguage();
   return (
     <div className="flex flex-col gap-3">
       <div className="flex flex-col gap-1">
         <h3 className="font-display text-sm font-semibold tracking-tight">{t("cowork.gracia.titulo")}</h3>
         <p className="text-xs text-muted-foreground leading-relaxed">
-          {t("cowork.gracia.regla", { gp, gc })}
+          {t("cowork.gracia.reglaUnica", { g })}
         </p>
         {r.ensayo && (
           <span className="mt-1 inline-flex w-fit items-center rounded-full border border-warning/30 bg-warning/10 px-2 py-0.5 text-[11px] font-medium text-warning">
@@ -77,8 +76,7 @@ function DetalleGracia({ r, gp, gc }: { r: ResumenGracia; gp: number; gc: number
         )}
       </div>
 
-      <BarraGracia etiqueta={t("cowork.gracia.sinPantalla")} uso={r.pantalla} />
-      <BarraGracia etiqueta={t("cowork.gracia.sinCamara")} uso={r.camara} />
+      <BarraGracia etiqueta={t("cowork.gracia.sinCamaraOPantalla")} uso={r.combinada} />
 
       <dl className="grid grid-cols-2 gap-2">
         <Cifra etiqueta={t("cowork.gracia.conectado")} valor={formatoMinutos(r.conectado)} />

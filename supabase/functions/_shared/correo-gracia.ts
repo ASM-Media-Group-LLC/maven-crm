@@ -93,11 +93,17 @@ export function correoGraciaHTML(c: CierreGracia): string {
     ? (c.descuento_min > 0 ? `RR. HH. devolvió minutos: el descuento ahora es de ${formatoMin(c.descuento_min)}` : "RR. HH. devolvió minutos: ya no hay descuento")
     : `${escapar(c.nombre)} tuvo ${formatoMin(c.descuento_min)} de descuento`;
 
+  // Desde el 27/11/2026 la gracia es UN bolsillo (sin cámara + sin pantalla); la
+  // base lo manda con gracia_camara_min = 0. Los cierres viejos siguen con dos.
+  const unica = Math.round(c.gracia_camara_min) === 0;
+  const reglaTxt = unica
+    ? `Cada turno tiene ${c.gracia_pantalla_min} min en total para estar sin cámara o sin compartir pantalla. Lo que pasa de ahí no se paga.`
+    : `Cada turno tiene ${c.gracia_pantalla_min} min sin compartir pantalla y ${c.gracia_camara_min} min sin cámara de gracia. Lo que pasa de ahí no se paga.`;
   const explicacion = c.es_correccion
     ? `Se recalculó el turno del ${fechaCorta(c.turno)} con los minutos que devolvió RR. HH.${c.motivos ? ` Motivo: «${escapar(c.motivos)}».` : ""}`
     : c.ensayo
-    ? `Cada turno tiene ${c.gracia_pantalla_min} min sin compartir pantalla y ${c.gracia_camara_min} min sin cámara de gracia. Lo que pasa de ahí no se paga. Esta semana es de ensayo: este descuento <b>no se aplica</b>, es para que veas cómo va a funcionar.`
-    : `Cada turno tiene ${c.gracia_pantalla_min} min sin compartir pantalla y ${c.gracia_camara_min} min sin cámara de gracia. Lo que pasa de ahí no se paga.`;
+    ? `${reglaTxt} Esta semana es de ensayo: este descuento <b>no se aplica</b>, es para que veas cómo va a funcionar.`
+    : reglaTxt;
 
   const fila = (k: string, v: string, color?: string, borde = true) =>
     `<tr><td style="padding:12px 16px;font-size:14px;color:#6b7183;${borde ? "border-bottom:1px solid #e7e9f0;" : ""}">${k}</td><td style="padding:12px 16px;font-size:14px;font-weight:700;text-align:right;font-variant-numeric:tabular-nums;${color ? `color:${color};` : ""}${borde ? "border-bottom:1px solid #e7e9f0;" : ""}">${escapar(v)}</td></tr>`;
@@ -110,8 +116,13 @@ export function correoGraciaHTML(c: CierreGracia): string {
     fila("Turno", `${fechaCorta(c.turno)} · ${hhmm(c.inicio)}–${hhmm(c.fin)}`),
     fila("Conectado", formatoMin(c.conectado_min)),
     fila("En pausa (comida y baño)", formatoMin(c.pausa_min)),
-    fila(`Sin pantalla · gracia ${graciaP} min`, formatoMin(c.sin_pantalla_min), ex.pantalla > 0 ? rojo : undefined),
-    fila(`Sin cámara · gracia ${graciaC} min`, formatoMin(c.sin_camara_min), ex.camara > 0 ? rojo : undefined),
+    ...(unica
+      ? [fila(`Sin cámara o pantalla · gracia ${graciaP} min`, formatoMin(c.sin_pantalla_min + c.sin_camara_min),
+          c.sin_pantalla_min + c.sin_camara_min > c.gracia_pantalla_min ? rojo : undefined)]
+      : [
+          fila(`Sin pantalla · gracia ${graciaP} min`, formatoMin(c.sin_pantalla_min), ex.pantalla > 0 ? rojo : undefined),
+          fila(`Sin cámara · gracia ${graciaC} min`, formatoMin(c.sin_camara_min), ex.camara > 0 ? rojo : undefined),
+        ]),
     fila("A pagar", formatoMin(c.a_pagar_min), "#0f8a5f"),
     fila(c.ensayo ? "Descuento (ensayo, no se aplica)" : "Descuento", formatoMin(c.descuento_min), c.descuento_min > 0 ? rojo : undefined, false),
   ].join("");

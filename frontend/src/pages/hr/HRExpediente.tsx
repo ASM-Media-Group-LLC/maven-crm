@@ -30,6 +30,8 @@ import { GraciaDelDia } from "@/components/hr/GraciaDelDia";
 import { AppsDelDia } from "@/components/hr/AppsDelDia";
 import { EquipoDelDia } from "@/components/hr/EquipoDelDia";
 import { AhoraEnVivo } from "@/components/hr/AhoraEnVivo";
+import { LoQuePaso } from "@/components/hr/TurnoTabla";
+import { useTurnoTabla } from "@/hooks/useTurnoTabla";
 import { CronologiaDelDia } from "@/components/hr/CronologiaDelDia";
 import { useDisenoPulido } from "@/hooks/useDisenoPulido";
 import { Mail } from "lucide-react";
@@ -927,6 +929,8 @@ function DesgloseNotaContenido({ dia, atencion, t, compacto }: {
   );
 }
 
+const PUNTO_BANDA: Record<string, string> = { bien: "bg-success", ojo: "bg-warning", mal: "bg-destructive" };
+
 export default function HRExpediente() {
   const { canFunction } = usePermissions();
   const { t } = useLanguage();
@@ -948,6 +952,10 @@ function ExpedientePermitido() {
   const [diaSel, setDiaSel] = useState<string>(() => diaDelLink(location.search, hoyStr));
   const [verCalendario, setVerCalendario] = useState(false);
   const [verDesglose, setVerDesglose] = useState(false);
+  // PESTAÑAS (Alvaro, 27/11/2026: «más seccionado, como pestañitas, no un scroll
+  // infinito»): arriba queda fijo el resumen del día; debajo, una sección a la vez.
+  type Pestana = "resumen" | "dia" | "pago" | "avisos" | "apps";
+  const [pestana, setPestana] = useState<Pestana>("resumen");
   const anio = Number(diaSel.slice(0, 4));
   const mes = Number(diaSel.slice(5, 7));
   const { canFunction } = usePermissions();
@@ -970,6 +978,12 @@ function ExpedientePermitido() {
   const c = dia.nota.banda ? TONO[dia.nota.banda] : null;
   // Diseño pulido (solo dueño con su link): casillas neutras, números en blanco.
   const pulido = useDisenoPulido();
+  const conVivo = !!userId && canFunction("N:argos.presencia", true) && !cargando && !error && esHoy;
+  // LO QUE PASÓ EN SU TURNO (Alvaro, 27/11/2026: «no hace correlación»): la misma
+  // raya y la misma lista que en Shift, para que lo de aquí cuadre con lo de allá.
+  // Usa la misma consulta que Shift (si vienes de ahí, ya está cargada).
+  const turno = useTurnoTabla(diaSel, esHoy, !!userId);
+  const filaTurno = turno.data?.filas.find((f) => f.userId === userId && f.llegada != null) ?? null;
 
   // % DE ATENCIÓN DEL DÍA (estilo Hubstaff): de los pantallazos que la IA ya
   // juzgó este día, qué porción estaba en lo suyo. Sin juzgados → "—" (no 0).
@@ -1026,16 +1040,12 @@ function ExpedientePermitido() {
             {expediente && <UserAvatar name={nombre} src={expediente.avatarUrl} seed={expediente.avatarSeed} size="md" />}
             <div className="min-w-0 flex-1">
               <h2 className="break-words font-display text-base font-bold leading-tight tracking-tight">{nombre}</h2>
-              {dia.nota.banda && (pulido ? (
-                <span className="mt-1 inline-flex items-center gap-1.5 text-xs text-muted-foreground">
-                  <span className={`h-1.5 w-1.5 rounded-full ${PUNTO_BANDA[dia.nota.banda] ?? "bg-muted-foreground"}`} aria-hidden />
-                  <span className="tabular-nums"><span className="font-semibold text-foreground">{dia.nota.valor}</span> / 100</span>
-                </span>
-              ) : (
+              {/* En el diseño pulido la nota ya va grande abajo: no se repite junto al nombre. */}
+              {dia.nota.banda && !pulido && (
                 <span className={`mt-0.5 inline-flex items-center rounded-control px-1.5 py-0.5 text-[11px] font-semibold ${c?.chip}`}>
                   {dia.nota.valor} / 100
                 </span>
-              ))}
+              )}
             </div>
             {/* Navegación de día */}
             <div className="flex items-center gap-1.5">
@@ -1084,36 +1094,55 @@ function ExpedientePermitido() {
           {/* Stats del día. Pulido: casillas neutras (filo fino, radio 10), la cifra
               en blanco y la etiqueta arriba en gris; lo flojo, solo un puntito. */}
           {pulido ? (
-          <div className="mt-4 grid grid-cols-3 gap-2 lg:grid-cols-7">
-            {[
-              { k: "hr.exp.nota" as const, v: dia.nota.valor != null ? String(dia.nota.valor) : "—", punto: null },
-              // A qué hora entró y a qué hora debía (Alvaro, 18/11/2026).
-              ...(() => {
-                const debia = expediente?.horario.entrada?.slice(0, 5) ?? null;
-                const entro = dia.entroAt ? new Date(dia.entroAt).toLocaleTimeString("es-CO", { timeZone: "America/Bogota", hour: "2-digit", minute: "2-digit", hour12: false }) : null;
-                const tarde = debia && entro ? (Number(entro.slice(0, 2)) * 60 + Number(entro.slice(3))) - (Number(debia.slice(0, 2)) * 60 + Number(debia.slice(3))) : null;
-                return [debia
-                  ? { k: "hr.exp.entradaTile" as const, p: { h: a12(debia) ?? debia }, v: a12(entro) ?? "—", punto: tarde != null && tarde > 5 ? "bg-destructive" : !entro ? "bg-warning" : null,
-                      title: tarde != null && tarde > 5 ? t("hr.exp.det.tarde", { n: tarde }) : undefined }
-                  : { k: "hr.exp.entradaSola" as const, v: a12(entro) ?? "—", punto: null }];
-              })(),
-              // Sin pantalla (Alvaro, 13/11/2026): pausas + sin compartir + sin conexión +
-              // fuera de Cowork, contra lo permitido (40 chats, 70 el resto).
-              { k: "hr.exp.sinPantallaTile" as const, p: { n: permitidoMin }, v: enHoras(sinPantallaMin),
-                punto: sinPantallaMin > permitidoMin ? "bg-destructive" : sinPantallaMin > permitidoMin * 0.8 ? "bg-warning" : null },
-              { k: "hr.exp.atencion" as const, v: atencion ? `${atencion.pct}%` : "—", punto: atencion == null ? null : atencion.pct < 60 ? "bg-destructive" : atencion.pct < 80 ? "bg-warning" : null, title: atencion ? t("hr.exp.atencionDetalle", { ok: atencion.ok, n: atencion.n }) : undefined },
-              { k: "hr.exp.horas" as const, v: enHoras(dia.horas * 60), punto: null },
-              { k: "hr.exp.faltas" as const, v: String(dia.faltas.length), punto: null },
-              { k: "hr.exp.pausas" as const, v: enHoras(dia.minutosPausaDeMas), punto: null },
-            ].map((x) => (
-              <div key={x.k} title={"title" in x ? x.title : undefined} className="rounded-[10px] border border-border/60 bg-card/30 px-3 py-2.5">
-                <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
-                  {x.punto && <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${x.punto}`} aria-hidden />}
-                  <span className="truncate">{"p" in x && x.p ? t(x.k, x.p) : t(x.k)}</span>
+          // CABECERA CLARA (Alvaro, 27/11/2026: «más estética, que se entienda»): la
+          // nota grande a la izquierda y seis casillas parejas, cada una con una
+          // línea que dice qué significa su número.
+          <div className={`mt-4 grid gap-4 ${conVivo ? "lg:grid-cols-[minmax(0,1.5fr)_minmax(17rem,1fr)]" : ""}`}>
+          {conVivo && userId && <AhoraEnVivo userId={userId} capturas={dia.capturas} junto />}
+          <div className={`grid gap-3 ${conVivo ? "content-start" : "lg:grid-cols-[13rem_1fr]"}`}>
+            <div className="flex flex-col justify-center rounded-2xl border border-border/60 bg-card/30 p-4">
+              <p className="text-xs font-medium text-muted-foreground">{t("hr.exp.nota")}</p>
+              <p className="mt-1 flex items-baseline gap-1.5">
+                <span className="font-display text-5xl font-bold tabular-nums leading-none tracking-tight">{dia.nota.valor ?? "—"}</span>
+                <span className="text-sm text-muted-foreground">/ 100</span>
+              </p>
+              {dia.nota.banda && (
+                <p className="mt-2 flex items-center gap-1.5 text-xs text-muted-foreground">
+                  <span className={`h-1.5 w-1.5 rounded-full ${PUNTO_BANDA[dia.nota.banda] ?? "bg-muted-foreground"}`} aria-hidden />
+                  {t(dia.nota.banda === "bien" ? "hr.exp.banda.bien" : dia.nota.banda === "ojo" ? "hr.exp.banda.ojo" : "hr.exp.banda.mal")}
+                </p>
+              )}
+            </div>
+            <div className={`grid grid-cols-2 gap-3 ${conVivo ? "" : "sm:grid-cols-3"}`}>
+            {(() => {
+              const debia = expediente?.horario.entrada?.slice(0, 5) ?? null;
+              const entro = dia.entroAt ? new Date(dia.entroAt).toLocaleTimeString("es-CO", { timeZone: "America/Bogota", hour: "2-digit", minute: "2-digit", hour12: false }) : null;
+              const tarde = debia && entro ? (Number(entro.slice(0, 2)) * 60 + Number(entro.slice(3))) - (Number(debia.slice(0, 2)) * 60 + Number(debia.slice(3))) : null;
+              const casillas: Array<{ k: string; etq: string; v: string; sub: string; punto: string | null; title?: string }> = [
+                { k: "entro", etq: t("hr.exp.c.entro"), v: a12(entro) ?? "—",
+                  sub: !debia ? t("hr.exp.c.sinHorario") : tarde != null && tarde > 5 ? t("hr.exp.c.tarde", { h: a12(debia) ?? debia, d: enHoras(tarde) }) : t("hr.exp.c.aTiempo", { h: a12(debia) ?? debia }),
+                  punto: tarde != null && tarde > 5 ? "bg-destructive" : debia && !entro ? "bg-warning" : null },
+                { k: "horas", etq: t("hr.exp.c.horas"), v: enHoras(dia.horas * 60), sub: t("hr.exp.c.horasSub"), punto: null },
+                { k: "foco", etq: t("hr.exp.c.foco"), v: atencion ? `${atencion.pct} %` : "—",
+                  sub: atencion ? t("hr.exp.c.focoSub", { ok: atencion.ok, n: atencion.n }) : t("hr.exp.c.focoNada"),
+                  punto: atencion == null ? null : atencion.pct < 60 ? "bg-destructive" : atencion.pct < 80 ? "bg-warning" : null },
+                { k: "sinPantalla", etq: t("hr.exp.c.sinPantalla"), v: enHoras(sinPantallaMin), sub: t("hr.exp.c.sinPantallaSub", { n: permitidoMin }),
+                  punto: sinPantallaMin > permitidoMin ? "bg-destructive" : sinPantallaMin > permitidoMin * 0.8 ? "bg-warning" : null },
+                { k: "faltas", etq: t("hr.exp.c.faltas"), v: String(dia.faltas.length), sub: t("hr.exp.c.faltasSub"), punto: dia.faltas.length > 0 ? "bg-warning" : null },
+                { k: "pausas", etq: t("hr.exp.c.pausas"), v: enHoras(dia.minutosPausaDeMas), sub: t("hr.exp.c.pausasSub"), punto: dia.minutosPausaDeMas > 0 ? "bg-warning" : null },
+              ];
+              return casillas.map((x) => (
+                <div key={x.k} className="flex h-full flex-col rounded-2xl border border-border/60 bg-card/30 px-4 py-3">
+                  <p className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+                    {x.punto && <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${x.punto}`} aria-hidden />}{x.etq}
+                  </p>
+                  <p className="mt-1.5 font-display text-2xl font-semibold tabular-nums leading-tight text-foreground">{x.v}</p>
+                  <p className="mt-1 text-[11px] leading-snug text-muted-foreground">{x.sub}</p>
                 </div>
-                <div className="mt-1 font-display text-xl font-semibold tabular-nums leading-tight text-foreground">{x.v}</div>
-              </div>
-            ))}
+              ));
+            })()}
+            </div>
+          </div>
           </div>
           ) : (
           <div className="mt-4 grid grid-cols-3 gap-2 sm:grid-cols-5">
@@ -1140,13 +1169,90 @@ function ExpedientePermitido() {
             </div>
           </div>
           )}
+          {filaTurno && (
+            <div className="mt-4 rounded-2xl border border-border/60 bg-card/30">
+              <LoQuePaso f={filaTurno} t={t} ahora={turno.data?.calculadoAt ?? Date.now()} />
+            </div>
+          )}
         </div>
       </section>
 
       {/* AHORA MISMO, EN VIVO (Alvaro, 18/11/2026: «dice live: la idea es que esté
           live»): su pantalla y su cámara en video, no en pantallazos. Solo hoy. */}
-      {userId && canFunction("N:argos.presencia", true) && !cargando && !error && esHoy && <AhoraEnVivo userId={userId} capturas={dia.capturas} />}
+      {/* El en vivo va ahora DENTRO de la cabecera, junto a los números (27/11/2026). */}
 
+      {/* LAS PESTAÑAS (27/11/2026): Resumen · Fotos por hora · Lo que hizo · Apps y equipo. */}
+      <div className="mt-5 grid grid-cols-2 gap-1 rounded-2xl border border-border/50 bg-background/40 p-1 sm:grid-cols-3 lg:flex">
+        {([
+          ["resumen", "hr.exp.tab.resumen"], ["dia", "hr.exp.tab.dia"],
+          ["pago", "hr.exp.tab.pago"], ["avisos", "hr.exp.tab.avisos"], ["apps", "hr.exp.tab.apps"],
+        ] as const).map(([k, etq]) => (
+          <button
+            key={k}
+            type="button"
+            onClick={() => setPestana(k)}
+            aria-pressed={pestana === k}
+            className={`min-w-0 flex-1 shrink-0 whitespace-nowrap rounded-xl px-3 py-2 text-sm font-semibold transition ${pestana === k ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
+          >
+            {t(etq)}
+          </button>
+        ))}
+      </div>
+
+      {pestana === "resumen" && (
+        <>
+      {/* Argos como MANAGER del día: lo PRIMERO, juzga el día con criterio
+          (Alvaro, 09/11). Reemplaza las barras abiertas de pantalla/cámara. */}
+      <TarjetaArgos nombre={nombre} dia={dia} horario={expediente?.horario ?? { entrada: null, salida: null }} />
+
+        </>
+      )}
+      {pestana === "pago" && (
+        <>
+      {/* Minutos de gracia del turno (Alvaro, 16/11): cuánto se pagó, cuánto se
+          descontó, y RR. HH. puede devolver minutos. */}
+      {userId && <GraciaDelDia userId={userId} fecha={dia.fecha} />}
+
+      {/* Asistencia + el desglose técnico, ya COLAPSADO: el perfil abre limpio y
+          el detalle (pantalla/cámara/atención) se abre solo si se quiere. */}
+      <section className="vidrio sube mt-4 p-4 lg:p-5">
+        <div className="v-cont">
+          {expediente && <AsistenciaDia horario={expediente.horario} dia={dia} userId={userId} nombre={nombre} t={t} />}
+
+          <button
+            type="button"
+            onClick={() => setVerDesglose((v) => !v)}
+            className="mt-3 flex w-full items-center justify-between rounded-2xl border border-border/40 bg-card/20 px-3.5 py-2.5 text-xs font-semibold text-muted-foreground transition hover:bg-card/40"
+          >
+            <span className="flex items-center gap-2"><Gauge className="h-3.5 w-3.5 text-primary" />{verDesglose ? t("hr.exp.ocultarDesglose") : t("hr.exp.verDesglose")}</span>
+            <ChevronDown className={`h-4 w-4 transition-transform ${verDesglose ? "rotate-180" : ""}`} />
+          </button>
+          {verDesglose && (
+            <div className="mt-2 rounded-2xl border border-border/40 bg-card/20 p-3.5">
+              <DesgloseNotaContenido dia={dia} atencion={atencion} t={t} compacto />
+            </div>
+          )}
+        </div>
+      </section>
+
+        </>
+      )}
+      {pestana === "avisos" && (
+        <>
+      {/* Videos de Argos del día (si los hubo). Se esconde solo si no hay. */}
+      {userId && canFunction("N:argos.video", true) && <ClipsDelDia userId={userId} fecha={dia.fecha} />}
+
+      {/* Qué le dijo Argos ese día: cronología de nudges (Alvaro, 09/11). */}
+      {userId && <AvisosDeArgos userId={userId} fecha={dia.fecha} />}
+
+        </>
+      )}
+
+
+      {/* SU DÍA, HORA POR HORA (Alvaro, 27/11/2026: «fotos por hora» y «lo que hizo» se
+          pisaban): sus horas con fotos y, debajo, la línea del día y los días anteriores. */}
+      {pestana === "dia" && (
+        <>
       {/* TODAS SUS HORAS, justo debajo del en vivo (Alvaro, 13/11 y 18/11/2026:
           «no puedo ver los pantallazos de todo el día», «necesito ver todas las
           horas», «todas las fotos de la hora»): una fila por hora con todas sus fotos. */}
@@ -1203,45 +1309,17 @@ function ExpedientePermitido() {
         />
       )}
 
-      {/* Argos como MANAGER del día: lo PRIMERO, juzga el día con criterio
-          (Alvaro, 09/11). Reemplaza las barras abiertas de pantalla/cámara. */}
-      <TarjetaArgos nombre={nombre} dia={dia} horario={expediente?.horario ?? { entrada: null, salida: null }} />
+        </>
+      )}
 
-      {/* Minutos de gracia del turno (Alvaro, 16/11): cuánto se pagó, cuánto se
-          descontó, y RR. HH. puede devolver minutos. */}
-      {userId && <GraciaDelDia userId={userId} fecha={dia.fecha} />}
-
+      {pestana === "apps" && (
+        <>
       {/* Apps y páginas de la app de computador (Alvaro, 17/11/2026). */}
       {userId && <AppsDelDia userId={userId} fecha={dia.fecha} />}
       {userId && <EquipoDelDia userId={userId} fecha={dia.fecha} />}
 
-      {/* Asistencia + el desglose técnico, ya COLAPSADO: el perfil abre limpio y
-          el detalle (pantalla/cámara/atención) se abre solo si se quiere. */}
-      <section className="vidrio sube mt-4 p-4 lg:p-5">
-        <div className="v-cont">
-          {expediente && <AsistenciaDia horario={expediente.horario} dia={dia} userId={userId} nombre={nombre} t={t} />}
-
-          <button
-            type="button"
-            onClick={() => setVerDesglose((v) => !v)}
-            className="mt-3 flex w-full items-center justify-between rounded-2xl border border-border/40 bg-card/20 px-3.5 py-2.5 text-xs font-semibold text-muted-foreground transition hover:bg-card/40"
-          >
-            <span className="flex items-center gap-2"><Gauge className="h-3.5 w-3.5 text-primary" />{verDesglose ? t("hr.exp.ocultarDesglose") : t("hr.exp.verDesglose")}</span>
-            <ChevronDown className={`h-4 w-4 transition-transform ${verDesglose ? "rotate-180" : ""}`} />
-          </button>
-          {verDesglose && (
-            <div className="mt-2 rounded-2xl border border-border/40 bg-card/20 p-3.5">
-              <DesgloseNotaContenido dia={dia} atencion={atencion} t={t} compacto />
-            </div>
-          )}
-        </div>
-      </section>
-
-      {/* Videos de Argos del día (si los hubo). Se esconde solo si no hay. */}
-      {userId && canFunction("N:argos.video", true) && <ClipsDelDia userId={userId} fecha={dia.fecha} />}
-
-      {/* Qué le dijo Argos ese día: cronología de nudges (Alvaro, 09/11). */}
-      {userId && <AvisosDeArgos userId={userId} fecha={dia.fecha} />}
+        </>
+      )}
 
     </Page>
   );
@@ -1249,8 +1327,6 @@ function ExpedientePermitido() {
 
 /** El día que pide el link (`?dia=AAAA-MM-DD`), si es válido y no es futuro; si no, hoy. */
 /** Puntito de la nota en el diseño pulido (el mismo del titular de Argos). */
-const PUNTO_BANDA: Record<string, string> = { bien: "bg-success", ojo: "bg-warning", mal: "bg-destructive" };
-
 function diaDelLink(search: string, hoy: string): string {
   const pedido = new URLSearchParams(search).get("dia");
   if (pedido && /^\d{4}-\d{2}-\d{2}$/.test(pedido) && pedido <= hoy) return pedido;

@@ -40,7 +40,8 @@ describe("minutos de gracia", () => {
 
   it("el tono avisa cuando se acaba y cuando ya descuenta", () => {
     expect(tonoGracia(resumenGracia(turno({ sin_pantalla_seg: 0, sin_camara_seg: 0, descuento_seg: 0 })))).toBe("bien");
-    expect(tonoGracia(resumenGracia(turno({ sin_pantalla_seg: 11 * 60, sin_camara_seg: 0, descuento_seg: 0 })))).toBe("poca");
+    // Bolsillo único (27/11/2026): 10 min entre las dos; con 6 usados quedan 4 → «poca».
+    expect(tonoGracia(resumenGracia(turno({ gracia_pantalla_min: 10, gracia_camara_min: 0, sin_pantalla_seg: 2 * 60, sin_camara_seg: 4 * 60, descuento_seg: 0 })))).toBe("poca");
     expect(tonoGracia(resumenGracia(turno()))).toBe("descuento");
   });
 
@@ -57,5 +58,10 @@ describe("minutos de gracia", () => {
     expect(validarDevolucion(500, 0, "se dañó la cámara")).toBe("minutos");
     expect(validarDevolucion(0, 30, "x")).toBe("motivo");
     expect(validarDevolucion(0, 30, "se dañó la cámara")).toBeNull();
+  });
+
+  it("bolsillo único: sin cámara y sin pantalla suman contra la misma gracia", () => {
+    const r = resumenGracia(turno({ gracia_pantalla_min: 10, gracia_camara_min: 0, sin_pantalla_seg: 4 * 60, sin_camara_seg: 9 * 60 }));
+    expect(r.combinada).toEqual({ usados: 13, gracia: 10, queda: 0, exceso: 3, agotada: true });
   });
 });
