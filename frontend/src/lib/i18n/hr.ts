@@ -2195,6 +2195,8 @@ export const hr = {
   "hr.exp.tab.resumen": { es: "Resumen", en: "Summary" },
   "hr.exp.tab.fotos": { es: "Fotos por hora", en: "Photos by hour" },
   "hr.exp.tab.hizo": { es: "Lo que hizo", en: "What they did" },
+  "hr.exp.tab.pago": { es: "Pago y gracia", en: "Pay and grace" },
+  "hr.exp.tab.avisos": { es: "Avisos", en: "Warnings" },
   "hr.exp.tab.apps": { es: "Apps y equipo", en: "Apps and device" },
   "hr.turno.verDia": { es: "Ver su día completo", en: "See their full day" },
   "hr.turno.normal.menos": { es: "trabajó {d} menos que de costumbre", en: "worked {d} less than usual" },

@@ -950,7 +950,7 @@ function ExpedientePermitido() {
   const [verDesglose, setVerDesglose] = useState(false);
   // PESTAÑAS (Alvaro, 27/11/2026: «más seccionado, como pestañitas, no un scroll
   // infinito»): arriba queda fijo el resumen del día; debajo, una sección a la vez.
-  type Pestana = "resumen" | "fotos" | "hizo" | "apps";
+  type Pestana = "resumen" | "fotos" | "hizo" | "pago" | "avisos" | "apps";
   const [pestana, setPestana] = useState<Pestana>("resumen");
   const anio = Number(diaSel.slice(0, 4));
   const mes = Number(diaSel.slice(5, 7));
@@ -1152,16 +1152,17 @@ function ExpedientePermitido() {
       {userId && canFunction("N:argos.presencia", true) && !cargando && !error && esHoy && <AhoraEnVivo userId={userId} capturas={dia.capturas} />}
 
       {/* LAS PESTAÑAS (27/11/2026): Resumen · Fotos por hora · Lo que hizo · Apps y equipo. */}
-      <div className="mt-5 flex gap-1 overflow-x-auto rounded-2xl border border-border/50 bg-background/40 p-1">
+      <div className="mt-5 grid grid-cols-3 gap-1 rounded-2xl border border-border/50 bg-background/40 p-1 lg:flex">
         {([
-          ["resumen", "hr.exp.tab.resumen"], ["fotos", "hr.exp.tab.fotos"], ["hizo", "hr.exp.tab.hizo"], ["apps", "hr.exp.tab.apps"],
+          ["resumen", "hr.exp.tab.resumen"], ["fotos", "hr.exp.tab.fotos"], ["hizo", "hr.exp.tab.hizo"],
+          ["pago", "hr.exp.tab.pago"], ["avisos", "hr.exp.tab.avisos"], ["apps", "hr.exp.tab.apps"],
         ] as const).map(([k, etq]) => (
           <button
             key={k}
             type="button"
             onClick={() => setPestana(k)}
             aria-pressed={pestana === k}
-            className={`min-w-0 flex-1 shrink-0 rounded-xl px-4 py-2 text-sm font-semibold transition ${pestana === k ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
+            className={`min-w-0 flex-1 shrink-0 whitespace-nowrap rounded-xl px-3 py-2 text-[13px] font-semibold transition ${pestana === k ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
           >
             {t(etq)}
           </button>
@@ -1174,6 +1175,10 @@ function ExpedientePermitido() {
           (Alvaro, 09/11). Reemplaza las barras abiertas de pantalla/cámara. */}
       <TarjetaArgos nombre={nombre} dia={dia} horario={expediente?.horario ?? { entrada: null, salida: null }} />
 
+        </>
+      )}
+      {pestana === "pago" && (
+        <>
       {/* Minutos de gracia del turno (Alvaro, 16/11): cuánto se pagó, cuánto se
           descontó, y RR. HH. puede devolver minutos. */}
       {userId && <GraciaDelDia userId={userId} fecha={dia.fecha} />}
@@ -1200,6 +1205,10 @@ function ExpedientePermitido() {
         </div>
       </section>
 
+        </>
+      )}
+      {pestana === "avisos" && (
+        <>
       {/* Videos de Argos del día (si los hubo). Se esconde solo si no hay. */}
       {userId && canFunction("N:argos.video", true) && <ClipsDelDia userId={userId} fecha={dia.fecha} />}
 
