@@ -1030,7 +1030,8 @@ function ExpedientePermitido() {
             {expediente && <UserAvatar name={nombre} src={expediente.avatarUrl} seed={expediente.avatarSeed} size="md" />}
             <div className="min-w-0 flex-1">
               <h2 className="break-words font-display text-base font-bold leading-tight tracking-tight">{nombre}</h2>
-              {dia.nota.banda && (pulido ? (
+              {/* En el diseño pulido la nota ya va grande abajo: no se repite junto al nombre. */}
+              {dia.nota.banda && !pulido && (false ? (
                 <span className="mt-1 inline-flex items-center gap-1.5 text-xs text-muted-foreground">
                   <span className={`h-1.5 w-1.5 rounded-full ${PUNTO_BANDA[dia.nota.banda] ?? "bg-muted-foreground"}`} aria-hidden />
                   <span className="tabular-nums"><span className="font-semibold text-foreground">{dia.nota.valor}</span> / 100</span>
@@ -1088,36 +1089,52 @@ function ExpedientePermitido() {
           {/* Stats del día. Pulido: casillas neutras (filo fino, radio 10), la cifra
               en blanco y la etiqueta arriba en gris; lo flojo, solo un puntito. */}
           {pulido ? (
-          <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4 xl:grid-cols-7">
-            {[
-              { k: "hr.exp.nota" as const, v: dia.nota.valor != null ? String(dia.nota.valor) : "—", punto: null },
-              // A qué hora entró y a qué hora debía (Alvaro, 18/11/2026).
-              ...(() => {
-                const debia = expediente?.horario.entrada?.slice(0, 5) ?? null;
-                const entro = dia.entroAt ? new Date(dia.entroAt).toLocaleTimeString("es-CO", { timeZone: "America/Bogota", hour: "2-digit", minute: "2-digit", hour12: false }) : null;
-                const tarde = debia && entro ? (Number(entro.slice(0, 2)) * 60 + Number(entro.slice(3))) - (Number(debia.slice(0, 2)) * 60 + Number(debia.slice(3))) : null;
-                return [debia
-                  ? { k: "hr.exp.entradaTile" as const, p: { h: a12(debia) ?? debia }, v: a12(entro) ?? "—", punto: tarde != null && tarde > 5 ? "bg-destructive" : !entro ? "bg-warning" : null,
-                      title: tarde != null && tarde > 5 ? t("hr.exp.det.tarde", { n: tarde }) : undefined }
-                  : { k: "hr.exp.entradaSola" as const, v: a12(entro) ?? "—", punto: null }];
-              })(),
-              // Sin pantalla (Alvaro, 13/11/2026): pausas + sin compartir + sin conexión +
-              // fuera de Cowork, contra lo permitido (40 chats, 70 el resto).
-              { k: "hr.exp.sinPantallaTile" as const, p: { n: permitidoMin }, v: enHoras(sinPantallaMin),
-                punto: sinPantallaMin > permitidoMin ? "bg-destructive" : sinPantallaMin > permitidoMin * 0.8 ? "bg-warning" : null },
-              { k: "hr.exp.atencion" as const, v: atencion ? `${atencion.pct}%` : "—", punto: atencion == null ? null : atencion.pct < 60 ? "bg-destructive" : atencion.pct < 80 ? "bg-warning" : null, title: atencion ? t("hr.exp.atencionDetalle", { ok: atencion.ok, n: atencion.n }) : undefined },
-              { k: "hr.exp.horas" as const, v: enHoras(dia.horas * 60), punto: null },
-              { k: "hr.exp.faltas" as const, v: String(dia.faltas.length), punto: null },
-              { k: "hr.exp.pausas" as const, v: enHoras(dia.minutosPausaDeMas), punto: null },
-            ].map((x) => (
-              <div key={x.k} title={"title" in x ? x.title : undefined} className="flex h-full flex-col justify-between gap-1.5 rounded-xl border border-border/60 bg-card/30 px-3 py-2.5">
-                <div className="flex items-start gap-1.5 text-[11px] font-medium leading-tight text-muted-foreground">
-                  {x.punto && <span className={`mt-1 h-1.5 w-1.5 shrink-0 rounded-full ${x.punto}`} aria-hidden />}
-                  <span>{"p" in x && x.p ? t(x.k, x.p) : t(x.k)}</span>
+          // CABECERA CLARA (Alvaro, 27/11/2026: «más estética, que se entienda»): la
+          // nota grande a la izquierda y seis casillas parejas, cada una con una
+          // línea que dice qué significa su número.
+          <div className="mt-4 grid gap-3 lg:grid-cols-[13rem_1fr]">
+            <div className="flex flex-col justify-center rounded-2xl border border-border/60 bg-card/30 p-4">
+              <p className="text-xs font-medium text-muted-foreground">{t("hr.exp.nota")}</p>
+              <p className="mt-1 flex items-baseline gap-1.5">
+                <span className="font-display text-5xl font-bold tabular-nums leading-none tracking-tight">{dia.nota.valor ?? "—"}</span>
+                <span className="text-sm text-muted-foreground">/ 100</span>
+              </p>
+              {dia.nota.banda && (
+                <p className="mt-2 flex items-center gap-1.5 text-xs text-muted-foreground">
+                  <span className={`h-1.5 w-1.5 rounded-full ${PUNTO_BANDA[dia.nota.banda] ?? "bg-muted-foreground"}`} aria-hidden />
+                  {t(dia.nota.banda === "bien" ? "hr.exp.banda.bien" : dia.nota.banda === "ojo" ? "hr.exp.banda.ojo" : "hr.exp.banda.mal")}
+                </p>
+              )}
+            </div>
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+            {(() => {
+              const debia = expediente?.horario.entrada?.slice(0, 5) ?? null;
+              const entro = dia.entroAt ? new Date(dia.entroAt).toLocaleTimeString("es-CO", { timeZone: "America/Bogota", hour: "2-digit", minute: "2-digit", hour12: false }) : null;
+              const tarde = debia && entro ? (Number(entro.slice(0, 2)) * 60 + Number(entro.slice(3))) - (Number(debia.slice(0, 2)) * 60 + Number(debia.slice(3))) : null;
+              const casillas: Array<{ k: string; etq: string; v: string; sub: string; punto: string | null; title?: string }> = [
+                { k: "entro", etq: t("hr.exp.c.entro"), v: a12(entro) ?? "—",
+                  sub: !debia ? t("hr.exp.c.sinHorario") : tarde != null && tarde > 5 ? t("hr.exp.c.tarde", { h: a12(debia) ?? debia, d: enHoras(tarde) }) : t("hr.exp.c.aTiempo", { h: a12(debia) ?? debia }),
+                  punto: tarde != null && tarde > 5 ? "bg-destructive" : debia && !entro ? "bg-warning" : null },
+                { k: "horas", etq: t("hr.exp.c.horas"), v: enHoras(dia.horas * 60), sub: t("hr.exp.c.horasSub"), punto: null },
+                { k: "foco", etq: t("hr.exp.c.foco"), v: atencion ? `${atencion.pct} %` : "—",
+                  sub: atencion ? t("hr.exp.c.focoSub", { ok: atencion.ok, n: atencion.n }) : t("hr.exp.c.focoNada"),
+                  punto: atencion == null ? null : atencion.pct < 60 ? "bg-destructive" : atencion.pct < 80 ? "bg-warning" : null },
+                { k: "sinPantalla", etq: t("hr.exp.c.sinPantalla"), v: enHoras(sinPantallaMin), sub: t("hr.exp.c.sinPantallaSub", { n: permitidoMin }),
+                  punto: sinPantallaMin > permitidoMin ? "bg-destructive" : sinPantallaMin > permitidoMin * 0.8 ? "bg-warning" : null },
+                { k: "faltas", etq: t("hr.exp.c.faltas"), v: String(dia.faltas.length), sub: t("hr.exp.c.faltasSub"), punto: dia.faltas.length > 0 ? "bg-warning" : null },
+                { k: "pausas", etq: t("hr.exp.c.pausas"), v: enHoras(dia.minutosPausaDeMas), sub: t("hr.exp.c.pausasSub"), punto: dia.minutosPausaDeMas > 0 ? "bg-warning" : null },
+              ];
+              return casillas.map((x) => (
+                <div key={x.k} className="flex h-full flex-col rounded-2xl border border-border/60 bg-card/30 px-4 py-3">
+                  <p className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+                    {x.punto && <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${x.punto}`} aria-hidden />}{x.etq}
+                  </p>
+                  <p className="mt-1.5 font-display text-2xl font-semibold tabular-nums leading-tight text-foreground">{x.v}</p>
+                  <p className="mt-1 text-[11px] leading-snug text-muted-foreground">{x.sub}</p>
                 </div>
-                <div className="mt-1 font-display text-xl font-semibold tabular-nums leading-tight text-foreground">{x.v}</div>
-              </div>
-            ))}
+              ));
+            })()}
+            </div>
           </div>
           ) : (
           <div className="mt-4 grid grid-cols-3 gap-2 sm:grid-cols-5">
