@@ -305,7 +305,9 @@ export function TurnoTabla() {
     tarde: delTurno.filter((f) => f.tardeMin != null).length,
     noVino: delTurno.filter((f) => f.noVino && !f.inactivo && !f.diaLibre).length,
     ignoraron: delTurno.filter((f) => f.ignorados > 0).length,
-    horas: delTurno.reduce((s, f) => s + f.conectadoMin, 0),
+    // Trabajado = con cámara y pantalla (Alvaro, 27/11/2026: «descontarlo»); sin
+    // cámara, sin pantalla, pausas y cortes no cuentan.
+    horas: delTurno.reduce((s, f) => s + f.activoMin, 0),
     horasTurno: tocaban.reduce((s, f) => s + (minutosTurno(f) ?? 0), 0),
   };
   /** Frases contra lo normal de la persona. */
@@ -362,7 +364,7 @@ export function TurnoTabla() {
             {f.llegada != null ? (
               <>
                 <p className="text-sm tabular-nums text-foreground/90">
-                  {t("hr.turno.deHoras", { a: duracion(t, f.conectadoMin), b: minutosTurno(f) != null ? duracion(t, minutosTurno(f)!) : "—" })}
+                  {t("hr.turno.deHoras", { a: duracion(t, f.activoMin), b: minutosTurno(f) != null ? duracion(t, minutosTurno(f)!) : "—" })}
                 </p>
                 <p className="text-[11px] tabular-nums text-muted-foreground">{t("hr.turno.llego", { h: ll.arriba })}</p>
               </>
