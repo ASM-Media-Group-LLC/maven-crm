@@ -17,7 +17,7 @@ import { horaBogota } from "@/lib/llegadas";
 import { hoyEnBogota } from "@/hooks/useHoyDelEquipo";
 import { useTurnoTabla } from "@/hooks/useTurnoTabla";
 import {
-  ordenarPorAtencion, seccionDe, semanaDe, sumarDias, turnosDelDia,
+  minutosTrabajados, ordenarPorAtencion, seccionDe, semanaDe, sumarDias, turnosDelDia,
   type FilaTurno, type Motivo, type Nivel, type Seccion, type TipoFranja,
 } from "@/lib/turnoTabla";
 
@@ -305,9 +305,9 @@ export function TurnoTabla() {
     tarde: delTurno.filter((f) => f.tardeMin != null).length,
     noVino: delTurno.filter((f) => f.noVino && !f.inactivo && !f.diaLibre).length,
     ignoraron: delTurno.filter((f) => f.ignorados > 0).length,
-    // Trabajado = con cámara y pantalla (Alvaro, 27/11/2026: «descontarlo»); sin
-    // cámara, sin pantalla, pausas y cortes no cuentan.
-    horas: delTurno.reduce((s, f) => s + f.activoMin, 0),
+    // Trabajado = con cámara y pantalla, más hasta su gracia sin cámara o pantalla
+    // (Alvaro, 27/11/2026: «10 minutos… después de ahí se descuenta»).
+    horas: delTurno.reduce((s, f) => s + minutosTrabajados(f), 0),
     horasTurno: tocaban.reduce((s, f) => s + (minutosTurno(f) ?? 0), 0),
   };
   /** Frases contra lo normal de la persona. */
@@ -364,7 +364,7 @@ export function TurnoTabla() {
             {f.llegada != null ? (
               <>
                 <p className="text-sm tabular-nums text-foreground/90">
-                  {t("hr.turno.deHoras", { a: duracion(t, f.activoMin), b: minutosTurno(f) != null ? duracion(t, minutosTurno(f)!) : "—" })}
+                  {t("hr.turno.deHoras", { a: duracion(t, minutosTrabajados(f)), b: minutosTurno(f) != null ? duracion(t, minutosTurno(f)!) : "—" })}
                 </p>
                 <p className="text-[11px] tabular-nums text-muted-foreground">{t("hr.turno.llego", { h: ll.arriba })}</p>
               </>

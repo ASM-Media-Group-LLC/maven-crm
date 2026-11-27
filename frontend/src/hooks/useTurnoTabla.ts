@@ -154,7 +154,7 @@ export function useTurnoTabla(dia: string, esHoy: boolean, habilitado = true) {
       ausentes.forEach((f, i) => { if (!activos[i]) f.inactivo = true; });
 
       const ids2 = filas.map((f) => f.userId);
-      const [libres, tardes, cierres] = await Promise.all([
+      const [libres, tardes, cierres, gracias] = await Promise.all([
         // DÍA LIBRE (27/11/2026): lo marcado por RR. HH. o el supervisor. Si la tabla
         // todavía no existe o falla, nadie sale como libre (se ve igual que antes).
         db.from("argos_dia_libre").select("user_id, motivo").eq("dia", dia).in("user_id", ids2),
@@ -162,7 +162,11 @@ export function useTurnoTabla(dia: string, esHoy: boolean, habilitado = true) {
         // conectado de los turnos cerrados de la semana anterior (argos_gracia_cierre).
         db.from("tardanzas_registro").select("user_id, dia").in("user_id", ids2).gte("dia", sumarDias(dia, -6)).lt("dia", dia),
         db.from("argos_gracia_cierre").select("user_id, turno, conectado_min").in("user_id", ids2).gte("turno", sumarDias(dia, -7)).lt("turno", dia),
+        // La gracia de cada uno (empresa o Posición). Sin la función todavía, 10.
+        db.rpc("argos_gracia_minutos_de", { _ids: ids2 }),
       ]);
+      const graciaDe = new Map<string, number>();
+      if (!gracias.error) for (const r of (gracias.data ?? []) as Array<{ user_id: string; minutos: number }>) graciaDe.set(r.user_id, r.minutos);
       const libreDe = new Map<string, string | null>();
       if (!libres.error) for (const r of (libres.data ?? []) as Array<{ user_id: string; motivo: string | null }>) libreDe.set(r.user_id, r.motivo);
       const tardesDe = new Map<string, Set<string>>();
@@ -175,6 +179,7 @@ export function useTurnoTabla(dia: string, esHoy: boolean, habilitado = true) {
         const x = horasDe.get(r.user_id) ?? []; x.push(r.conectado_min); horasDe.set(r.user_id, x);
       }
       for (const f of filas) {
+        f.graciaMin = graciaDe.get(f.userId) ?? 10;
         if (libreDe.has(f.userId)) {
           f.diaLibre = { motivo: libreDe.get(f.userId) ?? null };
           if (f.llegada == null) { f.nivel = "ok"; f.motivos = []; f.noVino = false; }

@@ -157,6 +157,10 @@ export interface FilaTurno {
   nivelAvisos: Nivel;
 
   activoMin: number;
+  /** Minutos sin cámara o sin pantalla (para la gracia). */
+  sinCamPantMin: number;
+  /** Gracia por turno de la persona (la pone el hook; 10 si no se sabe). */
+  graciaMin?: number;
   conectadoMin: number;
   cortes: number;
   cortesMin: number;
@@ -277,12 +281,13 @@ export function armarFila(dia: string, p: EntradaPersona, ahora: number): FilaTu
   else if (avisos.length >= UMBRALES.avisosAmbar || ignorados >= 1) nivelAvisos = "ambar";
 
   // CONEXIÓN: horas en Cowork, cuánto de eso trabajando y los cortes de internet.
-  let activoMs = 0, conectadoMs = 0, cortesMs = 0, cortes = 0;
+  let activoMs = 0, conectadoMs = 0, cortesMs = 0, cortes = 0, sinCamPantMs = 0;
   for (const s of segs) {
     const dur = s.fin - s.inicio;
     if (SIN_CONEXION.has(s.estado)) { cortes++; cortesMs += dur; continue; }
     if (s.estado !== "pausa") conectadoMs += dur;
     if (s.estado === "activo" || s.estado === "meet") activoMs += dur;
+    if (s.estado === "sin_camara" || s.estado === "sin_pantalla" || s.estado === "fuera_de_camara") sinCamPantMs += dur;
   }
   const activoMin = min(activoMs), conectadoMin = min(conectadoMs), cortesMin = min(cortesMs);
   const pct = conectadoMs > 0 ? activoMs / conectadoMs : 1;
@@ -356,6 +361,7 @@ export function armarFila(dia: string, p: EntradaPersona, ahora: number): FilaTu
     avisoAbierto: abierto?.tipo ?? null,
     nivelAvisos,
     activoMin,
+    sinCamPantMin: min(sinCamPantMs),
     conectadoMin,
     cortes,
     cortesMin,
@@ -368,6 +374,12 @@ export function armarFila(dia: string, p: EntradaPersona, ahora: number): FilaTu
 }
 
 /** ¿Sale en la tabla? Quien tenía turno ese día o quien trabajó aunque no le tocara. */
+/** Minutos trabajados (27/11/2026): con cámara y pantalla, más hasta su gracia
+ *  de tiempo sin cámara o sin pantalla (10 por defecto). */
+export function minutosTrabajados(f: Pick<FilaTurno, "activoMin" | "sinCamPantMin" | "graciaMin">): number {
+  return f.activoMin + Math.min(f.sinCamPantMin, f.graciaMin ?? 10);
+}
+
 export function apareceEnElDia(f: FilaTurno): boolean {
   return f.turnoInicio != null || f.llegada != null;
 }

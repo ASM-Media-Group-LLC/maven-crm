@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { armarFila, instanteBogota, seccionDe, semanaDe, type EntradaPersona } from "@/lib/turnoTabla";
+import { armarFila, instanteBogota, minutosTrabajados, seccionDe, semanaDe, type EntradaPersona } from "@/lib/turnoTabla";
 
 // La tabla del turno de Argos (25/11/2026): las cuentas de cada columna y el semáforo «normal».
 const DIA = "2026-11-24";
@@ -79,5 +79,11 @@ describe("tabla del turno", () => {
   it("la semana va de lunes a domingo", () => {
     expect(semanaDe("2026-11-26")[0]).toBe("2026-11-23");
     expect(semanaDe("2026-11-26")[6]).toBe("2026-11-29");
+  });
+
+  it("trabajado = con cámara y pantalla + hasta la gracia (10 por defecto)", () => {
+    expect(minutosTrabajados({ activoMin: 400, sinCamPantMin: 25, graciaMin: undefined })).toBe(410);
+    expect(minutosTrabajados({ activoMin: 400, sinCamPantMin: 6, graciaMin: 10 })).toBe(406);
+    expect(minutosTrabajados({ activoMin: 400, sinCamPantMin: 30, graciaMin: 20 })).toBe(420);
   });
 });
