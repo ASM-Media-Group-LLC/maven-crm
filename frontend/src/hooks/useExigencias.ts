@@ -141,17 +141,36 @@ export function useSoloNavegadorConEstado(activo = true): { soloNavegador: boole
   return activo ? estado : { soloNavegador: false, listo: true };
 }
 
-export function usePosicionesSoloNavegador() {
-  return useQuery<Record<string, boolean>>({
-    queryKey: ["posiciones-solo-navegador"],
+export interface ModoDeTrabajo { soloNavegador: boolean; debeCowork: boolean }
+
+/** Los interruptores de trabajo de cada puesto (solo navegador, debe estar en
+ *  Cowork), por id de posición. */
+export function usePosicionesModoDeTrabajo() {
+  return useQuery<Record<string, ModoDeTrabajo>>({
+    queryKey: ["posiciones-modo-de-trabajo"],
     staleTime: 30_000,
     queryFn: async () => {
-      const { data, error } = await db.rpc("posiciones_solo_navegador");
+      const { data, error } = await db.rpc("posiciones_modo_de_trabajo");
       if (error) throw new Error(error.message);
-      const mapa: Record<string, boolean> = {};
-      for (const f of (Array.isArray(data) ? data : []) as Array<{ id: string; solo_navegador: boolean }>) mapa[f.id] = f.solo_navegador === true;
+      const mapa: Record<string, ModoDeTrabajo> = {};
+      for (const f of (Array.isArray(data) ? data : []) as Array<{ id: string; solo_navegador: boolean; debe_cowork: boolean }>) {
+        mapa[f.id] = { soloNavegador: f.solo_navegador === true, debeCowork: f.debe_cowork !== false };
+      }
       return mapa;
     },
+  });
+}
+
+/** «Debe estar en Cowork» por posición (Alvaro, 27/11/2026): de ahí salen
+ *  Argos «fuera de Cowork», el envío a Cowork y si se le exige la app. */
+export function useGuardarDebeCowork() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (v: { posicion: string; valor: boolean }) => {
+      const { error } = await db.rpc("posicion_debe_cowork_guardar", { _posicion: v.posicion, _valor: v.valor });
+      if (error) throw new Error(error.message);
+    },
+    onSuccess: () => { void qc.invalidateQueries({ queryKey: ["posiciones-modo-de-trabajo"] }); },
   });
 }
 
@@ -163,7 +182,7 @@ export function useGuardarSoloNavegador() {
       if (error) throw new Error(error.message);
     },
     onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: ["posiciones-solo-navegador"] });
+      void qc.invalidateQueries({ queryKey: ["posiciones-modo-de-trabajo"] });
       olvidarSoloNavegador();
     },
   });
