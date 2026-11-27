@@ -436,7 +436,9 @@ export function TurnoTabla() {
   // FILA SENCILLA (Alvaro, 27/11/2026: «muy tupida… más minimalista; voy tocando y
   // me voy enterando»): a la vista solo la persona, una frase, su llegada y la
   // franja del día. Al tocarla se abre el detalle de las cinco cosas.
-  const Fila = ({ f }: { f: FilaTurno }) => {
+  // Se llama como función (no como componente nuevo en cada render): así, al abrir una
+  // fila, la lista no se vuelve a montar entera y la página no salta arriba (27/11/2026).
+  const fila = (f: FilaTurno) => {
     const abierta = abiertoId === f.userId;
     const foto = q.fotos[f.userId];
     const frases = [...(f.motivos[0] ? [frase(t, f.motivos[0])] : []), ...contraLoNormal(f)];
@@ -445,7 +447,7 @@ export function TurnoTabla() {
     const puedeLibre = q.data?.diaLibreListo && (f.noVino || f.diaLibre) && !f.inactivo;
     const ll = celdaLlegada(t, f);
     return (
-      <div className={`flex flex-col rounded-2xl transition ${abierta ? "bg-foreground/[0.04]" : ""}`}>
+      <div key={f.userId} className={`flex flex-col rounded-2xl transition ${abierta ? "bg-foreground/[0.04]" : ""}`}>
         <button
           type="button"
           onClick={() => setAbiertoId(abierta ? null : f.userId)}
@@ -755,7 +757,7 @@ export function TurnoTabla() {
               )}
               {(filtro === "mejores" || filtro === "peores" || filtro === "noVinieron" || filtro === "activos") ? (
                 <div className="mt-2 flex flex-col gap-1 md:divide-y md:divide-border/30">
-                  {vistas.map((f) => <Fila key={f.userId} f={f} />)}
+                  {vistas.map(fila)}
                 </div>
               ) : (<>
               {(["mirar", "ojo", "bien"] as Seccion[]).map((s) => secciones[s].length > 0 && (
@@ -765,7 +767,7 @@ export function TurnoTabla() {
                     {t(TITULO_SECCION[s])} · {secciones[s].length}
                   </p>
                   <div className="flex flex-col gap-1.5 md:divide-y md:divide-border/30 md:gap-0">
-                    {secciones[s].map((f) => <Fila key={f.userId} f={f} />)}
+                    {secciones[s].map(fila)}
                   </div>
                 </div>
               ))}
@@ -775,7 +777,7 @@ export function TurnoTabla() {
                     {t(TITULO_SECCION.noVinieron)} · {secciones.noVinieron.length}
                   </summary>
                   <div className="mt-2 flex flex-col gap-1.5 md:gap-0 md:divide-y md:divide-border/30">
-                    {secciones.noVinieron.map((f) => <Fila key={f.userId} f={f} />)}
+                    {secciones.noVinieron.map(fila)}
                   </div>
                 </details>
               )}
@@ -785,7 +787,7 @@ export function TurnoTabla() {
                     {t(TITULO_SECCION.luego)} · {secciones.luego.length}
                   </summary>
                   <div className="mt-2 flex flex-col gap-1.5 md:gap-0 md:divide-y md:divide-border/30">
-                    {secciones.luego.map((f) => <Fila key={f.userId} f={f} />)}
+                    {secciones.luego.map(fila)}
                   </div>
                 </details>
               )}
@@ -795,7 +797,7 @@ export function TurnoTabla() {
                     {t(TITULO_SECCION.inactivos)} · {secciones.inactivos.length}
                   </summary>
                   <div className="mt-2 flex flex-col gap-1.5 md:gap-0 md:divide-y md:divide-border/30">
-                    {secciones.inactivos.map((f) => <Fila key={f.userId} f={f} />)}
+                    {secciones.inactivos.map(fila)}
                   </div>
                 </details>
               )}
@@ -805,7 +807,7 @@ export function TurnoTabla() {
                     {t(TITULO_SECCION.libres)} · {secciones.libres.length}
                   </summary>
                   <div className="mt-2 flex flex-col gap-1.5 md:gap-0 md:divide-y md:divide-border/30">
-                    {secciones.libres.map((f) => <Fila key={f.userId} f={f} />)}
+                    {secciones.libres.map(fila)}
                   </div>
                 </details>
               )}
