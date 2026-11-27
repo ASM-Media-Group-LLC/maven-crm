@@ -2133,6 +2133,7 @@ export const hr = {
   "hr.pausas.bano": { es: "Baño", en: "Bathroom" },
   "hr.pendientes.titulo": { es: "Pendientes del equipo", en: "Team to-dos" },
   "hr.pendientes.cerrar": { es: "Cerrar hasta mañana", en: "Close until tomorrow" },
+  "hr.pendientes.achicar": { es: "Achicar", en: "Minimize" },
   "hr.pendientes.resolver": { es: "Resolver", en: "Fix it" },
   "hr.pendientes.verComo": { es: "Ver cómo", en: "See how" },
   "hr.pendientes.ahoraNo": { es: "Ahora no", en: "Not now" },

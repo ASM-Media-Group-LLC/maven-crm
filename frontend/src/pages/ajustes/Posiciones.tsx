@@ -97,7 +97,7 @@ function Casilla({ className, checked, ...props }: React.ComponentPropsWithoutRe
 
 function Letra({ nombre }: { nombre: string | null }) {
   return (
-    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary/10 text-[11px] font-semibold text-primary">
+    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-foreground/10 text-[11px] font-semibold text-foreground">
       {(nombre ?? "?").trim().charAt(0).toUpperCase()}
     </span>
   );
@@ -107,6 +107,8 @@ export default function Posiciones() {
   const { t } = useLanguage();
   const datos = useDatos();
   const [params] = useSearchParams();
+  // 27/11/2026: con un color de marca oscuro, «text-primary» sobre el fondo oscuro no se
+  // leía (pestaña «People», chips de posición). Lo seleccionado va en el color del texto.
   const [pestana, setPestana] = useState<"posiciones" | "personas">(params.has("persona") ? "personas" : "posiciones");
   const [abierta, setAbierta] = useState<string | null>(null);
 
@@ -127,7 +129,7 @@ export default function Posiciones() {
             <div className="flex w-fit rounded-control border border-border p-0.5 text-sm">
             {(["posiciones", "personas"] as const).map((p) => (
               <button key={p} type="button" onClick={() => setPestana(p)}
-                className={cn("rounded-control px-3 py-1.5 transition-colors", pestana === p ? "bg-primary/10 font-medium text-primary" : "text-muted-foreground hover:text-foreground")}>
+                className={cn("rounded-control px-3 py-1.5 transition-colors", pestana === p ? "bg-foreground/10 font-medium text-foreground" : "text-foreground/70 hover:text-foreground")}>
                 {t(`posiciones.tab.${p}`)}
               </button>
             ))}
@@ -278,7 +280,7 @@ function ListaPosiciones({ datos, onAbrir }: { datos: NonNullable<ReturnType<typ
                       <TableCell className="px-4 py-3">
                         <div className="flex max-w-[360px] flex-wrap gap-1">
                           {gente.slice(0, 3).map((n) => <span key={n} className="rounded-full border border-border bg-muted/40 px-2 py-0.5 text-xs">{n}</span>)}
-                          {gente.length > 3 && <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs text-primary">+{gente.length - 3}</span>}
+                          {gente.length > 3 && <span className="rounded-full bg-foreground/10 px-2 py-0.5 text-xs text-foreground">+{gente.length - 3}</span>}
                           {gente.length === 0 && <span className="text-xs text-muted-foreground">—</span>}
                         </div>
                       </TableCell>
@@ -725,7 +727,7 @@ function ListaPersonas({ datos }: { datos: NonNullable<ReturnType<typeof useDato
                         className="flex max-w-[320px] flex-wrap items-center gap-1 rounded-control border border-dashed border-border px-2 py-1 text-left hover:border-primary/50 disabled:cursor-default disabled:opacity-70">
                         {mias.length === 0
                           ? <span className="text-xs text-muted-foreground">{t("posiciones.personas.sinPosicion")}</span>
-                          : mias.map(pid => <span key={pid} className="rounded-full bg-primary/10 px-2 py-0.5 text-xs text-primary">{nombresPos.get(pid)}</span>)}
+                          : mias.map(pid => <span key={pid} className="rounded-full bg-foreground/10 px-2 py-0.5 text-xs text-foreground">{nombresPos.get(pid)}</span>)}
                         {p.editable && <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />}
                       </button>
                       {esDueno(p.id) ? <p className="mt-1 text-xs text-muted-foreground">{t("posiciones.personas.editor.protegida")}</p> :
