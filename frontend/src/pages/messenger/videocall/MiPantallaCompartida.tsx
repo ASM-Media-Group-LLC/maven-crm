@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { AlertTriangle, ChevronDown, ChevronUp, ScreenShareOff } from "lucide-react";
+import { AlertTriangle, ScreenShareOff } from "lucide-react";
 import { useLanguage } from "@/hooks/useLanguage";
 import { vigilarPantallaNegra } from "@/lib/pantallaNegra";
 import { cn } from "@/lib/utils";
@@ -16,15 +16,6 @@ import { cn } from "@/lib/utils";
 // en rojo con la ayuda del permiso de «Grabación de pantalla»: así nunca dice
 // «presentando» cuando a los demás no les llega nada.
 
-const CLAVE_OCULTA = "maven.call.miPantalla.oculta";
-
-function leerOculta(): boolean {
-  try { return window.localStorage.getItem(CLAVE_OCULTA) === "1"; } catch { return false; }
-}
-function guardarOculta(v: boolean) {
-  try { window.localStorage.setItem(CLAVE_OCULTA, v ? "1" : "0"); } catch { /* sin almacenamiento */ }
-}
-
 export interface MiPantallaCompartidaProps {
   /** La pista de la pantalla propia (publicación ScreenShare del participante local). */
   track: MediaStreamTrack;
@@ -38,7 +29,6 @@ export interface MiPantallaCompartidaProps {
 
 export default function MiPantallaCompartida({ track, compacto = false, onDejar, negra: negraDeAfuera }: MiPantallaCompartidaProps) {
   const { t } = useLanguage();
-  const [oculta, setOculta] = useState(leerOculta);
   const [ayudaAbierta, setAyudaAbierta] = useState(false);
   const [negraPropia, setNegraPropia] = useState(false);
   const negra = negraDeAfuera ?? negraPropia;
@@ -50,80 +40,52 @@ export default function MiPantallaCompartida({ track, compacto = false, onDejar,
     return vigilarPantallaNegra(track, setNegraPropia);
   }, [track, negraDeAfuera]);
 
-  const alternar = () => setOculta((v) => { guardarOculta(!v); return !v; });
-
-  if (oculta) {
-    return (
-      <button
-        type="button"
-        data-testid="mi-pantalla-pastilla"
-        onClick={alternar}
-        title={t("messenger.callView.miPantalla.mostrar")}
-        aria-label={t("messenger.callView.miPantalla.mostrar")}
-        className={cn(
-          "vidrio absolute bottom-2 left-2 z-20 flex items-center gap-2 rounded-full px-3 py-1.5 text-xs font-semibold text-foreground ring-1 ring-success/50 hover:bg-white/10",
-          negra && "ring-1 ring-destructive/70",
-        )}
-      >
-        {negra
-          ? <AlertTriangle className="h-3.5 w-3.5 text-destructive" aria-hidden />
-          : <span className="h-2 w-2 animate-pulse rounded-full bg-success" aria-hidden />}
-        {/* 26/11/2026 (Breiner): «Compartiendo» solo no se entendía; ahora lo dice completo. */}
-        {t("messenger.callView.miPantalla.titulo")}
-        <ChevronUp className="h-3 w-3 opacity-70" aria-hidden />
-      </button>
-    );
-  }
-
+  // 26/11/2026 (Alvaro): el cuadro tapaba a la gente. Ahora es una PASTILLA en
+  // la barra de arriba: «● Presentando · Dejar de compartir». Nunca encima de
+  // los videos, así que ya no hace falta esconderla.
   return (
     <div
       data-testid="mi-pantalla-compartida"
+      role="status"
       className={cn(
-        "vidrio absolute bottom-2 left-2 z-20 overflow-hidden rounded-xl shadow-xl ring-1",
-        negra ? "ring-destructive/60" : "ring-white/15",
-        compacto ? "max-w-[60%]" : "w-[280px] max-w-[45%]",
+        "relative flex shrink-0 items-center gap-1.5 rounded-full border bg-card/60 py-0.5 pl-2 pr-0.5",
+        negra ? "border-destructive/60" : "border-success/40",
       )}
     >
-      <div className={cn("flex items-center gap-2", compacto ? "px-2 py-1.5" : "px-3 py-2")}>
-        {negra
-          ? <AlertTriangle className="h-4 w-4 shrink-0 text-destructive" aria-hidden />
-          : <span className="h-2 w-2 shrink-0 rounded-full bg-success" aria-hidden />}
-        <span className={cn("min-w-0 flex-1 font-medium text-foreground", compacto ? "truncate text-[11px]" : "text-xs")}>
-          {negra ? t("messenger.callView.miPantalla.negra") : t("messenger.callView.miPantalla.presentando")}
-        </span>
-        <button
-          type="button"
-          onClick={alternar}
-          title={t("messenger.callView.miPantalla.ocultar")}
-          aria-label={t("messenger.callView.miPantalla.ocultar")}
-          className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-muted-foreground hover:bg-white/10 hover:text-foreground"
-        >
-          <ChevronDown className="h-3.5 w-3.5" aria-hidden />
-        </button>
-      </div>
-      {negra && !compacto && (
-        <div className="px-3 pb-1.5">
-          <button type="button" onClick={() => setAyudaAbierta((v) => !v)} className="text-[11px] text-muted-foreground underline underline-offset-2 hover:text-foreground">
-            {t("messenger.callView.miPantalla.comoArreglar")}
+      {negra
+        ? (
+          <button
+            type="button"
+            onClick={() => setAyudaAbierta((v) => !v)}
+            title={t("cowork.hubPantalla.negraDetalle")}
+            aria-label={t("messenger.callView.miPantalla.comoArreglar")}
+            className="flex items-center"
+          >
+            <AlertTriangle className="h-3.5 w-3.5 text-destructive" aria-hidden />
           </button>
-          {ayudaAbierta && <p className="mt-1 text-[11px] leading-snug text-muted-foreground">{t("cowork.hubPantalla.negraDetalle")}</p>}
-        </div>
+        )
+        : <span className="h-2 w-2 shrink-0 animate-pulse rounded-full bg-success motion-reduce:animate-none" aria-hidden />}
+      {!compacto && (
+        <span className={cn("whitespace-nowrap text-[11px] font-medium", negra ? "text-destructive" : "text-foreground")}>
+          {negra ? t("messenger.callView.miPantalla.negraCorto") : t("messenger.callView.miPantalla.presentandoCorto")}
+        </span>
       )}
-      <div className={cn("border-t border-white/10", compacto ? "px-2 py-1.5" : "px-3 py-2")}>
-        <button
-          type="button"
-          onClick={onDejar}
-          title={t("messenger.callView.miPantalla.dejar")}
-          aria-label={t("messenger.callView.miPantalla.dejar")}
-          className={cn(
-            "flex w-full items-center justify-center gap-1.5 rounded-full bg-destructive font-semibold text-destructive-foreground hover:bg-destructive/90",
-            compacto ? "h-6 text-[10px]" : "h-7 text-xs",
-          )}
-        >
-          <ScreenShareOff className="h-3.5 w-3.5" aria-hidden />
-          {t("messenger.callView.miPantalla.dejar")}
-        </button>
-      </div>
+      <button
+        type="button"
+        onClick={onDejar}
+        title={t("messenger.callView.miPantalla.dejar")}
+        aria-label={t("messenger.callView.miPantalla.dejar")}
+        className="flex h-6 items-center gap-1 rounded-full bg-destructive px-2 text-[11px] font-semibold text-destructive-foreground hover:bg-destructive/90"
+      >
+        <ScreenShareOff className="h-3 w-3" aria-hidden />
+        {/* «Dejar» se lee siempre, también en la ventanita: un ícono solo no se entendía. */}
+        {t("messenger.callView.miPantalla.dejarCorto")}
+      </button>
+      {negra && ayudaAbierta && (
+        <p className="vidrio absolute right-0 top-full z-40 mt-1 w-64 rounded-xl p-2.5 text-[11px] leading-snug text-muted-foreground shadow-xl">
+          {t("cowork.hubPantalla.negraDetalle")}
+        </p>
+      )}
     </div>
   );
 }

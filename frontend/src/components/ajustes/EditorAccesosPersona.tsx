@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Camera, MonitorUp } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -63,6 +64,18 @@ export function EditorAccesosPersona({ persona, posiciones, asignadas, revision,
     },
     onError: (e: { message?: string }) => setError(e.message || t("posiciones.errorGuardar")),
   });
+  // LO PRIMERO: ¿le pide cámara y pantalla? (Alvaro, 26/11/2026). Es lo que ve
+  // Argos: si UNA de sus posiciones lo tiene apagado, queda apagado.
+  const exigencias = useQuery({
+    queryKey: ["exigencias-de", persona.id],
+    queryFn: async () => {
+      const cliente = supabase as unknown as { rpc: (f: string, a: unknown) => Promise<{ data: unknown; error: { message: string } | null }> };
+      const { data, error: e } = await cliente.rpc("exigencias_de_varios", { _ids: [persona.id] });
+      if (e) throw e;
+      const fila = ((data ?? []) as Array<{ camara: boolean; pantalla: boolean }>)[0];
+      return fila ?? null;
+    },
+  });
   const cambiar = (valores: string[], clave: string, marcado: boolean) => marcado ? [...new Set([...valores, clave])] : valores.filter(k => k !== clave);
 
   return <Dialog open onOpenChange={open => { if (!open && !guardar.isPending) onCerrar(); }}>
@@ -72,8 +85,15 @@ export function EditorAccesosPersona({ persona, posiciones, asignadas, revision,
         <DialogDescription>{t("posiciones.personas.editor.descripcion")}</DialogDescription>
       </DialogHeader>
       <div className="min-h-0 flex-1 space-y-5 overflow-y-auto pr-2">
+        {exigencias.data && <div className="flex flex-wrap items-center gap-2 rounded-control border border-border p-3 text-sm" data-encendido>
+          {([["camara", Camera, exigencias.data.camara], ["pantalla", MonitorUp, exigencias.data.pantalla]] as const).map(([k, Icono, on]) => (
+            <span key={k} data-exigencia={k} data-encendida={on} className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 font-medium ${on ? "bg-success/15 text-success" : "bg-muted text-muted-foreground"}`}>
+              <Icono className="h-3.5 w-3.5" aria-hidden />{t(k === "camara" ? "posiciones.encendido.camara" : "posiciones.encendido.pantalla")}: {on ? t("posiciones.encendido.si") : t("posiciones.encendido.no")}
+            </span>
+          ))}
+          <span className="text-xs text-muted-foreground">{t("posiciones.encendido.ayuda")}</span>
+        </div>}
         {conflicto && <p role="alert" className="rounded-control border border-warning p-3 text-sm">{t("posiciones.personas.editor.conflicto")}</p>}
-        {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
         {revisando ? <>
           <div className="grid gap-3 rounded-control border border-border p-4 text-sm sm:grid-cols-2">
             <div><p className="font-medium">{t("posiciones.personas.editor.antes")}</p><p>{nombres(base.asignadas)}</p></div>
@@ -117,6 +137,9 @@ export function EditorAccesosPersona({ persona, posiciones, asignadas, revision,
           </section>
         </>}
       </div>
+      {/* El error TAMBIÉN junto a «Aplicar» (Grace, 26/11/2026): arriba quedaba
+          fuera de la vista con la lista larga y parecía que el botón no hacía nada. */}
+      {error && <p role="alert" data-error-aplicar className="rounded-control border border-destructive/50 bg-destructive/10 px-3 py-2 text-sm text-destructive">{error}</p>}
       <DialogFooter>
         <Button variant="outline" disabled={guardar.isPending} onClick={() => revisando ? setRevisando(false) : onCerrar()}>{t(revisando ? "posiciones.revision.seguir" : "posiciones.dialogo.cancelar")}</Button>
         <Button disabled={!pendiente || conflicto || guardar.isPending} onClick={() => { setError(""); if (revisando) guardar.mutate(); else setRevisando(true); }}>

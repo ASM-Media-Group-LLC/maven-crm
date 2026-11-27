@@ -32,6 +32,11 @@ interface Props {
   title?: string;
   canControl: boolean;
   compact?: boolean;
+  /** «barra»: botón redondo en la barra de abajo, junto al micrófono (Alvaro,
+   *  26/11/2026: «Grabar» flotaba encima de los nombres). Sin la variante, la
+   *  pastilla de siempre (que en la barra de arriba solo dice «REC» mientras
+   *  se graba, con canControl=false). */
+  variante?: "barra";
 }
 
 const claveSesion = (roomName: string) => `maven_rec_${roomName}`;
@@ -64,7 +69,7 @@ export async function detenerAlSalir(roomName: string, recordingId: string): Pro
   } catch { /* el barrido del servidor la cierra igual a los 5 min */ }
 }
 
-export default function RecordingControl({ room, roomName, source, title, canControl, compact }: Props) {
+export default function RecordingControl({ room, roomName, source, title, canControl, compact, variante }: Props) {
   const { t } = useLanguage();
   const [isRecording, setIsRecording] = useState<boolean>(() => room?.isRecording ?? false);
   const [busy, setBusy] = useState(false);
@@ -154,6 +159,39 @@ export default function RecordingControl({ room, roomName, source, title, canCon
   const mmss = elapsed !== null
     ? `${Math.floor(elapsed / 60)}:${String(elapsed % 60).padStart(2, "0")}`
     : null;
+
+  // En la barra de abajo: redondo como el resto de los botones. Contorno rojo
+  // para grabar; relleno rojo mientras graba (la misma regla de abajo:
+  // contorno ≠ relleno, para que nadie crea que ya se está grabando).
+  if (variante === "barra") {
+    if (!canControl) return null;
+    return (
+      <>
+        <button
+          type="button"
+          disabled={busy}
+          onClick={() => (isRecording ? setStopOpen(true) : void start())}
+          title={isRecording ? t("messenger.rec.detenerGrabacion") : t("messenger.rec.grabarLaReunion")}
+          aria-label={isRecording ? t("messenger.rec.detenerGrabacion") : t("messenger.rec.grabarLaReunion")}
+          data-boton-grabar
+          className={cn(
+            "relative flex items-center justify-center rounded-full transition-colors disabled:opacity-70",
+            compact ? "h-8 w-8" : "h-11 w-11",
+            isRecording
+              ? "bg-destructive text-white hover:bg-destructive/90"
+              : "bg-card text-red-500 ring-1 ring-inset ring-red-500/70 hover:bg-muted",
+          )}
+        >
+          {busy
+            ? <Loader2 className={compact ? "h-3.5 w-3.5 animate-spin" : "h-[18px] w-[18px] animate-spin"} />
+            : isRecording
+              ? <Square className={compact ? "h-3 w-3 fill-current" : "h-3.5 w-3.5 fill-current"} />
+              : <span className={cn("rounded-full bg-red-500", compact ? "h-2.5 w-2.5" : "h-3 w-3")} />}
+        </button>
+        <StopDialog open={stopOpen} onClose={() => setStopOpen(false)} onConfirm={stop} busy={busy} />
+      </>
+    );
+  }
 
   return (
     <>

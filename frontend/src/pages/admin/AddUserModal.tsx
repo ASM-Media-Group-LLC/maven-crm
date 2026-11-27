@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { RolPorPosicion } from "./RolPorPosicion";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -49,6 +50,8 @@ export interface CredencialesCreadas {
   email_sent_to: string | null;
   email_error: string | null;
   mailbox_ok: boolean;
+  /** Para «Asignarle su posición» apenas se crea. */
+  user_id?: string | null;
   mailbox_error?: string | null;
 }
 
@@ -60,9 +63,12 @@ interface AddUserModalProps {
   puedeAsignarRol?: boolean;
   /** Al llegar, el modal pasa a la vista de entrega de credenciales. */
   credenciales?: CredencialesCreadas | null;
+  /** El rol lo da la Posición: sin menú de rol; al crear, «Asignarle su posición». */
+  porPosiciones?: boolean;
+  onAsignarPosicion?: (userId: string) => void;
 }
 
-const AddUserModal = ({ open, onOpenChange, onConfirm, isLoading, credenciales, puedeAsignarRol = true }: AddUserModalProps) => {
+const AddUserModal = ({ open, onOpenChange, onConfirm, isLoading, credenciales, puedeAsignarRol = true, porPosiciones = false, onAsignarPosicion }: AddUserModalProps) => {
   const { t } = useLanguage();
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
@@ -136,6 +142,9 @@ const AddUserModal = ({ open, onOpenChange, onConfirm, isLoading, credenciales, 
         {credenciales ? (
           /* ── Vista de ENTREGA: esto es lo que el admin le pasa a la persona ── */
           <>
+            {porPosiciones && credenciales.user_id && onAsignarPosicion && (
+              <RolPorPosicion onAsignar={() => onAsignarPosicion(credenciales.user_id!)} />
+            )}
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
                 <UserCheck className="h-5 w-5 text-success" />
@@ -332,6 +341,7 @@ const AddUserModal = ({ open, onOpenChange, onConfirm, isLoading, credenciales, 
 
               <div className="space-y-2">
                 <Label htmlFor="role">{t("common.role")}</Label>
+                {porPosiciones ? <RolPorPosicion despuesDeCrear /> : (
                 <Select value={puedeAsignarRol ? role : "employee"} onValueChange={setRole} disabled={!puedeAsignarRol}>
                   <SelectTrigger>
                     <SelectValue placeholder={t("admin.selectRole")} />
@@ -344,6 +354,7 @@ const AddUserModal = ({ open, onOpenChange, onConfirm, isLoading, credenciales, 
                     ))}
                   </SelectContent>
                 </Select>
+                )}
               </div>
 
               <DialogFooter className="gap-2 sm:gap-0">
