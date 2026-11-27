@@ -78,7 +78,8 @@ export default function MiPantallaCompartida({ track, compacto = false, onDejar,
         className="flex h-6 items-center gap-1 rounded-full bg-destructive px-2 text-[11px] font-semibold text-destructive-foreground hover:bg-destructive/90"
       >
         <ScreenShareOff className="h-3 w-3" aria-hidden />
-        {!compacto && t("messenger.callView.miPantalla.dejarCorto")}
+        {/* «Dejar» se lee siempre, también en la ventanita: un ícono solo no se entendía. */}
+        {t("messenger.callView.miPantalla.dejarCorto")}
       </button>
       {negra && ayudaAbierta && (
         <p className="vidrio absolute right-0 top-full z-40 mt-1 w-64 rounded-xl p-2.5 text-[11px] leading-snug text-muted-foreground shadow-xl">
