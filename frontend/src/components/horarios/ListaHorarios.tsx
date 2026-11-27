@@ -7,7 +7,7 @@ import { UserAvatar } from "@/components/UserAvatar";
 import { useToast } from "@/hooks/use-toast";
 import { a12 } from "@/lib/horaBogota";
 import { useGuardarHorario, useHorariosEquipo } from "@/hooks/useHorariosEquipo";
-import { type PausaDePersona, usePausasDelEquipo } from "@/hooks/usePausas";
+import { type ComidaDePersona, type PausaDePersona, useComidasDelEquipo, useGuardarComidaPersona, usePausasDelEquipo } from "@/hooks/usePausas";
 import {
   type DiaHorario, type FilaEquipoHorario, alternarDia, cambio, hhmm, mismaHoraTodos, ponerHoraATodos, semanaInicial,
   trabaja, validarSemana,
@@ -37,7 +37,50 @@ function PausaDeLaFila({ pausa, t }: { pausa: PausaDePersona | undefined; t: Tr 
   return <span className="text-[11px] text-muted-foreground">{texto}</span>;
 }
 
-function FilaHorario({ f, t, pausa }: { f: FilaEquipoHorario; t: Tr; pausa?: PausaDePersona }) {
+// HORA DE COMIDA (Alvaro, 27/11/2026): por defecto la del plan de su puesto;
+// RR. HH. le puede poner una propia (o volver a la del plan). Si es
+// obligatoria y con qué margen lo decide el plan (Ajustes → Empresa).
+function ComidaDeLaFila({ uid, comida, t }: { uid: string; comida: ComidaDePersona | undefined; t: Tr }) {
+  const { toast } = useToast();
+  const guardar = useGuardarComidaPersona();
+  const [hora, setHora] = useState(comida?.origen === "persona" ? (comida.hora ?? "") : "");
+  if (!comida) return null;
+  const regla = comida.hora
+    ? t(comida.obligatoria ? "hr.horario.comidaObligatoria" : "hr.horario.comidaRecomendada", { m: comida.margen_min })
+    : null;
+  const enviar = (valor: string | null) => guardar.mutate({ uid, hora: valor }, {
+    onSuccess: () => toast({ title: t("hr.horario.comidaGuardada") }),
+    onError: (e) => toast({ title: t("hr.horario.comidaNoSeGuardo"), description: (e as Error).message, variant: "destructive" }),
+  });
+  return (
+    <div data-comida-fila className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+      <span className="font-medium text-foreground">{t("hr.horario.comida")}</span>
+      <input
+        type="time"
+        className={ENTRADA_HORA}
+        value={hora}
+        onChange={(e) => setHora(e.target.value)}
+        onBlur={() => { if (hora && hora !== comida.hora) enviar(hora); }}
+        aria-label={t("hr.horario.comidaPropia")}
+        placeholder={comida.hora_plan ?? ""}
+      />
+      <span>
+        {comida.origen === "persona"
+          ? t("hr.horario.comidaPropia")
+          : comida.hora_plan ? t("hr.horario.comidaDelPlan", { h: a12(comida.hora_plan) ?? comida.hora_plan }) : t("hr.horario.comidaSinHora")}
+        {regla && <> · {regla}</>}
+      </span>
+      {comida.origen === "persona" && (
+        <button type="button" onClick={() => { setHora(""); enviar(null); }} className="font-medium text-primary hover:underline">
+          {t("hr.horario.comidaQuitar")}
+        </button>
+      )}
+      {guardar.isPending && <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />}
+    </div>
+  );
+}
+
+function FilaHorario({ f, t, pausa, comida }: { f: FilaEquipoHorario; t: Tr; pausa?: PausaDePersona; comida?: ComidaDePersona }) {
   const { toast } = useToast();
   const guardar = useGuardarHorario();
   const inicial = useMemo(() => semanaInicial(f), [f]);
@@ -121,6 +164,7 @@ function FilaHorario({ f, t, pausa }: { f: FilaEquipoHorario; t: Tr; pausa?: Pau
         )}
 
         <PausaDeLaFila pausa={pausa} t={t} />
+        <ComidaDeLaFila uid={f.user_id} comida={comida} t={t} />
 
         <div className="flex flex-wrap items-center gap-2">
           <Button size="sm" className="h-9 rounded-lg" onClick={confirmar} disabled={!!error || guardar.isPending || (confirmado && !pendienteDeGuardar)}>
@@ -141,6 +185,7 @@ function FilaHorario({ f, t, pausa }: { f: FilaEquipoHorario; t: Tr; pausa?: Pau
 
 export function ListaHorarios({ obligatorio = false }: { obligatorio?: boolean }) {
   const pausas = usePausasDelEquipo();
+  const comidas = useComidasDelEquipo();
   const { t } = useLanguage();
   const q = useHorariosEquipo();
   const filas = useMemo(() => q.data ?? [], [q.data]);
@@ -204,7 +249,7 @@ export function ListaHorarios({ obligatorio = false }: { obligatorio?: boolean }
         <p className="p-6 text-sm text-muted-foreground">{filtro === "pendientes" && pendientes === 0 ? t("hr.horEq.todosListos") : t("hr.horEq.nadieFiltro")}</p>
       ) : (
         <ul className="divide-y divide-border/25">
-          {vistas.map((f) => <FilaHorario key={`${f.user_id}-${f.confirmado_at ?? "x"}`} f={f} t={t} pausa={pausas.data?.get(f.user_id)} />)}
+          {vistas.map((f) => <FilaHorario key={`${f.user_id}-${f.confirmado_at ?? "x"}`} f={f} t={t} pausa={pausas.data?.get(f.user_id)} comida={comidas.data?.get(f.user_id)} />)}
         </ul>
       )}
     </div>
