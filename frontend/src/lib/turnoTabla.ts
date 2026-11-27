@@ -426,6 +426,17 @@ export function turnosDelDia(filas: FilaTurno[]): string[] {
   return [...s].sort();
 }
 
+/** LA JORNADA (Alvaro, 27/11/2026): «aquí el AM es de 8 de la mañana a 4 de la
+ *  tarde, de 4 a 12 es el PM y la madrugada el resto». Se mira la hora de entrada. */
+export type Jornada = "am" | "pm" | "madrugada";
+export const JORNADAS: Jornada[] = ["am", "pm", "madrugada"];
+export function jornadaDe(entrada: string | null | undefined): Jornada | null {
+  if (!entrada) return null;
+  const h = Number(entrada.slice(0, 2));
+  if (!Number.isFinite(h)) return null;
+  return h >= 8 && h < 16 ? "am" : h >= 16 ? "pm" : "madrugada";
+}
+
 /** Los días de la semana (lunes a domingo) que contienen `dia`. */
 export function semanaDe(dia: string): string[] {
   const [a, m, d] = dia.split("-").map(Number);

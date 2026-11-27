@@ -18,7 +18,8 @@ import { horaBogota } from "@/lib/llegadas";
 import { hoyEnBogota } from "@/hooks/useHoyDelEquipo";
 import { useTurnoTabla } from "@/hooks/useTurnoTabla";
 import {
-  minutosTrabajados, ordenarPorAtencion, seccionDe, semanaDe, sumarDias, turnosDelDia,
+  jornadaDe, JORNADAS, minutosTrabajados, ordenarPorAtencion, seccionDe, semanaDe, sumarDias,
+  type Jornada,
   type FilaTurno, type Motivo, type Nivel, type Seccion, type TipoFranja,
 } from "@/lib/turnoTabla";
 
@@ -36,6 +37,10 @@ type Tr = (k: TranslationKey, vars?: Record<string, string | number>) => string;
 // La vista de un toque (Alvaro, 27/11/2026: «filtrar los que estuvieron, los que no,
 // los que estuvieron mejor, los que estuvieron peor»).
 type Filtro = "todos" | "activos" | "trabajaron" | "noVinieron" | "mejores" | "peores" | "tarde" | "ignoro";
+/** No vino (turno terminado) o aún no llega (turno empezado). Sin contar cuentas
+ *  sin uso ni a quien tiene el día libre: la tarjeta y la vista dicen lo mismo. */
+const noHaVenido = (f: FilaTurno) => (f.noVino || (f.llegada == null && f.noLlegaMin != null)) && !f.inactivo && !f.diaLibre;
+
 const VISTAS: Array<[Filtro, TranslationKey]> = [
   // Orden y vista de entrada (Alvaro, 27/11/2026): 1 Activos ahora, 2 Trabajaron, 3 Todos.
   ["activos", "hr.turno.v.activos"], ["trabajaron", "hr.turno.v.trabajaron"], ["todos", "hr.turno.v.todos"], ["noVinieron", "hr.turno.v.noVinieron"],
@@ -454,7 +459,7 @@ export function TurnoTabla() {
   useEffect(() => {
     setFiltro((f) => (!esHoy && f === "activos" ? "trabajaron" : f));
   }, [esHoy]);
-  const [turno, setTurno] = useState<string | null>(null);
+  const [turno, setTurno] = useState<Jornada | null>(null);
   const [buscar, setBuscar] = useState("");
   const [calAbierto, setCalAbierto] = useState(false);
   const [abiertoId, setAbiertoId] = useState<string | null>(null);
@@ -463,13 +468,12 @@ export function TurnoTabla() {
   const fmtDia = (d: string, o: Intl.DateTimeFormatOptions) => new Date(`${d}T12:00:00-05:00`).toLocaleDateString(locale, { timeZone: "America/Bogota", ...o });
 
   const filas = useMemo(() => q.data?.filas ?? [], [q.data]);
-  const turnos = useMemo(() => turnosDelDia(filas), [filas]);
-  const delTurno = useMemo(() => filas.filter((f) => !turno || `${f.entrada}–${f.salida}` === turno), [filas, turno]);
+  const delTurno = useMemo(() => filas.filter((f) => !turno || jornadaDe(f.entrada) === turno), [filas, turno]);
   const pasa = (f: FilaTurno, k: Filtro) =>
     k === "todos" ? true
       : k === "activos" ? f.activoAhora
       : k === "trabajaron" || k === "mejores" || k === "peores" ? f.llegada != null
-        : k === "noVinieron" ? (f.noVino && !f.inactivo && !f.diaLibre) || f.noLlegaMin != null
+        : k === "noVinieron" ? noHaVenido(f)
           : k === "tarde" ? f.tardeMin != null
             : f.ignorados > 0;
   /** Qué parte de su turno trabajó (0–1), o null si no hay turno. */
@@ -512,7 +516,8 @@ export function TurnoTabla() {
     vinieron: tocaban.filter((f) => f.llegada != null).length,
     tocaban: tocaban.length,
     tarde: delTurno.filter((f) => f.tardeMin != null).length,
-    noVino: delTurno.filter((f) => f.noVino && !f.inactivo && !f.diaLibre).length,
+    // El mismo número que la vista «No vinieron» (27/11/2026).
+    noVino: delTurno.filter(noHaVenido).length,
     ignoraron: delTurno.filter((f) => f.ignorados > 0).length,
     // Trabajado = con cámara y pantalla, más hasta su gracia sin cámara o pantalla
     // (Alvaro, 27/11/2026: «10 minutos… después de ahí se descuenta»).
@@ -694,7 +699,8 @@ export function TurnoTabla() {
             </div>
           </div>
 
-          <div className="flex w-full items-center gap-0.5 rounded-2xl border border-border/50 bg-background/40 p-1 xl:w-auto">
+          <div className="flex w-full min-w-0 flex-col gap-2 sm:flex-row sm:items-center xl:w-auto">
+          <div className="flex min-w-0 flex-1 items-center gap-0.5 rounded-2xl border border-border/50 bg-background/40 p-1 xl:w-auto">
             <button type="button" onClick={() => irA(sumarDias(dia, -7))} aria-label={t("hr.turno.semanaAnterior")}
               className="flex h-11 w-8 shrink-0 items-center justify-center rounded-xl text-muted-foreground transition hover:bg-foreground/[0.06] hover:text-foreground">
               <ChevronLeft className="h-4 w-4" />
@@ -751,6 +757,23 @@ export function TurnoTabla() {
               </button>
             )}
           </div>
+          {/* EL BUSCADOR, ARRIBA A LA DERECHA (Alvaro, 27/11/2026). */}
+          <div className="relative w-full min-w-0 sm:w-44 sm:shrink-0 xl:w-52">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <input
+              value={buscar}
+              onChange={(e) => setBuscar(e.target.value)}
+              placeholder={t("hr.turno.buscar")}
+              aria-label={t("hr.donde.buscar")}
+              className="h-[3.25rem] w-full rounded-2xl border border-border/50 bg-background/40 pl-9 pr-8 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            />
+            {buscar && (
+              <button type="button" onClick={() => setBuscar("")} aria-label={t("hr.donde.verTodos")} className="absolute right-1.5 top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-full text-muted-foreground hover:bg-foreground/10">
+                <X className="h-3.5 w-3.5" />
+              </button>
+            )}
+          </div>
+          </div>
         </div>
 
           {!q.isLoading && !q.isError && filas.length > 0 && (
@@ -787,7 +810,7 @@ export function TurnoTabla() {
 
             {/* VISTAS, TURNO Y BUSCADOR: todo del mismo alto (h-10) y sin barra de
                 scroll; en ventanas angostas las vistas se reparten parejas. */}
-            <div className="grid gap-2 border-t border-border/40 p-3 2xl:grid-cols-[minmax(0,1fr)_11rem_14rem] 2xl:items-center">
+            <div className="grid gap-2 border-t border-border/40 p-3 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
               <div className="grid grid-cols-3 gap-1 rounded-2xl border border-border/50 bg-background/40 p-1 sm:flex">
                 {VISTAS.map(([k, etq]) => (
                   <button
@@ -796,40 +819,29 @@ export function TurnoTabla() {
                     // «Activos ahora» siempre visible (Alvaro, 27/11/2026); mirando otro día, lleva a hoy.
                     onClick={() => { if (k === "activos" && !esHoy) irA(hoy); setFiltro(k); }}
                     aria-pressed={filtro === k}
-                    className={`h-8 min-w-0 truncate rounded-xl px-3 text-xs font-medium transition sm:flex-1 ${filtro === k ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:bg-foreground/[0.05] hover:text-foreground"}`}
+                    className={`h-8 min-w-0 truncate whitespace-nowrap rounded-xl px-2.5 text-xs font-medium transition sm:flex-auto sm:overflow-visible ${filtro === k ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:bg-foreground/[0.05] hover:text-foreground"}`}
                   >
                     {t(etq)}
+                    {/* CUÁNTOS (Alvaro, 27/11/2026: «falta saber cuántos están activos en
+                        este momento»): el número de cada vista al lado. Mejores y Peores
+                        son un orden, no un grupo; y «Activos ahora» solo cuenta hoy. */}
+                    {k !== "mejores" && k !== "peores" && (k !== "activos" || esHoy) && q.data && (
+                      <span className={`ml-1.5 tabular-nums ${filtro === k ? "opacity-80" : "text-foreground/70"}`}>
+                        {k === "activos" && <span className="mr-1 inline-block h-1.5 w-1.5 -translate-y-px rounded-full bg-success" aria-hidden />}
+                        {delTurno.filter((f) => pasa(f, k)).length}
+                      </span>
+                    )}
                   </button>
                 ))}
               </div>
-              <div className="grid grid-cols-2 gap-2 2xl:contents">
-                <select
-                  value={turno ?? ""}
-                  onChange={(e) => setTurno(e.target.value || null)}
-                  aria-label={t("hr.turno.turno")}
-                  className="h-10 w-full min-w-0 rounded-2xl border border-border/50 bg-background/40 px-3 text-sm"
-                >
-                  <option value="">{t("hr.turno.todosTurnos")}</option>
-                  {turnos.map((x) => {
-                    const [e, s] = x.split("–");
-                    return <option key={x} value={x}>{`${a12(e)} – ${a12(s)}`}</option>;
-                  })}
-                </select>
-                <div className="relative min-w-0">
-                  <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                  <input
-                    value={buscar}
-                    onChange={(e) => setBuscar(e.target.value)}
-                    placeholder={t("hr.donde.buscar")}
-                    aria-label={t("hr.donde.buscar")}
-                    className="h-10 w-full rounded-2xl border border-border/50 bg-background/40 pl-9 pr-8 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                  />
-                  {buscar && (
-                    <button type="button" onClick={() => setBuscar("")} aria-label={t("hr.donde.verTodos")} className="absolute right-1.5 top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-full text-muted-foreground hover:bg-foreground/10">
-                      <X className="h-3.5 w-3.5" />
-                    </button>
-                  )}
-                </div>
+              {/* LA JORNADA (Alvaro, 27/11/2026): un botoncito, no la lista de horarios. */}
+              <div className="flex shrink-0 gap-1 rounded-2xl border border-border/50 bg-background/40 p-1" role="group" aria-label={t("hr.turno.turno")}>
+                {([null, ...JORNADAS] as Array<Jornada | null>).map((j) => (
+                  <button key={j ?? "todas"} type="button" onClick={() => setTurno(j)} aria-pressed={turno === j}
+                    className={`h-8 flex-1 whitespace-nowrap rounded-xl px-3 text-xs font-medium transition lg:flex-none ${turno === j ? "bg-foreground/[0.1] text-foreground" : "text-muted-foreground hover:bg-foreground/[0.05] hover:text-foreground"}`}>
+                    {t(j === null ? "hr.turno.jornada.todas" : j === "am" ? "hr.turno.jornada.am" : j === "pm" ? "hr.turno.jornada.pm" : "hr.turno.jornada.madrugada")}
+                  </button>
+                ))}
               </div>
             </div>
 

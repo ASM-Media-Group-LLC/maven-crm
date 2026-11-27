@@ -144,7 +144,8 @@ export function useTurnoTabla(dia: string, esHoy: boolean, habilitado = true) {
       // (Alvaro, 26/11/2026): son cuentas sin uso o días libres mal puestos.
       const desde14 = iso(Date.parse(`${sumarDias(dia, -14)}T00:00:00-05:00`));
       const hasta1 = iso(Date.parse(`${sumarDias(dia, 1)}T00:00:00-05:00`));
-      const ausentes = filas.filter((f) => f.noVino);
+      // También quien aún no llega (turno empezado): una cuenta sin uso no cuenta.
+      const ausentes = filas.filter((f) => f.noVino || (f.llegada == null && f.noLlegaMin != null));
       const activos = await Promise.all(ausentes.map(async (f) => {
         const r = await db.from("cowork_tiempo_segmentos").select("id").eq("user_id", f.userId)
           .gte("started_at", desde14).lt("started_at", hasta1).limit(1);
