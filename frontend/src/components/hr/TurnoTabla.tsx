@@ -105,17 +105,19 @@ function Celda({ arriba, abajo, nivel = "ok", tenue = false, completo = false }:
 function Avance({ lleva, deberia, falta, problemas, t }: { lleva: number; deberia: number; falta: number; problemas: number; t: Tr }) {
   const pct = deberia > 0 ? Math.min(100, (lleva / deberia) * 100) : 100;
   const atras = falta > 5;
-  const tono = falta > 60 ? "bg-destructive/15 text-destructive" : atras ? "bg-warning/15 text-warning" : "bg-success/15 text-success";
+  // Tonos apagados (Alvaro, 27/11/2026: «muy prendidos»): fondo casi invisible y
+  // el color solo en el texto, atenuado.
+  const tono = falta > 60 ? "bg-destructive/[0.07] text-destructive/75" : atras ? "bg-warning/[0.07] text-warning/75" : "bg-foreground/[0.05] text-muted-foreground";
   return (
     <div className="flex w-full flex-col items-end gap-1.5">
       <p className="text-sm tabular-nums text-foreground/90">
         {duracion(t, lleva)} <span className="text-muted-foreground">/ {duracion(t, deberia)}</span>
       </p>
-      <div className="h-1 w-full max-w-[9rem] overflow-hidden rounded-full bg-foreground/10">
-        <div className={`h-full rounded-full ${atras ? (falta > 60 ? "bg-destructive" : "bg-warning") : "bg-success"}`} style={{ width: `${pct}%` }} />
+      <div className="h-0.5 w-full max-w-[9rem] overflow-hidden rounded-full bg-foreground/[0.08]">
+        <div className={`h-full rounded-full ${atras ? (falta > 60 ? "bg-destructive/45" : "bg-warning/45") : "bg-foreground/35"}`} style={{ width: `${pct}%` }} />
       </div>
       <div className="flex items-center gap-1">
-        <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold tabular-nums ${tono}`}>
+        <span className={`rounded-full px-2 py-0.5 text-[10px] font-medium tabular-nums ${tono}`}>
           {atras ? t("hr.turno.atras", { d: duracion(t, falta) }) : t("hr.turno.alDia")}
         </span>
         {problemas > 0 && (
@@ -489,7 +491,7 @@ export function TurnoTabla() {
                     <span className="rounded-full bg-foreground/[0.06] px-2.5 py-1 tabular-nums">{t("hr.turno.chip.camara", { c: duracion(t, f.activoMin) })}</span>
                     <span className="rounded-full bg-foreground/[0.06] px-2.5 py-1 tabular-nums">{t("hr.turno.chip.gracia", { g: duracion(t, Math.min(f.sinCamPantMin, f.graciaMin ?? 10)) })}</span>
                     {f.enCurso && marcha(f) && marcha(f)!.falta > 5 && (
-                      <span className="rounded-full bg-warning/15 px-2.5 py-1 font-semibold tabular-nums text-warning">{t("hr.turno.atras", { d: duracion(t, marcha(f)!.falta) })}</span>
+                      <span className="rounded-full bg-warning/[0.07] px-2.5 py-1 font-medium tabular-nums text-warning/75">{t("hr.turno.atras", { d: duracion(t, marcha(f)!.falta) })}</span>
                     )}
                   </div>
                 </div>
