@@ -143,6 +143,8 @@ export interface FilaTurno {
   comidaTope: number;
   comidaAhora: number | null;
   comidaDeMas: number;
+  /** Minutos que comió fuera de su hora obligatoria (null = sin hora o no se sabe). */
+  comidaFueraHoraMin?: number | null;
   nivelComida: Nivel;
 
   banos: number;
@@ -193,6 +195,7 @@ export type Motivo =
   | { k: "ignoro"; n: number }
   | { k: "avisos"; n: number }
   | { k: "comida"; min: number }
+  | { k: "comidaHora"; min: number }
   | { k: "bano"; min: number }
   | { k: "pocoActivo"; pct: number }
   | { k: "cortes"; n: number }

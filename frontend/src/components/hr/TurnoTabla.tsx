@@ -18,7 +18,7 @@ import { horaBogota } from "@/lib/llegadas";
 import { hoyEnBogota } from "@/hooks/useHoyDelEquipo";
 import { useTurnoTabla } from "@/hooks/useTurnoTabla";
 import {
-  jornadaDe, JORNADAS, minutosTrabajados, ordenarPorAtencion, seccionDe, semanaDe, sumarDias,
+  jornadaDe, JORNADAS, minutosTrabajados, ordenarPorAtencion, peor, seccionDe, semanaDe, sumarDias,
   type Jornada,
   type FilaTurno, type Motivo, type Nivel, type Seccion, type TipoFranja,
 } from "@/lib/turnoTabla";
@@ -76,6 +76,7 @@ function frase(t: Tr, m: Motivo): string {
     case "tarde": return t("hr.turno.motivo.tarde", { d: duracion(t, m.min) });
     case "pocoActivo": return t("hr.turno.motivo.pocoActivo", { n: m.pct });
     case "comida": return t("hr.turno.motivo.comida", { n: m.min });
+    case "comidaHora": return t("hr.turno.motivo.comidaHora", { d: duracion(t, m.min) });
     case "bano": return t("hr.turno.motivo.bano", { n: m.min });
     case "avisos": return t("hr.turno.motivo.avisos", { n: m.n });
     case "cortes": return t("hr.turno.motivo.cortes", { n: m.n });
@@ -209,8 +210,9 @@ function celdaComida(t: Tr, f: FilaTurno): { arriba: string; abajo: string; nive
   }
   const rangos = f.comida.map((c) => `${horaCorta(c.inicio)}–${c.fin != null ? hora(c.fin) : "…"}`);
   const arriba = rangos.length <= 2 ? rangos.join(", ") : `${horaCorta(f.comida[0].inicio)} … ${hora(f.comida[f.comida.length - 1].fin ?? f.comida[f.comida.length - 1].inicio)}`;
-  const abajo = rangos.length > 2 ? `${t("hr.turno.salidas", { n: rangos.length })} · ${tope}` : tope;
-  return { arriba, abajo, nivel: f.nivelComida, tenue: false };
+  const fuera = f.comidaFueraHoraMin ? ` · ${t("hr.turno.fueraDeHora", { d: duracion(t, f.comidaFueraHoraMin) })}` : "";
+  const abajo = (rangos.length > 2 ? `${t("hr.turno.salidas", { n: rangos.length })} · ${tope}` : tope) + fuera;
+  return { arriba, abajo, nivel: f.comidaFueraHoraMin ? peor(f.nivelComida, "ambar") : f.nivelComida, tenue: false };
 }
 
 function celdaBano(t: Tr, f: FilaTurno): { arriba: string; abajo: string; nivel: Nivel | "ahora"; tenue: boolean } {
@@ -489,7 +491,7 @@ export function TurnoTabla() {
     // Problemas (Alvaro, 27/11/2026, las cuatro): avisos de Argos, cortes de internet,
     // ratos de 1 min o más sin cámara o sin pantalla, y pasarse del baño o la comida.
     const sinCamPant = f.franja.filter((x) => (x.tipo === "sin_camara" || x.tipo === "sin_pantalla") && x.fin - x.inicio >= 60_000).length;
-    const pasado = (f.nivelComida !== "ok" ? 1 : 0) + (f.nivelBano !== "ok" ? 1 : 0);
+    const pasado = (f.nivelComida !== "ok" ? 1 : 0) + (f.nivelBano !== "ok" ? 1 : 0) + (f.comidaFueraHoraMin ? 1 : 0);
     return { deberia, lleva, falta: Math.max(0, deberia - lleva), problemas: f.avisos + f.cortes + sinCamPant + pasado };
   };
   const texto = buscar.trim().toLocaleLowerCase();
