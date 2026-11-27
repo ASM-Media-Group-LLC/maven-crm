@@ -122,7 +122,7 @@ export interface FilaTurno {
   enCurso: boolean;
   /** ¿Aún no empieza (hoy)? */
   empiezaLuego: boolean;
-  /** ¿Está trabajando en este momento (con cámara y pantalla en Cowork)? */
+  /** ¿Está en su turno en este momento (trabajando, en comida, en el baño…)? */
   activoAhora: boolean;
 
   llegada: number | null;
@@ -292,9 +292,14 @@ export function armarFila(dia: string, p: EntradaPersona, ahora: number): FilaTu
     if (s.estado === "sin_camara" || s.estado === "sin_pantalla" || s.estado === "fuera_de_camara") sinCamPantMs += dur;
   }
   const activoMin = min(activoMs), conectadoMin = min(conectadoMs), cortesMin = min(cortesMs);
-  // Activo ahora: su último rato en Cowork es de trabajo y se vio hace menos de 3 min.
+  // Activo ahora = está en su turno en este momento (Alvaro, 27/11/2026: «aunque
+  // estén en lunch, los tenés que sacar ahí»): se vio en Cowork hace menos de 3 min
+  // en cualquier estado que no sea un corte de internet (trabajando, en pausa, sin
+  // cámara…), o tiene una comida o un baño abiertos.
   const ultimo = segs[segs.length - 1];
-  const activoAhora = !terminado && !!ultimo && (ultimo.estado === "activo" || ultimo.estado === "meet") && ahora - ultimo.fin < 3 * 60_000;
+  const vistoHacePoco = !!ultimo && !SIN_CONEXION.has(ultimo.estado) && ahora - ultimo.fin < 3 * 60_000;
+  const enSalida = pausas.some((x) => x.fin == null && ahora - x.inicio < 3 * 60 * 60_000);
+  const activoAhora = !terminado && (vistoHacePoco || enSalida);
   const pct = conectadoMs > 0 ? activoMs / conectadoMs : 1;
   let nivelConexion: Nivel = "ok";
   // Con menos de una hora conectado no se juzga el porcentaje (recién empieza).
