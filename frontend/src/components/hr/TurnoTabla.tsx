@@ -471,68 +471,78 @@ export function TurnoTabla() {
   return (
     <section className="vidrio sube p-4 lg:p-5">
       <div className="v-cont flex flex-col gap-4">
-        {/* Encabezado + tira de la semana */}
-        <div className="flex flex-wrap items-center gap-3">
-          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-border/70 bg-foreground/[0.04] text-foreground/75">
-            <ClipboardList className="h-[18px] w-[18px]" />
-          </span>
-          <div className="min-w-0 flex-1">
-            <h2 className="font-display text-base font-bold leading-tight tracking-tight">{t("hr.turno.titulo")}</h2>
-            <p className="text-xs capitalize text-muted-foreground">
-              {esHoy ? `${t("hr.turno.hoy")} · ` : ""}{fmtDia(dia, { weekday: "long", day: "numeric", month: "long" })}
-            </p>
+        {/* ENCABEZADO (Alvaro, 27/11/2026: «que quede bien estético»): el título a la
+            izquierda y las fechas en un solo bloque a la derecha (semana + calendario). */}
+        <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+          <div className="flex min-w-0 items-center gap-3">
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-border/70 bg-foreground/[0.04] text-foreground/75">
+              <ClipboardList className="h-[18px] w-[18px]" />
+            </span>
+            <div className="min-w-0">
+              <h2 className="font-display text-base font-bold leading-tight tracking-tight">{t("hr.turno.titulo")}</h2>
+              <p className="text-xs capitalize text-muted-foreground">
+                {esHoy ? `${t("hr.turno.hoy")} · ` : ""}{fmtDia(dia, { weekday: "long", day: "numeric", month: "long" })}
+              </p>
+            </div>
           </div>
-        </div>
 
-        <div className="flex items-center gap-1 overflow-x-auto">
-          <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0 rounded-full" onClick={() => irA(sumarDias(dia, -7))} aria-label={t("hr.turno.semanaAnterior")}>
-            <ChevronLeft className="h-4 w-4" />
-          </Button>
-          {semana.map((d) => {
-            const futuro = d > hoy;
-            const activo = d === dia;
-            return (
-              <button
-                key={d}
-                type="button"
-                disabled={futuro}
-                onClick={() => irA(d)}
-                aria-current={activo ? "date" : undefined}
-                className={`flex min-w-[3.25rem] shrink-0 flex-col items-center rounded-xl px-2 py-1.5 text-xs transition ${activo ? "bg-primary text-primary-foreground shadow-sm" : futuro ? "text-muted-foreground/40" : "text-muted-foreground hover:bg-foreground/[0.05] hover:text-foreground"}`}
-              >
-                <span className="capitalize">{fmtDia(d, { weekday: "short" }).replace(".", "")}</span>
-                <span className="text-sm font-semibold tabular-nums">{fmtDia(d, { day: "numeric" })}</span>
-                {d === hoy && <span className={`text-[9px] uppercase ${activo ? "" : "text-primary"}`}>{t("hr.turno.hoy")}</span>}
+          <div className="flex w-full items-center gap-0.5 rounded-2xl border border-border/50 bg-background/40 p-1 xl:w-auto">
+            <button type="button" onClick={() => irA(sumarDias(dia, -7))} aria-label={t("hr.turno.semanaAnterior")}
+              className="flex h-11 w-8 shrink-0 items-center justify-center rounded-xl text-muted-foreground transition hover:bg-foreground/[0.06] hover:text-foreground">
+              <ChevronLeft className="h-4 w-4" />
+            </button>
+            {semana.map((d) => {
+              const futuro = d > hoy;
+              const activo = d === dia;
+              return (
+                <button
+                  key={d}
+                  type="button"
+                  disabled={futuro}
+                  onClick={() => irA(d)}
+                  aria-current={activo ? "date" : undefined}
+                  className={`relative flex h-11 min-w-0 flex-1 flex-col items-center justify-center rounded-xl text-xs transition xl:w-12 xl:flex-none ${activo ? "bg-primary text-primary-foreground shadow-sm" : futuro ? "text-muted-foreground/35" : "text-muted-foreground hover:bg-foreground/[0.06] hover:text-foreground"}`}
+                >
+                  <span className="capitalize leading-none">{fmtDia(d, { weekday: "short" }).replace(".", "")}</span>
+                  <span className="mt-1 text-sm font-semibold tabular-nums leading-none">{fmtDia(d, { day: "numeric" })}</span>
+                  {d === hoy && !activo && <span className="absolute bottom-1 h-1 w-1 rounded-full bg-primary" aria-label={t("hr.turno.hoy")} />}
+                </button>
+              );
+            })}
+            <button type="button" disabled={sumarDias(semana[0], 7) > hoy} onClick={() => irA(sumarDias(dia, 7) > hoy ? hoy : sumarDias(dia, 7))} aria-label={t("hr.turno.semanaSiguiente")}
+              className="flex h-11 w-8 shrink-0 items-center justify-center rounded-xl text-muted-foreground transition hover:enabled:bg-foreground/[0.06] hover:enabled:text-foreground disabled:opacity-30">
+              <ChevronRight className="h-4 w-4" />
+            </button>
+            <span className="mx-1 h-7 w-px shrink-0 bg-border/60" aria-hidden />
+            <Popover open={calAbierto} onOpenChange={setCalAbierto}>
+              <PopoverTrigger asChild>
+                <button type="button" aria-label={t("hr.turno.elegirDia")} title={t("hr.turno.elegirDia")}
+                  className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-muted-foreground transition hover:bg-foreground/[0.06] hover:text-foreground">
+                  <CalendarDays className="h-4 w-4" />
+                </button>
+              </PopoverTrigger>
+              <PopoverContent align="end" className="w-auto p-0">
+                <Calendar
+                  mode="single"
+                  selected={new Date(`${dia}T12:00:00`)}
+                  disabled={(d) => d > new Date(`${hoy}T23:59:59`)}
+                  onSelect={(d) => {
+                    if (!d) return;
+                    const s = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+                    irA(s);
+                    setCalAbierto(false);
+                  }}
+                  initialFocus
+                />
+              </PopoverContent>
+            </Popover>
+            {!esHoy && (
+              <button type="button" onClick={() => irA(hoy)}
+                className="h-11 shrink-0 rounded-xl px-3 text-xs font-medium text-primary transition hover:bg-foreground/[0.06]">
+                {t("hr.turno.hoy")}
               </button>
-            );
-          })}
-          <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0 rounded-full" disabled={sumarDias(semana[0], 7) > hoy} onClick={() => irA(sumarDias(dia, 7) > hoy ? hoy : sumarDias(dia, 7))} aria-label={t("hr.turno.semanaSiguiente")}>
-            <ChevronRight className="h-4 w-4" />
-          </Button>
-          <Popover open={calAbierto} onOpenChange={setCalAbierto}>
-            <PopoverTrigger asChild>
-              <Button variant="outline" size="sm" className="ml-1 shrink-0 rounded-full" aria-label={t("hr.turno.elegirDia")}>
-                <CalendarDays className="h-4 w-4 sm:mr-1.5" /><span className="hidden sm:inline">{t("hr.turno.elegirDia")}</span>
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent align="end" className="w-auto p-0">
-              <Calendar
-                mode="single"
-                selected={new Date(`${dia}T12:00:00`)}
-                disabled={(d) => d > new Date(`${hoy}T23:59:59`)}
-                onSelect={(d) => {
-                  if (!d) return;
-                  const s = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-                  irA(s);
-                  setCalAbierto(false);
-                }}
-                initialFocus
-              />
-            </PopoverContent>
-          </Popover>
-          {!esHoy && (
-            <Button variant="ghost" size="sm" className="shrink-0 rounded-full" onClick={() => irA(hoy)}>{t("hr.turno.irHoy")}</Button>
-          )}
+            )}
+          </div>
         </div>
 
         {q.isLoading ? (
@@ -563,7 +573,7 @@ export function TurnoTabla() {
                   disabled={!k}
                   onClick={() => k && setFiltro(filtro === k ? "todos" : k)}
                   aria-pressed={k ? filtro === k : undefined}
-                  className={`rounded-2xl border p-3 text-left transition disabled:cursor-default ${k && filtro === k ? "border-primary/60 bg-primary/10" : "border-border/50 bg-card/30 hover:enabled:bg-foreground/[0.04]"}`}
+                  className={`flex min-h-[5.5rem] flex-col justify-between rounded-2xl border p-3.5 text-left transition disabled:cursor-default ${k && filtro === k ? "border-primary/60 bg-primary/10" : "border-border/50 bg-card/30 hover:enabled:bg-foreground/[0.04]"}`}
                 >
                   <p className="flex items-center gap-1.5 font-display text-2xl font-bold tabular-nums leading-none">
                     {valor}{nivel && <Punto nivel={nivel} />}
@@ -577,27 +587,28 @@ export function TurnoTabla() {
               ))}
             </div>
 
-            {/* Filtros, turno y buscador */}
-            <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
-              <div className="flex gap-1 overflow-x-auto rounded-full border border-border/50 bg-background/40 p-1">
+            {/* VISTAS, TURNO Y BUSCADOR: todo del mismo alto (h-10) y sin barra de
+                scroll; en ventanas angostas las vistas se reparten parejas. */}
+            <div className="grid gap-2 2xl:grid-cols-[minmax(0,1fr)_11rem_14rem] 2xl:items-center">
+              <div className="grid grid-cols-3 gap-1 rounded-2xl border border-border/50 bg-background/40 p-1 sm:flex">
                 {VISTAS.filter(([k]) => k !== "activos" || esHoy).map(([k, etq]) => (
                   <button
                     key={k}
                     type="button"
                     onClick={() => setFiltro(k)}
                     aria-pressed={filtro === k}
-                    className={`shrink-0 rounded-full px-3.5 py-1.5 text-xs font-medium transition ${filtro === k ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
+                    className={`h-8 min-w-0 truncate rounded-xl px-3 text-xs font-medium transition sm:flex-1 ${filtro === k ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:bg-foreground/[0.05] hover:text-foreground"}`}
                   >
                     {t(etq)}
                   </button>
                 ))}
               </div>
-              <div className="flex items-center gap-1.5 lg:ml-auto">
+              <div className="grid grid-cols-2 gap-2 2xl:contents">
                 <select
                   value={turno ?? ""}
                   onChange={(e) => setTurno(e.target.value || null)}
                   aria-label={t("hr.turno.turno")}
-                  className="h-8 min-w-0 rounded-md border border-input bg-background/40 px-2 text-sm"
+                  className="h-10 w-full min-w-0 rounded-2xl border border-border/50 bg-background/40 px-3 text-sm"
                 >
                   <option value="">{t("hr.turno.todosTurnos")}</option>
                   {turnos.map((x) => {
@@ -605,17 +616,17 @@ export function TurnoTabla() {
                     return <option key={x} value={x}>{`${a12(e)} – ${a12(s)}`}</option>;
                   })}
                 </select>
-                <div className="relative min-w-0 flex-1 sm:w-56 sm:flex-none">
-                  <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <div className="relative min-w-0">
+                  <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                   <input
                     value={buscar}
                     onChange={(e) => setBuscar(e.target.value)}
                     placeholder={t("hr.donde.buscar")}
                     aria-label={t("hr.donde.buscar")}
-                    className="h-8 w-full rounded-md border border-input bg-background/40 pl-8 pr-7 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    className="h-10 w-full rounded-2xl border border-border/50 bg-background/40 pl-9 pr-8 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                   />
                   {buscar && (
-                    <button type="button" onClick={() => setBuscar("")} aria-label={t("hr.donde.verTodos")} className="absolute right-1 top-1/2 flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-full text-muted-foreground hover:bg-foreground/10">
+                    <button type="button" onClick={() => setBuscar("")} aria-label={t("hr.donde.verTodos")} className="absolute right-1.5 top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-full text-muted-foreground hover:bg-foreground/10">
                       <X className="h-3.5 w-3.5" />
                     </button>
                   )}
