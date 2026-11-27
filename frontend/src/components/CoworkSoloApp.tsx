@@ -60,6 +60,11 @@ function useSoloApp(lugar: LugarSoloApp): { estado: EstadoSoloApp; desde: Date |
     return () => { vivo = false; };
   }, [lugar]);
   const probador = !!user?.id && probadores.includes(user.id);
+  // VISTA PREVIA LOCAL (Alvaro, 27/11/2026: «no puedo ver cómo está el Cowork»):
+  // en el servidor de desarrollo (npm run dev, solo en un computador del equipo)
+  // Cowork y las llamadas no se mandan a la app, para poder revisarlos. En
+  // producción import.meta.env.DEV es false y la regla sigue igual.
+  if (import.meta.env.DEV) return { estado: "nada", desde, listo: true };
   return { estado: estadoSoloApp({ ua, tactil, enApp, desde, ahora: new Date(), probador }), desde, listo: leido || !hayQueMirar };
 }
 
