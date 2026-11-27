@@ -21,6 +21,7 @@ import { MessengerDockProvider } from "@/components/messenger/MessengerDock";
 const AnnouncementPopup = lazy(() => import("@/components/dashboard/AnnouncementPopup"));
 import { ArgosVigilante } from "@/components/ArgosVigilante";
 import { AvisoNasCaido } from "@/components/oficina/AvisoNasCaido";
+import { RecordatorioComida } from "@/components/horarios/RecordatorioComida";
 import { AvisoFueraDeCowork } from "@/components/cowork/AvisoFueraDeCowork";
 import { AvisoAlertaGrave } from "@/components/hr/AvisoAlertaGrave";
 import { useCoworkObligatorio, debeIrACowork } from "@/hooks/useCoworkObligatorio";
@@ -136,6 +137,8 @@ const AppShell = () => {
           <BarraDeLlamada />
           <BackToDashboardBar />
           <AvisoNasCaido />
+          {/* Hora de comida del plan o de RR. HH.: un recordatorio al día, en turno (27/11/2026). */}
+          <RecordatorioComida />
           {/* Argos: en su turno y fuera de Cowork → cartel + voz en cualquier página (13/11/2026). */}
           <AvisoFueraDeCowork />
           {/* Argos: 10 min sin actividad o 1 h fuera del trabajo → cartel + voz (19/11/2026). */}

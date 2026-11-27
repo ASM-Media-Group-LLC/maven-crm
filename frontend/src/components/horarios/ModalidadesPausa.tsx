@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { Coffee, Loader2, Plus, RefreshCw } from "lucide-react";
+import { Clock, Coffee, Loader2, Plus, RefreshCw } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { useLanguage } from "@/hooks/useLanguage";
@@ -19,14 +20,21 @@ function FilaModalidad({ m, editable }: { m: Modalidad | null; editable: boolean
   const [nombre, setNombre] = useState(m?.nombre ?? "");
   const [comida, setComida] = useState(String(m?.comida_min ?? 30));
   const [bano, setBano] = useState(String(m?.bano_min ?? 10));
-  const cambiado = !m || nombre !== m.nombre || Number(comida) !== m.comida_min || Number(bano) !== m.bano_min;
+  // Hora de comida (27/11/2026): vacía = el plan no pone hora.
+  const [hora, setHora] = useState(m?.comida_hora ?? "");
+  const [obligatoria, setObligatoria] = useState(m?.comida_obligatoria ?? false);
+  const [margen, setMargen] = useState(String(m?.comida_margen_min ?? 15));
+  const cambiado = !m || nombre !== m.nombre || Number(comida) !== m.comida_min || Number(bano) !== m.bano_min
+    || hora !== (m.comida_hora ?? "") || obligatoria !== (m.comida_obligatoria ?? false) || Number(margen) !== (m.comida_margen_min ?? 15);
   const valido = nombre.trim().length > 0 && Number.isInteger(Number(comida)) && Number(comida) >= 0 && Number(comida) <= 240
-    && Number.isInteger(Number(bano)) && Number(bano) >= 0 && Number(bano) <= 120;
+    && Number.isInteger(Number(bano)) && Number(bano) >= 0 && Number(bano) <= 120
+    && Number.isInteger(Number(margen)) && Number(margen) >= 0 && Number(margen) <= 240;
 
   const enviar = () => guardar.mutate(
-    { id: m?.id ?? null, nombre, comida_min: Number(comida), bano_min: Number(bano), activa: m?.activa ?? true },
+    { id: m?.id ?? null, nombre, comida_min: Number(comida), bano_min: Number(bano), activa: m?.activa ?? true,
+      hora: hora || null, obligatoria: !!hora && obligatoria, margen: Number(margen) },
     {
-      onSuccess: () => { toast({ title: t("hr.pausas.guardada") }); if (!m) { setNombre(""); setComida("30"); setBano("10"); } },
+      onSuccess: () => { toast({ title: t("hr.pausas.guardada") }); if (!m) { setNombre(""); setComida("30"); setBano("10"); setHora(""); setObligatoria(false); setMargen("15"); } },
       onError: (e) => toast({ title: t("hr.pausas.noSeGuardo"), description: (e as Error).message, variant: "destructive" }),
     },
   );
@@ -39,7 +47,10 @@ function FilaModalidad({ m, editable }: { m: Modalidad | null; editable: boolean
     return (
       <li className="flex items-center justify-between gap-3 px-4 py-3 text-sm">
         <span className="font-medium text-foreground">{m.nombre}</span>
-        <span className="text-xs tabular-nums text-muted-foreground">{t("hr.pausas.minutos", { a: m.comida_min, b: m.bano_min })}</span>
+        <span className="text-xs tabular-nums text-muted-foreground">
+          {t("hr.pausas.minutos", { a: m.comida_min, b: m.bano_min })}
+          {m.comida_hora && <> · {t(m.comida_obligatoria ? "hr.pausas.horaObligatoriaVer" : "hr.pausas.horaRecomendadaVer", { h: m.comida_hora, m: m.comida_margen_min ?? 15 })}</>}
+        </span>
       </li>
     );
   }
@@ -55,6 +66,26 @@ function FilaModalidad({ m, editable }: { m: Modalidad | null; editable: boolean
         {t("hr.pausas.bano")}
         <input className={CAMPO} inputMode="numeric" value={bano} onChange={(e) => setBano(e.target.value.replace(/\D/g, ""))} />
       </label>
+      {/* Hora de comida: cada empresa decide si es solo una guía o si es obligatoria. */}
+      <label className="flex items-center gap-1.5 text-xs text-muted-foreground" title={t("hr.pausas.horaAyuda")}>
+        <Clock className="h-3.5 w-3.5" aria-hidden />
+        {t("hr.pausas.hora")}
+        <input type="time" className="h-9 rounded-lg border border-input bg-background/50 px-2 text-sm tabular-nums text-foreground focus:outline-none focus:ring-1 focus:ring-primary/50"
+          value={hora} onChange={(e) => setHora(e.target.value)} aria-label={t("hr.pausas.hora")} />
+      </label>
+      {hora && (
+        <label className="flex items-center gap-1.5 text-xs text-muted-foreground" title={t("hr.pausas.obligatoriaAyuda")}>
+          <Switch checked={obligatoria} onCheckedChange={setObligatoria} aria-label={t("hr.pausas.obligatoria")} />
+          {obligatoria ? t("hr.pausas.obligatoria") : t("hr.pausas.recomendada")}
+        </label>
+      )}
+      {hora && obligatoria && (
+        <label className="flex items-center gap-1.5 text-xs text-muted-foreground" title={t("hr.pausas.margenAyuda")}>
+          {t("hr.pausas.margen")}
+          <input className={CAMPO} inputMode="numeric" value={margen} onChange={(e) => setMargen(e.target.value.replace(/\D/g, ""))} aria-label={t("hr.pausas.margen")} />
+          min
+        </label>
+      )}
       {m && <span className="text-[11px] text-muted-foreground">{t("hr.pausas.uso", { p: m.puestos, n: m.personas })}</span>}
       <Button size="sm" className="h-9 rounded-lg" disabled={!cambiado || !valido || guardar.isPending} onClick={enviar}>
         {contenidoBoton}
@@ -84,7 +115,7 @@ export function ModalidadesPausa() {
         </div>
       ) : (
         <ul className="divide-y divide-border/40">
-          {q.data.modalidades.map((m) => <FilaModalidad key={`${m.id}-${m.comida_min}-${m.bano_min}-${m.nombre}`} m={m} editable={q.data!.puede_editar} />)}
+          {q.data.modalidades.map((m) => <FilaModalidad key={`${m.id}-${m.comida_min}-${m.bano_min}-${m.nombre}-${m.comida_hora ?? ""}-${m.comida_obligatoria ? 1 : 0}-${m.comida_margen_min ?? 15}`} m={m} editable={q.data!.puede_editar} />)}
           {q.data.puede_editar && <FilaModalidad m={null} editable />}
         </ul>
       )}
