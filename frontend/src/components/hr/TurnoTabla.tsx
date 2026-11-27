@@ -84,16 +84,46 @@ function Punto({ nivel, etiqueta }: { nivel: Nivel | "ahora"; etiqueta?: string 
 }
 
 /** Una celda: dato arriba (blanco) y detalle abajo (gris), con el puntito al lado del detalle. */
-function Celda({ arriba, abajo, nivel = "ok", tenue = false }: { arriba: string; abajo?: string; nivel?: Nivel | "ahora"; tenue?: boolean }) {
+function Celda({ arriba, abajo, nivel = "ok", tenue = false, completo = false }: { arriba: string; abajo?: string; nivel?: Nivel | "ahora"; tenue?: boolean; completo?: boolean }) {
+  // `completo` (el detalle abierto, 27/11/2026): el texto se parte en líneas, nunca se corta.
+  const corte = completo ? "break-words" : "truncate";
   return (
     <div className="min-w-0">
-      <p className={`truncate text-sm tabular-nums ${tenue ? "text-muted-foreground" : "text-foreground"}`}>{arriba}</p>
+      <p className={`${corte} ${completo ? "text-base font-semibold" : "text-sm"} tabular-nums ${tenue ? "text-muted-foreground" : "text-foreground"}`}>{arriba}</p>
       {abajo && (
-        <p className="flex items-center gap-1.5 truncate text-[11px] text-muted-foreground">
-          <Punto nivel={nivel} />
-          <span className="truncate">{abajo}</span>
+        <p className={`mt-1 flex items-start gap-1.5 text-[11px] leading-snug text-muted-foreground ${completo ? "" : "truncate"}`}>
+          <span className="mt-1"><Punto nivel={nivel} /></span>
+          <span className={corte}>{abajo}</span>
         </p>
       )}
+    </div>
+  );
+}
+
+/** El avance de hoy como indicador (27/11/2026): barrita de lo que lleva sobre lo
+ *  que debería llevar y una pastilla de «X atrás» o «al día», más los problemas. */
+function Avance({ lleva, deberia, falta, problemas, t }: { lleva: number; deberia: number; falta: number; problemas: number; t: Tr }) {
+  const pct = deberia > 0 ? Math.min(100, (lleva / deberia) * 100) : 100;
+  const atras = falta > 5;
+  const tono = falta > 60 ? "bg-destructive/15 text-destructive" : atras ? "bg-warning/15 text-warning" : "bg-success/15 text-success";
+  return (
+    <div className="flex w-full flex-col items-end gap-1.5">
+      <p className="text-sm tabular-nums text-foreground/90">
+        {duracion(t, lleva)} <span className="text-muted-foreground">/ {duracion(t, deberia)}</span>
+      </p>
+      <div className="h-1 w-full max-w-[9rem] overflow-hidden rounded-full bg-foreground/10">
+        <div className={`h-full rounded-full ${atras ? (falta > 60 ? "bg-destructive" : "bg-warning") : "bg-success"}`} style={{ width: `${pct}%` }} />
+      </div>
+      <div className="flex items-center gap-1">
+        <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold tabular-nums ${tono}`}>
+          {atras ? t("hr.turno.atras", { d: duracion(t, falta) }) : t("hr.turno.alDia")}
+        </span>
+        {problemas > 0 && (
+          <span className="rounded-full bg-foreground/[0.07] px-2 py-0.5 text-[10px] font-medium tabular-nums text-muted-foreground">
+            {t(problemas === 1 ? "hr.turno.problema1" : "hr.turno.problemas", { n: problemas })}
+          </span>
+        )}
+      </div>
     </div>
   );
 }
@@ -410,17 +440,7 @@ export function TurnoTabla() {
                     </p>
                   </>
                 ) : f.enCurso && marcha(f) ? (
-                  <>
-                    <p className="text-sm tabular-nums text-foreground/90">
-                      {t("hr.turno.lleva", { a: duracion(t, marcha(f)!.lleva), b: duracion(t, marcha(f)!.deberia) })}
-                    </p>
-                    <p className={`text-[11px] tabular-nums ${marcha(f)!.falta > 15 ? "text-warning" : "text-muted-foreground"}`}>
-                      {[
-                        marcha(f)!.falta > 5 ? t("hr.turno.atras", { d: duracion(t, marcha(f)!.falta) }) : t("hr.turno.alDia"),
-                        marcha(f)!.problemas > 0 ? t(marcha(f)!.problemas === 1 ? "hr.turno.problema1" : "hr.turno.problemas", { n: marcha(f)!.problemas }) : null,
-                      ].filter(Boolean).join(" · ")}
-                    </p>
-                  </>
+                  <Avance {...marcha(f)!} t={t} />
                 ) : (
                   <>
                     <p className="text-sm tabular-nums text-foreground/90">
@@ -452,21 +472,27 @@ export function TurnoTabla() {
         )}
         {abierta && f.llegada != null && (
           <div className="flex flex-col gap-4 px-3 pb-5 md:pl-14">
-            {/* Cómo sale su porcentaje, en una frase (Alvaro, 27/11/2026: «¿el 94 % de qué?»). */}
+            {/* Lo principal arriba y en grande (27/11/2026): el % de su turno, una barra
+                y tres datos cortos. Sin frases largas. */}
             {minutosTurno(f) != null && (
-              <div className="rounded-2xl border border-border/40 bg-card/30 p-4">
-                <p className="flex items-baseline gap-2">
-                  <span className="font-display text-2xl font-bold tabular-nums">{Math.round((parte(f) ?? 0) * 100)} %</span>
-                  <span className="text-sm text-muted-foreground">{t("hr.turno.pctDeSuTurno")}</span>
-                </p>
-                <p className="mt-1.5 text-sm leading-relaxed text-foreground/85">
-                  {t("hr.turno.pctExplica", {
-                    a: duracion(t, minutosTrabajados(f)),
-                    b: duracion(t, minutosTurno(f)!),
-                    c: duracion(t, f.activoMin),
-                    g: duracion(t, Math.min(f.sinCamPantMin, f.graciaMin ?? 10)),
-                  })}
-                </p>
+              <div className="flex flex-col gap-3 rounded-2xl border border-border/40 bg-card/30 p-4 sm:flex-row sm:items-center sm:gap-6">
+                <div className="flex items-baseline gap-2 sm:w-44 sm:shrink-0">
+                  <span className="font-display text-4xl font-bold tabular-nums leading-none">{Math.round((parte(f) ?? 0) * 100)}%</span>
+                  <span className="text-xs leading-tight text-muted-foreground">{t("hr.turno.pctDeSuTurno")}</span>
+                </div>
+                <div className="flex min-w-0 flex-1 flex-col gap-2.5">
+                  <div className="h-2 overflow-hidden rounded-full bg-foreground/10">
+                    <div className="h-full rounded-full bg-success" style={{ width: `${Math.min(100, (parte(f) ?? 0) * 100)}%` }} />
+                  </div>
+                  <div className="flex flex-wrap gap-1.5 text-[11px]">
+                    <span className="rounded-full bg-foreground/[0.06] px-2.5 py-1 tabular-nums">{t("hr.turno.chip.trabajo", { a: duracion(t, minutosTrabajados(f)), b: duracion(t, minutosTurno(f)!) })}</span>
+                    <span className="rounded-full bg-foreground/[0.06] px-2.5 py-1 tabular-nums">{t("hr.turno.chip.camara", { c: duracion(t, f.activoMin) })}</span>
+                    <span className="rounded-full bg-foreground/[0.06] px-2.5 py-1 tabular-nums">{t("hr.turno.chip.gracia", { g: duracion(t, Math.min(f.sinCamPantMin, f.graciaMin ?? 10)) })}</span>
+                    {f.enCurso && marcha(f) && marcha(f)!.falta > 5 && (
+                      <span className="rounded-full bg-warning/15 px-2.5 py-1 font-semibold tabular-nums text-warning">{t("hr.turno.atras", { d: duracion(t, marcha(f)!.falta) })}</span>
+                    )}
+                  </div>
+                </div>
               </div>
             )}
             <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-5">
@@ -477,11 +503,11 @@ export function TurnoTabla() {
                 [Bell, t("hr.turno.col.avisos"), celdaAvisos(t, f)],
                 [Wifi, t("hr.turno.col.conexion"), celdaConexion(t, f)],
               ] as Array<[typeof Clock, string, ReturnType<typeof celdaLlegada>]>).map(([Icono, etq, x]) => (
-                <div key={etq} className="min-w-0 rounded-2xl border border-border/40 bg-card/20 p-3">
+                <div key={etq} className="flex h-full min-w-0 flex-col rounded-2xl border border-border/40 bg-card/20 p-3.5">
                   <p className="mb-2 flex items-center gap-1.5 text-[11px] text-muted-foreground">
                     <Icono className="h-3.5 w-3.5" />{etq}
                   </p>
-                  <Celda arriba={x.arriba || "—"} abajo={x.abajo} nivel={x.nivel} tenue={x.tenue} />
+                  <Celda arriba={x.arriba || "—"} abajo={x.abajo} nivel={x.nivel} tenue={x.tenue} completo />
                 </div>
               ))}
             </div>
