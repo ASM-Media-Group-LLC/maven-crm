@@ -47,6 +47,8 @@ export interface DatosTurno {
   filas: FilaTurno[];
   /** Momento en que se calcularon (para «actualizado a las…»). */
   calculadoAt: number;
+  /** ¿Se pudo leer la tabla de días libres? (false = todavía no existe en la base). */
+  diaLibreListo?: boolean;
 }
 
 export function useTurnoTabla(dia: string, esHoy: boolean, habilitado = true) {
@@ -150,7 +152,40 @@ export function useTurnoTabla(dia: string, esHoy: boolean, habilitado = true) {
         return r.error ? true : (r.data ?? []).length > 0;
       }));
       ausentes.forEach((f, i) => { if (!activos[i]) f.inactivo = true; });
-      return { dia, filas, calculadoAt: ahora };
+
+      const ids2 = filas.map((f) => f.userId);
+      const [libres, tardes, cierres] = await Promise.all([
+        // DÍA LIBRE (27/11/2026): lo marcado por RR. HH. o el supervisor. Si la tabla
+        // todavía no existe o falla, nadie sale como libre (se ve igual que antes).
+        db.from("argos_dia_libre").select("user_id, motivo").eq("dia", dia).in("user_id", ids2),
+        // LO NORMAL: tardanzas de los 6 días anteriores (tardanzas_registro) y horas
+        // conectado de los turnos cerrados de la semana anterior (argos_gracia_cierre).
+        db.from("tardanzas_registro").select("user_id, dia").in("user_id", ids2).gte("dia", sumarDias(dia, -6)).lt("dia", dia),
+        db.from("argos_gracia_cierre").select("user_id, turno, conectado_min").in("user_id", ids2).gte("turno", sumarDias(dia, -7)).lt("turno", dia),
+      ]);
+      const libreDe = new Map<string, string | null>();
+      if (!libres.error) for (const r of (libres.data ?? []) as Array<{ user_id: string; motivo: string | null }>) libreDe.set(r.user_id, r.motivo);
+      const tardesDe = new Map<string, Set<string>>();
+      if (!tardes.error) for (const r of (tardes.data ?? []) as Array<{ user_id: string; dia: string }>) {
+        const x = tardesDe.get(r.user_id) ?? new Set<string>(); x.add(r.dia); tardesDe.set(r.user_id, x);
+      }
+      const horasDe = new Map<string, number[]>();
+      if (!cierres.error) for (const r of (cierres.data ?? []) as Array<{ user_id: string; conectado_min: number | null }>) {
+        if (!r.conectado_min) continue;
+        const x = horasDe.get(r.user_id) ?? []; x.push(r.conectado_min); horasDe.set(r.user_id, x);
+      }
+      for (const f of filas) {
+        if (libreDe.has(f.userId)) {
+          f.diaLibre = { motivo: libreDe.get(f.userId) ?? null };
+          if (f.llegada == null) { f.nivel = "ok"; f.motivos = []; f.noVino = false; }
+        }
+        const hs = horasDe.get(f.userId);
+        f.costumbre = (tardes.error && cierres.error) ? null : {
+          tardesSemana: tardesDe.get(f.userId)?.size ?? 0,
+          conectadoPromedio: hs?.length ? Math.round(hs.reduce((x, y) => x + y, 0) / hs.length) : null,
+        };
+      }
+      return { dia, filas, calculadoAt: ahora, diaLibreListo: !libres.error };
     },
   });
 

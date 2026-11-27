@@ -98,6 +98,18 @@ const min = (ms: number) => Math.round(ms / 60_000);
 
 export interface TramoComida { inicio: number; fin: number | null }
 
+/** Un pedazo de la franja del día (Alvaro, 27/11/2026: «una franja por fila»). */
+export type TipoFranja = "trabajo" | "comida" | "bano" | "pausa" | "sin_camara" | "sin_pantalla" | "corte";
+export interface TramoFranja { tipo: TipoFranja; inicio: number; fin: number }
+
+/** Lo normal de la persona en los días anteriores (Alvaro, 27/11/2026: «contra lo normal»). */
+export interface Costumbre {
+  /** Días que llegó tarde en los 6 días anteriores. */
+  tardesSemana: number;
+  /** Minutos conectado promedio en los días anteriores que trabajó (null si no hay). */
+  conectadoPromedio: number | null;
+}
+
 export interface FilaTurno {
   userId: string;
   nombre: string;
@@ -153,6 +165,14 @@ export interface FilaTurno {
   /** No vino y no ha entrado a Cowork en los 14 días anteriores (cuenta sin uso o
    *  días libres mal puestos): va aparte, plegado (Alvaro, 26/11/2026). Lo marca el hook. */
   inactivo?: boolean;
+  /** RR. HH. marcó este día como libre o con permiso (tabla argos_dia_libre): no cuenta
+   *  como falta (Alvaro, 27/11/2026). Lo marca el hook. */
+  diaLibre?: { motivo: string | null } | null;
+  /** Lo normal de la persona (lo pone el hook). */
+  costumbre?: Costumbre | null;
+  /** La franja del día, en orden, y las horas de cada aviso de Argos. */
+  franja: TramoFranja[];
+  marcasAviso: number[];
   /** El peor de todos. */
   nivel: NivelFila;
   /** Por qué (claves de motivo, de la más grave a la menos). */
@@ -272,6 +292,19 @@ export function armarFila(dia: string, p: EntradaPersona, ahora: number): FilaTu
   else if (conectadoMin >= 60 && pct < UMBRALES.activoAmbar) nivelConexion = "ambar";
   if (cortes >= UMBRALES.cortesAmbar || cortesMin >= UMBRALES.cortesMinAmbar) nivelConexion = peor(nivelConexion, "ambar");
 
+  // FRANJA: los ratos en Cowork con su estado; encima, las pausas con su tipo.
+  const ESTADO: Record<string, TipoFranja> = {
+    activo: "trabajo", meet: "trabajo", pausa: "pausa", sin_camara: "sin_camara",
+    sin_pantalla: "sin_pantalla", fuera_de_camara: "sin_camara", sin_conexion: "corte", sin_conexion_larga: "corte",
+  };
+  const franja: TramoFranja[] = segs.map((x) => ({ tipo: ESTADO[x.estado] ?? "trabajo", inicio: x.inicio, fin: x.fin }));
+  for (const x of pausas) {
+    const fin = x.fin ?? (terminado ? x.inicio : ahora);
+    if (fin - x.inicio < 30_000) continue;
+    franja.push({ tipo: x.kind === "bano" ? "bano" : "comida", inicio: x.inicio, fin });
+  }
+  franja.sort((a, b) => a.inicio - b.inicio || (a.tipo === "trabajo" ? -1 : 1));
+
   // MOTIVOS, del más grave al menos (la frase de Argos sale de aquí).
   const motivos: Motivo[] = [];
   if (noVino) motivos.push({ k: "noVino" });
@@ -327,6 +360,8 @@ export function armarFila(dia: string, p: EntradaPersona, ahora: number): FilaTu
     cortes,
     cortesMin,
     nivelConexion,
+    franja,
+    marcasAviso: avisos.map((a) => a.at),
     nivel: empiezaLuego ? "ok" : peor(nivelLlegada, nivelComida, nivelBano, nivelAvisos, nivelConexion),
     motivos,
   };
@@ -337,11 +372,12 @@ export function apareceEnElDia(f: FilaTurno): boolean {
   return f.turnoInicio != null || f.llegada != null;
 }
 
-export type Seccion = "mirar" | "ojo" | "bien" | "luego" | "inactivos";
+export type Seccion = "mirar" | "ojo" | "bien" | "luego" | "inactivos" | "libres";
 
 export function seccionDe(f: FilaTurno): Seccion {
   if (f.empiezaLuego) return "luego";
   if (f.inactivo) return "inactivos";
+  if (f.diaLibre) return "libres";
   return f.nivel === "rojo" ? "mirar" : f.nivel === "ambar" ? "ojo" : "bien";
 }
 

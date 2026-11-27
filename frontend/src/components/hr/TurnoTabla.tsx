@@ -1,4 +1,7 @@
 import { useMemo, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   AlertTriangle, CalendarDays, ChevronLeft, ChevronRight, ClipboardList, Loader2, RefreshCw, Search, X,
@@ -15,7 +18,7 @@ import { hoyEnBogota } from "@/hooks/useHoyDelEquipo";
 import { useTurnoTabla } from "@/hooks/useTurnoTabla";
 import {
   ordenarPorAtencion, seccionDe, semanaDe, sumarDias, turnosDelDia,
-  type FilaTurno, type Motivo, type Nivel, type Seccion,
+  type FilaTurno, type Motivo, type Nivel, type Seccion, type TipoFranja,
 } from "@/lib/turnoTabla";
 
 // LA TABLA DEL TURNO — la primera pestaña de Argos (Alvaro, 25/11/2026): «poder
@@ -29,7 +32,7 @@ import {
 // señal). Lo que va bien no lleva puntito.
 
 type Tr = (k: TranslationKey, vars?: Record<string, string | number>) => string;
-type Filtro = "todos" | "mirar" | "tarde" | "noEsta" | "pausas";
+type Filtro = "todos" | "mirar" | "tarde" | "noEsta" | "pausas" | "ignoro";
 
 const PUNTO: Record<Nivel | "ahora", string> = {
   ok: "",
@@ -174,12 +177,62 @@ function celdaConexion(t: Tr, f: FilaTurno): { arriba: string; abajo: string; ni
 
 // ── La pantalla ───────────────────────────────────────────────────────────────
 
+// ── La franja del día (27/11/2026) ───────────────────────────────────────────
+// Los colores son los de Maven: trabajo en gris claro, comida y baño en el color
+// principal, sin cámara o pantalla en ámbar y los cortes de internet en rojo.
+const COLOR_FRANJA: Record<TipoFranja, string> = {
+  trabajo: "bg-foreground/30",
+  comida: "bg-[hsl(var(--chart-1))]",
+  bano: "bg-[hsl(var(--chart-5))]",
+  pausa: "bg-muted-foreground/25",
+  sin_camara: "bg-warning/70",
+  sin_pantalla: "bg-warning/70",
+  corte: "bg-destructive/70",
+};
+const ORDEN_LEYENDA: Array<[TipoFranja, TranslationKey]> = [
+  ["trabajo", "hr.turno.franja.trabajo"], ["comida", "hr.turno.franja.comida"], ["bano", "hr.turno.franja.bano"],
+  ["sin_camara", "hr.turno.franja.sinCamara"], ["corte", "hr.turno.franja.corte"],
+];
+
+function Franja({ f, t }: { f: FilaTurno; t: Tr }) {
+  const tramos = f.franja;
+  if (!tramos.length && f.turnoInicio == null) return null;
+  const desde = Math.min(f.turnoInicio ?? Infinity, ...tramos.map((x) => x.inicio));
+  const hasta = Math.max(f.turnoFin ?? -Infinity, ...tramos.map((x) => x.fin));
+  if (!Number.isFinite(desde) || !Number.isFinite(hasta) || hasta <= desde) return null;
+  const pos = (ms: number) => `${((ms - desde) / (hasta - desde)) * 100}%`;
+  const ancho = (a: number, b: number) => `${Math.max(0.3, ((b - a) / (hasta - desde)) * 100)}%`;
+  // Primero el trabajo y los estados; encima, las pausas (comida y baño).
+  const capas = [...tramos.filter((x) => x.tipo !== "comida" && x.tipo !== "bano"), ...tramos.filter((x) => x.tipo === "comida" || x.tipo === "bano")];
+  return (
+    <div className="mt-1 md:col-span-full md:pl-11" aria-hidden>
+      <div className="relative h-2.5 overflow-hidden rounded-full bg-foreground/[0.05]">
+        {f.turnoInicio != null && f.turnoFin != null && (
+          <div className="absolute inset-y-0 rounded-full border border-border/60" style={{ left: pos(f.turnoInicio), width: ancho(f.turnoInicio, f.turnoFin) }} />
+        )}
+        {capas.map((x, i) => (
+          <div key={i} className={`absolute inset-y-0.5 ${COLOR_FRANJA[x.tipo]}`} style={{ left: pos(x.inicio), width: ancho(x.inicio, x.fin) }} />
+        ))}
+        {f.marcasAviso.map((at, i) => (
+          <div key={`a${i}`} className="absolute inset-y-0 w-0.5 bg-destructive" style={{ left: pos(at) }} />
+        ))}
+      </div>
+      <div className="mt-0.5 flex justify-between text-[10px] tabular-nums text-muted-foreground/70">
+        <span>{hora(desde)}</span>
+        <span>{t("hr.turno.franja.avisos", { n: f.marcasAviso.length })}</span>
+        <span>{hora(hasta)}</span>
+      </div>
+    </div>
+  );
+}
+
 const TITULO_SECCION: Record<Seccion, TranslationKey> = {
   mirar: "hr.turno.sec.mirar",
   ojo: "hr.turno.sec.ojo",
   bien: "hr.turno.sec.bien",
   luego: "hr.turno.sec.luego",
   inactivos: "hr.turno.sec.inactivos",
+  libres: "hr.turno.sec.libres",
 };
 
 export function TurnoTabla() {
@@ -193,6 +246,24 @@ export function TurnoTabla() {
   const irA = (d: string) => setParams((prev) => { const n = new URLSearchParams(prev); n.set("t", "turno"); if (d === hoy) n.delete("dia"); else n.set("dia", d); return n; }, { replace: true });
 
   const q = useTurnoTabla(dia, esHoy);
+  const qc = useQueryClient();
+  const { toast } = useToast();
+  const [guardandoLibre, setGuardandoLibre] = useState<string | null>(null);
+  // DÍA LIBRE (27/11/2026): marcarlo o quitarlo desde la fila. Solo deja quien ya
+  // puede editar el horario de esa persona (lo decide la base).
+  const cambiarLibre = async (f: FilaTurno, libre: boolean) => {
+    setGuardandoLibre(f.userId);
+    const tabla = (supabase as unknown as { from: (x: string) => any }).from("argos_dia_libre"); // eslint-disable-line @typescript-eslint/no-explicit-any
+    const { error } = libre
+      ? await tabla.insert({ user_id: f.userId, dia })
+      : await tabla.delete().eq("user_id", f.userId).eq("dia", dia);
+    setGuardandoLibre(null);
+    if (error) {
+      toast({ title: t("hr.turno.libre.fallo"), description: error.message, variant: "destructive" });
+      return;
+    }
+    void qc.invalidateQueries({ queryKey: ["argos-turno-tabla", dia] });
+  };
   const [filtro, setFiltro] = useState<Filtro>("todos");
   const [turno, setTurno] = useState<string | null>(null);
   const [buscar, setBuscar] = useState("");
@@ -209,9 +280,10 @@ export function TurnoTabla() {
       : k === "mirar" ? f.nivel !== "ok" && !f.empiezaLuego && !f.inactivo
         : k === "tarde" ? f.tardeMin != null
           : k === "noEsta" ? (f.noVino && !f.inactivo) || f.noLlegaMin != null
-            : f.nivelComida !== "ok" || f.nivelBano !== "ok";
+            : k === "ignoro" ? f.ignorados > 0
+              : f.nivelComida !== "ok" || f.nivelBano !== "ok";
   const conteo = useMemo(() => {
-    const c: Record<Filtro, number> = { todos: 0, mirar: 0, tarde: 0, noEsta: 0, pausas: 0 };
+    const c: Record<Filtro, number> = { todos: 0, mirar: 0, tarde: 0, noEsta: 0, pausas: 0, ignoro: 0 };
     for (const f of delTurno) for (const k of Object.keys(c) as Filtro[]) if (pasa(f, k)) c[k]++;
     return c;
   }, [delTurno]);
@@ -222,7 +294,7 @@ export function TurnoTabla() {
     [delTurno, filtro, texto],
   );
   const secciones = useMemo(() => {
-    const m: Record<Seccion, FilaTurno[]> = { mirar: [], ojo: [], bien: [], luego: [], inactivos: [] };
+    const m: Record<Seccion, FilaTurno[]> = { mirar: [], ojo: [], bien: [], luego: [], inactivos: [], libres: [] };
     for (const f of vistas) m[seccionDe(f)].push(f);
     return m;
   }, [vistas]);
@@ -230,6 +302,27 @@ export function TurnoTabla() {
   const ahoraComiendo = delTurno.filter((f) => f.comidaAhora != null).length;
   const ahoraBano = delTurno.filter((f) => f.banoAhora != null).length;
   const ahoraAviso = delTurno.filter((f) => f.avisoAbierto).length;
+  // LOS NÚMEROS DEL DÍA (Alvaro, 27/11/2026: «solo números»).
+  const tocaban = delTurno.filter((f) => f.turnoInicio != null && !f.empiezaLuego && !f.inactivo && !f.diaLibre);
+  const numeros = {
+    vinieron: tocaban.filter((f) => f.llegada != null).length,
+    tocaban: tocaban.length,
+    tarde: delTurno.filter((f) => f.tardeMin != null).length,
+    noVino: delTurno.filter((f) => f.noVino && !f.inactivo && !f.diaLibre).length,
+    ignoraron: delTurno.filter((f) => f.ignorados > 0).length,
+    horas: delTurno.reduce((s, f) => s + f.conectadoMin, 0),
+  };
+  /** Frases contra lo normal de la persona. */
+  const contraLoNormal = (f: FilaTurno): string[] => {
+    const c = f.costumbre;
+    if (!c) return [];
+    const out: string[] = [];
+    if (f.tardeMin != null && c.tardesSemana >= 1) out.push(t("hr.turno.normal.tardeVez", { n: c.tardesSemana + 1 }));
+    if (!f.enCurso && f.llegada != null && c.conectadoPromedio != null && c.conectadoPromedio - f.conectadoMin >= 90) {
+      out.push(t("hr.turno.normal.menos", { d: duracion(t, c.conectadoPromedio - f.conectadoMin) }));
+    }
+    return out;
+  };
 
   const abrir = (f: FilaTurno) =>
     navegar(`/hr/expediente/${f.userId}?dia=${dia}`, { state: { volverA: `/hr/monitor-ia?t=turno${esHoy ? "" : `&dia=${dia}`}` } });
@@ -253,10 +346,13 @@ export function TurnoTabla() {
   const Fila = ({ f }: { f: FilaTurno }) => {
     const ll = celdaLlegada(t, f), co = celdaComida(t, f), ba = celdaBano(t, f), av = celdaAvisos(t, f), cx = celdaConexion(t, f);
     const foto = q.fotos[f.userId];
-    const motivo = f.motivos[0] ? frase(t, f.motivos[0]) : null;
-    const mas = f.motivos.length - 1;
+    const frases = [...(f.motivos[0] ? [frase(t, f.motivos[0])] : []), ...contraLoNormal(f)];
+    const motivo = f.diaLibre ? t("hr.turno.libre.marcado") : frases.length ? frases.join(" · ") : null;
+    const mas = f.diaLibre ? 0 : f.motivos.length - 1;
     const horario = f.entrada && f.salida ? `${a12(f.entrada)} – ${a12(f.salida)}` : t("hr.turno.sinHorario");
+    const puedeLibre = q.data?.diaLibreListo && (f.noVino || f.diaLibre) && !f.inactivo;
     return (
+      <div className="flex flex-col">
       <button
         type="button"
         onClick={() => abrir(f)}
@@ -293,7 +389,21 @@ export function TurnoTabla() {
           })}
         </div>
         <ChevronRight className="hidden h-4 w-4 text-muted-foreground transition group-hover:translate-x-0.5 group-hover:text-foreground md:block" />
+        <Franja f={f} t={t} />
       </button>
+      {puedeLibre && (
+        <div className="flex justify-end px-3 pb-1">
+          <button
+            type="button"
+            disabled={guardandoLibre === f.userId}
+            onClick={() => void cambiarLibre(f, !f.diaLibre)}
+            className="rounded-full border border-border/60 px-2.5 py-0.5 text-[11px] text-muted-foreground transition hover:text-foreground disabled:opacity-50"
+          >
+            {guardandoLibre === f.userId ? "…" : t(f.diaLibre ? "hr.turno.libre.quitar" : "hr.turno.libre.marcar")}
+          </button>
+        </div>
+      )}
+      </div>
     );
   };
 
@@ -376,6 +486,31 @@ export function TurnoTabla() {
           <p className="rounded-2xl border border-dashed border-border/50 p-6 text-center text-sm text-muted-foreground">{t("hr.turno.vacio")}</p>
         ) : (
           <>
+            {/* LOS NÚMEROS DEL DÍA: cada tarjeta filtra la tabla. */}
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
+              {([
+                ["todos", `${numeros.vinieron}/${numeros.tocaban}`, "hr.turno.num.vinieron", null],
+                ["tarde", String(numeros.tarde), "hr.turno.num.tarde", numeros.tarde ? "ambar" : null],
+                ["noEsta", String(numeros.noVino), "hr.turno.num.noVino", numeros.noVino ? "rojo" : null],
+                ["ignoro", String(numeros.ignoraron), "hr.turno.num.ignoraron", numeros.ignoraron ? "rojo" : null],
+                [null, duracion(t, numeros.horas), "hr.turno.num.horas", null],
+              ] as Array<[Filtro | null, string, TranslationKey, Nivel | null]>).map(([k, valor, etq, nivel]) => (
+                <button
+                  key={etq}
+                  type="button"
+                  disabled={!k}
+                  onClick={() => k && setFiltro(k)}
+                  aria-pressed={k ? filtro === k : undefined}
+                  className={`rounded-2xl border p-3 text-left transition disabled:cursor-default ${k && filtro === k ? "border-primary/60 bg-primary/10" : "border-border/50 bg-card/30 hover:enabled:bg-foreground/[0.04]"}`}
+                >
+                  <p className="flex items-center gap-1.5 font-display text-2xl font-bold tabular-nums leading-none">
+                    {valor}{nivel && <Punto nivel={nivel} />}
+                  </p>
+                  <p className="mt-1 text-[11px] text-muted-foreground">{t(etq)}</p>
+                </button>
+              ))}
+            </div>
+
             {/* EL PARTE DE ARGOS: a quién mirar y por qué. */}
             <div className="rounded-2xl border border-border/50 bg-card/30 p-4">
               <p className="flex items-center gap-2 text-sm font-semibold">
@@ -469,6 +604,12 @@ export function TurnoTabla() {
                 <span>{t("hr.turno.col.conexion")}</span>
                 <span />
               </div>
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 px-1 text-[10px] text-muted-foreground md:px-3">
+                {ORDEN_LEYENDA.map(([k, etq]) => (
+                  <span key={k} className="flex items-center gap-1"><span className={`inline-block h-2 w-3 rounded-sm ${COLOR_FRANJA[k]}`} />{t(etq)}</span>
+                ))}
+                <span className="flex items-center gap-1"><span className="inline-block h-2.5 w-0.5 bg-destructive" />{t("hr.turno.franja.aviso")}</span>
+              </div>
               {!vistas.length && (
                 <p className="rounded-2xl border border-dashed border-border/50 p-5 text-center text-sm text-muted-foreground">{t("hr.turno.nadieAsi")}</p>
               )}
@@ -500,6 +641,16 @@ export function TurnoTabla() {
                   </summary>
                   <div className="mt-2 flex flex-col gap-1.5 md:gap-0 md:divide-y md:divide-border/30">
                     {secciones.inactivos.map((f) => <Fila key={f.userId} f={f} />)}
+                  </div>
+                </details>
+              )}
+              {secciones.libres.length > 0 && (
+                <details className="mt-2 rounded-2xl border border-dashed border-border/40 bg-card/10 p-3">
+                  <summary className="cursor-pointer text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                    {t(TITULO_SECCION.libres)} · {secciones.libres.length}
+                  </summary>
+                  <div className="mt-2 flex flex-col gap-1.5 md:gap-0 md:divide-y md:divide-border/30">
+                    {secciones.libres.map((f) => <Fila key={f.userId} f={f} />)}
                   </div>
                 </details>
               )}
