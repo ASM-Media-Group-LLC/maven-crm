@@ -306,13 +306,17 @@ export function TurnoTabla() {
   const parte = (f: FilaTurno) => { const m = minutosTurno(f); return m ? minutosTrabajados(f) / m : null; };
   /** Cómo va hoy (Alvaro, 27/11/2026: «debería llevar 2 y solo lleva 1 h 46»): lo que
    *  ya pasó del turno sin contar su comida y baño permitidos, lo que lleva de verdad,
-   *  cuánto va atrás y cuántos problemas tuvo (avisos de Argos y cortes de internet). */
+   *  cuánto va atrás y cuántos problemas tuvo. */
   const marcha = (f: FilaTurno) => {
     if (f.turnoInicio == null || !q.data) return null;
     const pasados = Math.max(0, Math.round((Math.min(q.data.calculadoAt, f.turnoFin ?? q.data.calculadoAt) - f.turnoInicio) / 60_000));
     const deberia = Math.max(0, pasados - Math.min(f.comidaMin, f.comidaTope) - Math.min(f.banoMin, f.banoTope));
     const lleva = minutosTrabajados(f);
-    return { deberia, lleva, falta: Math.max(0, deberia - lleva), problemas: f.avisos + f.cortes };
+    // Problemas (Alvaro, 27/11/2026, las cuatro): avisos de Argos, cortes de internet,
+    // ratos de 1 min o más sin cámara o sin pantalla, y pasarse del baño o la comida.
+    const sinCamPant = f.franja.filter((x) => (x.tipo === "sin_camara" || x.tipo === "sin_pantalla") && x.fin - x.inicio >= 60_000).length;
+    const pasado = (f.nivelComida !== "ok" ? 1 : 0) + (f.nivelBano !== "ok" ? 1 : 0);
+    return { deberia, lleva, falta: Math.max(0, deberia - lleva), problemas: f.avisos + f.cortes + sinCamPant + pasado };
   };
   const texto = buscar.trim().toLocaleLowerCase();
   const vistas = useMemo(
