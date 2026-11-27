@@ -70,3 +70,10 @@ Deno.test("correo: escapa el nombre", () => {
   const html = correoGraciaHTML({ ...base, nombre: "<b>X</b>" });
   assertEquals(html.includes("<b>X</b>"), false);
 });
+
+Deno.test("gracia única (27/11/2026): una sola fila sin cámara o pantalla", () => {
+  const html = correoGraciaHTML({ ...base, gracia_pantalla_min: 10, gracia_camara_min: 0, extra_pantalla_min: 0, extra_camara_min: 0, sin_pantalla_min: 4, sin_camara_min: 9 });
+  assertEquals(html.includes("Sin cámara o pantalla · gracia 10 min"), true);
+  assertEquals(html.includes("10 min en total"), true);
+  assertEquals(html.includes("Sin pantalla · gracia"), false);
+});

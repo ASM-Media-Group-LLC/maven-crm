@@ -1,5 +1,7 @@
 import { type ReactNode, useState } from "react";
-import { Eye, Loader2, Lock, Monitor, RefreshCw, Video } from "lucide-react";
+import { Eye, Hourglass, Loader2, Lock, Monitor, RefreshCw, Video } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { minutosValidos, useGraciaEmpresa, useGuardarGracia } from "@/hooks/useGraciaEmpresa";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
@@ -106,9 +108,45 @@ function LineaCambio({ c }: { c: CambioExigencias }) {
   );
 }
 
+/** Minutos de gracia (27/11/2026): un campo que guarda al salir o con Enter. */
+function CampoGracia({ posicion, valor, porDefecto, puede, etiqueta }: { posicion: string | null; valor: number | null; porDefecto: number; puede: boolean; etiqueta: string }) {
+  const { t } = useLanguage();
+  const { toast } = useToast();
+  const guardar = useGuardarGracia();
+  const [texto, setTexto] = useState(valor == null ? "" : String(valor));
+  const enviar = () => {
+    const v = minutosValidos(texto, posicion != null);
+    if (v === "mal") { toast({ title: t("settings.gracia.mal"), variant: "destructive" }); return; }
+    if (v === valor) return;
+    guardar.mutate({ posicion, minutos: v }, {
+      onSuccess: () => toast({ title: t("settings.gracia.guardado") }),
+      onError: (e) => toast({ title: t("settings.gracia.fallo"), description: (e as Error).message, variant: "destructive" }),
+    });
+  };
+  return (
+    <label className={cn("flex items-center gap-2 text-xs", puede ? "text-foreground" : "text-muted-foreground")}>
+      <Hourglass className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+      <span className="whitespace-nowrap">{etiqueta}</span>
+      <Input
+        value={texto}
+        disabled={!puede || guardar.isPending}
+        inputMode="numeric"
+        placeholder={String(porDefecto)}
+        onChange={(e) => setTexto(e.target.value)}
+        onBlur={enviar}
+        onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
+        className="h-7 w-14 px-2 text-center text-xs tabular-nums"
+        aria-label={etiqueta}
+      />
+      <span className="text-muted-foreground">{t("settings.gracia.min")}</span>
+    </label>
+  );
+}
+
 export function CamaraPantallaPorPuesto() {
   const { t } = useLanguage();
   const q = useExigenciasPorPuesto();
+  const gracia = useGraciaEmpresa();
   const [pendiente, setPendiente] = useState<Pendiente | null>(null);
 
   let cuerpo: ReactNode;
@@ -146,6 +184,16 @@ export function CamaraPantallaPorPuesto() {
                 <div className="flex shrink-0 flex-wrap items-center gap-4">
                   <Interruptor puesto={p} cosa="camara" onPedir={setPendiente} />
                   <Interruptor puesto={p} cosa="pantalla" onPedir={setPendiente} />
+                  {gracia.data && (p.pide_camara || p.pide_pantalla) && (
+                    <CampoGracia
+                      key={`${p.id}-${gracia.data.puestos[p.id] ?? ""}`}
+                      posicion={p.id}
+                      valor={gracia.data.puestos[p.id] ?? null}
+                      porDefecto={gracia.data.minutos}
+                      puede={p.puede_cambiar}
+                      etiqueta={t("settings.gracia.puesto")}
+                    />
+                  )}
                 </div>
               </div>
               {pendiente?.puesto.id === p.id && <Confirmar p={pendiente} onCancelar={() => setPendiente(null)} />}
@@ -172,6 +220,21 @@ export function CamaraPantallaPorPuesto() {
           <p className="text-xs text-muted-foreground">{soloVer ? t("settings.exig.subVer") : t("settings.exig.sub")}</p>
         </div>
       </header>
+      {/* La gracia de toda la empresa (27/11/2026): minutos por turno sin cámara o
+          sin pantalla; cada puesto puede tener otro (vacío = este). */}
+      {gracia.data && (
+        <div className="flex flex-col gap-1 border-b border-border/50 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-xs text-muted-foreground">{t("settings.gracia.explica")}</p>
+          <CampoGracia
+            key={`empresa-${gracia.data.minutos}`}
+            posicion={null}
+            valor={gracia.data.minutos}
+            porDefecto={10}
+            puede={gracia.data.puede_cambiar}
+            etiqueta={t("settings.gracia.empresa")}
+          />
+        </div>
+      )}
       {cuerpo}
     </section>
   );

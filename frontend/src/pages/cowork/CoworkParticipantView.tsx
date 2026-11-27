@@ -337,7 +337,8 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
   const minutosPrivado = (() => {
     if (!miGracia || miGracia.aplica === false) return null;
     const r = resumenGracia(miGracia);
-    return minutosDisponibles({ camara: exigeCamara, pantalla: exigePantalla }, { camara: r.camara.queda, pantalla: r.pantalla.queda });
+    // Desde el 27/11/2026 la gracia es un solo bolsillo: lo que queda vale para las dos.
+    return minutosDisponibles({ camara: exigeCamara, pantalla: exigePantalla }, { camara: r.combinada.queda, pantalla: r.combinada.queda });
   })();
   const conMomentoPrivado = exigeCamara || exigePantalla;
   useAvisoFinMomentoPrivado();
