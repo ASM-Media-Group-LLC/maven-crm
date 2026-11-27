@@ -104,13 +104,14 @@ function Celda({ arriba, abajo, nivel = "ok", tenue = false, completo = false }:
  *  que tener la misma estética»): mismo alto, bordes, pista y colores. */
 const PISTA = "relative h-2 overflow-hidden rounded-full bg-foreground/[0.06]";
 const COLOR_FRANJA: Record<TipoFranja, string> = {
-  trabajo: "bg-success/70",
-  comida: "bg-[hsl(var(--chart-1))]",
-  bano: "bg-[hsl(var(--chart-5))]",
-  pausa: "bg-muted-foreground/25",
-  sin_camara: "bg-warning/70",
-  sin_pantalla: "bg-warning/70",
-  corte: "bg-destructive/70",
+  // Un poco menos de brillo (Alvaro, 27/11/2026: «bájale un poquito el brillo»).
+  trabajo: "bg-success/55",
+  comida: "bg-[hsl(var(--chart-1)/0.65)]",
+  bano: "bg-[hsl(var(--chart-5)/0.65)]",
+  pausa: "bg-muted-foreground/20",
+  sin_camara: "bg-warning/55",
+  sin_pantalla: "bg-warning/55",
+  corte: "bg-destructive/55",
 };
 
 /** El avance de hoy como indicador (27/11/2026): barrita de lo que lleva sobre lo
