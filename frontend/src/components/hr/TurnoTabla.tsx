@@ -115,6 +115,24 @@ const COLOR_FRANJA: Record<TipoFranja, string> = {
   corte: "bg-destructive/55",
 };
 
+/** Color del avance de hoy: los mismos de la franja (verde al día, ámbar atrás, rojo más de 1 h). */
+const colorAvance = (falta: number) => (falta > 60 ? COLOR_FRANJA.corte : falta > 5 ? COLOR_FRANJA.sin_camara : COLOR_FRANJA.trabajo);
+
+/** Fila cerrada (Alvaro, 27/11/2026: «¿para qué 2 líneas afuera?»): solo texto junto a la
+ *  franja del día; la barra de avance vive adentro, al abrir a la persona. */
+function AvanceTexto({ lleva, deberia, falta, problemas, t }: { lleva: number; deberia: number; falta: number; problemas: number; t: Tr }) {
+  return (
+    <div className="text-right">
+      <p className="whitespace-nowrap text-sm tabular-nums text-foreground/90">{t("hr.turno.deHorasSolo", { a: duracion(t, lleva), b: duracion(t, deberia) })}</p>
+      <p className="mt-0.5 flex items-center justify-end gap-1.5 whitespace-nowrap text-[11px] tabular-nums text-muted-foreground">
+        <span className={`h-1.5 w-1.5 rounded-full ${colorAvance(falta)}`} aria-hidden />
+        {falta > 5 ? t("hr.turno.atras", { d: duracion(t, falta) }) : t("hr.turno.alDia")}
+        {problemas > 0 && <span className="text-muted-foreground/70">· {t(problemas === 1 ? "hr.turno.problema1" : "hr.turno.problemas", { n: problemas })}</span>}
+      </p>
+    </div>
+  );
+}
+
 /** El avance de hoy como indicador (27/11/2026): barrita de lo que lleva sobre lo
  *  que debería llevar y una pastilla de «X atrás» o «al día», más los problemas. */
 function Avance({ lleva, deberia, falta, problemas, t }: { lleva: number; deberia: number; falta: number; problemas: number; t: Tr }) {
@@ -424,7 +442,7 @@ export function TurnoTabla() {
           type="button"
           onClick={() => setAbiertoId(abierta ? null : f.userId)}
           aria-expanded={abierta}
-          className="group grid w-full grid-cols-[1fr_auto] items-center gap-x-4 gap-y-2 rounded-2xl px-3 py-3.5 text-left transition hover:bg-foreground/[0.04] md:grid-cols-[minmax(11rem,15rem)_1fr_15rem_1rem]"
+          className="group grid w-full grid-cols-[1fr_auto] items-center gap-x-4 gap-y-2 rounded-2xl px-3 py-3.5 text-left transition hover:bg-foreground/[0.04] md:grid-cols-[minmax(11rem,15rem)_1fr_12rem_1rem]"
         >
           <div className="flex min-w-0 items-center gap-2.5">
             <span className="relative shrink-0">
@@ -450,7 +468,7 @@ export function TurnoTabla() {
                     </p>
                   </>
                 ) : f.enCurso && marcha(f) ? (
-                  <Avance {...marcha(f)!} t={t} />
+                  <AvanceTexto {...marcha(f)!} t={t} />
                 ) : (
                   <>
                     <p className="text-sm tabular-nums text-foreground/90">
@@ -486,23 +504,33 @@ export function TurnoTabla() {
                 y tres datos cortos. Sin frases largas. */}
             {minutosTurno(f) != null && (
               <div className="flex flex-col gap-3 rounded-2xl border border-border/40 bg-card/30 p-4 sm:flex-row sm:items-center sm:gap-6">
-                <div className="flex items-baseline gap-2 sm:w-44 sm:shrink-0">
-                  <span className="font-display text-[2.5rem] font-bold tabular-nums leading-none tracking-tight">{Math.round((parte(f) ?? 0) * 100)}%</span>
-                  <span className="text-sm leading-tight text-muted-foreground">{t("hr.turno.pctDeSuTurno")}</span>
-                </div>
-                <div className="flex min-w-0 flex-1 flex-col gap-2.5">
-                  <div className={PISTA}>
-                    <div className={`h-full rounded-full ${COLOR_FRANJA.trabajo}`} style={{ width: `${Math.min(100, (parte(f) ?? 0) * 100)}%` }} />
-                  </div>
+                {/* Hoy: UNA barra, la del avance (lleva contra lo que debería llevar); en
+                    un día cerrado, la del turno completo (Alvaro, 27/11/2026). */}
+                {(() => {
+                  const m = f.enCurso ? marcha(f) : null;
+                  const pct = m ? (m.deberia > 0 ? Math.min(1, m.lleva / m.deberia) : 1) : Math.min(1, parte(f) ?? 0);
+                  return (
+                    <>
+                      <div className="flex items-baseline gap-2 sm:w-44 sm:shrink-0">
+                        <span className="font-display text-[2.5rem] font-bold tabular-nums leading-none tracking-tight">{Math.round(pct * 100)}%</span>
+                        <span className="text-sm leading-tight text-muted-foreground">{t(m ? "hr.turno.pctDeLoQueVa" : "hr.turno.pctDeSuTurno")}</span>
+                      </div>
+                      <div className="flex min-w-0 flex-1 flex-col gap-2.5">
+                        <div className={PISTA}>
+                          <div className={`h-full rounded-full ${m ? colorAvance(m.falta) : COLOR_FRANJA.trabajo}`} style={{ width: `${pct * 100}%` }} />
+                        </div>
                   <div className="flex flex-wrap gap-1.5 text-xs">
-                    <span className="rounded-full bg-foreground/[0.06] px-2.5 py-1 tabular-nums">{t("hr.turno.chip.trabajo", { a: duracion(t, minutosTrabajados(f)), b: duracion(t, minutosTurno(f)!) })}</span>
+                    <span className="rounded-full bg-foreground/[0.06] px-2.5 py-1 tabular-nums">{m ? t("hr.turno.llevaDe", { a: duracion(t, m.lleva), b: duracion(t, m.deberia) }) : t("hr.turno.chip.trabajo", { a: duracion(t, minutosTrabajados(f)), b: duracion(t, minutosTurno(f)!) })}</span>
                     <span className="rounded-full bg-foreground/[0.06] px-2.5 py-1 tabular-nums">{t("hr.turno.chip.camara", { c: duracion(t, f.activoMin) })}</span>
                     <span className="rounded-full bg-foreground/[0.06] px-2.5 py-1 tabular-nums">{t("hr.turno.chip.gracia", { g: duracion(t, Math.min(f.sinCamPantMin, f.graciaMin ?? 10)) })}</span>
-                    {f.enCurso && marcha(f) && marcha(f)!.falta > 5 && (
-                      <span className="flex items-center gap-1.5 rounded-full bg-foreground/[0.06] px-2.5 py-1 font-medium tabular-nums"><span className={`h-1.5 w-1.5 rounded-full ${COLOR_FRANJA.sin_camara}`} aria-hidden />{t("hr.turno.atras", { d: duracion(t, marcha(f)!.falta) })}</span>
+                    {m && (
+                      <span className="flex items-center gap-1.5 rounded-full bg-foreground/[0.06] px-2.5 py-1 font-medium tabular-nums"><span className={`h-1.5 w-1.5 rounded-full ${colorAvance(m.falta)}`} aria-hidden />{m.falta > 5 ? t("hr.turno.atras", { d: duracion(t, m.falta) }) : t("hr.turno.alDia")}</span>
                     )}
                   </div>
                 </div>
+                    </>
+                  );
+                })()}
               </div>
             )}
             <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-5">
