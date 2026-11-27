@@ -198,8 +198,10 @@ Deno.serve(async (req) => {
       } else {
         const { data: uso, error: eU } = await comoLaPersona.rpc("drive_uso");
         if (eU) throw new HttpError(eU.message, 500);
-        const fila = (Array.isArray(uso) ? uso[0] : uso) as { usado: number; cupo: number } | undefined;
-        chequearCupo(Number(fila?.usado ?? 0), Number(fila?.cupo ?? 0), size);
+        const fila = (Array.isArray(uso) ? uso[0] : uso) as { usado: number; cupo: number | null } | undefined;
+        // Sin fila no se sabe: se bloquea como siempre (cupo 0). Con fila y cupo null: sin tope.
+        if (!fila) throw new HttpError("No pude medir tu espacio del Drive", 500);
+        chequearCupo(Number(fila.usado ?? 0), fila.cupo == null ? null : Number(fila.cupo), size);
       }
 
       // Y que haya lugar en el NAS, ANTES de crear la ficha: si no entra, que
@@ -579,7 +581,8 @@ async function chequearEspacioParaCrecer(
     : await admin.rpc("drive_uso", { p_user: fila.owner_id });
   if (error) throw new HttpError(error.message, 500);
   const f = primera(data);
-  chequearCupo(Number(f?.usado ?? 0), Number(f?.cupo ?? 0), bytes);
+  if (!f) throw new HttpError("No pude medir el espacio del Drive", 500);
+  chequearCupo(Number(f.usado ?? 0), f.cupo == null ? null : Number(f.cupo), bytes);
 }
 
 async function rolDe(cliente: SupabaseClient, id: string): Promise<string | null> {
