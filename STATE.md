@@ -166,3 +166,6 @@ Ambos sets ya tienen migrations subidas (`20260504100000`, `20260504110000`) per
 ## 2026-11-26 · Argos: tabla del turno
 - Argos abre en la pestaña «Turno» (Shift): una fila por persona con llegada/salida, comida (almuerzo + break), baño, avisos de Argos y conexión; semáforo normal, tira de la semana y calendario. Lee tablas existentes, sin migraciones (`lib/turnoTabla.ts`, `hooks/useTurnoTabla.ts`, `components/hr/TurnoTabla.tsx`).
 - Pendiente: perfil del empleado con calendario del mes; corregir horarios de 7 días (los días libres salen como «no vino»).
+## 2026-11-27 · Gracia de cámara y pantalla por empresa y posición
+- Un solo bolsillo por turno (sin cámara + sin pantalla juntos), 10 min por defecto; la empresa lo pone en Ajustes → Cámara y pantalla por puesto y cada puesto puede tener otro. Misma regla para el pago (argos_gracia_calculo) y las horas.
+- Pendiente: aplicar la migración 20261127050220 en producción (pide permiso del dueño).

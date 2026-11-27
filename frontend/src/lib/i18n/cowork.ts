@@ -870,6 +870,10 @@ export const cowork = {
   "cowork.avisar.sit.generalBuenTrabajo": { es: "Buen trabajo, sigue así", en: "Good work, keep it up" },
 
   // ── Minutos de gracia (Alvaro, 16/11): 15 sin pantalla y 15 sin cámara por turno ──
+  "cowork.gracia.quedanUnica": { es: "Te quedan {n} min sin cámara o pantalla", en: "{n} min left without camera or screen" },
+  "cowork.gracia.quedanUnicaCorto": { es: "{n} min", en: "{n} min" },
+  "cowork.gracia.reglaUnica": { es: "Cada turno tienes {g} min en total para estar sin cámara o sin pantalla. Lo que pase de ahí no se paga.", en: "Each shift you have {g} min in total without camera or screen. Anything beyond that isn't paid." },
+  "cowork.gracia.sinCamaraOPantalla": { es: "Sin cámara o pantalla", en: "Without camera or screen" },
   "cowork.gracia.quedan": { es: "Quedan {p} min de pantalla · {c} de cámara", en: "{p} min of screen · {c} of camera left" },
   "cowork.gracia.quedanCorto": { es: "{p} · {c} min", en: "{p} · {c} min" },
   "cowork.gracia.descuento": { es: "Descuento {d}", en: "Deduction {d}" },

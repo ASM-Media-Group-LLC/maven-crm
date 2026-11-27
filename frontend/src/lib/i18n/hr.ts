@@ -1905,6 +1905,8 @@ export const hr = {
   "hr.apps.sinTocar": { es: "Sin tocar nada", en: "Idle" },
   "hr.apps.quieto": { es: "{tiempo} sin tocar", en: "{tiempo} idle" },
   "hr.gracia.titulo": { es: "Minutos de gracia", en: "Grace minutes" },
+  "hr.gracia.reglaUnica": { es: "{g} min en total por turno sin cámara o sin pantalla. Lo que pase de ahí no se paga.", en: "{g} min in total per shift without camera or screen. Anything beyond that isn't paid." },
+  "hr.gracia.sinCamaraOPantalla": { es: "Sin cámara o pantalla", en: "Without camera or screen" },
   "hr.gracia.regla": {
     es: "{gp} min sin compartir pantalla y {gc} min sin cámara por turno. Lo que pasa de ahí no se paga.",
     en: "{gp} min without sharing the screen and {gc} min with the camera off per shift. Anything beyond that is not paid.",

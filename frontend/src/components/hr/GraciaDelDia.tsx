@@ -45,12 +45,11 @@ export function VistaGracia({ userId, fecha, estado, formAbierto = false }: { us
     cuerpo = <p className="py-2 text-sm text-muted-foreground">{gracia?.aplica === false ? t("hr.gracia.noAplica") : t("hr.gracia.sinTurno")}</p>;
   } else {
     const r = resumenGracia(gracia);
-    const gp = (gracia.gracia_pantalla_min ?? 0) - (gracia.extra_pantalla_min ?? 0);
-    const gc = (gracia.gracia_camara_min ?? 0) - (gracia.extra_camara_min ?? 0);
+    const g = (gracia.gracia_pantalla_min ?? 0) + (gracia.gracia_camara_min ?? 0) - (gracia.extra_pantalla_min ?? 0) - (gracia.extra_camara_min ?? 0);
     cuerpo = (
       <div className="flex flex-col gap-4">
         <div className="flex flex-wrap items-center gap-2">
-          <p className="text-xs text-muted-foreground">{t("hr.gracia.regla", { gp, gc })}</p>
+          <p className="text-xs text-muted-foreground">{t("hr.gracia.reglaUnica", { g })}</p>
           {r.ensayo && (
             <span className="inline-flex items-center rounded-full border border-warning/30 bg-warning/10 px-2 py-0.5 text-[11px] font-medium text-warning">
               {t("hr.gracia.ensayo")}
@@ -58,10 +57,7 @@ export function VistaGracia({ userId, fecha, estado, formAbierto = false }: { us
           )}
         </div>
 
-        <div className="grid gap-4 sm:grid-cols-2">
-          <Barra etiqueta={t("hr.gracia.sinPantalla")} uso={r.pantalla} />
-          <Barra etiqueta={t("hr.gracia.sinCamara")} uso={r.camara} />
-        </div>
+        <Barra etiqueta={t("hr.gracia.sinCamaraOPantalla")} uso={r.combinada} />
 
         <dl className="grid grid-cols-2 gap-2 sm:grid-cols-4">
           <Cifra etiqueta={t("hr.gracia.conectado")} valor={formatoMinutos(r.conectado)} />
