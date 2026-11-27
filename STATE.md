@@ -11,6 +11,7 @@
 - 27/11/2026 (Claude, PR 295): la ficha de la persona muestra la misma lista «Lo que pasó en su turno»; pestañas de una palabra (Resumen · Por hora · Pago · Avisos · Apps). Se trajo PR 302 (gracia única) a esta rama: ya no sale «Sin cámara 0 de 0» lleno de amarillo.
 - 27/11/2026 (Claude, PR 295): «Activos ahora» = en su turno en este momento, también en comida, baño o pausa (antes solo quien estaba trabajando con cámara y pantalla).
 - 27/11/2026 (Claude, PR 295): Shift → cada vista con su número (Activos ahora 15…); «No vinieron» = la tarjeta y la vista cuentan igual; buscador arriba a la derecha; el filtro de horarios es ahora Todos · AM (8–16) · PM (16–24) · Madrugada (resto), por hora de entrada. Pendiente: que cada empresa/Posición defina sus jornadas.
+- 27/11/2026 (Claude, PR 295): Shift marca en amarillo (sin descontar) a quien come fuera de su hora obligatoria (PR 307). Migración 20261127191943_argos_comida_fuera_de_hora.sql aplicada con OK del dueño.
 
 
 - 2026-11-26: app de escritorio: la ventanita flotante del Hub caía sobre la barra que mueve la ventana; sus botones no respondían y arrastrarla movía toda la app (video de Daniel Ospina). Clase `sin-arrastre` (no-drag) en PersistentCallProvider. Y «Ver en ventanita» en el recuadro de cada chatter (al pasar el mouse; su pantalla, sin sonido, una ventanita encima de todo).
