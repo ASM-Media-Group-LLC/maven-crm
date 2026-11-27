@@ -17,9 +17,9 @@ import { a12 } from "@/lib/horaBogota";
 import { horaBogota } from "@/lib/llegadas";
 import { hoyEnBogota } from "@/hooks/useHoyDelEquipo";
 import { useTurnoTabla } from "@/hooks/useTurnoTabla";
+import { horaEnTurno, useTurnosDeLaGente, useTurnosEmpresa } from "@/hooks/useTurnosEmpresa";
 import {
   jornadaDe, JORNADAS, minutosTrabajados, ordenarPorAtencion, seccionDe, semanaDe, sumarDias,
-  type Jornada,
   type FilaTurno, type Motivo, type Nivel, type Seccion, type TipoFranja,
 } from "@/lib/turnoTabla";
 
@@ -459,7 +459,9 @@ export function TurnoTabla() {
   useEffect(() => {
     setFiltro((f) => (!esHoy && f === "activos" ? "trabajaron" : f));
   }, [esHoy]);
-  const [turno, setTurno] = useState<Jornada | null>(null);
+  // El turno elegido: el id de un turno de la empresa (o «am/pm/madrugada» si la
+  // lista de la empresa no carga).
+  const [turno, setTurno] = useState<string | null>(null);
   const [buscar, setBuscar] = useState("");
   const [calAbierto, setCalAbierto] = useState(false);
   const [abiertoId, setAbiertoId] = useState<string | null>(null);
@@ -468,7 +470,22 @@ export function TurnoTabla() {
   const fmtDia = (d: string, o: Intl.DateTimeFormatOptions) => new Date(`${d}T12:00:00-05:00`).toLocaleDateString(locale, { timeZone: "America/Bogota", ...o });
 
   const filas = useMemo(() => q.data?.filas ?? [], [q.data]);
-  const delTurno = useMemo(() => filas.filter((f) => !turno || jornadaDe(f.entrada) === turno), [filas, turno]);
+  // LOS TURNOS DE LA EMPRESA (27/11/2026): los botones salen de la lista de la
+  // empresa (Ajustes → Empresa). Cada persona va en el suyo, o en el de su puesto,
+  // o en el que contiene su hora de entrada. Sin lista: AM / PM / Madrugada por hora.
+  const turnosEmp = useTurnosEmpresa();
+  const catalogo = useMemo(() => (turnosEmp.data?.turnos ?? []).filter((x) => x.activa), [turnosEmp.data]);
+  const turnosGente = useTurnosDeLaGente(useMemo(() => filas.map((f) => f.userId), [filas]));
+  const opcionesTurno: Array<[string, string]> = catalogo.length
+    ? catalogo.map((x) => [x.id, x.nombre])
+    : JORNADAS.map((j): [string, string] => [j, t(j === "am" ? "hr.turno.jornada.am" : j === "pm" ? "hr.turno.jornada.pm" : "hr.turno.jornada.madrugada")]);
+  const turnoDe = useMemo(() => (f: FilaTurno): string | null => {
+    if (!catalogo.length) return jornadaDe(f.entrada);
+    const suyo = turnosGente.data?.get(f.userId)?.turno_id;
+    if (suyo && catalogo.some((x) => x.id === suyo)) return suyo;
+    return f.entrada ? catalogo.find((x) => horaEnTurno(f.entrada!, x))?.id ?? null : null;
+  }, [catalogo, turnosGente.data]);
+  const delTurno = useMemo(() => filas.filter((f) => !turno || turnoDe(f) === turno), [filas, turno, turnoDe]);
   const pasa = (f: FilaTurno, k: Filtro) =>
     k === "todos" ? true
       : k === "activos" ? f.activoAhora
@@ -836,10 +853,10 @@ export function TurnoTabla() {
               </div>
               {/* LA JORNADA (Alvaro, 27/11/2026): un botoncito, no la lista de horarios. */}
               <div className="flex shrink-0 gap-1 rounded-2xl border border-border/50 bg-background/40 p-1" role="group" aria-label={t("hr.turno.turno")}>
-                {([null, ...JORNADAS] as Array<Jornada | null>).map((j) => (
+                {([[null, t("hr.turno.jornada.todas")], ...opcionesTurno] as Array<[string | null, string]>).map(([j, etq]) => (
                   <button key={j ?? "todas"} type="button" onClick={() => setTurno(j)} aria-pressed={turno === j}
                     className={`h-8 flex-1 whitespace-nowrap rounded-xl px-3 text-xs font-medium transition lg:flex-none ${turno === j ? "bg-foreground/[0.1] text-foreground" : "text-muted-foreground hover:bg-foreground/[0.05] hover:text-foreground"}`}>
-                    {t(j === null ? "hr.turno.jornada.todas" : j === "am" ? "hr.turno.jornada.am" : j === "pm" ? "hr.turno.jornada.pm" : "hr.turno.jornada.madrugada")}
+                    {etq}
                   </button>
                 ))}
               </div>
