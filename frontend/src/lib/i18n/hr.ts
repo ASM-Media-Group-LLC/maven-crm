@@ -2313,6 +2313,8 @@ export const hr = {
   "hr.turno.motivo.tarde": { es: "Llegó {d} tarde", en: "Arrived {d} late" },
   "hr.turno.motivo.pocoActivo": { es: "Solo {n} % del tiempo activo", en: "Active only {n}% of the time" },
   "hr.turno.motivo.comida": { es: "Se pasó {n} min en la comida", en: "{n} min over on lunch" },
+  "hr.turno.motivo.comidaHora": { es: "Comió {d} fuera de su hora", en: "Had lunch {d} outside their time" },
+  "hr.turno.fueraDeHora": { es: "{d} fuera de su hora", en: "{d} outside their time" },
   "hr.turno.motivo.bano": { es: "Se pasó {n} min en el baño", en: "{n} min over in the restroom" },
   "hr.turno.motivo.avisos": { es: "Argos le avisó {n} veces", en: "Argos warned them {n} times" },
   "hr.turno.motivo.cortes": { es: "{n} cortes de internet", en: "{n} internet drops" },

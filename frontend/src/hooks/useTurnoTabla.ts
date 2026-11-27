@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { cargarHorarios } from "@/lib/horarioEmpleado";
 import { useFotosDe } from "@/hooks/useHoyDelEquipo";
 import {
-  armarFila, apareceEnElDia, sumarDias,
+  armarFila, apareceEnElDia, peor, sumarDias,
   type Aviso, type EntradaPersona, type FilaTurno, type Marca, type Pausa, type Segmento,
 } from "@/lib/turnoTabla";
 
@@ -155,7 +155,7 @@ export function useTurnoTabla(dia: string, esHoy: boolean, habilitado = true) {
       ausentes.forEach((f, i) => { if (!activos[i]) f.inactivo = true; });
 
       const ids2 = filas.map((f) => f.userId);
-      const [libres, tardes, cierres, gracias] = await Promise.all([
+      const [libres, tardes, cierres, gracias, fueraHora] = await Promise.all([
         // DÍA LIBRE (27/11/2026): lo marcado por RR. HH. o el supervisor. Si la tabla
         // todavía no existe o falla, nadie sale como libre (se ve igual que antes).
         db.from("argos_dia_libre").select("user_id, motivo").eq("dia", dia).in("user_id", ids2),
@@ -165,7 +165,14 @@ export function useTurnoTabla(dia: string, esHoy: boolean, habilitado = true) {
         db.from("argos_gracia_cierre").select("user_id, turno, conectado_min").in("user_id", ids2).gte("turno", sumarDias(dia, -7)).lt("turno", dia),
         // La gracia de cada uno (empresa o Posición). Sin la función todavía, 10.
         db.rpc("argos_gracia_minutos_de", { _ids: ids2 }),
+        // COMER FUERA DE SU HORA (27/11/2026): solo si la hora es obligatoria. Si la
+        // función falla o no existe, no se marca a nadie (se ve como antes).
+        db.rpc("argos_comida_fuera_de_hora", { _ids: ids2, _dia: dia }),
       ]);
+      const fueraHoraDe = new Map<string, number>();
+      if (!fueraHora.error) for (const r of (fueraHora.data ?? []) as Array<{ user_id: string; minutos: number | null }>) {
+        if (r.minutos != null) fueraHoraDe.set(r.user_id, r.minutos);
+      }
       const graciaDe = new Map<string, number>();
       if (!gracias.error) for (const r of (gracias.data ?? []) as Array<{ user_id: string; minutos: number }>) graciaDe.set(r.user_id, r.minutos);
       const libreDe = new Map<string, string | null>();
@@ -181,6 +188,10 @@ export function useTurnoTabla(dia: string, esHoy: boolean, habilitado = true) {
       }
       for (const f of filas) {
         f.graciaMin = graciaDe.get(f.userId) ?? 10;
+        const fh = fueraHoraDe.get(f.userId);
+        f.comidaFueraHoraMin = fh ?? null;
+        // Aviso amarillo, sin descontar (Alvaro, 27/11/2026).
+        if (fh && fh > 0) { f.motivos.push({ k: "comidaHora", min: fh }); f.nivel = peor(f.nivel, "ambar"); }
         if (libreDe.has(f.userId)) {
           f.diaLibre = { motivo: libreDe.get(f.userId) ?? null };
           if (f.llegada == null) { f.nivel = "ok"; f.motivos = []; f.noVino = false; }
