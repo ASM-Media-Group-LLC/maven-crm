@@ -182,4 +182,4 @@ Ambos sets ya tienen migrations subidas (`20260504100000`, `20260504110000`) per
 ## 2026-11-27 · Drive: espacio por puesto y por persona, con «sin tope»
 - Grace: María (editora) llegó a 97 de 100 GB. Se creó la unidad compartida «Contenido» (sin tope, de la empresa) y se movieron ahí CONTENIDO MASSIVE / PLUS / UNLOK (112 GB, 6.177 ítems); María es editora de la unidad y dueña de sus carpetas. Su Mi unidad quedó en ~1,5 GB.
 - PR: cada puesto trae N GB o «sin tope» (Ajustes → Empresa) y a una persona se le puede poner otro o «sin tope» (Drive → Cupos). Orden: persona → puesto (sin tope si alguno; si no, el mayor) → 50 GB. La edge drive salta el chequeo con cupo null; el disco del NAS sigue mandando.
-- Orden para publicar: unir el PR (despliega la edge) y DESPUÉS aplicar 20261127210000_drive_espacio_por_puesto.sql (pide OK del dueño).
+- Publicado 27/11 con OK del dueño: PR #309 (edge drive desplegada) y luego la migración 20261127222141_drive_espacio_por_puesto.sql. «Editores de contenido exclusivo» quedó sin tope (María y David); a María se le quitó su cupo propio de 100 GB para que mande el del puesto.
