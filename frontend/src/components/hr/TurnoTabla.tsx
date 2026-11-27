@@ -259,6 +259,11 @@ const ORDEN_LEYENDA: Array<[TipoFranja, TranslationKey]> = [
   ["sin_camara", "hr.turno.franja.sinCamara"], ["corte", "hr.turno.franja.corte"],
 ];
 
+const ETIQUETA_FRANJA: Record<TipoFranja, TranslationKey> = {
+  trabajo: "hr.turno.franja.trabajo", comida: "hr.turno.franja.comida", bano: "hr.turno.franja.bano",
+  pausa: "hr.turno.franja.pausa", sin_camara: "hr.turno.franja.sinCamara", sin_pantalla: "hr.turno.franja.sinCamara", corte: "hr.turno.franja.corte",
+};
+
 function Franja({ f, t, ahora }: { f: FilaTurno; t: Tr; ahora: number }) {
   const tramos = f.franja;
   if (!tramos.length && f.turnoInicio == null) return null;
@@ -275,11 +280,14 @@ function Franja({ f, t, ahora }: { f: FilaTurno; t: Tr; ahora: number }) {
         {f.turnoInicio != null && f.turnoFin != null && (
           <div className="absolute inset-y-0 rounded-full border border-border/60" style={{ left: pos(f.turnoInicio), width: ancho(f.turnoInicio, f.turnoFin) }} />
         )}
+        {/* Al pasar el mouse, qué es cada pedazo y a qué hora (Alvaro, 27/11/2026). */}
         {capas.map((x, i) => (
-          <div key={i} className={`absolute inset-y-0 ${COLOR_FRANJA[x.tipo]}`} style={{ left: pos(x.inicio), width: ancho(x.inicio, x.fin) }} />
+          <div key={i} title={`${t(ETIQUETA_FRANJA[x.tipo])} · ${hora(x.inicio)} – ${hora(x.fin)} · ${duracion(t, Math.max(1, Math.round((x.fin - x.inicio) / 60_000)))}`}
+            className={`absolute inset-y-0 ${COLOR_FRANJA[x.tipo]}`} style={{ left: pos(x.inicio), width: ancho(x.inicio, x.fin) }} />
         ))}
         {f.marcasAviso.map((at, i) => (
-          <div key={`a${i}`} className="absolute inset-y-0 w-0.5 bg-destructive" style={{ left: pos(at) }} />
+          <div key={`a${i}`} title={`${t("hr.turno.franja.aviso")} · ${hora(at)}`}
+            className="absolute -inset-y-0.5 w-1 cursor-help rounded-full bg-destructive" style={{ left: pos(at) }} />
         ))}
         {/* Lo que falta del turno, más tenue, y la marca de «ahora» (27/11/2026). */}
         {f.enCurso && ahora < hasta && (
@@ -442,7 +450,7 @@ export function TurnoTabla() {
           type="button"
           onClick={() => setAbiertoId(abierta ? null : f.userId)}
           aria-expanded={abierta}
-          className="group grid w-full grid-cols-[1fr_auto] items-center gap-x-4 gap-y-2 rounded-2xl px-3 py-3.5 text-left transition hover:bg-foreground/[0.04] md:grid-cols-[minmax(11rem,15rem)_1fr_auto_1rem]"
+          className="group grid w-full grid-cols-[1fr_auto] items-center gap-x-4 gap-y-2 rounded-2xl px-3 py-3.5 text-left transition hover:bg-foreground/[0.04] md:grid-cols-[minmax(11rem,15rem)_1fr_10.5rem_1rem]"
         >
           <div className="flex min-w-0 items-center gap-2.5">
             <span className="relative shrink-0">

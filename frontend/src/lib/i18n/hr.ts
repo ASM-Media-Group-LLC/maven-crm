@@ -2183,6 +2183,7 @@ export const hr = {
   "hr.turno.franja.bano": { es: "Baño", en: "Restroom" },
   "hr.turno.franja.sinCamara": { es: "Sin cámara o pantalla", en: "No camera or screen" },
   "hr.turno.franja.corte": { es: "Sin internet", en: "No internet" },
+  "hr.turno.franja.pausa": { es: "Pausa", en: "Break" },
   "hr.turno.franja.aviso": { es: "Aviso de Argos", en: "Argos warning" },
   "hr.turno.franja.avisos": { es: "{n} avisos", en: "{n} warnings" },
   "hr.turno.normal.tardeVez": { es: "{n}.ª vez tarde esta semana", en: "late {n} times this week" },
