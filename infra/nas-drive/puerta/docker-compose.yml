@@ -61,12 +61,13 @@ services:
     # 100.64.206.91, utun0) y la app de escritorio con sesión de corp@
     # (unlok-workstation, 100.127.43.97, utun5). El pedido de la puerta entraba
     # por utun0, pero la mini contestaba por utun5 (su ruta hacia 100.95.94.18)
-    # y la respuesta se perdía. Por eso ahora apunta a 100.127.43.97, la entrada
-    # por la que la mini sí contesta. Arreglo de fondo pendiente: dejar UN solo
-    # Tailscale en la mini y volver a apuntar al nombre.
+    # y la respuesta se perdía. Por eso apunta a `unlok-workstation` (la entrada
+    # 100.127.43.97, por la que la mini sí contesta), por nombre como pide la
+    # regla de arriba. Arreglo de fondo pendiente: dejar UN solo Tailscale en la
+    # mini y entonces volver a `unlok-server-5`.
     command: >
       caddy reverse-proxy --from :8080
-      --to 100.127.43.97:8790
+      --to unlok-workstation.tail11d450.ts.net:8790
     restart: unless-stopped
 
 volumes:
