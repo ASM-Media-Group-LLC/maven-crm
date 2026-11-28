@@ -392,11 +392,11 @@ function TiraDelDia({ capturas, t }: { capturas: CapturaDia[]; t: Tr }) {
         const hc = m.camara ? formatUI(new Date(m.camara.createdAt), "HH:mm:ss") : null;
         return (
           <Dialog open onOpenChange={(o) => { if (!o) setVisorIdx(null); }}>
-            <DialogContent className="max-w-5xl bg-none from-transparent p-2 sm:p-3">
+            <DialogContent className="max-w-5xl bg-none from-transparent p-2 pt-14 sm:p-3 sm:pt-14">
               <DialogTitle className="sr-only">{t("hr.exp.pantallazosDia")}</DialogTitle>
               <div className="flex flex-col gap-2.5">
                 <div className="relative overflow-hidden rounded-xl border border-border/50 bg-black">
-                  <div className="relative aspect-[16/10] w-full">
+                  <div className="relative mx-auto aspect-[16/10] max-h-[68vh] w-full max-w-[calc(68vh*16/10)]">
                     {m.pantalla ? (
                       urlP ? <img src={urlP} alt="" className="h-full w-full object-contain" /> : <div className="flex h-full w-full items-center justify-center text-muted-foreground"><Loader2 className="h-6 w-6 animate-spin" /></div>
                     ) : (
