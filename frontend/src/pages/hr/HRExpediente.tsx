@@ -31,7 +31,7 @@ import { GraciaDelDia } from "@/components/hr/GraciaDelDia";
 import { AppsDelDia } from "@/components/hr/AppsDelDia";
 import { EquipoDelDia } from "@/components/hr/EquipoDelDia";
 import { AhoraEnVivo } from "@/components/hr/AhoraEnVivo";
-import { LoQuePaso, useHubDelDia, type Evento } from "@/components/hr/TurnoTabla";
+import { LoQuePaso, ResumenDelTurno, useHubDelDia, type Evento } from "@/components/hr/TurnoTabla";
 import { claveDeCausaDeEvento } from "@/lib/historialHub";
 import { PruebaDelMomento } from "@/components/hr/PruebaDelMomento";
 import { useTurnoTabla } from "@/hooks/useTurnoTabla";
@@ -989,6 +989,7 @@ function ExpedientePermitido() {
   const filaTurno = turno.data?.filas.find((f) => f.userId === userId && f.llegada != null) ?? null;
   // Lo del Hub (supervisores) también en «Lo que pasó» (27/11/2026).
   const hubDia = useHubDelDia(diaSel);
+  const [pestanaTurno, setPestanaTurno] = useState<"resumen" | "paso">("resumen");
   const hubDeEl = useMemo(() => (hubDia.data?.eventos ?? []).filter((e) => e.userId === userId), [hubDia.data, userId]);
 
   // % DE ATENCIÓN DEL DÍA (estilo Hubstaff): de los pantallazos que la IA ya
@@ -1332,11 +1333,27 @@ function ExpedientePermitido() {
           </div>
           )}
           {filaTurno && (
-            <div className="mt-4 rounded-2xl border border-border/60 bg-card/30">
-              {/* La ficha AGREGA (Alvaro, 27/11/2026: «si no, ¿de qué me sirve esta si ya
-                  lo vi en la anterior?»): cada línea se abre con lo que dijo Argos y la prueba. */}
-              <LoQuePaso f={filaTurno} t={t} ahora={turno.data?.calculadoAt ?? Date.now()} hub={hubDeEl}
-                detalle={(ev) => <DetalleEvento ev={ev} capturas={dia.capturas} t={t} />} />
+            // DOS PESTAÑAS (Alvaro, 28/11/2026): se cae en el RESUMEN (lo que antes era el
+            // desplegable de Shift: el avance y los cinco renglones, todo junto) y al lado
+            // «Lo que pasó en su turno» (la franja y cada cosa, que se abre con su prueba).
+            <div className="mt-5">
+              <div role="tablist" className="mb-3 inline-flex rounded-full border border-border/50 bg-card/30 p-1">
+                {(["resumen", "paso"] as const).map((k) => (
+                  <button key={k} type="button" role="tab" aria-selected={pestanaTurno === k} onClick={() => setPestanaTurno(k)}
+                    className={`rounded-full px-4 py-1.5 text-sm font-medium transition ${pestanaTurno === k ? "bg-foreground text-background shadow-sm" : "text-muted-foreground hover:text-foreground"}`}>
+                    {t(k === "resumen" ? "hr.exp.turno.resumen" : "hr.exp.turno.paso")}
+                  </button>
+                ))}
+              </div>
+              {pestanaTurno === "resumen" ? (
+                <ResumenDelTurno f={filaTurno} t={t} calculadoAt={turno.data?.calculadoAt ?? Date.now()}
+                  hub={hubDia.data?.resumen.find((r) => r.userId === userId)} />
+              ) : (
+                <div className="rounded-2xl border border-border/60 bg-card/30">
+                  <LoQuePaso f={filaTurno} t={t} ahora={turno.data?.calculadoAt ?? Date.now()} hub={hubDeEl} sinTitulo
+                    detalle={(ev) => <DetalleEvento ev={ev} capturas={dia.capturas} t={t} />} />
+                </div>
+              )}
             </div>
           )}
         </div>

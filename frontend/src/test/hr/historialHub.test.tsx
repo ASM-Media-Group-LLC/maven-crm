@@ -139,7 +139,7 @@ describe("la lógica de la pestaña", () => {
     expect(argos).not.toContain('{ k: "hub", label: t("hr.monia.tab.hub") }');
     expect(argos).toContain('hub: "turno"');
     expect(turnoTabla).toContain('rpc("hub_historial"');
-    expect(turnoTabla).toContain("celdaHub(t, hubResumen.get(f.userId)!)");
+    expect(turnoTabla).toContain("celdaHub(t, hub)");
   });
 });
 

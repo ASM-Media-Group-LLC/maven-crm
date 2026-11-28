@@ -463,7 +463,7 @@ export function useHubDelDia(dia: string) {
 
 /** `detalle`: en la ficha cada línea se abre y muestra más (lo que dijo Argos, la
  *  prueba). En Shift va sin detalle: la línea ya dice qué fue y cuánto duró. */
-export function LoQuePaso({ f, t, ahora, detalle, hub = [] }: { f: FilaTurno; t: Tr; ahora: number; detalle?: (ev: Evento) => ReactNode; hub?: EventoHub[] }) {
+export function LoQuePaso({ f, t, ahora, detalle, hub = [], sinTitulo = false }: { f: FilaTurno; t: Tr; ahora: number; detalle?: (ev: Evento) => ReactNode; hub?: EventoHub[]; sinTitulo?: boolean }) {
   const [foco, setFoco] = useState<number | null>(null);
   const [abierto, setAbierto] = useState<number | null>(null);
   const eventos = useMemo(() => eventosDelDia(f, hub), [f, hub]);
@@ -477,7 +477,7 @@ export function LoQuePaso({ f, t, ahora, detalle, hub = [] }: { f: FilaTurno; t:
   const trabajo = tramos.filter((x) => x.tipo === "trabajo");
   return (
     <div className="px-4 py-4">
-      <p className="mb-3 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">{t("hr.turno.paso.titulo")}</p>
+      {!sinTitulo && <p className="mb-3 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">{t("hr.turno.paso.titulo")}</p>}
       {/* La raya, más alta, con cada pedazo numerado por su línea de abajo. */}
       <div className="relative h-3 overflow-hidden rounded-full bg-foreground/[0.06]" onMouseLeave={() => setFoco(null)}>
         {trabajo.map((x, i) => (
@@ -567,6 +567,77 @@ const TITULO_SECCION: Record<Seccion, TranslationKey> = {
   libres: "hr.turno.sec.libres",
 };
 
+/** Cómo va: lo que ya pasó del turno sin su comida y baño permitidos, lo que lleva de
+ *  verdad y cuánto va atrás (Alvaro, 27/11/2026). */
+function marchaDe(f: FilaTurno, calculadoAt: number) {
+  if (f.turnoInicio == null) return null;
+  const pasados = Math.max(0, Math.round((Math.min(calculadoAt, f.turnoFin ?? calculadoAt) - f.turnoInicio) / 60_000));
+  const deberia = Math.max(0, pasados - Math.min(f.comidaMin, f.comidaTope) - Math.min(f.banoMin, f.banoTope));
+  const lleva = minutosTrabajados(f);
+  return { deberia, lleva, falta: Math.max(0, deberia - lleva) };
+}
+
+/** EL RESUMEN DEL TURNO (Alvaro, 28/11/2026: «una vez uno le da clic al empleado desde
+ *  Shift, que te lleve a la plantilla del empleado… caer en lo del 100 %»): el avance
+ *  y los cinco renglones. Antes era el desplegable de Shift; ahora es la primera
+ *  pestaña de la ficha. */
+export function ResumenDelTurno({ f, t, calculadoAt, hub }: { f: FilaTurno; t: Tr; calculadoAt: number; hub?: ResumenHub }) {
+  const ll = celdaLlegada(t, f);
+  return (
+      <div className="divide-y divide-border/40 rounded-2xl border border-border/40 bg-card/30">
+        {(() => {
+          const m = f.enCurso ? marchaDe(f, calculadoAt) : null;
+          const pct = m ? (m.deberia > 0 ? Math.min(1, m.lleva / m.deberia) : 1) : Math.min(1, ((): number => { const mt = minutosTurno(f); return mt ? minutosTrabajados(f) / mt : 0; })());
+          return (
+            // VISUAL (Alvaro, 27/11/2026: «puro texto»): el % grande; la barra y, debajo,
+            // a sus lados, lo que lleva y lo que debería llevar; la pastilla aparte.
+            <div className="flex items-center gap-5 px-4 py-4">
+              <div className="w-24 shrink-0">
+                <p className="font-display text-4xl font-bold tabular-nums leading-none tracking-tight">{Math.round(pct * 100)}%</p>
+                <p className="mt-1 text-[11px] text-muted-foreground">{t(m ? "hr.turno.lista.avanceHoy" : "hr.turno.lista.turno")}</p>
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className={PISTA}>
+                  <div className={`h-full rounded-full ${m ? colorAvance(m.falta) : COLOR_FRANJA.trabajo}`} style={{ width: `${pct * 100}%` }} />
+                </div>
+                <div className="mt-2 flex items-start justify-between gap-3 text-xs tabular-nums">
+                  <span><span className="block text-[11px] text-muted-foreground">{t("hr.turno.v2.lleva")}</span><span className="font-semibold">{duracion(t, m ? m.lleva : minutosTrabajados(f))}</span></span>
+                  <span className="text-right"><span className="block text-[11px] text-muted-foreground">{t(m ? "hr.turno.v2.deberia" : "hr.turno.v2.turno")}</span><span className="font-semibold">{duracion(t, m ? m.deberia : (minutosTurno(f) ?? 0))}</span></span>
+                </div>
+              </div>
+              {m && (
+                <span className="hidden shrink-0 items-center gap-2 rounded-full border border-border/50 bg-foreground/[0.04] px-3 py-1.5 text-xs font-medium tabular-nums sm:inline-flex">
+                  <span className={`h-2 w-2 rounded-full ${colorAvance(m.falta)}`} aria-hidden />
+                  {m.falta > 5 ? t("hr.turno.atras", { d: duracion(t, m.falta) }) : t("hr.turno.alDia")}
+                </span>
+              )}
+            </div>
+          );
+        })()}
+        {/* «Lo que pasó» completo vive en la ficha, no aquí (Alvaro, 27/11/2026: «no vamos
+            a tener un preview y luego entrar ya todo en el perfil»). Aquí, el resumen. */}
+        {([
+          [Clock, t("hr.turno.col.llegada"), ll],
+          [UtensilsCrossed, t("hr.turno.col.comida"), celdaComida(t, f)],
+          [DoorOpen, t("hr.turno.col.bano"), celdaBano(t, f)],
+          [Bell, t("hr.turno.col.avisos"), celdaAvisos(t, f)],
+          [Wifi, t("hr.turno.col.conexion"), celdaConexion(t, f)],
+          ...(hub ? [[MonitorUp, t("hr.turno.col.hub"), celdaHub(t, hub)] as [typeof Clock, string, ReturnType<typeof celdaLlegada>]] : []),
+        ] as Array<[typeof Clock, string, ReturnType<typeof celdaLlegada>]>).map(([Icono, etq, x]) => (
+          <div key={etq} className="flex flex-wrap items-center gap-x-4 gap-y-1 px-4 py-3">
+            <span className="flex w-40 shrink-0 items-center gap-2 text-sm text-muted-foreground"><Icono className="h-4 w-4" />{etq}</span>
+            <span className={`text-sm font-medium tabular-nums ${x.tenue ? "text-muted-foreground" : "text-foreground"}`}>{x.arriba || "—"}</span>
+            {x.abajo && (
+              <span className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                <Punto nivel={x.nivel} />{x.abajo}
+              </span>
+            )}
+          </div>
+        ))}
+      </div>
+  );
+}
+
 export function TurnoTabla() {
   const { t, language } = useLanguage();
   const navegar = useNavigate();
@@ -646,8 +717,6 @@ export function TurnoTabla() {
   // pasa aquí): los mismos números que tenía Workday (useTurnoPersonas, el día entero).
   const { personas: medidas } = useTurnoPersonas(dia, 0, 24, true);
   // EL HUB DE LOS SUPERVISORES (27/11/2026: la pestaña «Hub history» pasa aquí).
-  const hub = useHubDelDia(dia);
-  const hubResumen = useMemo(() => new Map((hub.data?.resumen ?? []).map((r) => [r.userId, r])), [hub.data]);
   const medidaDe = useMemo(() => new Map(medidas.map((p) => [p.userId, p])), [medidas]);
   const promedioDe = (gente: FilaTurno[], f: (p: PersonaTurno) => number | null) => {
     const v = gente.map((g) => medidaDe.get(g.userId)).filter((p): p is PersonaTurno => !!p && !p.sinNota).map(f).filter((x): x is number => x != null);
@@ -761,8 +830,10 @@ export function TurnoTabla() {
       <div key={f.userId} className={`flex flex-col rounded-2xl transition ${abierta ? "bg-foreground/[0.04]" : ""}`}>
         <button
           type="button"
-          onClick={() => setAbiertoId(abierta ? null : f.userId)}
-          aria-expanded={abierta}
+          // Si vino, tocarla lleva directo a su ficha de ese día (Alvaro, 28/11/2026: «ya no
+          // hace un drop»); si no vino, se abre para marcar el día libre.
+          onClick={() => (f.llegada != null ? abrir(f) : setAbiertoId(abierta ? null : f.userId))}
+          aria-expanded={f.llegada != null ? undefined : abierta}
           className="group grid w-full grid-cols-[1fr_auto] items-center gap-x-4 gap-y-2 rounded-2xl px-3 py-3.5 text-left transition hover:bg-foreground/[0.04] md:grid-cols-[minmax(11rem,15rem)_1fr_10.5rem_1rem]"
         >
           <div className="flex min-w-0 items-center gap-2.5">
@@ -804,7 +875,9 @@ export function TurnoTabla() {
               );
             })()}
           </div>
-          <ChevronDown className={`hidden h-4 w-4 text-muted-foreground transition md:block ${abierta ? "rotate-180" : ""}`} />
+          {f.llegada != null
+            ? <ChevronRight className="hidden h-4 w-4 text-muted-foreground transition group-hover:translate-x-0.5 md:block" />
+            : <ChevronDown className={`hidden h-4 w-4 text-muted-foreground transition md:block ${abierta ? "rotate-180" : ""}`} />}
         </button>
         {abierta && f.llegada == null && (
           <div className="flex flex-wrap items-center gap-3 px-3 pb-4 md:pl-14">
@@ -816,72 +889,6 @@ export function TurnoTabla() {
                 {t(f.diaLibre ? "hr.turno.libre.quitar" : "hr.turno.libre.marcar")}
               </Button>
             )}
-          </div>
-        )}
-        {abierta && f.llegada != null && (
-          // LISTA SIMPLE (Alvaro, 27/11/2026): sin cajas, un renglón por dato.
-          <div className="flex flex-col gap-4 px-3 pb-5 md:pl-14">
-            <div className="divide-y divide-border/40 rounded-2xl border border-border/40 bg-card/30">
-              {(() => {
-                const m = f.enCurso ? marcha(f) : null;
-                const pct = m ? (m.deberia > 0 ? Math.min(1, m.lleva / m.deberia) : 1) : Math.min(1, parte(f) ?? 0);
-                return (
-                  // VISUAL (Alvaro, 27/11/2026: «puro texto»): el % grande; la barra y, debajo,
-                  // a sus lados, lo que lleva y lo que debería llevar; la pastilla aparte.
-                  <div className="flex items-center gap-5 px-4 py-4">
-                    <div className="w-24 shrink-0">
-                      <p className="font-display text-4xl font-bold tabular-nums leading-none tracking-tight">{Math.round(pct * 100)}%</p>
-                      <p className="mt-1 text-[11px] text-muted-foreground">{t(m ? "hr.turno.lista.avanceHoy" : "hr.turno.lista.turno")}</p>
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <div className={PISTA}>
-                        <div className={`h-full rounded-full ${m ? colorAvance(m.falta) : COLOR_FRANJA.trabajo}`} style={{ width: `${pct * 100}%` }} />
-                      </div>
-                      <div className="mt-2 flex items-start justify-between gap-3 text-xs tabular-nums">
-                        <span><span className="block text-[11px] text-muted-foreground">{t("hr.turno.v2.lleva")}</span><span className="font-semibold">{duracion(t, m ? m.lleva : minutosTrabajados(f))}</span></span>
-                        <span className="text-right"><span className="block text-[11px] text-muted-foreground">{t(m ? "hr.turno.v2.deberia" : "hr.turno.v2.turno")}</span><span className="font-semibold">{duracion(t, m ? m.deberia : (minutosTurno(f) ?? 0))}</span></span>
-                      </div>
-                    </div>
-                    {m && (
-                      <span className="hidden shrink-0 items-center gap-2 rounded-full border border-border/50 bg-foreground/[0.04] px-3 py-1.5 text-xs font-medium tabular-nums sm:inline-flex">
-                        <span className={`h-2 w-2 rounded-full ${colorAvance(m.falta)}`} aria-hidden />
-                        {m.falta > 5 ? t("hr.turno.atras", { d: duracion(t, m.falta) }) : t("hr.turno.alDia")}
-                      </span>
-                    )}
-                  </div>
-                );
-              })()}
-              {/* «Lo que pasó» completo vive en la ficha, no aquí (Alvaro, 27/11/2026: «no vamos
-                  a tener un preview y luego entrar ya todo en el perfil»). Aquí, el resumen. */}
-              {([
-                [Clock, t("hr.turno.col.llegada"), ll],
-                [UtensilsCrossed, t("hr.turno.col.comida"), celdaComida(t, f)],
-                [DoorOpen, t("hr.turno.col.bano"), celdaBano(t, f)],
-                [Bell, t("hr.turno.col.avisos"), celdaAvisos(t, f)],
-                [Wifi, t("hr.turno.col.conexion"), celdaConexion(t, f)],
-                ...(hubResumen.get(f.userId) ? [[MonitorUp, t("hr.turno.col.hub"), celdaHub(t, hubResumen.get(f.userId)!)] as [typeof Clock, string, ReturnType<typeof celdaLlegada>]] : []),
-              ] as Array<[typeof Clock, string, ReturnType<typeof celdaLlegada>]>).map(([Icono, etq, x]) => (
-                <div key={etq} className="flex flex-wrap items-center gap-x-4 gap-y-1 px-4 py-3">
-                  <span className="flex w-40 shrink-0 items-center gap-2 text-sm text-muted-foreground"><Icono className="h-4 w-4" />{etq}</span>
-                  <span className={`text-sm font-medium tabular-nums ${x.tenue ? "text-muted-foreground" : "text-foreground"}`}>{x.arriba || "—"}</span>
-                  {x.abajo && (
-                    <span className="flex items-center gap-1.5 text-sm text-muted-foreground">
-                      <Punto nivel={x.nivel} />{x.abajo}
-                    </span>
-                  )}
-                </div>
-              ))}
-            </div>
-            <div className="flex flex-wrap items-center gap-2">
-              <Button size="sm" variant="outline" className="rounded-full" onClick={() => abrir(f)}>
-                {t("hr.turno.verDia")}<ChevronRight className="ml-1 h-3.5 w-3.5" />
-              </Button>
-              {puedeLibre && (
-                <Button size="sm" variant="ghost" className="rounded-full" disabled={guardandoLibre === f.userId} onClick={() => void cambiarLibre(f, !f.diaLibre)}>
-                  {t(f.diaLibre ? "hr.turno.libre.quitar" : "hr.turno.libre.marcar")}
-                </Button>
-              )}
-            </div>
           </div>
         )}
       </div>

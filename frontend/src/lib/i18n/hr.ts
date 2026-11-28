@@ -2363,6 +2363,8 @@ export const hr = {
   "hr.turno.chip.camara": { es: "Con cámara y pantalla: {c}", en: "With camera and screen: {c}" },
   "hr.turno.chip.gracia": { es: "Gracia usada: {g}", en: "Grace used: {g}" },
   "hr.exp.tab.resumen": { es: "Resumen", en: "Summary" },
+  "hr.exp.turno.resumen": { es: "Resumen", en: "Summary" },
+  "hr.exp.turno.paso": { es: "Lo que pasó en su turno", en: "What happened in their shift" },
   "hr.exp.tab.fotos": { es: "Fotos por hora", en: "Photos by hour" },
   "hr.exp.tab.hizo": { es: "Lo que hizo", en: "What they did" },
   "hr.exp.tab.dia": { es: "Por hora", en: "Hourly" },
