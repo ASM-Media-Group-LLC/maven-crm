@@ -10,7 +10,7 @@ export interface ItemPendiente {
 
 export interface Ocultos { hoy: boolean; sugerencias: string[] }
 
-const CLAVE_HOY = "maven.pendientes.cerradoEl";
+const CLAVE_HOY = "maven.pendientes.cerradoA";
 const CLAVE_SUG = "maven.pendientes.sugerenciasDespues";
 /** «Ahora no» deja una sugerencia escondida una semana. */
 const DIAS_SUGERENCIA = 7;
@@ -25,15 +25,21 @@ function escribir(k: string, v: string) {
 }
 
 export function leerOcultos(ahora: Date): Ocultos {
-  const hoy = leer(CLAVE_HOY) === dia(ahora);
+  // 27/11/2026 (Alvaro): la X lo esconde solo 5 minutos; después vuelve a salir
+  // mientras quede algo. Guarda la hora en que se cerró.
+  const cerradoEn = Number(leer(CLAVE_HOY) ?? "");
+  const hoy = Number.isFinite(cerradoEn) && cerradoEn > 0 && ahora.getTime() - cerradoEn < VUELVE_MS;
   let mapa: Record<string, string> = {};
   try { mapa = JSON.parse(leer(CLAVE_SUG) ?? "{}") as Record<string, string>; } catch { mapa = {}; }
   const sugerencias = Object.entries(mapa).filter(([, hasta]) => hasta > dia(ahora)).map(([k]) => k);
   return { hoy, sugerencias };
 }
 
-/** La X: no vuelve hasta mañana (y vuelve mientras quede algo). */
-export function ocultarHoy(ahora: Date) { escribir(CLAVE_HOY, dia(ahora)); }
+/** Cada cuánto vuelve a salir después de cerrarlo con la X. */
+export const VUELVE_MS = 5 * 60_000;
+
+/** La X: lo esconde 5 minutos (y vuelve mientras quede algo). */
+export function ocultarHoy(ahora: Date) { escribir(CLAVE_HOY, String(ahora.getTime())); }
 
 export function ocultarSugerencia(clave: string, ahora: Date) {
   let mapa: Record<string, string> = {};

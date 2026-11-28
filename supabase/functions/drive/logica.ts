@@ -130,8 +130,10 @@ export const legible = (b: number) =>
   b >= GB ? `${(b / GB).toFixed(b >= 10 * GB ? 0 : 1)} GB` : `${Math.max(1, Math.round(b / (1024 * 1024)))} MB`;
 
 /** ¿Le alcanza el cupo? Cuenta la papelera y lo que se está subiendo (ya
- *  ocupan o reservaron su lugar en el NAS). */
-export function chequearCupo(usado: number, cupo: number, size: number) {
+ *  ocupan o reservaron su lugar en el NAS). `null` = SIN TOPE (27/11/2026: por
+ *  puesto o por persona); entonces solo manda el disco del NAS (hayLugarEnElNas). */
+export function chequearCupo(usado: number, cupo: number | null, size: number) {
+  if (cupo == null) return;
   if (usado + size > cupo) {
     throw new HttpError(
       `No te alcanza el espacio: usas ${legible(usado)} de ${legible(cupo)} y este archivo pesa ${legible(size)}. ` +

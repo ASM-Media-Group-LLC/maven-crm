@@ -738,7 +738,8 @@ export function useSubirUnArchivo() {
 
 // ── Cupo ─────────────────────────────────────────────────────────────────────
 
-export interface UsoDrive { usado: number; cupo: number }
+/** cupo null = SIN TOPE (por puesto o por persona, 27/11/2026). */
+export interface UsoDrive { usado: number; cupo: number | null }
 
 /** Cuánto uso y cuánto tengo (50 GB salvo que un admin me haya puesto otro).
  *  Cuenta la papelera: sigue ocupando lugar en el NAS. */
@@ -751,9 +752,10 @@ export function useUsoDrive() {
     queryFn: async (): Promise<UsoDrive> => {
       const { data, error } = await supabase.rpc("drive_uso" as never);
       if (error) throw error;
-      const filas = data as unknown as { usado: number; cupo: number }[] | { usado: number; cupo: number } | null;
+      const filas = data as unknown as { usado: number; cupo: number | null }[] | { usado: number; cupo: number | null } | null;
       const f = Array.isArray(filas) ? filas[0] : filas ?? undefined;
-      return { usado: Number(f?.usado ?? 0), cupo: Number(f?.cupo ?? 0) };
+      if (!f) throw new Error("drive_uso sin respuesta");
+      return { usado: Number(f.usado ?? 0), cupo: f.cupo == null ? null : Number(f.cupo) };
     },
   });
 }
@@ -787,7 +789,7 @@ export function useCrearUnidad() {
   });
 }
 
-export interface UsoDePersona { user_id: string; nombre: string; usado: number; cupo: number; cupo_propio: boolean }
+export interface UsoDePersona { user_id: string; nombre: string; usado: number; cupo: number | null; cupo_propio: boolean }
 
 /** Para el admin: todas las personas de su agencia con su uso y su cupo. */
 export function useUsosDeMiAgencia(habilitado: boolean) {
@@ -798,24 +800,30 @@ export function useUsosDeMiAgencia(habilitado: boolean) {
     queryFn: async (): Promise<UsoDePersona[]> => {
       const { data, error } = await supabase.rpc("drive_usos_de_mi_agencia" as never);
       if (error) throw error;
-      return ((data ?? []) as UsoDePersona[]).map((u) => ({ ...u, usado: Number(u.usado), cupo: Number(u.cupo) }));
+      return ((data ?? []) as UsoDePersona[]).map((u) => ({ ...u, usado: Number(u.usado), cupo: u.cupo == null ? null : Number(u.cupo) }));
     },
   });
 }
 
-/** El admin cambia el cupo de alguien (en bytes) o lo vuelve al general
- *  (null). */
+/** El admin cambia el cupo de alguien (en bytes), lo deja SIN TOPE
+ *  (`sinTope`) o lo vuelve al de su puesto / el general (bytes null). */
 export function useGuardarCupo() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async ({ userId, bytes }: { userId: string; bytes: number | null }) => {
+    mutationFn: async ({ userId, bytes, sinTope = false }: { userId: string; bytes: number | null; sinTope?: boolean }) => {
+      if (sinTope) {
+        const { error } = await tabla("drive_cupos")
+          .upsert({ user_id: userId, bytes_max: 0, sin_tope: true } as never, { onConflict: "user_id" });
+        if (error) throw error;
+        return;
+      }
       if (bytes === null) {
         const { error } = await tabla("drive_cupos").delete().eq("user_id", userId);
         if (error) throw error;
         return;
       }
       const { error } = await tabla("drive_cupos")
-        .upsert({ user_id: userId, bytes_max: Math.round(bytes) } as never, { onConflict: "user_id" });
+        .upsert({ user_id: userId, bytes_max: Math.round(bytes), sin_tope: false } as never, { onConflict: "user_id" });
       if (error) throw error;
     },
     onSuccess: () => {
