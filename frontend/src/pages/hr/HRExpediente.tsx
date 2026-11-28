@@ -2,7 +2,7 @@ import { toast } from "sonner";
 import { exportarExpediente } from "@/lib/posiciones/exportarExpediente";
 import { usePermissions } from "@/hooks/usePermissions";
 import { formatUI } from "@/lib/formatoHora";
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent as TeclaReact, type ReactNode } from "react";
 import { enHoras } from "@/lib/duracion";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { format } from "date-fns";
@@ -30,7 +30,8 @@ import { GraciaDelDia } from "@/components/hr/GraciaDelDia";
 import { AppsDelDia } from "@/components/hr/AppsDelDia";
 import { EquipoDelDia } from "@/components/hr/EquipoDelDia";
 import { AhoraEnVivo } from "@/components/hr/AhoraEnVivo";
-import { LoQuePaso } from "@/components/hr/TurnoTabla";
+import { LoQuePaso, type Evento } from "@/components/hr/TurnoTabla";
+import { PruebaDelMomento } from "@/components/hr/PruebaDelMomento";
 import { useTurnoTabla } from "@/hooks/useTurnoTabla";
 import { CronologiaDelDia } from "@/components/hr/CronologiaDelDia";
 import { useDisenoPulido } from "@/hooks/useDisenoPulido";
@@ -1131,8 +1132,15 @@ function ExpedientePermitido() {
                 { k: "faltas", etq: t("hr.exp.c.faltas"), v: String(dia.faltas.length), sub: t("hr.exp.c.faltasSub"), punto: dia.faltas.length > 0 ? "bg-warning" : null },
                 { k: "pausas", etq: t("hr.exp.c.pausas"), v: enHoras(dia.minutosPausaDeMas), sub: t("hr.exp.c.pausasSub"), punto: dia.minutosPausaDeMas > 0 ? "bg-warning" : null },
               ];
+              // «Faults» lleva a la lista de esas faltas (27/11/2026).
+              const irAFaltas = () => {
+                setPestana("dia");
+                setTimeout(() => document.getElementById("faltas-del-dia")?.scrollIntoView({ behavior: "smooth", block: "start" }), 150);
+              };
               return casillas.map((x) => (
-                <div key={x.k} className="flex h-full flex-col rounded-2xl border border-border/60 bg-card/30 px-4 py-3">
+                <div key={x.k}
+                  {...(x.k === "faltas" && dia.faltas.length > 0 ? { role: "button", tabIndex: 0, onClick: irAFaltas, onKeyDown: (e: TeclaReact<HTMLDivElement>) => { if (e.key === "Enter") irAFaltas(); }, title: t("hr.exp.verFaltas") } : {})}
+                  className={`flex h-full flex-col rounded-2xl border border-border/60 bg-card/30 px-4 py-3 ${x.k === "faltas" && dia.faltas.length > 0 ? "cursor-pointer transition hover:border-border hover:bg-card/50" : ""}`}>
                   <p className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
                     {x.punto && <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${x.punto}`} aria-hidden />}{x.etq}
                   </p>
@@ -1171,7 +1179,10 @@ function ExpedientePermitido() {
           )}
           {filaTurno && (
             <div className="mt-4 rounded-2xl border border-border/60 bg-card/30">
-              <LoQuePaso f={filaTurno} t={t} ahora={turno.data?.calculadoAt ?? Date.now()} />
+              {/* La ficha AGREGA (Alvaro, 27/11/2026: «si no, ¿de qué me sirve esta si ya
+                  lo vi en la anterior?»): cada línea se abre con lo que dijo Argos y la prueba. */}
+              <LoQuePaso f={filaTurno} t={t} ahora={turno.data?.calculadoAt ?? Date.now()}
+                detalle={(ev) => <DetalleEvento ev={ev} capturas={dia.capturas} t={t} />} />
             </div>
           )}
         </div>
@@ -1270,11 +1281,12 @@ function ExpedientePermitido() {
           )}
 
           {/* Faltas del día, si hay */}
+          {/* TODAS, no 20 (Alvaro, 27/11/2026: «Faults 25… que se vea cuáles fueron»). */}
           {dia.faltas.length > 0 && (
-            <div className="mt-5 border-t border-border/40 pt-4">
-              <p className="mb-2 text-xs font-semibold text-muted-foreground">{t("hr.exp.faltas")}</p>
+            <div id="faltas-del-dia" className="mt-5 scroll-mt-4 border-t border-border/40 pt-4">
+              <p className="mb-2 text-xs font-semibold text-muted-foreground">{t("hr.exp.faltas")} · {dia.faltas.length}</p>
               <div className="flex flex-col gap-1.5">
-                {dia.faltas.slice(0, 20).map((f) => {
+                {dia.faltas.map((f) => {
                   const lbl = LABEL_FALTA[f.tipo as FaltaTipo];
                   return (
                     <div key={f.id} className="flex items-center gap-2 rounded-xl border border-border/40 bg-card/30 px-2.5 py-1.5">
@@ -1327,6 +1339,38 @@ function ExpedientePermitido() {
 
 /** El día que pide el link (`?dia=AAAA-MM-DD`), si es válido y no es futuro; si no, hoy. */
 /** Puntito de la nota en el diseño pulido (el mismo del titular de Argos). */
+/** Lo que se abre en cada línea de «Lo que pasó en su turno» (27/11/2026). */
+const PIDE: Record<string, TranslationKey> = {
+  camara_apagada: "hr.paso.pide.camara_apagada", sin_pantalla: "hr.paso.pide.sin_pantalla", fuera_cuadro: "hr.paso.pide.fuera_cuadro",
+};
+function DetalleEvento({ ev, capturas, t }: { ev: Evento; capturas: CapturaDia[]; t: Tr }) {
+  const a = ev.aviso;
+  const frases = a?.frases ?? [];
+  return (
+    <div className="flex flex-col gap-3 text-sm">
+      {ev.tipo === "aviso" && a?.tipo && (
+        <div className="flex flex-col gap-1.5">
+          <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+            {t("hr.paso.dijo")}{frases.length > 1 ? ` · ${t("hr.paso.vecesDijo", { n: frases.length })}` : ""}
+          </p>
+          {frases.length ? (
+            <ul className="flex flex-col gap-1">
+              {frases.map((x, i) => <li key={i} className="text-foreground">«{x}»</li>)}
+            </ul>
+          ) : PIDE[a.tipo] ? (
+            <p className="text-muted-foreground">{t("hr.paso.dijoAntes", { p: t(PIDE[a.tipo]) })}</p>
+          ) : null}
+          {a.escalado && <p className="text-xs text-warning">{t("hr.paso.escalado")}</p>}
+        </div>
+      )}
+      <div className="flex flex-col gap-1.5">
+        <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">{t("hr.paso.prueba")}</p>
+        <PruebaDelMomento capturas={capturas} desde={ev.inicio} hasta={ev.aviso?.cerradoAt ?? ev.fin} />
+      </div>
+    </div>
+  );
+}
+
 function diaDelLink(search: string, hoy: string): string {
   const pedido = new URLSearchParams(search).get("dia");
   if (pedido && /^\d{4}-\d{2}-\d{2}$/.test(pedido) && pedido <= hoy) return pedido;

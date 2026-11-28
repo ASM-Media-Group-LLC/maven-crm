@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { type ReactNode, useEffect, useMemo, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -20,7 +20,7 @@ import { useTurnoTabla } from "@/hooks/useTurnoTabla";
 import { horaEnTurno, useTurnosDeLaGente, useTurnosEmpresa } from "@/hooks/useTurnosEmpresa";
 import {
   jornadaDe, JORNADAS, minutosTrabajados, ordenarPorAtencion, peor, seccionDe, semanaDe, sumarDias,
-  type FilaTurno, type Motivo, type Nivel, type Seccion, type TipoFranja,
+  type Aviso, type FilaTurno, type Motivo, type Nivel, type Seccion, type TipoFranja,
 } from "@/lib/turnoTabla";
 
 // LA TABLA DEL TURNO — la primera pestaña de Argos (Alvaro, 25/11/2026): «poder
@@ -176,6 +176,15 @@ function celdaLlegada(t: Tr, f: FilaTurno): { arriba: string; abajo: string; niv
     return { arriba: t("hr.turno.noLlega"), abajo: t("hr.turno.haceMin", { d: duracion(t, f.noLlegaMin) }), nivel: f.nivelLlegada, tenue: false };
   }
   if (f.llegada == null) return { arriba: "—", abajo: "", nivel: "ok", tenue: true };
+  // SIN HORARIO (27/11/2026): primera y última conexión, sin juzgar.
+  if (f.sinHorario) {
+    const ultima = f.franja.length ? Math.max(...f.franja.map((x) => x.fin)) : null;
+    return {
+      arriba: hora(f.llegada),
+      abajo: f.activoAhora ? t("hr.turno.sinHorario.conectado") : ultima ? t("hr.turno.sinHorario.salio", { h: hora(ultima) }) : t("hr.turno.sinHorario.sin"),
+      nivel: "ok", tenue: false,
+    };
+  }
   const arriba = hora(f.llegada);
   let abajo: string;
   let nivel: Nivel | "ahora" = "ok";
@@ -319,7 +328,7 @@ function Franja({ f, t, ahora }: { f: FilaTurno; t: Tr; ahora: number }) {
 // pedazo de color, con su hora y cuánto duró. Pasar el mouse por una línea
 // ilumina su pedazo en la raya, y al revés.
 type TipoEvento = Exclude<TipoFranja, "trabajo" | "sin_pantalla"> | "aviso";
-interface Evento { tipo: TipoEvento; inicio: number; fin: number }
+export interface Evento { tipo: TipoEvento; inicio: number; fin: number; aviso?: Aviso }
 
 const COLOR_EVENTO: Record<TipoEvento, string> = {
   comida: COLOR_FRANJA.comida, bano: COLOR_FRANJA.bano, pausa: "bg-muted-foreground/40",
@@ -349,12 +358,34 @@ export function eventosDelDia(f: FilaTurno): Evento[] {
   const salidas = juntos.filter((x) => x.tipo === "comida" || x.tipo === "bano");
   const repetida = (x: Evento) => x.tipo === "pausa" && salidas.some((y) => Math.min(x.fin, y.fin) - Math.max(x.inicio, y.inicio) >= (x.fin - x.inicio) / 2);
   const largos = juntos.filter((x) => !repetida(x) && (x.tipo === "comida" || x.tipo === "bano" || x.tipo === "corte" || x.fin - x.inicio >= 60_000));
-  const avisos = f.marcasAviso.map((at): Evento => ({ tipo: "aviso", inicio: at, fin: at }));
+  const avisos = (f.avisosDet?.length ? f.avisosDet : f.marcasAviso.map((at): Aviso => ({ tipo: "", at, escalado: false, cerrado: false })))
+    .map((a): Evento => ({ tipo: "aviso", inicio: a.at, fin: a.at, aviso: a }));
   return [...largos, ...avisos].sort((a, b) => a.inicio - b.inicio);
 }
 
-export function LoQuePaso({ f, t, ahora }: { f: FilaTurno; t: Tr; ahora: number }) {
+/** POR QUÉ FUE EL AVISO (Alvaro, 27/11/2026: «la parte roja, ¿por qué fue?»). */
+const MOTIVO_AVISO: Record<string, TranslationKey> = {
+  camara_apagada: "hr.estado.llamado.camara_apagada", sin_pantalla: "hr.estado.llamado.sin_pantalla", fuera_cuadro: "hr.estado.llamado.fuera_cuadro",
+};
+export function motivoAviso(t: Tr, a: Aviso | undefined): string {
+  const k = a ? MOTIVO_AVISO[a.tipo] : undefined;
+  return k ? t("hr.turno.paso.avisoDe", { m: t(k) }) : t("hr.turno.franja.aviso");
+}
+/** «lo corrigió en 40 s» / «en 2 min» / «no lo corrigió» / «sigue». */
+export function corrigioAviso(t: Tr, a: Aviso | undefined, enCurso: boolean): string {
+  if (!a || !a.tipo) return "";
+  if (a.cerradoAt != null) {
+    const seg = Math.max(1, Math.round((a.cerradoAt - a.at) / 1000));
+    return t("hr.turno.paso.corrigio", { d: seg < 60 ? t("hr.turno.paso.seg", { n: seg }) : duracion(t, Math.round(seg / 60)) });
+  }
+  return t(enCurso ? "hr.turno.paso.sigue" : "hr.turno.paso.noCorrigio");
+}
+
+/** `detalle`: en la ficha cada línea se abre y muestra más (lo que dijo Argos, la
+ *  prueba). En Shift va sin detalle: la línea ya dice qué fue y cuánto duró. */
+export function LoQuePaso({ f, t, ahora, detalle }: { f: FilaTurno; t: Tr; ahora: number; detalle?: (ev: Evento) => ReactNode }) {
   const [foco, setFoco] = useState<number | null>(null);
+  const [abierto, setAbierto] = useState<number | null>(null);
   const eventos = useMemo(() => eventosDelDia(f), [f]);
   const tramos = f.franja;
   const desde = Math.min(f.turnoInicio ?? Infinity, ...tramos.map((x) => x.inicio));
@@ -375,7 +406,7 @@ export function LoQuePaso({ f, t, ahora }: { f: FilaTurno; t: Tr; ahora: number 
         ))}
         {eventos.map((x, i) => (
           <div key={i} onMouseEnter={() => setFoco(i)}
-            title={`${t(ETIQUETA_EVENTO[x.tipo])} · ${x.tipo === "aviso" ? hora(x.inicio) : `${horaCorta(x.inicio)} – ${hora(x.fin)}`}`}
+            title={`${x.tipo === "aviso" ? motivoAviso(t, x.aviso) : t(ETIQUETA_EVENTO[x.tipo])} · ${x.tipo === "aviso" ? hora(x.inicio) : `${horaCorta(x.inicio)} – ${hora(x.fin)}`}`}
             className={`absolute inset-y-0 cursor-help transition-opacity ${COLOR_EVENTO[x.tipo]} ${x.tipo === "aviso" ? "w-1 rounded-full" : ""} ${apagado(i)} ${foco === i ? "ring-2 ring-foreground/70" : ""}`}
             style={{ left: pos(x.inicio), ...(x.tipo === "aviso" ? {} : { width: ancho(x.inicio, x.fin) }) }} />
         ))}
@@ -398,16 +429,35 @@ export function LoQuePaso({ f, t, ahora }: { f: FilaTurno; t: Tr; ahora: number 
         <ul className="mt-3 flex flex-col" onMouseLeave={() => setFoco(null)}>
           {eventos.map((x, i) => {
             const min = Math.max(1, Math.round((x.fin - x.inicio) / 60_000));
-            const abierto = f.enCurso && x.tipo !== "aviso" && ahora - x.fin < 90_000;
-            return (
-              <li key={i} onMouseEnter={() => setFoco(i)}
-                className={`grid grid-cols-[0.75rem_7.5rem_1fr_auto] items-center gap-3 rounded-lg px-2 py-1.5 text-sm transition-colors ${foco === i ? "bg-foreground/[0.06]" : ""}`}>
+            const sigue = f.enCurso && x.tipo !== "aviso" && ahora - x.fin < 90_000;
+            const derecha = x.tipo === "aviso"
+              ? [corrigioAviso(t, x.aviso, f.enCurso), x.aviso?.escalado ? t("hr.turno.paso.escalado") : ""].filter(Boolean).join(" · ")
+              : sigue ? t("hr.turno.paso.enCurso", { d: duracion(t, min) }) : duracion(t, min);
+            const contenido = (
+              <>
                 <span className={`h-2.5 w-2.5 rounded-sm ${COLOR_EVENTO[x.tipo]}`} aria-hidden />
                 <span className="tabular-nums text-muted-foreground">{x.tipo === "aviso" ? hora(x.inicio) : `${horaCorta(x.inicio)} – ${hora(x.fin)}`}</span>
-                <span className="font-medium">{t(ETIQUETA_EVENTO[x.tipo])}</span>
-                <span className="tabular-nums text-muted-foreground">
-                  {x.tipo === "aviso" ? "" : abierto ? t("hr.turno.paso.enCurso", { d: duracion(t, min) }) : duracion(t, min)}
+                <span className="font-medium">{x.tipo === "aviso" ? motivoAviso(t, x.aviso) : t(ETIQUETA_EVENTO[x.tipo])}</span>
+                <span className="flex items-center gap-1.5 text-right tabular-nums text-muted-foreground">
+                  {derecha}
+                  {detalle && <ChevronDown className={`h-3.5 w-3.5 shrink-0 transition-transform ${abierto === i ? "rotate-180" : ""}`} aria-hidden />}
                 </span>
+              </>
+            );
+            const fila = "grid w-full grid-cols-[0.75rem_7.5rem_1fr_auto] items-center gap-3 rounded-lg px-2 py-1.5 text-left text-sm transition-colors";
+            return (
+              <li key={i} onMouseEnter={() => setFoco(i)}>
+                {detalle ? (
+                  <button type="button" aria-expanded={abierto === i} onClick={() => setAbierto(abierto === i ? null : i)}
+                    className={`${fila} ${foco === i || abierto === i ? "bg-foreground/[0.06]" : ""} hover:bg-foreground/[0.06]`}>
+                    {contenido}
+                  </button>
+                ) : (
+                  <div className={`${fila} ${foco === i ? "bg-foreground/[0.06]" : ""}`}>{contenido}</div>
+                )}
+                {detalle && abierto === i && (
+                  <div className="mb-2 ml-6 mt-1 rounded-xl border border-border/40 bg-background/40 p-3">{detalle(x)}</div>
+                )}
               </li>
             );
           })}
@@ -619,20 +669,26 @@ export function TurnoTabla() {
           <div className="col-span-2 row-start-2 md:col-span-1 md:row-start-auto">{f.llegada != null && <Franja f={f} t={t} ahora={q.data?.calculadoAt ?? Date.now()} />}</div>
           {/* UNA PASTILLA CLARA (Alvaro, 27/11/2026): lo importante y nada más; las horas
               exactas van adentro. */}
-          <div className="flex justify-end md:row-start-auto">
+          <div className="flex min-w-0 justify-end md:row-start-auto">
             {(() => {
               const m = f.enCurso && f.llegada != null ? marcha(f) : null;
               const pct = parte(f);
-              const [punto, texto] = (filtro === "mejores" || filtro === "peores") && pct != null
-                ? [COLOR_FRANJA.trabajo, t("hr.turno.pill.pct", { n: Math.round(pct * 100) })]
-                : m ? [colorAvance(m.falta), m.falta > 5 ? t("hr.turno.atras", { d: duracion(t, m.falta) }) : t("hr.turno.alDia")]
-                : f.llegada != null ? [null, t("hr.turno.pill.trabajo", { a: duracion(t, minutosTrabajados(f)), b: minutosTurno(f) != null ? duracion(t, minutosTurno(f)!) : "—" })]
-                : f.noVino && f.entrada ? [null, t("hr.turno.debiaEntrar", { h: a12(f.entrada) ?? "" })]
-                : [null, ll.arriba || "—"];
+              // Dos renglones cuando es largo (Alvaro, 27/11/2026: «se monta encima de la
+              // barra»): la columna es de ancho fijo y el texto nunca la pasa.
+              const [punto, texto, abajo]: [string | null, string, string | null] = (filtro === "mejores" || filtro === "peores") && pct != null
+                ? [COLOR_FRANJA.trabajo, t("hr.turno.pill.pct", { n: Math.round(pct * 100) }), null]
+                : m ? [colorAvance(m.falta), m.falta > 5 ? t("hr.turno.atras", { d: duracion(t, m.falta) }) : t("hr.turno.alDia"), null]
+                : f.sinHorario && f.llegada != null ? [null, t("hr.turno.pill.conectado", { a: duracion(t, f.conectadoMin) }), null]
+                : f.llegada != null ? [null, t("hr.turno.pill.trabajoArriba", { a: duracion(t, minutosTrabajados(f)) }), minutosTurno(f) != null ? t("hr.turno.pill.trabajoAbajo", { b: duracion(t, minutosTurno(f)!) }) : null]
+                : f.noVino && f.entrada ? [null, t("hr.turno.debiaEntrar", { h: a12(f.entrada) ?? "" }), null]
+                : [null, ll.arriba || "—", null];
               return (
-                <span className="inline-flex items-center gap-2 whitespace-nowrap rounded-full border border-border/50 bg-foreground/[0.04] px-3 py-1.5 text-xs font-medium tabular-nums text-foreground/85">
-                  {punto && <span className={`h-2 w-2 rounded-full ${punto}`} aria-hidden />}
-                  {texto}
+                <span className={`inline-flex max-w-full items-center gap-2 border border-border/50 bg-foreground/[0.04] px-3 py-1.5 text-xs font-medium tabular-nums text-foreground/85 ${abajo ? "rounded-2xl" : "rounded-full"}`}>
+                  {punto && <span className={`h-2 w-2 shrink-0 rounded-full ${punto}`} aria-hidden />}
+                  <span className="min-w-0 text-right leading-tight">
+                    <span className="block truncate">{texto}</span>
+                    {abajo && <span className="block truncate text-[11px] font-normal text-muted-foreground">{abajo}</span>}
+                  </span>
                 </span>
               );
             })()}

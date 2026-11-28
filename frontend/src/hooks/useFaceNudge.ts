@@ -233,14 +233,14 @@ export function useFaceNudge(
         playMessageNotification(0.5);
         // Al 3er llamado sin hacer caso: «te estoy reportando», y el reporte sale
         // de verdad a sus jefes (Alvaro, 13/11/2026).
-        void anunciar(reporta && tipoLlamado ? fraseDeReporte(tipoLlamado, llamados.current) : siguienteFrase(watch.state),
-          { volumen: reporta || conSonido ? 0.9 : 0.7, voiceId: VOZ_ARGOS });
+        const dicha = reporta && tipoLlamado ? fraseDeReporte(tipoLlamado, llamados.current) : siguienteFrase(watch.state);
+        void anunciar(dicha, { volumen: reporta || conSonido ? 0.9 : 0.7, voiceId: VOZ_ARGOS });
         if (reporta && tipoLlamado) void reportarme(tipoLlamado);
         ultimoAviso.current = ahora;
         // Registrar en el expediente que Argos le llamó la atención (una fila por
         // episodio; el índice parcial evita duplicar mientras no se corrija).
         const tipo = tipoDeEncuadre(watch.state);
-        if (tipo && user) void registrarNudge(user.id, tipo, MENSAJE_PERFIL[tipo], null);
+        if (tipo && user) void registrarNudge(user.id, tipo, MENSAJE_PERFIL[tipo], null, dicha);
       }
 
       // Con `supervisorSeg` en null la sesión decidió que el coordinador no se
@@ -359,15 +359,15 @@ export function useScreenShareNudge(compartiendo: boolean, activo: boolean) {
       llamados.current += 1;
       const reporta = regla.supervisorSeg !== null && llamados.current >= LLAMADO_DE_REPORTE;
       playMessageNotification(0.5);
-      void anunciar(reporta ? fraseDeReporte("sin_pantalla", llamados.current) : FRASES_SIN_PANTALLA[idxSinPantalla++ % FRASES_SIN_PANTALLA.length],
-        { voiceId: VOZ_ARGOS, volumen: reporta ? 0.9 : undefined });
+      const dichaPantalla = reporta ? fraseDeReporte("sin_pantalla", llamados.current) : FRASES_SIN_PANTALLA[idxSinPantalla++ % FRASES_SIN_PANTALLA.length];
+      void anunciar(dichaPantalla, { voiceId: VOZ_ARGOS, volumen: reporta ? 0.9 : undefined });
       if (reporta) void reportarme("sin_pantalla");
       toast.warning(reporta ? traducir("int.face.reportando") : traducir("int.face.noScreen"), {
         description: traducir("int.face.noScreenDesc"),
         duration: 10_000,
         id: "sin-pantalla",
       });
-      if (user) void registrarNudge(user.id, "sin_pantalla", MENSAJE_PERFIL.sin_pantalla, null);
+      if (user) void registrarNudge(user.id, "sin_pantalla", MENSAJE_PERFIL.sin_pantalla, null, dichaPantalla);
     };
 
     tick();

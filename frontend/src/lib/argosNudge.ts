@@ -27,7 +27,17 @@ export function tipoDeEncuadre(state: string | null | undefined): TipoNudge | nu
 
 /** Abre el episodio (si no hay uno abierto del mismo tipo). No bloquea ni rompe
  *  el aviso: si el insert choca con el índice o falla, se ignora. */
-export async function registrarNudge(uid: string, tipo: TipoNudge, mensaje: string, room: string | null): Promise<void> {
+export async function registrarNudge(uid: string, tipo: TipoNudge, mensaje: string, room: string | null, frase?: string): Promise<void> {
+  // LA FRASE QUE DIJO (27/11/2026): cada llamado del episodio la suma, para que el
+  // expediente muestre exactamente qué le dijo Argos. Si la función todavía no
+  // está en la base, se guarda como antes (solo el motivo).
+  if (frase) {
+    try {
+      const { error } = await (supabase as unknown as { rpc: (f: string, a: unknown) => Promise<{ error: unknown }> })
+        .rpc("argos_nudge_registrar", { _tipo: tipo, _mensaje: mensaje, _frase: frase });
+      if (!error) return;
+    } catch { /* sigue abajo */ }
+  }
   try {
     await sinTipar.from("argos_nudges").insert({
       user_id: uid, tipo, mensaje, room_nombre: room, avisado_at: new Date().toISOString(),
