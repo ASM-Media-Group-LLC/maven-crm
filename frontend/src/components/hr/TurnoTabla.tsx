@@ -448,18 +448,26 @@ export function LoQuePaso({ f, t, ahora, detalle }: { f: FilaTurno; t: Tr; ahora
             const derecha = x.tipo === "aviso"
               ? [corrigioAviso(t, x.aviso, f.enCurso), x.aviso?.escalado ? t("hr.turno.paso.escalado") : ""].filter(Boolean).join(" · ")
               : sigue ? t("hr.turno.paso.enCurso", { d: duracion(t, min) }) : duracion(t, min);
+            const cuando = x.tipo === "aviso" ? hora(x.inicio) : `${horaCorta(x.inicio)} – ${hora(x.fin)}`;
+            const que = x.tipo === "aviso" ? motivoAviso(t, x.aviso) : t(ETIQUETA_EVENTO[x.tipo]);
+            const flecha = detalle ? <ChevronDown className={`h-3.5 w-3.5 shrink-0 text-muted-foreground transition-transform ${abierto === i ? "rotate-180" : ""}`} aria-hidden /> : null;
+            // EN EL CELULAR (Alvaro, 27/11/2026: «estética en el teléfono»): qué fue
+            // arriba, entero; la hora y el resultado debajo, chiquito. Desde sm, 4 columnas.
             const contenido = (
               <>
-                <span className={`h-2.5 w-2.5 rounded-sm ${COLOR_EVENTO[x.tipo]}`} aria-hidden />
-                <span className="tabular-nums text-muted-foreground">{x.tipo === "aviso" ? hora(x.inicio) : `${horaCorta(x.inicio)} – ${hora(x.fin)}`}</span>
-                <span className="font-medium">{x.tipo === "aviso" ? motivoAviso(t, x.aviso) : t(ETIQUETA_EVENTO[x.tipo])}</span>
-                <span className="flex items-center gap-1.5 text-right tabular-nums text-muted-foreground">
-                  {derecha}
-                  {detalle && <ChevronDown className={`h-3.5 w-3.5 shrink-0 transition-transform ${abierto === i ? "rotate-180" : ""}`} aria-hidden />}
+                <span className={`mt-1.5 h-2.5 w-2.5 self-start rounded-sm sm:mt-0 sm:self-center ${COLOR_EVENTO[x.tipo]}`} aria-hidden />
+                <span className="hidden tabular-nums text-muted-foreground sm:block">{cuando}</span>
+                <span className="min-w-0">
+                  <span className="block font-medium leading-snug sm:truncate">{que}</span>
+                  <span className="block text-xs tabular-nums text-muted-foreground sm:hidden">{[cuando, derecha].filter(Boolean).join(" · ")}</span>
+                </span>
+                <span className="flex items-center justify-end gap-1.5 text-right tabular-nums text-muted-foreground">
+                  <span className="hidden sm:inline">{derecha}</span>
+                  {flecha}
                 </span>
               </>
             );
-            const fila = "grid w-full grid-cols-[0.75rem_7.5rem_1fr_auto] items-center gap-3 rounded-lg px-2 py-1.5 text-left text-sm transition-colors";
+            const fila = "grid w-full grid-cols-[0.75rem_1fr_auto] items-center gap-x-3 gap-y-0.5 rounded-lg px-2 py-1.5 text-left text-sm transition-colors sm:grid-cols-[0.75rem_7.5rem_1fr_auto]";
             return (
               <li key={i} onMouseEnter={() => setFoco(i)}>
                 {detalle ? (
