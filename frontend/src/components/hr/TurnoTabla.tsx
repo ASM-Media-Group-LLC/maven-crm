@@ -18,6 +18,7 @@ import { horaBogota } from "@/lib/llegadas";
 import { hoyEnBogota } from "@/hooks/useHoyDelEquipo";
 import { useTurnoTabla } from "@/hooks/useTurnoTabla";
 import { horaEnTurno, useTurnosDeLaGente, useTurnosEmpresa } from "@/hooks/useTurnosEmpresa";
+import { useTurnoPersonas, type PersonaTurno } from "@/hooks/useTurnoPersonas";
 import {
   jornadaDe, JORNADAS, minutosTrabajados, ordenarPorAtencion, peor, seccionDe, semanaDe, sumarDias,
   type Aviso, type FilaTurno, type Motivo, type Nivel, type Seccion, type TipoFranja,
@@ -191,6 +192,9 @@ function celdaLlegada(t: Tr, f: FilaTurno): { arriba: string; abajo: string; niv
   if (f.antesMin != null && f.salidaAt != null) {
     abajo = t("hr.turno.seFueAntes", { h: hora(f.salidaAt), d: duracion(t, f.antesMin) });
     nivel = f.nivelLlegada;
+  } else if (!f.enCurso && f.activoAhora && f.turnoFin != null && !f.empiezaLuego) {
+    // Sigue conectado aunque su turno ya terminó (27/11/2026).
+    abajo = t("hr.turno.sigueConectado", { h: hora(f.turnoFin) });
   } else if (f.enCurso) {
     abajo = f.tardeMin != null ? t("hr.turno.tardeEnTurno", { d: duracion(t, f.tardeMin) }) : t("hr.turno.enTurno");
     nivel = f.tardeMin != null ? f.nivelLlegada : "ok";
@@ -567,11 +571,21 @@ export function TurnoTabla() {
   const [turnoElegido, setTurnoElegido] = useState(false);
   useEffect(() => {
     // Espera a saber la lista de la empresa (si no, elegiría «pm» y luego no casa con sus turnos).
-    if (turnoElegido || !esHoy || turno != null || turnosEmp.isLoading) return;
+    // En «Activos ahora» no se filtra por turno: ahí sale TODA la gente conectada,
+    // por grupos (Alvaro, 27/11/2026). El turno de ahora se elige en las otras vistas.
+    if (turnoElegido || !esHoy || turno != null || turnosEmp.isLoading || filtro === "activos") return;
     const ahora = new Date().toLocaleTimeString("en-GB", { timeZone: "America/Bogota", hour: "2-digit", minute: "2-digit", hour12: false });
     const actual = catalogo.length ? catalogo.find((x) => horaEnTurno(ahora, x))?.id : jornadaDe(ahora);
     if (actual) { setTurno(actual); setTurnoElegido(true); }
-  }, [catalogo, esHoy, turno, turnoElegido, turnosEmp.isLoading]);
+  }, [catalogo, esHoy, turno, turnoElegido, turnosEmp.isLoading, filtro]);
+  // PANTALLA · CÁMARA · FOCO POR TURNO (Alvaro, 27/11/2026: Workday se va y lo útil
+  // pasa aquí): los mismos números que tenía Workday (useTurnoPersonas, el día entero).
+  const { personas: medidas } = useTurnoPersonas(dia, 0, 24, true);
+  const medidaDe = useMemo(() => new Map(medidas.map((p) => [p.userId, p])), [medidas]);
+  const promedioDe = (gente: FilaTurno[], f: (p: PersonaTurno) => number | null) => {
+    const v = gente.map((g) => medidaDe.get(g.userId)).filter((p): p is PersonaTurno => !!p && !p.sinNota).map(f).filter((x): x is number => x != null);
+    return v.length ? Math.round(v.reduce((a, b) => a + b, 0) / v.length) : null;
+  };
   /** Los grupos por turno, en el orden de la empresa (y «sin turno» al final). */
   const gruposTurno = useMemo(() => {
     const orden: Array<[string | null, string, string | null]> = [
@@ -581,8 +595,15 @@ export function TurnoTabla() {
       }),
       [null, t("hr.turno.grupo.sinTurno"), null],
     ];
+    // Hoy, el turno que corre ahora va primero.
+    if (esHoy) {
+      const ahora = new Date().toLocaleTimeString("en-GB", { timeZone: "America/Bogota", hour: "2-digit", minute: "2-digit", hour12: false });
+      const actual = catalogo.length ? catalogo.find((x) => horaEnTurno(ahora, x))?.id : jornadaDe(ahora);
+      const i = orden.findIndex(([id]) => id === actual);
+      if (i > 0) orden.unshift(...orden.splice(i, 1));
+    }
     return orden;
-  }, [opcionesTurno, catalogo, t]);
+  }, [opcionesTurno, catalogo, t, esHoy]);
   const pasa = (f: FilaTurno, k: Filtro) =>
     k === "todos" ? true
       : k === "activos" ? f.activoAhora
@@ -940,7 +961,7 @@ export function TurnoTabla() {
                     key={k}
                     type="button"
                     // «Activos ahora» siempre visible (Alvaro, 27/11/2026); mirando otro día, lleva a hoy.
-                    onClick={() => { if (k === "activos" && !esHoy) irA(hoy); setFiltro(k); }}
+                    onClick={() => { if (k === "activos") { if (!esHoy) irA(hoy); setTurno(null); setTurnoElegido(true); } setFiltro(k); }}
                     aria-pressed={filtro === k}
                     className={`h-8 min-w-0 truncate whitespace-nowrap rounded-xl px-2.5 text-xs font-medium transition sm:flex-auto sm:overflow-visible ${filtro === k ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:bg-foreground/[0.05] hover:text-foreground"}`}
                   >
@@ -1013,6 +1034,18 @@ export function TurnoTabla() {
                           {esHoy && activosG > 0 && <> · <span className="inline-block h-1.5 w-1.5 -translate-y-px rounded-full bg-success" aria-hidden /> {t("hr.turno.grupo.activos", { n: activosG })}</>}
                           {atrasG > 0 && <> · {t("hr.turno.grupo.atras", { n: atrasG })}</>}
                         </span>
+                        {(() => {
+                          const pan = promedioDe(gente, (p) => p.pantallaPct), cam = promedioDe(gente, (p) => p.camaraPct), foco = promedioDe(gente, (p) => p.atencionPct);
+                          if (pan == null && cam == null && foco == null) return null;
+                          const dato = (etq: TranslationKey, v: number | null) => v == null ? null : (
+                            <span className="whitespace-nowrap">{t(etq)} <span className={`font-semibold tabular-nums ${v < 80 ? "text-warning" : "text-foreground/85"}`}>{v}%</span></span>
+                          );
+                          return (
+                            <span className="ml-auto flex flex-wrap items-center gap-x-3 text-xs text-muted-foreground">
+                              {dato("hr.turno.grupo.pantalla", pan)}{dato("hr.turno.grupo.camara", cam)}{dato("hr.turno.grupo.foco", foco)}
+                            </span>
+                          );
+                        })()}
                       </div>
                       <div className="flex flex-col gap-1.5 md:divide-y md:divide-border/30 md:gap-0">
                         {gente.map(fila)}

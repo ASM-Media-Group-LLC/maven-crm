@@ -149,6 +149,16 @@ export function useTurnoTabla(dia: string, esHoy: boolean, habilitado = true) {
         };
         // Lo de otro día no entra: armarFila mira a cada persona solo dentro de su ventana.
         const fila = armarFila(dia, entrada, ahora);
+        // CONECTADO AHORA, AUNQUE SEA FUERA DE SU VENTANA (Alvaro, 27/11/2026: «hay
+        // gente que está conectada y aquí no aparece»): armarFila solo mira desde 1 h
+        // antes hasta 3 h después del turno; quien sigue conectado mucho después
+        // también cuenta como activo. Se mira su último rato del día y sus pausas abiertas.
+        if (!fila.activoAhora) {
+          const ultimo = entrada.segmentos.length ? entrada.segmentos.reduce((a, b) => (b.inicio > a.inicio ? b : a)) : null;
+          const visto = !!ultimo && ultimo.estado !== "sin_conexion" && ultimo.estado !== "sin_conexion_larga" && ahora - ultimo.fin < 3 * 60_000;
+          const pausaAbierta = entrada.pausas.some((x) => x.fin == null && ahora - x.inicio < 3 * 3_600_000);
+          if (visto || pausaAbierta) fila.activoAhora = true;
+        }
         if (libreDeHorario) fila.sinHorario = true;
         if (apareceEnElDia(fila)) filas.push(fila);
       }

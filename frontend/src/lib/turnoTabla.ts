@@ -317,8 +317,10 @@ export function armarFila(dia: string, p: EntradaPersona, ahora: number): FilaTu
   const ultimo = segs[segs.length - 1];
   const vistoHacePoco = !!ultimo && !SIN_CONEXION.has(ultimo.estado) && ahora - ultimo.fin < 3 * 60_000;
   const enSalida = pausas.some((x) => x.fin == null && ahora - x.inicio < 3 * 60 * 60_000);
-  // Sin turno (gente sin horario): está activa si se la ve ahora mismo.
-  const activoAhora = (turno ? !terminado : true) && (vistoHacePoco || enSalida);
+  // ACTIVO AHORA = CONECTADO AHORA, sin excepciones (Alvaro, 27/11/2026: «¿aquí
+  // está toda la gente que está conectada, sí o no?»). También quien sigue
+  // conectado después de su turno o no tiene horario.
+  const activoAhora = vistoHacePoco || enSalida;
   const pct = conectadoMs > 0 ? activoMs / conectadoMs : 1;
   let nivelConexion: Nivel = "ok";
   // Con menos de una hora conectado no se juzga el porcentaje (recién empieza).
