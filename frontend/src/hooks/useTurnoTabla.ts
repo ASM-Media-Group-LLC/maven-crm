@@ -157,7 +157,20 @@ export function useTurnoTabla(dia: string, esHoy: boolean, habilitado = true) {
           const ultimo = entrada.segmentos.length ? entrada.segmentos.reduce((a, b) => (b.inicio > a.inicio ? b : a)) : null;
           const visto = !!ultimo && ultimo.estado !== "sin_conexion" && ultimo.estado !== "sin_conexion_larga" && ahora - ultimo.fin < 3 * 60_000;
           const pausaAbierta = entrada.pausas.some((x) => x.fin == null && ahora - x.inicio < 3 * 3_600_000);
-          if (visto || pausaAbierta) fila.activoAhora = true;
+          if (visto || pausaAbierta) {
+            fila.activoAhora = true;
+            // Si llegó fuera de su ventana, su llegada es su primera conexión del día:
+            // nunca «no vino» estando conectado (Daison, 27/11/2026).
+            if (fila.llegada == null) {
+              const primeros = entrada.segmentos.filter((x) => x.estado !== "sin_conexion" && x.estado !== "sin_conexion_larga");
+              if (primeros.length) {
+                fila.llegada = Math.min(...primeros.map((x) => x.inicio));
+                fila.noVino = false;
+                fila.motivos = fila.motivos.filter((m) => m.k !== "noVino");
+                if (fila.nivel === "rojo" && !fila.motivos.length) fila.nivel = "ok";
+              }
+            }
+          }
         }
         if (libreDeHorario) fila.sinHorario = true;
         if (apareceEnElDia(fila)) filas.push(fila);

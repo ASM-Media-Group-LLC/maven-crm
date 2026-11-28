@@ -1504,7 +1504,7 @@ function DetalleEvento({ ev, capturas, t }: { ev: Evento; capturas: CapturaDia[]
     <div className="flex flex-col gap-3 text-sm">
       {ev.tipo === "aviso" && a?.tipo && (
         <div className="flex flex-col gap-1.5">
-          <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+          <p className="text-xs text-muted-foreground">
             {t("hr.paso.dijo")}{frases.length > 1 ? ` · ${t("hr.paso.vecesDijo", { n: frases.length })}` : ""}
           </p>
           {frases.length ? (
@@ -1521,7 +1521,7 @@ function DetalleEvento({ ev, capturas, t }: { ev: Evento; capturas: CapturaDia[]
         <p className="text-muted-foreground">{t(claveDeCausaDeEvento(ev.hub)!)}</p>
       )}
       <div className="flex flex-col gap-1.5">
-        <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">{t("hr.paso.prueba")}</p>
+        <p className="text-xs text-muted-foreground">{t("hr.paso.prueba")}</p>
         <PruebaDelMomento capturas={capturas} desde={ev.inicio} hasta={ev.aviso?.cerradoAt ?? ev.fin} />
       </div>
     </div>

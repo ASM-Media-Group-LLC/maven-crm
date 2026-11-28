@@ -19,7 +19,7 @@ import { hoyEnBogota } from "@/hooks/useHoyDelEquipo";
 import { useTurnoTabla } from "@/hooks/useTurnoTabla";
 import { horaEnTurno, useTurnosDeLaGente, useTurnosEmpresa } from "@/hooks/useTurnosEmpresa";
 import { useTurnoPersonas, type PersonaTurno } from "@/hooks/useTurnoPersonas";
-import { claveDeCausaDeEvento, claveDeEvento, leerHistorialHub, quienFue, type EventoHub, type HistorialHub, type ResumenHub } from "@/lib/historialHub";
+import { claveDeEvento, leerHistorialHub, quienFue, type EventoHub, type HistorialHub, type ResumenHub } from "@/lib/historialHub";
 import {
   jornadaDe, JORNADAS, minutosTrabajados, ordenarPorAtencion, peor, seccionDe, semanaDe, sumarDias,
   type Aviso, type FilaTurno, type Motivo, type Nivel, type Seccion, type TipoFranja,
@@ -621,24 +621,20 @@ export function TurnoTabla() {
   const [turnoElegido, setTurnoElegido] = useState(false);
   useEffect(() => {
     // Espera a saber la lista de la empresa (si no, elegiría «pm» y luego no casa con sus turnos).
-    // En «Activos ahora» no se filtra por turno: ahí sale TODA la gente conectada,
-    // por grupos (Alvaro, 27/11/2026). El turno de ahora se elige en las otras vistas.
-    if (turnoElegido || !esHoy || turno != null || turnosEmp.isLoading || filtro === "activos") return;
+    // Arranca en el turno de ahora y en «Activos ahora» (Alvaro, 27/11/2026: «entrar by
+    // default en el horario que está… y en Active Now»). Para ver a la gente conectada
+    // de otros turnos, «Todos».
+    if (turnoElegido || !esHoy || turno != null || turnosEmp.isLoading) return;
     const ahora = new Date().toLocaleTimeString("en-GB", { timeZone: "America/Bogota", hour: "2-digit", minute: "2-digit", hour12: false });
     const actual = catalogo.length ? catalogo.find((x) => horaEnTurno(ahora, x))?.id : jornadaDe(ahora);
     if (actual) { setTurno(actual); setTurnoElegido(true); }
-  }, [catalogo, esHoy, turno, turnoElegido, turnosEmp.isLoading, filtro]);
+  }, [catalogo, esHoy, turno, turnoElegido, turnosEmp.isLoading]);
   // PANTALLA · CÁMARA · FOCO POR TURNO (Alvaro, 27/11/2026: Workday se va y lo útil
   // pasa aquí): los mismos números que tenía Workday (useTurnoPersonas, el día entero).
   const { personas: medidas } = useTurnoPersonas(dia, 0, 24, true);
   // EL HUB DE LOS SUPERVISORES (27/11/2026: la pestaña «Hub history» pasa aquí).
   const hub = useHubDelDia(dia);
   const hubResumen = useMemo(() => new Map((hub.data?.resumen ?? []).map((r) => [r.userId, r])), [hub.data]);
-  const hubEventos = useMemo(() => {
-    const m = new Map<string, EventoHub[]>();
-    for (const e of hub.data?.eventos ?? []) { const a = m.get(e.userId) ?? []; a.push(e); m.set(e.userId, a); }
-    return m;
-  }, [hub.data]);
   const medidaDe = useMemo(() => new Map(medidas.map((p) => [p.userId, p])), [medidas]);
   const promedioDe = (gente: FilaTurno[], f: (p: PersonaTurno) => number | null) => {
     const v = gente.map((g) => medidaDe.get(g.userId)).filter((p): p is PersonaTurno => !!p && !p.sinNota).map(f).filter((x): x is number => x != null);
@@ -842,7 +838,8 @@ export function TurnoTabla() {
                   </div>
                 );
               })()}
-              <LoQuePaso f={f} t={t} ahora={q.data?.calculadoAt ?? Date.now()} hub={hubEventos.get(f.userId)} />
+              {/* «Lo que pasó» completo vive en la ficha, no aquí (Alvaro, 27/11/2026: «no vamos
+                  a tener un preview y luego entrar ya todo en el perfil»). Aquí, el resumen. */}
               {([
                 [Clock, t("hr.turno.col.llegada"), ll],
                 [UtensilsCrossed, t("hr.turno.col.comida"), celdaComida(t, f)],
@@ -1020,7 +1017,7 @@ export function TurnoTabla() {
                     key={k}
                     type="button"
                     // «Activos ahora» siempre visible (Alvaro, 27/11/2026); mirando otro día, lleva a hoy.
-                    onClick={() => { if (k === "activos") { if (!esHoy) irA(hoy); setTurno(null); setTurnoElegido(true); } setFiltro(k); }}
+                    onClick={() => { if (k === "activos" && !esHoy) irA(hoy); setFiltro(k); }}
                     aria-pressed={filtro === k}
                     className={`h-8 min-w-0 truncate whitespace-nowrap rounded-xl px-2.5 text-xs font-medium transition sm:flex-auto sm:overflow-visible ${filtro === k ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:bg-foreground/[0.05] hover:text-foreground"}`}
                   >
