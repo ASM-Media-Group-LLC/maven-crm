@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { useLanguage } from "@/hooks/useLanguage";
 import { UserAvatar } from "@/components/UserAvatar";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Page } from "@/components/ui/page";
 import { PageHeader } from "@/components/ui/page-header";
 import { useExpedienteEmpleado, type DiaExpediente, type CapturaDia } from "@/hooks/useExpedienteEmpleado";
@@ -1096,13 +1097,15 @@ function ExpedientePermitido() {
               en blanco y la etiqueta arriba en gris; lo flojo, solo un puntito. */}
           {pulido ? (
           // CABECERA CLARA (Alvaro, 27/11/2026: «más estética, que se entienda»; 28/11:
-          // «muy grande esa parte»; elegido con botones: el en vivo arriba a la derecha
-          // con la nota al lado, y debajo todos los números en UNA franja delgada). La
+          // «muy grande esa parte»; luego: «el 81 debería estar abajo; si le doy clic a
+          // Arrived o Hours connected, que salga un pop-up con más información»): con el
+          // en vivo, arriba el video y debajo UNA franja de casillas limpias (nombre y
+          // número; la nota es la primera) que al tocarlas abren su detalle. La
           // nota grande a la izquierda y seis casillas parejas, cada una con una
           // línea que dice qué significa su número.
-          <div className={`mt-4 grid ${conVivo ? "gap-3 md:grid-cols-[minmax(11rem,0.5fr)_minmax(0,1.5fr)]" : "gap-4"}`}>
+          <div className={`mt-4 grid ${conVivo ? "gap-3" : "gap-4"}`}>
           <div className={conVivo ? "contents" : "grid gap-2.5 lg:grid-cols-[13rem_1fr]"}>
-            <div className={`flex flex-col justify-center rounded-xl border border-border/60 bg-card/30 px-4 py-3 ${conVivo ? "order-1" : ""}`}>
+            <div className={`flex flex-col justify-center rounded-xl border border-border/60 bg-card/30 px-4 py-3 ${conVivo ? "hidden" : ""}`}>
               <p className="text-xs font-medium text-muted-foreground">{t("hr.exp.nota")}</p>
               <p className="mt-1 flex items-baseline gap-1.5">
                 <span className="font-display text-4xl font-bold tabular-nums leading-none tracking-tight">{dia.nota.valor ?? "—"}</span>
@@ -1115,7 +1118,7 @@ function ExpedientePermitido() {
                 </p>
               )}
             </div>
-            <div className={conVivo ? "order-2 grid grid-cols-3 gap-2 md:order-3 md:col-span-2 md:grid-cols-6" : "grid grid-cols-2 gap-2.5 sm:grid-cols-3"}>
+            <div className={conVivo ? "order-2 grid grid-cols-4 gap-2 md:grid-cols-7" : "grid grid-cols-2 gap-2.5 sm:grid-cols-3"}>
             {(() => {
               const debia = expediente?.horario.entrada?.slice(0, 5) ?? null;
               // La llegada DEL TURNO (la de Shift) cuando la hay: el primer ingreso del día
@@ -1142,6 +1145,42 @@ function ExpedientePermitido() {
                 setPestana("dia");
                 setTimeout(() => document.getElementById("faltas-del-dia")?.scrollIntoView({ behavior: "smooth", block: "start" }), 150);
               };
+              if (conVivo) {
+                // Franja limpia: la nota primero; cada casilla abre su detalle.
+                const nota = { k: "nota", etq: t("hr.exp.nota"), v: dia.nota.valor != null ? String(dia.nota.valor) : "—",
+                  sub: dia.nota.banda ? t(dia.nota.banda === "bien" ? "hr.exp.banda.bien" : dia.nota.banda === "ojo" ? "hr.exp.banda.ojo" : "hr.exp.banda.mal") : "",
+                  punto: dia.nota.banda ? (PUNTO_BANDA[dia.nota.banda] ?? null) : null };
+                return [nota, ...casillas].map((x) => (
+                  <Popover key={x.k}>
+                    <PopoverTrigger asChild>
+                      <button type="button"
+                        className="flex min-w-0 flex-col items-start rounded-xl border border-border/60 bg-card/30 px-3 py-2.5 text-left transition hover:border-border hover:bg-card/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50">
+                        <span className="flex w-full items-start gap-1.5 text-[11px] font-medium leading-tight text-muted-foreground">
+                          {x.punto && <span className={`mt-1 h-1.5 w-1.5 shrink-0 rounded-full ${x.punto}`} aria-hidden />}<span className="line-clamp-2">{x.etq}</span>
+                        </span>
+                        <span className="mt-auto flex pt-1 items-baseline gap-1 whitespace-nowrap font-display text-lg font-semibold tabular-nums leading-tight text-foreground">
+                          {x.v}{x.k === "nota" && <span className="text-[11px] font-normal text-muted-foreground">/ 100</span>}
+                        </span>
+                      </button>
+                    </PopoverTrigger>
+                    <PopoverContent align="start" className="w-64 p-4">
+                      <p className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+                        {x.punto && <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${x.punto}`} aria-hidden />}{x.etq}
+                      </p>
+                      <p className="mt-1 font-display text-3xl font-semibold tabular-nums leading-tight">
+                        {x.v}{x.k === "nota" && <span className="ml-1 text-sm font-normal text-muted-foreground">/ 100</span>}
+                      </p>
+                      {x.sub && <p className="mt-2 text-sm leading-snug text-muted-foreground">{x.sub}</p>}
+                      {x.k === "faltas" && dia.faltas.length > 0 && (
+                        <button type="button" onClick={irAFaltas}
+                          className="mt-3 inline-flex items-center gap-1 rounded-full border border-border/60 px-3 py-1 text-xs font-medium text-foreground transition hover:bg-foreground/[0.06]">
+                          {t("hr.exp.verFaltas")} <ChevronRight className="h-3.5 w-3.5" />
+                        </button>
+                      )}
+                    </PopoverContent>
+                  </Popover>
+                ));
+              }
               return casillas.map((x) => (
                 <div key={x.k}
                   {...(x.k === "faltas" && dia.faltas.length > 0 ? { role: "button", tabIndex: 0, onClick: irAFaltas, onKeyDown: (e: TeclaReact<HTMLDivElement>) => { if (e.key === "Enter") irAFaltas(); }, title: t("hr.exp.verFaltas") } : {})}
@@ -1157,7 +1196,7 @@ function ExpedientePermitido() {
             </div>
           </div>
           {/* PRIMERO LOS NÚMEROS, DESPUÉS LOS PANTALLAZOS (Alvaro, 27/11/2026). */}
-          {conVivo && userId && <div className="order-3 min-w-0 md:order-2"><AhoraEnVivo userId={userId} capturas={dia.capturas} junto /></div>}
+          {conVivo && userId && <div className="order-1 min-w-0"><AhoraEnVivo userId={userId} capturas={dia.capturas} junto /></div>}
           </div>
           ) : (
           <div className="mt-4 grid grid-cols-3 gap-2 sm:grid-cols-5">

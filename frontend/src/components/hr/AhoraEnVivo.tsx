@@ -72,7 +72,7 @@ export function AhoraEnVivo({ userId, capturas, junto = false }: { userId: strin
         {vivo ? (
           // Grande (Alvaro, 18/11/2026: «el live está muy chiquito»): a todo el ancho,
           // hasta casi el alto de la ventana.
-          <div className={`mx-auto w-full overflow-hidden rounded-xl ${junto ? "max-h-72" : "max-w-[calc((100vh-9rem)*16/9)]"}`}>
+          <div className={`mx-auto w-full overflow-hidden rounded-xl ${junto ? "max-w-[calc(18rem*16/9)]" : "max-w-[calc((100vh-9rem)*16/9)]"}`}>
             <EscenarioEnVivo
               estado={obs.estado}
               pantalla={obs.pantalla}
