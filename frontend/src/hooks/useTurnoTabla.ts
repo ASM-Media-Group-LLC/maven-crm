@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { cargarHorarios } from "@/lib/horarioEmpleado";
 import { useFotosDe } from "@/hooks/useHoyDelEquipo";
 import {
-  armarFila, apareceEnElDia, peor, sumarDias,
+  armarFila, apareceEnElDia, peor, situacionAhora, sumarDias,
   type Aviso, type EntradaPersona, type FilaTurno, type Marca, type Pausa, type Segmento,
 } from "@/lib/turnoTabla";
 
@@ -159,6 +159,11 @@ export function useTurnoTabla(dia: string, esHoy: boolean, habilitado = true) {
           const pausaAbierta = entrada.pausas.some((x) => x.fin == null && ahora - x.inicio < 3 * 3_600_000);
           if (visto || pausaAbierta) {
             fila.activoAhora = true;
+            const abierta = entrada.pausas.find((x) => x.fin == null && ahora - x.inicio < 3 * 3_600_000);
+            fila.situacion = situacionAhora({
+              comida: abierta?.kind === "almuerzo" || abierta?.kind === "break", bano: abierta?.kind === "bano", vistoHacePoco: visto,
+              estado: ultimo?.estado ?? null, cortaReciente: false, salio: false,
+            });
             // Si llegó fuera de su ventana, su llegada es su primera conexión del día:
             // nunca «no vino» estando conectado (Daison, 27/11/2026).
             if (fila.llegada == null) {

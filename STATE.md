@@ -7,6 +7,7 @@
 > queda claro dónde estamos, qué se decidió, y qué falta.
 
 ## Stack y deploy
+- 28/11/2026 (Claude): Shift → botón «Filtrar»: situación de ahora (trabajando, comida, baño, sin cámara/pantalla, sin internet, desconectado, ya salió), área y posición; varias a la vez; quien tiene dos posiciones sale en las dos. Áreas nuevas en Ajustes → Empresa (cada empresa crea las suyas; empiezan vacías). Migración 20261128065835_areas_de_la_empresa.sql aplicada con OK del dueño. Pendiente: HR crea las áreas de Kash y le pone área a cada posición.
 - 27/11/2026 (Claude, PR 295): Shift → al abrir a una persona, «Lo que pasó en su turno»: la raya grande y una línea por cada pedazo de color (comida, baño, sin cámara, sin internet, avisos) con hora y duración; mouse encima ilumina el pedazo. Arreglado «1 warnings».
 - 27/11/2026 (Claude, PR 295): la ficha de la persona muestra la misma lista «Lo que pasó en su turno»; pestañas de una palabra (Resumen · Por hora · Pago · Avisos · Apps). Se trajo PR 302 (gracia única) a esta rama: ya no sale «Sin cámara 0 de 0» lleno de amarillo.
 - 27/11/2026 (Claude, PR 295): «Activos ahora» = en su turno en este momento, también en comida, baño o pausa (antes solo quien estaba trabajando con cámara y pantalla).
