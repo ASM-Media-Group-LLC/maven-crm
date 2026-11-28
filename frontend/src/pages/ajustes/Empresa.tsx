@@ -7,6 +7,7 @@ import { usePuedoConfigurarEmpresa } from "@/hooks/usePausas";
 import { ModalidadesPausa } from "@/components/horarios/ModalidadesPausa";
 import { CamaraPantallaPorPuesto } from "@/components/ajustes/CamaraPantallaPorPuesto";
 import { TurnosEmpresa } from "@/components/horarios/TurnosEmpresa";
+import { AreasEmpresa } from "@/components/horarios/AreasEmpresa";
 import { DriveEspacioPorPuesto } from "@/components/ajustes/DriveEspacioPorPuesto";
 
 // AJUSTES → EMPRESA (Alvaro, 19/11/2026): lo que es de toda la empresa y no de
@@ -28,6 +29,8 @@ export default function Empresa() {
         {/* Los turnos de la empresa y el de cada puesto (27/11/2026): los ve quien
             llega aquí; los cambia el dueño, quien configura la empresa o RR. HH. */}
         <TurnosEmpresa />
+        {/* Las áreas de la empresa (28/11/2026): agrupan posiciones para filtrar Shift. */}
+        <AreasEmpresa />
         {puede.isLoading ? (
           <div className="flex justify-center p-10"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
         ) : puede.data ? (

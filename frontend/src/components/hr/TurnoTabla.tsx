@@ -18,11 +18,13 @@ import { horaBogota } from "@/lib/llegadas";
 import { hoyEnBogota } from "@/hooks/useHoyDelEquipo";
 import { useTurnoTabla } from "@/hooks/useTurnoTabla";
 import { horaEnTurno, useTurnosDeLaGente, useTurnosEmpresa } from "@/hooks/useTurnosEmpresa";
+import { usePosicionesDeLaGente } from "@/hooks/useAreasEmpresa";
+import { FiltroShift, SIN_FILTROS, type FiltrosShift, type OpcionFiltro } from "@/components/hr/FiltroShift";
 import { useTurnoPersonas, type PersonaTurno } from "@/hooks/useTurnoPersonas";
 import { claveDeEvento, leerHistorialHub, quienFue, type EventoHub, type HistorialHub, type ResumenHub } from "@/lib/historialHub";
 import {
-  jornadaDe, JORNADAS, minutosTrabajados, ordenarPorAtencion, peor, seccionDe, semanaDe, sumarDias,
-  type Aviso, type FilaTurno, type Motivo, type Nivel, type Seccion, type TipoFranja,
+  jornadaDe, JORNADAS, minutosTrabajados, ordenarPorAtencion, peor, seccionDe, semanaDe, SITUACIONES, sumarDias,
+  type Aviso, type Situacion, type FilaTurno, type Motivo, type Nivel, type Seccion, type TipoFranja,
 } from "@/lib/turnoTabla";
 
 // LA TABLA DEL TURNO — la primera pestaña de Argos (Alvaro, 25/11/2026): «poder
@@ -698,7 +700,38 @@ export function TurnoTabla() {
     if (suyo && catalogo.some((x) => x.id === suyo)) return suyo;
     return f.entrada ? catalogo.find((x) => horaEnTurno(f.entrada!, x))?.id ?? null : null;
   }, [catalogo, turnosGente.data]);
-  const delTurno = useMemo(() => filas.filter((f) => !turno || turnoDe(f) === turno), [filas, turno, turnoDe]);
+  const soloTurno = useMemo(() => filas.filter((f) => !turno || turnoDe(f) === turno), [filas, turno, turnoDe]);
+  // EL FILTRO (Alvaro, 28/11/2026): situación de ahora (solo hoy), área y posición.
+  // Dentro de un grupo suma; entre grupos se cruza. Quien tiene dos posiciones sale en las dos.
+  const [filtros, setFiltros] = useState<FiltrosShift>(SIN_FILTROS);
+  const posGente = usePosicionesDeLaGente(useMemo(() => filas.map((f) => f.userId), [filas]));
+  const delTurno = useMemo(() => {
+    const pos = posGente.data;
+    return soloTurno.filter((f) => {
+      if (esHoy && filtros.situaciones.length && !filtros.situaciones.includes(f.situacion)) return false;
+      const suyas = pos?.get(f.userId) ?? [];
+      if (filtros.posiciones.length && !suyas.some((x) => filtros.posiciones.includes(x.posicion_id))) return false;
+      if (filtros.areas.length && !suyas.some((x) => x.area_id && filtros.areas.includes(x.area_id))) return false;
+      return true;
+    });
+  }, [soloTurno, filtros, posGente.data, esHoy]);
+  const opcionesFiltro = useMemo(() => {
+    const pos = new Map<string, OpcionFiltro>(), areas = new Map<string, OpcionFiltro>();
+    const sit = Object.fromEntries(SITUACIONES.map((x) => [x, 0])) as Record<Situacion, number>;
+    for (const f of soloTurno) {
+      sit[f.situacion]++;
+      const vistas = new Set<string>();
+      for (const x of posGente.data?.get(f.userId) ?? []) {
+        pos.set(x.posicion_id, { id: x.posicion_id, nombre: x.posicion, n: (pos.get(x.posicion_id)?.n ?? 0) + 1 });
+        if (x.area_id && x.area && !vistas.has(x.area_id)) {
+          vistas.add(x.area_id);
+          areas.set(x.area_id, { id: x.area_id, nombre: x.area, n: (areas.get(x.area_id)?.n ?? 0) + 1 });
+        }
+      }
+    }
+    const porNombre = (a: OpcionFiltro, b: OpcionFiltro) => a.nombre.localeCompare(b.nombre);
+    return { sit, pos: [...pos.values()].sort(porNombre), areas: [...areas.values()].sort(porNombre) };
+  }, [soloTurno, posGente.data]);
   // ARRANCA EN EL TURNO QUE CORRE AHORA (Alvaro, 27/11/2026: «que te desplegara el
   // PM by default o en la hora que estés»). Solo hoy y una sola vez: si la persona
   // cambia el filtro, se respeta.
@@ -773,7 +806,6 @@ export function TurnoTabla() {
       }
       return ordenarPorAtencion(xs);
     },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     [delTurno, filtro, texto],
   );
   const secciones = useMemo(() => {
@@ -1054,6 +1086,8 @@ export function TurnoTabla() {
                   </button>
                 ))}
               </div>
+              <FiltroShift valor={filtros} onCambio={setFiltros} esHoy={esHoy}
+                situacionesN={opcionesFiltro.sit} areas={opcionesFiltro.areas} posiciones={opcionesFiltro.pos} />
               {/* LA JORNADA (Alvaro, 27/11/2026): un botoncito, no la lista de horarios. */}
               <div className="flex shrink-0 gap-1 rounded-2xl border border-border/50 bg-background/40 p-1" role="group" aria-label={t("hr.turno.turno")}>
                 {([[null, t("hr.turno.jornada.todas")], ...opcionesTurno] as Array<[string | null, string]>).map(([j, etq]) => (

@@ -110,6 +110,10 @@ const min = (ms: number) => Math.round(ms / 60_000);
 export interface TramoComida { inicio: number; fin: number | null }
 
 /** Un pedazo de la franja del día (Alvaro, 27/11/2026: «una franja por fila»). */
+/** Qué está haciendo ahora (Alvaro, 28/11/2026: filtrar Shift «por situaciones»). */
+export type Situacion = "trabajando" | "comida" | "bano" | "sinCamPant" | "sinInternet" | "desconectado" | "yaSalio";
+export const SITUACIONES: Situacion[] = ["trabajando", "comida", "bano", "sinCamPant", "sinInternet", "desconectado", "yaSalio"];
+
 export type TipoFranja = "trabajo" | "comida" | "bano" | "pausa" | "sin_camara" | "sin_pantalla" | "corte";
 export interface TramoFranja { tipo: TipoFranja; inicio: number; fin: number }
 
@@ -135,6 +139,8 @@ export interface FilaTurno {
   empiezaLuego: boolean;
   /** ¿Está en su turno en este momento (trabajando, en comida, en el baño…)? */
   activoAhora: boolean;
+  /** Qué está haciendo en este momento (solo tiene sentido hoy). */
+  situacion: Situacion;
 
   llegada: number | null;
   /** ¿La llegada salió de la marca de entrada (y no hubo trabajo en Cowork)? */
@@ -321,6 +327,11 @@ export function armarFila(dia: string, p: EntradaPersona, ahora: number): FilaTu
   // está toda la gente que está conectada, sí o no?»). También quien sigue
   // conectado después de su turno o no tiene horario.
   const activoAhora = vistoHacePoco || enSalida;
+  const situacion = situacionAhora({
+    comida: !!abiertaComida, bano: !!abiertoBano, vistoHacePoco,
+    estado: ultimo?.estado ?? null, cortaReciente: !!ultimo && ahora - ultimo.fin < 3 * 60_000,
+    salio: !!ultimaMarca?.cierre || (!!turno && ahora >= turno.fin && llegada != null),
+  });
   const pct = conectadoMs > 0 ? activoMs / conectadoMs : 1;
   let nivelConexion: Nivel = "ok";
   // Con menos de una hora conectado no se juzga el porcentaje (recién empieza).
@@ -365,6 +376,7 @@ export function armarFila(dia: string, p: EntradaPersona, ahora: number): FilaTu
     enCurso,
     empiezaLuego,
     activoAhora,
+    situacion,
     llegada,
     sinMarca,
     tardeMin,
@@ -470,4 +482,17 @@ export function semanaDe(dia: string): string[] {
 export function sumarDias(dia: string, n: number): string {
   const [a, m, d] = dia.split("-").map(Number);
   return new Date(Date.UTC(a, m - 1, d + n)).toISOString().slice(0, 10);
+}
+
+/** La situación de ahora: comida y baño abiertos mandan; luego lo último que se vio en Cowork. */
+export function situacionAhora(x: {
+  comida: boolean; bano: boolean; vistoHacePoco: boolean; estado: string | null; cortaReciente: boolean; salio: boolean;
+}): Situacion {
+  if (x.comida) return "comida";
+  if (x.bano) return "bano";
+  if (x.vistoHacePoco) {
+    return x.estado === "sin_camara" || x.estado === "sin_pantalla" || x.estado === "fuera_de_camara" ? "sinCamPant" : "trabajando";
+  }
+  if (x.estado && SIN_CONEXION.has(x.estado) && x.cortaReciente) return "sinInternet";
+  return x.salio ? "yaSalio" : "desconectado";
 }
