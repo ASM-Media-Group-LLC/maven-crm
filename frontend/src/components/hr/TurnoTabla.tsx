@@ -236,16 +236,35 @@ function celdaBano(t: Tr, f: FilaTurno): { arriba: string; abajo: string; nivel:
   };
 }
 
+/** POR QUÉ FUE EL AVISO (Alvaro, 27/11/2026: «la parte roja, ¿por qué fue?»). */
+const MOTIVO_AVISO: Record<string, TranslationKey> = {
+  camara_apagada: "hr.estado.llamado.camara_apagada", sin_pantalla: "hr.estado.llamado.sin_pantalla", fuera_cuadro: "hr.estado.llamado.fuera_cuadro",
+};
+
 function celdaAvisos(t: Tr, f: FilaTurno): { arriba: string; abajo: string; nivel: Nivel | "ahora"; tenue: boolean } {
   if (f.empiezaLuego) return { arriba: "", abajo: "", nivel: "ok", tenue: true };
   if (f.avisoAbierto) {
     return { arriba: String(f.avisos), abajo: t("hr.turno.avisandoAhora", { que: t(tipoAviso(f.avisoAbierto)) }), nivel: f.nivelAvisos === "ok" ? "ahora" : f.nivelAvisos, tenue: false };
   }
   if (!f.avisos) return { arriba: "0", abajo: "", nivel: "ok", tenue: true };
-  const abajo = f.ignorados > 0
-    ? t("hr.turno.ignorados", { n: f.ignorados })
-    : f.corregidos === f.avisos ? t("hr.turno.corrigioTodos") : resumenTipos(t, f.avisosPorTipo);
-  return { arriba: String(f.avisos), abajo, nivel: f.nivelAvisos, tenue: false };
+  // EL MISMO TEXTO QUE LA LÍNEA DEL AVISO (Alvaro, 27/11/2026: «1 · fixed them all
+  // no tiene sentido»): con uno, qué fue y cómo terminó; con varios, cuántos de
+  // cada cosa, cuántos corrigió y cuántos no.
+  const det = f.avisosDet ?? [];
+  if (det.length === 1 && det[0].tipo) {
+    const a = det[0];
+    const partes = [MOTIVO_AVISO[a.tipo] ? t(MOTIVO_AVISO[a.tipo]) : t("hr.turno.franja.aviso"), corrigioAviso(t, a, f.enCurso)];
+    if (a.escalado) partes.push(t("hr.turno.paso.escalado"));
+    return { arriba: "1", abajo: partes.join(" · "), nivel: f.nivelAvisos, tenue: false };
+  }
+  const corregidos = det.filter((a) => a.cerradoAt != null).length;
+  const sinCorregir = det.length - corregidos;
+  const partes = [Object.entries(f.avisosPorTipo).sort((a, b) => b[1] - a[1])
+    .map(([k, n]) => `${n} ${MOTIVO_AVISO[k] ? t(MOTIVO_AVISO[k]) : t(tipoAviso(k))}`).join(", ")];
+  if (corregidos) partes.push(t("hr.turno.avisos.corregidos", { n: corregidos }));
+  if (sinCorregir) partes.push(t(f.enCurso ? "hr.turno.avisos.abiertos" : "hr.turno.avisos.sinCorregir", { n: sinCorregir }));
+  if (f.ignorados > 0) partes.push(t("hr.turno.ignorados", { n: f.ignorados }));
+  return { arriba: String(f.avisos), abajo: partes.filter(Boolean).join(" · "), nivel: f.nivelAvisos, tenue: false };
 }
 
 function tipoAviso(tipo: string): TranslationKey {
@@ -363,10 +382,6 @@ export function eventosDelDia(f: FilaTurno): Evento[] {
   return [...largos, ...avisos].sort((a, b) => a.inicio - b.inicio);
 }
 
-/** POR QUÉ FUE EL AVISO (Alvaro, 27/11/2026: «la parte roja, ¿por qué fue?»). */
-const MOTIVO_AVISO: Record<string, TranslationKey> = {
-  camara_apagada: "hr.estado.llamado.camara_apagada", sin_pantalla: "hr.estado.llamado.sin_pantalla", fuera_cuadro: "hr.estado.llamado.fuera_cuadro",
-};
 export function motivoAviso(t: Tr, a: Aviso | undefined): string {
   const k = a ? MOTIVO_AVISO[a.tipo] : undefined;
   return k ? t("hr.turno.paso.avisoDe", { m: t(k) }) : t("hr.turno.franja.aviso");

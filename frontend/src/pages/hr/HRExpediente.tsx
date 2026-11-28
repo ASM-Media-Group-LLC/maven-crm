@@ -1098,8 +1098,7 @@ function ExpedientePermitido() {
           // CABECERA CLARA (Alvaro, 27/11/2026: «más estética, que se entienda»): la
           // nota grande a la izquierda y seis casillas parejas, cada una con una
           // línea que dice qué significa su número.
-          <div className={`mt-4 grid gap-4 ${conVivo ? "lg:grid-cols-[minmax(0,1.5fr)_minmax(17rem,1fr)]" : ""}`}>
-          {conVivo && userId && <AhoraEnVivo userId={userId} capturas={dia.capturas} junto />}
+          <div className={`mt-4 grid gap-4 ${conVivo ? "lg:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)]" : ""}`}>
           <div className={`grid gap-3 ${conVivo ? "content-start" : "lg:grid-cols-[13rem_1fr]"}`}>
             <div className="flex flex-col justify-center rounded-2xl border border-border/60 bg-card/30 p-4">
               <p className="text-xs font-medium text-muted-foreground">{t("hr.exp.nota")}</p>
@@ -1117,7 +1116,11 @@ function ExpedientePermitido() {
             <div className={`grid grid-cols-2 gap-3 ${conVivo ? "" : "sm:grid-cols-3"}`}>
             {(() => {
               const debia = expediente?.horario.entrada?.slice(0, 5) ?? null;
-              const entro = dia.entroAt ? new Date(dia.entroAt).toLocaleTimeString("es-CO", { timeZone: "America/Bogota", hour: "2-digit", minute: "2-digit", hour12: false }) : null;
+              // La llegada DEL TURNO (la de Shift) cuando la hay: el primer ingreso del día
+              // calendario agarra la cola del turno de ayer en quien sale a medianoche
+              // (Alvaro, 27/11/2026: Daniel «Arrived 12:00 AM» con turno de 4 PM).
+              const entroIso = filaTurno?.llegada != null ? new Date(filaTurno.llegada).toISOString() : dia.entroAt;
+              const entro = entroIso ? new Date(entroIso).toLocaleTimeString("es-CO", { timeZone: "America/Bogota", hour: "2-digit", minute: "2-digit", hour12: false }) : null;
               const tarde = debia && entro ? (Number(entro.slice(0, 2)) * 60 + Number(entro.slice(3))) - (Number(debia.slice(0, 2)) * 60 + Number(debia.slice(3))) : null;
               const casillas: Array<{ k: string; etq: string; v: string; sub: string; punto: string | null; title?: string }> = [
                 { k: "entro", etq: t("hr.exp.c.entro"), v: a12(entro) ?? "—",
@@ -1151,6 +1154,8 @@ function ExpedientePermitido() {
             })()}
             </div>
           </div>
+          {/* PRIMERO LOS NÚMEROS, DESPUÉS LOS PANTALLAZOS (Alvaro, 27/11/2026). */}
+          {conVivo && userId && <AhoraEnVivo userId={userId} capturas={dia.capturas} junto />}
           </div>
           ) : (
           <div className="mt-4 grid grid-cols-3 gap-2 sm:grid-cols-5">
