@@ -1187,18 +1187,46 @@ function ExpedientePermitido() {
                     <Nota>{t("hr.exp.pop.focoExpl")}</Nota>
                   </>
                 );
-                if (k === "sinPantalla") return (
-                  <>
-                    <div className="divide-y divide-border/40">
-                      <Fila a={t("hr.exp.pop.sinPantalla")} b={enHoras(sinPantallaMin)} />
-                      <Fila a={t("hr.exp.pop.permitido")} b={enHoras(permitidoMin)} />
-                      {sinPantallaMin <= permitidoMin
-                        ? <Fila a={t("hr.exp.pop.leQueda")} b={enHoras(permitidoMin - sinPantallaMin)} tono="text-success" />
-                        : <Fila a={t("hr.exp.pop.sePaso")} b={enHoras(sinPantallaMin - permitidoMin)} tono="text-destructive" />}
-                    </div>
-                    <Nota>{t("hr.exp.pop.sinPantallaExpl")}</Nota>
-                  </>
-                );
+                if (k === "sinPantalla") {
+                  // De qué hora a qué hora (Alvaro, 28/11/2026: «decir exactamente de qué
+                  // hora a qué hora no compartió la pantalla»): los tramos de su turno.
+                  const tipos = ["sin_pantalla", "sin_camara", "corte", "pausa"] as const;
+                  const piezas = (filaTurno?.franja ?? [])
+                    .filter((x) => (tipos as readonly string[]).includes(x.tipo))
+                    .map((x) => ({ tipo: x.tipo as string, inicio: x.inicio, fin: x.fin }))
+                    .sort((a, b) => a.inicio - b.inicio);
+                  const tramos: typeof piezas = [];
+                  for (const x of piezas) {
+                    const prev = tramos[tramos.length - 1];
+                    if (prev && prev.tipo === x.tipo && x.inicio - prev.fin < 60_000) { prev.fin = Math.max(prev.fin, x.fin); continue; }
+                    tramos.push({ ...x });
+                  }
+                  const hora = (ms: number) => a12(new Date(ms).toLocaleTimeString("en-GB", { timeZone: "America/Bogota", hour: "2-digit", minute: "2-digit", hour12: false })) ?? "";
+                  const dura = (ms: number) => { const sg = Math.max(1, Math.round(ms / 1000)); return sg < 60 ? t("hr.exp.pop.seg", { n: sg }) : enHoras(Math.round(sg / 60)); };
+                  return (
+                    <>
+                      <div className="divide-y divide-border/40">
+                        <Fila a={t("hr.exp.pop.permitido")} b={enHoras(permitidoMin)} />
+                        {sinPantallaMin <= permitidoMin
+                          ? <Fila a={t("hr.exp.pop.leQueda")} b={enHoras(permitidoMin - sinPantallaMin)} tono="text-success" />
+                          : <Fila a={t("hr.exp.pop.sePaso")} b={enHoras(sinPantallaMin - permitidoMin)} tono="text-destructive" />}
+                      </div>
+                      <p className="mb-1.5 mt-4 text-xs font-medium text-muted-foreground">{t("hr.exp.pop.tramos")}</p>
+                      {tramos.length === 0 ? <p className="text-xs text-muted-foreground">{t("hr.exp.pop.sinTramos")}</p> : (
+                        <ul className="max-h-56 space-y-1 overflow-y-auto pr-1">
+                          {tramos.map((x) => (
+                            <li key={`${x.tipo}-${x.inicio}`} className="flex items-baseline gap-3 rounded-lg bg-foreground/[0.03] px-2.5 py-1.5 text-sm">
+                              <span className="shrink-0 tabular-nums text-foreground">{x.fin - x.inicio >= 60_000 ? `${hora(x.inicio)} – ${hora(x.fin)}` : hora(x.inicio)}</span>
+                              <span className="min-w-0 flex-1 truncate text-xs text-muted-foreground">{t(`hr.exp.pop.tipo.${x.tipo}` as TranslationKey)}</span>
+                              <span className="shrink-0 text-xs tabular-nums text-muted-foreground">{dura(x.fin - x.inicio)}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                      <Nota>{t("hr.exp.pop.sinPantallaExpl")}</Nota>
+                    </>
+                  );
+                }
                 if (k === "faltas") {
                   if (dia.faltas.length === 0) return <Nota>{t("hr.exp.pop.sinFaltas")}</Nota>;
                   const por = new Map<string, number>();
