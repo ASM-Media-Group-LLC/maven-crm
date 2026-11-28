@@ -33,7 +33,6 @@ import { estaEnLlamadaDeMaven } from "@/lib/llamadaEnMaven";
 const cargarPestanas = {
   ahora: () => Promise.all([import("@/components/hr/ConectadosAhoraPanel"), import("@/components/hr/PantallazosVivoPanel")]),
   llamadas: () => Promise.all([import("@/components/hr/EstadoPanel"), import("@/components/hr/TableroCalidadLlamadas"), import("@/components/hr/LlamadasPanel")]),
-  hub: () => import("@/components/hr/HistorialHubPanel"),
   revision: () => import("@/components/hr/RevisionCasos"),
   ajustes: () => Promise.all([import("@/pages/hr/ArgosAjustes"), import("@/components/hr/ContextoEmpresaPanel")]),
 };
@@ -42,7 +41,6 @@ const PantallazosVivoPanel = lazy(() => import("@/components/hr/PantallazosVivoP
 const EstadoPanel = lazy(() => import("@/components/hr/EstadoPanel").then((m) => ({ default: m.EstadoPanel })));
 const TableroCalidadLlamadas = lazy(() => import("@/components/hr/TableroCalidadLlamadas").then((m) => ({ default: m.TableroCalidadLlamadas })));
 const LlamadasPanel = lazy(() => import("@/components/hr/LlamadasPanel").then((m) => ({ default: m.LlamadasPanel })));
-const HistorialHubPanel = lazy(() => import("@/components/hr/HistorialHubPanel").then((m) => ({ default: m.HistorialHubPanel })));
 const RevisionCasos = lazy(() => import("@/components/hr/RevisionCasos").then((m) => ({ default: m.RevisionCasos })));
 const ArgosAjustesContenido = lazy(() => import("@/pages/hr/ArgosAjustes").then((m) => ({ default: m.ArgosAjustesContenido })));
 const ContextoEmpresaPanel = lazy(() => import("@/components/hr/ContextoEmpresaPanel").then((m) => ({ default: m.ContextoEmpresaPanel })));
@@ -180,10 +178,12 @@ export default function HRMonitorIA() {
   // «Workday» (dia) se quitó el 27/11/2026 (Alvaro: «después de tener Shift, ¿la
   // necesitamos?»): sus % de pantalla, cámara y foco por turno viven ahora en cada
   // grupo de Shift. Los enlaces viejos a esa pestaña abren Shift.
-  type TabArgos = "turno" | "donde" | "ahora" | "llamadas" | "hub" | "revision" | "ajustes";
+  // «Hub history» (hub) también se quitó el 27/11/2026: lo del Hub de cada supervisor
+  // vive en su detalle de Shift y en «Lo que pasó». Sus enlaces abren Shift.
+  type TabArgos = "turno" | "donde" | "ahora" | "llamadas" | "revision" | "ajustes";
   const [searchParams, setSearchParams] = useSearchParams();
   const VIEJO_A_NUEVO: Record<string, TabArgos> = {
-    turno: "turno", donde: "donde", ahora: "ahora", dia: "turno", llamadas: "llamadas", hub: "hub", revision: "revision", ajustes: "ajustes",
+    turno: "turno", donde: "donde", ahora: "ahora", dia: "turno", llamadas: "llamadas", hub: "turno", revision: "revision", ajustes: "ajustes",
     equipo: "ahora", envivo: "ahora", panel: "turno", historial: "turno", resumen: "turno", atencion: "ahora",
   };
   const tabURL = searchParams.get("t");
@@ -259,7 +259,6 @@ export default function HRMonitorIA() {
           { k: "donde", label: t("hr.monia.tab.donde") },
           { k: "ahora", label: t("hr.monia.tab.ahora") },
           { k: "llamadas", label: t("hr.monia.tab.llamadas") },
-          { k: "hub", label: t("hr.monia.tab.hub") },
           ...(veCasos ? [{ k: "revision" as TabArgos, label: t("hr.monia.tab.revision") }] : []),
           ...(ajustaArgos ? [{ k: "ajustes" as TabArgos, label: t("hr.monia.tab.ajustes") }] : []),
         ];
@@ -315,13 +314,6 @@ export default function HRMonitorIA() {
         </div>
       )}
 
-      {/* HISTORIAL DEL HUB — cada vez que un supervisor quitó la pantalla, apagó
-          la cámara o salió del Hub, con la causa: a propósito o falla (19/11/2026). */}
-      {tab === "hub" && (
-        <div className="mt-5">
-          <HistorialHubPanel />
-        </div>
-      )}
 
       {/* REVISIÓN DE RR. HH. — un caso por persona y día: cometió, no cometió o
           justificado, con su frase; y el reporte limpio (19/11/2026). */}

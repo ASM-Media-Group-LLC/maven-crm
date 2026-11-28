@@ -1,10 +1,10 @@
 import { type ReactNode, useEffect, useMemo, useState } from "react";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import {
-  AlertTriangle, Bell, CalendarDays, ChevronDown, ChevronLeft, ChevronRight, ClipboardList, Clock, DoorOpen, Loader2, RefreshCw, Search,
+  AlertTriangle, Bell, CalendarDays, ChevronDown, MonitorUp, ChevronLeft, ChevronRight, ClipboardList, Clock, DoorOpen, Loader2, RefreshCw, Search,
   UtensilsCrossed, Wifi, X,
 } from "lucide-react";
 import { useLanguage } from "@/hooks/useLanguage";
@@ -19,6 +19,7 @@ import { hoyEnBogota } from "@/hooks/useHoyDelEquipo";
 import { useTurnoTabla } from "@/hooks/useTurnoTabla";
 import { horaEnTurno, useTurnosDeLaGente, useTurnosEmpresa } from "@/hooks/useTurnosEmpresa";
 import { useTurnoPersonas, type PersonaTurno } from "@/hooks/useTurnoPersonas";
+import { claveDeCausaDeEvento, claveDeEvento, leerHistorialHub, quienFue, type EventoHub, type HistorialHub, type ResumenHub } from "@/lib/historialHub";
 import {
   jornadaDe, JORNADAS, minutosTrabajados, ordenarPorAtencion, peor, seccionDe, semanaDe, sumarDias,
   type Aviso, type FilaTurno, type Motivo, type Nivel, type Seccion, type TipoFranja,
@@ -279,6 +280,19 @@ function resumenTipos(t: Tr, tipos: Record<string, number>): string {
   return Object.entries(tipos).sort((a, b) => b[1] - a[1]).map(([k, n]) => `${t(tipoAviso(k))} ${n}`).join(" · ");
 }
 
+/** La fila «Hub» del detalle (solo supervisores): salidas, pantalla, cámara, fallas. */
+function celdaHub(t: Tr, r: ResumenHub): { arriba: string; abajo: string; nivel: Nivel | "ahora"; tenue: boolean } {
+  const propio = r.salidasPropias + r.pantallaQuitada + r.camaraApagada;
+  const fallas = r.salidasFalla + r.pantallaFalla;
+  if (!propio && !fallas) return { arriba: t("hr.turno.hub.sinNada"), abajo: "", nivel: "ok", tenue: true };
+  const partes = [
+    r.pantallaQuitada ? t("hr.turno.hub.pantalla", { n: r.pantallaQuitada }) : null,
+    r.camaraApagada ? t("hr.turno.hub.camara", { n: r.camaraApagada }) : null,
+    fallas ? t("hr.turno.hub.fallas", { n: fallas }) : null,
+  ].filter(Boolean) as string[];
+  return { arriba: t(r.salidasPropias === 1 ? "hr.turno.hub.salio1" : "hr.turno.hub.salio", { n: r.salidasPropias }), abajo: partes.join(" · "), nivel: propio > 0 ? "ambar" : "ok", tenue: false };
+}
+
 function celdaConexion(t: Tr, f: FilaTurno): { arriba: string; abajo: string; nivel: Nivel | "ahora"; tenue: boolean } {
   if (f.empiezaLuego || (f.conectadoMin === 0 && f.cortes === 0)) return { arriba: f.empiezaLuego ? "" : "—", abajo: "", nivel: "ok", tenue: true };
   const arriba = f.enCurso ? t("hr.turno.hastaAhora", { d: duracion(t, f.conectadoMin) }) : duracion(t, f.conectadoMin);
@@ -350,22 +364,22 @@ function Franja({ f, t, ahora }: { f: FilaTurno; t: Tr; ahora: number }) {
 // qué pasó». Al abrir a la persona: la misma raya y, debajo, una línea por cada
 // pedazo de color, con su hora y cuánto duró. Pasar el mouse por una línea
 // ilumina su pedazo en la raya, y al revés.
-type TipoEvento = Exclude<TipoFranja, "trabajo" | "sin_pantalla"> | "aviso";
-export interface Evento { tipo: TipoEvento; inicio: number; fin: number; aviso?: Aviso }
+type TipoEvento = Exclude<TipoFranja, "trabajo" | "sin_pantalla"> | "aviso" | "hub";
+export interface Evento { tipo: TipoEvento; inicio: number; fin: number; aviso?: Aviso; hub?: EventoHub }
 
 const COLOR_EVENTO: Record<TipoEvento, string> = {
   comida: COLOR_FRANJA.comida, bano: COLOR_FRANJA.bano, pausa: "bg-muted-foreground/40",
-  sin_camara: COLOR_FRANJA.sin_camara, corte: COLOR_FRANJA.corte, aviso: "bg-destructive",
+  sin_camara: COLOR_FRANJA.sin_camara, corte: COLOR_FRANJA.corte, aviso: "bg-destructive", hub: "bg-[hsl(var(--chart-2)/0.85)]",
 };
 const ETIQUETA_EVENTO: Record<TipoEvento, TranslationKey> = {
   comida: "hr.turno.franja.comida", bano: "hr.turno.franja.bano", pausa: "hr.turno.franja.pausa",
-  sin_camara: "hr.turno.franja.sinCamara", corte: "hr.turno.franja.corte", aviso: "hr.turno.franja.aviso",
+  sin_camara: "hr.turno.franja.sinCamara", corte: "hr.turno.franja.corte", aviso: "hr.turno.franja.aviso", hub: "hr.turno.franja.hub",
 };
 
 /** Los pedazos que no son trabajo, juntando los seguidos del mismo tipo (menos de
  *  1 min entre uno y otro). Sin cámara/pantalla y pausas de menos de 1 min no
  *  salen (la gracia los cubre); comida, baño y cortes salen siempre. */
-export function eventosDelDia(f: FilaTurno): Evento[] {
+export function eventosDelDia(f: FilaTurno, hub: EventoHub[] = []): Evento[] {
   const piezas = f.franja
     .filter((x) => x.tipo !== "trabajo")
     .map((x) => ({ tipo: (x.tipo === "sin_pantalla" ? "sin_camara" : x.tipo) as TipoEvento, inicio: x.inicio, fin: x.fin }))
@@ -383,7 +397,23 @@ export function eventosDelDia(f: FilaTurno): Evento[] {
   const largos = juntos.filter((x) => !repetida(x) && (x.tipo === "comida" || x.tipo === "bano" || x.tipo === "corte" || x.fin - x.inicio >= 60_000));
   const avisos = (f.avisosDet?.length ? f.avisosDet : f.marcasAviso.map((at): Aviso => ({ tipo: "", at, escalado: false, cerrado: false })))
     .map((a): Evento => ({ tipo: "aviso", inicio: a.at, fin: a.at, aviso: a }));
-  return [...largos, ...avisos].sort((a, b) => a.inicio - b.inicio);
+  // LO DEL HUB (Alvaro, 27/11/2026: «Hub history» pasa a Shift): cuando el
+  // supervisor quitó la pantalla, apagó la cámara o salió del Hub, con quién fue.
+  // Al salir del Hub se cortan también la pantalla y la cámara en el mismo minuto:
+  // eso es UNA cosa, no tres (27/11/2026). Queda la salida; lo demás de ese minuto se
+  // junta en ella. Y dos cortes iguales seguidos (menos de 1 min) son uno.
+  // Solo lo de ESTE turno (1 h antes a 3 h después), no la cola del de anoche.
+  const enTurno = (ms: number) => f.turnoInicio == null || f.turnoFin == null || (ms >= f.turnoInicio - 3_600_000 && ms <= f.turnoFin + 3 * 3_600_000);
+  const malos = hub.filter((e) => quienFue(e) !== "bien" && enTurno(e.creado)).sort((a, b) => a.creado - b.creado);
+  const salidasHub = malos.filter((e) => e.tipo === "hub");
+  const desHub: Evento[] = [];
+  for (const e of malos) {
+    if (e.tipo !== "hub" && salidasHub.some((x) => Math.abs(x.creado - e.creado) < 90_000)) continue;
+    const prev = desHub[desHub.length - 1]?.hub;
+    if (prev && prev.tipo === e.tipo && e.creado - prev.creado < 60_000) continue;
+    desHub.push({ tipo: "hub", inicio: e.creado, fin: e.creado, hub: e });
+  }
+  return [...largos, ...avisos, ...desHub].sort((a, b) => a.inicio - b.inicio);
 }
 
 export function motivoAviso(t: Tr, a: Aviso | undefined): string {
@@ -400,12 +430,30 @@ export function corrigioAviso(t: Tr, a: Aviso | undefined, enCurso: boolean): st
   return t(enCurso ? "hr.turno.paso.sigue" : "hr.turno.paso.noCorrigio");
 }
 
+const QUIEN_HUB: Record<string, TranslationKey> = {
+  proposito: "hr.hubHist.quien.proposito", falla: "hr.hubHist.quien.falla", dudoso: "hr.hubHist.quien.dudoso",
+};
+/** El historial del Hub de un día (los supervisores). Sin permiso o con fallo: null
+ *  (no se muestra nada, nunca «sin movimientos»). */
+export function useHubDelDia(dia: string) {
+  return useQuery<HistorialHub | null>({
+    queryKey: ["argos-hub-historial", dia],
+    staleTime: 60_000,
+    queryFn: async () => {
+      const { data, error } = await (supabase as unknown as { rpc: (f: string, a: unknown) => Promise<{ data: unknown; error: unknown }> })
+        .rpc("hub_historial", { _desde: dia });
+      if (error) return null;
+      try { return leerHistorialHub(data); } catch { return null; }
+    },
+  });
+}
+
 /** `detalle`: en la ficha cada línea se abre y muestra más (lo que dijo Argos, la
  *  prueba). En Shift va sin detalle: la línea ya dice qué fue y cuánto duró. */
-export function LoQuePaso({ f, t, ahora, detalle }: { f: FilaTurno; t: Tr; ahora: number; detalle?: (ev: Evento) => ReactNode }) {
+export function LoQuePaso({ f, t, ahora, detalle, hub = [] }: { f: FilaTurno; t: Tr; ahora: number; detalle?: (ev: Evento) => ReactNode; hub?: EventoHub[] }) {
   const [foco, setFoco] = useState<number | null>(null);
   const [abierto, setAbierto] = useState<number | null>(null);
-  const eventos = useMemo(() => eventosDelDia(f), [f]);
+  const eventos = useMemo(() => eventosDelDia(f, hub), [f, hub]);
   const tramos = f.franja;
   const desde = Math.min(f.turnoInicio ?? Infinity, ...tramos.map((x) => x.inicio));
   const hasta = Math.max(f.turnoFin ?? -Infinity, ...tramos.map((x) => x.fin));
@@ -425,9 +473,9 @@ export function LoQuePaso({ f, t, ahora, detalle }: { f: FilaTurno; t: Tr; ahora
         ))}
         {eventos.map((x, i) => (
           <div key={i} onMouseEnter={() => setFoco(i)}
-            title={`${x.tipo === "aviso" ? motivoAviso(t, x.aviso) : t(ETIQUETA_EVENTO[x.tipo])} · ${x.tipo === "aviso" ? hora(x.inicio) : `${horaCorta(x.inicio)} – ${hora(x.fin)}`}`}
-            className={`absolute inset-y-0 cursor-help transition-opacity ${COLOR_EVENTO[x.tipo]} ${x.tipo === "aviso" ? "w-1 rounded-full" : ""} ${apagado(i)} ${foco === i ? "ring-2 ring-foreground/70" : ""}`}
-            style={{ left: pos(x.inicio), ...(x.tipo === "aviso" ? {} : { width: ancho(x.inicio, x.fin) }) }} />
+            title={`${x.tipo === "aviso" ? motivoAviso(t, x.aviso) : x.hub ? t(claveDeEvento(x.hub)) : t(ETIQUETA_EVENTO[x.tipo])} · ${x.inicio === x.fin ? hora(x.inicio) : `${horaCorta(x.inicio)} – ${hora(x.fin)}`}`}
+            className={`absolute inset-y-0 cursor-help transition-opacity ${COLOR_EVENTO[x.tipo]} ${x.inicio === x.fin ? "w-1 rounded-full" : ""} ${apagado(i)} ${foco === i ? "ring-2 ring-foreground/70" : ""}`}
+            style={{ left: pos(x.inicio), ...(x.inicio === x.fin ? {} : { width: ancho(x.inicio, x.fin) }) }} />
         ))}
         {f.enCurso && ahora < hasta && (
           <>
@@ -448,12 +496,14 @@ export function LoQuePaso({ f, t, ahora, detalle }: { f: FilaTurno; t: Tr; ahora
         <ul className="mt-3 flex flex-col" onMouseLeave={() => setFoco(null)}>
           {eventos.map((x, i) => {
             const min = Math.max(1, Math.round((x.fin - x.inicio) / 60_000));
-            const sigue = f.enCurso && x.tipo !== "aviso" && ahora - x.fin < 90_000;
+            const puntual = x.tipo === "aviso" || x.tipo === "hub";
+            const sigue = f.enCurso && !puntual && ahora - x.fin < 90_000;
             const derecha = x.tipo === "aviso"
               ? [corrigioAviso(t, x.aviso, f.enCurso), x.aviso?.escalado ? t("hr.turno.paso.escalado") : ""].filter(Boolean).join(" · ")
+              : x.hub ? t(QUIEN_HUB[quienFue(x.hub)] ?? "hr.hubHist.quien.dudoso")
               : sigue ? t("hr.turno.paso.enCurso", { d: duracion(t, min) }) : duracion(t, min);
-            const cuando = x.tipo === "aviso" ? hora(x.inicio) : `${horaCorta(x.inicio)} – ${hora(x.fin)}`;
-            const que = x.tipo === "aviso" ? motivoAviso(t, x.aviso) : t(ETIQUETA_EVENTO[x.tipo]);
+            const cuando = puntual ? hora(x.inicio) : `${horaCorta(x.inicio)} – ${hora(x.fin)}`;
+            const que = x.tipo === "aviso" ? motivoAviso(t, x.aviso) : x.hub ? `${t("hr.turno.franja.hub")}: ${t(claveDeEvento(x.hub)).toLocaleLowerCase()}` : t(ETIQUETA_EVENTO[x.tipo]);
             const flecha = detalle ? <ChevronDown className={`h-3.5 w-3.5 shrink-0 text-muted-foreground transition-transform ${abierto === i ? "rotate-180" : ""}`} aria-hidden /> : null;
             // EN EL CELULAR (Alvaro, 27/11/2026: «estética en el teléfono»): qué fue
             // arriba, entero; la hora y el resultado debajo, chiquito. Desde sm, 4 columnas.
@@ -581,6 +631,14 @@ export function TurnoTabla() {
   // PANTALLA · CÁMARA · FOCO POR TURNO (Alvaro, 27/11/2026: Workday se va y lo útil
   // pasa aquí): los mismos números que tenía Workday (useTurnoPersonas, el día entero).
   const { personas: medidas } = useTurnoPersonas(dia, 0, 24, true);
+  // EL HUB DE LOS SUPERVISORES (27/11/2026: la pestaña «Hub history» pasa aquí).
+  const hub = useHubDelDia(dia);
+  const hubResumen = useMemo(() => new Map((hub.data?.resumen ?? []).map((r) => [r.userId, r])), [hub.data]);
+  const hubEventos = useMemo(() => {
+    const m = new Map<string, EventoHub[]>();
+    for (const e of hub.data?.eventos ?? []) { const a = m.get(e.userId) ?? []; a.push(e); m.set(e.userId, a); }
+    return m;
+  }, [hub.data]);
   const medidaDe = useMemo(() => new Map(medidas.map((p) => [p.userId, p])), [medidas]);
   const promedioDe = (gente: FilaTurno[], f: (p: PersonaTurno) => number | null) => {
     const v = gente.map((g) => medidaDe.get(g.userId)).filter((p): p is PersonaTurno => !!p && !p.sinNota).map(f).filter((x): x is number => x != null);
@@ -784,13 +842,14 @@ export function TurnoTabla() {
                   </div>
                 );
               })()}
-              <LoQuePaso f={f} t={t} ahora={q.data?.calculadoAt ?? Date.now()} />
+              <LoQuePaso f={f} t={t} ahora={q.data?.calculadoAt ?? Date.now()} hub={hubEventos.get(f.userId)} />
               {([
                 [Clock, t("hr.turno.col.llegada"), ll],
                 [UtensilsCrossed, t("hr.turno.col.comida"), celdaComida(t, f)],
                 [DoorOpen, t("hr.turno.col.bano"), celdaBano(t, f)],
                 [Bell, t("hr.turno.col.avisos"), celdaAvisos(t, f)],
                 [Wifi, t("hr.turno.col.conexion"), celdaConexion(t, f)],
+                ...(hubResumen.get(f.userId) ? [[MonitorUp, t("hr.turno.col.hub"), celdaHub(t, hubResumen.get(f.userId)!)] as [typeof Clock, string, ReturnType<typeof celdaLlegada>]] : []),
               ] as Array<[typeof Clock, string, ReturnType<typeof celdaLlegada>]>).map(([Icono, etq, x]) => (
                 <div key={etq} className="flex flex-wrap items-center gap-x-4 gap-y-1 px-4 py-3">
                   <span className="flex w-40 shrink-0 items-center gap-2 text-sm text-muted-foreground"><Icono className="h-4 w-4" />{etq}</span>

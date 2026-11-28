@@ -79,7 +79,8 @@ describe("pantallas al instante", () => {
 
   it("Argos dibuja «Dónde está» sin esperar el código de las otras pestañas", () => {
     expect(argos).toMatch(/^import \{ DondeEstaPanel \}/m);
-    for (const panel of ["ConectadosAhoraPanel", "PantallazosVivoPanel", "ArgosHistorial", "LlamadasPanel", "EstadoPanel", "HistorialHubPanel", "RevisionCasos"]) {
+    // ArgosHistorial (Workday) y HistorialHubPanel (Hub history) se quitaron el 27/11/2026: viven en Shift.
+    for (const panel of ["ConectadosAhoraPanel", "PantallazosVivoPanel", "LlamadasPanel", "EstadoPanel", "RevisionCasos"]) {
       expect(argos).not.toMatch(new RegExp(`^import \\{ ${panel} \\}`, "m"));
       expect(argos).toContain(`const ${panel} = lazy(`);
     }

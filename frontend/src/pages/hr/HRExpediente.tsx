@@ -31,7 +31,8 @@ import { GraciaDelDia } from "@/components/hr/GraciaDelDia";
 import { AppsDelDia } from "@/components/hr/AppsDelDia";
 import { EquipoDelDia } from "@/components/hr/EquipoDelDia";
 import { AhoraEnVivo } from "@/components/hr/AhoraEnVivo";
-import { LoQuePaso, type Evento } from "@/components/hr/TurnoTabla";
+import { LoQuePaso, useHubDelDia, type Evento } from "@/components/hr/TurnoTabla";
+import { claveDeCausaDeEvento } from "@/lib/historialHub";
 import { PruebaDelMomento } from "@/components/hr/PruebaDelMomento";
 import { useTurnoTabla } from "@/hooks/useTurnoTabla";
 import { CronologiaDelDia } from "@/components/hr/CronologiaDelDia";
@@ -986,6 +987,9 @@ function ExpedientePermitido() {
   // Usa la misma consulta que Shift (si vienes de ahí, ya está cargada).
   const turno = useTurnoTabla(diaSel, esHoy, !!userId);
   const filaTurno = turno.data?.filas.find((f) => f.userId === userId && f.llegada != null) ?? null;
+  // Lo del Hub (supervisores) también en «Lo que pasó» (27/11/2026).
+  const hubDia = useHubDelDia(diaSel);
+  const hubDeEl = useMemo(() => (hubDia.data?.eventos ?? []).filter((e) => e.userId === userId), [hubDia.data, userId]);
 
   // % DE ATENCIÓN DEL DÍA (estilo Hubstaff): de los pantallazos que la IA ya
   // juzgó este día, qué porción estaba en lo suyo. Sin juzgados → "—" (no 0).
@@ -1331,7 +1335,7 @@ function ExpedientePermitido() {
             <div className="mt-4 rounded-2xl border border-border/60 bg-card/30">
               {/* La ficha AGREGA (Alvaro, 27/11/2026: «si no, ¿de qué me sirve esta si ya
                   lo vi en la anterior?»): cada línea se abre con lo que dijo Argos y la prueba. */}
-              <LoQuePaso f={filaTurno} t={t} ahora={turno.data?.calculadoAt ?? Date.now()}
+              <LoQuePaso f={filaTurno} t={t} ahora={turno.data?.calculadoAt ?? Date.now()} hub={hubDeEl}
                 detalle={(ev) => <DetalleEvento ev={ev} capturas={dia.capturas} t={t} />} />
             </div>
           )}
@@ -1512,6 +1516,9 @@ function DetalleEvento({ ev, capturas, t }: { ev: Evento; capturas: CapturaDia[]
           ) : null}
           {a.escalado && <p className="text-xs text-warning">{t("hr.paso.escalado")}</p>}
         </div>
+      )}
+      {ev.hub && claveDeCausaDeEvento(ev.hub) && (
+        <p className="text-muted-foreground">{t(claveDeCausaDeEvento(ev.hub)!)}</p>
       )}
       <div className="flex flex-col gap-1.5">
         <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">{t("hr.paso.prueba")}</p>
