@@ -318,6 +318,9 @@ const ETIQUETA_FRANJA: Record<TipoFranja, TranslationKey> = {
 };
 
 function Franja({ f, t, ahora }: { f: FilaTurno; t: Tr; ahora: number }) {
+  // ETIQUETA AL INSTANTE (Alvaro, 27/11/2026: «sale un signo de interrogación y al
+  // rato la información; quiero algo más rápido»): nada de `title` del navegador.
+  const [tip, setTip] = useState<{ x: string; texto: string } | null>(null);
   const tramos = f.franja;
   if (!tramos.length && f.turnoInicio == null) return null;
   const desde = Math.min(f.turnoInicio ?? Infinity, ...tramos.map((x) => x.inicio));
@@ -327,26 +330,36 @@ function Franja({ f, t, ahora }: { f: FilaTurno; t: Tr; ahora: number }) {
   const ancho = (a: number, b: number) => `${Math.max(0.3, ((b - a) / (hasta - desde)) * 100)}%`;
   // Primero el trabajo y los estados; encima, las pausas (comida y baño).
   const capas = [...tramos.filter((x) => x.tipo !== "comida" && x.tipo !== "bano"), ...tramos.filter((x) => x.tipo === "comida" || x.tipo === "bano")];
+  const avisos = f.avisosDet?.length ? f.avisosDet : f.marcasAviso.map((at): Aviso => ({ tipo: "", at, escalado: false, cerrado: false }));
+  const mostrar = (x: string, texto: string) => setTip({ x, texto });
   return (
-    <div aria-hidden>
+    <div className="relative" onMouseLeave={() => setTip(null)}>
+      {tip && (
+        <span className="pointer-events-none absolute bottom-full z-30 mb-2 -translate-x-1/2 whitespace-nowrap rounded-lg border border-border/60 bg-popover px-2.5 py-1.5 text-xs font-medium text-popover-foreground shadow-lg"
+          style={{ left: tip.x }}>
+          {tip.texto}
+        </span>
+      )}
       <div className={PISTA}>
         {f.turnoInicio != null && f.turnoFin != null && (
           <div className="absolute inset-y-0 rounded-full border border-border/60" style={{ left: pos(f.turnoInicio), width: ancho(f.turnoInicio, f.turnoFin) }} />
         )}
-        {/* Al pasar el mouse, qué es cada pedazo y a qué hora (Alvaro, 27/11/2026). */}
-        {capas.map((x, i) => (
-          <div key={i} title={`${t(ETIQUETA_FRANJA[x.tipo])} · ${hora(x.inicio)} – ${hora(x.fin)} · ${duracion(t, Math.max(1, Math.round((x.fin - x.inicio) / 60_000)))}`}
-            className={`absolute inset-y-0 ${COLOR_FRANJA[x.tipo]}`} style={{ left: pos(x.inicio), width: ancho(x.inicio, x.fin) }} />
-        ))}
-        {f.marcasAviso.map((at, i) => (
-          <div key={`a${i}`} title={`${t("hr.turno.franja.aviso")} · ${hora(at)}`}
-            className="absolute -inset-y-0.5 w-1 cursor-help rounded-full bg-destructive" style={{ left: pos(at) }} />
-        ))}
+        {capas.map((x, i) => {
+          const centro = pos((x.inicio + x.fin) / 2);
+          const texto = `${t(ETIQUETA_FRANJA[x.tipo])} · ${horaCorta(x.inicio)} – ${hora(x.fin)} · ${duracion(t, Math.max(1, Math.round((x.fin - x.inicio) / 60_000)))}`;
+          return <div key={i} onMouseEnter={() => mostrar(centro, texto)}
+            className={`absolute inset-y-0 ${COLOR_FRANJA[x.tipo]}`} style={{ left: pos(x.inicio), width: ancho(x.inicio, x.fin) }} />;
+        })}
+        {avisos.map((a, i) => {
+          const texto = [`${motivoAviso(t, a)} · ${hora(a.at)}`, corrigioAviso(t, a, f.enCurso)].filter(Boolean).join(" · ");
+          return <div key={`a${i}`} onMouseEnter={() => mostrar(pos(a.at), texto)}
+            className="absolute -inset-y-0.5 w-1.5 rounded-full bg-destructive" style={{ left: pos(a.at) }} />;
+        })}
         {/* Lo que falta del turno, más tenue, y la marca de «ahora» (27/11/2026). */}
         {f.enCurso && ahora < hasta && (
           <>
-            <div className="absolute inset-y-0 right-0 bg-background/40" style={{ left: pos(ahora) }} />
-            <div className="absolute -inset-y-0.5 w-0.5 rounded-full bg-foreground" style={{ left: pos(ahora) }} />
+            <div className="pointer-events-none absolute inset-y-0 right-0 bg-background/40" style={{ left: pos(ahora) }} />
+            <div className="pointer-events-none absolute -inset-y-0.5 w-0.5 rounded-full bg-foreground" style={{ left: pos(ahora) }} />
           </>
         )}
       </div>
