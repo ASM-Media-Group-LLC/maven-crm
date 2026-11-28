@@ -806,7 +806,10 @@ export function TurnoTabla() {
         <div className="overflow-hidden rounded-3xl border border-border/50 bg-card/25">
         {/* ENCABEZADO (Alvaro, 27/11/2026: «que quede bien estético»): el título a la
             izquierda y las fechas en un solo bloque a la derecha (semana + calendario). */}
-        <div className="flex flex-col gap-3 p-4 xl:flex-row xl:items-center xl:justify-between">
+        {/* PULIDO (Alvaro, 27/11/2026: «púlelo un poquito más»): arriba el título y el
+            buscador en un renglón; debajo la semana, de lado a lado y pareja. */}
+        <div className="flex flex-col gap-3 p-4">
+        <div className="flex items-center justify-between gap-3">
           <div className="flex min-w-0 items-center gap-3">
             <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-border/70 bg-foreground/[0.04] text-foreground/75">
               <ClipboardList className="h-[18px] w-[18px]" />
@@ -819,8 +822,24 @@ export function TurnoTabla() {
             </div>
           </div>
 
-          <div className="flex w-full min-w-0 flex-col gap-2 sm:flex-row sm:items-center xl:w-auto">
-          <div className="flex min-w-0 flex-1 items-center gap-0.5 rounded-2xl border border-border/50 bg-background/40 p-1 xl:w-auto">
+          {/* EL BUSCADOR, ARRIBA A LA DERECHA (Alvaro, 27/11/2026). */}
+          <div className="relative w-40 shrink-0 sm:w-56">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <input
+              value={buscar}
+              onChange={(e) => setBuscar(e.target.value)}
+              placeholder={t("hr.turno.buscar")}
+              aria-label={t("hr.donde.buscar")}
+              className="h-10 w-full rounded-xl border border-border/50 bg-background/40 pl-9 pr-8 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            />
+            {buscar && (
+              <button type="button" onClick={() => setBuscar("")} aria-label={t("hr.donde.verTodos")} className="absolute right-1.5 top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-full text-muted-foreground hover:bg-foreground/10">
+                <X className="h-3.5 w-3.5" />
+              </button>
+            )}
+          </div>
+        </div>
+          <div className="flex min-w-0 items-center gap-0.5 rounded-2xl border border-border/50 bg-background/40 p-1">
             <button type="button" onClick={() => irA(sumarDias(dia, -7))} aria-label={t("hr.turno.semanaAnterior")}
               className="flex h-11 w-8 shrink-0 items-center justify-center rounded-xl text-muted-foreground transition hover:bg-foreground/[0.06] hover:text-foreground">
               <ChevronLeft className="h-4 w-4" />
@@ -835,7 +854,7 @@ export function TurnoTabla() {
                   disabled={futuro}
                   onClick={() => irA(d)}
                   aria-current={activo ? "date" : undefined}
-                  className={`relative flex h-11 min-w-0 flex-1 flex-col items-center justify-center rounded-xl text-xs transition xl:w-12 xl:flex-none ${activo ? "bg-primary text-primary-foreground shadow-sm" : futuro ? "text-muted-foreground/35" : "text-muted-foreground hover:bg-foreground/[0.06] hover:text-foreground"}`}
+                  className={`relative flex h-11 min-w-0 flex-1 flex-col items-center justify-center rounded-xl text-xs transition ${activo ? "bg-primary text-primary-foreground shadow-sm" : futuro ? "text-muted-foreground/35" : "text-muted-foreground hover:bg-foreground/[0.06] hover:text-foreground"}`}
                 >
                   <span className="capitalize leading-none">{fmtDia(d, { weekday: "short" }).replace(".", "")}</span>
                   <span className="mt-1 text-sm font-semibold tabular-nums leading-none">{fmtDia(d, { day: "numeric" })}</span>
@@ -877,57 +896,41 @@ export function TurnoTabla() {
               </button>
             )}
           </div>
-          {/* EL BUSCADOR, ARRIBA A LA DERECHA (Alvaro, 27/11/2026). */}
-          <div className="relative w-full min-w-0 sm:w-44 sm:shrink-0 xl:w-52">
-            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <input
-              value={buscar}
-              onChange={(e) => setBuscar(e.target.value)}
-              placeholder={t("hr.turno.buscar")}
-              aria-label={t("hr.donde.buscar")}
-              className="h-[3.25rem] w-full rounded-2xl border border-border/50 bg-background/40 pl-9 pr-8 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            />
-            {buscar && (
-              <button type="button" onClick={() => setBuscar("")} aria-label={t("hr.donde.verTodos")} className="absolute right-1.5 top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-full text-muted-foreground hover:bg-foreground/10">
-                <X className="h-3.5 w-3.5" />
-              </button>
-            )}
-          </div>
-          </div>
         </div>
 
           {!q.isLoading && !q.isError && filas.length > 0 && (
             <>
-            {/* LOS NÚMEROS DEL DÍA: cada tarjeta filtra la tabla. */}
+            {/* LOS NÚMEROS DEL DÍA (pulido 27/11/2026): la etiqueta corta arriba, en un
+                renglón; el número debajo, todos del mismo alto. Cada uno filtra la tabla. */}
             <div className="grid grid-cols-2 border-t border-border/40 sm:grid-cols-5 sm:divide-x sm:divide-border/40">
               {([
-                ["trabajaron", `${numeros.vinieron}/${numeros.tocaban}`, "hr.turno.num.vinieron", null],
-                ["tarde", String(numeros.tarde), "hr.turno.num.tarde", numeros.tarde ? "ambar" : null],
-                ["noVinieron", String(numeros.noVino), "hr.turno.num.noVino", numeros.noVino ? "rojo" : null],
-                ["ignoro", String(numeros.ignoraron), "hr.turno.num.ignoraron", numeros.ignoraron ? "rojo" : null],
-                // Números humanos (Alvaro, 27/11/2026: «no me hables por 216 h 01»): el % en grande y horas redondas abajo.
-                [null, numeros.horasTurno ? `${Math.round((numeros.horas / numeros.horasTurno) * 100)} %` : "—", "hr.turno.num.horas", null],
-              ] as Array<[Filtro | null, string, TranslationKey, Nivel | null]>).map(([k, valor, etq, nivel]) => (
+                ["trabajaron", String(numeros.vinieron), `/${numeros.tocaban}`, "hr.turno.num2.vinieron", null],
+                ["tarde", String(numeros.tarde), null, "hr.turno.num2.tarde", numeros.tarde ? "ambar" : null],
+                ["noVinieron", String(numeros.noVino), null, "hr.turno.num2.noVino", numeros.noVino ? "rojo" : null],
+                ["ignoro", String(numeros.ignoraron), null, "hr.turno.num2.ignoraron", numeros.ignoraron ? "rojo" : null],
+                // Números humanos (Alvaro, 27/11/2026: «no me hables por 216 h 01»): el % y horas redondas al lado.
+                [null, numeros.horasTurno ? `${Math.round((numeros.horas / numeros.horasTurno) * 100)}%` : "—",
+                  numeros.horasTurno ? t("hr.turno.num2.horasDe", { a: Math.round(numeros.horas / 60), b: Math.round(numeros.horasTurno / 60) }) : null,
+                  "hr.turno.num2.horas", null],
+              ] as Array<[Filtro | null, string, string | null, TranslationKey, Nivel | null]>).map(([k, valor, extra, etq, nivel]) => (
                 <button
                   key={etq}
                   type="button"
                   disabled={!k}
                   onClick={() => k && setFiltro(filtro === k ? "todos" : k)}
                   aria-pressed={k ? filtro === k : undefined}
-                  className={`flex min-h-[5.5rem] flex-col justify-between px-4 py-3.5 text-left transition disabled:cursor-default ${k && filtro === k ? "bg-primary/10" : "hover:enabled:bg-foreground/[0.04]"}`}
+                  className={`flex flex-col gap-1.5 px-4 py-3 text-left transition disabled:cursor-default ${k && filtro === k ? "bg-primary/10" : "hover:enabled:bg-foreground/[0.04]"}`}
                 >
-                  <p className="flex items-center gap-1.5 font-display text-2xl font-bold tabular-nums leading-none">
-                    {valor}{nivel && <Punto nivel={nivel} />}
-                  </p>
-                  <p className="mt-1 text-[11px] text-muted-foreground">
-                    {etq === "hr.turno.num.horas"
-                      ? t("hr.turno.num.horasDe", { a: Math.round(numeros.horas / 60), b: Math.round(numeros.horasTurno / 60) })
-                      : t(etq)}
-                  </p>
+                  <span className="flex items-center gap-1.5 truncate text-[11px] font-medium text-muted-foreground">
+                    {nivel && <Punto nivel={nivel} />}{t(etq)}
+                  </span>
+                  <span className="flex items-baseline gap-1.5 font-display tabular-nums leading-none">
+                    <span className="text-2xl font-semibold text-foreground">{valor}</span>
+                    {extra && <span className="truncate text-sm font-medium text-muted-foreground">{extra}</span>}
+                  </span>
                 </button>
               ))}
             </div>
-
             {/* VISTAS, TURNO Y BUSCADOR: todo del mismo alto (h-10) y sin barra de
                 scroll; en ventanas angostas las vistas se reparten parejas. */}
             <div className="grid gap-2 border-t border-border/40 p-3 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
