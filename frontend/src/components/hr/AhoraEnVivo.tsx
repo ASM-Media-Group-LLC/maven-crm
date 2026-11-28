@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { CameraOff, Loader2, Maximize2, ScreenShareOff } from "lucide-react";
 import { useLanguage } from "@/hooks/useLanguage";
 import { useObservadorEnVivo } from "@/hooks/useObservadorEnVivo";
@@ -25,6 +26,9 @@ export function AhoraEnVivo({ userId, capturas, junto = false }: { userId: strin
   const [escuchar, setEscuchar] = useState(false);
   const obs = useObservadorEnVivo(userId, true, escuchar);
   const vivo = EN_VIVO.has(obs.estado);
+  // Foto abierta en grande (Alvaro, 27/11/2026: «si yo quiero le doy clic a la foto
+  // y que abra en grande, pero ahorita está muy grande toda esa parte»).
+  const [abierta, setAbierta] = useState<string | null>(null);
 
   // Si no hay video: su último pantallazo y su última cámara de hoy.
   const ultimo = useMemo(() => {
@@ -57,18 +61,20 @@ export function AhoraEnVivo({ userId, capturas, junto = false }: { userId: strin
           <h2 className="text-sm font-semibold">{t("hr.exp.cron.ahora")}</h2>
           {/* «En vivo» ya lo dice el video (18/11/2026: «se repite»). */}
           {!vivo && <span className="text-[11px] text-muted-foreground">{motivo}</span>}
-          <Link
+          {/* Con el video ya está su botón de agrandar (Alvaro, 28/11/2026: «es tontera
+              tener 2 veces esa parte»). */}
+          {!(junto && vivo) && <Link
             to={`/hr/en-vivo/${userId}`}
             className="ml-auto inline-flex items-center gap-1.5 rounded-full border border-border/60 px-2.5 py-1 text-[11px] font-medium text-foreground/80 transition-colors hover:bg-foreground/[0.06] hover:text-foreground"
           >
             <Maximize2 className="h-3.5 w-3.5" />{t("hr.exp.vivo.abrirGrande")}
-          </Link>
+          </Link>}
         </div>
 
         {vivo ? (
           // Grande (Alvaro, 18/11/2026: «el live está muy chiquito»): a todo el ancho,
           // hasta casi el alto de la ventana.
-          <div className={`mx-auto w-full overflow-hidden rounded-xl ${junto ? "" : "max-w-[calc((100vh-9rem)*16/9)]"}`}>
+          <div className={`mx-auto w-full overflow-hidden rounded-xl ${junto ? "rounded-2xl ring-1 ring-border/40 shadow-lg" : "max-w-[calc((100vh-9rem)*16/9)]"}`}>
             <EscenarioEnVivo
               estado={obs.estado}
               pantalla={obs.pantalla}
@@ -82,31 +88,52 @@ export function AhoraEnVivo({ userId, capturas, junto = false }: { userId: strin
             />
           </div>
         ) : ultimo.pantalla || ultimo.camara ? (
-          <div className={`grid gap-2 ${junto ? "" : "sm:grid-cols-2"}`}>
-            {([["pantalla", ultimo.pantalla], ["camara", ultimo.camara]] as const).map(([tipo, c]) => (
-              <div key={tipo} className="relative aspect-[16/10] overflow-hidden rounded-xl border border-border/50 bg-muted/40">
-                {c ? (
-                  url(c) ? <img src={url(c)} alt="" className="h-full w-full object-cover" /> : <div className="flex h-full w-full items-center justify-center text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /></div>
-                ) : (
-                  <div className="flex h-full w-full items-center justify-center text-muted-foreground">
-                    {tipo === "pantalla" ? <ScreenShareOff className="h-5 w-5 opacity-60" /> : <CameraOff className="h-5 w-5 opacity-60" />}
-                  </div>
-                )}
-                <span className="absolute left-2 top-2 rounded-md bg-black/60 px-2 py-1 text-[11px] font-semibold text-white backdrop-blur-sm">
-                  {tipo === "pantalla" ? t("hr.exp.pantalla") : t("hr.exp.camara")}
-                </span>
-                {c && (
-                  <span className="absolute bottom-2 left-2 rounded-md bg-black/60 px-2 py-1 text-[10px] tabular-nums text-white backdrop-blur-sm">
-                    {t("hr.exp.cron.ultimo", { hora: hhmm(c.createdAt) })}
-                  </span>
+          // En la ficha (junto): dos miniaturas lado a lado; clic = grande.
+          <div className={`grid gap-2 ${junto ? "grid-cols-2" : "sm:grid-cols-2"}`}>
+            {([["pantalla", ultimo.pantalla], ["camara", ultimo.camara]] as const).map(([tipo, c]) => {
+              const u = url(c);
+              return (
+              <div key={tipo} className="flex min-w-0 flex-col gap-1">
+                <button type="button" disabled={!u} onClick={() => u && setAbierta(u)}
+                  title={u ? t("hr.exp.vivo.abrirGrande") : undefined}
+                  className={`group relative aspect-[16/10] overflow-hidden rounded-xl border border-border/50 bg-muted/40 ${u ? "cursor-zoom-in" : ""}`}>
+                  {c ? (
+                    u ? <img src={u} alt="" className="h-full w-full object-cover transition group-hover:brightness-110" /> : <div className="flex h-full w-full items-center justify-center text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /></div>
+                  ) : (
+                    <div className="flex h-full w-full items-center justify-center text-muted-foreground">
+                      {tipo === "pantalla" ? <ScreenShareOff className="h-5 w-5 opacity-60" /> : <CameraOff className="h-5 w-5 opacity-60" />}
+                    </div>
+                  )}
+                  {!junto && (
+                    <span className="absolute left-2 top-2 rounded-md bg-black/60 px-2 py-1 text-[11px] font-semibold text-white backdrop-blur-sm">
+                      {tipo === "pantalla" ? t("hr.exp.pantalla") : t("hr.exp.camara")}
+                    </span>
+                  )}
+                </button>
+                {junto ? (
+                  <p className="flex items-baseline justify-between gap-2 px-0.5 text-[11px] text-muted-foreground">
+                    <span className="font-medium text-foreground/80">{tipo === "pantalla" ? t("hr.exp.pantalla") : t("hr.exp.camara")}</span>
+                    {c && <span className="tabular-nums">{hhmm(c.createdAt)}</span>}
+                  </p>
+                ) : c && (
+                  <span className="text-[10px] tabular-nums text-muted-foreground">{t("hr.exp.cron.ultimo", { hora: hhmm(c.createdAt) })}</span>
                 )}
               </div>
-            ))}
+              );
+            })}
           </div>
         ) : (
           <p className="py-6 text-center text-sm text-muted-foreground">{t("hr.exp.vivo.sinNada")}</p>
         )}
       </div>
+      {abierta && (
+        <Dialog open onOpenChange={(o) => { if (!o) setAbierta(null); }}>
+          <DialogContent className="max-w-5xl p-2 sm:p-3">
+            <DialogTitle className="sr-only">{t("hr.exp.cron.ahora")}</DialogTitle>
+            <img src={abierta} alt="" className="max-h-[80vh] w-full rounded-lg object-contain" />
+          </DialogContent>
+        </Dialog>
+      )}
     </section>
   );
 }

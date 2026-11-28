@@ -1,10 +1,10 @@
-import { useEffect, useMemo, useState } from "react";
-import { useQueryClient } from "@tanstack/react-query";
+import { type ReactNode, useEffect, useMemo, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import {
-  AlertTriangle, Bell, CalendarDays, ChevronDown, ChevronLeft, ChevronRight, ClipboardList, Clock, DoorOpen, Loader2, RefreshCw, Search,
+  AlertTriangle, Bell, CalendarDays, ChevronDown, MonitorUp, ChevronLeft, ChevronRight, ClipboardList, Clock, DoorOpen, Loader2, RefreshCw, Search,
   UtensilsCrossed, Wifi, X,
 } from "lucide-react";
 import { useLanguage } from "@/hooks/useLanguage";
@@ -17,10 +17,12 @@ import { a12 } from "@/lib/horaBogota";
 import { horaBogota } from "@/lib/llegadas";
 import { hoyEnBogota } from "@/hooks/useHoyDelEquipo";
 import { useTurnoTabla } from "@/hooks/useTurnoTabla";
+import { horaEnTurno, useTurnosDeLaGente, useTurnosEmpresa } from "@/hooks/useTurnosEmpresa";
+import { useTurnoPersonas, type PersonaTurno } from "@/hooks/useTurnoPersonas";
+import { claveDeEvento, leerHistorialHub, quienFue, type EventoHub, type HistorialHub, type ResumenHub } from "@/lib/historialHub";
 import {
   jornadaDe, JORNADAS, minutosTrabajados, ordenarPorAtencion, peor, seccionDe, semanaDe, sumarDias,
-  type Jornada,
-  type FilaTurno, type Motivo, type Nivel, type Seccion, type TipoFranja,
+  type Aviso, type FilaTurno, type Motivo, type Nivel, type Seccion, type TipoFranja,
 } from "@/lib/turnoTabla";
 
 // LA TABLA DEL TURNO — la primera pestaña de Argos (Alvaro, 25/11/2026): «poder
@@ -176,12 +178,24 @@ function celdaLlegada(t: Tr, f: FilaTurno): { arriba: string; abajo: string; niv
     return { arriba: t("hr.turno.noLlega"), abajo: t("hr.turno.haceMin", { d: duracion(t, f.noLlegaMin) }), nivel: f.nivelLlegada, tenue: false };
   }
   if (f.llegada == null) return { arriba: "—", abajo: "", nivel: "ok", tenue: true };
+  // SIN HORARIO (27/11/2026): primera y última conexión, sin juzgar.
+  if (f.sinHorario) {
+    const ultima = f.franja.length ? Math.max(...f.franja.map((x) => x.fin)) : null;
+    return {
+      arriba: hora(f.llegada),
+      abajo: f.activoAhora ? t("hr.turno.sinHorario.conectado") : ultima ? t("hr.turno.sinHorario.salio", { h: hora(ultima) }) : t("hr.turno.sinHorario.sin"),
+      nivel: "ok", tenue: false,
+    };
+  }
   const arriba = hora(f.llegada);
   let abajo: string;
   let nivel: Nivel | "ahora" = "ok";
   if (f.antesMin != null && f.salidaAt != null) {
     abajo = t("hr.turno.seFueAntes", { h: hora(f.salidaAt), d: duracion(t, f.antesMin) });
     nivel = f.nivelLlegada;
+  } else if (!f.enCurso && f.activoAhora && f.turnoFin != null && !f.empiezaLuego) {
+    // Sigue conectado aunque su turno ya terminó (27/11/2026).
+    abajo = t("hr.turno.sigueConectado", { h: hora(f.turnoFin) });
   } else if (f.enCurso) {
     abajo = f.tardeMin != null ? t("hr.turno.tardeEnTurno", { d: duracion(t, f.tardeMin) }) : t("hr.turno.enTurno");
     nivel = f.tardeMin != null ? f.nivelLlegada : "ok";
@@ -227,16 +241,35 @@ function celdaBano(t: Tr, f: FilaTurno): { arriba: string; abajo: string; nivel:
   };
 }
 
+/** POR QUÉ FUE EL AVISO (Alvaro, 27/11/2026: «la parte roja, ¿por qué fue?»). */
+const MOTIVO_AVISO: Record<string, TranslationKey> = {
+  camara_apagada: "hr.estado.llamado.camara_apagada", sin_pantalla: "hr.estado.llamado.sin_pantalla", fuera_cuadro: "hr.estado.llamado.fuera_cuadro",
+};
+
 function celdaAvisos(t: Tr, f: FilaTurno): { arriba: string; abajo: string; nivel: Nivel | "ahora"; tenue: boolean } {
   if (f.empiezaLuego) return { arriba: "", abajo: "", nivel: "ok", tenue: true };
   if (f.avisoAbierto) {
     return { arriba: String(f.avisos), abajo: t("hr.turno.avisandoAhora", { que: t(tipoAviso(f.avisoAbierto)) }), nivel: f.nivelAvisos === "ok" ? "ahora" : f.nivelAvisos, tenue: false };
   }
   if (!f.avisos) return { arriba: "0", abajo: "", nivel: "ok", tenue: true };
-  const abajo = f.ignorados > 0
-    ? t("hr.turno.ignorados", { n: f.ignorados })
-    : f.corregidos === f.avisos ? t("hr.turno.corrigioTodos") : resumenTipos(t, f.avisosPorTipo);
-  return { arriba: String(f.avisos), abajo, nivel: f.nivelAvisos, tenue: false };
+  // EL MISMO TEXTO QUE LA LÍNEA DEL AVISO (Alvaro, 27/11/2026: «1 · fixed them all
+  // no tiene sentido»): con uno, qué fue y cómo terminó; con varios, cuántos de
+  // cada cosa, cuántos corrigió y cuántos no.
+  const det = f.avisosDet ?? [];
+  if (det.length === 1 && det[0].tipo) {
+    const a = det[0];
+    const partes = [MOTIVO_AVISO[a.tipo] ? t(MOTIVO_AVISO[a.tipo]) : t("hr.turno.franja.aviso"), corrigioAviso(t, a, f.enCurso)];
+    if (a.escalado) partes.push(t("hr.turno.paso.escalado"));
+    return { arriba: "1", abajo: partes.join(" · "), nivel: f.nivelAvisos, tenue: false };
+  }
+  const corregidos = det.filter((a) => a.cerradoAt != null).length;
+  const sinCorregir = det.length - corregidos;
+  const partes = [Object.entries(f.avisosPorTipo).sort((a, b) => b[1] - a[1])
+    .map(([k, n]) => `${n} ${MOTIVO_AVISO[k] ? t(MOTIVO_AVISO[k]) : t(tipoAviso(k))}`).join(", ")];
+  if (corregidos) partes.push(t("hr.turno.avisos.corregidos", { n: corregidos }));
+  if (sinCorregir) partes.push(t(f.enCurso ? "hr.turno.avisos.abiertos" : "hr.turno.avisos.sinCorregir", { n: sinCorregir }));
+  if (f.ignorados > 0) partes.push(t("hr.turno.ignorados", { n: f.ignorados }));
+  return { arriba: String(f.avisos), abajo: partes.filter(Boolean).join(" · "), nivel: f.nivelAvisos, tenue: false };
 }
 
 function tipoAviso(tipo: string): TranslationKey {
@@ -245,6 +278,19 @@ function tipoAviso(tipo: string): TranslationKey {
 
 function resumenTipos(t: Tr, tipos: Record<string, number>): string {
   return Object.entries(tipos).sort((a, b) => b[1] - a[1]).map(([k, n]) => `${t(tipoAviso(k))} ${n}`).join(" · ");
+}
+
+/** La fila «Hub» del detalle (solo supervisores): salidas, pantalla, cámara, fallas. */
+function celdaHub(t: Tr, r: ResumenHub): { arriba: string; abajo: string; nivel: Nivel | "ahora"; tenue: boolean } {
+  const propio = r.salidasPropias + r.pantallaQuitada + r.camaraApagada;
+  const fallas = r.salidasFalla + r.pantallaFalla;
+  if (!propio && !fallas) return { arriba: t("hr.turno.hub.sinNada"), abajo: "", nivel: "ok", tenue: true };
+  const partes = [
+    r.pantallaQuitada ? t("hr.turno.hub.pantalla", { n: r.pantallaQuitada }) : null,
+    r.camaraApagada ? t("hr.turno.hub.camara", { n: r.camaraApagada }) : null,
+    fallas ? t("hr.turno.hub.fallas", { n: fallas }) : null,
+  ].filter(Boolean) as string[];
+  return { arriba: t(r.salidasPropias === 1 ? "hr.turno.hub.salio1" : "hr.turno.hub.salio", { n: r.salidasPropias }), abajo: partes.join(" · "), nivel: propio > 0 ? "ambar" : "ok", tenue: false };
 }
 
 function celdaConexion(t: Tr, f: FilaTurno): { arriba: string; abajo: string; nivel: Nivel | "ahora"; tenue: boolean } {
@@ -272,6 +318,9 @@ const ETIQUETA_FRANJA: Record<TipoFranja, TranslationKey> = {
 };
 
 function Franja({ f, t, ahora }: { f: FilaTurno; t: Tr; ahora: number }) {
+  // ETIQUETA AL INSTANTE (Alvaro, 27/11/2026: «sale un signo de interrogación y al
+  // rato la información; quiero algo más rápido»): nada de `title` del navegador.
+  const [tip, setTip] = useState<{ x: string; texto: string } | null>(null);
   const tramos = f.franja;
   if (!tramos.length && f.turnoInicio == null) return null;
   const desde = Math.min(f.turnoInicio ?? Infinity, ...tramos.map((x) => x.inicio));
@@ -281,26 +330,36 @@ function Franja({ f, t, ahora }: { f: FilaTurno; t: Tr; ahora: number }) {
   const ancho = (a: number, b: number) => `${Math.max(0.3, ((b - a) / (hasta - desde)) * 100)}%`;
   // Primero el trabajo y los estados; encima, las pausas (comida y baño).
   const capas = [...tramos.filter((x) => x.tipo !== "comida" && x.tipo !== "bano"), ...tramos.filter((x) => x.tipo === "comida" || x.tipo === "bano")];
+  const avisos = f.avisosDet?.length ? f.avisosDet : f.marcasAviso.map((at): Aviso => ({ tipo: "", at, escalado: false, cerrado: false }));
+  const mostrar = (x: string, texto: string) => setTip({ x, texto });
   return (
-    <div aria-hidden>
+    <div className="relative" onMouseLeave={() => setTip(null)}>
+      {tip && (
+        <span className="pointer-events-none absolute bottom-full z-30 mb-2 -translate-x-1/2 whitespace-nowrap rounded-lg border border-border/60 bg-popover px-2.5 py-1.5 text-xs font-medium text-popover-foreground shadow-lg"
+          style={{ left: tip.x }}>
+          {tip.texto}
+        </span>
+      )}
       <div className={PISTA}>
         {f.turnoInicio != null && f.turnoFin != null && (
           <div className="absolute inset-y-0 rounded-full border border-border/60" style={{ left: pos(f.turnoInicio), width: ancho(f.turnoInicio, f.turnoFin) }} />
         )}
-        {/* Al pasar el mouse, qué es cada pedazo y a qué hora (Alvaro, 27/11/2026). */}
-        {capas.map((x, i) => (
-          <div key={i} title={`${t(ETIQUETA_FRANJA[x.tipo])} · ${hora(x.inicio)} – ${hora(x.fin)} · ${duracion(t, Math.max(1, Math.round((x.fin - x.inicio) / 60_000)))}`}
-            className={`absolute inset-y-0 ${COLOR_FRANJA[x.tipo]}`} style={{ left: pos(x.inicio), width: ancho(x.inicio, x.fin) }} />
-        ))}
-        {f.marcasAviso.map((at, i) => (
-          <div key={`a${i}`} title={`${t("hr.turno.franja.aviso")} · ${hora(at)}`}
-            className="absolute -inset-y-0.5 w-1 cursor-help rounded-full bg-destructive" style={{ left: pos(at) }} />
-        ))}
+        {capas.map((x, i) => {
+          const centro = pos((x.inicio + x.fin) / 2);
+          const texto = `${t(ETIQUETA_FRANJA[x.tipo])} · ${horaCorta(x.inicio)} – ${hora(x.fin)} · ${duracion(t, Math.max(1, Math.round((x.fin - x.inicio) / 60_000)))}`;
+          return <div key={i} onMouseEnter={() => mostrar(centro, texto)}
+            className={`absolute inset-y-0 ${COLOR_FRANJA[x.tipo]}`} style={{ left: pos(x.inicio), width: ancho(x.inicio, x.fin) }} />;
+        })}
+        {avisos.map((a, i) => {
+          const texto = [`${motivoAviso(t, a)} · ${hora(a.at)}`, corrigioAviso(t, a, f.enCurso)].filter(Boolean).join(" · ");
+          return <div key={`a${i}`} onMouseEnter={() => mostrar(pos(a.at), texto)}
+            className="absolute -inset-y-0.5 w-1.5 rounded-full bg-destructive" style={{ left: pos(a.at) }} />;
+        })}
         {/* Lo que falta del turno, más tenue, y la marca de «ahora» (27/11/2026). */}
         {f.enCurso && ahora < hasta && (
           <>
-            <div className="absolute inset-y-0 right-0 bg-background/40" style={{ left: pos(ahora) }} />
-            <div className="absolute -inset-y-0.5 w-0.5 rounded-full bg-foreground" style={{ left: pos(ahora) }} />
+            <div className="pointer-events-none absolute inset-y-0 right-0 bg-background/40" style={{ left: pos(ahora) }} />
+            <div className="pointer-events-none absolute -inset-y-0.5 w-0.5 rounded-full bg-foreground" style={{ left: pos(ahora) }} />
           </>
         )}
       </div>
@@ -318,22 +377,22 @@ function Franja({ f, t, ahora }: { f: FilaTurno; t: Tr; ahora: number }) {
 // qué pasó». Al abrir a la persona: la misma raya y, debajo, una línea por cada
 // pedazo de color, con su hora y cuánto duró. Pasar el mouse por una línea
 // ilumina su pedazo en la raya, y al revés.
-type TipoEvento = Exclude<TipoFranja, "trabajo" | "sin_pantalla"> | "aviso";
-interface Evento { tipo: TipoEvento; inicio: number; fin: number }
+type TipoEvento = Exclude<TipoFranja, "trabajo" | "sin_pantalla"> | "aviso" | "hub";
+export interface Evento { tipo: TipoEvento; inicio: number; fin: number; aviso?: Aviso; hub?: EventoHub }
 
 const COLOR_EVENTO: Record<TipoEvento, string> = {
   comida: COLOR_FRANJA.comida, bano: COLOR_FRANJA.bano, pausa: "bg-muted-foreground/40",
-  sin_camara: COLOR_FRANJA.sin_camara, corte: COLOR_FRANJA.corte, aviso: "bg-destructive",
+  sin_camara: COLOR_FRANJA.sin_camara, corte: COLOR_FRANJA.corte, aviso: "bg-destructive", hub: "bg-[hsl(var(--chart-2)/0.85)]",
 };
 const ETIQUETA_EVENTO: Record<TipoEvento, TranslationKey> = {
   comida: "hr.turno.franja.comida", bano: "hr.turno.franja.bano", pausa: "hr.turno.franja.pausa",
-  sin_camara: "hr.turno.franja.sinCamara", corte: "hr.turno.franja.corte", aviso: "hr.turno.franja.aviso",
+  sin_camara: "hr.turno.franja.sinCamara", corte: "hr.turno.franja.corte", aviso: "hr.turno.franja.aviso", hub: "hr.turno.franja.hub",
 };
 
 /** Los pedazos que no son trabajo, juntando los seguidos del mismo tipo (menos de
  *  1 min entre uno y otro). Sin cámara/pantalla y pausas de menos de 1 min no
  *  salen (la gracia los cubre); comida, baño y cortes salen siempre. */
-export function eventosDelDia(f: FilaTurno): Evento[] {
+export function eventosDelDia(f: FilaTurno, hub: EventoHub[] = []): Evento[] {
   const piezas = f.franja
     .filter((x) => x.tipo !== "trabajo")
     .map((x) => ({ tipo: (x.tipo === "sin_pantalla" ? "sin_camara" : x.tipo) as TipoEvento, inicio: x.inicio, fin: x.fin }))
@@ -349,13 +408,65 @@ export function eventosDelDia(f: FilaTurno): Evento[] {
   const salidas = juntos.filter((x) => x.tipo === "comida" || x.tipo === "bano");
   const repetida = (x: Evento) => x.tipo === "pausa" && salidas.some((y) => Math.min(x.fin, y.fin) - Math.max(x.inicio, y.inicio) >= (x.fin - x.inicio) / 2);
   const largos = juntos.filter((x) => !repetida(x) && (x.tipo === "comida" || x.tipo === "bano" || x.tipo === "corte" || x.fin - x.inicio >= 60_000));
-  const avisos = f.marcasAviso.map((at): Evento => ({ tipo: "aviso", inicio: at, fin: at }));
-  return [...largos, ...avisos].sort((a, b) => a.inicio - b.inicio);
+  const avisos = (f.avisosDet?.length ? f.avisosDet : f.marcasAviso.map((at): Aviso => ({ tipo: "", at, escalado: false, cerrado: false })))
+    .map((a): Evento => ({ tipo: "aviso", inicio: a.at, fin: a.at, aviso: a }));
+  // LO DEL HUB (Alvaro, 27/11/2026: «Hub history» pasa a Shift): cuando el
+  // supervisor quitó la pantalla, apagó la cámara o salió del Hub, con quién fue.
+  // Al salir del Hub se cortan también la pantalla y la cámara en el mismo minuto:
+  // eso es UNA cosa, no tres (27/11/2026). Queda la salida; lo demás de ese minuto se
+  // junta en ella. Y dos cortes iguales seguidos (menos de 1 min) son uno.
+  // Solo lo de ESTE turno (1 h antes a 3 h después), no la cola del de anoche.
+  const enTurno = (ms: number) => f.turnoInicio == null || f.turnoFin == null || (ms >= f.turnoInicio - 3_600_000 && ms <= f.turnoFin + 3 * 3_600_000);
+  const malos = hub.filter((e) => quienFue(e) !== "bien" && enTurno(e.creado)).sort((a, b) => a.creado - b.creado);
+  const salidasHub = malos.filter((e) => e.tipo === "hub");
+  const desHub: Evento[] = [];
+  for (const e of malos) {
+    if (e.tipo !== "hub" && salidasHub.some((x) => Math.abs(x.creado - e.creado) < 90_000)) continue;
+    const prev = desHub[desHub.length - 1]?.hub;
+    if (prev && prev.tipo === e.tipo && e.creado - prev.creado < 60_000) continue;
+    desHub.push({ tipo: "hub", inicio: e.creado, fin: e.creado, hub: e });
+  }
+  return [...largos, ...avisos, ...desHub].sort((a, b) => a.inicio - b.inicio);
 }
 
-export function LoQuePaso({ f, t, ahora }: { f: FilaTurno; t: Tr; ahora: number }) {
+export function motivoAviso(t: Tr, a: Aviso | undefined): string {
+  const k = a ? MOTIVO_AVISO[a.tipo] : undefined;
+  return k ? t("hr.turno.paso.avisoDe", { m: t(k) }) : t("hr.turno.franja.aviso");
+}
+/** «lo corrigió en 40 s» / «en 2 min» / «no lo corrigió» / «sigue». */
+export function corrigioAviso(t: Tr, a: Aviso | undefined, enCurso: boolean): string {
+  if (!a || !a.tipo) return "";
+  if (a.cerradoAt != null) {
+    const seg = Math.max(1, Math.round((a.cerradoAt - a.at) / 1000));
+    return t("hr.turno.paso.corrigio", { d: seg < 60 ? t("hr.turno.paso.seg", { n: seg }) : duracion(t, Math.round(seg / 60)) });
+  }
+  return t(enCurso ? "hr.turno.paso.sigue" : "hr.turno.paso.noCorrigio");
+}
+
+const QUIEN_HUB: Record<string, TranslationKey> = {
+  proposito: "hr.hubHist.quien.proposito", falla: "hr.hubHist.quien.falla", dudoso: "hr.hubHist.quien.dudoso",
+};
+/** El historial del Hub de un día (los supervisores). Sin permiso o con fallo: null
+ *  (no se muestra nada, nunca «sin movimientos»). */
+export function useHubDelDia(dia: string) {
+  return useQuery<HistorialHub | null>({
+    queryKey: ["argos-hub-historial", dia],
+    staleTime: 60_000,
+    queryFn: async () => {
+      const { data, error } = await (supabase as unknown as { rpc: (f: string, a: unknown) => Promise<{ data: unknown; error: unknown }> })
+        .rpc("hub_historial", { _desde: dia });
+      if (error) return null;
+      try { return leerHistorialHub(data); } catch { return null; }
+    },
+  });
+}
+
+/** `detalle`: en la ficha cada línea se abre y muestra más (lo que dijo Argos, la
+ *  prueba). En Shift va sin detalle: la línea ya dice qué fue y cuánto duró. */
+export function LoQuePaso({ f, t, ahora, detalle, hub = [], sinTitulo = false }: { f: FilaTurno; t: Tr; ahora: number; detalle?: (ev: Evento) => ReactNode; hub?: EventoHub[]; sinTitulo?: boolean }) {
   const [foco, setFoco] = useState<number | null>(null);
-  const eventos = useMemo(() => eventosDelDia(f), [f]);
+  const [abierto, setAbierto] = useState<number | null>(null);
+  const eventos = useMemo(() => eventosDelDia(f, hub), [f, hub]);
   const tramos = f.franja;
   const desde = Math.min(f.turnoInicio ?? Infinity, ...tramos.map((x) => x.inicio));
   const hasta = Math.max(f.turnoFin ?? -Infinity, ...tramos.map((x) => x.fin));
@@ -366,7 +477,7 @@ export function LoQuePaso({ f, t, ahora }: { f: FilaTurno; t: Tr; ahora: number 
   const trabajo = tramos.filter((x) => x.tipo === "trabajo");
   return (
     <div className="px-4 py-4">
-      <p className="mb-3 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">{t("hr.turno.paso.titulo")}</p>
+      {!sinTitulo && <p className="mb-3 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">{t("hr.turno.paso.titulo")}</p>}
       {/* La raya, más alta, con cada pedazo numerado por su línea de abajo. */}
       <div className="relative h-3 overflow-hidden rounded-full bg-foreground/[0.06]" onMouseLeave={() => setFoco(null)}>
         {trabajo.map((x, i) => (
@@ -375,9 +486,9 @@ export function LoQuePaso({ f, t, ahora }: { f: FilaTurno; t: Tr; ahora: number 
         ))}
         {eventos.map((x, i) => (
           <div key={i} onMouseEnter={() => setFoco(i)}
-            title={`${t(ETIQUETA_EVENTO[x.tipo])} · ${x.tipo === "aviso" ? hora(x.inicio) : `${horaCorta(x.inicio)} – ${hora(x.fin)}`}`}
-            className={`absolute inset-y-0 cursor-help transition-opacity ${COLOR_EVENTO[x.tipo]} ${x.tipo === "aviso" ? "w-1 rounded-full" : ""} ${apagado(i)} ${foco === i ? "ring-2 ring-foreground/70" : ""}`}
-            style={{ left: pos(x.inicio), ...(x.tipo === "aviso" ? {} : { width: ancho(x.inicio, x.fin) }) }} />
+            title={`${x.tipo === "aviso" ? motivoAviso(t, x.aviso) : x.hub ? t(claveDeEvento(x.hub)) : t(ETIQUETA_EVENTO[x.tipo])} · ${x.inicio === x.fin ? hora(x.inicio) : `${horaCorta(x.inicio)} – ${hora(x.fin)}`}`}
+            className={`absolute inset-y-0 cursor-help transition-opacity ${COLOR_EVENTO[x.tipo]} ${x.inicio === x.fin ? "w-1 rounded-full" : ""} ${apagado(i)} ${foco === i ? "ring-2 ring-foreground/70" : ""}`}
+            style={{ left: pos(x.inicio), ...(x.inicio === x.fin ? {} : { width: ancho(x.inicio, x.fin) }) }} />
         ))}
         {f.enCurso && ahora < hasta && (
           <>
@@ -398,16 +509,45 @@ export function LoQuePaso({ f, t, ahora }: { f: FilaTurno; t: Tr; ahora: number 
         <ul className="mt-3 flex flex-col" onMouseLeave={() => setFoco(null)}>
           {eventos.map((x, i) => {
             const min = Math.max(1, Math.round((x.fin - x.inicio) / 60_000));
-            const abierto = f.enCurso && x.tipo !== "aviso" && ahora - x.fin < 90_000;
-            return (
-              <li key={i} onMouseEnter={() => setFoco(i)}
-                className={`grid grid-cols-[0.75rem_7.5rem_1fr_auto] items-center gap-3 rounded-lg px-2 py-1.5 text-sm transition-colors ${foco === i ? "bg-foreground/[0.06]" : ""}`}>
-                <span className={`h-2.5 w-2.5 rounded-sm ${COLOR_EVENTO[x.tipo]}`} aria-hidden />
-                <span className="tabular-nums text-muted-foreground">{x.tipo === "aviso" ? hora(x.inicio) : `${horaCorta(x.inicio)} – ${hora(x.fin)}`}</span>
-                <span className="font-medium">{t(ETIQUETA_EVENTO[x.tipo])}</span>
-                <span className="tabular-nums text-muted-foreground">
-                  {x.tipo === "aviso" ? "" : abierto ? t("hr.turno.paso.enCurso", { d: duracion(t, min) }) : duracion(t, min)}
+            const puntual = x.tipo === "aviso" || x.tipo === "hub";
+            const sigue = f.enCurso && !puntual && ahora - x.fin < 90_000;
+            const derecha = x.tipo === "aviso"
+              ? [corrigioAviso(t, x.aviso, f.enCurso), x.aviso?.escalado ? t("hr.turno.paso.escalado") : ""].filter(Boolean).join(" · ")
+              : x.hub ? t(QUIEN_HUB[quienFue(x.hub)] ?? "hr.hubHist.quien.dudoso")
+              : sigue ? t("hr.turno.paso.enCurso", { d: duracion(t, min) }) : duracion(t, min);
+            const cuando = puntual ? hora(x.inicio) : `${horaCorta(x.inicio)} – ${hora(x.fin)}`;
+            const que = x.tipo === "aviso" ? motivoAviso(t, x.aviso) : x.hub ? `${t("hr.turno.franja.hub")}: ${t(claveDeEvento(x.hub)).toLocaleLowerCase()}` : t(ETIQUETA_EVENTO[x.tipo]);
+            const flecha = detalle ? <ChevronDown className={`h-3.5 w-3.5 shrink-0 text-muted-foreground transition-transform ${abierto === i ? "rotate-180" : ""}`} aria-hidden /> : null;
+            // EN EL CELULAR (Alvaro, 27/11/2026: «estética en el teléfono»): qué fue
+            // arriba, entero; la hora y el resultado debajo, chiquito. Desde sm, 4 columnas.
+            const contenido = (
+              <>
+                <span className={`mt-1.5 h-2.5 w-2.5 self-start rounded-sm sm:mt-0 sm:self-center ${COLOR_EVENTO[x.tipo]}`} aria-hidden />
+                <span className="hidden tabular-nums text-muted-foreground sm:block">{cuando}</span>
+                <span className="min-w-0">
+                  <span className="block font-medium leading-snug sm:truncate">{que}</span>
+                  <span className="block text-xs tabular-nums text-muted-foreground sm:hidden">{[cuando, derecha].filter(Boolean).join(" · ")}</span>
                 </span>
+                <span className="flex items-center justify-end gap-1.5 text-right tabular-nums text-muted-foreground">
+                  <span className="hidden sm:inline">{derecha}</span>
+                  {flecha}
+                </span>
+              </>
+            );
+            const fila = "grid w-full grid-cols-[0.75rem_1fr_auto] items-center gap-x-3 gap-y-0.5 rounded-lg px-2 py-1.5 text-left text-sm transition-colors sm:grid-cols-[0.75rem_7.5rem_1fr_auto]";
+            return (
+              <li key={i} onMouseEnter={() => setFoco(i)}>
+                {detalle ? (
+                  <button type="button" aria-expanded={abierto === i} onClick={() => setAbierto(abierto === i ? null : i)}
+                    className={`${fila} ${foco === i || abierto === i ? "bg-foreground/[0.06]" : ""} hover:bg-foreground/[0.06]`}>
+                    {contenido}
+                  </button>
+                ) : (
+                  <div className={`${fila} ${foco === i ? "bg-foreground/[0.06]" : ""}`}>{contenido}</div>
+                )}
+                {detalle && abierto === i && (
+                  <div className="mb-2 ml-6 mt-1 rounded-xl border border-border/40 bg-background/40 p-3">{detalle(x)}</div>
+                )}
               </li>
             );
           })}
@@ -426,6 +566,77 @@ const TITULO_SECCION: Record<Seccion, TranslationKey> = {
   noVinieron: "hr.turno.sec.noVinieron",
   libres: "hr.turno.sec.libres",
 };
+
+/** Cómo va: lo que ya pasó del turno sin su comida y baño permitidos, lo que lleva de
+ *  verdad y cuánto va atrás (Alvaro, 27/11/2026). */
+function marchaDe(f: FilaTurno, calculadoAt: number) {
+  if (f.turnoInicio == null) return null;
+  const pasados = Math.max(0, Math.round((Math.min(calculadoAt, f.turnoFin ?? calculadoAt) - f.turnoInicio) / 60_000));
+  const deberia = Math.max(0, pasados - Math.min(f.comidaMin, f.comidaTope) - Math.min(f.banoMin, f.banoTope));
+  const lleva = minutosTrabajados(f);
+  return { deberia, lleva, falta: Math.max(0, deberia - lleva) };
+}
+
+/** EL RESUMEN DEL TURNO (Alvaro, 28/11/2026: «una vez uno le da clic al empleado desde
+ *  Shift, que te lleve a la plantilla del empleado… caer en lo del 100 %»): el avance
+ *  y los cinco renglones. Antes era el desplegable de Shift; ahora es la primera
+ *  pestaña de la ficha. */
+export function ResumenDelTurno({ f, t, calculadoAt, hub }: { f: FilaTurno; t: Tr; calculadoAt: number; hub?: ResumenHub }) {
+  const ll = celdaLlegada(t, f);
+  return (
+      <div className="divide-y divide-border/40 rounded-2xl border border-border/40 bg-card/30">
+        {(() => {
+          const m = f.enCurso ? marchaDe(f, calculadoAt) : null;
+          const pct = m ? (m.deberia > 0 ? Math.min(1, m.lleva / m.deberia) : 1) : Math.min(1, ((): number => { const mt = minutosTurno(f); return mt ? minutosTrabajados(f) / mt : 0; })());
+          return (
+            // VISUAL (Alvaro, 27/11/2026: «puro texto»): el % grande; la barra y, debajo,
+            // a sus lados, lo que lleva y lo que debería llevar; la pastilla aparte.
+            <div className="flex items-center gap-5 px-4 py-4">
+              <div className="w-24 shrink-0">
+                <p className="font-display text-4xl font-bold tabular-nums leading-none tracking-tight">{Math.round(pct * 100)}%</p>
+                <p className="mt-1 text-[11px] text-muted-foreground">{t(m ? "hr.turno.lista.avanceHoy" : "hr.turno.lista.turno")}</p>
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className={PISTA}>
+                  <div className={`h-full rounded-full ${m ? colorAvance(m.falta) : COLOR_FRANJA.trabajo}`} style={{ width: `${pct * 100}%` }} />
+                </div>
+                <div className="mt-2 flex items-start justify-between gap-3 text-xs tabular-nums">
+                  <span><span className="block text-[11px] text-muted-foreground">{t("hr.turno.v2.lleva")}</span><span className="font-semibold">{duracion(t, m ? m.lleva : minutosTrabajados(f))}</span></span>
+                  <span className="text-right"><span className="block text-[11px] text-muted-foreground">{t(m ? "hr.turno.v2.deberia" : "hr.turno.v2.turno")}</span><span className="font-semibold">{duracion(t, m ? m.deberia : (minutosTurno(f) ?? 0))}</span></span>
+                </div>
+              </div>
+              {m && (
+                <span className="hidden shrink-0 items-center gap-2 rounded-full border border-border/50 bg-foreground/[0.04] px-3 py-1.5 text-xs font-medium tabular-nums sm:inline-flex">
+                  <span className={`h-2 w-2 rounded-full ${colorAvance(m.falta)}`} aria-hidden />
+                  {m.falta > 5 ? t("hr.turno.atras", { d: duracion(t, m.falta) }) : t("hr.turno.alDia")}
+                </span>
+              )}
+            </div>
+          );
+        })()}
+        {/* «Lo que pasó» completo vive en la ficha, no aquí (Alvaro, 27/11/2026: «no vamos
+            a tener un preview y luego entrar ya todo en el perfil»). Aquí, el resumen. */}
+        {([
+          [Clock, t("hr.turno.col.llegada"), ll],
+          [UtensilsCrossed, t("hr.turno.col.comida"), celdaComida(t, f)],
+          [DoorOpen, t("hr.turno.col.bano"), celdaBano(t, f)],
+          [Bell, t("hr.turno.col.avisos"), celdaAvisos(t, f)],
+          [Wifi, t("hr.turno.col.conexion"), celdaConexion(t, f)],
+          ...(hub ? [[MonitorUp, t("hr.turno.col.hub"), celdaHub(t, hub)] as [typeof Clock, string, ReturnType<typeof celdaLlegada>]] : []),
+        ] as Array<[typeof Clock, string, ReturnType<typeof celdaLlegada>]>).map(([Icono, etq, x]) => (
+          <div key={etq} className="flex flex-wrap items-center gap-x-4 gap-y-1 px-4 py-3">
+            <span className="flex w-40 shrink-0 items-center gap-2 text-sm text-muted-foreground"><Icono className="h-4 w-4" />{etq}</span>
+            <span className={`text-sm font-medium tabular-nums ${x.tenue ? "text-muted-foreground" : "text-foreground"}`}>{x.arriba || "—"}</span>
+            {x.abajo && (
+              <span className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                <Punto nivel={x.nivel} />{x.abajo}
+              </span>
+            )}
+          </div>
+        ))}
+      </div>
+  );
+}
 
 export function TurnoTabla() {
   const { t, language } = useLanguage();
@@ -461,7 +672,9 @@ export function TurnoTabla() {
   useEffect(() => {
     setFiltro((f) => (!esHoy && f === "activos" ? "trabajaron" : f));
   }, [esHoy]);
-  const [turno, setTurno] = useState<Jornada | null>(null);
+  // El turno elegido: el id de un turno de la empresa (o «am/pm/madrugada» si la
+  // lista de la empresa no carga).
+  const [turno, setTurno] = useState<string | null>(null);
   const [buscar, setBuscar] = useState("");
   const [calAbierto, setCalAbierto] = useState(false);
   const [abiertoId, setAbiertoId] = useState<string | null>(null);
@@ -470,7 +683,63 @@ export function TurnoTabla() {
   const fmtDia = (d: string, o: Intl.DateTimeFormatOptions) => new Date(`${d}T12:00:00-05:00`).toLocaleDateString(locale, { timeZone: "America/Bogota", ...o });
 
   const filas = useMemo(() => q.data?.filas ?? [], [q.data]);
-  const delTurno = useMemo(() => filas.filter((f) => !turno || jornadaDe(f.entrada) === turno), [filas, turno]);
+  // LOS TURNOS DE LA EMPRESA (27/11/2026): los botones salen de la lista de la
+  // empresa (Ajustes → Empresa). Cada persona va en el suyo, o en el de su puesto,
+  // o en el que contiene su hora de entrada. Sin lista: AM / PM / Madrugada por hora.
+  const turnosEmp = useTurnosEmpresa();
+  const catalogo = useMemo(() => (turnosEmp.data?.turnos ?? []).filter((x) => x.activa), [turnosEmp.data]);
+  const turnosGente = useTurnosDeLaGente(useMemo(() => filas.map((f) => f.userId), [filas]));
+  const opcionesTurno: Array<[string, string]> = catalogo.length
+    ? catalogo.map((x) => [x.id, x.nombre])
+    : JORNADAS.map((j): [string, string] => [j, t(j === "am" ? "hr.turno.jornada.am" : j === "pm" ? "hr.turno.jornada.pm" : "hr.turno.jornada.madrugada")]);
+  const turnoDe = useMemo(() => (f: FilaTurno): string | null => {
+    if (!catalogo.length) return jornadaDe(f.entrada);
+    const suyo = turnosGente.data?.get(f.userId)?.turno_id;
+    if (suyo && catalogo.some((x) => x.id === suyo)) return suyo;
+    return f.entrada ? catalogo.find((x) => horaEnTurno(f.entrada!, x))?.id ?? null : null;
+  }, [catalogo, turnosGente.data]);
+  const delTurno = useMemo(() => filas.filter((f) => !turno || turnoDe(f) === turno), [filas, turno, turnoDe]);
+  // ARRANCA EN EL TURNO QUE CORRE AHORA (Alvaro, 27/11/2026: «que te desplegara el
+  // PM by default o en la hora que estés»). Solo hoy y una sola vez: si la persona
+  // cambia el filtro, se respeta.
+  const [turnoElegido, setTurnoElegido] = useState(false);
+  useEffect(() => {
+    // Espera a saber la lista de la empresa (si no, elegiría «pm» y luego no casa con sus turnos).
+    // Arranca en el turno de ahora y en «Activos ahora» (Alvaro, 27/11/2026: «entrar by
+    // default en el horario que está… y en Active Now»). Para ver a la gente conectada
+    // de otros turnos, «Todos».
+    if (turnoElegido || !esHoy || turno != null || turnosEmp.isLoading) return;
+    const ahora = new Date().toLocaleTimeString("en-GB", { timeZone: "America/Bogota", hour: "2-digit", minute: "2-digit", hour12: false });
+    const actual = catalogo.length ? catalogo.find((x) => horaEnTurno(ahora, x))?.id : jornadaDe(ahora);
+    if (actual) { setTurno(actual); setTurnoElegido(true); }
+  }, [catalogo, esHoy, turno, turnoElegido, turnosEmp.isLoading]);
+  // PANTALLA · CÁMARA · FOCO POR TURNO (Alvaro, 27/11/2026: Workday se va y lo útil
+  // pasa aquí): los mismos números que tenía Workday (useTurnoPersonas, el día entero).
+  const { personas: medidas } = useTurnoPersonas(dia, 0, 24, true);
+  // EL HUB DE LOS SUPERVISORES (27/11/2026: la pestaña «Hub history» pasa aquí).
+  const medidaDe = useMemo(() => new Map(medidas.map((p) => [p.userId, p])), [medidas]);
+  const promedioDe = (gente: FilaTurno[], f: (p: PersonaTurno) => number | null) => {
+    const v = gente.map((g) => medidaDe.get(g.userId)).filter((p): p is PersonaTurno => !!p && !p.sinNota).map(f).filter((x): x is number => x != null);
+    return v.length ? Math.round(v.reduce((a, b) => a + b, 0) / v.length) : null;
+  };
+  /** Los grupos por turno, en el orden de la empresa (y «sin turno» al final). */
+  const gruposTurno = useMemo(() => {
+    const orden: Array<[string | null, string, string | null]> = [
+      ...opcionesTurno.map(([id, nombre]): [string, string, string | null] => {
+        const x = catalogo.find((c) => c.id === id);
+        return [id, nombre, x ? `${a12(x.entrada)} – ${a12(x.salida)}` : null];
+      }),
+      [null, t("hr.turno.grupo.sinTurno"), null],
+    ];
+    // Hoy, el turno que corre ahora va primero.
+    if (esHoy) {
+      const ahora = new Date().toLocaleTimeString("en-GB", { timeZone: "America/Bogota", hour: "2-digit", minute: "2-digit", hour12: false });
+      const actual = catalogo.length ? catalogo.find((x) => horaEnTurno(ahora, x))?.id : jornadaDe(ahora);
+      const i = orden.findIndex(([id]) => id === actual);
+      if (i > 0) orden.unshift(...orden.splice(i, 1));
+    }
+    return orden;
+  }, [opcionesTurno, catalogo, t, esHoy]);
   const pasa = (f: FilaTurno, k: Filtro) =>
     k === "todos" ? true
       : k === "activos" ? f.activoAhora
@@ -561,8 +830,10 @@ export function TurnoTabla() {
       <div key={f.userId} className={`flex flex-col rounded-2xl transition ${abierta ? "bg-foreground/[0.04]" : ""}`}>
         <button
           type="button"
-          onClick={() => setAbiertoId(abierta ? null : f.userId)}
-          aria-expanded={abierta}
+          // Si vino, tocarla lleva directo a su ficha de ese día (Alvaro, 28/11/2026: «ya no
+          // hace un drop»); si no vino, se abre para marcar el día libre.
+          onClick={() => (f.llegada != null ? abrir(f) : setAbiertoId(abierta ? null : f.userId))}
+          aria-expanded={f.llegada != null ? undefined : abierta}
           className="group grid w-full grid-cols-[1fr_auto] items-center gap-x-4 gap-y-2 rounded-2xl px-3 py-3.5 text-left transition hover:bg-foreground/[0.04] md:grid-cols-[minmax(11rem,15rem)_1fr_10.5rem_1rem]"
         >
           <div className="flex min-w-0 items-center gap-2.5">
@@ -580,25 +851,33 @@ export function TurnoTabla() {
           <div className="col-span-2 row-start-2 md:col-span-1 md:row-start-auto">{f.llegada != null && <Franja f={f} t={t} ahora={q.data?.calculadoAt ?? Date.now()} />}</div>
           {/* UNA PASTILLA CLARA (Alvaro, 27/11/2026): lo importante y nada más; las horas
               exactas van adentro. */}
-          <div className="flex justify-end md:row-start-auto">
+          <div className="flex min-w-0 justify-end md:row-start-auto">
             {(() => {
               const m = f.enCurso && f.llegada != null ? marcha(f) : null;
               const pct = parte(f);
-              const [punto, texto] = (filtro === "mejores" || filtro === "peores") && pct != null
-                ? [COLOR_FRANJA.trabajo, t("hr.turno.pill.pct", { n: Math.round(pct * 100) })]
-                : m ? [colorAvance(m.falta), m.falta > 5 ? t("hr.turno.atras", { d: duracion(t, m.falta) }) : t("hr.turno.alDia")]
-                : f.llegada != null ? [null, t("hr.turno.pill.trabajo", { a: duracion(t, minutosTrabajados(f)), b: minutosTurno(f) != null ? duracion(t, minutosTurno(f)!) : "—" })]
-                : f.noVino && f.entrada ? [null, t("hr.turno.debiaEntrar", { h: a12(f.entrada) ?? "" })]
-                : [null, ll.arriba || "—"];
+              // Dos renglones cuando es largo (Alvaro, 27/11/2026: «se monta encima de la
+              // barra»): la columna es de ancho fijo y el texto nunca la pasa.
+              const [punto, texto, abajo]: [string | null, string, string | null] = (filtro === "mejores" || filtro === "peores") && pct != null
+                ? [COLOR_FRANJA.trabajo, t("hr.turno.pill.pct", { n: Math.round(pct * 100) }), null]
+                : m ? [colorAvance(m.falta), m.falta > 5 ? t("hr.turno.atras", { d: duracion(t, m.falta) }) : t("hr.turno.alDia"), null]
+                : f.sinHorario && f.llegada != null ? [null, t("hr.turno.pill.conectado", { a: duracion(t, f.conectadoMin) }), null]
+                : f.llegada != null ? [null, t("hr.turno.pill.trabajoArriba", { a: duracion(t, minutosTrabajados(f)) }), minutosTurno(f) != null ? t("hr.turno.pill.trabajoAbajo", { b: duracion(t, minutosTurno(f)!) }) : null]
+                : f.noVino && f.entrada ? [null, t("hr.turno.debiaEntrar", { h: a12(f.entrada) ?? "" }), null]
+                : [null, ll.arriba || "—", null];
               return (
-                <span className="inline-flex items-center gap-2 whitespace-nowrap rounded-full border border-border/50 bg-foreground/[0.04] px-3 py-1.5 text-xs font-medium tabular-nums text-foreground/85">
-                  {punto && <span className={`h-2 w-2 rounded-full ${punto}`} aria-hidden />}
-                  {texto}
+                <span className={`inline-flex max-w-full items-center gap-2 border border-border/50 bg-foreground/[0.04] px-3 py-1.5 text-xs font-medium tabular-nums text-foreground/85 ${abajo ? "rounded-2xl" : "rounded-full"}`}>
+                  {punto && <span className={`h-2 w-2 shrink-0 rounded-full ${punto}`} aria-hidden />}
+                  <span className="min-w-0 text-right leading-tight">
+                    <span className="block truncate">{texto}</span>
+                    {abajo && <span className="block truncate text-[11px] font-normal text-muted-foreground">{abajo}</span>}
+                  </span>
                 </span>
               );
             })()}
           </div>
-          <ChevronDown className={`hidden h-4 w-4 text-muted-foreground transition md:block ${abierta ? "rotate-180" : ""}`} />
+          {f.llegada != null
+            ? <ChevronRight className="hidden h-4 w-4 text-muted-foreground transition group-hover:translate-x-0.5 md:block" />
+            : <ChevronDown className={`hidden h-4 w-4 text-muted-foreground transition md:block ${abierta ? "rotate-180" : ""}`} />}
         </button>
         {abierta && f.llegada == null && (
           <div className="flex flex-wrap items-center gap-3 px-3 pb-4 md:pl-14">
@@ -610,70 +889,6 @@ export function TurnoTabla() {
                 {t(f.diaLibre ? "hr.turno.libre.quitar" : "hr.turno.libre.marcar")}
               </Button>
             )}
-          </div>
-        )}
-        {abierta && f.llegada != null && (
-          // LISTA SIMPLE (Alvaro, 27/11/2026): sin cajas, un renglón por dato.
-          <div className="flex flex-col gap-4 px-3 pb-5 md:pl-14">
-            <div className="divide-y divide-border/40 rounded-2xl border border-border/40 bg-card/30">
-              {(() => {
-                const m = f.enCurso ? marcha(f) : null;
-                const pct = m ? (m.deberia > 0 ? Math.min(1, m.lleva / m.deberia) : 1) : Math.min(1, parte(f) ?? 0);
-                return (
-                  // VISUAL (Alvaro, 27/11/2026: «puro texto»): el % grande; la barra y, debajo,
-                  // a sus lados, lo que lleva y lo que debería llevar; la pastilla aparte.
-                  <div className="flex items-center gap-5 px-4 py-4">
-                    <div className="w-24 shrink-0">
-                      <p className="font-display text-4xl font-bold tabular-nums leading-none tracking-tight">{Math.round(pct * 100)}%</p>
-                      <p className="mt-1 text-[11px] text-muted-foreground">{t(m ? "hr.turno.lista.avanceHoy" : "hr.turno.lista.turno")}</p>
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <div className={PISTA}>
-                        <div className={`h-full rounded-full ${m ? colorAvance(m.falta) : COLOR_FRANJA.trabajo}`} style={{ width: `${pct * 100}%` }} />
-                      </div>
-                      <div className="mt-2 flex items-start justify-between gap-3 text-xs tabular-nums">
-                        <span><span className="block text-[11px] text-muted-foreground">{t("hr.turno.v2.lleva")}</span><span className="font-semibold">{duracion(t, m ? m.lleva : minutosTrabajados(f))}</span></span>
-                        <span className="text-right"><span className="block text-[11px] text-muted-foreground">{t(m ? "hr.turno.v2.deberia" : "hr.turno.v2.turno")}</span><span className="font-semibold">{duracion(t, m ? m.deberia : (minutosTurno(f) ?? 0))}</span></span>
-                      </div>
-                    </div>
-                    {m && (
-                      <span className="hidden shrink-0 items-center gap-2 rounded-full border border-border/50 bg-foreground/[0.04] px-3 py-1.5 text-xs font-medium tabular-nums sm:inline-flex">
-                        <span className={`h-2 w-2 rounded-full ${colorAvance(m.falta)}`} aria-hidden />
-                        {m.falta > 5 ? t("hr.turno.atras", { d: duracion(t, m.falta) }) : t("hr.turno.alDia")}
-                      </span>
-                    )}
-                  </div>
-                );
-              })()}
-              <LoQuePaso f={f} t={t} ahora={q.data?.calculadoAt ?? Date.now()} />
-              {([
-                [Clock, t("hr.turno.col.llegada"), ll],
-                [UtensilsCrossed, t("hr.turno.col.comida"), celdaComida(t, f)],
-                [DoorOpen, t("hr.turno.col.bano"), celdaBano(t, f)],
-                [Bell, t("hr.turno.col.avisos"), celdaAvisos(t, f)],
-                [Wifi, t("hr.turno.col.conexion"), celdaConexion(t, f)],
-              ] as Array<[typeof Clock, string, ReturnType<typeof celdaLlegada>]>).map(([Icono, etq, x]) => (
-                <div key={etq} className="flex flex-wrap items-center gap-x-4 gap-y-1 px-4 py-3">
-                  <span className="flex w-40 shrink-0 items-center gap-2 text-sm text-muted-foreground"><Icono className="h-4 w-4" />{etq}</span>
-                  <span className={`text-sm font-medium tabular-nums ${x.tenue ? "text-muted-foreground" : "text-foreground"}`}>{x.arriba || "—"}</span>
-                  {x.abajo && (
-                    <span className="flex items-center gap-1.5 text-sm text-muted-foreground">
-                      <Punto nivel={x.nivel} />{x.abajo}
-                    </span>
-                  )}
-                </div>
-              ))}
-            </div>
-            <div className="flex flex-wrap items-center gap-2">
-              <Button size="sm" variant="outline" className="rounded-full" onClick={() => abrir(f)}>
-                {t("hr.turno.verDia")}<ChevronRight className="ml-1 h-3.5 w-3.5" />
-              </Button>
-              {puedeLibre && (
-                <Button size="sm" variant="ghost" className="rounded-full" disabled={guardandoLibre === f.userId} onClick={() => void cambiarLibre(f, !f.diaLibre)}>
-                  {t(f.diaLibre ? "hr.turno.libre.quitar" : "hr.turno.libre.marcar")}
-                </Button>
-              )}
-            </div>
           </div>
         )}
       </div>
@@ -688,7 +903,10 @@ export function TurnoTabla() {
         <div className="overflow-hidden rounded-3xl border border-border/50 bg-card/25">
         {/* ENCABEZADO (Alvaro, 27/11/2026: «que quede bien estético»): el título a la
             izquierda y las fechas en un solo bloque a la derecha (semana + calendario). */}
-        <div className="flex flex-col gap-3 p-4 xl:flex-row xl:items-center xl:justify-between">
+        {/* PULIDO (Alvaro, 27/11/2026: «púlelo un poquito más»): arriba el título y el
+            buscador en un renglón; debajo la semana, de lado a lado y pareja. */}
+        <div className="flex flex-col gap-3 p-4">
+        <div className="flex items-center justify-between gap-3">
           <div className="flex min-w-0 items-center gap-3">
             <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-border/70 bg-foreground/[0.04] text-foreground/75">
               <ClipboardList className="h-[18px] w-[18px]" />
@@ -701,8 +919,24 @@ export function TurnoTabla() {
             </div>
           </div>
 
-          <div className="flex w-full min-w-0 flex-col gap-2 sm:flex-row sm:items-center xl:w-auto">
-          <div className="flex min-w-0 flex-1 items-center gap-0.5 rounded-2xl border border-border/50 bg-background/40 p-1 xl:w-auto">
+          {/* EL BUSCADOR, ARRIBA A LA DERECHA (Alvaro, 27/11/2026). */}
+          <div className="relative w-40 shrink-0 sm:w-56">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <input
+              value={buscar}
+              onChange={(e) => setBuscar(e.target.value)}
+              placeholder={t("hr.turno.buscar")}
+              aria-label={t("hr.donde.buscar")}
+              className="h-10 w-full rounded-xl border border-border/50 bg-background/40 pl-9 pr-8 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            />
+            {buscar && (
+              <button type="button" onClick={() => setBuscar("")} aria-label={t("hr.donde.verTodos")} className="absolute right-1.5 top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-full text-muted-foreground hover:bg-foreground/10">
+                <X className="h-3.5 w-3.5" />
+              </button>
+            )}
+          </div>
+        </div>
+          <div className="flex min-w-0 items-center gap-0.5 rounded-2xl border border-border/50 bg-background/40 p-1">
             <button type="button" onClick={() => irA(sumarDias(dia, -7))} aria-label={t("hr.turno.semanaAnterior")}
               className="flex h-11 w-8 shrink-0 items-center justify-center rounded-xl text-muted-foreground transition hover:bg-foreground/[0.06] hover:text-foreground">
               <ChevronLeft className="h-4 w-4" />
@@ -717,7 +951,7 @@ export function TurnoTabla() {
                   disabled={futuro}
                   onClick={() => irA(d)}
                   aria-current={activo ? "date" : undefined}
-                  className={`relative flex h-11 min-w-0 flex-1 flex-col items-center justify-center rounded-xl text-xs transition xl:w-12 xl:flex-none ${activo ? "bg-primary text-primary-foreground shadow-sm" : futuro ? "text-muted-foreground/35" : "text-muted-foreground hover:bg-foreground/[0.06] hover:text-foreground"}`}
+                  className={`relative flex h-11 min-w-0 flex-1 flex-col items-center justify-center rounded-xl text-xs transition ${activo ? "bg-primary text-primary-foreground shadow-sm" : futuro ? "text-muted-foreground/35" : "text-muted-foreground hover:bg-foreground/[0.06] hover:text-foreground"}`}
                 >
                   <span className="capitalize leading-none">{fmtDia(d, { weekday: "short" }).replace(".", "")}</span>
                   <span className="mt-1 text-sm font-semibold tabular-nums leading-none">{fmtDia(d, { day: "numeric" })}</span>
@@ -759,57 +993,41 @@ export function TurnoTabla() {
               </button>
             )}
           </div>
-          {/* EL BUSCADOR, ARRIBA A LA DERECHA (Alvaro, 27/11/2026). */}
-          <div className="relative w-full min-w-0 sm:w-44 sm:shrink-0 xl:w-52">
-            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <input
-              value={buscar}
-              onChange={(e) => setBuscar(e.target.value)}
-              placeholder={t("hr.turno.buscar")}
-              aria-label={t("hr.donde.buscar")}
-              className="h-[3.25rem] w-full rounded-2xl border border-border/50 bg-background/40 pl-9 pr-8 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            />
-            {buscar && (
-              <button type="button" onClick={() => setBuscar("")} aria-label={t("hr.donde.verTodos")} className="absolute right-1.5 top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-full text-muted-foreground hover:bg-foreground/10">
-                <X className="h-3.5 w-3.5" />
-              </button>
-            )}
-          </div>
-          </div>
         </div>
 
           {!q.isLoading && !q.isError && filas.length > 0 && (
             <>
-            {/* LOS NÚMEROS DEL DÍA: cada tarjeta filtra la tabla. */}
+            {/* LOS NÚMEROS DEL DÍA (pulido 27/11/2026): la etiqueta corta arriba, en un
+                renglón; el número debajo, todos del mismo alto. Cada uno filtra la tabla. */}
             <div className="grid grid-cols-2 border-t border-border/40 sm:grid-cols-5 sm:divide-x sm:divide-border/40">
               {([
-                ["trabajaron", `${numeros.vinieron}/${numeros.tocaban}`, "hr.turno.num.vinieron", null],
-                ["tarde", String(numeros.tarde), "hr.turno.num.tarde", numeros.tarde ? "ambar" : null],
-                ["noVinieron", String(numeros.noVino), "hr.turno.num.noVino", numeros.noVino ? "rojo" : null],
-                ["ignoro", String(numeros.ignoraron), "hr.turno.num.ignoraron", numeros.ignoraron ? "rojo" : null],
-                // Números humanos (Alvaro, 27/11/2026: «no me hables por 216 h 01»): el % en grande y horas redondas abajo.
-                [null, numeros.horasTurno ? `${Math.round((numeros.horas / numeros.horasTurno) * 100)} %` : "—", "hr.turno.num.horas", null],
-              ] as Array<[Filtro | null, string, TranslationKey, Nivel | null]>).map(([k, valor, etq, nivel]) => (
+                ["trabajaron", String(numeros.vinieron), `/${numeros.tocaban}`, "hr.turno.num2.vinieron", null],
+                ["tarde", String(numeros.tarde), null, "hr.turno.num2.tarde", numeros.tarde ? "ambar" : null],
+                ["noVinieron", String(numeros.noVino), null, "hr.turno.num2.noVino", numeros.noVino ? "rojo" : null],
+                ["ignoro", String(numeros.ignoraron), null, "hr.turno.num2.ignoraron", numeros.ignoraron ? "rojo" : null],
+                // Números humanos (Alvaro, 27/11/2026: «no me hables por 216 h 01»): el % y horas redondas al lado.
+                [null, numeros.horasTurno ? `${Math.round((numeros.horas / numeros.horasTurno) * 100)}%` : "—",
+                  numeros.horasTurno ? t("hr.turno.num2.horasDe", { a: Math.round(numeros.horas / 60), b: Math.round(numeros.horasTurno / 60) }) : null,
+                  "hr.turno.num2.horas", null],
+              ] as Array<[Filtro | null, string, string | null, TranslationKey, Nivel | null]>).map(([k, valor, extra, etq, nivel]) => (
                 <button
                   key={etq}
                   type="button"
                   disabled={!k}
                   onClick={() => k && setFiltro(filtro === k ? "todos" : k)}
                   aria-pressed={k ? filtro === k : undefined}
-                  className={`flex min-h-[5.5rem] flex-col justify-between px-4 py-3.5 text-left transition disabled:cursor-default ${k && filtro === k ? "bg-primary/10" : "hover:enabled:bg-foreground/[0.04]"}`}
+                  className={`flex flex-col gap-1.5 px-4 py-3 text-left transition disabled:cursor-default ${k && filtro === k ? "bg-primary/10" : "hover:enabled:bg-foreground/[0.04]"}`}
                 >
-                  <p className="flex items-center gap-1.5 font-display text-2xl font-bold tabular-nums leading-none">
-                    {valor}{nivel && <Punto nivel={nivel} />}
-                  </p>
-                  <p className="mt-1 text-[11px] text-muted-foreground">
-                    {etq === "hr.turno.num.horas"
-                      ? t("hr.turno.num.horasDe", { a: Math.round(numeros.horas / 60), b: Math.round(numeros.horasTurno / 60) })
-                      : t(etq)}
-                  </p>
+                  <span className="flex items-center gap-1.5 truncate text-[11px] font-medium text-muted-foreground">
+                    {nivel && <Punto nivel={nivel} />}{t(etq)}
+                  </span>
+                  <span className="flex items-baseline gap-1.5 font-display tabular-nums leading-none">
+                    <span className="text-2xl font-semibold text-foreground">{valor}</span>
+                    {extra && <span className="truncate text-sm font-medium text-muted-foreground">{extra}</span>}
+                  </span>
                 </button>
               ))}
             </div>
-
             {/* VISTAS, TURNO Y BUSCADOR: todo del mismo alto (h-10) y sin barra de
                 scroll; en ventanas angostas las vistas se reparten parejas. */}
             <div className="grid gap-2 border-t border-border/40 p-3 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
@@ -838,10 +1056,10 @@ export function TurnoTabla() {
               </div>
               {/* LA JORNADA (Alvaro, 27/11/2026): un botoncito, no la lista de horarios. */}
               <div className="flex shrink-0 gap-1 rounded-2xl border border-border/50 bg-background/40 p-1" role="group" aria-label={t("hr.turno.turno")}>
-                {([null, ...JORNADAS] as Array<Jornada | null>).map((j) => (
-                  <button key={j ?? "todas"} type="button" onClick={() => setTurno(j)} aria-pressed={turno === j}
+                {([[null, t("hr.turno.jornada.todas")], ...opcionesTurno] as Array<[string | null, string]>).map(([j, etq]) => (
+                  <button key={j ?? "todas"} type="button" onClick={() => { setTurnoElegido(true); setTurno(j); }} aria-pressed={turno === j}
                     className={`h-8 flex-1 whitespace-nowrap rounded-xl px-3 text-xs font-medium transition lg:flex-none ${turno === j ? "bg-foreground/[0.1] text-foreground" : "text-muted-foreground hover:bg-foreground/[0.05] hover:text-foreground"}`}>
-                    {t(j === null ? "hr.turno.jornada.todas" : j === "am" ? "hr.turno.jornada.am" : j === "pm" ? "hr.turno.jornada.pm" : "hr.turno.jornada.madrugada")}
+                    {etq}
                   </button>
                 ))}
               </div>
@@ -874,7 +1092,44 @@ export function TurnoTabla() {
               {!vistas.length && (
                 <p className="rounded-2xl border border-dashed border-border/50 p-5 text-center text-sm text-muted-foreground">{t("hr.turno.nadieAsi")}</p>
               )}
-              {(filtro === "mejores" || filtro === "peores" || filtro === "noVinieron" || filtro === "activos") ? (
+              {/* POR GRUPOS DE TURNO (Alvaro, 27/11/2026: «que luego te lo pusiera por
+                  grupos»): con «Todos», un bloque por turno con su resumen arriba. */}
+              {turno == null && vistas.length > 0 ? (
+                gruposTurno.map(([id, nombre, horas]) => {
+                  const gente = vistas.filter((f) => turnoDe(f) === id);
+                  if (!gente.length) return null;
+                  const activosG = gente.filter((f) => f.activoAhora).length;
+                  const atrasG = gente.filter((f) => { const m = f.enCurso ? marcha(f) : null; return !!m && m.falta > 5; }).length;
+                  return (
+                    <div key={id ?? "sin"} className="mt-3 flex flex-col gap-1.5 md:gap-0">
+                      <div className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5 rounded-xl bg-foreground/[0.035] px-3 py-2">
+                        <span className="text-sm font-semibold text-foreground">{nombre}</span>
+                        {horas && <span className="text-xs tabular-nums text-muted-foreground">{horas}</span>}
+                        <span className="text-xs text-muted-foreground">
+                          {t("hr.turno.grupo.personas", { n: gente.length })}
+                          {esHoy && activosG > 0 && <> · <span className="inline-block h-1.5 w-1.5 -translate-y-px rounded-full bg-success" aria-hidden /> {t("hr.turno.grupo.activos", { n: activosG })}</>}
+                          {atrasG > 0 && <> · {t("hr.turno.grupo.atras", { n: atrasG })}</>}
+                        </span>
+                        {(() => {
+                          const pan = promedioDe(gente, (p) => p.pantallaPct), cam = promedioDe(gente, (p) => p.camaraPct), foco = promedioDe(gente, (p) => p.atencionPct);
+                          if (pan == null && cam == null && foco == null) return null;
+                          const dato = (etq: TranslationKey, v: number | null) => v == null ? null : (
+                            <span className="whitespace-nowrap">{t(etq)} <span className={`font-semibold tabular-nums ${v < 80 ? "text-warning" : "text-foreground/85"}`}>{v}%</span></span>
+                          );
+                          return (
+                            <span className="ml-auto flex flex-wrap items-center gap-x-3 text-xs text-muted-foreground">
+                              {dato("hr.turno.grupo.pantalla", pan)}{dato("hr.turno.grupo.camara", cam)}{dato("hr.turno.grupo.foco", foco)}
+                            </span>
+                          );
+                        })()}
+                      </div>
+                      <div className="flex flex-col gap-1.5 md:divide-y md:divide-border/30 md:gap-0">
+                        {gente.map(fila)}
+                      </div>
+                    </div>
+                  );
+                })
+              ) : (filtro === "mejores" || filtro === "peores" || filtro === "noVinieron" || filtro === "activos") ? (
                 <div className="mt-2 flex flex-col gap-1 md:divide-y md:divide-border/30">
                   {vistas.map(fila)}
                 </div>

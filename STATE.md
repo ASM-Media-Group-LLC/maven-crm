@@ -176,7 +176,9 @@ Ambos sets ya tienen migrations subidas (`20260504100000`, `20260504110000`) per
 ## 2026-11-27 · Gracia de cámara y pantalla por empresa y posición
 - Un solo bolsillo por turno (sin cámara + sin pantalla juntos), 10 min por defecto; la empresa lo pone en Ajustes → Cámara y pantalla por puesto y cada puesto puede tener otro. Misma regla para el pago (argos_gracia_calculo) y las horas.
 - Pendiente: aplicar la migración 20261127050220 en producción (pide permiso del dueño).
-
+## 2026-11-27 · Turnos de la empresa, del puesto y de la persona
+- Cada empresa define sus turnos (AM 08–16, PM 16–00, Madrugada 00–08 sembrados) en Ajustes → Empresa; cada puesto trae uno por defecto y cada persona puede tener el suyo (Horarios del equipo). El horario base usa: horas propias → turno (persona → puesto) → turno del rol → rol. Argos → Turno filtra con esos turnos.
+- Migración 20261127190845_turnos_de_la_empresa.sql. Aplicada el 27/11 con OK del dueño, más 20261127191003_turnos_conflictos.sql (aviso de quien tiene varios puestos con turnos distintos; gana su turno propio, si no el del primer puesto). Pendiente: que RR. HH. elija el turno de cada puesto/persona.
 - 27/11/2026 (Claude): cuadrito «Pendientes del equipo» abajo a la derecha (horarios sin confirmar, personas sin Posición, hora de comida, turnos). Cada cosa la ve quien la puede arreglar según su Posición. Migración 20261127200000_pendientes_de_gestion.sql.
 
 - 27/11/2026 (Claude): limpieza de Posiciones (cuentas de prueba a la papelera, posiciones vacías borradas, Juan Pachas sin Administración→Usuarios); horarios solo se piden a quien debe estar en Cowork; skin negro/gris en oscuro con primario claro.
@@ -184,3 +186,4 @@ Ambos sets ya tienen migrations subidas (`20260504100000`, `20260504110000`) per
 - Grace: María (editora) llegó a 97 de 100 GB. Se creó la unidad compartida «Contenido» (sin tope, de la empresa) y se movieron ahí CONTENIDO MASSIVE / PLUS / UNLOK (112 GB, 6.177 ítems); María es editora de la unidad y dueña de sus carpetas. Su Mi unidad quedó en ~1,5 GB.
 - PR: cada puesto trae N GB o «sin tope» (Ajustes → Empresa) y a una persona se le puede poner otro o «sin tope» (Drive → Cupos). Orden: persona → puesto (sin tope si alguno; si no, el mayor) → 50 GB. La edge drive salta el chequeo con cupo null; el disco del NAS sigue mandando.
 - Orden para publicar: unir el PR (despliega la edge) y DESPUÉS aplicar 20261127210000_drive_espacio_por_puesto.sql (pide OK del dueño).
+- 27/11/2026 (Claude, PR #306): Shift/ficha → cada aviso de Argos dice qué fue y en cuánto lo corrigió; en la ficha cada línea de «Lo que pasó» se abre con lo que Argos le dijo y los pantallazos del rato; «Faults» lleva a la lista completa. Quien no debe estar en Cowork y no tiene horario confirmado: entrada/salida = primera y última conexión, sin tarde ni «atrás». Turno hasta 23:59 = medianoche (8 h). Migración 20261128032503_argos_nudges_frases.sql (frases que dijo Argos + argos_sin_cowork_de) aplicada con OK del dueño.

@@ -6,6 +6,7 @@ import { useLanguage } from "@/hooks/useLanguage";
 import { usePuedoConfigurarEmpresa } from "@/hooks/usePausas";
 import { ModalidadesPausa } from "@/components/horarios/ModalidadesPausa";
 import { CamaraPantallaPorPuesto } from "@/components/ajustes/CamaraPantallaPorPuesto";
+import { TurnosEmpresa } from "@/components/horarios/TurnosEmpresa";
 import { DriveEspacioPorPuesto } from "@/components/ajustes/DriveEspacioPorPuesto";
 
 // AJUSTES → EMPRESA (Alvaro, 19/11/2026): lo que es de toda la empresa y no de
@@ -24,6 +25,9 @@ export default function Empresa() {
         {/* La cámara y la pantalla por puesto las ve todo el que llega aquí desde
             un aviso (jefes, RR. HH.); cambiarlas es de quien tenga la función. */}
         <CamaraPantallaPorPuesto />
+        {/* Los turnos de la empresa y el de cada puesto (27/11/2026): los ve quien
+            llega aquí; los cambia el dueño, quien configura la empresa o RR. HH. */}
+        <TurnosEmpresa />
         {puede.isLoading ? (
           <div className="flex justify-center p-10"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
         ) : puede.data ? (

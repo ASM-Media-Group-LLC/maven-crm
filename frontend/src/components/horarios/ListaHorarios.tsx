@@ -8,6 +8,7 @@ import { useToast } from "@/hooks/use-toast";
 import { a12 } from "@/lib/horaBogota";
 import { useGuardarHorario, useHorariosEquipo } from "@/hooks/useHorariosEquipo";
 import { type ComidaDePersona, type PausaDePersona, useComidasDelEquipo, useGuardarComidaPersona, usePausasDelEquipo } from "@/hooks/usePausas";
+import { type TurnoDePersona, type TurnoEmpresa, useGuardarTurnoPersona, useTurnosDeLaGente, useTurnosEmpresa } from "@/hooks/useTurnosEmpresa";
 import {
   type DiaHorario, type FilaEquipoHorario, alternarDia, cambio, hhmm, mismaHoraTodos, ponerHoraATodos, semanaInicial,
   trabaja, validarSemana,
@@ -80,9 +81,15 @@ function ComidaDeLaFila({ uid, comida, t }: { uid: string; comida: ComidaDePerso
   );
 }
 
-function FilaHorario({ f, t, pausa, comida }: { f: FilaEquipoHorario; t: Tr; pausa?: PausaDePersona; comida?: ComidaDePersona }) {
+function FilaHorario({ f, t, pausa, comida, turnos, suTurno }: { f: FilaEquipoHorario; t: Tr; pausa?: PausaDePersona; comida?: ComidaDePersona; turnos: TurnoEmpresa[]; suTurno?: TurnoDePersona }) {
   const { toast } = useToast();
   const guardar = useGuardarHorario();
+  const guardarTurno = useGuardarTurnoPersona();
+  // SU TURNO (27/11/2026): el suyo, si RR. HH. le puso uno; si no, el del puesto.
+  const turnoPropio = suTurno?.origen === "persona" ? suTurno.turno_id : null;
+  const [turnoSel, setTurnoSel] = useState<string | null>(turnoPropio);
+  const turnoCambio = turnoSel !== turnoPropio;
+  const hayTurnos = turnos.some((tu) => tu.activa);
   const inicial = useMemo(() => semanaInicial(f), [f]);
   const [dias, setDias] = useState<DiaHorario[]>(inicial);
   const misma = mismaHoraTodos(dias);
@@ -90,12 +97,17 @@ function FilaHorario({ f, t, pausa, comida }: { f: FilaEquipoHorario; t: Tr; pau
   const base = hhmm(f.base_entrada) && hhmm(f.base_salida) ? { entrada: hhmm(f.base_entrada)!, salida: hhmm(f.base_salida)! } : null;
   const error = validarSemana(dias);
   const confirmado = !!f.confirmado_at;
-  const pendienteDeGuardar = cambio(inicial, dias);
+  const pendienteDeGuardar = cambio(inicial, dias) || turnoCambio;
   const nombre = f.nombre ?? "—";
 
   const confirmar = () => {
     guardar.mutate({ userId: f.user_id, dias }, {
-      onSuccess: () => toast({ title: t("hr.horEq.listo", { n: nombre }) }),
+      onSuccess: () => {
+        toast({ title: t("hr.horEq.listo", { n: nombre }) });
+        if (turnoCambio) guardarTurno.mutate({ userId: f.user_id, turno: turnoSel }, {
+          onError: (e) => toast({ title: t("hr.horEq.noSeGuardo"), description: (e as Error).message, variant: "destructive" }),
+        });
+      },
       onError: (e) => toast({ title: t("hr.horEq.noSeGuardo"), description: (e as Error).message, variant: "destructive" }),
     });
   };
@@ -135,6 +147,29 @@ function FilaHorario({ f, t, pausa, comida }: { f: FilaEquipoHorario; t: Tr; pau
           <span className="ml-1 text-[11px] text-muted-foreground">{t("hr.horEq.tocaDescanso")}</span>
         </div>
 
+        {/* EL TURNO (27/11/2026): tocar uno pone sus horas en los días que trabaja. */}
+        {hayTurnos && (
+          <div className="flex flex-wrap items-center gap-1.5" role="group" aria-label={t("hr.turnosEmp.suTurno")}>
+            <span className="mr-1 text-xs text-muted-foreground">{t("hr.turnosEmp.suTurno")}</span>
+            {turnos.filter((x) => x.activa || x.id === turnoSel).map((x) => {
+              const activo = turnoSel === x.id;
+              const delPuesto = !turnoSel && suTurno?.origen === "puesto" && suTurno.turno_id === x.id;
+              return (
+                <button key={x.id} type="button" aria-pressed={activo}
+                  title={`${a12(x.entrada)} – ${a12(x.salida)}`}
+                  onClick={() => {
+                    if (activo) { setTurnoSel(null); return; }
+                    setTurnoSel(x.id); setPorDia(false);
+                    setDias((prev) => ponerHoraATodos(prev, x.entrada, x.salida));
+                  }}
+                  className={`h-8 rounded-lg px-2.5 text-xs font-medium transition-colors ${activo ? "bg-primary/20 text-foreground ring-1 ring-primary/40" : delPuesto ? "bg-foreground/[0.06] text-foreground ring-1 ring-border" : "bg-foreground/[0.04] text-muted-foreground hover:text-foreground"}`}>
+                  {x.nombre}{delPuesto && <span className="ml-1 text-[10px] text-muted-foreground">{t("hr.turnosEmp.delPuesto")}</span>}
+                </button>
+              );
+            })}
+          </div>
+        )}
+
         {!porDia ? (
           <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
             <label className="flex items-center gap-2">{t("hr.horEq.entra")}
@@ -163,6 +198,18 @@ function FilaHorario({ f, t, pausa, comida }: { f: FilaEquipoHorario; t: Tr; pau
           </div>
         )}
 
+        {/* SUS HORAS NO SON LAS DEL TURNO (27/11/2026): manda la semana; se avisa. */}
+        {(() => {
+          const tu = turnoSel ? turnos.find((x) => x.id === turnoSel) : suTurno && turnos.find((x) => x.id === suTurno.turno_id);
+          if (!tu || !misma || (misma.entrada === tu.entrada && misma.salida === tu.salida)) return null;
+          return (
+            <span className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+              <span className="h-1.5 w-1.5 rounded-full bg-warning" aria-hidden />
+              {t("hr.turnosEmp.horasDistintas", { t: tu.nombre, a: a12(tu.entrada) ?? tu.entrada, b: a12(tu.salida) ?? tu.salida })}
+            </span>
+          );
+        })()}
+
         <PausaDeLaFila pausa={pausa} t={t} />
         <ComidaDeLaFila uid={f.user_id} comida={comida} t={t} />
 
@@ -173,7 +220,7 @@ function FilaHorario({ f, t, pausa, comida }: { f: FilaEquipoHorario; t: Tr; pau
           </Button>
           {error && <span className="text-[11px] text-muted-foreground">{t(error === "sinDias" ? "hr.horEq.errSinDias" : "hr.horEq.errIncompleto")}</span>}
           {pendienteDeGuardar && (
-            <button type="button" onClick={() => { setDias(inicial); setPorDia(!mismaHoraTodos(inicial) && inicial.some(trabaja)); }} className="text-[11px] text-muted-foreground hover:text-foreground">
+            <button type="button" onClick={() => { setDias(inicial); setTurnoSel(turnoPropio); setPorDia(!mismaHoraTodos(inicial) && inicial.some(trabaja)); }} className="text-[11px] text-muted-foreground hover:text-foreground">
               {t("hr.horEq.deshacer")}
             </button>
           )}
@@ -189,6 +236,10 @@ export function ListaHorarios({ obligatorio = false }: { obligatorio?: boolean }
   const { t } = useLanguage();
   const q = useHorariosEquipo();
   const filas = useMemo(() => q.data ?? [], [q.data]);
+  // Los turnos de la empresa y el de cada persona. Si no cargan, la fila se ve
+  // como antes (sin botones de turno): nunca se inventa un turno.
+  const turnosEmp = useTurnosEmpresa();
+  const turnosGente = useTurnosDeLaGente(useMemo(() => filas.map((f) => f.user_id), [filas]));
   const pendientes = filas.filter((f) => !f.confirmado_at).length;
   const [filtro, setFiltro] = useState<Filtro>(obligatorio ? "pendientes" : "pendientes");
   const [buscar, setBuscar] = useState("");
@@ -249,7 +300,7 @@ export function ListaHorarios({ obligatorio = false }: { obligatorio?: boolean }
         <p className="p-6 text-sm text-muted-foreground">{filtro === "pendientes" && pendientes === 0 ? t("hr.horEq.todosListos") : t("hr.horEq.nadieFiltro")}</p>
       ) : (
         <ul className="divide-y divide-border/25">
-          {vistas.map((f) => <FilaHorario key={`${f.user_id}-${f.confirmado_at ?? "x"}`} f={f} t={t} pausa={pausas.data?.get(f.user_id)} comida={comidas.data?.get(f.user_id)} />)}
+          {vistas.map((f) => <FilaHorario key={`${f.user_id}-${f.confirmado_at ?? "x"}-${turnosGente.data?.get(f.user_id)?.turno_id ?? ""}`} f={f} t={t} pausa={pausas.data?.get(f.user_id)} comida={comidas.data?.get(f.user_id)} turnos={turnosEmp.data?.turnos ?? []} suTurno={turnosGente.data?.get(f.user_id)} />)}
         </ul>
       )}
     </div>

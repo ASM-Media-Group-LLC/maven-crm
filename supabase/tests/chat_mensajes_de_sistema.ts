@@ -96,6 +96,17 @@ const FIXTURE_HASTA = "20260929180000";
 // Migraciones que tocan objetos de este banco pero necesitan tablas que sus fixtures no traen.
 // Se prueban en su propio banco, con el motivo al lado.
 const NO_CARGAN_AQUI: Record<string, string> = {
+  "20261127190845_turnos_de_la_empresa.sql":
+    "Turnos de la empresa: usa posiciones_borrador, el reloj de Cowork y es_admin_o_dueno, que estos fixtures no " +
+    "traen; solo entra por profiles (turno_empresa_id). No toca nada del Messenger. Se aplicó y comprobó en producción.",
+  "20261127191003_turnos_conflictos.sql":
+    "Turnos de la empresa: los conflictos de varios puestos. Usa posiciones_borrador; no toca nada del Messenger.",
+  "20261127191943_argos_comida_fuera_de_hora.sql":
+    "Argos: comida fuera de su hora. Usa el reloj de Cowork; no toca nada del Messenger.",
+  "20261127210000_limpieza_posiciones.sql":
+    "Posiciones: limpieza de puestos repetidos. Usa posiciones_borrador_personas; no toca nada del Messenger.",
+  "20261128032503_argos_nudges_frases.sql":
+    "Argos: lo que dijo cada aviso. Usa argos_nudges y el reloj de Cowork; no toca nada del Messenger.",
   "20261119060000_posiciones_mandan.sql":
     "Posiciones (Ajustes): toca user_roles (trigger de protegidos) y depende de posiciones_borrador, roles_config, monitor_config, drive_acceso_extra y auth.users, que estos fixtures no traen; no toca nada del Messenger. Se aplicó y comprobó en producción con la comparación antes/después.",
   "20261111120000_backstage_equipo.sql":

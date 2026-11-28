@@ -46,7 +46,15 @@ const SIN_CONEXION = new Set(["sin_conexion", "sin_conexion_larga"]);
 
 export interface Segmento { estado: string; inicio: number; fin: number }
 export interface Pausa { kind: string; inicio: number; fin: number | null; autoCerrada: boolean }
-export interface Aviso { tipo: string; at: number; escalado: boolean; cerrado: boolean }
+export interface Aviso {
+  tipo: string; at: number; escalado: boolean; cerrado: boolean;
+  /** Cuándo lo corrigió (null = no lo corrigió). */
+  cerradoAt?: number | null;
+  /** El motivo corto que guardó Argos («Tenía la cámara apagada»). */
+  mensaje?: string | null;
+  /** Lo que Argos le dijo, llamado por llamado (desde el 27/11/2026). */
+  frases?: string[];
+}
 export interface Marca { inicio: number; fin: number | null; cierre: string | null }
 
 export interface Horario {
@@ -81,6 +89,9 @@ export function ventanaTurno(dia: string, h: Pick<Horario, "entrada" | "salida">
   if (!h.entrada || !h.salida) return null;
   const inicio = instanteBogota(dia, h.entrada);
   let fin = instanteBogota(dia, h.salida);
+  // «11:59 PM» es medianoche (Alvaro, 27/11/2026: «of 7 h 59 min» cuando los demás
+  // dicen «of 8 h»): se lleva a las 12:00 AM para que el turno mida lo que es.
+  if (h.salida.slice(0, 5) === "23:59") fin += 60_000;
   if (fin <= inicio) fin += 24 * 3_600_000;
   return { inicio, fin };
 }
@@ -181,6 +192,10 @@ export interface FilaTurno {
   /** La franja del día, en orden, y las horas de cada aviso de Argos. */
   franja: TramoFranja[];
   marcasAviso: number[];
+  /** Cada aviso de Argos con su detalle (motivo, frases, cuándo lo corrigió). */
+  avisosDet: Aviso[];
+  /** No debe estar en Cowork y no tiene horario: entrada y salida = su primera y última conexión. */
+  sinHorario?: boolean;
   /** El peor de todos. */
   nivel: NivelFila;
   /** Por qué (claves de motivo, de la más grave a la menos). */
@@ -302,7 +317,10 @@ export function armarFila(dia: string, p: EntradaPersona, ahora: number): FilaTu
   const ultimo = segs[segs.length - 1];
   const vistoHacePoco = !!ultimo && !SIN_CONEXION.has(ultimo.estado) && ahora - ultimo.fin < 3 * 60_000;
   const enSalida = pausas.some((x) => x.fin == null && ahora - x.inicio < 3 * 60 * 60_000);
-  const activoAhora = !terminado && (vistoHacePoco || enSalida);
+  // ACTIVO AHORA = CONECTADO AHORA, sin excepciones (Alvaro, 27/11/2026: «¿aquí
+  // está toda la gente que está conectada, sí o no?»). También quien sigue
+  // conectado después de su turno o no tiene horario.
+  const activoAhora = vistoHacePoco || enSalida;
   const pct = conectadoMs > 0 ? activoMs / conectadoMs : 1;
   let nivelConexion: Nivel = "ok";
   // Con menos de una hora conectado no se juzga el porcentaje (recién empieza).
@@ -382,6 +400,7 @@ export function armarFila(dia: string, p: EntradaPersona, ahora: number): FilaTu
     nivelConexion,
     franja,
     marcasAviso: avisos.map((a) => a.at),
+    avisosDet: avisos,
     nivel: empiezaLuego ? "ok" : peor(nivelLlegada, nivelComida, nivelBano, nivelAvisos, nivelConexion),
     motivos,
   };

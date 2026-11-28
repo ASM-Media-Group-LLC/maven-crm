@@ -28,6 +28,7 @@ const migracion = Object.values((import.meta as unknown as { glob: Glob }).glob(
 const migracionVieja = Object.values((import.meta as unknown as { glob: Glob }).glob("../../../../supabase/migrations/20261119012000_hub_supervisores_senal_y_avisos.sql", { query: "?raw", import: "default", eager: true }))[0] ?? "";
 const hook = Object.values((import.meta as unknown as { glob: Glob }).glob("../../hooks/useHubDelSupervisor.ts", { query: "?raw", import: "default", eager: true }))[0] ?? "";
 const argos = Object.values((import.meta as unknown as { glob: Glob }).glob("../../pages/hr/HRMonitorIA.tsx", { query: "?raw", import: "default", eager: true }))[0] ?? "";
+const turnoTabla = Object.values((import.meta as unknown as { glob: Glob }).glob("../../components/hr/TurnoTabla.tsx", { query: "?raw", import: "default", eager: true }))[0] ?? "";
 
 const funcion = (sql: string, nombre: string) => {
   const i = sql.indexOf(`create or replace function public.${nombre}(`);
@@ -132,9 +133,13 @@ describe("la lógica de la pestaña", () => {
     expect(diaBogota(new Date("2026-11-20T03:00:00Z"))).toBe("2026-11-19");
     expect(diaBogota(new Date("2026-11-20T03:00:00Z"), 1)).toBe("2026-11-18");
   });
-  it("Argos tiene la pestaña", () => {
-    expect(argos).toContain('{ k: "hub", label: t("hr.monia.tab.hub") }');
-    expect(argos).toContain("<HistorialHubPanel />");
+  // 27/11/2026 (Alvaro): la pestaña se quitó; lo del Hub vive en Shift (fila «Hub»
+  // del supervisor y sus movimientos en «Lo que pasó») y los enlaces viejos abren Shift.
+  it("Argos ya no tiene la pestaña: lo del Hub está en Shift", () => {
+    expect(argos).not.toContain('{ k: "hub", label: t("hr.monia.tab.hub") }');
+    expect(argos).toContain('hub: "turno"');
+    expect(turnoTabla).toContain('rpc("hub_historial"');
+    expect(turnoTabla).toContain("celdaHub(t, hub)");
   });
 });
 

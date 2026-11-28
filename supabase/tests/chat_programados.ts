@@ -245,6 +245,13 @@ const NO_CARGAN_AQUI: Record<string, string> = {
     "reescribe is_in_role_group y le suma tenant_id a user_roles, pero necesita roles_config, role_permissions, " +
     "role_base_grants y sus triggers. Con una agencia da lo mismo que prod persona por persona; se prueba en " +
     "roles_por_agencia.ts sobre el catálogo de prod.",
+  "20261127210000_limpieza_posiciones.sql":
+    "documenta la limpieza de Posiciones ya aplicada en prod (cuentas de prueba a la papelera, Posiciones vacías " +
+    "borradas, un permiso viejo apagado); toca profiles pero necesita posiciones_borrador_personas y role_permissions, " +
+    "que este fixture no trae. No cambia nada del chat.",
+  "20261127190845_turnos_de_la_empresa.sql":
+    "solo toca el Messenger porque le suma turno_empresa_id a profiles, pero necesita posiciones_borrador, " +
+    "rol_turnos, roles_config, horario_semanal y sus funciones, que este fixture no trae. No cambia nada del chat.",
   "20261006130000_agencia_lineas.sql":
     "crea agencia_lineas (con FK a scouter_companies, que este fixture no trae) y le cambia el NOMBRE a una agencia " +
     "(ASM Tech → Kash): los mensajes de sistema usan el id de la agencia, nunca el nombre. Se prueba en agencia_lineas.ts.",

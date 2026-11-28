@@ -2,7 +2,7 @@ import { toast } from "sonner";
 import { exportarExpediente } from "@/lib/posiciones/exportarExpediente";
 import { usePermissions } from "@/hooks/usePermissions";
 import { formatUI } from "@/lib/formatoHora";
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent as TeclaReact, type ReactNode } from "react";
 import { enHoras } from "@/lib/duracion";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { format } from "date-fns";
@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { useLanguage } from "@/hooks/useLanguage";
 import { UserAvatar } from "@/components/UserAvatar";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Page } from "@/components/ui/page";
 import { PageHeader } from "@/components/ui/page-header";
 import { useExpedienteEmpleado, type DiaExpediente, type CapturaDia } from "@/hooks/useExpedienteEmpleado";
@@ -30,7 +31,9 @@ import { GraciaDelDia } from "@/components/hr/GraciaDelDia";
 import { AppsDelDia } from "@/components/hr/AppsDelDia";
 import { EquipoDelDia } from "@/components/hr/EquipoDelDia";
 import { AhoraEnVivo } from "@/components/hr/AhoraEnVivo";
-import { LoQuePaso } from "@/components/hr/TurnoTabla";
+import { LoQuePaso, ResumenDelTurno, useHubDelDia, type Evento } from "@/components/hr/TurnoTabla";
+import { claveDeCausaDeEvento } from "@/lib/historialHub";
+import { PruebaDelMomento } from "@/components/hr/PruebaDelMomento";
 import { useTurnoTabla } from "@/hooks/useTurnoTabla";
 import { CronologiaDelDia } from "@/components/hr/CronologiaDelDia";
 import { useDisenoPulido } from "@/hooks/useDisenoPulido";
@@ -390,11 +393,11 @@ function TiraDelDia({ capturas, t }: { capturas: CapturaDia[]; t: Tr }) {
         const hc = m.camara ? formatUI(new Date(m.camara.createdAt), "HH:mm:ss") : null;
         return (
           <Dialog open onOpenChange={(o) => { if (!o) setVisorIdx(null); }}>
-            <DialogContent className="max-w-5xl bg-none from-transparent p-2 sm:p-3">
+            <DialogContent className="max-w-5xl bg-none from-transparent p-2 pt-14 sm:p-3 sm:pt-14">
               <DialogTitle className="sr-only">{t("hr.exp.pantallazosDia")}</DialogTitle>
               <div className="flex flex-col gap-2.5">
                 <div className="relative overflow-hidden rounded-xl border border-border/50 bg-black">
-                  <div className="relative aspect-[16/10] w-full">
+                  <div className="relative mx-auto aspect-[16/10] max-h-[68vh] w-full max-w-[calc(68vh*16/10)]">
                     {m.pantalla ? (
                       urlP ? <img src={urlP} alt="" className="h-full w-full object-contain" /> : <div className="flex h-full w-full items-center justify-center text-muted-foreground"><Loader2 className="h-6 w-6 animate-spin" /></div>
                     ) : (
@@ -984,6 +987,10 @@ function ExpedientePermitido() {
   // Usa la misma consulta que Shift (si vienes de ahí, ya está cargada).
   const turno = useTurnoTabla(diaSel, esHoy, !!userId);
   const filaTurno = turno.data?.filas.find((f) => f.userId === userId && f.llegada != null) ?? null;
+  // Lo del Hub (supervisores) también en «Lo que pasó» (27/11/2026).
+  const hubDia = useHubDelDia(diaSel);
+  const [pestanaTurno, setPestanaTurno] = useState<"resumen" | "paso">("resumen");
+  const hubDeEl = useMemo(() => (hubDia.data?.eventos ?? []).filter((e) => e.userId === userId), [hubDia.data, userId]);
 
   // % DE ATENCIÓN DEL DÍA (estilo Hubstaff): de los pantallazos que la IA ya
   // juzgó este día, qué porción estaba en lo suyo. Sin juzgados → "—" (no 0).
@@ -1094,16 +1101,19 @@ function ExpedientePermitido() {
           {/* Stats del día. Pulido: casillas neutras (filo fino, radio 10), la cifra
               en blanco y la etiqueta arriba en gris; lo flojo, solo un puntito. */}
           {pulido ? (
-          // CABECERA CLARA (Alvaro, 27/11/2026: «más estética, que se entienda»): la
+          // CABECERA CLARA (Alvaro, 27/11/2026: «más estética, que se entienda»; 28/11:
+          // «muy grande esa parte»; luego: «el 81 debería estar abajo; si le doy clic a
+          // Arrived o Hours connected, que salga un pop-up con más información»): con el
+          // en vivo, arriba el video y debajo UNA franja de casillas limpias (nombre y
+          // número; la nota es la primera) que al tocarlas abren su detalle. La
           // nota grande a la izquierda y seis casillas parejas, cada una con una
           // línea que dice qué significa su número.
-          <div className={`mt-4 grid gap-4 ${conVivo ? "lg:grid-cols-[minmax(0,1.5fr)_minmax(17rem,1fr)]" : ""}`}>
-          {conVivo && userId && <AhoraEnVivo userId={userId} capturas={dia.capturas} junto />}
-          <div className={`grid gap-3 ${conVivo ? "content-start" : "lg:grid-cols-[13rem_1fr]"}`}>
-            <div className="flex flex-col justify-center rounded-2xl border border-border/60 bg-card/30 p-4">
+          <div className={`grid ${conVivo ? "mt-5 gap-5" : "mt-4 gap-4"}`}>
+          <div className={conVivo ? "contents" : "grid gap-2.5 lg:grid-cols-[13rem_1fr]"}>
+            <div className={`flex flex-col justify-center rounded-xl border border-border/60 bg-card/30 px-4 py-3 ${conVivo ? "hidden" : ""}`}>
               <p className="text-xs font-medium text-muted-foreground">{t("hr.exp.nota")}</p>
               <p className="mt-1 flex items-baseline gap-1.5">
-                <span className="font-display text-5xl font-bold tabular-nums leading-none tracking-tight">{dia.nota.valor ?? "—"}</span>
+                <span className="font-display text-4xl font-bold tabular-nums leading-none tracking-tight">{dia.nota.valor ?? "—"}</span>
                 <span className="text-sm text-muted-foreground">/ 100</span>
               </p>
               {dia.nota.banda && (
@@ -1113,10 +1123,14 @@ function ExpedientePermitido() {
                 </p>
               )}
             </div>
-            <div className={`grid grid-cols-2 gap-3 ${conVivo ? "" : "sm:grid-cols-3"}`}>
+            <div className={conVivo ? "order-2 grid grid-cols-3 overflow-hidden rounded-2xl border border-border/50 bg-card/30 md:grid-cols-7 [&>*]:border-border/40 max-md:[&>*:nth-child(n+2)]:border-t max-md:[&>*:not(:nth-child(3n+1))]:border-l md:[&>*:not(:first-child)]:border-l" : "grid grid-cols-2 gap-2.5 sm:grid-cols-3"}>
             {(() => {
               const debia = expediente?.horario.entrada?.slice(0, 5) ?? null;
-              const entro = dia.entroAt ? new Date(dia.entroAt).toLocaleTimeString("es-CO", { timeZone: "America/Bogota", hour: "2-digit", minute: "2-digit", hour12: false }) : null;
+              // La llegada DEL TURNO (la de Shift) cuando la hay: el primer ingreso del día
+              // calendario agarra la cola del turno de ayer en quien sale a medianoche
+              // (Alvaro, 27/11/2026: Daniel «Arrived 12:00 AM» con turno de 4 PM).
+              const entroIso = filaTurno?.llegada != null ? new Date(filaTurno.llegada).toISOString() : dia.entroAt;
+              const entro = entroIso ? new Date(entroIso).toLocaleTimeString("es-CO", { timeZone: "America/Bogota", hour: "2-digit", minute: "2-digit", hour12: false }) : null;
               const tarde = debia && entro ? (Number(entro.slice(0, 2)) * 60 + Number(entro.slice(3))) - (Number(debia.slice(0, 2)) * 60 + Number(debia.slice(3))) : null;
               const casillas: Array<{ k: string; etq: string; v: string; sub: string; punto: string | null; title?: string }> = [
                 { k: "entro", etq: t("hr.exp.c.entro"), v: a12(entro) ?? "—",
@@ -1131,18 +1145,167 @@ function ExpedientePermitido() {
                 { k: "faltas", etq: t("hr.exp.c.faltas"), v: String(dia.faltas.length), sub: t("hr.exp.c.faltasSub"), punto: dia.faltas.length > 0 ? "bg-warning" : null },
                 { k: "pausas", etq: t("hr.exp.c.pausas"), v: enHoras(dia.minutosPausaDeMas), sub: t("hr.exp.c.pausasSub"), punto: dia.minutosPausaDeMas > 0 ? "bg-warning" : null },
               ];
+              // «Faults» lleva a la lista de esas faltas (27/11/2026).
+              const irAFaltas = () => {
+                setPestana("dia");
+                setTimeout(() => document.getElementById("faltas-del-dia")?.scrollIntoView({ behavior: "smooth", block: "start" }), 150);
+              };
+              // Lo que explica cada casilla al tocarla (Alvaro, 28/11/2026: «descríbeme
+              // bien la situación, si no, eso se mira horrible»).
+              const Fila = ({ a, b, tono }: { a: string; b: string; tono?: string }) => (
+                <div className="flex items-baseline justify-between gap-4 py-1.5 text-sm">
+                  <span className="text-muted-foreground">{a}</span>
+                  <span className={`font-medium tabular-nums ${tono ?? "text-foreground"}`}>{b}</span>
+                </div>
+              );
+              const Nota = ({ children }: { children: ReactNode }) => <p className="mt-3 text-xs leading-relaxed text-muted-foreground">{children}</p>;
+              const salida = expediente?.horario.salida?.slice(0, 5) ?? null;
+              const aMin = (h: string) => Number(h.slice(0, 2)) * 60 + Number(h.slice(3, 5));
+              const durTurno = debia && salida ? ((aMin(salida) - aMin(debia) + 1440) % 1440 || 1440) : null;
+              const detalleDe = (k: string): ReactNode => {
+                if (k === "nota") return <DesgloseNotaContenido dia={dia} atencion={atencion} t={t} compacto />;
+                if (k === "entro") return !debia ? <Nota>{t("hr.exp.pop.sinHorario")}</Nota> : (
+                  <div className="divide-y divide-border/40">
+                    <Fila a={t("hr.exp.pop.debia")} b={a12(debia) ?? debia} />
+                    <Fila a={t("hr.exp.pop.llego")} b={a12(entro) ?? t("hr.exp.pop.noLlego")} />
+                    {entro && <Fila a={t("hr.exp.pop.diferencia")} b={tarde != null && tarde > 5 ? t("hr.exp.pop.tarde", { d: enHoras(tarde) }) : t("hr.exp.pop.aTiempo")} tono={tarde != null && tarde > 5 ? "text-destructive" : "text-success"} />}
+                  </div>
+                );
+                if (k === "horas") return (
+                  <>
+                    <div className="divide-y divide-border/40">
+                      <Fila a={t("hr.exp.pop.conectado")} b={enHoras(dia.horas * 60)} />
+                      {debia && salida && <Fila a={t("hr.exp.pop.turno")} b={`${a12(debia)} – ${a12(salida)}`} />}
+                      {durTurno && <Fila a={t("hr.exp.pop.duracion")} b={enHoras(durTurno)} />}
+                      {durTurno && <Fila a={t("hr.exp.pop.lleva")} b={`${Math.min(100, Math.round((dia.horas * 60 * 100) / durTurno))} %`} />}
+                    </div>
+                    <Nota>{t("hr.exp.pop.horasExpl")}</Nota>
+                  </>
+                );
+                if (k === "foco") return !atencion ? <Nota>{t("hr.exp.pop.focoNada")}</Nota> : (
+                  <>
+                    <div className="divide-y divide-border/40">
+                      <Fila a={t("hr.exp.pop.revisadas")} b={String(atencion.n)} />
+                      <Fila a={t("hr.exp.pop.enLoSuyo")} b={String(atencion.ok)} tono="text-success" />
+                      <Fila a={t("hr.exp.pop.fuera")} b={String(atencion.n - atencion.ok)} tono={atencion.n - atencion.ok > 0 ? "text-destructive" : undefined} />
+                    </div>
+                    <Nota>{t("hr.exp.pop.focoExpl")}</Nota>
+                  </>
+                );
+                if (k === "sinPantalla") {
+                  // De qué hora a qué hora (Alvaro, 28/11/2026: «decir exactamente de qué
+                  // hora a qué hora no compartió la pantalla»): los tramos de su turno.
+                  const tipos = ["sin_pantalla", "sin_camara", "corte", "pausa"] as const;
+                  const piezas = (filaTurno?.franja ?? [])
+                    .filter((x) => (tipos as readonly string[]).includes(x.tipo))
+                    .map((x) => ({ tipo: x.tipo as string, inicio: x.inicio, fin: x.fin }))
+                    .sort((a, b) => a.inicio - b.inicio);
+                  const tramos: typeof piezas = [];
+                  for (const x of piezas) {
+                    const prev = tramos[tramos.length - 1];
+                    if (prev && prev.tipo === x.tipo && x.inicio - prev.fin < 60_000) { prev.fin = Math.max(prev.fin, x.fin); continue; }
+                    tramos.push({ ...x });
+                  }
+                  const hora = (ms: number) => a12(new Date(ms).toLocaleTimeString("en-GB", { timeZone: "America/Bogota", hour: "2-digit", minute: "2-digit", hour12: false })) ?? "";
+                  const dura = (ms: number) => { const sg = Math.max(1, Math.round(ms / 1000)); return sg < 60 ? t("hr.exp.pop.seg", { n: sg }) : enHoras(Math.round(sg / 60)); };
+                  return (
+                    <>
+                      <div className="divide-y divide-border/40">
+                        <Fila a={t("hr.exp.pop.permitido")} b={enHoras(permitidoMin)} />
+                        {sinPantallaMin <= permitidoMin
+                          ? <Fila a={t("hr.exp.pop.leQueda")} b={enHoras(permitidoMin - sinPantallaMin)} tono="text-success" />
+                          : <Fila a={t("hr.exp.pop.sePaso")} b={enHoras(sinPantallaMin - permitidoMin)} tono="text-destructive" />}
+                      </div>
+                      <p className="mb-1.5 mt-4 text-xs font-medium text-muted-foreground">{t("hr.exp.pop.tramos")}</p>
+                      {tramos.length === 0 ? <p className="text-xs text-muted-foreground">{t("hr.exp.pop.sinTramos")}</p> : (
+                        <ul className="max-h-56 space-y-1 overflow-y-auto pr-1">
+                          {tramos.map((x) => (
+                            <li key={`${x.tipo}-${x.inicio}`} className="flex items-baseline gap-3 rounded-lg bg-foreground/[0.03] px-2.5 py-1.5 text-sm">
+                              <span className="shrink-0 tabular-nums text-foreground">{x.fin - x.inicio >= 60_000 ? `${hora(x.inicio)} – ${hora(x.fin)}` : hora(x.inicio)}</span>
+                              <span className="min-w-0 flex-1 truncate text-xs text-muted-foreground">{t(`hr.exp.pop.tipo.${x.tipo}` as TranslationKey)}</span>
+                              <span className="shrink-0 text-xs tabular-nums text-muted-foreground">{dura(x.fin - x.inicio)}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                      <Nota>{t("hr.exp.pop.sinPantallaExpl")}</Nota>
+                    </>
+                  );
+                }
+                if (k === "faltas") {
+                  if (dia.faltas.length === 0) return <Nota>{t("hr.exp.pop.sinFaltas")}</Nota>;
+                  const por = new Map<string, number>();
+                  for (const f of dia.faltas) { const l = LABEL_FALTA[f.tipo as FaltaTipo]; const n = l ? t(l) : f.tipo; por.set(n, (por.get(n) ?? 0) + 1); }
+                  return (
+                    <>
+                      <p className="mb-1 text-xs text-muted-foreground">{t("hr.exp.pop.faltasExpl")}</p>
+                      <div className="divide-y divide-border/40">
+                        {[...por.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5).map(([n, c]) => <Fila key={n} a={n} b={`× ${c}`} />)}
+                      </div>
+                      <button type="button" onClick={irAFaltas}
+                        className="mt-3 inline-flex w-full items-center justify-center gap-1 rounded-full border border-border/60 px-3 py-1.5 text-xs font-medium text-foreground transition hover:bg-foreground/[0.06]">
+                        {t("hr.exp.verFaltas")} <ChevronRight className="h-3.5 w-3.5" />
+                      </button>
+                    </>
+                  );
+                }
+                if (k === "pausas") return (
+                  <>
+                    <Fila a={t("hr.exp.pop.deMas")} b={enHoras(dia.minutosPausaDeMas)} tono={dia.minutosPausaDeMas > 0 ? "text-destructive" : "text-success"} />
+                    <Nota>{t(dia.minutosPausaDeMas > 0 ? "hr.exp.pop.pausasMal" : "hr.exp.pop.pausasBien")}</Nota>
+                  </>
+                );
+                return null;
+              };
+              if (conVivo) {
+                // Franja limpia: la nota primero; cada casilla abre su detalle.
+                const nota = { k: "nota", etq: t("hr.exp.nota"), v: dia.nota.valor != null ? String(dia.nota.valor) : "—",
+                  sub: dia.nota.banda ? t(dia.nota.banda === "bien" ? "hr.exp.banda.bien" : dia.nota.banda === "ojo" ? "hr.exp.banda.ojo" : "hr.exp.banda.mal") : "",
+                  punto: dia.nota.banda ? (PUNTO_BANDA[dia.nota.banda] ?? null) : null };
+                return [nota, ...casillas].map((x) => (
+                  <Popover key={x.k}>
+                    <PopoverTrigger asChild>
+                      <button type="button"
+                        className={`group flex min-w-0 flex-col items-center gap-1.5 px-2 py-3.5 text-center transition hover:bg-foreground/[0.04] focus-visible:bg-foreground/[0.06] focus-visible:outline-none data-[state=open]:bg-foreground/[0.06] ${x.k === "nota" ? "col-span-3 md:col-span-1" : ""}`}>
+                        <span className="flex items-center gap-1.5 whitespace-nowrap text-[11px] font-medium text-muted-foreground">
+                          {x.punto && <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${x.punto}`} aria-hidden />}
+                          {t(`hr.exp.corto.${x.k}` as TranslationKey)}
+                        </span>
+                        <span className="flex items-baseline gap-1 whitespace-nowrap font-display text-lg font-semibold tabular-nums leading-none text-foreground xl:text-xl">
+                          {x.v}{x.k === "nota" && <span className="text-xs font-normal text-muted-foreground">/ 100</span>}
+                        </span>
+                      </button>
+                    </PopoverTrigger>
+                    <PopoverContent align="start" sideOffset={8} className="w-80 rounded-2xl p-0">
+                      <div className="border-b border-border/50 px-5 pb-4 pt-4">
+                        <p className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+                          {x.punto && <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${x.punto}`} aria-hidden />}{x.etq}
+                        </p>
+                        <p className="mt-1.5 font-display text-3xl font-semibold tabular-nums leading-none">
+                          {x.v}{x.k === "nota" && <span className="ml-1 text-sm font-normal text-muted-foreground">/ 100</span>}
+                        </p>
+                      </div>
+                      <div className="px-5 py-4">{detalleDe(x.k)}</div>
+                    </PopoverContent>
+                  </Popover>
+                ));
+              }
               return casillas.map((x) => (
-                <div key={x.k} className="flex h-full flex-col rounded-2xl border border-border/60 bg-card/30 px-4 py-3">
-                  <p className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+                <div key={x.k}
+                  {...(x.k === "faltas" && dia.faltas.length > 0 ? { role: "button", tabIndex: 0, onClick: irAFaltas, onKeyDown: (e: TeclaReact<HTMLDivElement>) => { if (e.key === "Enter") irAFaltas(); }, title: t("hr.exp.verFaltas") } : {})}
+                  className={`flex h-full min-w-0 flex-col rounded-xl border border-border/60 bg-card/30 ${conVivo ? "px-3 py-2" : "px-3.5 py-2.5"} ${x.k === "faltas" && dia.faltas.length > 0 ? "cursor-pointer transition hover:border-border hover:bg-card/50" : ""}`}>
+                  <p className="flex items-center gap-1.5 truncate text-[11px] font-medium text-muted-foreground">
                     {x.punto && <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${x.punto}`} aria-hidden />}{x.etq}
                   </p>
-                  <p className="mt-1.5 font-display text-2xl font-semibold tabular-nums leading-tight text-foreground">{x.v}</p>
-                  <p className="mt-1 text-[11px] leading-snug text-muted-foreground">{x.sub}</p>
+                  <p className={`mt-0.5 font-display font-semibold tabular-nums leading-tight text-foreground ${conVivo ? "whitespace-nowrap text-base xl:text-lg" : "text-xl"}`}>{x.v}</p>
+                  <p className={`mt-0.5 text-muted-foreground ${conVivo ? "line-clamp-2 text-[10px] leading-snug" : "line-clamp-2 text-[11px] leading-snug"}`} title={x.sub}>{x.sub}</p>
                 </div>
               ));
             })()}
             </div>
           </div>
+          {/* PRIMERO LOS NÚMEROS, DESPUÉS LOS PANTALLAZOS (Alvaro, 27/11/2026). */}
+          {conVivo && userId && <div className="order-1 min-w-0"><AhoraEnVivo userId={userId} capturas={dia.capturas} junto /></div>}
           </div>
           ) : (
           <div className="mt-4 grid grid-cols-3 gap-2 sm:grid-cols-5">
@@ -1170,8 +1333,27 @@ function ExpedientePermitido() {
           </div>
           )}
           {filaTurno && (
-            <div className="mt-4 rounded-2xl border border-border/60 bg-card/30">
-              <LoQuePaso f={filaTurno} t={t} ahora={turno.data?.calculadoAt ?? Date.now()} />
+            // DOS PESTAÑAS (Alvaro, 28/11/2026): se cae en el RESUMEN (lo que antes era el
+            // desplegable de Shift: el avance y los cinco renglones, todo junto) y al lado
+            // «Lo que pasó en su turno» (la franja y cada cosa, que se abre con su prueba).
+            <div className="mt-5">
+              <div role="tablist" className="mb-3 inline-flex rounded-full border border-border/50 bg-card/30 p-1">
+                {(["resumen", "paso"] as const).map((k) => (
+                  <button key={k} type="button" role="tab" aria-selected={pestanaTurno === k} onClick={() => setPestanaTurno(k)}
+                    className={`rounded-full px-4 py-1.5 text-sm font-medium transition ${pestanaTurno === k ? "bg-foreground text-background shadow-sm" : "text-muted-foreground hover:text-foreground"}`}>
+                    {t(k === "resumen" ? "hr.exp.turno.resumen" : "hr.exp.turno.paso")}
+                  </button>
+                ))}
+              </div>
+              {pestanaTurno === "resumen" ? (
+                <ResumenDelTurno f={filaTurno} t={t} calculadoAt={turno.data?.calculadoAt ?? Date.now()}
+                  hub={hubDia.data?.resumen.find((r) => r.userId === userId)} />
+              ) : (
+                <div className="rounded-2xl border border-border/60 bg-card/30">
+                  <LoQuePaso f={filaTurno} t={t} ahora={turno.data?.calculadoAt ?? Date.now()} hub={hubDeEl} sinTitulo
+                    detalle={(ev) => <DetalleEvento ev={ev} capturas={dia.capturas} t={t} />} />
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -1270,11 +1452,12 @@ function ExpedientePermitido() {
           )}
 
           {/* Faltas del día, si hay */}
+          {/* TODAS, no 20 (Alvaro, 27/11/2026: «Faults 25… que se vea cuáles fueron»). */}
           {dia.faltas.length > 0 && (
-            <div className="mt-5 border-t border-border/40 pt-4">
-              <p className="mb-2 text-xs font-semibold text-muted-foreground">{t("hr.exp.faltas")}</p>
+            <div id="faltas-del-dia" className="mt-5 scroll-mt-4 border-t border-border/40 pt-4">
+              <p className="mb-2 text-xs font-semibold text-muted-foreground">{t("hr.exp.faltas")} · {dia.faltas.length}</p>
               <div className="flex flex-col gap-1.5">
-                {dia.faltas.slice(0, 20).map((f) => {
+                {dia.faltas.map((f) => {
                   const lbl = LABEL_FALTA[f.tipo as FaltaTipo];
                   return (
                     <div key={f.id} className="flex items-center gap-2 rounded-xl border border-border/40 bg-card/30 px-2.5 py-1.5">
@@ -1327,6 +1510,41 @@ function ExpedientePermitido() {
 
 /** El día que pide el link (`?dia=AAAA-MM-DD`), si es válido y no es futuro; si no, hoy. */
 /** Puntito de la nota en el diseño pulido (el mismo del titular de Argos). */
+/** Lo que se abre en cada línea de «Lo que pasó en su turno» (27/11/2026). */
+const PIDE: Record<string, TranslationKey> = {
+  camara_apagada: "hr.paso.pide.camara_apagada", sin_pantalla: "hr.paso.pide.sin_pantalla", fuera_cuadro: "hr.paso.pide.fuera_cuadro",
+};
+function DetalleEvento({ ev, capturas, t }: { ev: Evento; capturas: CapturaDia[]; t: Tr }) {
+  const a = ev.aviso;
+  const frases = a?.frases ?? [];
+  return (
+    <div className="flex flex-col gap-3 text-sm">
+      {ev.tipo === "aviso" && a?.tipo && (
+        <div className="flex flex-col gap-1.5">
+          <p className="text-xs text-muted-foreground">
+            {t("hr.paso.dijo")}{frases.length > 1 ? ` · ${t("hr.paso.vecesDijo", { n: frases.length })}` : ""}
+          </p>
+          {frases.length ? (
+            <ul className="flex flex-col gap-1">
+              {frases.map((x, i) => <li key={i} className="text-foreground">«{x}»</li>)}
+            </ul>
+          ) : PIDE[a.tipo] ? (
+            <p className="text-muted-foreground">{t("hr.paso.dijoAntes", { p: t(PIDE[a.tipo]) })}</p>
+          ) : null}
+          {a.escalado && <p className="text-xs text-warning">{t("hr.paso.escalado")}</p>}
+        </div>
+      )}
+      {ev.hub && claveDeCausaDeEvento(ev.hub) && (
+        <p className="text-muted-foreground">{t(claveDeCausaDeEvento(ev.hub)!)}</p>
+      )}
+      <div className="flex flex-col gap-1.5">
+        <p className="text-xs text-muted-foreground">{t("hr.paso.prueba")}</p>
+        <PruebaDelMomento capturas={capturas} desde={ev.inicio} hasta={ev.aviso?.cerradoAt ?? ev.fin} />
+      </div>
+    </div>
+  );
+}
+
 function diaDelLink(search: string, hoy: string): string {
   const pedido = new URLSearchParams(search).get("dia");
   if (pedido && /^\d{4}-\d{2}-\d{2}$/.test(pedido) && pedido <= hoy) return pedido;

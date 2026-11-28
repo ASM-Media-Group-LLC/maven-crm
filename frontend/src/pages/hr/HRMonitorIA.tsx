@@ -32,20 +32,15 @@ import { estaEnLlamadaDeMaven } from "@/lib/llamadaEnMaven";
 // no espera código que no se ve. El contenido de cada pestaña no cambia.
 const cargarPestanas = {
   ahora: () => Promise.all([import("@/components/hr/ConectadosAhoraPanel"), import("@/components/hr/PantallazosVivoPanel")]),
-  dia: () => Promise.all([import("@/components/hr/ArgosHistorial"), import("@/components/hr/ArgosPanelDia")]),
   llamadas: () => Promise.all([import("@/components/hr/EstadoPanel"), import("@/components/hr/TableroCalidadLlamadas"), import("@/components/hr/LlamadasPanel")]),
-  hub: () => import("@/components/hr/HistorialHubPanel"),
   revision: () => import("@/components/hr/RevisionCasos"),
   ajustes: () => Promise.all([import("@/pages/hr/ArgosAjustes"), import("@/components/hr/ContextoEmpresaPanel")]),
 };
 const ConectadosAhoraPanel = lazy(() => import("@/components/hr/ConectadosAhoraPanel").then((m) => ({ default: m.ConectadosAhoraPanel })));
 const PantallazosVivoPanel = lazy(() => import("@/components/hr/PantallazosVivoPanel").then((m) => ({ default: m.PantallazosVivoPanel })));
-const ArgosHistorial = lazy(() => import("@/components/hr/ArgosHistorial").then((m) => ({ default: m.ArgosHistorial })));
-const ArgosPanelDia = lazy(() => import("@/components/hr/ArgosPanelDia").then((m) => ({ default: m.ArgosPanelDia })));
 const EstadoPanel = lazy(() => import("@/components/hr/EstadoPanel").then((m) => ({ default: m.EstadoPanel })));
 const TableroCalidadLlamadas = lazy(() => import("@/components/hr/TableroCalidadLlamadas").then((m) => ({ default: m.TableroCalidadLlamadas })));
 const LlamadasPanel = lazy(() => import("@/components/hr/LlamadasPanel").then((m) => ({ default: m.LlamadasPanel })));
-const HistorialHubPanel = lazy(() => import("@/components/hr/HistorialHubPanel").then((m) => ({ default: m.HistorialHubPanel })));
 const RevisionCasos = lazy(() => import("@/components/hr/RevisionCasos").then((m) => ({ default: m.RevisionCasos })));
 const ArgosAjustesContenido = lazy(() => import("@/pages/hr/ArgosAjustes").then((m) => ({ default: m.ArgosAjustesContenido })));
 const ContextoEmpresaPanel = lazy(() => import("@/components/hr/ContextoEmpresaPanel").then((m) => ({ default: m.ContextoEmpresaPanel })));
@@ -180,19 +175,24 @@ export default function HRMonitorIA() {
   //   · Historial del Hub (19/11/2026) = qué quitaron los supervisores, cuándo y por qué.
   //   · Turno (25/11/2026) = la tabla del turno: una fila por persona con llegada,
   //     comida, baño, avisos y conexión. Es la que abre Argos.
-  type TabArgos = "turno" | "donde" | "ahora" | "dia" | "llamadas" | "hub" | "revision" | "ajustes";
+  // «Workday» (dia) se quitó el 27/11/2026 (Alvaro: «después de tener Shift, ¿la
+  // necesitamos?»): sus % de pantalla, cámara y foco por turno viven ahora en cada
+  // grupo de Shift. Los enlaces viejos a esa pestaña abren Shift.
+  // «Hub history» (hub) también se quitó el 27/11/2026: lo del Hub de cada supervisor
+  // vive en su detalle de Shift y en «Lo que pasó». Sus enlaces abren Shift.
+  type TabArgos = "turno" | "donde" | "ahora" | "llamadas" | "revision" | "ajustes";
   const [searchParams, setSearchParams] = useSearchParams();
   const VIEJO_A_NUEVO: Record<string, TabArgos> = {
-    turno: "turno", donde: "donde", ahora: "ahora", dia: "dia", llamadas: "llamadas", hub: "hub", revision: "revision", ajustes: "ajustes",
-    equipo: "ahora", envivo: "ahora", panel: "dia", historial: "dia", resumen: "dia", atencion: "ahora",
+    turno: "turno", donde: "donde", ahora: "ahora", dia: "turno", llamadas: "llamadas", hub: "turno", revision: "revision", ajustes: "ajustes",
+    equipo: "ahora", envivo: "ahora", panel: "turno", historial: "turno", resumen: "turno", atencion: "ahora",
   };
   const tabURL = searchParams.get("t");
   // Al entrar a Argos se cae en «Dónde está» (Alvaro, 10/11: «necesito saber
   // dónde está el empleado en todo momento»); antes era «El día» (08/11).
   // Desde el 25/11/2026 abre en «Turno» (Alvaro: «echar el chequeo de los empleados»).
   const solicitada: TabArgos = (tabURL && VIEJO_A_NUEVO[tabURL]) || "turno";
-  const tabPermitida = (k: TabArgos) => k === "ajustes" ? ajustaArgos : k === "dia" ? veExpediente : k === "turno" ? veExpediente || vePresencia : k === "revision" ? true : vePresencia;
-  const tab: TabArgos = tabPermitida(solicitada) ? solicitada : vePresencia || veExpediente ? "turno" : veExpediente ? "dia" : ajustaArgos ? "ajustes" : "revision";
+  const tabPermitida = (k: TabArgos) => k === "ajustes" ? ajustaArgos : k === "turno" ? veExpediente || vePresencia : k === "revision" ? true : vePresencia;
+  const tab: TabArgos = tabPermitida(solicitada) ? solicitada : vePresencia || veExpediente ? "turno" : ajustaArgos ? "ajustes" : "revision";
   const setTab = (k: TabArgos) => setSearchParams((prev) => { const n = new URLSearchParams(prev); n.set("t", k); return n; }, { replace: true });
 
   // Revisión de RR. HH. (19/11/2026): la ve quien tenga alguna función de la
@@ -257,10 +257,8 @@ export default function HRMonitorIA() {
         const tabs: Array<{ k: TabArgos; label: string }> = [
           { k: "turno", label: t("hr.monia.tab.turno") },
           { k: "donde", label: t("hr.monia.tab.donde") },
-          { k: "dia", label: t("hr.monia.tab.dia") },
           { k: "ahora", label: t("hr.monia.tab.ahora") },
           { k: "llamadas", label: t("hr.monia.tab.llamadas") },
-          { k: "hub", label: t("hr.monia.tab.hub") },
           ...(veCasos ? [{ k: "revision" as TabArgos, label: t("hr.monia.tab.revision") }] : []),
           ...(ajustaArgos ? [{ k: "ajustes" as TabArgos, label: t("hr.monia.tab.ajustes") }] : []),
         ];
@@ -303,15 +301,6 @@ export default function HRMonitorIA() {
         </div>
       )}
 
-      {/* EL DÍA — UN SOLO bloque (Alvaro, 08/11): el Historial (turnos → dentro
-          de cada turno su gente, quién está mal de ESE turno). Se quitó el
-          "Panel del día" de abajo que repetía el mismo ranking y se sentía
-          revuelto. Quien no es admin cae al resumen simple. */}
-      {tab === "dia" && (
-        <div className="mt-5 flex flex-col gap-5">
-          {vistaCompleta ? <ArgosHistorial /> : <ArgosPanelDia />}
-        </div>
-      )}
 
       {/* LLAMADAS — a quién se le corta la llamada hoy, por qué, su internet
           medido de verdad y si la cancelación de ruido le corre (13/11/2026). */}
@@ -325,13 +314,6 @@ export default function HRMonitorIA() {
         </div>
       )}
 
-      {/* HISTORIAL DEL HUB — cada vez que un supervisor quitó la pantalla, apagó
-          la cámara o salió del Hub, con la causa: a propósito o falla (19/11/2026). */}
-      {tab === "hub" && (
-        <div className="mt-5">
-          <HistorialHubPanel />
-        </div>
-      )}
 
       {/* REVISIÓN DE RR. HH. — un caso por persona y día: cometió, no cometió o
           justificado, con su frase; y el reporte limpio (19/11/2026). */}

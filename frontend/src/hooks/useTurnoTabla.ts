@@ -65,11 +65,16 @@ export function useTurnoTabla(dia: string, esHoy: boolean, habilitado = true) {
       if (!ids.length) return { dia, filas: [], calculadoAt: Date.now() };
 
       // 2) Nombres, horario de ESE día y tope de comida y baño de cada uno.
-      const [perfiles, horarios, pausasPlan] = await Promise.all([
+      const [perfiles, horarios, pausasPlan, sinCowork] = await Promise.all([
         db.from("profiles").select("id, full_name, deleted_at").in("id", ids),
         cargarHorarios(ids, dia),
         db.rpc("pausas_del_equipo"),
+        // SIN COWORK, SIN HORARIO (Alvaro, 27/11/2026): a quien no debe estar en
+        // Cowork no se le pide horario; su entrada y salida son su primera y última
+        // conexión. Si la función no está, todos se ven como antes.
+        db.rpc("argos_sin_cowork_de", { _ids: ids }),
       ]);
+      const sinHorario = new Set<string>(sinCowork.error ? [] : ((sinCowork.data ?? []) as Array<{ user_id: string }>).map((r) => r.user_id));
       if (perfiles.error) throw new Error(perfiles.error.message);
       const nombres = new Map<string, string>();
       for (const p of (perfiles.data ?? []) as Array<{ id: string; full_name: string | null; deleted_at: string | null }>) {
@@ -92,8 +97,9 @@ export function useTurnoTabla(dia: string, esHoy: boolean, habilitado = true) {
         todas<{ user_id: string; kind: string; started_at: string; ended_at: string | null; auto_closed: boolean | null }>((a, b) =>
           db.from("cowork_breaks").select("user_id, kind, started_at, ended_at, auto_closed")
             .in("user_id", gente).gte("started_at", desde).lt("started_at", hasta).order("started_at").range(a, b)),
-        todas<{ user_id: string; tipo: string; avisado_at: string; escalado_at: string | null; cerrado_at: string | null }>((a, b) =>
-          db.from("argos_nudges").select("user_id, tipo, avisado_at, escalado_at, cerrado_at")
+        // «*»: las frases (27/11/2026) llegan solas cuando la columna exista.
+        todas<{ user_id: string; tipo: string; mensaje: string | null; avisado_at: string; escalado_at: string | null; cerrado_at: string | null; frases?: string[] | null }>((a, b) =>
+          db.from("argos_nudges").select("*")
             .in("user_id", gente).gte("avisado_at", desde).lt("avisado_at", hasta).order("avisado_at").range(a, b)),
         todas<{ user_id: string; inicio: string; fin: string | null; cierre: string | null }>((a, b) =>
           db.from("turno_marcas").select("user_id, inicio, fin, cierre")
@@ -110,7 +116,10 @@ export function useTurnoTabla(dia: string, esHoy: boolean, habilitado = true) {
 
       const filas: FilaTurno[] = [];
       for (const id of gente) {
-        const h = horarios.get(id);
+        const hBase = horarios.get(id);
+        // Sin Cowork y sin horario confirmado: sin turno (no hay tarde, ni «atrás»).
+        const libreDeHorario = sinHorario.has(id) && !hBase?.confirmado;
+        const h = libreDeHorario ? undefined : hBase;
         const pl = plan.get(id);
         const entrada: EntradaPersona = {
           userId: id,
@@ -131,6 +140,8 @@ export function useTurnoTabla(dia: string, esHoy: boolean, habilitado = true) {
           })),
           avisos: (avisosDe.get(id) ?? []).map((n): Aviso => ({
             tipo: n.tipo, at: ms(n.avisado_at), escalado: !!n.escalado_at, cerrado: !!n.cerrado_at,
+            cerradoAt: n.cerrado_at ? ms(n.cerrado_at) : null, mensaje: n.mensaje ?? null,
+            frases: Array.isArray(n.frases) ? n.frases : [],
           })),
           marcas: (marcasDe.get(id) ?? []).map((m): Marca => ({
             inicio: ms(m.inicio), fin: m.fin ? ms(m.fin) : null, cierre: m.cierre,
@@ -138,6 +149,30 @@ export function useTurnoTabla(dia: string, esHoy: boolean, habilitado = true) {
         };
         // Lo de otro día no entra: armarFila mira a cada persona solo dentro de su ventana.
         const fila = armarFila(dia, entrada, ahora);
+        // CONECTADO AHORA, AUNQUE SEA FUERA DE SU VENTANA (Alvaro, 27/11/2026: «hay
+        // gente que está conectada y aquí no aparece»): armarFila solo mira desde 1 h
+        // antes hasta 3 h después del turno; quien sigue conectado mucho después
+        // también cuenta como activo. Se mira su último rato del día y sus pausas abiertas.
+        if (!fila.activoAhora) {
+          const ultimo = entrada.segmentos.length ? entrada.segmentos.reduce((a, b) => (b.inicio > a.inicio ? b : a)) : null;
+          const visto = !!ultimo && ultimo.estado !== "sin_conexion" && ultimo.estado !== "sin_conexion_larga" && ahora - ultimo.fin < 3 * 60_000;
+          const pausaAbierta = entrada.pausas.some((x) => x.fin == null && ahora - x.inicio < 3 * 3_600_000);
+          if (visto || pausaAbierta) {
+            fila.activoAhora = true;
+            // Si llegó fuera de su ventana, su llegada es su primera conexión del día:
+            // nunca «no vino» estando conectado (Daison, 27/11/2026).
+            if (fila.llegada == null) {
+              const primeros = entrada.segmentos.filter((x) => x.estado !== "sin_conexion" && x.estado !== "sin_conexion_larga");
+              if (primeros.length) {
+                fila.llegada = Math.min(...primeros.map((x) => x.inicio));
+                fila.noVino = false;
+                fila.motivos = fila.motivos.filter((m) => m.k !== "noVino");
+                if (fila.nivel === "rojo" && !fila.motivos.length) fila.nivel = "ok";
+              }
+            }
+          }
+        }
+        if (libreDeHorario) fila.sinHorario = true;
         if (apareceEnElDia(fila)) filas.push(fila);
       }
       // Quien «no vino» y tampoco entró a Cowork en los 14 días anteriores va aparte

@@ -87,3 +87,13 @@ describe("tabla del turno", () => {
     expect(minutosTrabajados({ activoMin: 400, sinCamPantMin: 30, graciaMin: 20 })).toBe(420);
   });
 });
+
+describe("el largo del turno", () => {
+  it("un turno de 4 PM a 11:59 PM mide 8 h, no 7 h 59 (27/11/2026)", async () => {
+    const { ventanaTurno } = await import("@/lib/turnoTabla");
+    const v = ventanaTurno("2026-11-27", { entrada: "16:00:00", salida: "23:59:00" });
+    expect(v && (v.fin - v.inicio) / 60_000).toBe(480);
+    const w = ventanaTurno("2026-11-27", { entrada: "16:00:00", salida: "00:00:00" });
+    expect(w && (w.fin - w.inicio) / 60_000).toBe(480);
+  });
+});

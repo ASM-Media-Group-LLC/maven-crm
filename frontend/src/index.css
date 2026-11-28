@@ -1971,3 +1971,8 @@ html.liviano[data-liviano~="oculta"] *::after {
   -webkit-backdrop-filter: none;
   backdrop-filter: none;
 }
+
+/* Con una ventana abierta (foto, detalle…) se esconden la pastilla «Abrir en la
+   app» y «Pendientes»: tapaban la X de cerrar (Alvaro, 28/11/2026). */
+body[data-scroll-locked] [data-abrir-en-app],
+body[data-scroll-locked] [data-pendientes-gestion] { display: none !important; }

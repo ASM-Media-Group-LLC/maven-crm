@@ -279,6 +279,23 @@ const NO_TOCAN_EL_MESSENGER: Record<string, string> = {
     "crea agencia_lineas (con FK a scouter_companies, que este fixture no trae) y le cambia el NOMBRE a una agencia " +
     "(ASM Tech → Kash): el Messenger usa el id de la agencia, nunca el nombre. Los candados sobre tenants (ninguno " +
     "más fuerte que SHARE ROW EXCLUSIVE, que deja leer) los mira su propio banco: agencia_lineas.ts.",
+  "20261127210000_limpieza_posiciones.sql":
+    "Posiciones: limpieza de puestos repetidos. Usa posiciones_borrador y posiciones_borrador_personas, que este " +
+    "fixture no trae; no toca nada del Messenger.",
+  "20261127190845_turnos_de_la_empresa.sql":
+    "Turnos de la empresa (AM/PM/Madrugada): crea turnos_empresa, le suma turno_empresa_id a profiles y turno_id a " +
+    "posiciones_borrador, y rehace horario_de/horarios_del_equipo. Entra a esta cadena por profiles, pero usa " +
+    "posiciones_borrador, el reloj de Cowork y es_admin_o_dueno, que este fixture no trae; no toca nada del Messenger. " +
+    "Se aplicó y comprobó en producción.",
+  "20261127191003_turnos_conflictos.sql":
+    "Turnos de la empresa: avisa a quien tiene varios puestos con turnos distintos. Lee profiles y posiciones_borrador " +
+    "(que este fixture no trae); no toca nada del Messenger.",
+  "20261127191943_argos_comida_fuera_de_hora.sql":
+    "Argos: la comida fuera de su hora. Lee profiles y las tablas del reloj de Cowork, que este fixture no trae; no " +
+    "toca nada del Messenger.",
+  "20261128032503_argos_nudges_frases.sql":
+    "Argos: lo que dijo cada aviso (argos_nudges.frases) y quién no tiene Cowork. Usa argos_nudges y el reloj de " +
+    "Cowork, que este fixture no trae; no toca nada del Messenger.",
 };
 // Si una migración posterior cambia a propósito algo que creó A (el PR 2 suma el
 // esqueleto del nombre visible a profiles_nombre_lo_cambia_un_admin), se anota
