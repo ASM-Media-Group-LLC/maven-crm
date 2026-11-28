@@ -1095,15 +1095,16 @@ function ExpedientePermitido() {
           {/* Stats del día. Pulido: casillas neutras (filo fino, radio 10), la cifra
               en blanco y la etiqueta arriba en gris; lo flojo, solo un puntito. */}
           {pulido ? (
-          // CABECERA CLARA (Alvaro, 27/11/2026: «más estética, que se entienda»): la
+          // CABECERA CLARA (Alvaro, 27/11/2026: «más estética, que se entienda»; 28/11:
+          // «muy grande esa parte»: casillas compactas, 3 por fila en pantalla ancha). La
           // nota grande a la izquierda y seis casillas parejas, cada una con una
           // línea que dice qué significa su número.
           <div className={`mt-4 grid gap-4 ${conVivo ? "lg:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)]" : ""}`}>
-          <div className={`grid gap-3 ${conVivo ? "content-start" : "lg:grid-cols-[13rem_1fr]"}`}>
-            <div className="flex flex-col justify-center rounded-2xl border border-border/60 bg-card/30 p-4">
+          <div className={`grid gap-2.5 ${conVivo ? "content-start" : "lg:grid-cols-[13rem_1fr]"}`}>
+            <div className="flex flex-col justify-center rounded-xl border border-border/60 bg-card/30 px-4 py-3">
               <p className="text-xs font-medium text-muted-foreground">{t("hr.exp.nota")}</p>
               <p className="mt-1 flex items-baseline gap-1.5">
-                <span className="font-display text-5xl font-bold tabular-nums leading-none tracking-tight">{dia.nota.valor ?? "—"}</span>
+                <span className="font-display text-4xl font-bold tabular-nums leading-none tracking-tight">{dia.nota.valor ?? "—"}</span>
                 <span className="text-sm text-muted-foreground">/ 100</span>
               </p>
               {dia.nota.banda && (
@@ -1113,7 +1114,7 @@ function ExpedientePermitido() {
                 </p>
               )}
             </div>
-            <div className={`grid grid-cols-2 gap-3 ${conVivo ? "" : "sm:grid-cols-3"}`}>
+            <div className={`grid grid-cols-2 gap-2.5 ${conVivo ? "xl:grid-cols-3" : "sm:grid-cols-3"}`}>
             {(() => {
               const debia = expediente?.horario.entrada?.slice(0, 5) ?? null;
               // La llegada DEL TURNO (la de Shift) cuando la hay: el primer ingreso del día
@@ -1143,12 +1144,12 @@ function ExpedientePermitido() {
               return casillas.map((x) => (
                 <div key={x.k}
                   {...(x.k === "faltas" && dia.faltas.length > 0 ? { role: "button", tabIndex: 0, onClick: irAFaltas, onKeyDown: (e: TeclaReact<HTMLDivElement>) => { if (e.key === "Enter") irAFaltas(); }, title: t("hr.exp.verFaltas") } : {})}
-                  className={`flex h-full flex-col rounded-2xl border border-border/60 bg-card/30 px-4 py-3 ${x.k === "faltas" && dia.faltas.length > 0 ? "cursor-pointer transition hover:border-border hover:bg-card/50" : ""}`}>
+                  className={`flex h-full flex-col rounded-xl border border-border/60 bg-card/30 px-3.5 py-2.5 ${x.k === "faltas" && dia.faltas.length > 0 ? "cursor-pointer transition hover:border-border hover:bg-card/50" : ""}`}>
                   <p className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
                     {x.punto && <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${x.punto}`} aria-hidden />}{x.etq}
                   </p>
-                  <p className="mt-1.5 font-display text-2xl font-semibold tabular-nums leading-tight text-foreground">{x.v}</p>
-                  <p className="mt-1 text-[11px] leading-snug text-muted-foreground">{x.sub}</p>
+                  <p className="mt-1 font-display text-xl font-semibold tabular-nums leading-tight text-foreground">{x.v}</p>
+                  <p className="mt-0.5 line-clamp-2 text-[11px] leading-snug text-muted-foreground" title={x.sub}>{x.sub}</p>
                 </div>
               ));
             })()}
