@@ -61,18 +61,20 @@ export function AhoraEnVivo({ userId, capturas, junto = false }: { userId: strin
           <h2 className="text-sm font-semibold">{t("hr.exp.cron.ahora")}</h2>
           {/* «En vivo» ya lo dice el video (18/11/2026: «se repite»). */}
           {!vivo && <span className="text-[11px] text-muted-foreground">{motivo}</span>}
-          <Link
+          {/* Con el video ya está su botón de agrandar (Alvaro, 28/11/2026: «es tontera
+              tener 2 veces esa parte»). */}
+          {!(junto && vivo) && <Link
             to={`/hr/en-vivo/${userId}`}
             className="ml-auto inline-flex items-center gap-1.5 rounded-full border border-border/60 px-2.5 py-1 text-[11px] font-medium text-foreground/80 transition-colors hover:bg-foreground/[0.06] hover:text-foreground"
           >
             <Maximize2 className="h-3.5 w-3.5" />{t("hr.exp.vivo.abrirGrande")}
-          </Link>
+          </Link>}
         </div>
 
         {vivo ? (
           // Grande (Alvaro, 18/11/2026: «el live está muy chiquito»): a todo el ancho,
           // hasta casi el alto de la ventana.
-          <div className={`mx-auto w-full overflow-hidden rounded-xl ${junto ? "max-w-[calc(18rem*16/9)]" : "max-w-[calc((100vh-9rem)*16/9)]"}`}>
+          <div className={`mx-auto w-full overflow-hidden rounded-xl ${junto ? "rounded-2xl ring-1 ring-border/40 shadow-lg" : "max-w-[calc((100vh-9rem)*16/9)]"}`}>
             <EscenarioEnVivo
               estado={obs.estado}
               pantalla={obs.pantalla}

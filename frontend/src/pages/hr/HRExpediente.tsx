@@ -1103,7 +1103,7 @@ function ExpedientePermitido() {
           // número; la nota es la primera) que al tocarlas abren su detalle. La
           // nota grande a la izquierda y seis casillas parejas, cada una con una
           // línea que dice qué significa su número.
-          <div className={`mt-4 grid ${conVivo ? "gap-3" : "gap-4"}`}>
+          <div className={`grid ${conVivo ? "mt-5 gap-5" : "mt-4 gap-4"}`}>
           <div className={conVivo ? "contents" : "grid gap-2.5 lg:grid-cols-[13rem_1fr]"}>
             <div className={`flex flex-col justify-center rounded-xl border border-border/60 bg-card/30 px-4 py-3 ${conVivo ? "hidden" : ""}`}>
               <p className="text-xs font-medium text-muted-foreground">{t("hr.exp.nota")}</p>
@@ -1118,7 +1118,7 @@ function ExpedientePermitido() {
                 </p>
               )}
             </div>
-            <div className={conVivo ? "order-2 grid grid-cols-4 gap-2 md:grid-cols-7" : "grid grid-cols-2 gap-2.5 sm:grid-cols-3"}>
+            <div className={conVivo ? "order-2 grid grid-cols-3 overflow-hidden rounded-2xl border border-border/50 bg-card/30 md:grid-cols-7 [&>*]:border-border/40 max-md:[&>*:nth-child(n+2)]:border-t max-md:[&>*:not(:nth-child(3n+1))]:border-l md:[&>*:not(:first-child)]:border-l" : "grid grid-cols-2 gap-2.5 sm:grid-cols-3"}>
             {(() => {
               const debia = expediente?.horario.entrada?.slice(0, 5) ?? null;
               // La llegada DEL TURNO (la de Shift) cuando la hay: el primer ingreso del día
@@ -1145,6 +1145,85 @@ function ExpedientePermitido() {
                 setPestana("dia");
                 setTimeout(() => document.getElementById("faltas-del-dia")?.scrollIntoView({ behavior: "smooth", block: "start" }), 150);
               };
+              // Lo que explica cada casilla al tocarla (Alvaro, 28/11/2026: «descríbeme
+              // bien la situación, si no, eso se mira horrible»).
+              const Fila = ({ a, b, tono }: { a: string; b: string; tono?: string }) => (
+                <div className="flex items-baseline justify-between gap-4 py-1.5 text-sm">
+                  <span className="text-muted-foreground">{a}</span>
+                  <span className={`font-medium tabular-nums ${tono ?? "text-foreground"}`}>{b}</span>
+                </div>
+              );
+              const Nota = ({ children }: { children: ReactNode }) => <p className="mt-3 text-xs leading-relaxed text-muted-foreground">{children}</p>;
+              const salida = expediente?.horario.salida?.slice(0, 5) ?? null;
+              const aMin = (h: string) => Number(h.slice(0, 2)) * 60 + Number(h.slice(3, 5));
+              const durTurno = debia && salida ? ((aMin(salida) - aMin(debia) + 1440) % 1440 || 1440) : null;
+              const detalleDe = (k: string): ReactNode => {
+                if (k === "nota") return <DesgloseNotaContenido dia={dia} atencion={atencion} t={t} compacto />;
+                if (k === "entro") return !debia ? <Nota>{t("hr.exp.pop.sinHorario")}</Nota> : (
+                  <div className="divide-y divide-border/40">
+                    <Fila a={t("hr.exp.pop.debia")} b={a12(debia) ?? debia} />
+                    <Fila a={t("hr.exp.pop.llego")} b={a12(entro) ?? t("hr.exp.pop.noLlego")} />
+                    {entro && <Fila a={t("hr.exp.pop.diferencia")} b={tarde != null && tarde > 5 ? t("hr.exp.pop.tarde", { d: enHoras(tarde) }) : t("hr.exp.pop.aTiempo")} tono={tarde != null && tarde > 5 ? "text-destructive" : "text-success"} />}
+                  </div>
+                );
+                if (k === "horas") return (
+                  <>
+                    <div className="divide-y divide-border/40">
+                      <Fila a={t("hr.exp.pop.conectado")} b={enHoras(dia.horas * 60)} />
+                      {debia && salida && <Fila a={t("hr.exp.pop.turno")} b={`${a12(debia)} – ${a12(salida)}`} />}
+                      {durTurno && <Fila a={t("hr.exp.pop.duracion")} b={enHoras(durTurno)} />}
+                      {durTurno && <Fila a={t("hr.exp.pop.lleva")} b={`${Math.min(100, Math.round((dia.horas * 60 * 100) / durTurno))} %`} />}
+                    </div>
+                    <Nota>{t("hr.exp.pop.horasExpl")}</Nota>
+                  </>
+                );
+                if (k === "foco") return !atencion ? <Nota>{t("hr.exp.pop.focoNada")}</Nota> : (
+                  <>
+                    <div className="divide-y divide-border/40">
+                      <Fila a={t("hr.exp.pop.revisadas")} b={String(atencion.n)} />
+                      <Fila a={t("hr.exp.pop.enLoSuyo")} b={String(atencion.ok)} tono="text-success" />
+                      <Fila a={t("hr.exp.pop.fuera")} b={String(atencion.n - atencion.ok)} tono={atencion.n - atencion.ok > 0 ? "text-destructive" : undefined} />
+                    </div>
+                    <Nota>{t("hr.exp.pop.focoExpl")}</Nota>
+                  </>
+                );
+                if (k === "sinPantalla") return (
+                  <>
+                    <div className="divide-y divide-border/40">
+                      <Fila a={t("hr.exp.pop.sinPantalla")} b={enHoras(sinPantallaMin)} />
+                      <Fila a={t("hr.exp.pop.permitido")} b={enHoras(permitidoMin)} />
+                      {sinPantallaMin <= permitidoMin
+                        ? <Fila a={t("hr.exp.pop.leQueda")} b={enHoras(permitidoMin - sinPantallaMin)} tono="text-success" />
+                        : <Fila a={t("hr.exp.pop.sePaso")} b={enHoras(sinPantallaMin - permitidoMin)} tono="text-destructive" />}
+                    </div>
+                    <Nota>{t("hr.exp.pop.sinPantallaExpl")}</Nota>
+                  </>
+                );
+                if (k === "faltas") {
+                  if (dia.faltas.length === 0) return <Nota>{t("hr.exp.pop.sinFaltas")}</Nota>;
+                  const por = new Map<string, number>();
+                  for (const f of dia.faltas) { const l = LABEL_FALTA[f.tipo as FaltaTipo]; const n = l ? t(l) : f.tipo; por.set(n, (por.get(n) ?? 0) + 1); }
+                  return (
+                    <>
+                      <p className="mb-1 text-xs text-muted-foreground">{t("hr.exp.pop.faltasExpl")}</p>
+                      <div className="divide-y divide-border/40">
+                        {[...por.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5).map(([n, c]) => <Fila key={n} a={n} b={`× ${c}`} />)}
+                      </div>
+                      <button type="button" onClick={irAFaltas}
+                        className="mt-3 inline-flex w-full items-center justify-center gap-1 rounded-full border border-border/60 px-3 py-1.5 text-xs font-medium text-foreground transition hover:bg-foreground/[0.06]">
+                        {t("hr.exp.verFaltas")} <ChevronRight className="h-3.5 w-3.5" />
+                      </button>
+                    </>
+                  );
+                }
+                if (k === "pausas") return (
+                  <>
+                    <Fila a={t("hr.exp.pop.deMas")} b={enHoras(dia.minutosPausaDeMas)} tono={dia.minutosPausaDeMas > 0 ? "text-destructive" : "text-success"} />
+                    <Nota>{t(dia.minutosPausaDeMas > 0 ? "hr.exp.pop.pausasMal" : "hr.exp.pop.pausasBien")}</Nota>
+                  </>
+                );
+                return null;
+              };
               if (conVivo) {
                 // Franja limpia: la nota primero; cada casilla abre su detalle.
                 const nota = { k: "nota", etq: t("hr.exp.nota"), v: dia.nota.valor != null ? String(dia.nota.valor) : "—",
@@ -1154,29 +1233,26 @@ function ExpedientePermitido() {
                   <Popover key={x.k}>
                     <PopoverTrigger asChild>
                       <button type="button"
-                        className="flex min-w-0 flex-col items-start rounded-xl border border-border/60 bg-card/30 px-3 py-2.5 text-left transition hover:border-border hover:bg-card/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50">
-                        <span className="flex w-full items-start gap-1.5 text-[11px] font-medium leading-tight text-muted-foreground">
-                          {x.punto && <span className={`mt-1 h-1.5 w-1.5 shrink-0 rounded-full ${x.punto}`} aria-hidden />}<span className="line-clamp-2">{x.etq}</span>
+                        className={`group flex min-w-0 flex-col items-center gap-1.5 px-2 py-3.5 text-center transition hover:bg-foreground/[0.04] focus-visible:bg-foreground/[0.06] focus-visible:outline-none data-[state=open]:bg-foreground/[0.06] ${x.k === "nota" ? "col-span-3 md:col-span-1" : ""}`}>
+                        <span className="flex items-center gap-1.5 whitespace-nowrap text-[11px] font-medium text-muted-foreground">
+                          {x.punto && <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${x.punto}`} aria-hidden />}
+                          {t(`hr.exp.corto.${x.k}` as TranslationKey)}
                         </span>
-                        <span className="mt-auto flex pt-1 items-baseline gap-1 whitespace-nowrap font-display text-lg font-semibold tabular-nums leading-tight text-foreground">
-                          {x.v}{x.k === "nota" && <span className="text-[11px] font-normal text-muted-foreground">/ 100</span>}
+                        <span className="flex items-baseline gap-1 whitespace-nowrap font-display text-lg font-semibold tabular-nums leading-none text-foreground xl:text-xl">
+                          {x.v}{x.k === "nota" && <span className="text-xs font-normal text-muted-foreground">/ 100</span>}
                         </span>
                       </button>
                     </PopoverTrigger>
-                    <PopoverContent align="start" className="w-64 p-4">
-                      <p className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
-                        {x.punto && <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${x.punto}`} aria-hidden />}{x.etq}
-                      </p>
-                      <p className="mt-1 font-display text-3xl font-semibold tabular-nums leading-tight">
-                        {x.v}{x.k === "nota" && <span className="ml-1 text-sm font-normal text-muted-foreground">/ 100</span>}
-                      </p>
-                      {x.sub && <p className="mt-2 text-sm leading-snug text-muted-foreground">{x.sub}</p>}
-                      {x.k === "faltas" && dia.faltas.length > 0 && (
-                        <button type="button" onClick={irAFaltas}
-                          className="mt-3 inline-flex items-center gap-1 rounded-full border border-border/60 px-3 py-1 text-xs font-medium text-foreground transition hover:bg-foreground/[0.06]">
-                          {t("hr.exp.verFaltas")} <ChevronRight className="h-3.5 w-3.5" />
-                        </button>
-                      )}
+                    <PopoverContent align="start" sideOffset={8} className="w-80 rounded-2xl p-0">
+                      <div className="border-b border-border/50 px-5 pb-4 pt-4">
+                        <p className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+                          {x.punto && <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${x.punto}`} aria-hidden />}{x.etq}
+                        </p>
+                        <p className="mt-1.5 font-display text-3xl font-semibold tabular-nums leading-none">
+                          {x.v}{x.k === "nota" && <span className="ml-1 text-sm font-normal text-muted-foreground">/ 100</span>}
+                        </p>
+                      </div>
+                      <div className="px-5 py-4">{detalleDe(x.k)}</div>
                     </PopoverContent>
                   </Popover>
                 ));

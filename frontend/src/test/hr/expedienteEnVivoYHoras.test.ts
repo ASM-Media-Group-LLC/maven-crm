@@ -33,7 +33,7 @@ describe("arriba, en vivo", () => {
     expect(horas).toBeGreaterThan(vivo);
     expect(cron).toBeGreaterThan(horas);
     expect(s).toContain("!cargando && !error && esHoy;");
-    expect(s).toContain("{conVivo && userId && <AhoraEnVivo");
+    expect(s).toContain("{conVivo && userId && <div className=\"order-1 min-w-0\"><AhoraEnVivo");
     expect(fuente("CronologiaDelDia.tsx")).toContain("const mostrarAhora = false;");
   });
 });
